@@ -11,7 +11,9 @@ namespace SqlSource.Tool.Describing.SqlServer;
 
 /// <summary>
 /// The one thing of the describer that holds the connection's value, and the one place that makes a connection and a
-/// command.  Nothing here runs until a <c>live</c> function asks for it, so a replayed session touches no driver.
+/// command.  Nothing here runs until a <c>live</c> function asks for it, but for the listener on SqlClient's event
+/// source, which is enabled when this is made for a log that keeps anything and only listens: so a replayed session
+/// touches no driver.
 /// </summary>
 /// <remarks>
 /// <para>
