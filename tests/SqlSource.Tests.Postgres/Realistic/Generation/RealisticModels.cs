@@ -7,6 +7,7 @@ using SqlSource.Generation.Models;
 using SqlSource.Settings;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Generation;

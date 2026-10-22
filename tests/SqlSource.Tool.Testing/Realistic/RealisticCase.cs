@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using SqlSource.Snapshot;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
-namespace SqlSource.Tests.Postgres.Realistic;
+namespace SqlSource.Tool.Testing.Realistic;
 
 // Whether a column of a case's result can be NULL, as a person reasoned it from the SQL and schema.sql and never
 // from the describer's output.  Why says how a column that can be NULL comes to be; Exempt says why the seed cannot
@@ -20,13 +19,14 @@ internal sealed record ModelRefusal(string Id, string Why);
 // and why.
 internal sealed record CheckedFrom(int Major, string Why);
 
-// One realistic case: a folder with a query, its truth and its sample values, and the sidecar of its models.  A case
-// refused by the describer has the failure's id and no columns; one whose models the generator refuses says so by
-// Models, and one whose sidecar an earlier major describes otherwise says from which major it is checked by
-// CheckedFrom.  One with a parameter that Dapper cannot send says why by Dapper, which leaves it out of the run
-// through Dapper alone.  A sample set holds a SQL literal for each parameter, by its name without @, compared
+// One realistic case of an engine's corpus: a folder with a query, its truth and its sample values, and the sidecar of
+// its models.  A case refused by the describer has the failure's id and no columns; one whose models the generator
+// refuses says so by Models, and one whose sidecar an earlier major describes otherwise says from which major it is
+// checked by CheckedFrom.  One with a parameter that Dapper cannot send says why by Dapper, which leaves it out of the
+// run through Dapper alone.  A sample set holds a SQL literal for each parameter, by its name without @, compared
 // ignoring case.
 internal sealed record RealisticCase(
+    RealisticEngine Engine,
     string Name,
     string Folder,
     int? MinimumMajor,
@@ -56,14 +56,15 @@ internal sealed record RealisticCase(
     // The files of the case's folder: its query, its truth, and its sidecar when it has models.
     public IReadOnlyList<string> Files => [QueryFile, CaseFile, .. HasModels ? [SidecarFile] : Array.Empty<string>()];
 
-    // Whether the server of that major runs the case: a case may need a later one, MERGE ... RETURNING for one.
+    // Whether the server of that major runs the case: a case may need a later one, as PostgreSQL's MERGE ... RETURNING
+    // does.
     public bool RunsOn(int major) => MinimumMajor is not { } minimum || minimum <= major;
 
     // Skips the test on a server of an earlier major than the case needs.
     public void SkipUnlessRunsOn(int major) =>
         Assert.SkipUnless(
             RunsOn(major),
-            $"{this} needs PostgreSQL {MinimumMajor} or later, and the server is {major}."
+            $"{this} needs {Engine.Product} {MinimumMajor} or later, and the server is {major}."
         );
 
     // Skips the test for a case that the describer refuses, which has no columns, models or entry to check.
@@ -79,7 +80,7 @@ internal sealed record RealisticCase(
     public bool IsReadThroughDapperOn(int major) => HasModels && Dapper is null && RunsOn(major);
 
     // The case as FixtureReplay plans one.
-    public FixtureCase AsFixture => new(SidecarValues.Engine.Postgres, Name, Folder);
+    public FixtureCase AsFixture => new(Engine.Engine, Name, Folder);
 
     // How a failure names a case, by the name of its folder: the one spelling, which the reader uses before it has
     // a case.

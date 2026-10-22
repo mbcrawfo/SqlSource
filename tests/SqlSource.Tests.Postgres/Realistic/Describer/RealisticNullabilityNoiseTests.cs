@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Describer;
@@ -36,27 +37,21 @@ public sealed class RealisticNullabilityNoiseTests(PostgresContainer postgres)
             }
 
             var described = await RealisticDescribe.DescribeOnceAsync(found, postgres.RealisticConnectionString);
-            var columns = RealisticDescribe.ColumnsOf(found, described);
-            count += found.Columns.Where((truth, index) => !truth.Nullable && columns[index].Nullable != false).Count();
+            count += RealisticNoise.CountOf(found, RealisticDescriptions.ColumnsOf(found, described));
         }
 
-        if (count > held)
+        var verdict = RealisticNoise.Verdict(
+            count,
+            held,
+            major,
+            "a change made the describer answer nullable or unknown where it answered not null, and the cases that "
+                + "changed fail RealisticDescriptionTests or are in the diff of their sidecars, query.sql.json; or, in "
+                + $"a change that adds cases, raise the budget of {major} in Budgets to {count} and say why in the "
+                + "commit."
+        );
+        if (verdict is not null)
         {
-            Assert.Fail(
-                $"The noise is {count}, over the budget of {held}: a change made the describer answer nullable or "
-                    + "unknown where it answered not null, and the cases that changed fail RealisticDescriptionTests "
-                    + "or are in the diff of their sidecars, query.sql.json; or, in a change that adds cases, raise "
-                    + $"the budget of {major} in "
-                    + $"Budgets to {count} and say why in the commit."
-            );
-        }
-
-        if (count < held)
-        {
-            Assert.Fail(
-                $"The noise is {count}, under the budget of {held}: lower the budget of {major} in Budgets to "
-                    + $"{count} in this change, so the improvement is kept."
-            );
+            Assert.Fail(verdict);
         }
     }
 }

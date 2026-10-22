@@ -9,6 +9,7 @@ using Shouldly;
 using SqlSource.Testing.Generator;
 using SqlSource.Tests.Postgres.Describer;
 using SqlSource.Tests.Postgres.Realistic.Describer;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
 
@@ -91,7 +92,7 @@ public sealed class RealisticModelRefusalTests(PostgresContainer postgres)
         if (!opened.Succeeded)
         {
             throw new InvalidOperationException(
-                $"No session was opened for the case {found}:\n{RealisticDescribe.RenderFailure(opened.Failure)}"
+                $"No session was opened for the case {found}:\n{RealisticDescriptions.RenderFailure(opened.Failure)}"
             );
         }
 
@@ -102,7 +103,7 @@ public sealed class RealisticModelRefusalTests(PostgresContainer postgres)
         );
         if (!described.Succeeded)
         {
-            Assert.Fail($"{found} was refused:\n{RealisticDescribe.RenderFailure(described.Failure)}");
+            Assert.Fail($"{found} was refused:\n{RealisticDescriptions.RenderFailure(described.Failure)}");
         }
 
         return Sidecars.Of(query, RealisticDescribe.EntryOf(found, session.Server, described.Value));
