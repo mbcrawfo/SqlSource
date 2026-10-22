@@ -25,7 +25,7 @@ Packages go to nuget.org through [trusted publishing](https://learn.microsoft.co
 
 1. Set `VersionPrefix` in `Directory.Build.props` to the version being released.  If that changes it, run `tools/describe-end-to-end.sh` in the same pull request, as step 7 says.
 2. In the same pull request, record the diagnostics the release ships.  Move every entry of `src/SqlSource/AnalyzerReleases.Unshipped.md` to `src/SqlSource/AnalyzerReleases.Shipped.md`, under a new `## Release <version>` heading, keeping the `### New Rules`, `### Removed Rules` and `### Changed Rules` tables as they are.  Leave the unshipped file with its two header lines only.  Skip this when the unshipped file has no entries.  Nothing checks that it was done, and a release that skips it makes the next removal or change of a diagnostic impossible to record correctly.
-3. For the first stable release only, in the same pull request, take the `--prerelease` flags and the sentences that explain them out of `README.md`, `src/SqlSource.Tool/README.md`, `examples/PostgresExamples/README.md` and `docs/manual/` (`git grep -- --prerelease` finds them), and switch the NuGet badge of `README.md` from `nuget/vpre` to `nuget/v` if it should show releases alone.
+3. For the first stable release only, in the same pull request, take the `--prerelease` flags and the sentences that explain them out of `README.md`, `src/SqlSource.Tool/README.md`, `examples/PostgresExamples/README.md`, `examples/SqlServerExamples/README.md` and `docs/manual/` (`git grep -- --prerelease` finds them), and switch the NuGet badge of `README.md` from `nuget/vpre` to `nuget/v` if it should show releases alone.
 4. Merge that to `main`.
 5. Tag the merged commit and push the tag:
 

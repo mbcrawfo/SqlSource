@@ -14,14 +14,14 @@ The rules for changing the example projects, `examples/<Engine>Examples`.
 
 1. **A change to what a user writes, gets or sees updates the examples that show it**, in the same pull request, by rule 4 of the root `AGENTS.md`.  A phase that delivers a feature adds an example of it to each project the feature applies to.
 2. **The sidecars are written by `tools/describe-end-to-end.sh`, never by hand.**  Run it after a change to a query or to a project's `schema.sql`, and read its diff.
-3. **The project sets no `SqlSourceDatabase`.**  Its queries belong to the default logical database, `postgres`, so a run has one database: the README's `SQLSOURCE_CONNECTION` and the connection `postgres=` in `tools/describe-end-to-end.sh` both depend on it.
-4. **`schema.sql` names no owner, role or database.**  The Compose file runs it as its own user in its own database, and the script as `postgres` in a database of its own, and both must give the sidecars the same answer.
-5. **The Compose file's image is the tests' default image**, `DefaultImages.Postgres` of `tests/SqlSource.Testing/DefaultImages.cs`, and moves with it by rule 5 of the root `AGENTS.md`.
-6. **The README lists the versions of Dapper and Npgsql** that `Directory.Packages.props` pins.  A change to either updates it.
-7. **The README's links to the manual are relative.**  It is not a packed readme.
+3. **A project sets no `SqlSourceDatabase`.**  Its queries belong to the default logical database of its dialect, `postgres` or `mssql`, so a run has one database: the README's `SQLSOURCE_CONNECTION` and the connection `postgres=` or `mssql=` in `tools/describe-end-to-end.sh` both depend on it.
+4. **`schema.sql` names no owner, role or database.**  The Compose file and the script each run it in a database of their own, PostgreSQL's Compose file as its own user and the script as `postgres`, SQL Server's both as `sa` in a database `examples`, and both must give the sidecars the same answer.  SQL Server's Compose file applies it from a second service, with `sqlcmd -I` and `-d examples`, only when it creates the database.
+5. **Each Compose file's image is its engine's default image for the tests**, `DefaultImages.Postgres` or `DefaultImages.SqlServer` of `tests/SqlSource.Testing/DefaultImages.cs`, and moves with it by rule 5 of the root `AGENTS.md`.
+6. **Each README lists the versions of Dapper and of its driver**, Npgsql or Microsoft.Data.SqlClient, that `Directory.Packages.props` pins.  A change to one updates the READMEs that list it.
+7. **Each README's links to the manual are relative.**  It is not a packed readme.
 
 ## Adding a database
 
-A new database gets a project of its own, `examples/<Engine>Examples`, by the pattern of `PostgresExamples`: its Compose file and `schema.sql`, the three folders, a README, an entry in `SqlSource.slnx` under `/examples/`, and its sidecars written by the same script.
+A new database gets a project of its own, `examples/<Engine>Examples`, by the pattern of `PostgresExamples` and `SqlServerExamples`: its Compose file and `schema.sql`, the three folders, a README, an entry in `SqlSource.slnx` under `/examples/`, and its sidecars written by the same script.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.
