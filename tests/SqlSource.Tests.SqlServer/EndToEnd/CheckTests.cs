@@ -4,20 +4,24 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Testing.EndToEnd;
+using SqlSource.Tests.SqlServer.Realistic;
 using SqlSource.Tool.Testing;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
-// The sidecars committed beside the end-to-end queries are what the server answers today: "describe --check" on the
-// project, with the real MSBuild and a connection to each database, finds every entry the same as its sidecar's.  The
-// counts it prints are those of the entries the committed sidecars hold for each database.
+// The sidecars committed beside the end-to-end queries and the realistic cases are what the server answers today:
+// "describe --check" on the project, with the real MSBuild and a connection to each database, finds every entry the
+// same as its sidecar's.  The counts it prints are those of the entries the committed sidecars hold for each database.
 [Collection(UsesSqlServer.Name)]
 public sealed class CheckTests(SqlServerContainer sqlServer)
 {
-    // The sidecars under EndToEnd/.
+    // The sidecars under EndToEnd/ and Realistic/Cases/.
     private static IEnumerable<string> Sidecars() =>
-        Directory.EnumerateFiles(RepositoryPaths.EndToEnd, "*.sql.json", SearchOption.AllDirectories);
+        new[] { RepositoryPaths.EndToEnd, RepositoryPaths.RealisticCases }.SelectMany(static folder =>
+            Directory.EnumerateFiles(folder, "*.sql.json", SearchOption.AllDirectories)
+        );
 
     [Fact]
     public async Task Check_Project_EveryEntryIsTheSame()
@@ -25,45 +29,61 @@ public sealed class CheckTests(SqlServerContainer sqlServer)
         var sidecars = Sidecars().ToList();
         var app = CommittedEntries.Count(sidecars, SqlServerContainer.AppDatabase);
         var billing = CommittedEntries.Count(sidecars, SqlServerContainer.BillingDatabase);
+        var realistic = CommittedEntries.Count(sidecars, SqlServerContainer.RealisticDatabase);
         app.ShouldBeGreaterThan(0);
         billing.ShouldBeGreaterThan(0);
+        realistic.ShouldBeGreaterThan(0);
         string[] connections =
         [
             .. Connection(SqlServerContainer.AppDatabase),
             .. Connection(SqlServerContainer.BillingDatabase),
+            .. Connection(SqlServerContainer.RealisticDatabase),
         ];
 
-        if (sqlServer.Major >= 17)
+        var withModels = RealisticCases.All.Where(static found => found.HasModels).ToList();
+        var checkedHere = withModels.Where(found => found.IsCheckedOn(sqlServer.Major)).ToList();
+        if (sqlServer.Major >= 17 && checkedHere.Count == withModels.Count)
         {
             var result = await CheckAsync(connections);
 
             result.ExitCode.ShouldBe(0, result.Error);
             result.Out.ShouldBe(
-                $"app (mssql): {app} same, 0 differ, 0 failed\nbilling (mssql): {billing} same, 0 differ, 0 failed\n"
+                $"app (mssql): {app} same, 0 differ, 0 failed\n"
+                    + $"billing (mssql): {billing} same, 0 differ, 0 failed\n"
+                    + $"realistic (mssql): {realistic} same, 0 differ, 0 failed\n"
             );
             return;
         }
 
-        // A server before major 17 cannot describe NewTypes.sql, whose table is not made there, and a filtered check
-        // compares only what it names, so the run names every other query file of EndToEnd/Queries/ by its path and
-        // none of the 2025-only file.  A "--database" filter would take the file in with the rest of "app".
+        // A server before major 17 cannot describe NewTypes.sql, whose table is not made there, and no server
+        // describes as their sidecars hold the realistic cases that a minimumMajor or a checkedFrom leaves out on it.
+        // A filtered check compares only what it names, so the run names every other query file of EndToEnd/Queries/
+        // and the query.sql of each realistic case that it checks, by their paths.  A "--database" filter would take
+        // the files it leaves out in with the rest.  SQL Server 2017, which CI runs, takes this path: a local run on
+        // the default image does not exercise it.
+        var leavesOutNewTypes = sqlServer.Major < 17;
         var newTypes = CommittedEntries.Count(
             [RepositoryPaths.NewTypesQueries + ".json"],
             SqlServerContainer.AppDatabase
         );
         newTypes.ShouldBeGreaterThan(0);
+        checkedHere.ShouldNotBeEmpty();
         // The named files include Constants.sql, whose only query has no sidecar and counts nothing; NewTypes.sql is
-        // the one file that only 2025 describes.
+        // the one file of EndToEnd/Queries/ that only 2025 describes.
         var named = Directory
             .EnumerateFiles(RepositoryPaths.EndToEndQueries, "*.sql", SearchOption.AllDirectories)
-            .Where(static path => path != RepositoryPaths.NewTypesQueries)
+            .Where(path => !leavesOutNewTypes || path != RepositoryPaths.NewTypesQueries)
             .Order()
+            .Concat(checkedHere.Select(static found => Path.Combine(found.Folder, RealisticCase.QueryFile)))
             .ToList();
         var namedSidecars = named.Select(static path => path + ".json").Where(File.Exists).ToList();
         var checkedApp = CommittedEntries.Count(namedSidecars, SqlServerContainer.AppDatabase);
         var checkedBilling = CommittedEntries.Count(namedSidecars, SqlServerContainer.BillingDatabase);
-        checkedApp.ShouldBe(app - newTypes);
+        var checkedRealistic = CommittedEntries.Count(namedSidecars, SqlServerContainer.RealisticDatabase);
+        checkedApp.ShouldBe(leavesOutNewTypes ? app - newTypes : app);
         checkedBilling.ShouldBe(billing);
+        checkedRealistic.ShouldBe(checkedHere.Count);
+        checkedRealistic.ShouldBeLessThan(realistic);
 
         var floor = await CheckAsync([.. connections, .. named]);
 
@@ -71,6 +91,7 @@ public sealed class CheckTests(SqlServerContainer sqlServer)
         floor.Out.ShouldBe(
             $"app (mssql): {checkedApp} same, 0 differ, 0 failed\n"
                 + $"billing (mssql): {checkedBilling} same, 0 differ, 0 failed\n"
+                + $"realistic (mssql): {checkedRealistic} same, 0 differ, 0 failed\n"
         );
     }
 

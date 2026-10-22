@@ -14,9 +14,10 @@ using Xunit;
 
 namespace SqlSource.Tests.SqlServer.Realistic.Describer;
 
-// Describes a realistic case as a run does, in a session of its own on the database "realistic".  A rule every check
-// of the describer over a case shares is here too, that the server runs the case; that a description has the columns
-// of the truth is RealisticDescriptions' of tests/SqlSource.Tool.Testing.
+// Describes a realistic case as a run does, in a session of its own on the database "realistic", and builds the
+// entry a run writes from what it gave.  A rule every check of the describer over a case shares is here too, that
+// the server runs the case; that a description has the columns of the truth is RealisticDescriptions' of
+// tests/SqlSource.Tool.Testing.
 internal static class RealisticDescribe
 {
     // The description of each case by its name, once in a run: every check describes against the one container of
@@ -51,6 +52,14 @@ internal static class RealisticDescribe
         var (planned, _) = FixtureReplay.Plan(found.AsFixture, TestContext.Current.CancellationToken);
         var query = planned.Query;
         return new DescribeRequest(query.Name, SampleSql.Build(query), query.Parameters);
+    }
+
+    // The entry that a run writes for the case's one query from its description, as tools/describe-end-to-end.sh
+    // wrote the case's sidecar: the query as the plan of a run holds it, on the database "realistic".
+    public static SidecarEntry EntryOf(RealisticCase found, ServerInfo server, QueryDescription description)
+    {
+        var (planned, dialect) = FixtureReplay.Plan(found.AsFixture, TestContext.Current.CancellationToken);
+        return EntryBuilder.Build(planned, dialect, SqlServerContainer.RealisticDatabase, server, description);
     }
 
     // The case's description, described once in a run and kept by the case's name: each check of a case and the
