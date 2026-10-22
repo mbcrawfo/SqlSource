@@ -163,7 +163,7 @@ public sealed class AllTypesQueryTests(SqlServerContainer sqlServer)
     }
 
     // The column of a property of AllTypesDto: SqlVariantValue is sql_variant_value.
-    internal static string ColumnOf(string property) =>
+    private static string ColumnOf(string property) =>
         string.Concat(
             property.Select(
                 static (letter, i) =>

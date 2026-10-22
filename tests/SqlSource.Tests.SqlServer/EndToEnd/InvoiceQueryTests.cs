@@ -53,6 +53,36 @@ public sealed class InvoiceQueryTests(SqlServerContainer sqlServer)
                 },
             }.ToList()
         );
+        invoices
+            .Take(2)
+            .ShouldAllBe(static invoice =>
+                invoice.IssuedOn.Kind == DateTimeKind.Unspecified
+                && invoice.PaidAt!.Value.Kind == DateTimeKind.Unspecified
+            );
+    }
+
+    [Fact]
+    public async Task QuerySingleAsync_GetInvoice_ReadsThePaidInvoice()
+    {
+        await using var connection = EndToEndSources.Billing(sqlServer);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+
+        var invoice = await connection.QuerySingleAsync<GetInvoiceRow>(
+            InvoiceQueries.GetInvoice,
+            new GetInvoiceArgs(1)
+        );
+
+        invoice.ShouldBeEquivalentTo(
+            new GetInvoiceRow
+            {
+                Id = 1,
+                Number = "INV-0001",
+                Amount = 120.50m,
+                PaidAt = new DateTime(2024, 1, 20, 10, 30, 0, DateTimeKind.Unspecified),
+            }
+        );
+        invoice.PaidAt.ShouldBe(new DateTime(2024, 1, 20, 10, 30, 0, DateTimeKind.Unspecified));
+        invoice.PaidAt!.Value.Kind.ShouldBe(DateTimeKind.Unspecified);
     }
 
     [Fact]

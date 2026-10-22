@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
@@ -14,10 +15,11 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 
 // What the Dapper recipe of docs/manual/recipes.md (#models-through-dapper) says for SQL Server beyond the generated
 // queries, on the connection that the recipe sets up: the type each C# parameter is sent as; a DateTime for a
-// datetime2 goes as a TypedParameter, the recipe's sample copied in Types/, or with its DbType in DynamicParameters; a
-// SqlVector<float>, which Dapper refuses, goes as a TypedParameter; a string is written to json as it is; DateOnly,
-// TimeOnly and an alias type mapped to a struct are read through their handlers; a mark in an alias is not matched; and
-// a command on a connection in a transaction is given the transaction.  A test that writes rolls back.
+// datetime2, written or compared, goes as a TypedParameter, the recipe's sample copied in Types/, or with its DbType
+// in DynamicParameters; a SqlVector<float>, which Dapper refuses, goes as a TypedParameter; a string is written to json
+// as it is; DateOnly, TimeOnly and an alias type mapped to a struct are read through their handlers; a mark in an
+// alias is matched neither by a record nor by a class; and a command on a connection in a transaction is given the
+// transaction.  A test that writes rolls back.
 [Collection(UsesSqlServer.Name)]
 public sealed class DapperRecipeTests(SqlServerContainer sqlServer)
 {
@@ -176,6 +178,40 @@ public sealed class DapperRecipeTests(SqlServerContainer sqlServer)
         error.Message.ShouldContain("upper_name!");
     }
 
+    // A class is filled by name, property by property: a column with a mark matches no property, and Dapper leaves the
+    // property as the class made it, without an error.
+    [Fact]
+    public async Task QueryAsync_ColumnWithAMarkIntoAClass_LeavesThePropertyAtItsDefault()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+
+        var names = (await connection.QueryAsync<MarkedNames>(NoteQueries.ListMarkedNames)).ToList();
+
+        names.Count.ShouldBe(3);
+        names.ShouldAllBe(static name => name.Id == MarkedNames.Unset && name.UpperName == nameof(MarkedNames.Unset));
+    }
+
+    // A DateTime compared with a column of datetime2 is sent as datetime, to 1/300 of a second, so it does not find the
+    // row of its value; sent as datetime2, it does.
+    [Fact]
+    public async Task ExecuteScalarAsync_DateTimeComparedWithDatetime2_FindsTheRowOnlyAsDatetime2()
+    {
+        var full = await FullRowAsync();
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        const string Sql = "SELECT COUNT(*) FROM dbo.all_types WHERE datetime2_value = @value";
+
+        var asDatetime = await connection.ExecuteScalarAsync<int>(Sql, new { value = full.Datetime2Value });
+        var asDatetime2 = await connection.ExecuteScalarAsync<int>(
+            Sql,
+            new { value = new TypedParameter(SqlDbType.DateTime2, full.Datetime2Value) }
+        );
+
+        asDatetime.ShouldBe(0);
+        asDatetime2.ShouldBe(1);
+    }
+
     [Fact]
     public async Task QueryAsync_WithoutTheTransactionOfTheConnection_IsRefused()
     {
@@ -236,4 +272,21 @@ public sealed class DapperRecipeTests(SqlServerContainer sqlServer)
     }
 
     private sealed record Overridden(DateOnly OpenedOn, TimeOnly RemindAt, Email Email);
+
+    // The model of ListMarkedNames as a class, which Dapper fills by property, with values that show a property left
+    // as it was made.
+    [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Dapper makes it.")]
+    [SuppressMessage(
+        "Major Code Smell",
+        "S1144:Unused private types or members should be removed",
+        Justification = "Dapper sets a property whose column it matches."
+    )]
+    private sealed class MarkedNames
+    {
+        public const int Unset = -1;
+
+        public int? Id { get; set; } = Unset;
+
+        public string? UpperName { get; set; } = nameof(Unset);
+    }
 }
