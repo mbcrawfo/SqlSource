@@ -15,7 +15,7 @@ public sealed class RealisticNullabilityNoiseTests(SqlServerContainer sqlServer)
 {
     // The budget of each recorded major, by the major.  One is lowered in the change that lowers the noise, as the
     // test below demands, and raised only in a change that adds cases, by how much and why in that commit.
-    private static readonly Dictionary<int, int> Budgets = new() { [14] = 30, [17] = 30 };
+    private static readonly Dictionary<int, int> Budgets = new() { [14] = 39, [17] = 44 };
 
     [Fact]
     public void Budgets_RecordedMajors_EachHoldOneAndNoOtherDoes() =>

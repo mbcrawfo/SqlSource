@@ -128,7 +128,7 @@ If your SQL uses one of these constructs, check the generated SQL: hover over th
 | Database | Dialect | Described today | Page |
 |----|----|----|----|
 | PostgreSQL | `postgres` | Yes | [PostgreSQL](postgresql.md) |
-| SQL Server, Azure SQL | `mssql` | Coming | [SQL Server](sqlserver.md) |
+| SQL Server, Azure SQL | `mssql` | Yes | [SQL Server](sqlserver.md) |
 | MySQL | `mysql` | No | None |
 | MariaDB | `mariadb` | No | None |
 | SQLite | `sqlite` | No | None |
@@ -138,14 +138,7 @@ If your SQL uses one of these constructs, check the generated SQL: hover over th
 
 Every dialect is read, and every `.sql` file gets its constants and token methods whatever its database.  *Described* is something more: the `sqlsource` tool can ask the database about a query's parameters and columns and write the answer to a sidecar.  The tool decides by the dialect of the file, and asks only the databases marked Yes.  A database that merely shares a dialect with one of them, such as DuckDB with `postgres`, is read by that dialect's rules and cannot be described.  The tool still tries to describe a file read as `postgres` whose output is `models` or `codegen`, and the build asks for its entries, so give a DuckDB file the output `sql`: see [the output setting](settings.md#setting-output).
 
-> **Coming in a later release.**  The tool will describe SQL Server queries.  See [what works today](README.md#what-works-today).
-
-A query that must be described and whose dialect cannot be is reported by the tool and by the build:
-
-- **[SQLSRC209](diagnostics.md#sqlsrc209)** for a dialect that has no database to ask: every row marked No.  The default output is `codegen`, so a project that sets neither the dialect nor the output gets it for every file.
-- **[SQLSRC216](diagnostics.md#sqlsrc216)** from the tool for `mssql`, until SQL Server queries can be described, and [SQLSRC241](diagnostics.md#sqlsrc241) in the build, since such a query has no entry in its file's sidecar.
-
-Each goes away when the query's output is `sql`, which asks for the SQL alone and needs no database: see [the output setting](settings.md#setting-output).  The query's constant or method is generated either way.
+A query that must be described and whose dialect has no database to ask, every row marked No, is [SQLSRC209](diagnostics.md#sqlsrc209), from the tool and in the build.  The default output is `codegen`, so a project that sets neither the dialect nor the output gets it for every file.  It goes away when the query's output is `sql`, which asks for the SQL alone and needs no database: see [the output setting](settings.md#setting-output).  The query's constant or method is generated either way.
 
 <a id="known-issues"></a>
 

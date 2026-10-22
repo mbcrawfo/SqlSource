@@ -1,0 +1,32 @@
+{
+  "minimumMajor": 17,
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "sku", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "spec",
+      "nullable": true,
+      "why": "dbo.product_specs.spec is nullable and the left join finds no row; 5's is NULL and 3 has no row"
+    },
+    {
+      "name": "cpu",
+      "nullable": true,
+      "why": "JSON_VALUE of a NULL spec is NULL; product 5's spec is NULL and 3 has none"
+    },
+    {
+      "name": "ram_gb",
+      "nullable": true,
+      "why": "JSON_VALUE of a NULL spec is NULL, and so its CAST; product 5's spec is NULL and 3 has none"
+    },
+    {
+      "name": "ports",
+      "nullable": true,
+      "why": "JSON_QUERY of a missing path is NULL; product 2's spec has no ports, and 5's spec is NULL"
+    }
+  ],
+  "samples": [
+    { "category_id": "NULL" },
+    { "category_id": "3" }
+  ]
+}

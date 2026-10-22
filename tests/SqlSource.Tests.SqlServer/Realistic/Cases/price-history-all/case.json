@@ -1,0 +1,17 @@
+{
+  "columns": [
+    { "name": "product_id", "nullable": false },
+    { "name": "sku", "nullable": false },
+    { "name": "price", "nullable": false },
+    { "name": "valid_from", "nullable": false },
+    {
+      "name": "replaced_at",
+      "nullable": true,
+      "why": "NULLIF is NULL for a current price, whose valid_to is the end of time; every product's current row"
+    }
+  ],
+  "samples": [
+    { "product_id": "NULL" },
+    { "product_id": "1" }
+  ]
+}

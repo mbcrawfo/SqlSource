@@ -1,0 +1,24 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    {
+      "name": "previous_note",
+      "nullable": true,
+      "why": "dbo.orders.note is nullable; order 3, of the first sample, has none before the update"
+    },
+    {
+      "name": "note",
+      "nullable": true,
+      "why": "the update sets note to @note, which the second sample's NULL clears on order 1"
+    },
+    { "name": "row_version", "nullable": false }
+  ],
+  "samples": [
+    {
+      "id": "3",
+      "note": "N'Ring the bell twice'",
+      "version": "(SELECT row_version FROM dbo.orders WHERE id = 3)"
+    },
+    { "id": "1", "note": "NULL", "version": "(SELECT row_version FROM dbo.orders WHERE id = 1)" }
+  ]
+}

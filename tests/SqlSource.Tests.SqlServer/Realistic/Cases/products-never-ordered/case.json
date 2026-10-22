@@ -1,0 +1,20 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "sku", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "category_id",
+      "nullable": true,
+      "why": "dbo.products.category_id is nullable; product 6, the gift card, has none and no order since August"
+    },
+    {
+      "name": "discontinued_at",
+      "nullable": true,
+      "why": "dbo.products.discontinued_at is nullable; products 6 and 7, unordered since August, have none"
+    }
+  ],
+  "samples": [
+    { "since": "'2024-08-01'" }
+  ]
+}

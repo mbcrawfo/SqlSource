@@ -4,6 +4,7 @@ using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Processes;
 using SqlSource.Tool.Testing;
 using Xunit;
@@ -26,7 +27,7 @@ public sealed class ToolHostTests
         host.TempDirectory.ShouldBe(Path.GetTempPath());
         host.ProcessorCount.ShouldBe(Environment.ProcessorCount);
         _ = host.Describers.Find(SqlDialect.PostgreSql).ShouldBeOfType<PostgresDescriber>();
-        host.Describers.Find(SqlDialect.SqlServer).ShouldBeNull();
+        _ = host.Describers.Find(SqlDialect.SqlServer).ShouldBeOfType<SqlServerDescriber>();
         host.Exchange("billing").ShouldBeSameAs(LiveExchange.Instance);
         host.Time.ShouldBeSameAs(TimeProvider.System);
     }

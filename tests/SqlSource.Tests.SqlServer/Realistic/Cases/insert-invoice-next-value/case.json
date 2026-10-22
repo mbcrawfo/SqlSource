@@ -1,0 +1,28 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "number", "nullable": false },
+    { "name": "order_id", "nullable": false },
+    { "name": "issued_at", "nullable": false },
+    {
+      "name": "due_at",
+      "nullable": true,
+      "why": "billing.invoices.due_at is nullable, and DATEADD of a NULL @terms_days is NULL; the first sample's is"
+    },
+    { "name": "amount", "nullable": false },
+    {
+      "name": "tax",
+      "nullable": true,
+      "why": "billing.invoices.tax is nullable, and the total times a NULL @tax_rate is NULL; the first sample's is"
+    },
+    {
+      "name": "voided_at",
+      "nullable": true,
+      "why": "billing.invoices.voided_at is nullable, and the insert sets none, so every new invoice has NULL"
+    }
+  ],
+  "samples": [
+    { "order_id": "14", "issued_at": "'2024-10-12'", "terms_days": "NULL", "tax_rate": "NULL" },
+    { "order_id": "14", "issued_at": "'2024-10-12'", "terms_days": "30", "tax_rate": "0.2000" }
+  ]
+}

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        A project of the dialect mssql, whose queries are of the database "fixtures", the one that
+        tests/SqlSource.Tests.SqlServer makes on its container from Fixtures/Describers/mssql/schema.sql.
+    -->
+    <Import Project="../build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <SqlSourceDialect>mssql</SqlSourceDialect>
+        <SqlSourceDatabase>fixtures</SqlSourceDatabase>
+    </PropertyGroup>
+    <Import Project="../build/SqlSource.targets" />
+</Project>

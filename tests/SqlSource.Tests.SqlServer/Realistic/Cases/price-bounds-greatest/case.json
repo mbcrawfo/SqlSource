@@ -1,0 +1,30 @@
+{
+  "minimumMajor": 16,
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "sku", "nullable": false },
+    { "name": "list_price", "nullable": false },
+    { "name": "current_price", "nullable": false },
+    {
+      "name": "lowest_previous",
+      "nullable": true,
+      "why": "MIN over no history rows is NULL; only products 1 and 5 had their price changed"
+    },
+    {
+      "name": "highest_previous",
+      "nullable": true,
+      "why": "MAX over no history rows is NULL; only products 1 and 5 had their price changed"
+    },
+    { "name": "lowest_price", "nullable": false },
+    { "name": "highest_price", "nullable": false },
+    {
+      "name": "best_discount_pct",
+      "nullable": true,
+      "why": "GREATEST is NULL when every argument is; product 2 has no discount and the first sample no campaign"
+    }
+  ],
+  "samples": [
+    { "campaign_pct": "NULL" },
+    { "campaign_pct": "12.50" }
+  ]
+}

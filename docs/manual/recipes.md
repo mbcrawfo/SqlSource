@@ -16,28 +16,37 @@ Short answers to "how do I...", each a sample you can copy and a link to the pag
 
 ## Read one folder with another dialect
 
-A project of PostgreSQL files keeps its reports for SQL Server in `Reporting/`.  Item metadata gives the folder its own dialect, and its own output, since the tool cannot describe SQL Server queries yet:
+A project of PostgreSQL files keeps its reports for SQL Server in `Reporting/`.  Item metadata gives the folder its own dialect:
 
 ```xml
 <PropertyGroup>
     <SqlSourceDialect>postgres</SqlSourceDialect>
 </PropertyGroup>
 <ItemGroup>
-    <AdditionalFiles Update="Reporting/**/*.sql" SqlSourceDialect="mssql" SqlSourceOutput="sql" />
+    <AdditionalFiles Update="Reporting/**/*.sql" SqlSourceDialect="mssql" />
 </ItemGroup>
 ```
 
-For one file, markers in its file header do the same:
+For one file, a marker in its file header does the same:
 
 ```sql mssql
 -- dialect: mssql
--- output: sql
 
 -- name: MonthlyTotals
 SELECT [month], SUM(total) AS total FROM invoices GROUP BY [month];
 ```
 
-Rules: [configure one folder differently](settings.md#configure-a-folder), [dialect](settings.md#setting-dialect), [which place wins](settings.md#precedence).
+The reports are described against SQL Server, as the database `mssql`, beside the database `postgres` of the other files, so the tool needs a connection for each:
+
+```console
+$ export SQLSOURCE_CONNECTION_POSTGRES="Host=localhost;Database=app;Username=app;Password=secret"
+$ export SQLSOURCE_CONNECTION_MSSQL="Server=localhost,1433;Database=reports;User ID=app;Password=secret;TrustServerCertificate=True"
+$ dotnet sqlsource describe
+```
+
+Add `SqlSourceOutput="sql"` to the metadata, or `-- output: sql` to the file, when the reports want their SQL alone: the tool then leaves them out and needs no connection for them.
+
+Rules: [configure one folder differently](settings.md#configure-a-folder), [dialect](settings.md#setting-dialect), [which place wins](settings.md#precedence), [connections](tool.md#connections).
 
 <a id="leave-migration-scripts-out"></a>
 

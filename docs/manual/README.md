@@ -15,7 +15,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Give a query parameter a type | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | Choose a table name or a clause at run time | [Tokens](parameters-and-tokens.md#tokens), or the [recipe](recipes.md#table-name-at-run-time) |
 | Choose the dialect a file is read by | [Choosing a dialect](dialects.md#choosing-a-dialect) |
-| Use a database other than PostgreSQL | [Database support](dialects.md#database-support) |
+| Use SQL Server, or another database | [SQL Server](sqlserver.md), [database support](dialects.md#database-support) |
 | See what the generator writes, and where it goes | [The generator](generator.md#locations) |
 | Know which models a query gets, what they are named, and what their properties are | [Models](generator.md#models) |
 | Use the queries with Dapper or ADO.NET | [The recipe](recipes.md#dapper-and-adonet) |
@@ -26,9 +26,9 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Keep the sidecars current after a schema change | [After a schema change](tool.md#after-a-schema-change) |
 | Set up CI | [Check in CI](tool.md#check-in-ci), or the [recipe](recipes.md#check-sidecars-in-ci) |
 | Look up a command, an option or an exit code | [The command reference](tool.md#command-reference) |
-| Know what the tool needs of my PostgreSQL database | [PostgreSQL](postgresql.md#connecting) |
-| Know why a column is recorded as possibly null | [Which columns can be null](postgresql.md#nullability) |
-| Know which queries the tool cannot describe | [What can be described](postgresql.md#what-can-be-described) |
+| Know what the tool needs of my database | [PostgreSQL](postgresql.md#connecting), [SQL Server](sqlserver.md#connecting) |
+| Know why a column is recorded as possibly null | Which columns can be null in [PostgreSQL](postgresql.md#nullability) and [SQL Server](sqlserver.md#nullability) |
+| Know which queries the tool cannot describe | What can be described in [PostgreSQL](postgresql.md#what-can-be-described) and [SQL Server](sqlserver.md#what-can-be-described) |
 | Know which C# type a PostgreSQL or SQL Server type gets, or choose another | Types of [PostgreSQL](postgresql.md#type-map) and [SQL Server](sqlserver.md#types), [type overrides](settings.md#setting-type-overrides) |
 | See a whole project that uses SqlSource, with its database | [The PostgreSQL example](../../examples/PostgresExamples/README.md) |
 | Look up a build error or a tool error | [Diagnostics](diagnostics.md) |
@@ -55,8 +55,9 @@ SqlSource is in early development.  This table is the one list of what works in 
 | An error in the build for a query whose sidecar entry is missing or out of date | Available | [Sidecar files](tool.md#sidecar-files), [SQLSRC241](diagnostics.md#sqlsrc241), [SQLSRC244](diagnostics.md#sqlsrc244) |
 | Describing PostgreSQL queries | Available | [PostgreSQL](postgresql.md) |
 | The C# type of each column and parameter of a described PostgreSQL query, and an error in the build for one that has none | Available | [Types](postgresql.md#type-map) |
-| Describing SQL Server queries | Coming ([SQLSRC216](diagnostics.md#sqlsrc216) until then) | [SQL Server](sqlserver.md) |
-| Models for the parameters and rows of a query: their names, namespace, shape, properties and nullability, table models and shared models | Available | [Models](generator.md#models), [PostgreSQL](postgresql.md#models) |
+| Describing SQL Server queries | Available | [SQL Server](sqlserver.md) |
+| The C# type of each column and parameter of a described SQL Server query, and an error in the build for one that has none | Available | [Types](sqlserver.md#types) |
+| Models for the parameters and rows of a query: their names, namespace, shape, properties and nullability, table models and shared models | Available | [Models](generator.md#models), [PostgreSQL](postgresql.md#models), [SQL Server](sqlserver.md#models) |
 | A column's nullability set by `!` or `?` at the end of its alias, or by a `-- column:` marker, which leaves the column's name alone for Dapper | Available | [Which properties can be null](generator.md#model-nullability), [the `-- column:` marker](generator.md#column-marker) |
 | Generated query methods | Coming | [Query methods](generator.md#query-methods) |
 | Library maps for the types of libraries such as NodaTime | Coming | Not documented until it is delivered |

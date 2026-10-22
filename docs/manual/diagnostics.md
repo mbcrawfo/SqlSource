@@ -166,7 +166,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236, and 262 to 266, are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
-The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` dialect, and reports [SQLSRC216](#sqlsrc216) for a query of a dialect it cannot describe yet.
+The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
 The ids from `SQLSRC237` to `SQLSRC245` are reported by the build, about the sidecar of a `.sql` file that a type uses.  A query whose output is `models` or `codegen` needs a current entry in its file's sidecar, which `dotnet sqlsource describe` writes; one whose output is `sql` needs none.  The default output is `codegen`, so under the `postgres` and `mssql` dialects every query needs an entry unless the project, the type or the file sets the output to `sql`.  A query that no entry can be written for gets [SQLSRC209](#sqlsrc209) or [SQLSRC210](#sqlsrc210) instead.  A sidecar that exists is checked even when no query of its file needs an entry.  While a `.sql` file has an error of its own, an id from 101 to 119, it has no queries to check, so the build checks only the sidecar itself, [SQLSRC237](#sqlsrc237) to [SQLSRC240](#sqlsrc240), and reports no entry of it as one that names no query.
 
@@ -913,13 +913,13 @@ See: [Known issues](generator.md#known-issues)
 
 **Output needs a dialect that can be described**
 
-A query whose output is `models` or `codegen` is described by a database, and the dialect the tool can describe today is `postgres`.  The dialect `mssql` passes this check, since describing SQL Server queries comes in a later release, and its queries get [SQLSRC216](#sqlsrc216) from the tool until then, and [SQLSRC241](#sqlsrc241) in the build, since they have no entry in their sidecar.  This file has a query with such an output and another dialect.  The build reports this error, and so does the tool.  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets this error for every file.
+A query whose output is `models` or `codegen` is described by a database, and the dialects the tool can describe are `postgres` and `mssql`.  This file has a query with such an output and another dialect.  The build reports this error, and so does the tool.  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets this error for every file.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC209: The output 'codegen' needs each query described by its database, and the dialect 'ansi' has no database to ask.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.
 ```
 
-For PostgreSQL files, set the dialect: `<SqlSourceDialect>postgres</SqlSourceDialect>` for the project, the metadata of the same name for a file, or `-- dialect: postgres` at the top of the file.  **For SQL Server files, set the output to `sql`**, though the message names `mssql`, which gives SQLSRC216 and SQLSRC241 until SQL Server queries can be described.  For any other database, and for queries that only want their SQL, set the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>`, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types.  Until it is mended, no query of the file is described, and none gets an error about its entry in the sidecar; the file's constants and methods are generated as before.
+For PostgreSQL or SQL Server files, set the dialect: `<SqlSourceDialect>postgres</SqlSourceDialect>` or `<SqlSourceDialect>mssql</SqlSourceDialect>` for the project, the metadata of the same name for a file, or `-- dialect: postgres` at the top of the file.  For any other database, and for queries that only want their SQL, set the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>`, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types.  Until it is mended, no query of the file is described, and none gets an error about its entry in the sidecar; the file's constants and methods are generated as before.
 
 See: [Database support](dialects.md#database-support)
 
@@ -1020,15 +1020,15 @@ See: [Connections](tool.md#connections)
 
 **No describer for the dialect**
 
-The query must be described, and its dialect is `mssql`, which this version of the `sqlsource` tool cannot describe yet: it describes `postgres` alone.  It is not [SQLSRC209](#sqlsrc209), which is about a dialect the tool does not describe, every row marked No in [database support](dialects.md#database-support).
+No dialect of this release gets this error: the tool describes `postgres` and `mssql`, the two dialects that pass [SQLSRC209](#sqlsrc209).  It is kept for a database whose dialect passes that check before the tool can describe it, where it would be reported at each query that the run would have described, and each would count as failed.  A dialect that the tool does not describe at all is SQLSRC209, every row marked No in [database support](dialects.md#database-support).
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC216: This version of sqlsource cannot describe 'mssql'
 ```
 
-Set the output of the queries to `sql`, with an `-- output: sql` marker or `SqlSourceOutput` in the project file, to use their constants and methods without types; the tool then leaves them out.  Describing SQL Server queries comes in a later release, which you take by updating the `SqlSource` package and the tool together, as [SQLSRC206](#sqlsrc206) asks.  The error is reported at each query that the run would have described, and each counts as failed.
+A tool of an earlier release reported it so for `mssql`, which that release could not describe.  Update the tool, together with the `SqlSource` package, as [SQLSRC206](#sqlsrc206) asks.
 
-See: [SQL Server](sqlserver.md)
+See: [Database support](dialects.md#database-support)
 
 ## SQLSRC217
 
@@ -1214,11 +1214,11 @@ For SQL Server, the line starts with `Msg <number>, Level <level>, State <state>
 | `SqlClient cannot read the connection string` | The string is not written as SqlClient wants one: `Server=localhost;Database=app;User ID=app;Password=...`.  It has a keyword that SqlClient does not know or does not support, such as `Network Library` or `Context Connection`, or a value that is not of its keyword's kind or is out of its range, such as a `Connect Timeout` too large |
 | `SqlClient does not accept these settings of the connection string together` | Two settings that SqlClient reads one by one and refuses together, such as `Integrated Security` with an `Authentication` |
 | `the connection string is empty` | The value sets nothing, such as `;` |
-| `the Authentication of the connection string needs both a User ID and a Password` | An `Authentication` of `Sql Password`, `Active Directory Password` or `Active Directory Service Principal` signs in with a user and a password, and the connection string lacks one of them or leaves it empty.  Give both; an `Active Directory` method then needs a provider the tool does not have, the row below, so use a login and a password |
+| `the Authentication of the connection string needs both a User ID and a Password` | An `Authentication` of `Sql Password`, `Active Directory Password` or `Active Directory Service Principal` signs in with a user and a password, and the connection string lacks one of them or leaves it empty.  Give both; an `Active Directory` method then needs a provider the tool does not have, the row below, so use a SQL Server login and its password, or, on Windows, Windows authentication with `Integrated Security=True` |
 | `SqlClient does not support this server on this platform` | The connection string names a server that cannot be used from this operating system: a LocalDB instance, such as `(localdb)\MSSQLLocalDB`, can be used on Windows alone.  Describe against a SQL Server that listens on a port, such as one in a container |
-| `SqlClient has no provider for the Authentication of the connection string` | An `Authentication` of Microsoft Entra ID, `Active Directory ...`, which the tool cannot sign in with.  Use a login and a password |
+| `SqlClient has no provider for the Authentication of the connection string` | An `Authentication` of Microsoft Entra ID, `Active Directory ...`, which the tool cannot sign in with.  Use a SQL Server login and its password, or, on Windows, Windows authentication with `Integrated Security=True` |
 
-See: [Connecting](postgresql.md#connecting), [SQL Server](sqlserver.md)
+See: [Connecting](postgresql.md#connecting), [connecting to SQL Server](sqlserver.md#connecting)
 
 ## SQLSRC225
 
@@ -1330,7 +1330,7 @@ Write `CAST(@p AS int)` where the parameter is used, or `-- param: @p int`.  A p
 
 The same error with no `server:` line is for a parameter used more than once whose uses SQL Server gives different types, or gives one of its uses no type.  The uses that say nothing of the type, such as `@p IS NULL`, are then left out, as [SQLSRC262](#sqlsrc262) says, and this error is given when every use is left out that way, or when a use that is left has no type.  When the uses that are left have two types, the error is [SQLSRC262](#sqlsrc262) instead, and when every use gets the same type, the parameter has that type and no error is given.  The fix is the same: a `CAST` at a use, or a `-- param:` marker.
 
-See: [Parameters](postgresql.md#parameters), [SQL Server](sqlserver.md)
+See: [Parameters](postgresql.md#parameters), [SQL Server parameters](sqlserver.md#parameters)
 
 ## SQLSRC227
 
@@ -1389,7 +1389,7 @@ For SQL Server the error is at the step `resolve type`, and its reasons are thes
 
 Write the type as a column definition would: `int`, `nvarchar(50)`, `varchar(max)`, `decimal(18,2)`, `dbo.Email`, `[billing].[Amount]`.  An alias type needs its schema unless it is in `dbo` or in the default schema of the login.
 
-See: [Parameters](postgresql.md#parameters), [SQL Server](sqlserver.md)
+See: [Parameters](postgresql.md#parameters), [SQL Server parameters](sqlserver.md#parameters)
 
 ## SQLSRC229
 
@@ -1480,7 +1480,7 @@ DECLARE @x int = @n next_message: RECEIVE TOP (1) message_body, @p + 1 AS q FROM
 
 **Fix:** end the list of declarations with a `;`, or give the parameter a `-- param:` marker with its type, `-- param: @p int`, which makes it a parameter for SqlSource too.
 
-See: [What can be described](postgresql.md#what-can-be-described), [SQL Server](sqlserver.md)
+See: [What can be described](postgresql.md#what-can-be-described), [what SQL Server can describe](sqlserver.md#what-can-be-described)
 
 ## SQLSRC232
 
@@ -1559,7 +1559,7 @@ The server that the database's connection string reaches is older than the oldes
 
 Upgrade the server, or point the tool at a database of a supported version, a copy of the schema on a newer server for one.  The error is reported once, at the first query of the database that the run would have described, as [SQLSRC224](#sqlsrc224) is, and each of the database's queries counts as failed.  A version that does not start with a number is not refused, since the tool cannot tell what it is.
 
-See: [Connecting](postgresql.md#connecting), [SQL Server](sqlserver.md)
+See: [Connecting](postgresql.md#connecting), [connecting to SQL Server](sqlserver.md#connecting)
 
 ## SQLSRC236
 
@@ -1667,7 +1667,7 @@ The query's output is `models` or `codegen`, which needs a description of the qu
 /work/App/Queries/Users.sql(1,10): error SQLSRC241: The query 'GetUser' has no entry in the sidecar of its file, and its output 'codegen' needs one.  Run 'sqlsource describe'.
 ```
 
-Run `dotnet sqlsource describe` and commit the sidecar it writes.  Under `mssql`, which this version of the tool cannot describe, set the output to `sql` instead: see [SQLSRC216](#sqlsrc216).  The default output is `codegen`, so a project that only wants each query's SQL as a constant sets the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>` for the project, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a query, however many types use its file, and the query's constant or method is still generated.
+Run `dotnet sqlsource describe` and commit the sidecar it writes.  The default output is `codegen`, so a project that only wants each query's SQL as a constant sets the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>` for the project, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a query, however many types use its file, and the query's constant or method is still generated.
 
 See: [Output](settings.md#setting-output)
 
@@ -2106,7 +2106,7 @@ SQL Server gives a parameter a type at each place the query uses it, and SqlSour
 
 Declare the parameter's type with a `-- param:` marker, `-- param: @p nvarchar(100)`: SQL Server then checks every use against the type you chose.  Or use two parameters, one for each type.  The optional filter, `(@name IS NULL OR name = @name)`, is not this error: its use in `@name IS NULL` fixes no type, and the parameter takes the type of the column.
 
-See: [SQL Server](sqlserver.md)
+See: [SQL Server parameters](sqlserver.md#parameters)
 
 ## SQLSRC263
 
@@ -2141,7 +2141,7 @@ SELECT id, name FROM dbo.users WHERE id = @id;
 
 Paths whose columns differ only in their names are not this error: SQL Server gives such a column no name, which is [SQLSRC266](#sqlsrc266).  Give it one name on every path.
 
-See: [SQL Server](sqlserver.md)
+See: [What SQL Server can describe](sqlserver.md#what-can-be-described)
 
 ## SQLSRC264
 
@@ -2171,7 +2171,7 @@ SELECT id, total FROM dbo.orders WHERE customer_id = @customer_id;
 
 Or `EXEC` a literal string, `EXEC(N'SELECT id, total FROM dbo.orders')`, which SQL Server can read.  A part of the SQL that changes between calls, such as the name of a table, can be a [token](parameters-and-tokens.md#tokens), which the generated method takes as an argument.
 
-See: [SQL Server](sqlserver.md)
+See: [What SQL Server can describe](sqlserver.md#what-can-be-described)
 
 ## SQLSRC265
 
@@ -2206,7 +2206,7 @@ GROUP BY customer_id;
 
 Or declare a table variable in the place of the temporary table, `DECLARE @recent TABLE (customer_id int NOT NULL, total decimal(12,2) NOT NULL)`, whose columns SQL Server reads from its declaration.  A query that reads a temporary table it does not create is [SQLSRC225](#sqlsrc225) instead, with `Msg 208`, `Invalid object name`.
 
-See: [SQL Server](sqlserver.md)
+See: [What SQL Server can describe](sqlserver.md#what-can-be-described)
 
 ## SQLSRC266
 
@@ -2233,7 +2233,7 @@ Give the column an alias, which names its property, then run `dotnet sqlsource d
 SELECT customer_id, COUNT(*) AS order_count FROM dbo.orders GROUP BY customer_id;
 ```
 
-See: [SQL Server](sqlserver.md)
+See: [What SQL Server can describe](sqlserver.md#what-can-be-described)
 
 ## SQLSRC267
 

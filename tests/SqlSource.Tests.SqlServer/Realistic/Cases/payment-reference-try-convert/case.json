@@ -1,0 +1,22 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "invoice_number", "nullable": false },
+    { "name": "paid_at", "nullable": false },
+    { "name": "amount", "nullable": false },
+    { "name": "method", "nullable": false },
+    {
+      "name": "reference",
+      "nullable": true,
+      "why": "billing.payments.reference is nullable; payment 8, a voucher, has none"
+    },
+    {
+      "name": "bank_reference",
+      "nullable": true,
+      "why": "TRY_CONVERT is NULL where int cannot hold the text: card payment 1's, transfer 4's over int, voucher 8's"
+    }
+  ],
+  "samples": [
+    { "from": "'2024-01-01'", "to": "'2025-01-01'" }
+  ]
+}

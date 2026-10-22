@@ -36,7 +36,7 @@ public sealed class DescriberTests
     public void Constructor_TwoDescribersOfOneDialect_Throws() =>
         Should.Throw<ArgumentException>(() => new DescriberRegistry([new FakeDescriber(), new FakeDescriber()]));
 
-    // The registry of the tests' hosts, which has no describer: the released tool's has PostgreSQL's.
+    // The registry of the tests' hosts, which has no describer: the released tool's has PostgreSQL's and SQL Server's.
     [Fact]
     public void Empty_EveryDescribableDialect_HasNoDescriber()
     {

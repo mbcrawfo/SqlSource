@@ -1,0 +1,16 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "email",
+      "nullable": true,
+      "why": "dbo.customers.email is nullable in both branches; Chen, with orders and open cart ...3305, has none"
+    },
+    {
+      "name": "time_zone",
+      "nullable": true,
+      "why": "dbo.customers.time_zone is nullable in both branches; Chen, with orders and cart ...3305, has none"
+    }
+  ]
+}

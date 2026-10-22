@@ -45,12 +45,7 @@ TRUNCATE TABLE audit_log;
 
 `describe` finds the `.sql` files that a type with `[SqlSourceGenerate]` claims, in the projects it runs on, and describes each query whose [output](settings.md#setting-output) is `models` or `codegen`.  `codegen` is the default, so `GetUser` above is described.  `ResetAuditLog` asks for its SQL alone, and the tool leaves it out: it needs no database and no connection.
 
-A query is described through its [dialect](concepts.md#dialect).  The tool can ask PostgreSQL today, which is the dialect `postgres`; the [database support table](dialects.md#database-support) lists every dialect.  A query that must be described and whose dialect cannot be is reported by the tool, and by the build:
-
-- A file of a dialect the tool does not describe, every row marked No in [database support](dialects.md#database-support), such as `ansi`, `mysql` or `sqlite`, is [SQLSRC209](diagnostics.md#sqlsrc209).  The default dialect is `ansi`, so a project that sets neither the dialect nor the output gets it for every file.
-- A file of `mssql` passes that check, since SQL Server queries will be described, and each of its queries that must be described is [SQLSRC216](diagnostics.md#sqlsrc216) until then.  The build reports each such query as [SQLSRC241](diagnostics.md#sqlsrc241), since it has no entry in its file's sidecar.  See [SQL Server](sqlserver.md).
-
-Either way, set the output of those queries to `sql`, as [the output setting](settings.md#setting-output) says; for SQL Server files too, though SQLSRC209's message also names `mssql`.  For SQLSRC209 you can instead set the dialect, when the files are PostgreSQL.
+A query is described through its [dialect](concepts.md#dialect).  The tool can ask PostgreSQL, which is the dialect `postgres`, and SQL Server, which is `mssql`; the [database support table](dialects.md#database-support) lists every dialect.  A query that must be described and whose dialect cannot be, every row marked No in [database support](dialects.md#database-support), such as `ansi`, `mysql` or `sqlite`, is [SQLSRC209](diagnostics.md#sqlsrc209), from the tool and in the build.  The default dialect is `ansi`, so a project that sets neither the dialect nor the output gets it for every file.  Set the output of those queries to `sql`, as [the output setting](settings.md#setting-output) says, or set the dialect, when the files are PostgreSQL or SQL Server.
 
 The tool reads `[SqlSourceGenerate]` from your C# source without compiling it, which limits how `Path` and `Output` can be written there: see [the generator's known issues](generator.md#known-issues).
 
@@ -83,7 +78,7 @@ A connection is given in one of three ways.  The first that gives one wins:
 - **A database that needs nothing described needs no connection.**  When every query of a database has a current sidecar entry, the tool asks the database nothing, and without a connection its summary line says `no connection`.  `--force` and `--check` describe every query, so every database of the run needs one then.
 - **A database with a query to describe and no connection** is [SQLSRC213](diagnostics.md#sqlsrc213).  Its `help:` line names the option and the variable to set, and lists any `--connection` names that matched no database of the run but are close to one, so that a misspelt name is seen.  A name that is far from every database is counted by the position of its value on the command line and never printed, since it may be a connection string typed without its name.
 
-The tool keeps connection strings to itself as far as it can.  In what it prints or writes to a [log](#logs), it writes `***` in the place of the whole value of a connection wherever it finds it, and of each password of the connection string where it stands apart from other letters, digits and underscores.  It refuses to write a connection's value into a sidecar.  When a database cannot be opened, the error says what went wrong in the tool's own words and names neither the host nor the user.  A short password or a changed value, or a connection string typed in the wrong place on the command line, can still appear: see [known issues](#known-issues).  The tool also takes the connection variables out of the environment of the `dotnet msbuild` it runs to read your projects.  The connection string itself is the database's own: for PostgreSQL, see [connecting](postgresql.md#connecting).
+The tool keeps connection strings to itself as far as it can.  In what it prints or writes to a [log](#logs), it writes `***` in the place of the whole value of a connection wherever it finds it, and of each password of the connection string where it stands apart from other letters, digits and underscores.  It refuses to write a connection's value into a sidecar.  When a database cannot be opened, the error says what went wrong in the tool's own words and names neither the host nor the user.  A short password or a changed value, or a connection string typed in the wrong place on the command line, can still appear: see [known issues](#known-issues).  The tool also takes the connection variables out of the environment of the `dotnet msbuild` it runs to read your projects.  The connection string itself is the database's own: see connecting to [PostgreSQL](postgresql.md#connecting) and to [SQL Server](sqlserver.md#connecting).
 
 <a id="sidecar-files"></a>
 
@@ -301,7 +296,7 @@ $ dotnet sqlsource describe --log sqlsource.log
 - the version of the tool, of .NET and of the operating system, and the rest of your command line;
 - the paths of your projects and files, and the names of your queries and databases;
 - the SQL of your queries as the tool sent it to the database, and what the server answered, its errors and warnings included;
-- for a database that could not be opened, what went wrong, in the tool's own words and with the server's SQLSTATE, which names neither its host nor its user;
+- for a database that could not be opened, what went wrong, in the tool's own words and with the server's SQLSTATE, or SQL Server's error number, which names neither its host nor its user;
 - each error, and how the run ended.
 
 <a id="requirements"></a>
@@ -311,7 +306,7 @@ $ dotnet sqlsource describe --log sqlsource.log
 - **The .NET SDK**, and not only a runtime.  The tool asks MSBuild about your projects through `dotnet msbuild`.  It runs on .NET 8 or later.
 - **Restored projects.**  The tool does not restore: run `dotnet restore` first ([SQLSRC220](diagnostics.md#sqlsrc220)).
 - **The same version as the `SqlSource` package** of your projects ([SQLSRC206](diagnostics.md#sqlsrc206)).
-- **A database the tool can reach**, of a version it supports, for each logical database with a query to describe.  See [PostgreSQL](postgresql.md#connecting).
+- **A database the tool can reach**, of a version it supports, for each logical database with a query to describe.  See [PostgreSQL](postgresql.md#connecting) and [SQL Server](sqlserver.md#connecting).
 
 <a id="known-issues"></a>
 

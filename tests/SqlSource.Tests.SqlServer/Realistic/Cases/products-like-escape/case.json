@@ -1,0 +1,28 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "sku", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "category_id",
+      "nullable": true,
+      "why": "dbo.products.category_id is nullable; product 6, the gift card, has none"
+    },
+    { "name": "list_price", "nullable": false },
+    {
+      "name": "discount_pct",
+      "nullable": true,
+      "why": "dbo.products.discount_pct is nullable; products 2, 4, 6 and 7 have none"
+    },
+    {
+      "name": "discontinued_at",
+      "nullable": true,
+      "why": "dbo.products.discontinued_at is nullable; every product but 4 is still sold"
+    }
+  ],
+  "samples": [
+    { "pattern": "N'%'" },
+    { "pattern": "N'%\\_%'" },
+    { "pattern": "N'ACC-00%'" }
+  ]
+}

@@ -15,6 +15,28 @@
         <PackageReference Include="xunit.v3" />
     </ItemGroup>
     <ItemGroup>
+        <!--
+            The fixture project SqlServer, with the package's MSBuild files and the repository's global.json beside
+            it, in the output where FixtureProjects of tests/SqlSource.Tool.Testing copies it from.
+        -->
+        <None
+            Include="../SqlSource.Tool.Tests/Fixtures/Projects/SqlServer/**"
+            Link="Fixtures/Projects/SqlServer/%(RecursiveDir)%(Filename)%(Extension)"
+            CopyToOutputDirectory="PreserveNewest"
+        />
+        <None
+            Include="../../src/SqlSource/build/SqlSource.props"
+            Link="Fixtures/build/SqlSource.props"
+            CopyToOutputDirectory="PreserveNewest"
+        />
+        <None
+            Include="../../src/SqlSource/build/SqlSource.targets"
+            Link="Fixtures/build/SqlSource.targets"
+            CopyToOutputDirectory="PreserveNewest"
+        />
+        <None Include="../../global.json" Link="Fixtures/global.json" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+    <ItemGroup>
         <ProjectReference
             Include="../../src/SqlSource/SqlSource.csproj"
             OutputItemType="Analyzer"

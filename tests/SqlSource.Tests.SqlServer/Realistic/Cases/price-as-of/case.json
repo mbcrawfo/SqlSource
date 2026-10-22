@@ -1,0 +1,23 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "sku", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "list_price", "nullable": false },
+    {
+      "name": "price",
+      "nullable": true,
+      "why": "the left join finds no price as of a time before the price list was made, as the second sample's"
+    },
+    {
+      "name": "price_since",
+      "nullable": true,
+      "why": "the left join finds no price as of a time before the price list was made, as the second sample's"
+    },
+    { "name": "effective_price", "nullable": false }
+  ],
+  "samples": [
+    { "at": "SYSUTCDATETIME()" },
+    { "at": "'2020-01-01'" }
+  ]
+}

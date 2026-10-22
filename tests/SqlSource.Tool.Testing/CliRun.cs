@@ -29,8 +29,12 @@ internal sealed class CliRun : IDisposable
     // does not use it: it starts the real "dotnet".
     public FakeProcessRunner Processes { get; } = new();
 
-    // The describers of the run.  None unless a test adds one, where the released tool has PostgreSQL's.
+    // The describers of the run.  None unless a test adds one, where the released tool has PostgreSQL's and SQL
+    // Server's.
     public List<IQueryDescriber> Describers { get; } = [];
+
+    // Set for a run with the describers of the released tool, those of ToolHost.Create, in place of Describers.
+    public bool ReleasedDescribers { get; set; }
 
     public CliRun()
         : this(null) { }
@@ -113,7 +117,7 @@ internal sealed class CliRun : IDisposable
         {
             Out = Out ?? output,
             Error = error,
-            Describers = new DescriberRegistry(Describers),
+            Describers = ReleasedDescribers ? ToolHost.Create().Describers : new DescriberRegistry(Describers),
             Exchange = _ => Exchange,
             Time = Time,
             CreateFile = CreateFile ?? ToolHost.NewFile,

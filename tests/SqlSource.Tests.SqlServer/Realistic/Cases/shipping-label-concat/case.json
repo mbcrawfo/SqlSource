@@ -1,0 +1,21 @@
+{
+  "columns": [
+    { "name": "order_id", "nullable": false },
+    { "name": "label", "nullable": false },
+    {
+      "name": "address_line",
+      "nullable": true,
+      "why": "+ yields NULL when ship_name or ship_city is; pending draft order 15 has neither, shipped 10 no city"
+    },
+    { "name": "contact", "nullable": false },
+    {
+      "name": "attention",
+      "nullable": true,
+      "why": "+ yields NULL when dbo.customers.company is NULL; Ben, of pending order 14, has no company"
+    }
+  ],
+  "samples": [
+    { "status": "'pending'" },
+    { "status": "'shipped'" }
+  ]
+}

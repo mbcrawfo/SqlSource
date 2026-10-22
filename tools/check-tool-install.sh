@@ -2,9 +2,9 @@
 # Installs the packed sqlsource tool the way a user does, into an empty folder outside the repository, and runs it.
 # A tool carries everything it loads, so only a run of the packed tool shows that all of it is there and loads, and
 # that a tool built for .NET 8 starts on a machine whose only runtime is a later one.
-# No run here opens a database, so what a driver loads only when it connects, Microsoft.Data.SqlClient's copy for the
-# platform under runtimes/ and its native SNI on Windows, is shown to be in the package by tools/check-package.sh and
-# not shown to load.
+# A describer loads its driver only when it connects, so one run connects through Microsoft.Data.SqlClient to a port
+# that refuses, which loads SqlClient's copy for the platform under runtimes/.  Its native SNI, which only Windows
+# loads, is shown to be in the package by tools/check-package.sh and not shown to load.
 # It restores from the folder that holds the package and from nowhere else.
 # Usage: check-tool-install.sh [directory]   The directory holds one SqlSource.Tool.<version>.nupkg.  Without it, the
 # package is packed into a temporary directory first.
@@ -127,10 +127,48 @@ if [[ "$code" -ne 1 ]] || [[ -s "$work/describe.out" ]] ||
     exit 1
 fi
 
+# A project of one mssql query, and a connection to the port 1 of this machine, which refuses at once.  The tool loads
+# SqlClient to connect, and its copy for the platform must be the one it loads: the copy outside runtimes/ throws
+# PlatformNotSupportedException at the first use, which the tool reports as SQLSRC224 with another text.  The project
+# imports SqlSource.props and .targets, copied from src/SqlSource/build/ with the repository's global.json beside it,
+# and is never restored.
+mssql="$work/mssql"
+mkdir -p "$mssql/build" "$mssql/App"
+cp "$repo_root/global.json" "$mssql/"
+cp "$repo_root/src/SqlSource/build/SqlSource.props" "$repo_root/src/SqlSource/build/SqlSource.targets" "$mssql/build/"
+cat >"$mssql/App/App.csproj" <<'PROJECT'
+<Project Sdk="Microsoft.NET.Sdk">
+    <Import Project="../build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <SqlSourceDialect>mssql</SqlSourceDialect>
+        <SqlSourceDatabase>orders</SqlSourceDatabase>
+    </PropertyGroup>
+    <Import Project="../build/SqlSource.targets" />
+</Project>
+PROJECT
+printf -- '-- name: GetOrders\nSELECT 1 AS one;\n' >"$mssql/App/Orders.sql"
+printf '[SqlSource.SqlSourceGenerate]\ninternal static partial class Queries;\n' >"$mssql/App/Queries.cs"
+cd "$mssql"
+code=0
+"$tool" describe App/App.csproj --connection 'orders=Data Source=127.0.0.1,1;Connect Timeout=5;Encrypt=False' \
+    >"$work/mssql.out" 2>"$work/mssql.err" || code=$?
+summary='orders (mssql): 0 described, 0 skipped, 1 failed'
+if [[ "$code" -ne 1 ]] || ! grep --quiet --fixed-strings "$summary" "$work/mssql.out" ||
+    ! grep --quiet ': error SQLSRC224: ' "$work/mssql.err" ||
+    ! grep --quiet --fixed-strings 'SqlClient could not reach the server' "$work/mssql.err" ||
+    grep --quiet 'SQLSRC200' "$work/mssql.err"; then
+    cat "$work/mssql.out" "$work/mssql.err" >&2
+    echo "check-tool-install: $COMMAND describe of an mssql query exited with $code, and not with 1 and SQLSRC224" >&2
+    echo "check-tool-install: that says SqlClient could not reach the server: SqlClient's copy did not load" >&2
+    exit 1
+fi
+
 # A machine that has a .NET 8 runtime ran the tool on it above.  This run takes the newest runtime the machine has,
 # which is what a machine without .NET 8 does by the RollForward of the project.
 export DOTNET_ROLL_FORWARD=LatestMajor
 check_version 'on the newest runtime'
 
 echo "check-tool-install: $package installs as a tool, and $COMMAND runs: --version, --help, and describe, which"
-echo "check-tool-install: reports SQLSRC201 in an empty folder.  It runs on the newest runtime as well."
+echo "check-tool-install: reports SQLSRC201 in an empty folder, and SQLSRC224 through SqlClient for an mssql query"
+echo "check-tool-install: whose server refuses.  It runs on the newest runtime as well."

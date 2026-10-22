@@ -7,7 +7,7 @@
 -- Each nullable path of the schema is held by a row:
 --   Ana (1)      every contact field set; orders 1, 2, 6, 13 and 15; a cart she has not checked out
 --   Ben (2)      no company; orders 3, 4, 8, 11 and 14; a cart that became order 8
---   Chen (3)     suspended; no email and no time zone; orders 5, cancelled, and 10
+--   Chen (3)     suspended; no email and no time zone; orders 5, cancelled, and 10; an open cart
 --   Dana (4)     closed, with closed_at; no phone and no company; order 7
 --   Eli (5)      no phone; no order and no cart
 --   Fatima (6)   no email, phone, company or time zone; no order, and a cart with no items
@@ -182,12 +182,14 @@ INSERT INTO dbo.prices (product_id, price) VALUES
     (8, 59.00);
 
 -- Cart ...3301 is Ana's, not checked out.  ...3302 is Ben's, checked out as order 8.  ...3303 is a guest's, with no
--- customer, and ...3304 is Fatima's, with no items.
+-- customer, and ...3304 is Fatima's, with no items.  ...3305 is Chen's, left open with no items, so a customer with
+-- orders and an open cart has no email and no time zone.
 INSERT INTO dbo.carts (id, customer_id, created_at, checked_out_at) VALUES
     ('3F2504E0-4F89-41D3-9A0C-0305E82C3301', 1, '2024-10-15 08:00:00', NULL),
     ('3F2504E0-4F89-41D3-9A0C-0305E82C3302', 2, '2024-07-11 17:40:00', '2024-07-11 17:55:00'),
     ('3F2504E0-4F89-41D3-9A0C-0305E82C3303', NULL, '2024-10-18 22:10:00', NULL),
-    ('3F2504E0-4F89-41D3-9A0C-0305E82C3304', 6, '2024-10-19 13:00:00', NULL);
+    ('3F2504E0-4F89-41D3-9A0C-0305E82C3304', 6, '2024-10-19 13:00:00', NULL),
+    ('3F2504E0-4F89-41D3-9A0C-0305E82C3305', 3, '2024-09-20 15:30:00', NULL);
 
 INSERT INTO dbo.cart_items (cart_id, product_id, quantity, added_at) VALUES
     ('3F2504E0-4F89-41D3-9A0C-0305E82C3301', 7, 1, '2024-10-15 08:01:00'),
