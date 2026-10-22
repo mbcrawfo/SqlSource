@@ -30,7 +30,7 @@ Moving a tag is a change of its own: change the tag and its row of `ImageBuilds`
 
 ## The fixtures
 
-The fixture schema is `tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql/schema.sql`: tables of `dbo` and of a schema `billing`, an identity, a default, a `rowversion`, a computed and a persisted computed column, an alias type and a table type, a view over an outer join, a table with an `AFTER` trigger, a system-versioned table whose period columns are hidden, the table `dbo.victim`, which a test that proves a text runs nothing looks for afterwards, and `dbo.all_types`, with one `NOT NULL` column of every type that SQL Server 2017 and 2025 share.  The describer's fixture cases are in the folders beside it.
+The fixture schema is `tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql/schema.sql`: tables of `dbo` and of a schema `billing`, an identity, a default, a `rowversion`, a computed and a persisted computed column, an alias type, one named by a keyword, `dbo.[User]`, with the table `dbo.accounts` of a column of it, and a table type, a view over an outer join, an inline and a multi-statement table-valued function, a table with an `AFTER` trigger, a system-versioned table whose period columns are hidden, the table `dbo.victim`, which a test that proves a text runs nothing looks for afterwards, and `dbo.all_types`, with one `NOT NULL` column of every type that SQL Server 2017 and 2025 share.  The describer's fixture cases are in the folders beside it.
 
 ### The describer's fixtures
 

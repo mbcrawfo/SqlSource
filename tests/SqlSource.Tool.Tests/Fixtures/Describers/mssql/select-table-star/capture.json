@@ -68,7 +68,8 @@
             "sourceTable": "users",
             "sourceColumn": "id",
             "isIdentityColumn": true,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -88,7 +89,8 @@
             "sourceTable": "users",
             "sourceColumn": "name",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -108,7 +110,8 @@
             "sourceTable": "users",
             "sourceColumn": "email",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -128,7 +131,8 @@
             "sourceTable": "users",
             "sourceColumn": "nickname",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -148,7 +152,8 @@
             "sourceTable": "users",
             "sourceColumn": "credit",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -168,7 +173,8 @@
             "sourceTable": "users",
             "sourceColumn": "created_at",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -188,7 +194,8 @@
             "sourceTable": "users",
             "sourceColumn": "deleted_at",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -208,7 +215,8 @@
             "sourceTable": "users",
             "sourceColumn": "name_len",
             "isIdentityColumn": false,
-            "isComputedColumn": true
+            "isComputedColumn": true,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -228,7 +236,8 @@
             "sourceTable": "users",
             "sourceColumn": "name_len_p",
             "isIdentityColumn": false,
-            "isComputedColumn": true
+            "isComputedColumn": true,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -248,7 +257,8 @@
             "sourceTable": "users",
             "sourceColumn": "rv",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": true,
@@ -268,7 +278,8 @@
             "sourceTable": null,
             "sourceColumn": null,
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": null
           }
         ],
         "errors": null,
@@ -301,7 +312,8 @@
             "sourceTable": "users",
             "sourceColumn": "id",
             "isIdentityColumn": true,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -321,7 +333,8 @@
             "sourceTable": "users",
             "sourceColumn": "name",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -341,7 +354,8 @@
             "sourceTable": "users",
             "sourceColumn": "email",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -361,7 +375,8 @@
             "sourceTable": "users",
             "sourceColumn": "nickname",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -381,7 +396,8 @@
             "sourceTable": "users",
             "sourceColumn": "credit",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -401,7 +417,8 @@
             "sourceTable": "users",
             "sourceColumn": "created_at",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -421,7 +438,8 @@
             "sourceTable": "users",
             "sourceColumn": "deleted_at",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -441,7 +459,8 @@
             "sourceTable": "users",
             "sourceColumn": "name_len",
             "isIdentityColumn": false,
-            "isComputedColumn": true
+            "isComputedColumn": true,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -461,7 +480,8 @@
             "sourceTable": "users",
             "sourceColumn": "name_len_p",
             "isIdentityColumn": false,
-            "isComputedColumn": true
+            "isComputedColumn": true,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -481,7 +501,8 @@
             "sourceTable": "users",
             "sourceColumn": "rv",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": true,
@@ -501,7 +522,8 @@
             "sourceTable": null,
             "sourceColumn": null,
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": null
           }
         ],
         "errors": null,

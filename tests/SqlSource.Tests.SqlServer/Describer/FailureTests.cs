@@ -106,6 +106,32 @@ public sealed class FailureTests(SqlServerContainer sqlServer)
         columns.Errors.ShouldNotBeNull().Select(static error => error.Number).ShouldBe([334, 11501]);
     }
 
+    // "parameters" takes an EXEC with no argument of a procedure the database lacks, and "columns" answers 2812 and
+    // 11529 as rows of no type that gives a cause: the lines are those rows, at the step of "columns".
+    [Fact]
+    public async Task DescribeAsync_ExecOfAMissingProcedure_IsSqlsrc225AtDescribeColumns()
+    {
+        var failure = await ShouldFailAsync(Of(SqlDialectRules.SqlServer, "EXEC dbo.sqlsrc_missing"), "SQLSRC225");
+
+        failure.Step.ShouldBe(DescribeStep.DescribeColumns);
+        failure.ServerLines.Count.ShouldBe(2);
+        failure.ServerLines[0].ShouldStartWith("Msg 2812: ");
+        failure.ServerLines[1].ShouldStartWith("Msg 11529: ");
+    }
+
+    // A misspelt keyword is read as a call of a procedure that the database lacks, and "parameters" refuses it with
+    // 2812 and 11501, which the "columns" asked after gives no cause for.
+    [Fact]
+    public async Task DescribeAsync_MisspeltKeyword_IsSqlsrc225AtDescribeParametersEndingWith11501()
+    {
+        var failure = await ShouldFailAsync(Of(SqlDialectRules.SqlServer, "SELEC 1"), "SQLSRC225");
+
+        failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+        failure.ServerLines.Count.ShouldBe(2);
+        failure.ServerLines[0].ShouldStartWith("Msg 2812, ");
+        failure.ServerLines[1].ShouldStartWith("Msg 11501, ");
+    }
+
     private async Task<DescribeFailure> ShouldFailAsync(DescribeRequest request, string id)
     {
         var described = await Sessions.DescribeAsync(sqlServer.ConnectionString, request);

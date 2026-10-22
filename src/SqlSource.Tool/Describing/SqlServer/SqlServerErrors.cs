@@ -320,7 +320,7 @@ internal static class SqlServerErrors
 
     /// <summary>
     /// <c>SQLSRC262</c>: the copies of a reused parameter that constrain its type have two types, the first two in
-    /// order of use, each named as a declaration would write it (<see cref="SqlServerTypes.Spelled" />).
+    /// order of use, each named as a message names a type (<see cref="SqlServerTypes.Spelled" />).
     /// </summary>
     /// <param name="query">The query.</param>
     /// <param name="parameter">The parameter's name, as the list spells it.</param>

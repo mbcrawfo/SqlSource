@@ -66,6 +66,13 @@ public sealed class DriverLogTests(SqlServerContainer sqlServer)
         events.Count.ShouldBe(begins.Count + ends.Count);
         begins.ShouldAllBe(e => e.Members.Select(static m => m.Name).SequenceEqual(BeginExecuteMembers));
         ends.ShouldAllBe(e => e.Members.Select(static m => m.Name).SequenceEqual(EndExecuteMembers));
+        // A member that SqlClient's payload does not name is written as null, so each listed one must have a value.
+        begins.ShouldAllBe(e => Number(e, "objectId") != null && Member(e, "commandText") != null);
+        ends.ShouldAllBe(e =>
+            Number(e, "objectId") != null
+            && Number(e, "compositestate") != null
+            && Number(e, "sqlExceptionNumber") != null
+        );
         begins.Select(static e => Member(e, "commandText")).ShouldContain(SqlServerLive.DescribeUndeclaredParameters);
         ends.Select(static e => Number(e, "sqlExceptionNumber")).ShouldContain(208L);
         ShouldNameNothingOf(log, new SqlConnectionStringBuilder { ConnectionString = sqlServer.ConnectionString });

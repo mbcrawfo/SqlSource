@@ -10,9 +10,11 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// </summary>
 /// <remarks>
 /// The nullability is the server's <c>is_nullable</c> and is never narrowed: the server says it through every join,
-/// and the describer corrects it nowhere a test has not proved it wrong.  An origin is a column of the session's
-/// database alone, since the sidecar's origin names no database: a table of another database, of a linked server or
-/// of the system resource is not one the table match may find in the session's.
+/// and the describer corrects it nowhere a test has not proved it wrong.  An origin is a column of a table or a view
+/// of the session's database alone.  The sidecar's origin names no database: a table of another database, of a linked
+/// server or of the system resource is not one the table match may find in the session's.  A table-valued function's
+/// column has none, as a function's column has none on PostgreSQL, and the table match cannot read a function whose
+/// parameters it does not have.
 /// </remarks>
 internal static class SqlServerColumns
 {
@@ -22,8 +24,20 @@ internal static class SqlServerColumns
     /// <summary>The reason of a column of a linked server.</summary>
     public const string AnotherServer = "another server";
 
-    /// <summary>The reason of a column of a database not the session's, or of a session whose is unknown.</summary>
+    /// <summary>
+    /// The reason of a column of a database not the session's, or of a session whose database is unknown.
+    /// </summary>
     public const string AnotherDatabase = "another database";
+
+    /// <summary>
+    /// The reason of a column whose source is neither a table nor a view, such as a table-valued function's, or
+    /// whose source's type the tool could not read.
+    /// </summary>
+    public const string NotATableOrView = "not a table or view";
+
+    // The source types, OBJECTPROPERTYEX's BaseType, of a table and of a view.
+    private const string Table = "U";
+    private const string View = "V";
 
     /// <summary>
     /// The visible columns, in order, each with why it has no origin; or the ordinal of the first that has no name.
@@ -72,8 +86,9 @@ internal static class SqlServerColumns
     }
 
     /// <summary>
-    /// The base column a row comes from, or null with the reason: the source's schema, table and column, when the
-    /// three are given, no linked server is, and the source's database is the session's.
+    /// The base column a row comes from, or null with the reason: the source's schema, table and column, when no
+    /// linked server is given, the three are, the source's database is the session's, and the source is a table or a
+    /// view.  The reasons are tried in that order: the server, the parts, the database, then the type.
     /// </summary>
     /// <param name="row">A visible row of <c>columns</c>.</param>
     /// <param name="database">The session's database, or null when <c>open</c> did not say it.</param>
@@ -90,16 +105,22 @@ internal static class SqlServerColumns
         }
 
         // Ordinally, as the server gave both: a database of a name that differs in case alone is another one.
-        return database is not null && string.Equals(row.SourceDatabase, database, StringComparison.Ordinal)
+        if (database is null || !string.Equals(row.SourceDatabase, database, StringComparison.Ordinal))
+        {
+            return (null, AnotherDatabase);
+        }
+
+        return row.SourceType is Table or View
             ? (new SidecarOrigin(schema, table, column), null)
-            : (null, AnotherDatabase);
+            : (null, NotATableOrView);
     }
 }
 
 /// <summary>A column of a sidecar, and why it has no origin when it has none.</summary>
 /// <param name="Column">The column.</param>
 /// <param name="NoOriginReason">
-/// <see cref="SqlServerColumns.Expression" />, <see cref="SqlServerColumns.AnotherServer" /> or
-/// <see cref="SqlServerColumns.AnotherDatabase" />, or null for a column with an origin.
+/// <see cref="SqlServerColumns.Expression" />, <see cref="SqlServerColumns.AnotherServer" />,
+/// <see cref="SqlServerColumns.AnotherDatabase" /> or <see cref="SqlServerColumns.NotATableOrView" />, or null for a
+/// column with an origin.
 /// </param>
 internal sealed record BuiltColumn(SidecarColumn Column, string? NoOriginReason);

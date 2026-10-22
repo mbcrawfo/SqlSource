@@ -50,7 +50,7 @@ As of the merge of 6.1: the describer types parameters and answers `ResultKind.N
 
 1. Rows with `is_hidden = 1` are dropped: browse mode 2 adds one, `ROWSTAT`.
 2. A row that holds an error makes the query fail, below.  No row is `ResultKind.None`, the answer for a statement with no result set: an `UPDATE` with no `OUTPUT`, a `SELECT ... INTO`, an `OUTPUT ... INTO`.
-3. Each other row is a column: `name` as the server returned it, a `!` or `?` suffix kept; `ordinal`; `type` by `SqlServerTypes`; `nullable` the server's `is_nullable`, `nullableSource` `server`; `origin` the source's schema, table and column when the three are given, `source_server` is null and `source_database` is the session's database, which mode 2 gives as the view for a view's column and gives for no column of a `FOR SYSTEM_TIME` query; `identity` and `computed` the server's flags, null where it gives none.  A column of another database, a linked server or the system resource, `master.sys.databases`, has no origin: the sidecar's `origin` has no database, and the table match must not find a table of that name in the session's database.
+3. Each other row is a column: `name` as the server returned it, a `!` or `?` suffix kept; `ordinal`; `type` by `SqlServerTypes`; `nullable` the server's `is_nullable`, `nullableSource` `server`; `origin` the source's schema, table and column when the three are given, `source_server` is null and `source_database` is the session's database, which mode 2 gives as the view for a view's column and gives for no column of a `FOR SYSTEM_TIME` query; `identity` and `computed` the server's flags, null where it gives none.  A column of another database, a linked server or the system resource, `master.sys.databases`, has no origin: the sidecar's `origin` has no database, and the table match must not find a table of that name in the session's database.  A column has an origin only when its source is a table or a view: a table-valued function's column, which mode 2 gives the function as its source, has none, as a function's column has none on PostgreSQL, and is `no-origin`, since `SELECT *` from the function fails without its arguments.  This was decided in 6.2's build, and `columns` reads the source's type for it, `OBJECTPROPERTYEX`'s `BaseType`, as a column of the tool's own.
 4. A column whose `name` is null, `SELECT 1`, is `SQLSRC266`.  Two columns of one name are recorded, and the generator's `SQLSRC255` reports them, as for PostgreSQL.
 
 Browse mode 2, not the outline's 1: mode 1 names a view's base table as the origin and adds hidden key and `rowversion` columns of every table the query reads, which differ between versions on a system view; mode 2 names the view, as PostgreSQL's origin does, and adds one hidden column.  Nullability, identity and computed are the same under both.
@@ -70,7 +70,7 @@ By `error_type`, never by message:
 | 10, `TEMPORARY_TABLE` | A temporary table in a batch of several statements | `SQLSRC265`, with `help:` to make the query one statement or use a table variable |
 | 8, `UNDECLARED_PARAMETER` | Unreachable: every parameter is declared | `SQLSRC225`, so that it is seen and reported |
 | 3, 4 or 10 in the answer of the `columns` asked after `parameters` failed with 11501 | `sp_describe_undeclared_parameters` reports a temporary table of a batch of several statements as 208 and 11501, where this procedure gives its cause | That row's id; any other answer leaves the failure `SQLSRC225` with `parameters`' lines |
-| Any other | The query is not valid against this schema: 207, an unknown column; 102, a `GO` inside the query; 2812, a word read as a procedure | `SQLSRC225` with every error row as a `server:` line, in the server's order |
+| Any other | The query is not valid against this schema: 2812 then 11529, an `EXEC` with no argument of a procedure the database lacks; 11519, an extended procedure.  207, an unknown column, 102, a `GO` inside the query, and 2812 with an argument fail `parameters` first with 11501, and are reported at `describe parameters` | `SQLSRC225` with every error row as a `server:` line, in the server's order |
 
 The step is `describe columns`, or `table match` for `table`.
 
@@ -110,6 +110,7 @@ Every case of 6.1 is recorded again, since every query now asks `columns`.  New 
 | `select-alias-and-clr` | An alias type column and a `hierarchyid` column |
 | `select-computed-not-null` | A table with a `PERSISTED NOT NULL` computed column that the server calls nullable, `matched` |
 | `select-other-database` | A column of `msdb` and one of `master.sys.databases`: no origin, `no-origin` |
+| `select-table-function` | `SELECT *` from an inline table-valued function: no origin, `no-origin`; added in the build |
 | `insert-output` | `OUTPUT inserted.*`, `matched` to its table |
 | `merge-output` | `MERGE` with `WHEN NOT MATCHED BY SOURCE` and `OUTPUT` of `$action`, `inserted` and `deleted` |
 | `select-first-result-set` | `SELECT ...; SELECT ...`: the first result set alone |

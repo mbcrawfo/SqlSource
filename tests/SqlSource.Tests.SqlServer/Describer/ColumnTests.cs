@@ -1,10 +1,14 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Parsing;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.SqlServer;
 using Xunit;
+using static SqlSource.Tool.Testing.DescribeRequests;
 
 namespace SqlSource.Tests.SqlServer.Describer;
 
@@ -270,6 +274,79 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
         columns.ShouldAllBe(column =>
             column.Column.Origin == null && column.NoOriginReason == SqlServerColumns.AnotherDatabase
         );
+    }
+
+    // The tool's source_type is the BaseType of the source in the session's database: U for a table, a synonym's
+    // table among them, V for a view, IF and TF for the functions, whose columns the server names the function as the
+    // source of; and null for a source of another database, which OBJECTPROPERTYEX would read in the session's.
+    [Theory]
+    [InlineData("SELECT id FROM dbo.users", "U")]
+    [InlineData("SELECT user_id FROM dbo.user_orders", "V")]
+    [InlineData("SELECT id FROM dbo.orders_of(1)", "IF")]
+    [InlineData("SELECT id FROM dbo.orders_table_of(1)", "TF")]
+    [InlineData("SELECT job_id FROM msdb.dbo.sysjobs", null)]
+    [InlineData("SELECT database_id FROM master.sys.databases", null)]
+    [InlineData("SELECT object_id FROM sys.objects", null)]
+    [InlineData("SELECT 1 AS one", null)]
+    public async Task ColumnsAsync_SourceType_IsTheBaseTypeOfASourceOfTheSessionsDatabase(string sql, string? type) =>
+        (await ColumnsAsync(sql)).Single(row => !row.IsHidden).SourceType.ShouldBe(type);
+
+    // The server names the synonym's table as the source, and not the synonym.
+    [Fact]
+    public async Task ColumnsAsync_Synonym_IsItsTable()
+    {
+        await sqlServer.ExecuteAsync("DROP SYNONYM IF EXISTS dbo.orders_synonym");
+        await sqlServer.ExecuteAsync("CREATE SYNONYM dbo.orders_synonym FOR dbo.orders");
+        try
+        {
+            var row = (await ColumnsAsync("SELECT id FROM dbo.orders_synonym")).Single(row => !row.IsHidden);
+
+            (row.SourceTable, row.SourceType).ShouldBe(("orders", "U"));
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync("DROP SYNONYM dbo.orders_synonym");
+        }
+    }
+
+    // A column of a function has no origin: SELECT * from the function, which the table match would ask, fails
+    // without its arguments.
+    [Theory]
+    [InlineData("SELECT id, total FROM dbo.orders_of(1)")]
+    [InlineData("SELECT id, total FROM dbo.orders_table_of(1)")]
+    public async Task ColumnsAsync_TableValuedFunction_HasNoOrigin(string sql)
+    {
+        var rows = await ColumnsAsync(sql);
+
+        rows.Where(row => !row.IsHidden).ShouldAllBe(row => row.SourceTable != null && row.SourceColumn != null);
+        SqlServerColumns
+            .Build(rows, SqlServerContainer.Database)
+            .Value.ShouldNotBeNull()
+            .ShouldAllBe(column =>
+                column.Column.Origin == null && column.NoOriginReason == SqlServerColumns.NotATableOrView
+            );
+    }
+
+    // An inferred parameter of an alias type named by a keyword is declared to "columns" in brackets: the server
+    // refuses dbo.User with 156.
+    [Fact]
+    public async Task DescribeAsync_InferredAliasTypeNamedByAKeyword_IsDeclaredInBrackets()
+    {
+        var (described, capture) = await Sessions.DescribeCapturedAsync(
+            sqlServer.ConnectionString,
+            Of(SqlDialectRules.SqlServer, "SELECT id, owner FROM dbo.accounts WHERE owner = @owner")
+        );
+
+        var description = described.Value.ShouldNotBeNull(described.Failure?.Descriptor.Id);
+        description
+            .Parameters.ShouldHaveSingleItem()
+            .Type.ShouldBe(new SqlServerType("nvarchar(50)", 100, 0, 0, new SqlServerUserType("dbo", "User", null)));
+        description.Columns.ShouldNotBeNull().Select(column => column.Name).ShouldBe(["id", "owner"]);
+        capture
+            .Calls.Single(call => call.Method == SqlServerCallNames.Columns)
+            .Request.Deserialize<SqlServerColumnsRequest>(CaptureJson.Options)
+            .ShouldNotBeNull()
+            .Params.ShouldBe("@owner [dbo].[User]");
     }
 
     [Theory]

@@ -68,7 +68,8 @@
             "sourceTable": "users",
             "sourceColumn": "id",
             "isIdentityColumn": true,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -88,7 +89,8 @@
             "sourceTable": "users",
             "sourceColumn": "name",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -108,7 +110,8 @@
             "sourceTable": "orders",
             "sourceColumn": "id",
             "isIdentityColumn": true,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -128,7 +131,8 @@
             "sourceTable": "orders",
             "sourceColumn": "total",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": true,
@@ -148,7 +152,8 @@
             "sourceTable": null,
             "sourceColumn": null,
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": null
           }
         ],
         "errors": null,

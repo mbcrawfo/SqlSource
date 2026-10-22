@@ -218,7 +218,7 @@ internal sealed record SqlServerColumnsAnswer(
 
 /// <summary>
 /// A row of <c>sys.dm_exec_describe_first_result_set</c> in browse mode 2: one column of a result set.  The members
-/// are named as the function names its columns.
+/// are named as the function names its columns, but <see cref="SourceType" />, which is the tool's own.
 /// </summary>
 /// <param name="IsHidden">
 /// Whether the browse mode added the column: mode 2 adds one, <c>ROWSTAT</c>, which no query returns.
@@ -242,6 +242,12 @@ internal sealed record SqlServerColumnsAnswer(
 /// <param name="SourceColumn">The source column, or null for an expression.</param>
 /// <param name="IsIdentityColumn">Whether the source column is an identity column, or null.</param>
 /// <param name="IsComputedColumn">Whether the source column is computed, or null.</param>
+/// <param name="SourceType">
+/// The tool's own column, which the function does not have: the <c>OBJECTPROPERTYEX</c> <c>BaseType</c> of the source
+/// table, <c>U</c> for a table, <c>V</c> for a view, <c>IF</c> or <c>TF</c> for a table-valued function; or null
+/// when the source is not in the session's database, or the row names none.  A capture recorded before it has no
+/// <c>columns</c> call at all.
+/// </param>
 internal sealed record SqlServerColumnRow(
     bool IsHidden,
     int ColumnOrdinal,
@@ -260,7 +266,8 @@ internal sealed record SqlServerColumnRow(
     string? SourceTable,
     string? SourceColumn,
     bool? IsIdentityColumn,
-    bool? IsComputedColumn
+    bool? IsComputedColumn,
+    string? SourceType
 ) : ISqlServerTypeRow;
 
 /// <summary>

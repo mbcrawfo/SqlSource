@@ -32,7 +32,8 @@ public sealed class SqlServerColumnsTests
         SourceTable: "users",
         SourceColumn: "id",
         IsIdentityColumn: true,
-        IsComputedColumn: false
+        IsComputedColumn: false,
+        SourceType: "U"
     );
 
     private static readonly SqlServerColumnRow Email = Id with
@@ -54,6 +55,7 @@ public sealed class SqlServerColumnsTests
         ColumnOrdinal = 3,
         Name = "ROWSTAT",
         SourceColumn = null,
+        SourceType = null,
         SourceTable = null,
         SourceSchema = null,
         SourceDatabase = null,
@@ -68,6 +70,7 @@ public sealed class SqlServerColumnsTests
         SourceSchema = null,
         SourceTable = null,
         SourceColumn = null,
+        SourceType = null,
         IsIdentityColumn = false,
     };
 
@@ -205,6 +208,45 @@ public sealed class SqlServerColumnsTests
                 Database
             )
             .ShouldBe((null, "another database"));
+
+    [Fact]
+    public void OriginOf_View_IsItsSchemaViewAndColumn() =>
+        SqlServerColumns
+            .OriginOf(Id with { SourceTable = "user_orders", SourceColumn = "user_id", SourceType = "V" }, Database)
+            .ShouldBe((new SidecarOrigin("dbo", "user_orders", "user_id"), null));
+
+    // The server names an inline or a multi-statement function as its columns' source; a column of a function has no
+    // origin, as on PostgreSQL, and a source whose type the tool could not read has none either.
+    [Theory]
+    [InlineData("IF")]
+    [InlineData("TF")]
+    [InlineData("FT")]
+    [InlineData(null)]
+    public void OriginOf_SourceNotATableOrView_IsNone(string? type) =>
+        SqlServerColumns
+            .OriginOf(Id with { SourceTable = "orders_of", SourceType = type }, Database)
+            .ShouldBe((null, "not a table or view"));
+
+    // The type is read for the session's database alone, so a function of another database is of another database.
+    [Fact]
+    public void OriginOf_FunctionOfAnotherDatabase_IsOfAnotherDatabase() =>
+        SqlServerColumns
+            .OriginOf(Id with { SourceDatabase = "msdb", SourceType = "IF" }, Database)
+            .ShouldBe((null, "another database"));
+
+    [Fact]
+    public void OriginOf_ExpressionWithNoType_IsAnExpression() =>
+        SqlServerColumns.OriginOf(One with { SourceType = null }, Database).ShouldBe((null, "expression"));
+
+    [Fact]
+    public void Build_ColumnOfAFunction_SaysWhy()
+    {
+        var built = SqlServerColumns.Build([Id with { SourceTable = "orders_of", SourceType = "IF" }], Database);
+
+        built.Succeeded.ShouldBeTrue();
+        built.Value.Single().Column.Origin.ShouldBeNull();
+        built.Value.Single().NoOriginReason.ShouldBe(SqlServerColumns.NotATableOrView);
+    }
 
     [Fact]
     public void OriginOf_OtherServer_IsNone() =>

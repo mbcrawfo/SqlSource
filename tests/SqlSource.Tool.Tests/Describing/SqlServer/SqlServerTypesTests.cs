@@ -150,6 +150,38 @@ public sealed class SqlServerTypesTests
         SqlServerTypes.Spelled(type).ShouldBe("hierarchyid");
     }
 
+    // A user type that is not of sys is declared by its schema and name, each in brackets: dbo.User does not declare,
+    // since User is a keyword, and the server refuses it with 156.
+    [Theory]
+    [InlineData("dbo", "User", "[dbo].[User]")]
+    [InlineData("dbo", "Email", "[dbo].[Email]")]
+    [InlineData("my schema", "odd ]type", "[my schema].[odd ]]type]")]
+    public void Declared_UserTypeNotOfSys_IsItsSchemaAndNameInBrackets(string schema, string name, string declared)
+    {
+        var type = new SqlServerType("nvarchar(50)", 100, 0, 0, new SqlServerUserType(schema, name, null));
+
+        SqlServerTypes.Declared(type).ShouldBe(declared);
+        SqlServerTypes.Spelled(type).ShouldBe(schema + "." + name);
+    }
+
+    // sysname and hierarchyid are user types of sys, declared by their system type names.
+    [Fact]
+    public void Declared_UserTypesOfSys_AreTheirSystemTypeNames()
+    {
+        var name = "Microsoft.SqlServer.Types.SqlHierarchyId, " + TypesAssembly;
+
+        SqlServerTypes
+            .Declared(new SqlServerType("nvarchar(128)", 256, 0, 0, new SqlServerUserType("sys", "sysname", null)))
+            .ShouldBe("nvarchar(128)");
+        SqlServerTypes
+            .Declared(new SqlServerType("hierarchyid", 892, 0, 0, new SqlServerUserType("sys", "hierarchyid", name)))
+            .ShouldBe("hierarchyid");
+    }
+
+    [Fact]
+    public void Declared_SystemType_IsItsName() =>
+        SqlServerTypes.Declared(new SqlServerType("decimal(18,4)", 9, 18, 4, null)).ShouldBe("decimal(18,4)");
+
     [Fact]
     public void FromColumn_RowWithoutAName_ThrowsInvalidOperationException() =>
         Should.Throw<InvalidOperationException>(() =>
@@ -203,6 +235,7 @@ public sealed class SqlServerTypesTests
             userSchema,
             userName,
             assemblyQualifiedName,
+            null,
             null,
             null,
             null,

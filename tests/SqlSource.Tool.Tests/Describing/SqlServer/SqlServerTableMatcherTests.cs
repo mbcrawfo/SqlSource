@@ -47,7 +47,8 @@ public sealed class SqlServerTableMatcherTests
             "items",
             name,
             false,
-            false
+            false,
+            "U"
         );
 
     // A column of the query as the describer builds it: the server's name and nullability, and its origin.
@@ -178,7 +179,10 @@ public sealed class SqlServerTableMatcherTests
     [Fact]
     public void Match_View_Matches()
     {
-        SqlServerColumnRow[] view = [.. Items.Select(static row => row with { SourceTable = "user_orders" })];
+        SqlServerColumnRow[] view =
+        [
+            .. Items.Select(static row => row with { SourceTable = "user_orders", SourceType = "V" }),
+        ];
 
         SqlServerTableMatcher
             .Match(

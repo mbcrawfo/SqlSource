@@ -57,12 +57,22 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
 
     // The columns of a first result set, or the errors of its describe as rows, for "columns" and "table".  Browse
     // mode 2: a view is its columns' source, as on PostgreSQL, and the one hidden column it adds is ROWSTAT.  Mode 1
-    // names a view's base table and adds hidden key columns of every table read.
+    // names a view's base table and adds hidden key columns of every table read.  source_type is the tool's own: the
+    // BaseType of the source, U for a table, V for a view and IF or TF for a table-valued function, whose columns the
+    // server names the function as the source of.  It is read only for a source of the session's database, the names
+    // compared by their code points as SqlServerColumns compares them: OBJECTPROPERTYEX reads the current database
+    // whatever OBJECT_ID named, and a name of two parts finds sys.databases of the system resource in it.
     private const string ColumnsSql = """
         SELECT is_hidden, column_ordinal, name, is_nullable, system_type_name, max_length, precision, scale,
             user_type_schema, user_type_name, assembly_qualified_type_name, source_server, source_database,
             source_schema, source_table, source_column, is_identity_column, is_computed_column, error_number,
-            error_type, error_message
+            error_type, error_message,
+            RTRIM(CAST(
+                CASE WHEN source_database = DB_NAME() COLLATE Latin1_General_BIN2 THEN OBJECTPROPERTYEX(
+                    OBJECT_ID(QUOTENAME(source_schema) + N'.' + QUOTENAME(source_table)),
+                    'BaseType'
+                ) END AS nvarchar(2)
+            )) AS source_type
         FROM sys.dm_exec_describe_first_result_set(@tsql, @params, 2)
         ORDER BY column_ordinal
         """;
@@ -276,7 +286,8 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
                             StringOf(reader, "source_table"),
                             StringOf(reader, "source_column"),
                             BoolOf(reader, "is_identity_column"),
-                            BoolOf(reader, "is_computed_column")
+                            BoolOf(reader, "is_computed_column"),
+                            StringOf(reader, "source_type")
                         )
                     );
                 }
@@ -291,8 +302,11 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             token
         );
 
-    // A name in brackets, which hold any character but a ] that is not written twice.
-    private static string Bracketed(string name) => "[" + name.Replace("]", "]]", StringComparison.Ordinal) + "]";
+    /// <summary>
+    /// A catalog name in brackets, which hold any character but a <c>]</c> that is not written twice: <c>[User]</c>,
+    /// <c>[odd ]]type]</c>.
+    /// </summary>
+    public static string Bracketed(string name) => "[" + name.Replace("]", "]]", StringComparison.Ordinal) + "]";
 
     // A call of sp_describe_undeclared_parameters with the SQL and the declarations as the values of its parameters.
     private async Task<SqlCommand> DescribeUndeclaredAsync(string sql, string? declarations, CancellationToken token)

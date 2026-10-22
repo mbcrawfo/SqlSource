@@ -52,9 +52,10 @@ public sealed class TableMatchTests(SqlServerContainer sqlServer)
             "orders"
         );
 
-    // Each query but the two of FOR SYSTEM_TIME and of another database differs from orders, id, user_id, total,
-    // note, in one way, and the last in three, and says the first check that failed.  Under FOR SYSTEM_TIME the server
-    // gives no column an origin, and a column of another database has none.
+    // Each query but the two of FOR SYSTEM_TIME and of another database, and the two of a function, differs from
+    // orders, id, user_id, total, note, in one way, and the last in three, and says the first check that failed.  Under
+    // FOR SYSTEM_TIME the server gives no column an origin, and a column of another database or of a function, inline
+    // or multi-statement, has none.
     [Theory]
     [InlineData(
         "SELECT id, user_id, total, note, total + 1 AS more FROM dbo.orders",
@@ -62,6 +63,8 @@ public sealed class TableMatchTests(SqlServerContainer sqlServer)
     )]
     [InlineData("SELECT id, amount FROM dbo.prices FOR SYSTEM_TIME ALL", SidecarValues.TableMatch.NoOrigin)]
     [InlineData("SELECT database_id, name FROM master.sys.databases", SidecarValues.TableMatch.NoOrigin)]
+    [InlineData("SELECT * FROM dbo.orders_of(@user_id)", SidecarValues.TableMatch.NoOrigin)]
+    [InlineData("SELECT * FROM dbo.orders_table_of(@user_id)", SidecarValues.TableMatch.NoOrigin)]
     [InlineData(
         "SELECT o.id, o.user_id, o.total, u.name FROM dbo.orders AS o JOIN dbo.users AS u ON u.id = o.user_id",
         SidecarValues.TableMatch.SeveralTables

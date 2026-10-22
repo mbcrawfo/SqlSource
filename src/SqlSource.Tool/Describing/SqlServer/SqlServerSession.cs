@@ -491,8 +491,8 @@ internal sealed partial class SqlServerSession : IDescribeSession
     }
 
     // The declarations of "columns": every parameter of the list in its order, a declared one at its declaration as
-    // DeclaredTypeText read it, and any other at the type it was described at, as a declaration spells it; or null for
-    // a query with no parameter.
+    // DeclaredTypeText read it, and any other at the type it was described at, as SqlServerTypes.Declared writes it;
+    // or null for a query with no parameter.
     private static string? ColumnsParams(
         EquatableArray<DescribedParameter> parameters,
         Dictionary<string, string> declarationOf
@@ -505,7 +505,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
                         parameter.Name,
                         declarationOf.TryGetValue(parameter.Name, out var declaration)
                             ? declaration
-                            : SqlServerTypes.Spelled(
+                            : SqlServerTypes.Declared(
                                 parameter.Type as SqlServerType
                                     ?? throw new InvalidOperationException(
                                         $"The parameter '{parameter.Name}' was described with no type of SQL Server."

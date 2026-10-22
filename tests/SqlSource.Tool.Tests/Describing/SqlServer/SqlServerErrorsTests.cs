@@ -603,7 +603,8 @@ public sealed class SqlServerErrorsTests
             null,
             null,
             false,
-            false
+            false,
+            null
         );
 
         SqlServerErrors

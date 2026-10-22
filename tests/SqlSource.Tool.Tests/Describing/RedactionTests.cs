@@ -261,7 +261,8 @@ public sealed class RedactionTests : IDisposable
             value,
             value,
             false,
-            false
+            false,
+            value
         );
 
     // The answers of "columns" and "table" in each of their three shapes: rows, the describe's error rows, and the
@@ -292,6 +293,7 @@ public sealed class RedactionTests : IDisposable
                 "sourceSchema",
                 "sourceTable",
                 "sourceColumn",
+                "sourceType",
             }
         )
         {

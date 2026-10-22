@@ -67,7 +67,7 @@
       "method": "columns",
       "request": {
         "sql": "SELECT id, dbo_email_value, hierarchyid_value\nFROM dbo.all_types\nWHERE dbo_email_value = @email AND hierarchyid_value = @node;",
-        "params": "@email dbo.Email, @node hierarchyid"
+        "params": "@email [dbo].[Email], @node hierarchyid"
       },
       "answer": {
         "rows": [
@@ -89,7 +89,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "id",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -109,7 +110,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "dbo_email_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -129,7 +131,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "hierarchyid_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": true,
@@ -149,7 +152,8 @@
             "sourceTable": null,
             "sourceColumn": null,
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": null
           }
         ],
         "errors": null,
@@ -182,7 +186,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "id",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -202,7 +207,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "bigint_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -222,7 +228,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "int_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -242,7 +249,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "smallint_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -262,7 +270,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "tinyint_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -282,7 +291,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "bit_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -302,7 +312,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "decimal_18_4_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -322,7 +333,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "numeric_10_0_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -342,7 +354,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "money_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -362,7 +375,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "smallmoney_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -382,7 +396,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "float_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -402,7 +417,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "float_24_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -422,7 +438,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "real_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -442,7 +459,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "date_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -462,7 +480,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "time_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -482,7 +501,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "time_3_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -502,7 +522,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "datetime_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -522,7 +543,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "smalldatetime_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -542,7 +564,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "datetime2_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -562,7 +585,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "datetime2_0_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -582,7 +606,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "datetimeoffset_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -602,7 +627,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "datetimeoffset_3_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -622,7 +648,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "char_10_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -642,7 +669,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "varchar_50_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -662,7 +690,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "varchar_max_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -682,7 +711,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "text_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -702,7 +732,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "nchar_10_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -722,7 +753,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "nvarchar_50_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -742,7 +774,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "nvarchar_max_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -762,7 +795,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "ntext_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -782,7 +816,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "binary_16_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -802,7 +837,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "varbinary_50_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -822,7 +858,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "varbinary_max_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -842,7 +879,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "image_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -862,7 +900,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "uniqueidentifier_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -882,7 +921,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "xml_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -902,7 +942,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "sql_variant_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -922,7 +963,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "rowversion_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -942,7 +984,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "hierarchyid_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -962,7 +1005,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "geography_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -982,7 +1026,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "geometry_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -1002,7 +1047,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "sysname_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": false,
@@ -1022,7 +1068,8 @@
             "sourceTable": "all_types",
             "sourceColumn": "dbo_email_value",
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": "U"
           },
           {
             "isHidden": true,
@@ -1042,7 +1089,8 @@
             "sourceTable": null,
             "sourceColumn": null,
             "isIdentityColumn": false,
-            "isComputedColumn": false
+            "isComputedColumn": false,
+            "sourceType": null
           }
         ],
         "errors": null,

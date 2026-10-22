@@ -48,7 +48,8 @@ public sealed class SqlServerEventsTests
         SourceTable: "users",
         SourceColumn: "id",
         IsIdentityColumn: true,
-        IsComputedColumn: false
+        IsComputedColumn: false,
+        SourceType: "U"
     );
 
     // The one hidden row that browse mode 2 adds.
@@ -61,6 +62,7 @@ public sealed class SqlServerEventsTests
         SourceSchema = null,
         SourceTable = null,
         SourceColumn = null,
+        SourceType = null,
         IsIdentityColumn = null,
         IsComputedColumn = null,
     };
@@ -126,7 +128,8 @@ public sealed class SqlServerEventsTests
             new("sourceTable", row.SourceTable),
             new("sourceColumn", row.SourceColumn),
             new("isIdentityColumn", LogValue.Of(row.IsIdentityColumn)),
-            new("isComputedColumn", LogValue.Of(row.IsComputedColumn))
+            new("isComputedColumn", LogValue.Of(row.IsComputedColumn)),
+            new("sourceType", row.SourceType)
         );
 
     [Fact]
@@ -439,7 +442,8 @@ public sealed class SqlServerEventsTests
                         new("sourceTable", "users"),
                         new("sourceColumn", "id"),
                         new("isIdentityColumn", true),
-                        new("isComputedColumn", false)
+                        new("isComputedColumn", false),
+                        new("sourceType", "U")
                     ),
                     ColumnRowMap(Rowstat),
                 ])
@@ -658,6 +662,7 @@ public sealed class SqlServerEventsTests
             SourceSchema = null,
             SourceTable = null,
             SourceColumn = null,
+            SourceType = null,
             IsIdentityColumn = null,
             IsComputedColumn = null,
         };
@@ -826,7 +831,7 @@ public sealed class SqlServerEventsTests
             )
             .Add(
                 "columns",
-                new SqlServerColumnsRequest(Sql, "@p dbo.Email, @e dbo.Email"),
+                new SqlServerColumnsRequest(Sql, "@p dbo.Email, @e [dbo].[Email]"),
                 new SqlServerColumnsAnswer([], null, null)
             );
         var inner = new RecordingLog();
@@ -844,7 +849,7 @@ public sealed class SqlServerEventsTests
         Member(parameters, "params").ShouldBe((LogValue)"@p dbo.***");
         Member(parameters, "rows")
             .ShouldBe(LogValue.ListOf([ParameterMap("@e", "nvarchar(320)", 640, 0, 0, "dbo", "***")]));
-        Member(inner.Events[2].Members, "params").ShouldBe((LogValue)"@p dbo.***, @e dbo.***");
+        Member(inner.Events[2].Members, "params").ShouldBe((LogValue)"@p dbo.***, @e [dbo].[***]");
     }
 
     // The same inside a list of maps: the message of an error is a string two levels down, and the SQL holds it too.

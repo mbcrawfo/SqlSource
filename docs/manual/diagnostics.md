@@ -1279,20 +1279,22 @@ For SQL Server, each error the server gave is a `server:` line, `Msg <number>, L
     server: Msg 11501, Level 16, State 2: The batch could not be analyzed because of compile errors.
 ```
 
-At the step `describe columns`, each line is `Msg <number>:` and its text, with no level or state, and the last is `Msg 11501` or `Msg 11529`, which says only that SQL Server could not work out the query's columns:
+The step can also be `describe columns`, when SQL Server accepted the query's parameters and could not work out its columns.  There each line is `Msg <number>:` and its text, with no level or state, and the last is often `Msg 11529`, which says only that every path of the query failed.  A call of a procedure that the database does not have, with no argument, is such a query:
 
 ```console
-/work/App/Queries/Orders.sql(1,10): error SQLSRC225: The server rejected the query 'AddOrder': The target table 'dbo.orders' of the DML statement cannot have any enabled triggers if the statement contains an OUTPUT clause without INTO clause.
-    query: AddOrder, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
+/work/App/Queries/Orders.sql(1,10): error SQLSRC225: The server rejected the query 'ArchiveOrders': Could not find stored procedure 'dbo.archive_ordrs'.
+    query: ArchiveOrders, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
     step: describe columns
-    server: Msg 334: The target table 'dbo.orders' of the DML statement cannot have any enabled triggers if the statement contains an OUTPUT clause without INTO clause.
-    server: Msg 11501: The batch could not be analyzed because of compile errors.
+    server: Msg 2812: Could not find stored procedure 'dbo.archive_ordrs'.
+    server: Msg 11529: The metadata could not be determined because every code path results in an error; see previous errors for some of these.
 ```
 
-- **An `OUTPUT` clause without `INTO`, on a table that has an enabled trigger,** is `Msg 334`, as above.  SQL Server refuses the statement when it runs, too.  Output the rows `INTO` a table variable and select them from it.
+The same call with an argument, `EXEC dbo.archive_ordrs @before`, is `Msg 2812` at the step `describe parameters`, with its level and state, then `Msg 11501`.  Correct the procedure's name, or bring the database to the schema the query was written for.
+
+- **An `OUTPUT` clause without `INTO`, on a table that has an enabled trigger,** is `Msg 334`.  SQL Server refuses the statement when it runs, too.  Output the rows `INTO` a table variable and select them from it.
 - **A table or a column that the database does not have** is `Msg 208`, `Invalid object name`, or `Msg 207`, `Invalid column name`, as in the first SQL Server example.  A temporary table that the query reads and does not create is `Msg 208` too, since it does not exist when the query is described; one that the query creates is [SQLSRC265](#sqlsrc265).
 - **A `GO` inside the query** is `Msg 102`, `Incorrect syntax near 'GO'`.  `GO` ends a batch in SQL Server Management Studio and `sqlcmd`, and is not T-SQL: give each batch a `-- name:` of its own.
-- **A misspelt keyword at the start of the query**, such as `SELEC 1`, is `Msg 2812`, `Could not find stored procedure 'SELEC'`, then `Msg 11529`: SQL Server reads a query that starts with a name as a call of the procedure of that name.  Correct the spelling.
+- **A misspelt keyword at the start of the query**, such as `SELEC 1`, is `Msg 2812`, `Could not find stored procedure 'SELEC'`, then `Msg 11501`: SQL Server reads a query that starts with a name as a call of the procedure of that name.  Correct the spelling.
 - **A type that a `-- param:` marker declares** is checked against every use of the parameter, so `-- param: @p xml` with `WHERE id = @p` is this error, `Msg 206`, `Operand type clash: xml is incompatible with int`.  A type that the query's own text names and the database lacks, `CAST(@p AS dbo.Nope)`, is this error too.
 - **A parameter whose name, with its `@`, is longer than 128 characters** is this error, `Msg 103`, `The identifier that starts with '...' is too long`, whether it is used once, used more than once or declared with `-- param:`; a declared one gives it at the step `resolve type`.  Give the parameter a shorter name.
 - **A statement whose result SQL Server cannot work out**, such as `CREATE PROCEDURE`, is `Msg 11527`, `... does not support metadata discovery`.  Give the query `-- output: sql`.

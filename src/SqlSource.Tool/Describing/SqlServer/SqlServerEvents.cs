@@ -256,7 +256,8 @@ internal static class SqlServerEvents
             new("sourceTable", row.SourceTable),
             new("sourceColumn", row.SourceColumn),
             new("isIdentityColumn", LogValue.Of(row.IsIdentityColumn)),
-            new("isComputedColumn", LogValue.Of(row.IsComputedColumn))
+            new("isComputedColumn", LogValue.Of(row.IsComputedColumn)),
+            new("sourceType", row.SourceType)
         );
 
     private static LogValue DescribeErrorOf(SqlServerDescribeError error) =>

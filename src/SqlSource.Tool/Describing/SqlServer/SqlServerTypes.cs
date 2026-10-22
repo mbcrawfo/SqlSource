@@ -49,6 +49,27 @@ internal static class SqlServerTypes
         return user.Schema is null ? name : user.Schema + "." + name;
     }
 
+    /// <summary>
+    /// The type as a declaration of <c>@params</c> writes it: <c>[schema].[name]</c> of a user type that is not of
+    /// <c>sys</c>, each name in brackets with a <c>]</c> written twice, so that a name that is a keyword or holds a
+    /// space, <c>[dbo].[User]</c>, declares; and the system type name otherwise, so <c>sysname</c> is
+    /// <c>nvarchar(128)</c> and <c>hierarchyid</c> is <c>hierarchyid</c>.  <see cref="Spelled" /> is for messages.
+    /// </summary>
+    public static string Declared(SqlServerType type)
+    {
+        if (
+            type.UserType is not { Name: { } name } user
+            || string.Equals(user.Schema, SystemSchema, StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return type.Name;
+        }
+
+        return user.Schema is null
+            ? SqlServerLive.Bracketed(name)
+            : SqlServerLive.Bracketed(user.Schema) + "." + SqlServerLive.Bracketed(name);
+    }
+
     private static SqlServerType Build(ISqlServerTypeRow row)
     {
         if (

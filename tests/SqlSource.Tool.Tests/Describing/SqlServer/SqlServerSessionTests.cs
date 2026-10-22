@@ -50,7 +50,8 @@ public sealed class SqlServerSessionTests
         SourceTable: "users",
         SourceColumn: "id",
         IsIdentityColumn: true,
-        IsComputedColumn: false
+        IsComputedColumn: false,
+        SourceType: "U"
     );
 
     private static readonly SqlServerColumnRow NameColumn = IdColumn with
@@ -83,6 +84,7 @@ public sealed class SqlServerSessionTests
         SourceSchema = null,
         SourceTable = null,
         SourceColumn = null,
+        SourceType = null,
         IsIdentityColumn = false,
     };
 
@@ -528,7 +530,7 @@ public sealed class SqlServerSessionTests
 
     // The SQL as written, with every parameter of the list declared in its order: a declared one as its declaration
     // reads, a reused one once under its own name, and an inferred one at the type the server gave it, an alias type by
-    // its schema and name and a CLR type of sys by its name.
+    // its schema and name, each in brackets, and a CLR type of sys by its name.
     [Fact]
     public async Task DescribeAsync_ColumnsParams_DeclareEveryParameter()
     {
@@ -540,7 +542,7 @@ public sealed class SqlServerSessionTests
             + "AND (name = @name_1 OR nickname = @name_2)";
         var columns = new SqlServerColumnsRequest(
             Sql,
-            "@tenant int, @email dbo.Email, @node hierarchyid, @name nvarchar(100)"
+            "@tenant int, @email [dbo].[Email], @node hierarchyid, @name nvarchar(100)"
         );
         var script = new SqlServerScript()
             .Add(
@@ -653,6 +655,7 @@ public sealed class SqlServerSessionTests
             SourceSchema = null,
             SourceTable = null,
             SourceColumn = null,
+            SourceType = null,
             IsIdentityColumn = null,
             IsComputedColumn = null,
         };
@@ -667,6 +670,29 @@ public sealed class SqlServerSessionTests
         description.Columns.ShouldBe([
             new SidecarColumn(0, "n", Int, true, SidecarValues.NullableSource.Server, null, null, null),
         ]);
+        description.MatchesTable.ShouldBeNull();
+        description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
+    }
+
+    // The server names a table-valued function as its columns' source, and SELECT * from it fails without its
+    // arguments: a column of a function has no origin, so no table is asked.
+    [Theory]
+    [InlineData("IF")]
+    [InlineData("TF")]
+    public async Task DescribeAsync_ColumnsOfATableValuedFunction_AsksNoTable(string type)
+    {
+        const string Sql = "SELECT id FROM dbo.orders_of(1)";
+        var columns = new SqlServerColumnsRequest(Sql, null);
+        var id = IdColumn with { SourceTable = "orders_of", SourceType = type, IsIdentityColumn = false };
+        var script = new SqlServerScript()
+            .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([], null))
+            .Add("columns", columns, new SqlServerColumnsAnswer([id, Rowstat], null, null));
+
+        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
+
+        asked.Select(call => call.Method).ShouldBe(["parameters", "columns"]);
+        var description = described.Value.ShouldNotBeNull();
+        description.Columns.ShouldNotBeNull().Single().Origin.ShouldBeNull();
         description.MatchesTable.ShouldBeNull();
         description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
     }
@@ -836,6 +862,7 @@ public sealed class SqlServerSessionTests
             SourceSchema = null,
             SourceTable = null,
             SourceColumn = null,
+            SourceType = null,
         };
         var script = new SqlServerScript()
             .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([], null))
