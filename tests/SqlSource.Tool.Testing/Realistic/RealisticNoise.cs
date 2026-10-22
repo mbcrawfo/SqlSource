@@ -25,6 +25,7 @@ internal static class RealisticNoise
 
     // What a count over the corpus says against the budget held for that major: over it, the fault and the engine's
     // hint of what to do; under it, that the budget is lowered so the improvement is kept; at it, nothing.
+    // Each engine's suite holds its budgets in a field named Budgets, which the message under the budget names.
     public static string? Verdict(int count, int held, int major, string overHint)
     {
         if (count > held)
