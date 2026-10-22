@@ -27,7 +27,8 @@
             "value": "SQL_Latin1_General_CP1_CI_AS"
           }
         ],
-        "error": null
+        "error": null,
+        "database": "fixtures"
       }
     },
     {
@@ -59,6 +60,18 @@
             "suggestedAssemblyQualifiedTypeName": null
           }
         ],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "sql": "UPDATE TOP (@n) dbo.users SET nickname = NULL WHERE name LIKE @pattern;",
+        "params": "@n bigint, @pattern nvarchar(4000)"
+      },
+      "answer": {
+        "rows": [],
+        "errors": null,
         "error": null
       }
     }

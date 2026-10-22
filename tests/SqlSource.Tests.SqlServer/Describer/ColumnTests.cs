@@ -290,8 +290,12 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
     {
         var answer = await AnswerAsync("INSERT INTO dbo.trig (id, v) OUTPUT inserted.id VALUES (1, 1)");
 
-        answer.Rows.ShouldBeNull();
-        answer.Error.ShouldBeNull();
+        answer.Rows.ShouldBeNull(
+            string.Join("; ", answer.Rows?.Select(row => $"{row.ColumnOrdinal} {row.Name ?? "null"}") ?? [])
+        );
+        answer.Error.ShouldBeNull(
+            string.Join("; ", answer.Error?.Errors.Select(error => $"Msg {error.Number}: {error.Message}") ?? [])
+        );
         answer.Errors.ShouldNotBeNull().Select(error => error.Number).ShouldBe([334, 11501]);
     }
 

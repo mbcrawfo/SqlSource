@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing.SqlServer;
@@ -10,14 +13,19 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// <remarks>
 /// The names are written without the engine: the log a describer is given puts <c>mssql.</c> before each, and removes
 /// the connection's value from every string.  A member is added and never renamed.  Every event has the name of the
-/// query as its first member, <c>query</c>, then the SQL the call sent as <c>sql</c> and the declarations it sent as
-/// <c>params</c>, and last <c>durationMs</c>.  A row is a map of every member of the record, named as the capture
-/// names it.  An error is the list of every error of the exception, in its order, each a map of <c>number</c>,
+/// query as its first member, <c>query</c>.  The event of a call has then the SQL the call sent as <c>sql</c> and the
+/// declarations it sent as <c>params</c>, or for <c>table</c>, whose text is the tool's, the <c>schema</c> and
+/// <c>table</c> it describes, and last <c>durationMs</c>.  A row is a map of every member of the record, named as the
+/// capture names it.  An error is the list of every error of the exception, in its order, each a map of <c>number</c>,
 /// <c>class</c>, <c>state</c> and <c>message</c>; the describer's own text of a connection that was lost or timed out
-/// has 0 for each number.  <c>open</c> has no event of its own: the run's <c>database.open</c> records what the
-/// session knows of its server, the four settings included.  A describe writes <c>declared</c> for each declared
-/// parameter, in the list's order, then <c>parameters</c>, then <c>probe</c> for each probe, one or two for each copy
-/// of a reused parameter whose copies' types differ, each only when its call was made.
+/// has 0 for each number.  <c>open</c> has no event of its own: the run's <c>database.open</c> records what the session
+/// knows of its server, the four settings included.  A describe writes <c>declared</c> for each declared parameter, in
+/// the list's order, then <c>parameters</c>, then <c>probe</c> for each probe, one or two for each copy of a reused
+/// parameter whose copies' types differ, then <c>columns</c>; and for a statement with rows, <c>column</c> for each
+/// column in order, then <c>table</c> when every column has an origin in one table, then <c>table-match</c>.  An event
+/// is written only when its call was made or its step was reached, so a describe that fails writes nothing after the
+/// step that failed.  When <c>parameters</c> fails with 11501, <c>columns</c> follows it, asked with the declarations
+/// alone, and nothing after.
 /// </remarks>
 internal static class SqlServerEvents
 {
@@ -84,17 +92,114 @@ internal static class SqlServerEvents
             new("query", query),
             new("sql", request.Sql),
             new("params", request.Params),
-            answer switch
-            {
-                { Error: { } error } => new LogMember(Error, ErrorOf(error)),
-                { Errors: { Count: > 0 } errors } => new LogMember(
-                    "errors",
-                    LogValue.ListOf(errors.Select(DescribeErrorOf))
-                ),
-                _ => new LogMember("rows", LogValue.ListOf((answer.Rows ?? []).Select(DeclaredRowOf))),
-            },
+            DescribedOf(answer.Error, answer.Errors, answer.Rows, DeclaredRowOf),
             new(Duration, durationMs)
         );
+
+    /// <summary>
+    /// <c>mssql.columns</c>: the SQL as written and the declarations of every parameter, and every row the server
+    /// described, the hidden ones included, the error rows of the describe, or the error of the call.
+    /// </summary>
+    public static void Columns(
+        IRunLog log,
+        string query,
+        SqlServerColumnsRequest request,
+        SqlServerColumnsAnswer answer,
+        long durationMs
+    ) =>
+        log.Write(
+            SqlServerCallNames.Columns,
+            new("query", query),
+            new("sql", request.Sql),
+            new("params", request.Params),
+            DescribedOf(answer.Error, answer.Errors, answer.Rows, ColumnRowOf),
+            new(Duration, durationMs)
+        );
+
+    /// <summary>
+    /// <c>mssql.table</c>: the schema and the table of the one origin, and every row the server described of
+    /// <c>SELECT *</c> from it, the error rows of the describe, or the error of the call.
+    /// </summary>
+    public static void Table(
+        IRunLog log,
+        string query,
+        SqlServerTableRequest request,
+        SqlServerColumnsAnswer answer,
+        long durationMs
+    ) =>
+        log.Write(
+            SqlServerCallNames.Table,
+            new("query", query),
+            new("schema", request.Schema),
+            new("table", request.Table),
+            DescribedOf(answer.Error, answer.Errors, answer.Rows, ColumnRowOf),
+            new(Duration, durationMs)
+        );
+
+    /// <summary>
+    /// <c>mssql.column</c>: one column as it was built from the server's row, with its origin, or why it has none.
+    /// </summary>
+    /// <param name="log">The describer's log.</param>
+    /// <param name="query">The query's name.</param>
+    /// <param name="column">The column.</param>
+    /// <param name="noOriginReason">Why the column has no origin, or null for a column with one.</param>
+    public static void Column(IRunLog log, string query, SidecarColumn column, string? noOriginReason) =>
+        log.Write(
+            "column",
+            new("query", query),
+            new("ordinal", column.Ordinal),
+            new("name", column.Name),
+            new("type", column.Type.Name),
+            new(
+                "origin",
+                column.Origin is { } origin
+                    ? LogValue.MapOf(
+                        new("schema", origin.Schema),
+                        new("table", origin.Table),
+                        new("column", origin.Column)
+                    )
+                    : LogValue.Null
+            ),
+            new("noOrigin", noOriginReason),
+            new("nullable", LogValue.Of(column.Nullable)),
+            new("nullableSource", column.NullableSource),
+            new("identity", LogValue.Of(column.Identity)),
+            new("computed", LogValue.Of(column.Computed))
+        );
+
+    /// <summary>
+    /// <c>mssql.table-match</c>: <c>matched</c> with the table or view whose column list the result is, or the first
+    /// check of the match that failed with no table.  The table is its schema and its name apart, as the origin of a
+    /// <c>column</c> is.
+    /// </summary>
+    public static void TableMatch(IRunLog log, string query, SidecarTable? table, string tableMatch) =>
+        log.Write(
+            "table-match",
+            new("query", query),
+            new("tableMatch", tableMatch),
+            new(
+                "table",
+                table is null ? LogValue.Null : LogValue.MapOf(new("schema", table.Schema), new("table", table.Table))
+            )
+        );
+
+    // The answer of a call of sys.dm_exec_describe_first_result_set: the error of the call, the error rows of the
+    // describe, or its rows, each a map.
+    private static LogMember DescribedOf<TRow>(
+        SqlServerServerError? error,
+        IReadOnlyList<SqlServerDescribeError>? errors,
+        IReadOnlyList<TRow>? rows,
+        Func<TRow, LogValue> rowOf
+    ) =>
+        (error, errors) switch
+        {
+            ({ } failed, _) => new LogMember(Error, ErrorOf(failed)),
+            (_, { Count: > 0 } described) => new LogMember(
+                "errors",
+                LogValue.ListOf(described.Select(DescribeErrorOf))
+            ),
+            _ => new LogMember("rows", LogValue.ListOf((rows ?? []).Select(rowOf))),
+        };
 
     private static LogValue ErrorOf(SqlServerServerError error) =>
         LogValue.ListOf(
@@ -130,6 +235,28 @@ internal static class SqlServerEvents
             new("userTypeSchema", row.UserTypeSchema),
             new("userTypeName", row.UserTypeName),
             new("assemblyQualifiedTypeName", row.AssemblyQualifiedTypeName)
+        );
+
+    private static LogValue ColumnRowOf(SqlServerColumnRow row) =>
+        LogValue.MapOf(
+            new("isHidden", row.IsHidden),
+            new("columnOrdinal", row.ColumnOrdinal),
+            new("name", row.Name),
+            new("isNullable", LogValue.Of(row.IsNullable)),
+            new("systemTypeName", row.SystemTypeName),
+            new("maxLength", LogValue.Of(row.MaxLength)),
+            new("precision", LogValue.Of(row.Precision)),
+            new("scale", LogValue.Of(row.Scale)),
+            new("userTypeSchema", row.UserTypeSchema),
+            new("userTypeName", row.UserTypeName),
+            new("assemblyQualifiedTypeName", row.AssemblyQualifiedTypeName),
+            new("sourceServer", row.SourceServer),
+            new("sourceDatabase", row.SourceDatabase),
+            new("sourceSchema", row.SourceSchema),
+            new("sourceTable", row.SourceTable),
+            new("sourceColumn", row.SourceColumn),
+            new("isIdentityColumn", LogValue.Of(row.IsIdentityColumn)),
+            new("isComputedColumn", LogValue.Of(row.IsComputedColumn))
         );
 
     private static LogValue DescribeErrorOf(SqlServerDescribeError error) =>

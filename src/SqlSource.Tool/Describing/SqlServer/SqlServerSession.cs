@@ -26,6 +26,14 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// <para>
 /// A parameter is declared when its marker gives a type: a <c>-- param: @p null</c> with no type is inferred.
 /// </para>
+/// <para>
+/// A query's columns are those of its first result set as <c>sys.dm_exec_describe_first_result_set</c> describes it
+/// in browse mode 2, under the declarations of every parameter, with no correction: the server's nullability is
+/// recorded as it is given (<see cref="SqlServerColumns" />).  When every column comes from one table or view, the
+/// server's description of <c>SELECT *</c> from it is what the result is matched against
+/// (<see cref="SqlServerTableMatcher" />).  There is no plan walk, so an entry with rows records <c>plan</c> as
+/// <c>skipped</c>.
+/// </para>
 /// </remarks>
 internal sealed partial class SqlServerSession : IDescribeSession
 {
@@ -44,6 +52,9 @@ internal sealed partial class SqlServerSession : IDescribeSession
     private const string ProbeXml = "xml";
     private const string ProbeInt = "int";
 
+    // The session's database, DB_NAME(), whose columns alone have an origin; null in a capture recorded before "open"
+    // asked it.
+    private readonly string? _database;
     private readonly IDescribeExchange _exchange;
     private readonly SqlServerLive _live;
     private readonly IRunLog _log;
@@ -54,9 +65,11 @@ internal sealed partial class SqlServerSession : IDescribeSession
         IRunLog log,
         SqlServerConnection connection,
         SqlServerLive live,
-        ServerInfo server
+        ServerInfo server,
+        string? database
     )
     {
+        _database = database;
         _exchange = request.Exchange;
         _time = request.Time;
         _live = live;
@@ -101,7 +114,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
                 );
             }
 
-            var session = new SqlServerSession(request, log, connection, live, server);
+            var session = new SqlServerSession(request, log, connection, live, server, answer.Database);
             kept = true;
             return new Outcome<IDescribeSession, DescribeFailure>(session);
         }
@@ -115,15 +128,24 @@ internal sealed partial class SqlServerSession : IDescribeSession
     }
 
     /// <summary>
-    /// The description of a query: its parameters, each typed by the server.  A statement's rows are not described
-    /// yet, so the result is that of a statement without rows.
+    /// The description of a query: its parameters, each typed by the server, and the columns of its first result set,
+    /// with the table whose column list they are, or none for a statement without rows.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The order: each declared type is read against T-SQL's grammar of a type name before anything is sent; then
     /// <c>declared</c> for each declared parameter, in the list's order; then <c>parameters</c>, with the SQL whose
     /// reused parameters are renamed to copies and the declarations; then the comparison of the server's parameters
     /// with the list, before any <c>probe</c>, so that a text whose parameters the two read differently is not probed;
-    /// then, for each reused parameter whose copies' types differ, the probes of its copies.
+    /// then, for each reused parameter whose copies' types differ, the probes of its copies; then <c>columns</c>, with
+    /// the SQL as written and every parameter declared; then, when every column has an origin in one table,
+    /// <c>table</c> for it, and the match.
+    /// </para>
+    /// <para>
+    /// A <c>parameters</c> that fails with <see cref="SqlServerErrors.RefusedBatch" /> asks <c>columns</c> with the
+    /// declared parameters alone before it is reported, since that error says only that the batch did not compile
+    /// and <c>columns</c> may give its cause (<see cref="SqlServerErrors.AfterRefusal" />).
+    /// </para>
     /// </remarks>
     public async Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
         DescribeRequest request,
@@ -163,16 +185,24 @@ internal sealed partial class SqlServerSession : IDescribeSession
         var declared = declarations
             .Select(static declaration => (declaration.Parameter.Name, declaration.Type))
             .ToList();
+        var declaredParams = declared.Count == 0 ? null : SqlServerLive.Declarations(declared);
         var answer = await ParametersAsync(
             request.Name,
-            new SqlServerParametersRequest(
-                copied.Sql,
-                declared.Count == 0 ? null : SqlServerLive.Declarations(declared)
-            ),
+            new SqlServerParametersRequest(copied.Sql, declaredParams),
             cancellationToken
         );
         if (answer.Error is { } error)
         {
+            if (error.Errors.Any(static row => row.Number == SqlServerErrors.RefusedBatch))
+            {
+                var refusal = await ColumnsAsync(
+                    request.Name,
+                    new SqlServerColumnsRequest(request.Sql, declaredParams),
+                    cancellationToken
+                );
+                return Failed(SqlServerErrors.AfterRefusal(request, error, copied, refusal));
+            }
+
             return Failed(SqlServerErrors.Parameters(request, error, copied));
         }
 
@@ -197,7 +227,13 @@ internal sealed partial class SqlServerSession : IDescribeSession
             _ = rowOf.TryAdd(Bare(row.Name), row);
         }
 
-        var probes = new Probes(request, copied, declarations, rowOf);
+        // Each declared parameter's declaration, as DeclaredTypeText read it, by its name.
+        var declarationOf = declarations.ToDictionary(
+            static declaration => declaration.Parameter.Name,
+            static declaration => declaration.Type,
+            StringComparer.OrdinalIgnoreCase
+        );
+        var probes = new Probes(request, copied, declarationOf, rowOf);
         var reusedTypes = new Dictionary<string, SqlServerType>(StringComparer.OrdinalIgnoreCase);
         foreach (var reused in copied.Reused)
         {
@@ -210,23 +246,113 @@ internal sealed partial class SqlServerSession : IDescribeSession
             reusedTypes[reused.Name] = unified.Value!;
         }
 
+        var parameters = new EquatableArray<DescribedParameter>([
+            .. request.Parameters.Select(parameter => DescribedOf(parameter, declaredTypes, reusedTypes, rowOf)),
+        ]);
+        return await ResultAsync(request, parameters, ColumnsParams(parameters, declarationOf), cancellationToken);
+    }
+
+    public ValueTask DisposeAsync() => Connection.DisposeAsync();
+
+    // The columns of the query's first result set, through "columns", and the match of its table, through "table",
+    // with the parameters already described.
+    private async Task<Outcome<QueryDescription, DescribeFailure>> ResultAsync(
+        DescribeRequest request,
+        EquatableArray<DescribedParameter> parameters,
+        string? declarations,
+        CancellationToken cancellationToken
+    )
+    {
+        var answer = await ColumnsAsync(
+            request.Name,
+            new SqlServerColumnsRequest(request.Sql, declarations),
+            cancellationToken
+        );
+        if (answer.Error is { } error)
+        {
+            return Failed(SqlServerErrors.Failed(request, error, DescribeStep.DescribeColumns));
+        }
+
+        if (answer.Errors is { Count: > 0 } errors)
+        {
+            return Failed(SqlServerErrors.Columns(request, errors, DescribeStep.DescribeColumns));
+        }
+
+        var rows =
+            answer.Rows ?? throw new InvalidOperationException("The answer to 'columns' holds no rows and no error.");
+        var built = SqlServerColumns.Build(rows, _database);
+        if (!built.Succeeded)
+        {
+            return Failed(SqlServerErrors.NoColumnName(request, built.Failure));
+        }
+
+        if (built.Value.Count == 0)
+        {
+            return Outcome<QueryDescription, DescribeFailure>.Of(
+                new QueryDescription(SidecarResultKind.None, parameters, null, null, null, null)
+            );
+        }
+
+        foreach (var column in built.Value)
+        {
+            SqlServerEvents.Column(_log, request.Name, column.Column, column.NoOriginReason);
+        }
+
+        var columns = new EquatableArray<SidecarColumn>([.. built.Value.Select(static column => column.Column)]);
+        var matched = await MatchAsync(request, columns, cancellationToken);
+        if (matched.Failure is { } failure)
+        {
+            return Failed(failure);
+        }
+
+        var (table, tableMatch) = matched.Value;
         return Outcome<QueryDescription, DescribeFailure>.Of(
             new QueryDescription(
-                SidecarResultKind.None,
-                new EquatableArray<DescribedParameter>([
-                    .. request.Parameters.Select(parameter =>
-                        DescribedOf(parameter, declaredTypes, reusedTypes, rowOf)
-                    ),
-                ]),
-                null,
-                null,
-                null,
-                null
+                SidecarResultKind.Rows,
+                parameters,
+                columns,
+                table,
+                SidecarValues.Plan.Skipped,
+                tableMatch
             )
         );
     }
 
-    public ValueTask DisposeAsync() => Connection.DisposeAsync();
+    // The table whose column list the columns are, or the first check that failed.  "table" is asked only when every
+    // column has an origin in one table, since the first two checks need none, and a call that fails for a table the
+    // match never reads would fail the query.
+    private async Task<Outcome<(SidecarTable? Table, string TableMatch), DescribeFailure>> MatchAsync(
+        DescribeRequest request,
+        EquatableArray<SidecarColumn> columns,
+        CancellationToken cancellationToken
+    )
+    {
+        IReadOnlyList<SqlServerColumnRow>? rows = null;
+        if (SqlServerTableMatcher.TableOf(columns) is { Schema: { } schema, Table: { } name })
+        {
+            var answer = await TableAsync(request.Name, new SqlServerTableRequest(schema, name), cancellationToken);
+            if (answer.Error is { } error)
+            {
+                return Outcome<(SidecarTable?, string), DescribeFailure>.Failed(
+                    SqlServerErrors.Failed(request, error, DescribeStep.TableMatch)
+                );
+            }
+
+            if (answer.Errors is { Count: > 0 } errors)
+            {
+                return Outcome<(SidecarTable?, string), DescribeFailure>.Failed(
+                    SqlServerErrors.Columns(request, errors, DescribeStep.TableMatch)
+                );
+            }
+
+            rows =
+                answer.Rows ?? throw new InvalidOperationException("The answer to 'table' holds no rows and no error.");
+        }
+
+        var (table, tableMatch) = SqlServerTableMatcher.Match(columns, rows);
+        SqlServerEvents.TableMatch(_log, request.Name, table, tableMatch);
+        return Outcome<(SidecarTable?, string), DescribeFailure>.Of((table, tableMatch));
+    }
 
     // The type the server reads a declared parameter's declaration as, through "declared".
     private async Task<Outcome<SqlServerType, DescribeFailure>> ResolveAsync(
@@ -349,6 +475,31 @@ internal sealed partial class SqlServerSession : IDescribeSession
             );
     }
 
+    // The declarations of "columns": every parameter of the list in its order, a declared one at its declaration as
+    // DeclaredTypeText read it, and any other at the type it was described at, as a declaration spells it; or null for
+    // a query with no parameter.
+    private static string? ColumnsParams(
+        EquatableArray<DescribedParameter> parameters,
+        Dictionary<string, string> declarationOf
+    ) =>
+        parameters.Count == 0
+            ? null
+            : SqlServerLive.Declarations(
+                parameters.Select(parameter =>
+                    (
+                        parameter.Name,
+                        declarationOf.TryGetValue(parameter.Name, out var declaration)
+                            ? declaration
+                            : SqlServerTypes.Spelled(
+                                parameter.Type as SqlServerType
+                                    ?? throw new InvalidOperationException(
+                                        $"The parameter '{parameter.Name}' was described with no type of SQL Server."
+                                    )
+                            )
+                    )
+                )
+            );
+
     // A name without its "@", as the server reports one.
     private static string Bare(string name) => name.StartsWith('@') ? name[1..] : name;
 
@@ -393,17 +544,10 @@ internal sealed partial class SqlServerSession : IDescribeSession
     private sealed class Probes(
         DescribeRequest request,
         CopiedSql copied,
-        List<(SqlQueryParameter Parameter, string Type)> declarations,
+        Dictionary<string, string> declarationOf,
         Dictionary<string, SqlServerParameterRow> rowOf
     )
     {
-        // Each declared parameter's declaration, as DeclaredTypeText read it, by its name.
-        private readonly Dictionary<string, string> _declarationOf = declarations.ToDictionary(
-            static declaration => declaration.Parameter.Name,
-            static declaration => declaration.Type,
-            StringComparer.OrdinalIgnoreCase
-        );
-
         public SqlServerProbeRequest Request(string probed, string type)
         {
             var declared = new List<(string Name, string Type)>();
@@ -411,7 +555,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
             {
                 if (parameter.Type is not null)
                 {
-                    declared.Add((parameter.Name, _declarationOf[parameter.Name]));
+                    declared.Add((parameter.Name, declarationOf[parameter.Name]));
                     continue;
                 }
 
