@@ -268,19 +268,13 @@ internal sealed partial class SqlServerSession : IDescribeSession
             new SqlServerColumnsRequest(request.Sql, declarations),
             cancellationToken
         );
-        if (answer.Error is { } error)
+        var rows = RowsOf(request, answer, DescribeStep.DescribeColumns, SqlServerCallNames.Columns);
+        if (rows.Failure is { } refused)
         {
-            return Failed(SqlServerErrors.Failed(request, error, DescribeStep.DescribeColumns));
+            return Failed(refused);
         }
 
-        if (answer.Errors is { Count: > 0 } errors)
-        {
-            return Failed(SqlServerErrors.Columns(request, errors, DescribeStep.DescribeColumns));
-        }
-
-        var rows =
-            answer.Rows ?? throw new InvalidOperationException("The answer to 'columns' holds no rows and no error.");
-        var built = SqlServerColumns.Build(rows, _database);
+        var built = SqlServerColumns.Build(rows.Value!, _database);
         if (!built.Succeeded)
         {
             return Failed(SqlServerErrors.NoColumnName(request, built.Failure));
@@ -331,27 +325,46 @@ internal sealed partial class SqlServerSession : IDescribeSession
         if (SqlServerTableMatcher.TableOf(columns) is { Schema: { } schema, Table: { } name })
         {
             var answer = await TableAsync(request.Name, new SqlServerTableRequest(schema, name), cancellationToken);
-            if (answer.Error is { } error)
+            var described = RowsOf(request, answer, DescribeStep.TableMatch, SqlServerCallNames.Table);
+            if (described.Failure is { } failure)
             {
-                return Outcome<(SidecarTable?, string), DescribeFailure>.Failed(
-                    SqlServerErrors.Failed(request, error, DescribeStep.TableMatch)
-                );
+                return Outcome<(SidecarTable?, string), DescribeFailure>.Failed(failure);
             }
 
-            if (answer.Errors is { Count: > 0 } errors)
-            {
-                return Outcome<(SidecarTable?, string), DescribeFailure>.Failed(
-                    SqlServerErrors.Columns(request, errors, DescribeStep.TableMatch)
-                );
-            }
-
-            rows =
-                answer.Rows ?? throw new InvalidOperationException("The answer to 'table' holds no rows and no error.");
+            rows = described.Value;
         }
 
         var (table, tableMatch) = SqlServerTableMatcher.Match(columns, rows);
         SqlServerEvents.TableMatch(_log, request.Name, table, tableMatch);
         return Outcome<(SidecarTable?, string), DescribeFailure>.Of((table, tableMatch));
+    }
+
+    // The rows of an answer of "columns" or "table", or what the query is reported as at the step of the call: the
+    // error of the call is SQLSRC225, and the error rows of the describe are classified by their type.
+    private static Outcome<IReadOnlyList<SqlServerColumnRow>, DescribeFailure> RowsOf(
+        DescribeRequest request,
+        SqlServerColumnsAnswer answer,
+        DescribeStep step,
+        string call
+    )
+    {
+        if (answer.Error is { } error)
+        {
+            return Outcome<IReadOnlyList<SqlServerColumnRow>, DescribeFailure>.Failed(
+                SqlServerErrors.Failed(request, error, step)
+            );
+        }
+
+        if (answer.Errors is { Count: > 0 } errors)
+        {
+            return Outcome<IReadOnlyList<SqlServerColumnRow>, DescribeFailure>.Failed(
+                SqlServerErrors.Columns(request, errors, step)
+            );
+        }
+
+        return Outcome<IReadOnlyList<SqlServerColumnRow>, DescribeFailure>.Of(
+            answer.Rows ?? throw new InvalidOperationException($"The answer to '{call}' holds no rows and no error.")
+        );
     }
 
     // The type the server reads a declared parameter's declaration as, through "declared".
