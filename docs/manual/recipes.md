@@ -368,6 +368,9 @@ connection.QueryAsync<ListCustomerOrdersSinceDto>(
   ```
 
   ```csharp
+  using Microsoft.Data;
+  using Microsoft.Data.SqlTypes;
+
   connection.ExecuteAsync(
       Sql.SaveEmbedding,
       new { id, embedding = new TypedParameter(SqlDbTypeExtensions.Vector, new SqlVector<float>(elements)) }
