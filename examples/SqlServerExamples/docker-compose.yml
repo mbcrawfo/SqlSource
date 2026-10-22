@@ -1,0 +1,66 @@
+# Starts the SQL Server of the example and applies schema.sql to a database "examples".  The password of sa is for this
+# example alone.  The image is the tests' default image, which rule 5 of the repository's AGENTS.md keeps in step; it
+# is built for x64 alone, which Apple silicon runs under emulation.  To use another host port, change 51433 under
+# "ports", and the port of the connection string with it.
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: Examples-Passw0rd
+    ports:
+      - "127.0.0.1:51433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD
+        - /opt/mssql-tools18/bin/sqlcmd
+        - -C
+        - -b
+        - -S
+        - localhost
+        - -U
+        - sa
+        - -P
+        - Examples-Passw0rd
+        - -l
+        - "5"
+        - -Q
+        - SELECT 1
+      interval: 2s
+      timeout: 10s
+      retries: 60
+      start_period: 10s
+
+  # The image has no folder of scripts to run on a first start, so this service, on the same image, applies the schema
+  # once the server answers, and exits.  schema.sql names no database, so it is run with -d examples, or it would land
+  # in master.  It creates the database and applies the schema only when the database is missing, so a second "up"
+  # leaves the tables as they are.  -I sets QUOTED_IDENTIFIER on, as SqlClient has it, and -b stops at the first error.
+  schema:
+    image: mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04
+    platform: linux/amd64
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    restart: "no"
+    volumes:
+      - ./schema.sql:/schema.sql:ro
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+        sqlcmd=(/opt/mssql-tools18/bin/sqlcmd -C -I -b -S sqlserver -U sa -P Examples-Passw0rd)
+        query="SET NOCOUNT ON; SELECT CASE WHEN DB_ID(N'examples') IS NULL THEN 0 ELSE 1 END"
+        exists="$$("$${sqlcmd[@]}" -h -1 -W -Q "$$query")"
+        if [[ $$exists == 1 ]]; then
+            echo "The database examples exists; schema.sql is not applied again."
+            exit 0
+        fi
+        "$${sqlcmd[@]}" -Q "CREATE DATABASE examples"
+        "$${sqlcmd[@]}" -d examples -f 65001 -i /schema.sql
+        echo "The database examples is created and schema.sql applied."
+
+volumes:
+  sqlserver-data:
