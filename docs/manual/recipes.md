@@ -369,14 +369,17 @@ connection.QueryAsync<ListCustomerOrdersSinceDto>(
   ```csharp
   connection.ExecuteAsync(
       Sql.SaveEmbedding,
-      new { id, embedding = new TypedParameter(SqlDbType.Vector, new SqlVector<float>(elements)) }
+      new { id, embedding = new TypedParameter(SqlDbTypeExtensions.Vector, new SqlVector<float>(elements)) }
   );
   ```
+
+  `SqlDbTypeExtensions` is Microsoft.Data.SqlClient's, in the namespace `Microsoft.Data`, so the call builds on .NET 8 and later, where `SqlDbType.Vector` is in .NET 10 alone.
 
   A `string` for a `json` column needs nothing: SQL Server converts Dapper's text to `json`.
 - **A type override to a type that SqlClient does not give needs a Dapper type handler.**  Dapper fills a record with the type SqlClient gives for each column, or through a handler.  `date=System.DateOnly` makes a property a `DateOnly` where SqlClient gives a `DateTime`, and `time=System.TimeOnly` a `TimeOnly` where it gives a `TimeSpan`.  An alias type mapped to a struct of your own is the same: SqlClient gives the alias type's base type, a `string` for one over `nvarchar`.  Add a handler for each, once, beside `MatchNamesWithUnderscores`:
 
   ```csharp
+  using System;
   using System.Data;
   using Dapper;
 
@@ -390,6 +393,12 @@ connection.QueryAsync<ListCustomerOrdersSinceDto>(
           parameter.Value = value;
       }
   }
+  ```
+
+  ```csharp
+  using System;
+  using System.Data;
+  using Dapper;
 
   public sealed class TimeOnlyHandler : SqlMapper.TypeHandler<TimeOnly>
   {

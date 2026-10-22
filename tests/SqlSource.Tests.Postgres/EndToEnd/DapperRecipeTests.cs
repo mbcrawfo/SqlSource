@@ -15,7 +15,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.EndToEnd;
 
-// What the Dapper recipe of docs/manual/recipes.md (#models-through-dapper) says beyond the generated queries, on the
+// What the Dapper recipe of docs/manual/recipes.md (#dapper-with-postgresql) says beyond the generated queries, on the
 // data source that the recipe sets up: a parameter that Dapper cannot send goes as a TypedParameter, the recipe's
 // sample copied in Types/, or as a string cast in the SQL; a C# enum parameter is sent as its number; a DateTimeOffset
 // parameter takes offset 0 alone; and which records Dapper fills.  A test that writes rolls back.

@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
+using Microsoft.Data;
 using Microsoft.Data.SqlTypes;
 using Shouldly;
 using SqlSource.Testing.EndToEnd;
@@ -13,7 +14,7 @@ using Xunit;
 
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
-// What the Dapper recipe of docs/manual/recipes.md (#models-through-dapper) says for SQL Server beyond the generated
+// What the Dapper recipe of docs/manual/recipes.md (#dapper-with-sql-server) says for SQL Server beyond the generated
 // queries, on the connection that the recipe sets up: the type each C# parameter is sent as; a DateTime for a
 // datetime2, written or compared, goes as a TypedParameter, the recipe's sample copied in Types/, or with its DbType
 // in DynamicParameters; a SqlVector<float>, which Dapper refuses, goes as a TypedParameter; a string is written to json
@@ -88,7 +89,8 @@ public sealed class DapperRecipeTests(SqlServerContainer sqlServer)
         written.ShouldBe(full.Datetime2Value);
     }
 
-    // The input model is the template of the parameters, and the one added with its DbType takes its place.
+    // The parameters come from an object as a template, and the one added by the same name with its DbType takes the
+    // template's place.
     [Fact]
     public async Task ExecuteScalarAsync_Datetime2ByDbTypeOverTheModel_IsWrittenExactly()
     {
@@ -126,7 +128,11 @@ public sealed class DapperRecipeTests(SqlServerContainer sqlServer)
         var written = await WriteAsync(
             "new_types",
             "vector_value",
-            new { id = WrittenId, value = new TypedParameter(SqlDbType.Vector, new SqlVector<float>(elements)) }
+            new
+            {
+                id = WrittenId,
+                value = new TypedParameter(SqlDbTypeExtensions.Vector, new SqlVector<float>(elements)),
+            }
         );
 
         written.ShouldBeOfType<SqlVector<float>>().Memory.ToArray().ShouldBe(elements);
