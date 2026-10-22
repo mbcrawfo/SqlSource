@@ -9,9 +9,10 @@
 #   "app" and "billing", each made from the schema.sql and seed.sql of Realistic/, EndToEnd/app/ and EndToEnd/billing/.
 #   It then writes the sidecars of examples/PostgresExamples the same way, against a database "examples" made from its
 #   schema.sql, and runs after a change to a query or to the schema of the examples too.
-# - SQL Server: the .sql.json files of the end-to-end queries under tests/SqlSource.Tests.SqlServer/EndToEnd/Queries,
-#   against the databases "app" and "billing", each made from the schema.sql and seed.sql of EndToEnd/app/ and
-#   EndToEnd/billing/, with EndToEnd/app/new-types.sql after the seed of "app".
+# - SQL Server: the .sql.json files of the realistic cases under tests/SqlSource.Tests.SqlServer/Realistic/Cases and of
+#   the end-to-end queries under tests/SqlSource.Tests.SqlServer/EndToEnd/Queries, against the databases "realistic",
+#   "app" and "billing", each made from the schema.sql and seed.sql of Realistic/, EndToEnd/app/ and EndToEnd/billing/,
+#   with EndToEnd/app/new-types.sql after the seed of "app".
 # It runs the tool as a project, where the other recording scripts run a test: a test project does not build until its
 # sidecars are current.  Each image is the default image of its engine's tests, which the sidecars are recorded on, so
 # SQLSOURCE_TESTS_POSTGRES_IMAGE and SQLSOURCE_TESTS_SQLSERVER_IMAGE are ignored.  It needs Docker.
@@ -30,7 +31,8 @@ EXAMPLES_DATABASE='examples'
 
 SQLSERVER_PROJECT='tests/SqlSource.Tests.SqlServer'
 SQLSERVER_END_TO_END="$SQLSERVER_PROJECT/EndToEnd"
-SQLSERVER_DATABASES=(app billing)
+SQLSERVER_REALISTIC="$SQLSERVER_PROJECT/Realistic"
+SQLSERVER_DATABASES=(realistic app billing)
 # The password of sa, which SQL Server refuses unless it has three kinds of character and eight of them.
 SQLSERVER_PASSWORD='Describe-End-To-End-1'
 # The image's sqlcmd: -C trusts the server's own certificate, -I sets QUOTED_IDENTIFIER on, as SqlClient does, and -b
@@ -135,7 +137,7 @@ describe_postgres() {
 }
 
 describe_sqlserver() {
-    local image port deadline database file files connection connections=()
+    local image port deadline database folder file files connection connections=()
     image="$(default_image SqlServer)"
 
     # The image is built for x64 alone, which an arm64 host runs under emulation.
@@ -155,27 +157,31 @@ describe_sqlserver() {
     done
     echo 'done'
 
-    # The schemas and seeds are the files that SqlServerContainer applies, in the same order: those of "app", with
-    # new-types.sql after them, since the default image is SQL Server 2025, then those of "billing".  sqlcmd splits
-    # each at its lines of GO, and -f 65001 names the files' code page, UTF-8, rather than leaving it to sqlcmd's
-    # default.
+    # The schemas and seeds are the files that SqlServerContainer applies, in the same order: those of "realistic",
+    # then those of "app", with new-types.sql after them, since the default image is SQL Server 2025, then those of
+    # "billing".  sqlcmd splits each at its lines of GO, and -f 65001 names the files' code page, UTF-8, rather than
+    # leaving it to sqlcmd's default.
     for database in "${SQLSERVER_DATABASES[@]}"; do
         printf 'Creating the database %s ... ' "$database"
         docker exec "$sqlserver_container" "${SQLCMD[@]}" -Q "CREATE DATABASE [$database]" >/dev/null
+        folder="$SQLSERVER_END_TO_END/$database"
+        if [[ $database == realistic ]]; then
+            folder="$SQLSERVER_REALISTIC"
+        fi
         files=(schema.sql seed.sql)
         if [[ $database == app ]]; then
             files+=(new-types.sql)
         fi
         for file in "${files[@]}"; do
             docker exec -i "$sqlserver_container" "${SQLCMD[@]}" -d "$database" -f 65001 -i /dev/stdin \
-                <"$SQLSERVER_END_TO_END/$database/$file" >/dev/null
+                <"$folder/$file" >/dev/null
         done
         echo 'done'
         connection="Server=127.0.0.1,$port;User ID=sa;Password=$SQLSERVER_PASSWORD;TrustServerCertificate=True"
         connections+=(--connection "$database=$connection;Database=$database")
     done
 
-    find "$SQLSERVER_END_TO_END/Queries" -name '*.sql.json' -type f -delete
+    find "$SQLSERVER_END_TO_END/Queries" "$SQLSERVER_REALISTIC/Cases" -name '*.sql.json' -type f -delete
 
     dotnet run --project src/SqlSource.Tool -- \
         describe --force "$SQLSERVER_PROJECT/SqlSource.Tests.SqlServer.csproj" "${connections[@]}"
