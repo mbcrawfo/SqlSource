@@ -107,7 +107,7 @@ public sealed class PostgresContainer : IAsyncLifetime
         try
         {
             await using var source = NpgsqlDataSource.Create(ConnectionString);
-            await EndToEndFiles.RunAsync(source, RepositoryPaths.PostgresSchema, token);
+            await EndToEndFiles.RunAsync(source, RepositoryPaths.PostgresSchema, EndToEndEngine.Postgres, token);
 
             // The seed relies on a hole of PostgreSQL: the NOT NULL of a domain is not checked again for a NULL that
             // is already of the domain, which gives invoice 4 its NULL amount.  A major that closes it fails the seed
@@ -115,6 +115,7 @@ public sealed class PostgresContainer : IAsyncLifetime
             // distinct-on-latest-per-account and view-joined-left, which count on that NULL, are to be read again.
             await EndToEndFiles.CreateAsync(
                 source,
+                EndToEndEngine.Postgres,
                 RealisticDatabase,
                 SourceOf,
                 [RepositoryPaths.RealisticSchema, RepositoryPaths.RealisticSeed],
@@ -125,7 +126,7 @@ public sealed class PostgresContainer : IAsyncLifetime
             // order that tools/describe-end-to-end.sh applies them.
             foreach (var database in EndToEndDatabases)
             {
-                await EndToEndFiles.CreateAsync(source, database, SourceOf, token);
+                await EndToEndFiles.CreateAsync(source, EndToEndEngine.Postgres, database, SourceOf, token);
             }
 
             await using var opened = await source.OpenConnectionAsync(token);

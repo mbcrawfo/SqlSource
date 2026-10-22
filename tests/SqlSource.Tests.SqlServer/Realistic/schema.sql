@@ -1,6 +1,6 @@
 -- The schema of the database "realistic", which the corpus of realistic queries in tests/SqlSource.Tests.SqlServer is
 -- described and executed against.  SqlServerContainer applies it, then seed.sql, once for the run, through
--- SqlServerScripts: each batch between the lines that hold GO alone runs as one command of SqlClient, with
+-- EndToEndFiles: each batch between the lines that hold GO alone runs as one command of SqlClient, with
 -- QUOTED_IDENTIFIER on, which the persisted computed column of dbo.products needs.  It stands apart from the fixture
 -- schema: a change here moves no capture of the fixtures.  Every batch runs on SQL Server 2017; what 2017 lacks is
 -- made by a batch that runs only on a later major.  A column is added only when a case needs it.

@@ -23,4 +23,13 @@ internal static class RepositoryPaths
     public static string RealisticSeed { get; } = Path.Combine(Realistic, "seed.sql");
 
     public static string RealisticCases { get; } = Path.Combine(Realistic, "Cases");
+
+    // The databases "app" and "billing" of the end-to-end tests, from EndToEndEngine.
+    public static string EndToEnd => EndToEndEngine.SqlServer.Folder;
+
+    public static string EndToEndProject { get; } =
+        Path.Combine(Root, "tests", "SqlSource.Tests.SqlServer", "SqlSource.Tests.SqlServer.csproj");
+
+    // The table of the types that SQL Server 2025 brings, json and vector, applied to "app" on a major of 17 or later.
+    public static string NewTypesSchema { get; } = Path.Combine(EndToEnd, "app", "new-types.sql");
 }

@@ -1,6 +1,6 @@
 -- The schema every fixture case of the SQL Server describer is recorded against, and every container test of
 -- tests/SqlSource.Tests.SqlServer runs against: that project creates the database fixtures and applies this file to
--- it through SqlServerScripts, which runs each batch between the lines that hold GO alone as one command of SqlClient.
+-- it through EndToEndFiles, which runs each batch between the lines that hold GO alone as one command of SqlClient.
 -- SqlClient runs with QUOTED_IDENTIFIER on, which the persisted computed column of dbo.users needs.  A statement that
 -- must start a batch, CREATE SCHEMA, CREATE TRIGGER, CREATE VIEW or CREATE FUNCTION, has a GO before it and after it.
 -- A change here can change what the describer answers: record every case again with tools/record-fixtures.sh mssql.
