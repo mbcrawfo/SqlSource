@@ -14,7 +14,7 @@ A pull request that changes nothing of SQL Server fails CI at random and needs i
 
 ## Proposed fix
 
-Start the container again once in `SqlServerContainer.InitializeAsync` when it stops before it is ready and its log holds the fatal-error line, and say so in the test's output; or find the cause from the dump `sqlservr` leaves in `/var/opt/mssql/log/` and set what the image needs, such as its memory limit (`MSSQL_MEMORY_LIMIT_MB`).  Report the crash to Microsoft with its `Crash Id` if the image is at fault.
+Start a new container once in `SqlServerContainer.InitializeAsync` when the first stops before it is ready and its log holds the fatal-error line, and say so in the test's output.  `StartAsync` is called before the method's `try` today, and xunit does not call `DisposeAsync` when `InitializeAsync` throws, so the retry wraps the start in its own `try`: it disposes the container that failed, builds a new `MsSqlContainer` from the same `MsSqlBuilder` (a failed instance is not started again), keeps it in a field that `DisposeAsync` and the existing `catch` dispose, and lets a second failure throw after disposing that one too.  Or find the cause from the dump `sqlservr` leaves in `/var/opt/mssql/log/` and set what the image needs, such as its memory limit (`MSSQL_MEMORY_LIMIT_MB`).  Report the crash to Microsoft with its `Crash Id` if the image is at fault.
 
 ## Trigger
 
