@@ -12,7 +12,7 @@ It builds on sub-phase 6.5.  Sub-phase 6.7 builds on it.  It follows [sub-phase 
 
 ## Goals
 
-1. Each case of the corpus that the describer does not refuse is claimed by a class of its own with output `Models`, under `Realistic/Generation/`, and has a committed `query.sql.json` written by `tools/describe-end-to-end.sh`, whose `DATABASES` for SQL Server gains `realistic`.
+1. Each case of the corpus that the describer does not refuse is claimed by a class of its own with output `Models`, under `Realistic/Generation/`, and has a committed `query.sql.json` written by `tools/describe-end-to-end.sh`, whose `SQLSERVER_DATABASES` gains `realistic`.
 2. A case whose models the generator refuses, two columns of one name if the corpus has one, is not claimed and says why in a `models` member of its `case.json`, as `two-columns-named-id` does.
 3. Each committed entry is compared whole with the one described, provenance and origins included, which `--check` ignores, on each of 14 and 17 that runs the case and that a `checkedFrom` does not leave out.  A case that 2017 describes otherwise, by a parameter's type as the spike found for `DATEADD` or by a column's type, gets `checkedFrom` with why, and is left out of the comparison on 2017 whole, as PostgreSQL's `checkedFrom` leaves a case out; the sidecar is always recorded on the default image.
 4. `--check` covers `realistic` on both majors, with the positional filters leaving out what `minimumMajor` and `checkedFrom` leave out.
@@ -35,7 +35,7 @@ As of 6.5: the project builds with the generator and has its end-to-end sidecars
 
 As 5.6 and 5.7 have it, with SQL Server's majors and with these differences:
 
-- The database is 6.3's `realistic`, which `SqlServerContainer` creates from `Realistic/schema.sql` and `Realistic/seed.sql`; `tools/describe-end-to-end.sh`'s SQL Server part creates it from the same files in the same order and gives the tool `--connection realistic=...`, as PostgreSQL's part does for its corpus.
+- The database is 6.3's `realistic`, which `SqlServerContainer` creates from `Realistic/schema.sql` and `Realistic/seed.sql`; `tools/describe-end-to-end.sh`'s SQL Server part creates it from the same files in the same order and gives the tool `--connection realistic=...`, as PostgreSQL's part does for its corpus.  `realistic` goes first in `SQLSERVER_DATABASES`, as `SqlServerContainer` builds it before `app` and `billing`, and the part's loop, which today applies `EndToEnd/<database>/schema.sql` and `seed.sql` (with `new-types.sql` for `app`), needs the case that PostgreSQL's loop has, reading `realistic`'s files from `Realistic/` and not `EndToEnd/realistic/`; its `find` deletes the sidecars of `Realistic/Cases` too.
 - The corpus's `AdditionalFiles` metadata sets `SqlSourceDatabase` `realistic` and, if the project overrides a type at its own level, returns that key to the base map, as PostgreSQL's corpus returns `timestamptz`.
 - The Dapper run binds the samples by the SQL's parameter names, as PostgreSQL's does, `D-0004` being the reason an input model cannot be passed; a sample's literal is turned into a value by asking the server for it.
 - The comparison whole sets `NameSpan`, `ServerVersion` and `Database` equal on both sides, as `DescribeCommandTests` does.
@@ -46,7 +46,7 @@ As 5.6 and 5.7 have it, with SQL Server's majors and with these differences:
 
 ## Documentation
 
-`tests/SqlSource.Tests.SqlServer/README.md`: a case's sidecar, `checkedFrom`, `dapper` and `models`; `tools/AGENTS.md` for `DATABASES`; the epic outline's row of 6.6.
+`tests/SqlSource.Tests.SqlServer/README.md`: a case's sidecar, `checkedFrom`, `dapper` and `models`; `tools/AGENTS.md` for `SQLSERVER_DATABASES` and the folder of `realistic`; the epic outline's row of 6.6.
 
 ## Order of work
 

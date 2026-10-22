@@ -232,9 +232,14 @@ dotnet_diagnostic.CA1515.severity = none
 # CA2007 (ConfigureAwait): xUnit1030 forbids the call in a test.
 dotnet_diagnostic.CA2007.severity = none
 
-[tests/SqlSource.Tests.SqlServer/{SqlServerContainer,SqlServerScripts}.cs]
-# CA2100 (review SQL for user input): the two places that make a command of the SQL Server tests, from a script of the
-# repository or a statement of a test's own, never from what a user writes.
+[tests/SqlSource.Testing/EndToEndFiles.cs]
+# CA2100 (review SQL for user input): the place that makes a command of each batch of a file of the repository that
+# builds a test database, never of what a user writes.
+dotnet_diagnostic.CA2100.severity = none
+
+[tests/SqlSource.Tests.SqlServer/SqlServerContainer.cs]
+# CA2100 (review SQL for user input): the place that makes a command of the SQL Server tests from a statement of a
+# test's own, never from what a user writes.
 dotnet_diagnostic.CA2100.severity = none
 
 [src/SqlSource/Polyfills/*.cs]

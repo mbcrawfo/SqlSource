@@ -1,10 +1,45 @@
 <Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        The generator comes from a project reference, which does not bring the package's MSBuild files.  Importing the
+        real ones, here and at the end of this file, means the end-to-end tests exercise what ships.
+    -->
+    <Import Project="../../src/SqlSource/build/SqlSource.props" />
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
+        <!-- SQLSRC240 stays a warning: raising VersionPrefix warns until tools/describe-end-to-end.sh runs. -->
+        <WarningsNotAsErrors>$(WarningsNotAsErrors);SQLSRC240</WarningsNotAsErrors>
+        <!-- The dialect of every query of the project. -->
+        <SqlSourceDialect>mssql</SqlSourceDialect>
+        <!-- The logical database that a query is described against, unless its file names another. -->
+        <SqlSourceDatabase>app</SqlSourceDatabase>
+        <!-- What a query generates: its SQL and its models, which need an entry in the sidecar beside its file. -->
+        <SqlSourceOutput>Models</SqlSourceOutput>
+        <!-- The suffix of the model of a query's parameters. -->
+        <SqlSourceInputModelSuffix>Args</SqlSourceInputModelSuffix>
+        <!-- The kind of type that a query's input model is. -->
+        <SqlSourceInputModelType>record</SqlSourceInputModelType>
+        <!-- The C# type that date is read as, in place of the default of the type map. -->
+        <SqlSourceTypeOverrides>date=System.DateOnly</SqlSourceTypeOverrides>
     </PropertyGroup>
     <ItemGroup>
+        <!-- The queries of billing: sealed class output models, the suffix Row, and date as a DateTime. -->
+        <AdditionalFiles
+            Update="EndToEnd/Queries/Billing/**/*.sql"
+            SqlSourceOutputModelType="sealed class"
+            SqlSourceOutputModelSuffix="Row"
+            SqlSourceTypeOverrides="date=default"
+        />
+    </ItemGroup>
+    <ItemGroup>
+        <!-- The scratch project of the error-path tests is a project of its own, never built or described here. -->
+        <Compile Remove="EndToEnd/ErrorPaths/**" />
+        <AdditionalFiles Remove="EndToEnd/ErrorPaths/**" />
+        <None Remove="EndToEnd/ErrorPaths/**" />
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Dapper" />
         <PackageReference Include="GitHubActionsTestLogger" />
         <!-- The version the tool itself references: central pinning would otherwise hold it at the generator's. -->
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
@@ -16,12 +51,18 @@
     </ItemGroup>
     <ItemGroup>
         <!--
-            The fixture project SqlServer, with the package's MSBuild files and the repository's global.json beside
-            it, in the output where FixtureProjects of tests/SqlSource.Tool.Testing copies it from.
+            The fixture projects SqlServer and ErrorPaths, with the package's MSBuild files and the repository's
+            global.json beside them, in the output where FixtureProjects of tests/SqlSource.Tool.Testing copies them
+            from.
         -->
         <None
             Include="../SqlSource.Tool.Tests/Fixtures/Projects/SqlServer/**"
             Link="Fixtures/Projects/SqlServer/%(RecursiveDir)%(Filename)%(Extension)"
+            CopyToOutputDirectory="PreserveNewest"
+        />
+        <None
+            Include="EndToEnd/ErrorPaths/**"
+            Link="Fixtures/Projects/ErrorPaths/%(RecursiveDir)%(Filename)%(Extension)"
             CopyToOutputDirectory="PreserveNewest"
         />
         <None
@@ -45,4 +86,5 @@
         <ProjectReference Include="../SqlSource.Testing/SqlSource.Testing.csproj" />
         <ProjectReference Include="../SqlSource.Tool.Testing/SqlSource.Tool.Testing.csproj" />
     </ItemGroup>
+    <Import Project="../../src/SqlSource/build/SqlSource.targets" />
 </Project>

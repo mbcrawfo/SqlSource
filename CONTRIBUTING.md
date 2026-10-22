@@ -7,7 +7,7 @@ This repository holds SqlSource, a C# source generator that turns the `.sql` fil
 | Tool | Version | Notes |
 |----|----|----|
 | [.NET SDK](https://dotnet.microsoft.com/download) | 10.0.401 or a later 10.x release | Pinned in `global.json` |
-| [Docker](https://docs.docker.com/get-started/get-docker/) | Any current release | Runs the pinned lint images used by the scripts in `tools/`, the PostgreSQL that `tests/SqlSource.Tests.Postgres` and `tests/SqlSource.Tests.Postgres.Npgsql8` run against, and the SQL Server that `tests/SqlSource.Tests.SqlServer` runs against |
+| [Docker](https://docs.docker.com/get-started/get-docker/) | Any current release | Runs the pinned lint images used by the scripts in `tools/`, the PostgreSQL that `tests/SqlSource.Tests.Postgres` and `tests/SqlSource.Tests.Postgres.Npgsql8` run against, and the SQL Server that `tests/SqlSource.Tests.SqlServer` and `tests/SqlSource.Tests.SqlServer.SqlClient61` run against |
 | `unzip` | Any | `tools/check-package.sh` lists the contents of the packages with it.  Present on macOS and most Linux distributions. |
 
 CSharpier and ReportGenerator are local .NET tools pinned in `dotnet-tools.json`.  Restore them once after cloning:
@@ -23,14 +23,15 @@ The two projects that ship are:
 - `src/SqlSource` is the source generator, and the package `SqlSource`.  [`docs/architecture/generator.md`](docs/architecture/generator.md) explains how it works.
 - `src/SqlSource.Tool` is the `sqlsource` command, a console application that references the generator's project and shares its code, and the package `SqlSource.Tool`.  [`docs/architecture/tool.md`](docs/architecture/tool.md) explains how it works.
 
-The six test projects and the two libraries they share, which [`tests/README.md`](tests/README.md) describes:
+The seven test projects and the two libraries they share, which [`tests/README.md`](tests/README.md) describes:
 
 - `tests/SqlSource.Tests` runs every test of the generator.
 - `tests/SqlSource.Tests.RoslynFloor` compiles the generator driver tests a second time, on the oldest supported Roslyn.
 - `tests/SqlSource.Tool.Tests` runs the tests of the tool.
 - `tests/SqlSource.Tests.Postgres` runs the PostgreSQL describer against a real server and is the end-to-end project, which builds models from its own queries and reads rows into them through Dapper, and needs Docker.
 - `tests/SqlSource.Tests.Postgres.Npgsql8` reads every mapped type through Dapper on Npgsql 8, the oldest supported driver, and needs Docker.
-- `tests/SqlSource.Tests.SqlServer` runs the tests of SQL Server against a real server, and needs Docker.
+- `tests/SqlSource.Tests.SqlServer` runs the tests of SQL Server against a real server and is SQL Server's end-to-end project, which builds models from its own queries and reads rows into them through Dapper, and needs Docker.
+- `tests/SqlSource.Tests.SqlServer.SqlClient61` reads every mapped type through Dapper on Microsoft.Data.SqlClient 6.1, the oldest supported driver, and needs Docker.
 - `tests/SqlSource.Testing` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 
 `examples/PostgresExamples` shows a user SqlSource with PostgreSQL and Dapper; it builds with the solution and holds no tests.
@@ -42,7 +43,7 @@ dotnet build SqlSource.slnx
 dotnet test --solution SqlSource.slnx
 ```
 
-This runs every test project, the two PostgreSQL projects on the default PostgreSQL image and the SQL Server project on the default SQL Server image.  CI also runs `tests/SqlSource.Tests.Postgres` on PostgreSQL 14, the oldest supported:
+This runs every test project, the two PostgreSQL projects on the default PostgreSQL image and the two SQL Server projects on the default SQL Server image.  CI also runs `tests/SqlSource.Tests.Postgres` on PostgreSQL 14, the oldest supported:
 
 ```bash
 SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/SqlSource.Tests.Postgres
@@ -56,7 +57,7 @@ SQLSOURCE_TESTS_SQLSERVER_IMAGE=mcr.microsoft.com/mssql/server:2017-CU31-GDR19-u
 
 The default SQL Server image is `mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04`.  SQL Server's images are built for x64 alone, and on Apple silicon Docker runs them under emulation: the first run takes minutes while each image is pulled.  The SQL Server tests' readme has [the images and how a tag is moved](tests/SqlSource.Tests.SqlServer/README.md#the-images).
 
-The PostgreSQL tests' readme has the procedures of that project: [moving to a new image minor](tests/SqlSource.Tests.Postgres/README.md#the-image), [re-recording the describer's fixtures](tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures) with `tools/record-fixtures.sh postgres`, [adding a realistic case](tests/SqlSource.Tests.Postgres/README.md#the-realistic-corpus), writing its sidecar with `tools/describe-end-to-end.sh`, and [writing the sidecars of the end-to-end project, the realistic cases and the examples again](tests/SqlSource.Tests.Postgres/README.md#writing-the-sidecars) with `tools/describe-end-to-end.sh`.  The SQL Server tests' readme has [adding a realistic case](tests/SqlSource.Tests.SqlServer/README.md#adding-a-case) and [re-recording the describer's fixtures](tests/SqlSource.Tests.SqlServer/README.md#the-describers-fixtures) with `tools/record-fixtures.sh mssql`; the script given no engine records both.  To [add a fixture project](tests/README.md#fixture-projects), see `tests/README.md`.
+The PostgreSQL tests' readme has the procedures of that project: [moving to a new image minor](tests/SqlSource.Tests.Postgres/README.md#the-image), [re-recording the describer's fixtures](tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures) with `tools/record-fixtures.sh postgres`, [adding a realistic case](tests/SqlSource.Tests.Postgres/README.md#the-realistic-corpus), writing its sidecar with `tools/describe-end-to-end.sh`, and [writing the sidecars of the end-to-end project, the realistic cases and the examples again](tests/SqlSource.Tests.Postgres/README.md#writing-the-sidecars) with `tools/describe-end-to-end.sh`.  The SQL Server tests' readme has [adding a realistic case](tests/SqlSource.Tests.SqlServer/README.md#adding-a-case), [re-recording the describer's fixtures](tests/SqlSource.Tests.SqlServer/README.md#the-describers-fixtures) with `tools/record-fixtures.sh mssql`, whose run with no engine records both, and [writing the sidecars of its end-to-end project again](tests/SqlSource.Tests.SqlServer/README.md#writing-the-sidecars) with `tools/describe-end-to-end.sh`, which writes those of both engines in one run.  To [add a fixture project](tests/README.md#fixture-projects), see `tests/README.md`.
 
 To run the tool from its source:
 

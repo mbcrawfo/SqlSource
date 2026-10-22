@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Snapshot.Reading;
+using SqlSource.Testing.EndToEnd;
 using SqlSource.Tests.Postgres.Realistic;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Testing;
@@ -20,25 +20,20 @@ public sealed class CheckTests(PostgresContainer postgres)
 {
     // The number of entries of the sidecars under EndToEnd/ and Realistic/Cases/, by the database each was described
     // against.
-    private static int CommittedEntries(string database) =>
-        Entries(
+    private static int ProjectEntries(string database) =>
+        CommittedEntries.Count(
             new[] { RepositoryPaths.EndToEnd, RepositoryPaths.RealisticCases }.SelectMany(static folder =>
                 Directory.EnumerateFiles(folder, "*.sql.json", SearchOption.AllDirectories)
             ),
             database
         );
 
-    private static int Entries(IEnumerable<string> sidecars, string database) =>
-        sidecars
-            .SelectMany(static path => SidecarReader.Read(File.ReadAllText(path)).Sidecar.ShouldNotBeNull(path).Queries)
-            .Count(entry => entry.Database == database);
-
     [Fact]
     public async Task Check_Project_EveryEntryIsTheSame()
     {
-        var app = CommittedEntries(PostgresContainer.AppDatabase);
-        var billing = CommittedEntries(PostgresContainer.BillingDatabase);
-        var realistic = CommittedEntries(PostgresContainer.RealisticDatabase);
+        var app = ProjectEntries(PostgresContainer.AppDatabase);
+        var billing = ProjectEntries(PostgresContainer.BillingDatabase);
+        var realistic = ProjectEntries(PostgresContainer.RealisticDatabase);
         app.ShouldBeGreaterThan(0);
         billing.ShouldBeGreaterThan(0);
         realistic.ShouldBeGreaterThan(0);
@@ -67,7 +62,7 @@ public sealed class CheckTests(PostgresContainer postgres)
         // such a server runs this path, PostgreSQL 14 today, which CI runs: a local run on the default image does not
         // exercise it.
         checkedHere.ShouldNotBeEmpty();
-        var checkedEntries = Entries(
+        var checkedEntries = CommittedEntries.Count(
             checkedHere.Select(static found => found.SidecarPath),
             PostgresContainer.RealisticDatabase
         );

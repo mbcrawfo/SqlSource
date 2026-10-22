@@ -27,7 +27,13 @@ public sealed class AppContainer : IAsyncLifetime
         try
         {
             await using var server = NpgsqlDataSource.Create(_container.GetConnectionString());
-            await EndToEndFiles.CreateAsync(server, Database, _ => NpgsqlDataSource.Create(ConnectionString), token);
+            await EndToEndFiles.CreateAsync(
+                server,
+                EndToEndEngine.Postgres,
+                Database,
+                _ => NpgsqlDataSource.Create(ConnectionString),
+                token
+            );
         }
         catch
         {

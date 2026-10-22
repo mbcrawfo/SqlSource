@@ -10,6 +10,7 @@
     <Project Path="tests/SqlSource.Tests.Postgres.Npgsql8/SqlSource.Tests.Postgres.Npgsql8.csproj" />
     <Project Path="tests/SqlSource.Tests.Postgres/SqlSource.Tests.Postgres.csproj" />
     <Project Path="tests/SqlSource.Tests.RoslynFloor/SqlSource.Tests.RoslynFloor.csproj" />
+    <Project Path="tests/SqlSource.Tests.SqlServer.SqlClient61/SqlSource.Tests.SqlServer.SqlClient61.csproj" />
     <Project Path="tests/SqlSource.Tests.SqlServer/SqlSource.Tests.SqlServer.csproj" />
     <Project Path="tests/SqlSource.Tests/SqlSource.Tests.csproj" />
     <Project Path="tests/SqlSource.Testing/SqlSource.Testing.csproj" />

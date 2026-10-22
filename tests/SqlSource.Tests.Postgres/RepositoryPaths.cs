@@ -27,8 +27,8 @@ internal static class RepositoryPaths
     // The classes that claim each realistic case as a query of the project.
     public static string RealisticQueries { get; } = Path.Combine(Realistic, "Generation", "RealisticQueries.cs");
 
-    // The databases "app" and "billing" of the end-to-end tests, from EndToEndFiles, which the Npgsql 8 project shares.
-    public static string EndToEnd => EndToEndFiles.Folder;
+    // The databases "app" and "billing" of the end-to-end tests, which the Npgsql 8 project shares.
+    public static string EndToEnd => EndToEndEngine.Postgres.Folder;
 
     public static string EndToEndProject { get; } =
         Path.Combine(Root, "tests", "SqlSource.Tests.Postgres", "SqlSource.Tests.Postgres.csproj");

@@ -21,7 +21,9 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
     // Every row of the spike's table of columns, and of its table of statements with OUTPUT, that answers columns, but
     // the view, the system tables, the rows with no result set and the table with a trigger, which have tests of their
     // own.  Each expression is aliased, but in "SELECT 1, id", which has a column with no name, "SELECT u.id, o.id",
-    // which has two named id, and "FOR JSON PATH", whose column the server names.
+    // which has two named id, and "FOR JSON PATH", whose column the server names.  Two rows of MERGE are not the
+    // spike's, one that updates and inserts and one that updates alone: with the spike's two, they show that the server
+    // calls inserted and deleted nullable only where an action of the MERGE leaves them empty.
     public static TheoryData<string, string[]> SpikeRows =>
         new()
         {
@@ -191,6 +193,33 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
                     + "WHEN NOT MATCHED THEN INSERT (user_id, total) VALUES (s.id, 0) "
                     + "OUTPUT $action AS action, inserted.id, inserted.total;",
                 ["action 0 -", "id 0 dbo.orders.id", "total 0 dbo.orders.total"]
+            },
+            {
+                "MERGE dbo.orders AS t USING dbo.users AS s ON t.user_id = s.id "
+                    + "WHEN MATCHED THEN UPDATE SET total = 1 "
+                    + "WHEN NOT MATCHED THEN INSERT (user_id, total) VALUES (s.id, 0) "
+                    + "OUTPUT $action AS action, inserted.id AS inserted_id, inserted.total AS inserted_total, "
+                    + "deleted.id AS deleted_id, deleted.total AS deleted_total;",
+                [
+                    "action 0 -",
+                    "inserted_id 0 dbo.orders.id",
+                    "inserted_total 0 dbo.orders.total",
+                    "deleted_id 1 dbo.orders.id",
+                    "deleted_total 1 dbo.orders.total",
+                ]
+            },
+            {
+                "MERGE dbo.orders AS t USING dbo.users AS s ON t.user_id = s.id "
+                    + "WHEN MATCHED THEN UPDATE SET total = 1 "
+                    + "OUTPUT $action AS action, inserted.id AS inserted_id, inserted.total AS inserted_total, "
+                    + "deleted.id AS deleted_id, deleted.total AS deleted_total;",
+                [
+                    "action 0 -",
+                    "inserted_id 0 dbo.orders.id",
+                    "inserted_total 0 dbo.orders.total",
+                    "deleted_id 0 dbo.orders.id",
+                    "deleted_total 0 dbo.orders.total",
+                ]
             },
             {
                 "UPDATE o SET total = 0 OUTPUT inserted.id, u.name "

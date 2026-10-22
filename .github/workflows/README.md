@@ -7,10 +7,10 @@ The GitHub Actions workflows of the repository.  [`CONTRIBUTING.md`](../../CONTR
 | Workflow | Runs on | Does |
 |----|----|----|
 | `ci.yml` | Pull requests to `main`, pushes to `main` | Calls `build.yml` and ends with the `ci` job |
-| `build.yml` | Called by `ci.yml` and `publish.yml` | Every check in `pre-commit-validation.sh`, a `Release` build, the tests with coverage, the two PostgreSQL projects and the SQL Server project on their default images among them, the tests of `tests/SqlSource.Tests.Postgres` alone again on PostgreSQL 14 and of `tests/SqlSource.Tests.SqlServer` alone again on SQL Server 2017, `dotnet pack`, and the three package checks |
+| `build.yml` | Called by `ci.yml` and `publish.yml` | Every check in `pre-commit-validation.sh`, a `Release` build, the tests with coverage, the two PostgreSQL projects and the two SQL Server projects on their default images among them, the tests of `tests/SqlSource.Tests.Postgres` alone again on PostgreSQL 14 and of `tests/SqlSource.Tests.SqlServer` alone again on SQL Server 2017, `dotnet pack`, and the three package checks |
 | `publish.yml` | `v*` tags, manual runs on `main` | Calls `build.yml`, pushes the two packages to nuget.org, and creates a GitHub release for a tag |
 | `coverage-comment.yml` | A successful `ci.yml` run for a pull request | Posts the coverage report as a comment on the pull request, or updates the comment it posted before |
-| `nightly.yml` | Every night, manual runs, pull requests that change the file | Restores, builds in `Release` and runs the tests of every project but `tests/SqlSource.Tests.Postgres`, `tests/SqlSource.Tests.Postgres.Npgsql8` and `tests/SqlSource.Tests.SqlServer` on `windows-latest` and `macos-latest` |
+| `nightly.yml` | Every night, manual runs, pull requests that change the file | Restores, builds in `Release` and runs the tests of every project but `tests/SqlSource.Tests.Postgres`, `tests/SqlSource.Tests.Postgres.Npgsql8`, `tests/SqlSource.Tests.SqlServer` and `tests/SqlSource.Tests.SqlServer.SqlClient61` on `windows-latest` and `macos-latest` |
 
 ## The test images
 
@@ -28,7 +28,7 @@ The `ci` job succeeds only when every other job in `ci.yml` succeeded or was ski
 
 ## Nightly
 
-`ci.yml` runs on Linux alone.  `nightly.yml` is what runs the tests on Windows and macOS, where paths, quoting, exit codes and the kill of a process differ.  It runs no check that needs Docker, none of `tests/SqlSource.Tests.Postgres`, `tests/SqlSource.Tests.Postgres.Npgsql8` and `tests/SqlSource.Tests.SqlServer`, whose containers its runners cannot start, and packs nothing, and it is no required check: a failure is mended in a pull request of its own.  To try a branch on both systems before it is merged, start the workflow by hand:
+`ci.yml` runs on Linux alone.  `nightly.yml` is what runs the tests on Windows and macOS, where paths, quoting, exit codes and the kill of a process differ.  It runs no check that needs Docker, none of `tests/SqlSource.Tests.Postgres`, `tests/SqlSource.Tests.Postgres.Npgsql8`, `tests/SqlSource.Tests.SqlServer` and `tests/SqlSource.Tests.SqlServer.SqlClient61`, whose containers its runners cannot start, and packs nothing, and it is no required check: a failure is mended in a pull request of its own.  To try a branch on both systems before it is merged, start the workflow by hand:
 
 ```bash
 gh workflow run nightly.yml --ref <branch>

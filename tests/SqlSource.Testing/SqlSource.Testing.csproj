@@ -40,6 +40,7 @@
         <InternalsVisibleTo Include="SqlSource.Tests.Postgres" />
         <InternalsVisibleTo Include="SqlSource.Tests.Postgres.Npgsql8" />
         <InternalsVisibleTo Include="SqlSource.Tests.SqlServer" />
+        <InternalsVisibleTo Include="SqlSource.Tests.SqlServer.SqlClient61" />
         <InternalsVisibleTo Include="SqlSource.Tool.Testing" />
         <InternalsVisibleTo Include="SqlSource.Tool.Tests" />
     </ItemGroup>
