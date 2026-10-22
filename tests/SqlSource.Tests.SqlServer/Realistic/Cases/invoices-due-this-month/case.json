@@ -1,0 +1,23 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "number", "nullable": false },
+    { "name": "issued_at", "nullable": false },
+    {
+      "name": "due_at",
+      "nullable": true,
+      "why": "billing.invoices.due_at is nullable; invoice 12, due on receipt in September, has none"
+    },
+    { "name": "due_on", "nullable": false },
+    {
+      "name": "remind_on",
+      "nullable": true,
+      "why": "DATEADD of a NULL date is NULL; invoice 12, due on receipt in September, has no due_at"
+    },
+    { "name": "statement_on", "nullable": false },
+    { "name": "amount", "nullable": false }
+  ],
+  "samples": [
+    { "year": "2024", "month": "9", "reminder_days": "-7" }
+  ]
+}

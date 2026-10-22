@@ -1,0 +1,26 @@
+{
+  "minimumMajor": 16,
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "email",
+      "nullable": true,
+      "why": "dbo.customers.email is nullable, of the alias type dbo.Email; Chen and Fatima have none"
+    },
+    {
+      "name": "time_zone",
+      "nullable": true,
+      "why": "a NULL zone is distinct from a zone that is not; Chen and Fatima, for the first sample's"
+    },
+    {
+      "name": "closed_at",
+      "nullable": true,
+      "why": "dbo.customers.closed_at is nullable; every customer but Dana and Gus is open"
+    }
+  ],
+  "samples": [
+    { "time_zone": "'GMT Standard Time'" },
+    { "time_zone": "NULL" }
+  ]
+}

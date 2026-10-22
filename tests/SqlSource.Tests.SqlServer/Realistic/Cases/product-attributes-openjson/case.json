@@ -1,0 +1,27 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "sku", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "color",
+      "nullable": true,
+      "why": "OPENJSON ... WITH gives NULL for a missing path; product 3's attributes have no color"
+    },
+    {
+      "name": "weight_kg",
+      "nullable": true,
+      "why": "OPENJSON ... WITH gives NULL for a missing path; only product 1's attributes have a weight_kg"
+    },
+    {
+      "name": "ports",
+      "nullable": true,
+      "why": "OPENJSON ... WITH gives NULL for a missing path; only product 3's attributes have ports"
+    },
+    {
+      "name": "sizes",
+      "nullable": true,
+      "why": "OPENJSON ... WITH gives NULL for a missing path; only product 7's attributes have sizes"
+    }
+  ]
+}

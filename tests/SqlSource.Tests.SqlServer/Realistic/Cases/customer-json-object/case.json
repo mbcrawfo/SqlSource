@@ -1,0 +1,19 @@
+{
+  "minimumMajor": 16,
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "contact", "nullable": false },
+    { "name": "reachable_by", "nullable": false },
+    { "name": "channels", "nullable": false },
+    {
+      "name": "last_order",
+      "nullable": true,
+      "why": "the scalar subquery finds no order for Eli and Fatima, who have none"
+    }
+  ],
+  "samples": [
+    { "status": "'active'" },
+    { "status": "'closed'" }
+  ]
+}

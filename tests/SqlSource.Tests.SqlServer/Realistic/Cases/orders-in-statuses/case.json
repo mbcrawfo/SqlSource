@@ -1,0 +1,26 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "customer_id", "nullable": false },
+    { "name": "placed_at", "nullable": false },
+    { "name": "status", "nullable": false },
+    {
+      "name": "ship_name",
+      "nullable": true,
+      "why": "dbo.orders.ship_name is nullable; Ana's pending draft order 15 has none"
+    },
+    {
+      "name": "ship_city",
+      "nullable": true,
+      "why": "dbo.orders.ship_city is nullable; Chen's shipped order 10 and Ana's pending order 15 have none"
+    },
+    {
+      "name": "shipped_at",
+      "nullable": true,
+      "why": "dbo.orders.shipped_at is nullable; pending orders 13 to 15 were never shipped"
+    }
+  ],
+  "samples": [
+    { "status_1": "'pending'", "status_2": "'shipped'" }
+  ]
+}

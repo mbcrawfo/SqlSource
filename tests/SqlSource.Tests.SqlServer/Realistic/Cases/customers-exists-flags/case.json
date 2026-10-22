@@ -1,0 +1,17 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "email",
+      "nullable": true,
+      "why": "dbo.customers.email is nullable, of the alias type dbo.Email; Chen and Fatima have none"
+    },
+    { "name": "has_orders", "nullable": false },
+    { "name": "has_open_cart", "nullable": false }
+  ],
+  "samples": [
+    { "as_of": "'2024-11-01'" },
+    { "as_of": "'2024-10-01'" }
+  ]
+}

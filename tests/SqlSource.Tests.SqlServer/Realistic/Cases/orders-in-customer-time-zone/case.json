@@ -1,0 +1,25 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "customer_name", "nullable": false },
+    {
+      "name": "time_zone",
+      "nullable": true,
+      "why": "dbo.customers.time_zone is nullable; Chen, of orders 5 and 10, has none"
+    },
+    { "name": "placed_utc", "nullable": false },
+    {
+      "name": "placed_local",
+      "nullable": true,
+      "why": "AT TIME ZONE a NULL zone is NULL; Chen, of orders 5 and 10, has no time_zone"
+    },
+    {
+      "name": "shipped_local",
+      "nullable": true,
+      "why": "dbo.orders.shipped_at is nullable, and AT TIME ZONE keeps a NULL; pending orders 13 to 15 have none"
+    }
+  ],
+  "samples": [
+    { "since": "'2024-05-01'" }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "columns": [
+    { "name": "cart_id", "nullable": false },
+    {
+      "name": "customer_id",
+      "nullable": true,
+      "why": "dbo.carts.customer_id is nullable; cart ...3303, a guest's, has none"
+    },
+    { "name": "created_at", "nullable": false },
+    {
+      "name": "checked_out_at",
+      "nullable": true,
+      "why": "dbo.carts.checked_out_at is nullable; carts ...3303 and ...3304 are still open"
+    },
+    {
+      "name": "product_id",
+      "nullable": true,
+      "why": "the left join finds no item for Fatima's cart ...3304, which has none"
+    },
+    {
+      "name": "sku",
+      "nullable": true,
+      "why": "the left joins find no item, so no product, for Fatima's cart ...3304"
+    },
+    {
+      "name": "product_name",
+      "nullable": true,
+      "why": "the left joins find no item, so no product, for Fatima's cart ...3304"
+    },
+    {
+      "name": "quantity",
+      "nullable": true,
+      "why": "the left join finds no item for Fatima's cart ...3304, which has none"
+    },
+    {
+      "name": "added_at",
+      "nullable": true,
+      "why": "the left join finds no item for Fatima's cart ...3304, which has none"
+    }
+  ],
+  "samples": [
+    { "cart_id": "'3F2504E0-4F89-41D3-9A0C-0305E82C3303'" },
+    { "cart_id": "'3F2504E0-4F89-41D3-9A0C-0305E82C3304'" }
+  ]
+}

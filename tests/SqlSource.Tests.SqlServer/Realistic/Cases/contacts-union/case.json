@@ -1,0 +1,20 @@
+{
+  "columns": [
+    { "name": "name", "nullable": false },
+    {
+      "name": "email",
+      "nullable": true,
+      "why": "dbo.customers.email is nullable in both branches; Chen and Fatima, and Chen's recipients, have none"
+    },
+    {
+      "name": "phone",
+      "nullable": true,
+      "why": "dbo.customers.phone is nullable in both branches; Dana, Eli and Fatima have none"
+    },
+    { "name": "source", "nullable": false }
+  ],
+  "samples": [
+    { "q": "N'%'" },
+    { "q": "N'B%'" }
+  ]
+}

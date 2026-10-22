@@ -1,0 +1,23 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "status", "nullable": false },
+    {
+      "name": "previous_note",
+      "nullable": true,
+      "why": "dbo.orders.note is nullable, and deleted holds it as it was; order 13, of overdue invoice 13, has none"
+    },
+    { "name": "note", "nullable": false },
+    { "name": "invoice_number", "nullable": false },
+    { "name": "due_at", "nullable": false },
+    { "name": "outstanding", "nullable": false },
+    {
+      "name": "shipped_at",
+      "nullable": true,
+      "why": "dbo.orders.shipped_at is nullable, and the update keeps it; order 13, pending, was never shipped"
+    }
+  ],
+  "samples": [
+    { "as_of": "'2024-11-01'" }
+  ]
+}

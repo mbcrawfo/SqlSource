@@ -1,0 +1,20 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "placed_at", "nullable": false },
+    { "name": "status", "nullable": false },
+    {
+      "name": "ship_city",
+      "nullable": true,
+      "why": "dbo.orders.ship_city is nullable; Ana's draft order 15 has none"
+    },
+    {
+      "name": "lines",
+      "nullable": true,
+      "why": "a FOR JSON subquery over no rows is NULL; Ana's draft order 15 has no lines"
+    }
+  ],
+  "samples": [
+    { "customer_id": "1" }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "sku", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "color",
+      "nullable": true,
+      "why": "JSON_VALUE is NULL for a missing path or NULL text; product 3 has no color, 5 and 6 no attributes"
+    },
+    {
+      "name": "weight_kg",
+      "nullable": true,
+      "why": "JSON_VALUE is NULL for a missing path, and CAST keeps it; only product 1 has a weight_kg"
+    }
+  ],
+  "samples": [
+    { "color": "NULL" },
+    { "color": "N'black'" }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "placed_at", "nullable": false },
+    { "name": "status", "nullable": false },
+    { "name": "customer_name", "nullable": false },
+    {
+      "name": "customer_email",
+      "nullable": true,
+      "why": "dbo.customers.email is nullable, of the alias type dbo.Email; Chen, of orders 5 and 10, has none"
+    },
+    {
+      "name": "ship_city",
+      "nullable": true,
+      "why": "dbo.orders.ship_city is nullable; with no filter, orders 8, 10 and 15 have none"
+    },
+    {
+      "name": "shipped_at",
+      "nullable": true,
+      "why": "dbo.orders.shipped_at is nullable; cancelled order 5 and pending orders 13 to 15 were never shipped"
+    },
+    { "name": "note", "nullable": true, "why": "dbo.orders.note is nullable; most orders, such as 2, have none" }
+  ],
+  "samples": [
+    { "customer_id": "NULL", "status": "NULL", "placed_from": "NULL", "placed_to": "NULL", "ship_city": "NULL" },
+    {
+      "customer_id": "2",
+      "status": "'delivered'",
+      "placed_from": "'2024-03-01'",
+      "placed_to": "'2024-10-01'",
+      "ship_city": "NULL"
+    },
+    { "customer_id": "NULL", "status": "NULL", "placed_from": "NULL", "placed_to": "NULL", "ship_city": "N'London'" }
+  ]
+}

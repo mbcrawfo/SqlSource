@@ -1,0 +1,21 @@
+{
+  "columns": [
+    { "name": "kind", "nullable": false },
+    { "name": "reference_id", "nullable": false },
+    { "name": "occurred_at", "nullable": false },
+    {
+      "name": "amount",
+      "nullable": true,
+      "why": "the subquery's SUM over no lines is NULL; Ana's draft order 15 has no lines"
+    },
+    { "name": "detail", "nullable": false },
+    {
+      "name": "note",
+      "nullable": true,
+      "why": "dbo.orders.note and billing.payments.reference are nullable; Ana's order 2 has no note"
+    }
+  ],
+  "samples": [
+    { "customer_id": "1" }
+  ]
+}
