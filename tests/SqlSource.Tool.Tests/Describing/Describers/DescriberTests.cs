@@ -140,8 +140,8 @@ public sealed class DescriberTests
     }
 
     // The sidecar reads a SQL Server type, but the records the describer of the tests puts through the exchange
-    // (FakeCalls) carry PostgreSQL's types and those of an engine the sidecar's model does not know: a SQL Server
-    // type is refused there, until phase 6 adds that engine's describer.
+    // (FakeCalls) carry only PostgreSQL's types and those of an engine the sidecar's model does not know: a SQL Server
+    // type is refused there, since SQL Server's describer carries its own records.
     [Fact]
     public async Task DescribeAsync_DescriptionWithASqlServerType_IsNotCarriedThroughTheExchange()
     {

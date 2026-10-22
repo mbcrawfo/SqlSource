@@ -6,6 +6,7 @@ using SqlSource.Diagnostics;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Parsing;
 using SqlSource.Settings;
+using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Types;

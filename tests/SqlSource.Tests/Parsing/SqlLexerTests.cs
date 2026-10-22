@@ -7,9 +7,9 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-// A test without a dialect in its name reads by the ANSI rules, which are the default.  An internal type cannot be
-// the parameter of a public test method, so a row names its dialects, separated by commas.  An option of a dialect
-// follows it after a plus sign, as in "MySql+AnsiQuotes".
+// A test reads by the ANSI rules, which are the default, unless its name, its rows or its body name others.  An
+// internal type cannot be the parameter of a public test method, so a row names its dialects, separated by commas.  An
+// option of a dialect follows it after a plus sign, as in "MySql+AnsiQuotes".
 public sealed class SqlLexerTests
 {
     private const string AllDialects = "Ansi,SqlServer,PostgreSql,CockroachDb,MySql,MariaDb,Sqlite,Oracle";

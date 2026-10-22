@@ -5,7 +5,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation.Types;
-using SqlSource.Settings.ClrTypes;
 using SqlSource.Testing.Generator;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
@@ -542,15 +541,6 @@ public sealed class MappedTypeResolverTests
         );
 
         types.ShouldHaveSingleItem().Status.ShouldBe(MappedTypeStatus.NotFound);
-    }
-
-    // An open generic is the spec's case of a type that cannot be a property's.  The grammar has no way to write
-    // one, so no override names it.
-    [Fact]
-    public void TryParse_OpenGeneric_IsRefused()
-    {
-        ClrTypeName.TryParse("System.Collections.Generic.List<>".AsSpan(), out _).ShouldBeFalse();
-        ClrTypeName.TryParse("global::MyApp.Box<>".AsSpan(), out _).ShouldBeFalse();
     }
 
     [Fact]

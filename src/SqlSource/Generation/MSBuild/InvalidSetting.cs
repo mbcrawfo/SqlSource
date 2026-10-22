@@ -1,5 +1,5 @@
 using System;
-using SqlSource.Settings;
+using SqlSource.Settings.TypeOverrides;
 
 namespace SqlSource.Generation.MSBuild;
 

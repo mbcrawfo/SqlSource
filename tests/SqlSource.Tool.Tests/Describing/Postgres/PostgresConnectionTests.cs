@@ -46,7 +46,7 @@ public sealed class PostgresConnectionTests
 
     // What the driver throws, when a connection string names a file, is no NpgsqlException: it reads the file when it
     // has a server to talk to, a client certificate once the server agrees to TLS and a password file once the
-    // server asks for a password, so a closed port proves nothing and these tests have a server of their own words.
+    // server asks for a password, so a closed port proves nothing and these tests talk to FakePostgresServer.
     // The driver's text quotes the path.  The message is the constant, with no inner exception to repeat it.
     [Fact]
     public async Task OpenAsync_ClientCertificateThatIsNotThere_ThrowsTheFixedMessage()

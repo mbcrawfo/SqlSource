@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Settings;
+using SqlSource.Settings.TypeOverrides;
 
 namespace SqlSource.Generation.Types;
 

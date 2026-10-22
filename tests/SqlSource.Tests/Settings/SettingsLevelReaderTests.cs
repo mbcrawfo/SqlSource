@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Settings;
+using SqlSource.Settings.TypeOverrides;
 using Xunit;
 
 namespace SqlSource.Tests.Settings;

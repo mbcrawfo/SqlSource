@@ -17,7 +17,7 @@ internal static class SqlDescribableDialects
 
     /// <summary>
     /// The engine whose rules read a file's type override: SQL Server for <see cref="SqlDialect.SqlServer" />, and
-    /// PostgreSQL for every other dialect, as before SQL Server's map.
+    /// PostgreSQL for every other dialect.
     /// </summary>
     public static DatabaseEngine EngineOf(SqlDialect dialect) =>
         dialect == SqlDialect.SqlServer ? DatabaseEngine.SqlServer : DatabaseEngine.PostgreSql;

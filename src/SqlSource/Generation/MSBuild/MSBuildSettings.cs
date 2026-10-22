@@ -11,7 +11,8 @@ namespace SqlSource.Generation.MSBuild;
 /// </summary>
 /// <remarks>
 /// The dialect is not read here.  It is an input of the parse and is resolved before it, by
-/// <see cref="DialectSetting" />; everything here joins after a type's queries are selected.
+/// <see cref="DialectSetting" />.  Of what is read here, only whether a list asks for <c>keep-comments</c> reaches the
+/// parse, through <see cref="FileParseInput" />; everything else joins after a type's queries are selected.
 /// </remarks>
 internal static class MSBuildSettings
 {

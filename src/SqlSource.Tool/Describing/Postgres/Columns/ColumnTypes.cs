@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using SqlSource.Tool.Describing.Postgres.Types;
 
 namespace SqlSource.Tool.Describing.Postgres.Columns;
 

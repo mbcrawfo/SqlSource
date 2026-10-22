@@ -193,7 +193,8 @@ public sealed class PlanInstancesTests
         r.Child.ShouldBeNull();
     }
 
-    // The plan of a CTE hangs under whichever node first needs it: its scans are no instances of this plan's joins.
+    // A child that is another plan, an InitPlan, a SubPlan, a Member or a Subquery, is not followed: its scans are no
+    // instances of this plan's joins.
     [Theory]
     [InlineData("InitPlan")]
     [InlineData("SubPlan")]

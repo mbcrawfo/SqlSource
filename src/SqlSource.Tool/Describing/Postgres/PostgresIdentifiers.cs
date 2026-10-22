@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.Text;
 using SqlSource.Parsing.Quoting;
+using SqlSource.Tool.Describing.Postgres.Statements;
 
 namespace SqlSource.Tool.Describing.Postgres;
 

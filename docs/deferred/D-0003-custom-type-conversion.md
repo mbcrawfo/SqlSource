@@ -8,7 +8,7 @@ The [epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.m
 
 [`SQLSRC232`](../manual/diagnostics.md#sqlsrc232), raised by [`PostgresErrors`](../../src/SqlSource.Tool/Describing/Postgres/PostgresErrors.cs) for a parameter whose type Npgsql cannot bind: a composite type, a table's row type, `regclass` and the other types of the system catalogs that Npgsql does not load, and a type whose schema or name holds a `.`.  The workaround is a `text` parameter with a cast in the SQL.  The tool never rewrites a user's SQL to make a parameter bindable.
 
-Sub-phase 5.2 delivered the [type override](../manual/settings.md#setting-type-overrides), `SqlSourceTypeOverrides` and `-- type-override:`, which gives any database type, a composite included, the C# type of a project's choice for the models of sub-phase 5.3.  It is read by [`TypeOverrideGrammar`](../../src/SqlSource/Settings/TypeOverrideGrammar.cs) and applied by [`QueryTyper`](../../src/SqlSource/Generation/Types/QueryTyper.cs).  It names a C# type and nothing else: no conversion, and no change to what is sent, so a parameter that `SQLSRC232` refuses is still refused.
+Sub-phase 5.2 delivered the [type override](../manual/settings.md#setting-type-overrides), `SqlSourceTypeOverrides` and `-- type-override:`, which gives any database type, a composite included, the C# type of a project's choice for the models of sub-phase 5.3.  It is read by [`TypeOverrideGrammar`](../../src/SqlSource/Settings/TypeOverrides/TypeOverrideGrammar.cs) and applied by [`QueryTyper`](../../src/SqlSource/Generation/Types/QueryTyper.cs).  It names a C# type and nothing else: no conversion, and no change to what is sent, so a parameter that `SQLSRC232` refuses is still refused.
 
 ## Why deferred
 

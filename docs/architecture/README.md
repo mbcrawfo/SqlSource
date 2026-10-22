@@ -75,7 +75,7 @@ What the compiler is given for one project, which the target `SqlSourceWriteMani
 
 ### Origin
 
-The column of a relation that a column of a result comes from, a `ColumnOrigin`, as the PostgreSQL describer finds it from the row description and the catalog.  An expression, a column of a set operation and a system column have none.
+The column of a table or view that a column of a result comes from, which the table match reads: the PostgreSQL describer's `ColumnOrigin`, from the row description and the catalog, and the SQL Server describer's, from the source columns of `sys.dm_exec_describe_first_result_set` (`SqlServerColumns.OriginOf`).  An expression, a column of a set operation and a system column have none.
 
 ### Plan walk
 

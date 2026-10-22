@@ -62,9 +62,10 @@ internal static class GeneratorParameterList
     public static WordEnumerator Words(ReadOnlySpan<char> text) => new(text);
 
     /// <summary>
-    /// Reads a list that is not in a marker.  Null when the value is empty or holds no word that is a parameter:
-    /// the level then gives no list.  A word that is no parameter is added to <paramref name="invalid" /> and the
-    /// other words apply.  <c>default</c> beside a word other than itself makes the whole value invalid.
+    /// Reads a list that is not in a marker.  Null when the value is empty, or holds no word that is a parameter or
+    /// <c>default</c>: the level then gives no list.  <c>default</c> alone or repeated is the empty list.  A word that
+    /// is no parameter is added to <paramref name="invalid" /> and the other words apply.  <c>default</c> beside a word
+    /// other than itself makes the whole value invalid.
     /// </summary>
     public static GeneratorParameters? Parse(string? value, List<string> invalid)
     {

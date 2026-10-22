@@ -22,6 +22,10 @@ internal sealed class FakeProject
 
     public string TargetFrameworks { get; set; } = "";
 
+    // A project that sets TargetFramework beside TargetFrameworks: its evaluation without a framework answers
+    // TargetFramework, and NuGet imports the package's props under it.
+    public bool KeepsTargetFramework { get; set; }
+
     public string ProjectAssetsFile { get; set; } = "";
 
     public List<string> PackageReferences { get; } = [];
@@ -68,7 +72,7 @@ internal sealed class FakeProject
         }
 
         var framework = FakeProcessRunner.PropertyOf(request, "TargetFramework");
-        var several = TargetFrameworks.Length > 0;
+        var several = TargetFrameworks.Length > 0 && !(KeepsTargetFramework && framework is null);
         var imported =
             several && framework is null ? "" : ImportedByFramework.GetValueOrDefault(framework ?? "", Imported);
         var json = JsonSerializer.Serialize(

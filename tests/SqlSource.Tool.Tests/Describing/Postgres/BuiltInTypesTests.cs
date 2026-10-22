@@ -1,5 +1,6 @@
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Types;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;

@@ -11,7 +11,8 @@ namespace SqlSource.Generation.Models;
 /// The models of each query that has them, in the order of the file.  A query with an error has none.
 /// </param>
 /// <param name="Diagnostics">
-/// The errors of the queries' names, each at its query's name, and <c>SQLSRC259</c> at its marker.
+/// The errors of the queries' names, each at its query's name, and <c>SQLSRC259</c> and <c>SQLSRC260</c>, each at its
+/// marker.
 /// </param>
 internal sealed record FileModels(
     string NormalizedPath,

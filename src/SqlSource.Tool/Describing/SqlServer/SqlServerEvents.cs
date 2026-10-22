@@ -17,10 +17,11 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// declarations it sent as <c>params</c>, or for <c>table</c>, whose text is the tool's, the <c>schema</c> and
 /// <c>table</c> it describes, and last <c>durationMs</c>.  A row is a map of every member of the record, named as the
 /// capture names it.  An error is the list of every error of the exception, in its order, each a map of <c>number</c>,
-/// <c>class</c>, <c>state</c> and <c>message</c>; the describer's own text of a connection that was lost or timed out
-/// has 0 for each number.  <c>open</c> has no event of its own: the run's <c>database.open</c> records what the session
-/// knows of its server, the four settings included.  A describe writes <c>declared</c> for each declared parameter, in
-/// the list's order, then <c>parameters</c>, then <c>probe</c> for each probe, one or two for each copy of a reused
+/// <c>class</c>, <c>state</c> and <c>message</c>; an error of the describer's own
+/// (<see cref="ConnectionErrors.Own" />), such as a connection found closed or a connection string it refuses, has 0
+/// for each number.  <c>open</c> has no event of its own: the run's <c>database.open</c> records what the session knows
+/// of its server, the four settings included.  A describe writes <c>declared</c> for each declared parameter, in the
+/// list's order, then <c>parameters</c>, then <c>probe</c> for each probe, one or two for each copy of a reused
 /// parameter whose copies' types differ, then <c>columns</c>; and for a statement with rows, <c>column</c> for each
 /// column in order, then <c>table</c> when every column has an origin in one table, then <c>table-match</c>.  An event
 /// is written only when its call was made or its step was reached, so a describe that fails writes nothing after the

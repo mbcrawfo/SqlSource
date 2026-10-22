@@ -11,7 +11,7 @@ using SqlSource.Tool.Reporting;
 namespace SqlSource.Tool.Describing;
 
 /// <summary>
-/// The last step of <c>describe --check</c>, in the place of <see cref="SidecarStore" />: compares what was
+/// The step of <c>describe --check</c> that stands in the place of <see cref="SidecarStore" />: compares what was
 /// described with the sidecars on the disk.  It reads nothing, changes nothing and reports nothing: each difference
 /// is an <c>SQLSRC219</c> in what it returns.
 /// </summary>

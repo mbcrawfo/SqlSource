@@ -5,6 +5,7 @@ using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Settings.TypeOverrides;
 using Xunit;
 
 namespace SqlSource.Tests.Parsing;

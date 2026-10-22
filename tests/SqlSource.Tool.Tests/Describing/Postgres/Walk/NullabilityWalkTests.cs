@@ -5,6 +5,7 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Columns;
+using SqlSource.Tool.Describing.Postgres.Types;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
@@ -540,7 +541,7 @@ public sealed class NullabilityWalkTests
         AnswersOf(RunOver(Products, InsertInto(Products, entry)))
             .ShouldBe([(nullable, nullable is null ? "no-origin" : "expression")]);
 
-    // Orders of the accounts "a", with columns that are never NULL and one that may be.
+    // Orders of the accounts "a", with columns that are never NULL and two that may be, note and parent_id.
     private static readonly PostgresTableRow OrdersO = PostgresTables.TableOf(
         16709,
         "o",
@@ -1015,7 +1016,8 @@ public sealed class NullabilityWalkTests
 
     public static TheoryData<string> Unusable => [.. UnusableRows.Keys];
 
-    // The first is a UNION's Append, which has no Output; the second has fewer entries than the result has columns.
+    // The two "no-output" rows: a UNION's Append, which has no Output, and an Output with fewer entries than the result
+    // has columns.
     [Theory]
     [MemberData(nameof(Unusable))]
     public void Run_PlanThatCannotBeUsed_IsUnavailableWithItsReasonAndEveryColumnKeepsWhatItWasBuiltWith(string name)

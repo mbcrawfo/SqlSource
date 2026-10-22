@@ -28,7 +28,7 @@ public sealed class ModelRunsTests
     }
 
     [Fact]
-    public void Entry_NoColumns_HasNoRows()
+    public void Entry_NullColumns_HasNoRows()
     {
         var entry = Entry(Users, "GetUser", [Parameter("a")], null);
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using SqlSource.Parsing;
+using SqlSource.Tool.Describing.Postgres.Statements;
 
 namespace SqlSource.Tool.Describing.Postgres;
 

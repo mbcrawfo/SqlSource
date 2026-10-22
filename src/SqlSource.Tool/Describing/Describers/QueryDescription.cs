@@ -13,8 +13,14 @@ namespace SqlSource.Tool.Describing.Describers;
 /// </param>
 /// <param name="Columns">The columns, in order.  Null when there are no rows.</param>
 /// <param name="MatchesTable">The table whose column list the result is, or null.</param>
-/// <param name="Plan">Whether the nullability plan walk ran.  Provenance.</param>
-/// <param name="TableMatch">The first failing check of the table match.  Provenance.</param>
+/// <param name="Plan">
+/// What became of the nullability plan walk, a value of <c>SidecarValues.Plan</c>, or null for a statement without
+/// rows.  Provenance.
+/// </param>
+/// <param name="TableMatch">
+/// <c>matched</c>, or the first check of the table match that failed, a value of <c>SidecarValues.TableMatch</c>; null
+/// for a statement without rows.  Provenance.
+/// </param>
 internal sealed record QueryDescription(
     SidecarResultKind ResultKind,
     EquatableArray<DescribedParameter> Parameters,

@@ -3,7 +3,8 @@ using System;
 namespace SqlSource.Tool.Describing.Describers;
 
 /// <summary>
-/// What a describer needs to open a session.  It is the one thing that holds a connection's value.
+/// What a describer needs to open a session.  With the argument of <see cref="IQueryDescriber.SecretsOf" />, it is
+/// what holds a connection's value for a describer.
 /// </summary>
 /// <param name="Database">The logical name of the database, as the plan spells it.</param>
 /// <param name="Connection">The connection's value.  A describer hands it to its driver and to nothing else.</param>

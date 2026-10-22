@@ -14,7 +14,7 @@ using Xunit;
 namespace SqlSource.Tests.Diagnostics;
 
 // docs/manual/diagnostics.md is the list of diagnostics a user reads.  These tests keep it complete: a descriptor that
-// is added, removed or renamed fails the build of this project's tests until the document says the same.
+// is added, removed or renamed fails them until the document says the same.
 public sealed class DiagnosticsDocumentTests
 {
     private const string HeadingPrefix = "## ";
@@ -56,7 +56,7 @@ public sealed class DiagnosticsDocumentTests
     }
 
     // The section of SQLSRC109 tells a user what the generator parameters are.  A generator parameter that is added is
-    // added to this list and to the section together, and nothing the section names may be unknown to the parser.
+    // added to this list and to the section together; each name here must be in the section and known to the parser.
     [Fact]
     public void Document_UnknownGeneratorParameterSection_ListsEveryGeneratorParameter()
     {

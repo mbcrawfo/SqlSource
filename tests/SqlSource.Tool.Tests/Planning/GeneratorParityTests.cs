@@ -247,8 +247,7 @@ public sealed class GeneratorParityTests : IDisposable
         var run = GeneratorHarness.Run(output, [source], listed, dialect: dialect);
         var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
 
-        // A diagnostic of the compiler keeps its arguments to itself, so each side is compared by its message: the
-        // one descriptor's format with each side's arguments.
+        // Each side is compared by its message, as MessageOf says.
         var expected = InOrder(
             run.Result.Diagnostics.Where(IsCompared)
                 .Select(diagnostic =>

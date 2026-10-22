@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Settings.TypeOverrides;
 
 namespace SqlSource.Parsing.Markers;
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Settings;
+using SqlSource.Settings.TypeOverrides;
 using SqlSource.Testing.Generator;
 using Xunit;
 

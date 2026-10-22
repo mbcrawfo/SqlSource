@@ -49,8 +49,9 @@ internal sealed record WalkOutcome(
 /// function the plan prints bare is the catalog's.
 /// </param>
 /// <param name="Tables">
-/// The answer of <c>tables</c>, by OID, where the column of a reference inside an expression is looked up.  A
-/// relation it does not hold leaves the reference unproved.
+/// The rows of <c>tables</c>, by OID, with those <c>relations</c> answered for the relations the plan scans that
+/// <c>tables</c> did not, where the column of a reference inside an expression is looked up.  A relation it does not
+/// hold leaves the reference unproved.
 /// </param>
 /// <param name="ColumnTypes">
 /// The type of each column as the row description gives it, by OID, in the order of the columns.  A list of another

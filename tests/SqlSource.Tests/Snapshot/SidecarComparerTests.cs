@@ -283,8 +283,8 @@ public sealed class SidecarComparerTests
     public void FindDifference_ValueWithACharacterTheFormatEscapes_IsShownEscaped() =>
         ShouldDiffer(entry => entry with { Hash = "a\"b\n" }, "hash", "\"h\"", "\"a\\\"b\\n\"");
 
-    // The versions and the server differ between a developer's machine and CI by design, and provenance and origin
-    // are informational.
+    // The versions and the server differ between a developer's machine and CI by design, and provenance, origin,
+    // identity and computed are informational.  An entry's name and its span are not compared either.
     [Fact]
     public void FindDifference_MemberThatCheckDoesNotCompare_IsNull()
     {

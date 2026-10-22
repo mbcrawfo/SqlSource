@@ -1125,7 +1125,7 @@ public sealed class GeneratedSourceTests
 
     // CS8981 is reported from warning level 7 on, so it shows that the harness compiles at the highest level.
     [Fact]
-    public void Run_GeneratedCode_IsCompiledAtTheHighestWarningLevel()
+    public void CreateCompilation_LowercaseTypeName_ReportsCS8981()
     {
         var compilation = GeneratorHarness.CreateCompilation([
             new SourceFile("/app/Repo/Lowercase.cs", "internal class lowercase { }\n"),

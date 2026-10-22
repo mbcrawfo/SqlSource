@@ -7,7 +7,8 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.SqlServer;
 
 // A SQL Server type from a row of either procedure: the system type name and the facets verbatim, and the user type
-// when the row names one.  The rows are those of the spike's table of types.
+// when the row names one.  The rows are those of the table of types in
+// docs/superpowers/specs/2026-10-20-query-generation-phase-6-sql-server-spike.md.
 public sealed class SqlServerTypesTests
 {
     private const string TypesAssembly =

@@ -126,7 +126,8 @@ public sealed class SidecarTests
         UsableEntries(withoutEntry).ShouldBeEmpty();
     }
 
-    // An engine nobody knows is not a crash, and is never usable.
+    // An entry of another engine than the file's is never usable, whether SqlSource knows the engine, as mssql, or
+    // not, as oracle, which is no crash either.
     [Theory]
     [InlineData("mssql")]
     [InlineData("oracle")]

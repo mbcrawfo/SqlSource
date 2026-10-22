@@ -16,7 +16,10 @@ internal interface IRunLog
     bool Writes { get; }
 
     /// <summary>Writes one event.</summary>
-    /// <param name="name">The event's name: <c>run.start</c>, or <c>postgres.</c> and a describer's own.</param>
+    /// <param name="name">
+    /// The event's name: one of the run's, as <c>run.start</c>, or a describer's own after its engine and a dot,
+    /// <c>postgres.</c> or <c>mssql.</c>.
+    /// </param>
     /// <param name="members">Its members, in the order they are written.</param>
     void Write(string name, params LogMember[] members);
 }

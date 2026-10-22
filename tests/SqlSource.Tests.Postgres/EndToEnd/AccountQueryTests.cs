@@ -18,7 +18,7 @@ public sealed class AccountQueryTests(PostgresContainer postgres)
     private static readonly DateTimeOffset BobClosedAt = new(2024, 9, 1, 17, 45, 0, TimeSpan.Zero);
     private static readonly DateTimeOffset CarolCreatedAt = new(2024, 3, 1, 10, 0, 0, TimeSpan.Zero);
 
-    // The seed's three accounts, with the default of status and created_at and the generated name_length.
+    // The seed's three accounts, with the generated name_length.
     private static readonly AccountsDto[] Accounts =
     [
         new(1, "alice", "alice@example.com", "active", AliceCreatedAt, null, 5),

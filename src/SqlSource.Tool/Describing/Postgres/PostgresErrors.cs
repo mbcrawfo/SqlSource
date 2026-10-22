@@ -6,6 +6,8 @@ using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Describing.Postgres.Statements;
+using SqlSource.Tool.Describing.Postgres.Types;
 
 namespace SqlSource.Tool.Describing.Postgres;
 
