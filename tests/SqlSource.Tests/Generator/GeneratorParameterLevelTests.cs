@@ -10,7 +10,8 @@ namespace SqlSource.Tests.Generator;
 
 // The list of generator parameters in effect for a query, for a type that claims its file, is the one from the most
 // specific level that gives a list, whole: the query's markers, the preamble's, the attribute, the metadata of the
-// file's item, the project's property.  Two parameters change a query's SQL, and each row shows both.
+// file's item, the project's property.  Two parameters change a query's generated code, keep-comments its SQL and
+// no-token-validation its method's checks, and each row shows both.
 public sealed class GeneratorParameterLevelTests
 {
     private const string On = "keep-comments no-token-validation";

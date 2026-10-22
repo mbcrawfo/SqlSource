@@ -1,5 +1,6 @@
 using System;
 using SqlSource.Parsing;
+using SqlSource.Tool.Describing.Postgres.Statements;
 
 namespace SqlSource.Tool.Describing.Postgres;
 

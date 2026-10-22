@@ -7,9 +7,8 @@ using Xunit;
 
 namespace SqlSource.Tests.SqlServer.SqlClient61;
 
-// A SQL Server with the end-to-end database "app": the default image of the end-to-end project, its schema, its seed
-// and the table of the types of SQL Server 2025.  The image is the default image of DefaultImages, so that it is named
-// once.
+// A SQL Server of DefaultImages.SqlServer, the end-to-end project's default image, with the end-to-end database "app":
+// its schema, its seed and the table of the types of SQL Server 2025.
 public sealed class AppContainer : IAsyncLifetime
 {
     private const string Database = "app";

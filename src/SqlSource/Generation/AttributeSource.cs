@@ -110,7 +110,8 @@ internal static class AttributeSource
                 Models = 1,
 
                 /// <summary>
-                /// The SQL, the types, and a method that runs the query.
+                /// The SQL, the types, and, in a later release, a method that runs the query.  Until then it generates
+                /// what <see cref="Models" /> does.
                 /// </summary>
                 CodeGen = 2,
             }
@@ -142,7 +143,8 @@ internal static class AttributeSource
             }
 
             /// <summary>
-            /// The type a generated method returns many rows in.  Every one is filled before the method returns.
+            /// The type a generated method returns many rows in.  Every one is filled before the method returns.  It
+            /// has no effect until the methods that run the queries arrive in a later release.
             /// </summary>
             internal enum GeneratorCollectionType
             {
@@ -198,7 +200,8 @@ internal static class AttributeSource
             }
 
             /// <summary>
-            /// Where the methods that run the queries of a type go.
+            /// Where the methods that run the queries of a type go.  It has no effect until those methods arrive in a
+            /// later release.
             /// </summary>
             internal enum MethodLocation
             {
@@ -289,13 +292,15 @@ internal static class AttributeSource
 
                 /// <summary>
                 /// Where the methods that run the queries go.  The default is
-                /// <see cref="global::SqlSource.MethodLocation.ExtensionClass" />.
+                /// <see cref="global::SqlSource.MethodLocation.ExtensionClass" />.  It has no effect until those
+                /// methods arrive in a later release.
                 /// </summary>
                 public MethodLocation MethodLocation { get; set; }
 
                 /// <summary>
                 /// The type a method returns many rows in.  The default is
-                /// <see cref="global::SqlSource.GeneratorCollectionType.Array" />.
+                /// <see cref="global::SqlSource.GeneratorCollectionType.Array" />.  It has no effect until the methods
+                /// that run the queries arrive in a later release.
                 /// </summary>
                 public GeneratorCollectionType CollectionType { get; set; }
 

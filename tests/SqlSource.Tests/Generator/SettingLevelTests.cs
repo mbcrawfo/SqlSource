@@ -195,7 +195,7 @@ public sealed class SettingLevelTests
     [InlineData("InputModelSuffix = \"A B\"", "A B", "InputModelSuffix")]
     [InlineData("OutputModelSuffix = \"A.B\"", "A.B", "OutputModelSuffix")]
     [InlineData("ModelNamespace = \"App.\"", "App.", "ModelNamespace")]
-    public void Run_AttributePropertyWithANumberThatIsNoMember_IsAnErrorAtTheAttribute(
+    public void Run_AttributePropertyThatIsNotValid_IsAnErrorAtTheAttribute(
         string argument,
         string value,
         string property

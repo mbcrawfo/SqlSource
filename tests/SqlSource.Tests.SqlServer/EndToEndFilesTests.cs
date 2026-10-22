@@ -33,7 +33,7 @@ public sealed class EndToEndFilesTests
         EndToEndFiles.SqlServerBatches("SELECT 1 AS go\n").ShouldBe(["SELECT 1 AS go\n"]);
 
     [Fact]
-    public void SqlServerBatches_GoInsideAString_DoesNotSplit() =>
+    public void SqlServerBatches_GoFollowedByTextOnItsLine_DoesNotSplit() =>
         EndToEndFiles.SqlServerBatches("SELECT 'a\nGO here';\n").ShouldBe(["SELECT 'a\nGO here';\n"]);
 
     [Fact]

@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using SqlSource.Settings;
+using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Types;

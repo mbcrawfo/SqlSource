@@ -242,10 +242,10 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         sent.Parameters.ShouldBe(["id"]);
     }
 
-    // The live function itself, with a text no describe can bring it: "prepare" refuses such a text first.  Npgsql
-    // and the server read two statements.  With a named parameter Npgsql refuses and sends nothing; without one the
-    // server refuses the whole text.  Either way the answer is an error and the table of the second statement is
-    // still there.
+    // The live function itself, with a text no describe can bring it: ParameterPlaceholders.Rewrite refuses such a text
+    // first, SQLSRC230, and sends nothing.  Npgsql and the server read two statements.  With a named parameter Npgsql
+    // refuses and sends nothing; without one the server refuses the whole text.  Either way the answer is an error and
+    // the table of the second statement is still there.
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

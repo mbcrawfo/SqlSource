@@ -15,7 +15,8 @@ public sealed class PlanExpressionTests
 
     private static readonly Func<OutputReference, bool> AllProved = static _ => true;
 
-    // The context of a walk that proves each reference the predicate names, of no known type, and reads every group.
+    // The context of a walk that proves each reference the predicate names, of no known type, and reads every group
+    // unless groupPreserved vetoes one.
     private static ExpressionContext Untyped(
         bool catalogFunctions,
         Func<OutputReference, bool> proved,
@@ -251,7 +252,7 @@ public sealed class PlanExpressionTests
     public void NullableOf_CastOutsideAFamily_IsUnknown(string entry) =>
         PlanExpression.NullableOf(entry, Context(catalogFunctions: true)).ShouldBeNull();
 
-    // A form of the table takes the new forms as its arguments, and COALESCE and CASE take them too.
+    // A form of the table takes another as its argument, and COALESCE and CASE take them too.
     [Theory]
     [InlineData("COALESCE(u.note, ((id)::bigint * 2))")]
     [InlineData("CASE WHEN (id > 1) THEN (id * 2) ELSE length((name)::text) END")]

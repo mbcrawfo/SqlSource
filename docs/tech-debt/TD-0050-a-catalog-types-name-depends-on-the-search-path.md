@@ -2,11 +2,11 @@
 
 ## Problem
 
-The PostgreSQL describer names a type of `pg_catalog` that has no modifier by `format_type(oid, -1)`, the `FormatType` of a row of `types` ([`PostgresTypeNames`](../../src/SqlSource.Tool/Describing/Postgres/PostgresTypeNames.cs), `TypesSql` in [`PostgresLive`](../../src/SqlSource.Tool/Describing/Postgres/PostgresLive.cs)).  `format_type` writes a type by the session's `search_path`: when a type of the same name stands before `pg_catalog` on it, the catalog's type is qualified.  Seen on PostgreSQL 18 and 14: with a domain `public.text` and `Search Path=public,pg_catalog`, `SELECT NULL::pg_catalog.text` is named `pg_catalog.text` and not `text`.
+The PostgreSQL describer names a type of `pg_catalog` that has no modifier by `format_type(oid, -1)`, the `FormatType` of a row of `types` ([`PostgresTypeNames`](../../src/SqlSource.Tool/Describing/Postgres/Types/PostgresTypeNames.cs), `TypesSql` in [`PostgresLive`](../../src/SqlSource.Tool/Describing/Postgres/PostgresLive.cs)).  `format_type` writes a type by the session's `search_path`: when a type of the same name stands before `pg_catalog` on it, the catalog's type is qualified.  Seen on PostgreSQL 18 and 14: with a domain `public.text` and `Search Path=public,pg_catalog`, `SELECT NULL::pg_catalog.text` is named `pg_catalog.text` and not `text`.
 
 So such a name depends on the session, against the remark of `PostgresTypeNames` that the name of a type does not, and the sidecar of one query differs between two databases, or two connection strings, that differ only in a user's type named like a built-in.
 
-The `bindName` of such a type, the name `check` binds a parameter by and the sidecar records beside `name`, is not affected: [`PostgresBindNames`](../../src/SqlSource.Tool/Describing/Postgres/PostgresBindNames.cs) takes `format_type(oid, -1)` without a leading `pg_catalog.`, so it is `text` in either session.  Only `name` has the problem.
+The `bindName` of such a type, the name `check` binds a parameter by and the sidecar records beside `name`, is not affected: [`PostgresBindNames`](../../src/SqlSource.Tool/Describing/Postgres/Types/PostgresBindNames.cs) takes `format_type(oid, -1)` without a leading `pg_catalog.`, so it is `text` in either session.  Only `name` has the problem.
 
 A type of `pg_catalog` that takes a modifier is not affected: `format_type` special-cases every built-in one and never qualifies them.  The container test `DescribeAsync_BuiltInTypeHiddenOnTheSearchPath_IsStillTheCatalogsSpellingAndBindsByTheBareName` in [`ColumnTests`](../../tests/SqlSource.Tests.Postgres/Describer/ColumnTests.cs) guards `numeric(10,2)` under a domain named `numeric`.
 

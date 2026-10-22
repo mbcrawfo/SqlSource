@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using SqlSource.Settings;
+using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Types;

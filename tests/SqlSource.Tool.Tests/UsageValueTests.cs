@@ -12,7 +12,7 @@ public sealed class UsageValueTests
     [InlineData("Host=db", false)]
     [InlineData("a;b", false)]
     [InlineData("=", false)]
-    public void MayBePrintedAsPath_TokenWithoutAnEqualsSignAndASemicolon_IsTrue(string text, bool expected) =>
+    public void MayBePrintedAsPath_Token_IsTrueOnlyWithoutAnEqualsSignOrASemicolon(string text, bool expected) =>
         new UsageValue(null, text, 2).MayBePrintedAsPath.ShouldBe(expected);
 
     [Fact]

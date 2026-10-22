@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using SqlSource.Generation.Types;
-using SqlSource.Settings;
+using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using Xunit;
@@ -284,10 +284,6 @@ public sealed class PostgresTypeMapTests
     [Fact]
     public void Keys_OfTheMap_AreTheKnownNamesOfTheSettings() =>
         PostgresTypeMap.Keys.ShouldBe(TypeKeys.KnownNames, ignoreOrder: true);
-
-    [Fact]
-    public void Keys_OfTheSqlServerMap_AreTheKnownSqlServerNamesOfTheSettings() =>
-        SqlServerTypeMap.Keys.ShouldBe(TypeKeys.KnownSqlServerNames, ignoreOrder: true);
 
     [Theory]
     [InlineData("citext", "public", "string")]

@@ -1,11 +1,12 @@
 using System.Collections.Immutable;
 using Shouldly;
 using SqlSource.Settings;
+using SqlSource.Settings.TypeOverrides;
 using Xunit;
 
 namespace SqlSource.Tests.Settings;
 
-// Every setting resolves by one rule: the most specific level that has a value gives it.
+// Every setting but the type override resolves by one rule: the most specific level that has a value gives it.
 public sealed class QuerySettingsTests
 {
     private static readonly SettingsLevel Keep = new() { Parameters = GeneratorParameters.KeepComments };

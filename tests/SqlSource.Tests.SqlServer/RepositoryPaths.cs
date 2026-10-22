@@ -27,7 +27,8 @@ internal static class RepositoryPaths
     // The file of the classes that claim the realistic cases as Models queries.
     public static string RealisticQueries { get; } = Path.Combine(Realistic, "Generation", "RealisticQueries.cs");
 
-    // The databases "app" and "billing" of the end-to-end tests, from EndToEndEngine.
+    // The end-to-end project's folder EndToEnd/: the folders of the databases "app" and "billing", and Queries/, from
+    // EndToEndEngine.
     public static string EndToEnd => EndToEndEngine.SqlServer.Folder;
 
     public static string EndToEndProject { get; } =

@@ -52,7 +52,6 @@ public sealed class UserDocsSamplesTests
                 continue;
             }
 
-            // The block's text starts on the line after its fence.
             problems.AddRange(
                 SqlFileParser
                     .Parse(text, "Example.sql", dialect)
@@ -65,6 +64,7 @@ public sealed class UserDocsSamplesTests
 
     private static string Describe(string file, int fence, string text, SqlParseError error)
     {
+        // The block's text starts on the line after its fence.
         var line = fence + 1 + text.Take(error.Span.Start).Count(character => character == '\n');
         var descriptor = SqlDiagnostics.ForParseError(error.Kind);
         object?[] arguments = [.. error.Arguments];

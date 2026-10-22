@@ -145,7 +145,7 @@ public sealed class DescriberFixtureTests : IDisposable
         }
     }
 
-    // The cases of the SQL Server describer.
+    // The cases of the SQL Server describer.  A build that copied none would leave the theory with nothing to run.
     [Fact]
     public void Cases_OfSqlServer_HoldEveryCase()
     {
@@ -156,6 +156,24 @@ public sealed class DescriberFixtureTests : IDisposable
             {
                 "mssql/delete-declared-only",
                 "mssql/insert-declared",
+                "mssql/insert-output",
+                "mssql/merge-output",
+                "mssql/select-aggregates",
+                "mssql/select-alias-and-clr",
+                "mssql/select-columns-differ",
+                "mssql/select-computed-not-null",
+                "mssql/select-first-result-set",
+                "mssql/select-hidden-period",
+                "mssql/select-left-join",
+                "mssql/select-names-differ",
+                "mssql/select-nullability-differs",
+                "mssql/select-order-differs",
+                "mssql/select-other-database",
+                "mssql/select-several-tables",
+                "mssql/select-table-function",
+                "mssql/select-table-star",
+                "mssql/select-temporal-all",
+                "mssql/select-view-star",
                 "mssql/update-copies-agree",
                 "mssql/update-inferred",
                 "mssql/update-optional-filter",
@@ -185,6 +203,8 @@ public sealed class DescriberFixtureTests : IDisposable
     [InlineData("parameters")]
     [InlineData("probe", "update-optional-filter")]
     [InlineData("declared", "insert-declared")]
+    [InlineData("columns")]
+    [InlineData("table", "select-table-star")]
     public Task Replay_SqlServerCaptureWithACallRemoved_ThrowsACaptureMiss(
         string method,
         string from = "update-inferred"

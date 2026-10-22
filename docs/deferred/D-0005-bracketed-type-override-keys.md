@@ -6,7 +6,7 @@ Phase 6 of the [query generation epic](../superpowers/specs/2026-10-07-query-gen
 
 ## Delivered instead
 
-[Sub-phase 6.4](../superpowers/specs/2026-10-20-query-generation-phase-6-4-type-map-design.md) refuses a bracketed key, as the grammar of `Settings/TypeKeys.cs` and `Settings/TypeOverrideGrammar.cs` already does, and the help of the error shows the plain and the quoted forms, which mean what they mean for PostgreSQL: a plain part compared ignoring case, a quoted part compared exactly.
+[Sub-phase 6.4](../superpowers/specs/2026-10-20-query-generation-phase-6-4-type-map-design.md) refuses a bracketed key, as the grammar of `Settings/TypeOverrides/TypeKeys.cs` and `Settings/TypeOverrides/TypeOverrideGrammar.cs` already does, and the help of the error shows the plain and the quoted forms, which mean what they mean for PostgreSQL: a plain part compared ignoring case, a quoted part compared exactly.
 
 ## Why deferred
 

@@ -115,7 +115,12 @@ public sealed class ProjectEvaluatorTests : IDisposable
     [Fact]
     public async Task Evaluate_ProjectWithBothKindsOfFramework_KeepsTheOneItHas()
     {
-        _runner.Default = new FakeProject { TargetFramework = "net9.0" };
+        _runner.Default = new FakeProject
+        {
+            TargetFramework = "net9.0",
+            TargetFrameworks = "net8.0;net9.0",
+            KeepsTargetFramework = true,
+        };
 
         _ = await EvaluateAsync();
 

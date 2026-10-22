@@ -104,7 +104,7 @@ public sealed class SqlServerTableMatcherTests
     [Theory]
     [InlineData("Name")]
     [InlineData("name!")]
-    public void Match_NamesDifferInCase_NamesDiffer(string name) =>
+    public void Match_NameThatDiffersInCaseOrHasASuffix_IsNamesDiffer(string name) =>
         SqlServerTableMatcher
             .Match(
                 [From("id", nullable: false), From("name", nullable: false) with { Name = name }, From("note", true)],

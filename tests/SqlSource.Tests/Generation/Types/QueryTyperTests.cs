@@ -8,6 +8,7 @@ using SqlSource.Generation.Sidecars;
 using SqlSource.Generation.Types;
 using SqlSource.Parsing;
 using SqlSource.Settings;
+using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
@@ -15,9 +16,10 @@ using Xunit;
 
 namespace SqlSource.Tests.Generation.Types;
 
-// The typer called directly, for what no sidecar the reader accepts can hold, and for the queries of mssql, whose
-// entries no generator run uses yet.  The driver tests of the type override are in
-// tests/SqlSource.Tests/Generator/TypeOverrideLevelTests.cs.
+// The typer called directly, for what no sidecar the reader accepts can hold, and for SQL Server's map and type
+// override over one entry built here.  The driver tests of the type override are in
+// tests/SqlSource.Tests/Generator/TypeOverrideLevelTests.cs, and those of SQL Server's models in
+// tests/SqlSource.Tests/Generator/SqlServerModelTests.cs.
 public sealed class QueryTyperTests
 {
     private const string Guid = "global::System.Guid";

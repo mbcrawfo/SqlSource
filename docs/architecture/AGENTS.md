@@ -12,7 +12,7 @@ Each page is in this folder.
 | `src/SqlSource/Generation`, with `Models/`, `Paths/`, `Sidecars/` and `Types/` | `generator.md` | `## The pipeline` |
 | `src/SqlSource/Generation/MSBuild` | `generator.md` | `## Settings` |
 | `src/SqlSource/Generation/Emitting` | `generator.md` | `## Emitting` |
-| `src/SqlSource/Settings`, with `ClrTypes/` | `generator.md` | `## Settings` |
+| `src/SqlSource/Settings`, with `ClrTypes/` and `TypeOverrides/` | `generator.md` | `## Settings` |
 | `src/SqlSource/Parsing`, with `Markers/`, `Quoting/` and `Tokens/` | `generator.md` | `## Parsing` |
 | `src/SqlSource/Diagnostics` | `generator.md` | `## Diagnostics` |
 | `src/SqlSource/Snapshot`, with `Reading/` | `generator.md` | `## Snapshot` |
@@ -26,7 +26,7 @@ Each page is in this folder.
 | `src/SqlSource.Tool/Logging` and `src/SqlSource.Tool/Reporting` | `tool.md` | `## Logging and reporting` |
 | `src/SqlSource.Tool/Describing/Describers` | `postgres-describer.md` | `## The describer contract` |
 | `src/SqlSource.Tool/Describing/Capture` | `postgres-describer.md` | `## Capture and replay` |
-| `src/SqlSource.Tool/Describing/Postgres`, with `Columns/` | `postgres-describer.md`, `postgres-nullability.md` | `## One describe, step by step`, `## Building parameters and columns`, `## Matching a table`, `## Errors`, `## Why a query cannot run a statement`; `## Nullability` in `postgres-nullability.md` |
+| `src/SqlSource.Tool/Describing/Postgres`, with `Columns/`, `Statements/` and `Types/` | `postgres-describer.md`, `postgres-nullability.md` | `## One describe, step by step`, `## Building parameters and columns`, `## Matching a table`, `## Errors`, `## Why a query cannot run a statement`; `## Nullability` in `postgres-nullability.md` |
 | `src/SqlSource.Tool/Describing/Postgres/Walk` | `postgres-nullability.md` | `## The plan walk` |
 | `src/SqlSource.Tool/Describing/SqlServer` | `sqlserver-describer.md` | Every section |
 

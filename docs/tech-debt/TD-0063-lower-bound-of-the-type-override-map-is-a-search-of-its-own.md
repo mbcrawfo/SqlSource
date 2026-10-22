@@ -2,7 +2,7 @@
 
 ## Problem
 
-[`SortedSearch`](../../src/SqlSource/SortedSearch.cs) is the one exact binary search of the generator's sorted lists: `SqlPath.IndexOf` and `MappedTypeResolver.Find` search through it.  [`TypeOverrideMap`](../../src/SqlSource/Settings/TypeOverrideMap.cs) is the third search that was written out beside them, and it stays apart: its `LowerBound` finds the first entry that is not less than a key, which `SortedSearch` does not offer, over a `KeyParts`, a `ref struct` that holds spans of the key's text.  On netstandard2.0 a generic helper cannot take a `ref struct` as its key, for that needs `allows ref struct`.  So a change to how the map's entries are searched is made in `LowerBound` and not in `SortedSearch`.
+[`SortedSearch`](../../src/SqlSource/SortedSearch.cs) is the one exact binary search of the generator's sorted lists: `SqlPath.IndexOf` and `MappedTypeResolver.Find` search through it.  [`TypeOverrideMap`](../../src/SqlSource/Settings/TypeOverrides/TypeOverrideMap.cs) is the third search that was written out beside them, and it stays apart: its `LowerBound` finds the first entry that is not less than a key, which `SortedSearch` does not offer, over a `KeyParts`, a `ref struct` that holds spans of the key's text.  On netstandard2.0 a generic helper cannot take a `ref struct` as its key, for that needs `allows ref struct`.  So a change to how the map's entries are searched is made in `LowerBound` and not in `SortedSearch`.
 
 ## Why it exists
 

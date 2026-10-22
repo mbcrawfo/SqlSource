@@ -210,8 +210,7 @@ public sealed class SqlServerEventsTests
             );
     }
 
-    // An answer with neither rows nor an error is a bug of the describer: the event holds no rows, as prepare holds
-    // no types.
+    // An answer with neither rows nor an error is a bug of the describer: the event holds no rows.
     [Fact]
     public void Parameters_AnswerWithNothing_WritesNoRows()
     {
@@ -806,7 +805,7 @@ public sealed class SqlServerEventsTests
     }
 
     // As a run gives the describer its log: the engine before each name, and the connection's value written as ***
-    // wherever it stands: in the SQL, in the declarations and in a string of a row.
+    // wherever it stands: in the declarations and in a string of a row.
     [Fact]
     public async Task DescribeAsync_ThroughTheLogOfASession_HasTheEngineBeforeEachNameAndNothingOfTheSecret()
     {

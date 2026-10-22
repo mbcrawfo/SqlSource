@@ -9,7 +9,8 @@ namespace SqlSource.Tool;
 
 /// <summary>
 /// What the tool takes from outside itself.  Nothing in the tool reads <see cref="Console" />,
-/// <see cref="Environment" /> or the current directory except through a host, so that a test can give a run its own.
+/// <see cref="Environment" /> or the current directory except <see cref="Create" /> and
+/// <see cref="Cli.Run(string[])" />, the entry of a real run, so that a test can give a run its own.
 /// </summary>
 /// <param name="Out">Where everything but an error goes.</param>
 /// <param name="Error">Where an error goes.</param>

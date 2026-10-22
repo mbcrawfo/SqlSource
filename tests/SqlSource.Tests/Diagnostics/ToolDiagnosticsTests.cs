@@ -79,8 +79,8 @@ public sealed class ToolDiagnosticsTests
             ToolDiagnostics.FileNotInRun,
             ToolDiagnostics.DirectoryCannotBeRead,
         };
-        // SQLSRC231 starts with the name of the reader and SQLSRC266 with a column's position, and their own tests
-        // format them.
+        // SQLSRC200 is formatted above, and SQLSRC215 starts with a count, SQLSRC231 with the name of the reader and
+        // SQLSRC266 with a column's position; their own tests format them.
         foreach (
             var descriptor in ToolDiagnostics
                 .All.Remove(ToolDiagnostics.UnexpectedFailure)

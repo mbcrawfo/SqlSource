@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
-        The end-to-end read of all_types on Npgsql 8.0.9, the oldest driver that is supported.  A project of its own,
-        since the end-to-end project gets Npgsql 10 through the tool it references.  The generator comes from a project
-        reference, which does not bring the package's MSBuild files, so the real ones are imported here and at the end
-        of this file.
+        The end-to-end read of all_types on Npgsql 8.0.9, the latest 8.0 release; 8.0 is the oldest version that is
+        supported.  A project of its own, since the end-to-end project gets Npgsql 10 through the tool it references.
+        The generator comes from a project reference, which does not bring the package's MSBuild files, so the real
+        ones are imported here and at the end of this file.
     -->
     <Import Project="../../src/SqlSource/build/SqlSource.props" />
     <PropertyGroup>

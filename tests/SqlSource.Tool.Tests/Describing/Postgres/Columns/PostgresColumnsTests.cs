@@ -4,6 +4,7 @@ using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Columns;
+using SqlSource.Tool.Describing.Postgres.Types;
 using SqlSource.Tool.Testing;
 using Xunit;
 

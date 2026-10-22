@@ -15,8 +15,8 @@ namespace SqlSource.Generation;
 
 /// <summary>
 /// Reads a type marked with the generated attribute into a <see cref="TargetType" />.  It is one of the few steps that
-/// look at symbols and syntax, beside the check of the target framework, <c>NpgsqlProbe</c>, <c>MappedTypeResolver</c>
-/// and <c>ModelNameChecker</c>; every step after them works on data.
+/// look at symbols and syntax, beside the check of the target framework, <c>NpgsqlProbe</c>, <c>SqlClientProbe</c>,
+/// <c>MappedTypeResolver</c> and <c>ModelNameChecker</c>; every step after them works on data.
 /// </summary>
 internal static class TargetTypeReader
 {
@@ -186,7 +186,8 @@ internal static class TargetTypeReader
     {
         public SettingPlace Place => SettingPlace.Attribute;
 
-        // A string that is empty or white space is not set, as Path is: the reader of the level says so.
+        // A string that is empty or white space is not set: the reader of the level says so.  Path is no setting, and
+        // is unset only when it is empty.
         public string? Text(SettingId setting) =>
             PropertyOf(setting) is { } property && GetNamedArgument(attribute, property) is { Value: string written }
                 ? written

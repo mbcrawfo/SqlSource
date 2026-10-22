@@ -47,7 +47,7 @@ public sealed class PostgresSessionTests
             .ShouldBe($"The database 'app' runs PostgreSQL {version}, and the tool supports 14 and later");
     }
 
-    // A version with no leading digits is not refused: the tool cannot tell what it is.
+    // A server at or above the floor opens, and so does a version with no leading digits, which the tool cannot read.
     [Theory]
     [InlineData("14.0")]
     [InlineData("18beta1")]

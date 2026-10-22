@@ -5,6 +5,7 @@ using SqlSource.Generation.Paths;
 using SqlSource.Generation.Types;
 using SqlSource.Parsing;
 using SqlSource.Settings;
+using SqlSource.Settings.TypeOverrides;
 using SqlSource.Testing.Generator;
 using Xunit;
 

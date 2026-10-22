@@ -6,6 +6,8 @@ using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Statements;
+using SqlSource.Tool.Describing.Postgres.Types;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 

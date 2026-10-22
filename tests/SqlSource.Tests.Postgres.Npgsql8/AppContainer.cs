@@ -6,8 +6,8 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.Npgsql8;
 
-// A PostgreSQL with the end-to-end database "app": the default image of the end-to-end project, its schema and its
-// seed.  The image is the default image of DefaultImages, so that it is named once.
+// A PostgreSQL of DefaultImages.Postgres, the end-to-end project's default image, with the end-to-end database "app":
+// its schema and its seed.
 public sealed class AppContainer : IAsyncLifetime
 {
     private const string Database = "app";

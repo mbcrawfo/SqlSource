@@ -91,13 +91,6 @@ public sealed class SidecarModelTests
     public void TryGetKind_AnyOtherValue_ReturnsFalse(string kind) =>
         Postgres(kind: kind).TryGetKind(out _).ShouldBeFalse();
 
-    [Theory]
-    [InlineData("Queries/Users.sql", "Queries/Users.sql.json")]
-    [InlineData(@"C:\app\Users.sql", @"C:\app\Users.sql.json")]
-    [InlineData("Users.SQL", "Users.SQL.json")]
-    public void PathFor_SqlPath_AppendsJson(string sqlPath, string expected) =>
-        SidecarFormat.PathFor(sqlPath).ShouldBe(expected);
-
     [Fact]
     public void SidecarFormat_IsVersionOneOfTheSchemaInTheRepository()
     {

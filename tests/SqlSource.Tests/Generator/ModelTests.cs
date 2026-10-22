@@ -660,7 +660,7 @@ public sealed class ModelTests
     // warning, so the list leaves out nothing the compiler objects to.
     [Theory]
     [MemberData(nameof(Kinds))]
-    public void Run_ReservedNamesConfirmed_CompileInNoModel(string kind)
+    public void Run_DeclaredNamesNotReserved_CompileInEachModel(string kind)
     {
         var names = DeclaredNames().Where(name => !PropertyNames.IsReserved(name)).ToArray();
         names.ShouldNotBeEmpty();

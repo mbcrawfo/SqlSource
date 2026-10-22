@@ -106,7 +106,7 @@ public sealed class SidecarWriterTests
         SidecarWriter.Write(SidecarOf(Entry(value))).ShouldContain("    \"" + value + "\": {\n");
     }
 
-    // What a hand-written writer gets wrong comes back as it went in.
+    // The characters a hand-written writer most often gets wrong read back as they went in.
     [Theory]
     [InlineData(0x00)]
     [InlineData(0x1F)]

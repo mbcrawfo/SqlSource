@@ -6,7 +6,8 @@ using SqlSource.Parsing;
 namespace SqlSource.Diagnostics;
 
 /// <summary>
-/// Every diagnostic the generator reports.  Each is an error that a consumer cannot turn off, unless its descriptor
+/// The generator's own diagnostics: every one it reports but <c>SQLSRC209</c> and <c>SQLSRC210</c>, which are in
+/// <see cref="ToolDiagnostics" />.  Each is an error that a consumer cannot turn off, unless its descriptor
 /// says why a project may configure it, as a warning or as information; <c>SqlDiagnosticsTests</c> lists those by id.
 /// </summary>
 /// <remarks>

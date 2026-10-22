@@ -8,6 +8,7 @@ using SqlSource.Tool;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Statements;
 using SqlSource.Tool.Testing;
 using Xunit;
 

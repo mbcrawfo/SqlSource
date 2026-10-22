@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Generation.Types;
+using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using Xunit;
@@ -10,6 +11,11 @@ namespace SqlSource.Tests.Generation.Types;
 
 public sealed class SqlServerTypeMapTests
 {
+    // The names a key may be written with are the map's own keys, so the map and the settings never drift apart.
+    [Fact]
+    public void Keys_OfTheMap_AreTheKnownSqlServerNamesOfTheSettings() =>
+        SqlServerTypeMap.Keys.ShouldBe(TypeKeys.KnownSqlServerNames, ignoreOrder: true);
+
     private const string DateTime = "global::System.DateTime";
     private const string Vector = "global::Microsoft.Data.SqlTypes.SqlVector<float>";
     private const string NeedsDriver = "!NeedsDriver";
