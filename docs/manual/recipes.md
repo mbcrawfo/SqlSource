@@ -335,7 +335,7 @@ connection.QueryAsync<ListCustomerOrdersSinceDto>(
 - **Send a `datetime2` parameter as a `datetime2`.**  Dapper sends a `DateTime` as a `datetime`, which holds a time to 1/300 of a second.  So `13:45:30.1234567` is written to a `datetime2(7)` column as `13:45:30.1233333`, and compared with one, it is another value: `WHERE placed_at = @placedAt` finds no row of the time you gave.  Send it as above, with `TypedParameter` from the next point, or give Dapper the input model in `DynamicParameters` and add that parameter with its `DbType`, under the query's name, where it takes the place of the model's property of the same name, whatever its case:
 
   ```csharp
-  var args = new ListCustomerOrdersSinceArgs(customerId, since);
+  var args = new ListCustomerOrdersSinceParams(customerId, since);
   var parameters = new DynamicParameters(args);
   parameters.Add("since", args.Since, DbType.DateTime2);
   ```
