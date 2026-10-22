@@ -23,8 +23,8 @@ public sealed class RealisticNullabilityNoiseTests(SqlServerContainer sqlServer)
             .Keys.Order()
             .ShouldBe(SqlServerContainer.RecordedMajors.Order(), "a recorded major and a budget differ");
 
-    // No description of a case is committed, so a count over the budget is read against the cases' truths: a count
-    // that differs from the budget lists the noisy columns, each as the safety tests name a column.
+    // A count that differs from the budget lists the noisy columns, each as the safety tests name a column, to read
+    // against the cases' truths; the cases that changed are in the diff of their sidecars too.
     [Fact]
     public async Task Noise_OverTheCorpus_IsTheBudget()
     {
@@ -52,10 +52,10 @@ public sealed class RealisticNullabilityNoiseTests(SqlServerContainer sqlServer)
             count,
             held,
             major,
-            "a change made the describer answer nullable or unknown where it answered not null.  No description of "
-                + "a case is committed to diff: compare what RealisticNullabilitySafetyTests describes of each case "
-                + "with the columns that its truth, case.json, calls not null; or, in a change that adds cases, raise "
-                + $"the budget of {major} in Budgets to {count} and say why in the commit."
+            "a change made the describer answer nullable or unknown where it answered not null, and the cases that "
+                + "changed fail RealisticDescriptionTests or are in the diff of their sidecars, query.sql.json; or, in "
+                + $"a change that adds cases, raise the budget of {major} in Budgets to {count} and say why in the "
+                + "commit."
         );
         if (verdict is not null)
         {
