@@ -32,4 +32,10 @@ internal static class RepositoryPaths
 
     // The table of the types that SQL Server 2025 brings, json and vector, applied to "app" on a major of 17 or later.
     public static string NewTypesSchema { get; } = Path.Combine(EndToEnd, "app", "new-types.sql");
+
+    // The folder of the end-to-end queries and their sidecars.
+    public static string EndToEndQueries { get; } = Path.Combine(EndToEnd, "Queries");
+
+    // The file of the queries of those types, NewTypes.sql, which a server before major 17 cannot describe.
+    public static string NewTypesQueries { get; } = Path.Combine(EndToEndQueries, "NewTypes.sql");
 }
