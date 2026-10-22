@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -25,11 +24,6 @@ internal static partial class EndToEndFiles
 
     // Reads the file and runs each of its batches as one command, in order, on one connection of the source, as
     // sqlcmd runs a script in one session.
-    [SuppressMessage(
-        "Security",
-        "CA2100:Review SQL queries for security vulnerabilities",
-        Justification = "The SQL is a file of the repository."
-    )]
     public static async Task RunAsync(
         DbDataSource source,
         string path,

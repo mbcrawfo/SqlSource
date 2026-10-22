@@ -8,9 +8,10 @@
 --
 -- all_types: row 1 has a value in every column, chosen to show the range of its type and to be exact in it, so that a
 -- test can compare it as it is read: float and real hold binary fractions, datetime ends in .003, which it holds
--- exactly, smalldatetime is on a whole minute, datetime2, time and datetimeoffset have all 7 digits, the text of char,
--- varchar and text is within code page 1252, and sql_variant holds an int.  Row 2 has NULL in every column but id and
--- rowversion_value, which the server fills in every row, as it does in row 1.
+-- exactly, smalldatetime is on a whole minute, both written with a T, which no SET DATEFORMAT or language reads
+-- otherwise, datetime2, time and datetimeoffset have all 7 digits, the text of char, varchar and text is within code
+-- page 1252, and sql_variant holds an int.  Row 2 has NULL in every column but id and rowversion_value, which the
+-- server fills in every row, as it does in row 1.
 
 SET IDENTITY_INSERT dbo.accounts ON;
 
@@ -44,7 +45,7 @@ INSERT INTO dbo.all_types (
     1,
     -9223372036854775808, 2147483647, -32768, 255, 1, 12345678.1234, -1234567.89, 922337203685477.5807,
     -214748.3648, -2.25, 1.5,
-    '2024-03-15', '2024-03-15 13:45:30.003', '2024-03-15 13:45:30.1234567', '2024-03-15 13:46:00',
+    '2024-03-15', '2024-03-15T13:45:30.003', '2024-03-15 13:45:30.1234567', '2024-03-15T13:46:00',
     '13:45:30.1234567', '2024-03-15 13:45:30.1234567 +02:00',
     'héllo', 'Grüße, café', 'Ünïcödé text', N'Zoë日本', N'Grüße, 日本語', N'Ζωή, 日本語',
     N'<root><item id="1">Zoë</item></root>',
