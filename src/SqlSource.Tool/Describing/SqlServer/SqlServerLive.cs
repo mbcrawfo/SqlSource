@@ -59,19 +59,23 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
     // mode 2: a view is its columns' source, as on PostgreSQL, and the one hidden column it adds is ROWSTAT.  Mode 1
     // names a view's base table and adds hidden key columns of every table read.  source_type is the tool's own: the
     // BaseType of the source, U for a table, V for a view and IF or TF for a table-valued function, whose columns the
-    // server names the function as the source of.  It is read only for a source of the session's database, the names
-    // compared by their code points as SqlServerColumns compares them: OBJECTPROPERTYEX reads the current database
-    // whatever OBJECT_ID named, and a name of two parts finds sys.databases of the system resource in it.
+    // server names the function as the source of.  It is read only for a source of the session's own server and
+    // database, the names compared by their code points as SqlServerColumns compares them: OBJECTPROPERTYEX reads the
+    // current database whatever OBJECT_ID named, a name of two parts finds sys.databases of the system resource in it,
+    // and a linked server's database of the session's name would find a local object of the source's name.
     private const string ColumnsSql = """
         SELECT is_hidden, column_ordinal, name, is_nullable, system_type_name, max_length, precision, scale,
             user_type_schema, user_type_name, assembly_qualified_type_name, source_server, source_database,
             source_schema, source_table, source_column, is_identity_column, is_computed_column, error_number,
             error_type, error_message,
             RTRIM(CAST(
-                CASE WHEN source_database = DB_NAME() COLLATE Latin1_General_BIN2 THEN OBJECTPROPERTYEX(
-                    OBJECT_ID(QUOTENAME(source_schema) + N'.' + QUOTENAME(source_table)),
-                    'BaseType'
-                ) END AS nvarchar(2)
+                CASE
+                    WHEN source_server IS NULL AND source_database = DB_NAME() COLLATE Latin1_General_BIN2
+                    THEN OBJECTPROPERTYEX(
+                        OBJECT_ID(QUOTENAME(source_schema) + N'.' + QUOTENAME(source_table)),
+                        'BaseType'
+                    )
+                END AS nvarchar(2)
             )) AS source_type
         FROM sys.dm_exec_describe_first_result_set(@tsql, @params, 2)
         ORDER BY column_ordinal

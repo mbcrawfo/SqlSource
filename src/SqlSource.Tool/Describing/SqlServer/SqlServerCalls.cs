@@ -245,8 +245,8 @@ internal sealed record SqlServerColumnsAnswer(
 /// <param name="SourceType">
 /// The tool's own column, which the function does not have: the <c>OBJECTPROPERTYEX</c> <c>BaseType</c> of the source
 /// table, <c>U</c> for a table, <c>V</c> for a view, <c>IF</c> or <c>TF</c> for a table-valued function; or null
-/// when the source is not in the session's database, or the row names none.  A capture recorded before it has no
-/// <c>columns</c> call at all.
+/// when the source is of a linked server or not in the session's database, or the row names none.  A capture recorded
+/// before it has no <c>columns</c> call at all.
 /// </param>
 internal sealed record SqlServerColumnRow(
     bool IsHidden,
