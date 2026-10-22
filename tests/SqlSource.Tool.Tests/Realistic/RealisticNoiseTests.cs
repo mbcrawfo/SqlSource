@@ -37,6 +37,33 @@ public sealed class RealisticNoiseTests
     }
 
     [Fact]
+    public void NoisyOf_Columns_GivesThePositionsOfANotNullTruthDescribedNullableOrUnknown()
+    {
+        var found = RealisticTestCases.Keyed() with
+        {
+            Columns =
+            [
+                new TruthColumn("not_null", false, null, null),
+                new TruthColumn("nullable", false, null, null),
+                new TruthColumn("truly_nullable", true, "w", null),
+                new TruthColumn("unknown", false, null, null),
+            ],
+        };
+
+        RealisticNoise
+            .NoisyOf(
+                found,
+                [
+                    Column(0, "not_null", false),
+                    Column(1, "nullable", true),
+                    Column(2, "truly_nullable", null),
+                    Column(3, "unknown", null),
+                ]
+            )
+            .ShouldBe([1, 3]);
+    }
+
+    [Fact]
     public void Verdict_CountOfTheBudget_IsNone() => RealisticNoise.Verdict(5, 5, 14, "h").ShouldBeNull();
 
     [Fact]

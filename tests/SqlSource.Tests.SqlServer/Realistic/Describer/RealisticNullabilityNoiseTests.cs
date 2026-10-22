@@ -43,13 +43,9 @@ public sealed class RealisticNullabilityNoiseTests(SqlServerContainer sqlServer)
 
             var described = await RealisticDescribe.DescribeOnceAsync(found, sqlServer.RealisticConnectionString);
             var columns = RealisticDescriptions.ColumnsOf(found, described);
-            count += RealisticNoise.CountOf(found, columns);
-            noisy.AddRange(
-                found
-                    .Columns.Select((truth, index) => (truth, index))
-                    .Where(pair => !pair.truth.Nullable && columns[pair.index].Nullable != false)
-                    .Select(pair => $"{found} column {pair.index} {pair.truth.Name}")
-            );
+            var noisyOfCase = RealisticNoise.NoisyOf(found, columns);
+            count += noisyOfCase.Count;
+            noisy.AddRange(noisyOfCase.Select(index => $"{found} column {index} {found.Columns[index].Name}"));
         }
 
         var verdict = RealisticNoise.Verdict(

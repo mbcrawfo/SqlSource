@@ -11,7 +11,17 @@ internal static class RealisticNoise
 {
     // The noise of one case, from the columns that RealisticDescriptions.ColumnsOf gave for it.
     public static int CountOf(RealisticCase found, IReadOnlyList<SidecarColumn> columns) =>
-        found.Columns.Where((truth, index) => !truth.Nullable && columns[index].Nullable != false).Count();
+        NoisyOf(found, columns).Count;
+
+    // The positions of the case's noisy columns, in order, from the columns that RealisticDescriptions.ColumnsOf gave
+    // for it, so that a test over the budget can name them.
+    public static IReadOnlyList<int> NoisyOf(RealisticCase found, IReadOnlyList<SidecarColumn> columns) =>
+        [
+            .. found
+                .Columns.Select((truth, index) => (truth, index))
+                .Where(pair => !pair.truth.Nullable && columns[pair.index].Nullable != false)
+                .Select(static pair => pair.index),
+        ];
 
     // What a count over the corpus says against the budget held for that major: over it, the fault and the engine's
     // hint of what to do; under it, that the budget is lowered so the improvement is kept; at it, nothing.
