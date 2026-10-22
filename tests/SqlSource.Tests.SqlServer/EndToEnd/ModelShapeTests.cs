@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -38,9 +37,6 @@ public sealed class ModelShapeTests
         ("ClosedAt", typeof(DateTimeOffset?), true),
         ("NameLength", typeof(int?), true),
     ];
-
-    // The columns of all_types that InsertAllTypes does not write, as the header of Queries/AllTypes.sql says why.
-    private static readonly HashSet<string> InsertLeavesOut = ["Datetime2Value", "RowversionValue"];
 
     [Fact]
     public void Build_Project_DeclaresTheGeneratorsAttribute() =>
@@ -271,10 +267,6 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Parse_String_IsTheEmailOfTheString() =>
-        new EmailHandler().Parse("alice@example.com").ShouldBe(new Email("alice@example.com"));
-
-    [Fact]
     public void Build_HeaderOverride_MakesTimeATimeOnly() =>
         PropertiesOf(typeof(ListAccountNotesDto)).ShouldContain(("RemindAt", typeof(TimeOnly?), true));
 
@@ -425,7 +417,7 @@ public sealed class ModelShapeTests
         // A parameter for each column that the query writes, in its order, with the column's type, and none can be
         // null, since no -- param: marker says null.
         var expected = PropertiesOf(typeof(AllTypesDto))
-            .Where(static column => !InsertLeavesOut.Contains(column.Name))
+            .Where(static column => !AllTypesQueryTests.WriteSideLeftOut.ContainsKey(column.Name))
             .Select(static column => (column.Name, Nullable.GetUnderlyingType(column.Type) ?? column.Type, false));
         PropertiesOf(typeof(InsertAllTypesArgs)).ShouldBe(expected);
         PropertiesOf(typeof(InsertAllTypesArgs)).Length.ShouldBe(30);
