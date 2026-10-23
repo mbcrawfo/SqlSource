@@ -1,40 +1,12 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace SqlSource.Tool.Describing.Postgres;
 
-// The calls of a describe: each is asked through the exchange and written to the log where it happens, with how
-// long it took by the run's clock.  Under a replay the event is written all the same.
+// The calls of a describe: each is asked through the exchange by DescriberSession.AskAsync and written to the log where
+// it happens, with how long it took by the run's clock.  Under a replay the event is written all the same.
 internal sealed partial class PostgresSession
 {
-    // Asks one call, and writes its event with the request, the answer and the time it took.
-    private async Task<TAnswer> AskAsync<TRequest, TAnswer>(
-        string method,
-        TRequest request,
-        Func<TRequest, CancellationToken, Task<TAnswer>> live,
-        Action<TRequest, TAnswer, long> log,
-        CancellationToken cancellationToken
-    )
-    {
-        var (answer, durationMs) = await TimedAskAsync(method, request, live, cancellationToken);
-        log(request, answer, durationMs);
-        return answer;
-    }
-
-    // Asks one call and writes nothing: for "check", whose event holds the verdict read from its answer.
-    private async Task<(TAnswer Answer, long DurationMs)> TimedAskAsync<TRequest, TAnswer>(
-        string method,
-        TRequest request,
-        Func<TRequest, CancellationToken, Task<TAnswer>> live,
-        CancellationToken cancellationToken
-    )
-    {
-        var started = _time.GetTimestamp();
-        var answer = await _exchange.AskAsync(method, request, live, cancellationToken);
-        return (answer, (long)_time.GetElapsedTime(started).TotalMilliseconds);
-    }
-
     private Task<PostgresPrepareAnswer> PrepareAsync(
         string query,
         PostgresPrepareRequest request,

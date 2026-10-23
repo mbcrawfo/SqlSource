@@ -28,7 +28,7 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// leak until the session ends.  Its name is a counter, since the name is part of a request and a capture must be
 /// the same each time it is recorded.
 /// </remarks>
-internal sealed partial class PostgresSession : IDescribeSession
+internal sealed partial class PostgresSession : DescriberSession
 {
     public const string DriverName = "Npgsql";
 
@@ -36,10 +36,8 @@ internal sealed partial class PostgresSession : IDescribeSession
     public const int MinimumMajorVersion = 14;
 
     private readonly string _database;
-    private readonly IDescribeExchange _exchange;
     private readonly IRunLog _log;
     private readonly PostgresLive _live;
-    private readonly TimeProvider _time;
     private readonly IReadOnlyList<string> _explainSettings;
     private int _statements;
 
@@ -51,18 +49,14 @@ internal sealed partial class PostgresSession : IDescribeSession
         ServerInfo server,
         IReadOnlyList<string> explainSettings
     )
+        : base(request.Exchange, request.Time, server)
     {
         _database = request.Database;
-        _exchange = request.Exchange;
-        _time = request.Time;
         _log = log;
         _live = live;
         Connection = connection;
-        Server = server;
         _explainSettings = explainSettings;
     }
-
-    public ServerInfo Server { get; }
 
     /// <summary>
     /// The session's connection.  The container tests ask on it what a describe left behind:
@@ -77,7 +71,7 @@ internal sealed partial class PostgresSession : IDescribeSession
     /// The settings of the planner that every <c>explain</c> carries: none, but in a test.
     /// </param>
     /// <param name="cancellationToken">Ends the call.</param>
-    public static async Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
+    public static Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,
         IRunLog log,
         IReadOnlyList<string> explainSettings,
@@ -86,42 +80,24 @@ internal sealed partial class PostgresSession : IDescribeSession
     {
         var connection = new PostgresConnection(request.Connection, log);
         var live = new PostgresLive(connection);
-        var kept = false;
-        try
-        {
-            var answer = await request.Exchange.AskAsync(
+        return OpenAsync(
+            request,
+            connection,
+            new SessionOpening<PostgresOpenRequest, PostgresOpenAnswer>(
                 PostgresCallNames.Open,
                 PostgresOpenRequest.Instance,
                 (_, token) => live.OpenAsync(token),
-                cancellationToken
-            );
-            if (answer.Error is { } error)
-            {
-                return Outcome<IDescribeSession, DescribeFailure>.Failed(PostgresErrors.Open(error, request.Database));
-            }
-
-            var server = ServerOf(answer);
-            if (Versions.LeadingMajor(server.Version) is { } major && major < MinimumMajorVersion)
-            {
-                return Outcome<IDescribeSession, DescribeFailure>.Failed(
-                    PostgresErrors.VersionNotSupported(request.Database, server.Version)
-                );
-            }
-
-            var session = new PostgresSession(request, log, connection, live, server, explainSettings);
-            kept = true;
-            return new Outcome<IDescribeSession, DescribeFailure>(session);
-        }
-        finally
-        {
-            if (!kept)
-            {
-                await connection.DisposeAsync();
-            }
-        }
+                answer => answer.Error is { } error ? PostgresErrors.Open(error, request.Database) : null,
+                ServerOf,
+                static (_, server) => IsBelow(server.Version, MinimumMajorVersion),
+                server => PostgresErrors.VersionNotSupported(request.Database, server.Version),
+                (_, server) => new PostgresSession(request, log, connection, live, server, explainSettings)
+            ),
+            cancellationToken
+        );
     }
 
-    public async Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
+    public override async Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
         DescribeRequest request,
         CancellationToken cancellationToken
     )
@@ -624,7 +600,7 @@ internal sealed partial class PostgresSession : IDescribeSession
         return PostgresErrors.Check(request, parameters, asked, answer, verdict);
     }
 
-    public ValueTask DisposeAsync() => Connection.DisposeAsync();
+    public override ValueTask DisposeAsync() => Connection.DisposeAsync();
 
     // What the walk is given of the statement: its name, how many arguments an EXECUTE of it takes, the columns as
     // they were built and their origins.

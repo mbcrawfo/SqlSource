@@ -13,14 +13,11 @@ namespace SqlSource.Tool.Describing.Postgres;
 internal sealed partial class PostgresSession
 {
     private static ServerInfo ServerOf(PostgresOpenAnswer answer) =>
-        new(
-            answer.ServerVersion
-                ?? throw new InvalidOperationException("The answer to 'open' holds no version and no error."),
+        ServerOf(
+            answer.ServerVersion,
             DriverName,
             answer.DriverVersion,
-            new EquatableArray<ServerSetting>([
-                .. (answer.Settings ?? []).Select(static setting => new ServerSetting(setting.Name, setting.Value)),
-            ])
+            (answer.Settings ?? []).Select(static setting => new ServerSetting(setting.Name, setting.Value))
         );
 
     // The types the server resolved for the parameters of the query's list, which are the first of its types, and
@@ -169,7 +166,4 @@ internal sealed partial class PostgresSession
                 : new QueryDescription(SidecarResultKind.None, typed, null, null, null, null)
         );
     }
-
-    private static Outcome<QueryDescription, DescribeFailure> Failed(DescribeFailure failure) =>
-        Outcome<QueryDescription, DescribeFailure>.Failed(failure);
 }
