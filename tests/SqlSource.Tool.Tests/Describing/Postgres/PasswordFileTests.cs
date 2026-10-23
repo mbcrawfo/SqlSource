@@ -1,6 +1,6 @@
-using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
@@ -11,6 +11,11 @@ public sealed class PasswordFileTests
     [Fact]
     public void Passwords_EntriesWithCommentsAndBlankLines_AreEachPassword() =>
         PasswordFile.Passwords("# c\n\nh:5432:db:u:pw1\n*:*:*:*:pw2\n").ShouldBe(["pw1", "pw2"]);
+
+    // Npgsql's reader ends a line at a carriage return alone too, as a file of the old Mac's line ends has them.
+    [Fact]
+    public void Passwords_LinesEndedByCarriageReturnsAlone_AreEachPassword() =>
+        PasswordFile.Passwords("h:*:*:u:pw1\rh:*:*:u:pw2\r").ShouldBe(["pw1", "pw2"]);
 
     // Npgsql trims each line, and a CRLF file is read the same.
     [Fact]
@@ -52,17 +57,19 @@ public sealed class PasswordFileTests
     [Fact]
     public void PathsOf_PassfileGiven_IsItAlone() =>
         PasswordFile
-            .PathsOf("/p/own", Environment(("PGPASSFILE", "/e/file"), ("HOME", "/home/u")))
+            .PathsOf("/p/own", Environments.Of(("PGPASSFILE", "/e/file"), ("HOME", "/home/u")))
             .ShouldBe(["/p/own"]);
 
     [Fact]
     public void PathsOf_PgPassFileSet_IsIt() =>
-        PasswordFile.PathsOf(null, Environment(("PGPASSFILE", "/e/file"), ("HOME", "/home/u"))).ShouldBe(["/e/file"]);
+        PasswordFile
+            .PathsOf(null, Environments.Of(("PGPASSFILE", "/e/file"), ("HOME", "/home/u")))
+            .ShouldBe(["/e/file"]);
 
     [Fact]
     public void PathsOf_NeitherSet_IsTheDefaultsOfHomeAndAppData() =>
         PasswordFile
-            .PathsOf(null, Environment(("HOME", "/home/u"), ("APPDATA", "/app")))
+            .PathsOf(null, Environments.Of(("HOME", "/home/u"), ("APPDATA", "/app")))
             .ShouldBe([
                 System.IO.Path.Combine("/home/u", ".pgpass"),
                 System.IO.Path.Combine("/app", "postgresql", "pgpass.conf"),
@@ -71,24 +78,13 @@ public sealed class PasswordFileTests
     [Fact]
     public void PathsOf_OnlyHomeSet_IsTheHomeDefault() =>
         PasswordFile
-            .PathsOf(null, Environment(("HOME", "/home/u")))
+            .PathsOf(null, Environments.Of(("HOME", "/home/u")))
             .ShouldBe([System.IO.Path.Combine("/home/u", ".pgpass")]);
 
     [Fact]
-    public void PathsOf_NothingSet_IsNone() => PasswordFile.PathsOf(null, Environment()).ShouldBeEmpty();
+    public void PathsOf_NothingSet_IsNone() => PasswordFile.PathsOf(null, Environments.Of()).ShouldBeEmpty();
 
     [Fact]
     public void PathsOf_EmptyValues_AreNotSet() =>
-        PasswordFile.PathsOf("", Environment(("PGPASSFILE", ""), ("HOME", ""))).ShouldBeEmpty();
-
-    private static System.Func<string, string?> Environment(params (string Name, string Value)[] variables)
-    {
-        var map = new Dictionary<string, string>();
-        foreach (var (name, value) in variables)
-        {
-            map[name] = value;
-        }
-
-        return name => map.GetValueOrDefault(name);
-    }
+        PasswordFile.PathsOf("", Environments.Of(("PGPASSFILE", ""), ("HOME", ""))).ShouldBeEmpty();
 }

@@ -174,12 +174,27 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
         }
     }
 
-    // The password file is read as the driver reads it, whole, and a file it cannot read gives none.
+    // The password file is read as the driver reads it, whole, and a file it cannot read gives none.  So is one that
+    // can be read only once, a named pipe or the pipe of a shell's process substitution, which is read ahead of the
+    // driver here and would leave it nothing: an empty length, which such a pipe has until a reader opens it, is not
+    // opened, and a stream that cannot seek is closed unread.
     private static IReadOnlyList<string> PasswordsIn(string path)
     {
         try
         {
-            return PasswordFile.Passwords(File.ReadAllText(path));
+            if (new FileInfo(path) is not { Exists: true, Length: > 0 })
+            {
+                return [];
+            }
+
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            if (!stream.CanSeek)
+            {
+                return [];
+            }
+
+            using var reader = new StreamReader(stream);
+            return PasswordFile.Passwords(reader.ReadToEnd());
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)

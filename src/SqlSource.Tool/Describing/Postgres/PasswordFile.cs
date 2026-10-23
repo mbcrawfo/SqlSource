@@ -10,8 +10,9 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// remove a password that is in no connection string.
 /// </summary>
 /// <remarks>
-/// Npgsql 10.0.3 (<c>PgPassFile</c>) reads a file as the tool does here: it trims each line, skips an empty one and
-/// one that starts with <c>#</c>, and splits at a colon that no backslash escapes.  Only the entry that matches the
+/// Npgsql 10.0.3 (<c>PgPassFile</c>) reads a file as the tool does here: it ends a line at <c>\r</c>, <c>\n</c> or
+/// <c>\r\n</c>, as a <see cref="TextReader" /> does, trims each line, skips an empty one and one that starts with
+/// <c>#</c>, and splits at a colon that no backslash escapes.  Only the entry that matches the
 /// connection is used, but every entry's password is given: the match depends on the host, port, database and user
 /// as the driver resolves them, and a password too many removes a word that nothing else prints.
 /// </remarks>
@@ -30,7 +31,8 @@ internal static class PasswordFile
     public static IReadOnlyList<string> Passwords(string text)
     {
         var passwords = new List<string>();
-        foreach (var raw in text.Split('\n'))
+        using var reader = new StringReader(text);
+        while (reader.ReadLine() is { } raw)
         {
             var line = raw.Trim();
             if (line.Length == 0 || line[0] == '#')

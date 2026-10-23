@@ -1,6 +1,7 @@
 using System;
-using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.IO.Pipes;
 using System.Linq;
 using System.Threading.Tasks;
 using Npgsql;
@@ -40,22 +41,22 @@ public sealed class PostgresDescriberTests
     // Npgsql takes the password of the environment when the string has none.
     [Fact]
     public void SecretsOf_NoPasswordAndPgPasswordSet_IsPgPassword() =>
-        new PostgresDescriber().SecretsOf("Host=h", Environment(("PGPASSWORD", "envpass1"))).ShouldBe(["envpass1"]);
+        new PostgresDescriber().SecretsOf("Host=h", Environments.Of(("PGPASSWORD", "envpass1"))).ShouldBe(["envpass1"]);
 
     [Fact]
     public void SecretsOf_PasswordInTheStringAndPgPasswordSet_IsTheStringsAlone() =>
         new PostgresDescriber()
-            .SecretsOf("Host=h;Password=pw", Environment(("PGPASSWORD", "envpass1")))
+            .SecretsOf("Host=h;Password=pw", Environments.Of(("PGPASSWORD", "envpass1")))
             .ShouldBe(["pw"]);
 
     [Fact]
     public void SecretsOf_NoPasswordAndAPasswordFile_IsItsPasswords()
     {
         using var folder = new TempFolder();
-        var file = folder.Write("pgpass", "# c\nh:5432:db:u:filepass1\n*:*:*:*:filepass2\n");
+        var file = folder.WriteFile("pgpass", "# c\nh:5432:db:u:filepass1\n*:*:*:*:filepass2\n");
 
         new PostgresDescriber()
-            .SecretsOf("Host=h", Environment(("PGPASSFILE", file)))
+            .SecretsOf("Host=h", Environments.Of(("PGPASSFILE", file)))
             .ShouldBe(["filepass1", "filepass2"]);
     }
 
@@ -64,10 +65,10 @@ public sealed class PostgresDescriberTests
     public void SecretsOf_PgPasswordAndAPasswordFile_IsPgPassword()
     {
         using var folder = new TempFolder();
-        var file = folder.Write("pgpass", "h:5432:db:u:filepass1\n");
+        var file = folder.WriteFile("pgpass", "h:5432:db:u:filepass1\n");
 
         new PostgresDescriber()
-            .SecretsOf("Host=h", Environment(("PGPASSWORD", "envpass1"), ("PGPASSFILE", file)))
+            .SecretsOf("Host=h", Environments.Of(("PGPASSWORD", "envpass1"), ("PGPASSFILE", file)))
             .ShouldBe(["envpass1"]);
     }
 
@@ -75,20 +76,20 @@ public sealed class PostgresDescriberTests
     public void SecretsOf_PasswordInTheStringAndAPasswordFile_IsTheStringsAlone()
     {
         using var folder = new TempFolder();
-        var file = folder.Write("pgpass", "h:5432:db:u:filepass1\n");
+        var file = folder.WriteFile("pgpass", "h:5432:db:u:filepass1\n");
 
-        new PostgresDescriber().SecretsOf("Host=h;Password=pw", Environment(("PGPASSFILE", file))).ShouldBe(["pw"]);
+        new PostgresDescriber().SecretsOf("Host=h;Password=pw", Environments.Of(("PGPASSFILE", file))).ShouldBe(["pw"]);
     }
 
     [Fact]
     public void SecretsOf_PassfileInTheString_WinsOverPgPassFile()
     {
         using var folder = new TempFolder();
-        var own = folder.Write("own", "h:5432:db:u:ownpass1\n");
-        var other = folder.Write("other", "h:5432:db:u:otherpass1\n");
+        var own = folder.WriteFile("own", "h:5432:db:u:ownpass1\n");
+        var other = folder.WriteFile("other", "h:5432:db:u:otherpass1\n");
 
         new PostgresDescriber()
-            .SecretsOf($"Host=h;Passfile={own}", Environment(("PGPASSFILE", other)))
+            .SecretsOf($"Host=h;Passfile={own}", Environments.Of(("PGPASSFILE", other)))
             .ShouldBe(["ownpass1"]);
     }
 
@@ -96,9 +97,9 @@ public sealed class PostgresDescriberTests
     public void SecretsOf_DefaultPasswordFileOfHome_IsItsPasswords()
     {
         using var folder = new TempFolder();
-        _ = folder.Write(".pgpass", "h:5432:db:u:homepass1\n");
+        _ = folder.WriteFile(".pgpass", "h:5432:db:u:homepass1\n");
 
-        new PostgresDescriber().SecretsOf("Host=h", Environment(("HOME", folder.Path))).ShouldBe(["homepass1"]);
+        new PostgresDescriber().SecretsOf("Host=h", Environments.Of(("HOME", folder.Path))).ShouldBe(["homepass1"]);
     }
 
     [Fact]
@@ -107,16 +108,65 @@ public sealed class PostgresDescriberTests
         using var folder = new TempFolder();
         var describer = new PostgresDescriber();
 
-        describer.SecretsOf("Host=h", Environment(("PGPASSFILE", Path.Combine(folder.Path, "none")))).ShouldBeEmpty();
-        describer.SecretsOf("Host=h", Environment(("PGPASSFILE", folder.Path))).ShouldBeEmpty();
-        describer.SecretsOf("Host=h", Environment(("PGPASSFILE", "bad\0name"))).ShouldBeEmpty();
+        describer
+            .SecretsOf("Host=h", Environments.Of(("PGPASSFILE", Path.Combine(folder.Path, "none"))))
+            .ShouldBeEmpty();
+        describer.SecretsOf("Host=h", Environments.Of(("PGPASSFILE", folder.Path))).ShouldBeEmpty();
+        describer.SecretsOf("Host=h", Environments.Of(("PGPASSFILE", "bad\0name"))).ShouldBeEmpty();
+    }
+
+    // A pipe can be read once, and the driver reads the password file after the tool: the tool leaves it unread.
+    [Fact]
+    public async Task SecretsOf_PasswordFileThatIsAPipe_IsNoneAndLeavesItUnread()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "A pipe has no path of /dev/fd on Windows.");
+        using var server = new AnonymousPipeServerStream(PipeDirection.Out, HandleInheritability.None);
+        using var client = new AnonymousPipeClientStream(PipeDirection.In, server.ClientSafePipeHandle);
+        byte[] line = [.. "*:*:*:*:pipepass1\n"u8];
+        var token = TestContext.Current.CancellationToken;
+        await server.WriteAsync(line, token);
+        await server.FlushAsync(token);
+        var path = "/dev/fd/" + server.GetClientHandleAsString();
+
+        // A read of the pipe would wait for its writer to close it.
+        var secrets = await Eventually.WithinAsync(
+            Task.Run(() => new PostgresDescriber().SecretsOf("Host=h", Environments.Of(("PGPASSFILE", path)))),
+            "the pipe was read"
+        );
+
+        secrets.ShouldBeEmpty();
+
+        var read = new byte[line.Length];
+        await client.ReadExactlyAsync(read, token);
+        read.ShouldBe(line);
+    }
+
+    // A named pipe with no writer would block whoever opens it, so it is not opened.
+    [Fact]
+    public async Task SecretsOf_PasswordFileThatIsANamedPipe_IsNoneAndIsNotOpened()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "mkfifo is a command of Unix.");
+        using var folder = new TempFolder();
+        var path = folder.PathOf("pgpass");
+        using (var mkfifo = Process.Start(new ProcessStartInfo("mkfifo", [path]) { UseShellExecute = false }))
+        {
+            await mkfifo!.WaitForExitAsync(TestContext.Current.CancellationToken);
+            mkfifo.ExitCode.ShouldBe(0);
+        }
+
+        var secrets = await Eventually.WithinAsync(
+            Task.Run(() => new PostgresDescriber().SecretsOf("Host=h", Environments.Of(("PGPASSFILE", path)))),
+            "the named pipe was opened"
+        );
+
+        secrets.ShouldBeEmpty();
     }
 
     // Npgsql reads a password file only for a string that has no Password, as it reads the environment's.
     [Fact]
     public void SecretsOf_SslPasswordOnlyAndPgPasswordSet_IsBoth() =>
         new PostgresDescriber()
-            .SecretsOf("Host=h;SSL Password=kp", Environment(("PGPASSWORD", "envpass1")))
+            .SecretsOf("Host=h;SSL Password=kp", Environments.Of(("PGPASSWORD", "envpass1")))
             .ShouldBe(["kp", "envpass1"], ignoreOrder: true);
 
     [Fact]
@@ -130,31 +180,6 @@ public sealed class PostgresDescriberTests
     [InlineData("Password=pw;Port=abc")]
     public void RewriteOf_ConnectionTheDriverCannotRead_IsNull(string connection) =>
         new PostgresDescriber().RewriteOf(connection).ShouldBeNull();
-
-    private static Func<string, string?> Environment(params (string Name, string Value)[] variables)
-    {
-        var map = new Dictionary<string, string>();
-        foreach (var (name, value) in variables)
-        {
-            map[name] = value;
-        }
-
-        return name => map.GetValueOrDefault(name);
-    }
-
-    private sealed class TempFolder : IDisposable
-    {
-        public string Path { get; } = Directory.CreateTempSubdirectory("sqlsource-pgpass").FullName;
-
-        public string Write(string name, string text)
-        {
-            var file = System.IO.Path.Combine(Path, name);
-            File.WriteAllText(file, text);
-            return file;
-        }
-
-        public void Dispose() => Directory.Delete(Path, recursive: true);
-    }
 
     // The list is closed: nothing else reaches a SET LOCAL, and a describer that would send it is never made.
     [Theory]
