@@ -21,10 +21,14 @@ public sealed partial class StoreQueries(DbConnection connection)
     public Task<IEnumerable<ListOrderTotalsDto>> ListOrderTotalsAsync() =>
         connection.QueryAsync<ListOrderTotalsDto>(Sql.ListOrderTotals);
 
-    // Shipped is a long and not a long?, by the query's -- column: marker, which leaves the column's name alone for
-    // Dapper: a count is never null, though the tool cannot show it for count(o.shipped_at).
+    // Shipped is a long and not a long?: a count is never null, even of a column that may be, and the tool shows it.
     public Task<IEnumerable<CountShippedOrdersDto>> CountShippedOrdersAsync() =>
         connection.QueryAsync<CountShippedOrdersDto>(Sql.CountShippedOrders);
+
+    // DisplayName is a string and not a string?, by the query's -- column: marker, which leaves the column's name
+    // alone for Dapper: initcap of a name that is never null is not null, though the tool cannot show it.
+    public Task<IEnumerable<ListUserDisplayNamesDto>> ListUserDisplayNamesAsync() =>
+        connection.QueryAsync<ListUserDisplayNamesDto>(Sql.ListUserDisplayNames);
 
     // GetOrderTagsDto is a record with an array column, which Dapper reads as any other.
     public Task<GetOrderTagsDto?> GetOrderTagsAsync(int orderId) =>

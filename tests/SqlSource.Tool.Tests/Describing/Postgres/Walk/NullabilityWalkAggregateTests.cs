@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
@@ -121,4 +123,29 @@ public sealed class NullabilityWalkAggregateTests
     public void Run_AggregateTheNodeComputesOverAChild_IsAnswered() =>
         AnswersOf(RunOverOrders(Aggregate("Sorted", true, Scan("o", "o.quantity"), "(sum(o.quantity) * 2)")))
             .ShouldBe([NotNullExpression]);
+
+    // The count of an argument over the side a LEFT JOIN extends, computed by the grouped Aggregate above it, is the
+    // catalog's only when "overloads" answered that no other schema holds count.
+    [Fact]
+    public void Run_CountOfAnArgumentWithTheCatalogAlone_IsAnswered()
+    {
+        var plan = Aggregate(
+            "Hashed",
+            true,
+            Join("Left", Scan("a", "a.id"), Scan("b", "b.id")) with
+            {
+                Output = ["a.id", "b.id"],
+            },
+            "a.id",
+            "count(b.id)"
+        ) with
+        {
+            Output = ["a.id", "count(b.id)"],
+        };
+        var alone = new CatalogNames(new HashSet<string>(["count"], StringComparer.Ordinal), new HashSet<string>());
+
+        AnswersOf(RunAs(Scope(true) with { CatalogAlone = alone }, plan, OfA, Expression))
+            .ShouldBe([NotNullCatalog, NotNullExpression]);
+        AnswersOf(RunAs(Scope(true), plan, OfA, Expression)).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
+    }
 }

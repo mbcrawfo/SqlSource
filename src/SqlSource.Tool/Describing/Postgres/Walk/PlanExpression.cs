@@ -24,8 +24,11 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// a quoted literal with its cast, a number, <c>true</c> or <c>false</c>, and <c>NULL::type</c>, which is the one
 /// that can be <c>NULL</c>; the tests <c>IS NULL</c>, <c>IS NOT NULL</c> and <c>IS DISTINCT FROM</c>, and the
 /// <c>NOT</c> of the last, which is how <c>IS NOT DISTINCT FROM</c> prints; <c>COALESCE</c>, <c>GREATEST</c> and
-/// <c>LEAST</c> with an argument that cannot be <c>NULL</c>; and a <c>CASE</c> with an <c>ELSE</c> whose every result
-/// cannot be.  A <c>CASE</c> written without an <c>ELSE</c> prints <c>ELSE NULL::type</c>.
+/// <c>LEAST</c> with an argument that cannot be <c>NULL</c>, or with a plain reference to each side of the full join
+/// that computes the entry (<see cref="ExpressionContext.ProvedOnFullJoinSide" />), since each row of such a join has
+/// a row of one side at least; and a <c>CASE</c> with an <c>ELSE</c> whose every result cannot be.  A <c>CASE</c>
+/// written without an <c>ELSE</c> prints <c>ELSE NULL::type</c>.  Each of the forms that is not <c>NULL</c> is typed
+/// from its arguments or results that are proved of a known type, as the next paragraph says.
 /// </para>
 /// <para>
 /// A value is also proved with its type (<see cref="ProvedTypeOf" />): a constant, a test, <c>count(*)</c> or a
@@ -35,8 +38,11 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// argument types read, of the result it gives: the plan prints each argument with its implicit cast, so its type is
 /// what the text shows.  A cast, <c>(E)::T</c>, is not <c>NULL</c> when <c>E</c> is proved of a type that is
 /// <c>T</c> or in one family of <see cref="SetOperationTypes" /> with it; any other cast is unknown.
-/// <c>COALESCE</c>, <c>GREATEST</c>, <c>LEAST</c> and <c>CASE</c> are not <c>NULL</c> but of no known type, so they
-/// feed no operator, and a reference in parentheses of its own, <c>(u.id)</c>, is unknown.
+/// A <c>COALESCE</c>, a <c>GREATEST</c> or a <c>LEAST</c> that is not <c>NULL</c> is of the one type that every
+/// argument proved of a known type has, and a <c>CASE</c> whose every result is not <c>NULL</c> of the one its results
+/// proved of a known type have, when the session finds <c>pg_catalog</c> first: the parser casts each argument and
+/// each result to their common type, and the plan prints the casts.  With no such type, or two, the form is of no
+/// known type and feeds no operator.  A reference in parentheses of its own, <c>(u.id)</c>, is unknown.
 /// </para>
 /// <para>
 /// An aggregate, <c>name([DISTINCT] a, ... [ORDER BY ...])</c> with nothing after its parenthesis, is not <c>NULL</c>
@@ -46,6 +52,17 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// <c>WITHIN GROUP</c> makes it no such form: a filter may leave a group no row, and a window's frame may be empty.
 /// Inside a group that a child of the node printed (<see cref="ExpressionContext.GroupFromChild" />) no aggregate is
 /// read, since the child computed it under its own grouping.
+/// </para>
+/// <para>
+/// A name of <see cref="CatalogOverloads" /> that only <c>pg_catalog</c> holds, all of it built in
+/// (<see cref="ExpressionContext.CatalogAlone" />), is read by its name, since the call is then one of
+/// <c>pg_catalog</c>'s overloads of it, whichever the server chose: <c>count(...)</c> with any argument, a
+/// <c>bigint</c>; <c>array_agg(...)</c> of one argument where an aggregate of the table would be read, of no known
+/// type; <c>jsonb_build_object(...)</c> and <c>json_build_object(...)</c> with no argument written <c>VARIADIC</c>, a
+/// <c>jsonb</c> and a <c>json</c>; the constructor of a built-in range type with two or three arguments, of that type;
+/// and <c>(A * B)</c> over two values proved of one of those range types, of that type.  The arguments of all but the
+/// intersection are read for their balance only.  <see cref="CatalogNamesIn" /> gives the names of the table an entry
+/// calls.
 /// </para>
 /// <para>
 /// A subquery is a <c>SubPlan</c> that the plan prints by its name, and the walk says what its plan proves.
@@ -101,8 +118,8 @@ internal static partial class PlanExpression
     /// <summary>
     /// The type of an entry that is, as a whole, a value proved not <c>NULL</c> of a known type, or null: a constant,
     /// a test, <c>count(*)</c> or a ranking as <see cref="TypeOf" /> types them, or an operator, a function or a cast
-    /// of the forms the remarks give.  <c>COALESCE</c>, <c>GREATEST</c>, <c>LEAST</c> and <c>CASE</c> are not
-    /// <c>NULL</c> but of no known type, and a reference that is the whole entry is never asked.
+    /// of the forms the remarks give, a <c>COALESCE</c>, a <c>GREATEST</c>, a <c>LEAST</c> and a <c>CASE</c> among
+    /// them, of the type their proved arguments or results share.  A reference that is the whole entry is never asked.
     /// </summary>
     /// <param name="entry">The entry as the plan prints it.</param>
     /// <param name="context">What the walk says of the plan the entry is read in.</param>
@@ -224,6 +241,17 @@ internal static partial class PlanExpression
         return groups;
     }
 
+    /// <summary>
+    /// The names of <see cref="CatalogOverloads" /> the entry calls, each once in the order first found: a lower-case
+    /// bare name followed by its parenthesis, but <c>count</c> whose parenthesis holds only <c>*</c>, and an operator
+    /// between two operands.  None when its quotes or its parentheses do not balance.  A name found that the reader
+    /// does not read costs a name to ask about, and is never wrong.
+    /// </summary>
+    /// <param name="entry">The entry as the plan prints it.</param>
+    /// <returns>The names of functions and the names of operators.</returns>
+    public static (IReadOnlyList<string> Functions, IReadOnlyList<string> Operators) CatalogNamesIn(string entry) =>
+        PlanTokens.Read(entry) is { } tokens ? new Reader(entry, tokens, NoContext).CatalogNames() : ([], []);
+
     // Reads spans of the tokens, each [from, to), as one form or none.  This part holds the reader's state, its span
     // helpers and the grammar that both its jobs read, of a test, a constant, count, a ranking and a type's name; the
     // forms of nullability are in PlanExpression.Nullability.cs, the proofs of types in PlanExpression.Proofs.cs, and
@@ -236,6 +264,9 @@ internal static partial class PlanExpression
 
         // The index of the token that closes each opening parenthesis or bracket, and -1 for any other.
         private readonly int[] _closes;
+
+        // The type Proved gave each span read so far, by the span and the state of _groupsHaveRows it was read in.
+        private readonly Dictionary<(int From, int To, bool GroupsHaveRows), long?> _proved = [];
 
         // Whether an aggregate of the span being read is one of the node's own, over a group that has a row: false
         // inside a group a child printed.
@@ -402,7 +433,8 @@ internal static partial class PlanExpression
         // catalog's count("any") whatever the order of the path, and prints bare, while one of the catalog's own
         // signature, count(*) or rank(), is found in pg_catalog first.  With anyArgument count may hold an
         // argument too, which TypeOf takes: the type is the catalog's bigint, and a form that NullableOf does not
-        // answer false never makes its column not null.
+        // answer false never makes its column not null.  Such a count is read only where no other schema holds a
+        // count (IsCatalogsCount).
         private bool IsCountOrRanking(int from, int to, bool anyArgument = false)
         {
             var isCount = IsWord(from, "count");
@@ -453,6 +485,64 @@ internal static partial class PlanExpression
                 ? _closes[window] == to - 1
                 : (Is(window, Kind.Word) || Is(window, Kind.QuotedName)) && window == to - 1;
         }
+
+        // count with any argument, an optional FILTER and an optional OVER, to the end, where only pg_catalog holds a
+        // function of the name: then it is count("any"), which is never NULL.
+        private bool IsCatalogsCount(int from, int to) =>
+            IsWord(from, "count") && HeldAlone("count") && IsCountOrRanking(from, to, anyArgument: true);
+
+        // The names of CatalogOverloads the tokens call, as CatalogNamesIn gives them.
+        public (IReadOnlyList<string> Functions, IReadOnlyList<string> Operators) CatalogNames()
+        {
+            var functions = new List<string>();
+            var operators = new List<string>();
+            for (var at = 0; at < _tokens.Count; at++)
+            {
+                var text = Text(at);
+                if (IsBareCall(at) && CatalogOverloads.FunctionNames.Contains(text, StringComparer.Ordinal))
+                {
+                    if (
+                        !(text == "count" && _closes[at + 1] == at + 3 && Text(at + 2) == "*")
+                        && !functions.Contains(text)
+                    )
+                    {
+                        functions.Add(text);
+                    }
+                }
+                else if (
+                    Is(at, Kind.Other)
+                    && CatalogOverloads.OperatorNames.Contains(text, StringComparer.Ordinal)
+                    && at > 0
+                    && EndsOperand(at - 1)
+                    && at + 1 < _tokens.Count
+                    && StartsOperand(at + 1)
+                    && !operators.Contains(text)
+                )
+                {
+                    operators.Add(text);
+                }
+            }
+
+            return (functions, operators);
+        }
+
+        // A lower-case name with no schema before it, followed by its parenthesis.
+        private bool IsBareCall(int at) =>
+            IsLowerWord(at) && (at == 0 || !Is(at - 1, Kind.Dot)) && at + 1 < _tokens.Count && Is(at + 1, Kind.Open);
+
+        private bool EndsOperand(int at) =>
+            _tokens[at].Kind
+                is Kind.Close
+                    or Kind.Word
+                    or Kind.Number
+                    or Kind.String
+                    or Kind.QuotedName
+                    or Kind.CloseBracket;
+
+        // A parameter, $1, is a symbol and its number.
+        private bool StartsOperand(int at) =>
+            _tokens[at].Kind is Kind.Open or Kind.Word or Kind.Number or Kind.String or Kind.QuotedName
+            || (Is(at, Kind.Other) && Text(at).StartsWith('$'));
 
         // Inside one pair of parentheses: x IS NULL, x IS NOT NULL, x IS DISTINCT FROM y, or NOT of the last in a
         // pair of its own.  Each operand is one primary with an optional cast.

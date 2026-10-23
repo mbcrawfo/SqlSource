@@ -44,6 +44,21 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
+    public async Task QueryAsync_ListDisplayNames_ReadsTheNames()
+    {
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+
+        var names = await connection.QueryAsync<ListDisplayNamesDto>(NoteQueries.ListDisplayNames);
+
+        names.ShouldBe([
+            new ListDisplayNamesDto(1, "Alice"),
+            new ListDisplayNamesDto(2, "Bob"),
+            new ListDisplayNamesDto(3, "Carol"),
+        ]);
+    }
+
+    [Fact]
     public async Task QueryAsync_ListNoteKinds_ReadsTheEnumAndTheDomain()
     {
         await using var source = EndToEndSources.App(postgres);

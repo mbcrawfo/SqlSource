@@ -20,7 +20,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <para>
 /// The SQL of the catalog calls runs under the user's <c>search_path</c>, so every type and function it names is
 /// written with <c>pg_catalog.</c>: a user's domain named <c>text</c> before <c>pg_catalog</c> on the path would
-/// otherwise take <c>::text</c>.  Its operators are not (TD-0077).
+/// otherwise take <c>::text</c>.  Its operators are not (TD-0077), but those of <c>overloads</c> compare only by the
+/// exact argument types of an operator of <c>pg_catalog</c>'s.
 /// </para>
 /// </remarks>
 internal sealed class PostgresLive(PostgresConnection connection)
@@ -155,6 +156,39 @@ internal sealed class PostgresLive(PostgresConnection connection)
         JOIN pg_catalog.pg_namespace AS n ON n.nspname = p.schema
         JOIN pg_catalog.pg_class AS c ON c.relnamespace = n.oid AND c.relname = p.name
         ORDER BY 1, 2
+        """;
+
+    // PostgreSQL's FirstNormalObjectId: every object that initdb creates has a lower OID, so an object of pg_catalog at
+    // or above it was added after, by a superuser or by an extension made in pg_catalog.
+    private const string FirstNormalObjectId = "16384";
+
+    // The names of the functions and of the operators, among the ones asked for, that a schema other than pg_catalog
+    // holds, or that pg_catalog holds as an object that is not built in: two queries, one for each, with the names as
+    // one positional text[].  Each name is of the collation "C", so that ORDER BY 1 gives ordinal order whatever the
+    // database's collation.  The call is made only when the session finds pg_catalog first, and each comparison is of
+    // the exact argument types of an operator of pg_catalog's, (name, text) and (oid, oid), so that one is taken: a
+    // user's operator of a comparison's exact types beats one of pg_catalog's that needs a cast, wherever it stands on
+    // the path.
+    private const string OverloadedFunctionsSql = $"""
+        SELECT DISTINCT p.proname::pg_catalog.text COLLATE "C"
+        FROM pg_catalog.pg_proc AS p
+        WHERE p.proname = ANY ($1::pg_catalog.text[])
+            AND (
+                p.pronamespace <> 'pg_catalog'::pg_catalog.regnamespace::pg_catalog.oid
+                OR p.oid >= {FirstNormalObjectId}::pg_catalog.oid
+            )
+        ORDER BY 1
+        """;
+
+    private const string OverloadedOperatorsSql = $"""
+        SELECT DISTINCT o.oprname::pg_catalog.text COLLATE "C"
+        FROM pg_catalog.pg_operator AS o
+        WHERE o.oprname = ANY ($1::pg_catalog.text[])
+            AND (
+                o.oprnamespace <> 'pg_catalog'::pg_catalog.regnamespace::pg_catalog.oid
+                OR o.oid >= {FirstNormalObjectId}::pg_catalog.oid
+            )
+        ORDER BY 1
         """;
 
     // The server's spelling of each pair of a type and a modifier, in one query.
@@ -502,6 +536,38 @@ internal sealed class PostgresLive(PostgresConnection connection)
             static error => new PostgresPartitionsAnswer(null, error),
             token
         );
+
+    /// <summary>
+    /// Asks <c>overloads</c>: which of the function names and of the operator names asked for a schema other than
+    /// <c>pg_catalog</c> holds, or <c>pg_catalog</c> holds as an object that is not built in, whatever its arguments
+    /// and whether or not the session's search path names it.
+    /// </summary>
+    public Task<PostgresOverloadsAnswer> OverloadsAsync(PostgresOverloadsRequest asked, CancellationToken token) =>
+        InDescribeAsync(
+            async () =>
+            {
+                var functions = await NamesAsync(OverloadedFunctionsSql, asked.Functions, token);
+                var operators = await NamesAsync(OverloadedOperatorsSql, asked.Operators, token);
+                return new PostgresOverloadsAnswer(functions, operators, null);
+            },
+            static error => new PostgresOverloadsAnswer(null, null, error),
+            token
+        );
+
+    // The one text column of a query that takes the names as its $1.
+    private async Task<List<string>> NamesAsync(string sql, IReadOnlyList<string> names, CancellationToken token)
+    {
+        await using var command = await connection.CommandAsync(sql, token);
+        _ = command.Parameters.Add(new NpgsqlParameter { Value = names.ToArray(), DataTypeName = "text[]" });
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var held = new List<string>();
+        while (await reader.ReadAsync(token))
+        {
+            held.Add(reader.GetString(0));
+        }
+
+        return held;
+    }
 
     /// <summary>
     /// The text <c>columns</c> sends: the statement with a <c>NULL</c> for each parameter.  The server describes an

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -164,7 +165,8 @@ internal sealed partial class PostgresSession : DescriberSession
     // each modifier the built types need, once; Npgsql's own reading of the SQL; and, for a query with rows that is
     // gated or has a column of no origin, its generic plan, then the ancestors of the relations an Append of the plan
     // may scan as partitions, and, for a column of no origin, the relations the plan scans that "tables" did not
-    // answer.
+    // answer and which of the names of CatalogOverloads the plan prints another schema holds, or pg_catalog holds as
+    // an object that is not built in.
     // The table match is made last and asks nothing: it reads the nullability the walk set.
     private async Task<Outcome<QueryDescription, DescribeFailure>> DescribePreparedAsync(
         DescribeRequest request,
@@ -335,7 +337,17 @@ internal sealed partial class PostgresSession : DescriberSession
             var partitions = await PartitionsOfAsync(request, root, cancellationToken);
             var cache = new PlanInstancesCache(root, partitions);
             var relations = await RelationsOfAsync(request, root, origins, scope.Tables, cancellationToken);
-            outcome = NullabilityWalk.Run(cache, columns, origins, scope with { Tables = relations });
+            var alone = await OverloadsOfAsync(request, root, origins, scope, cancellationToken);
+            outcome = NullabilityWalk.Run(
+                cache,
+                columns,
+                origins,
+                scope with
+                {
+                    Tables = relations,
+                    CatalogAlone = alone,
+                }
+            );
         }
         else
         {
@@ -400,6 +412,39 @@ internal sealed partial class PostgresSession : DescriberSession
         }
 
         return merged;
+    }
+
+    // The names of CatalogOverloads that the plan prints and that "overloads" answered no schema but pg_catalog holds,
+    // and pg_catalog holds only as built-in objects, for the walk to read them by their name.  It is asked only when a
+    // column has no origin, the session finds pg_catalog first, and the plan prints such a name, and nothing is held
+    // alone otherwise.  An error is logged and never reported: every name asked is then held elsewhere.
+    private async Task<CatalogNames> OverloadsOfAsync(
+        DescribeRequest request,
+        PlanNode root,
+        ColumnOrigin?[] origins,
+        WalkScope scope,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            !origins.Any(static origin => origin is null)
+            || !scope.CatalogFunctionsFirst
+            || CatalogOverloads.RequestOf(root) is not { } asked
+        )
+        {
+            return CatalogNames.None;
+        }
+
+        var answer = await OverloadsAsync(request.Name, asked, cancellationToken);
+        if (answer is not { Error: null, Functions: { } functions, Operators: { } operators })
+        {
+            return CatalogNames.None;
+        }
+
+        return new CatalogNames(
+            asked.Functions.Except(functions, StringComparer.Ordinal).ToFrozenSet(StringComparer.Ordinal),
+            asked.Operators.Except(operators, StringComparer.Ordinal).ToFrozenSet(StringComparer.Ordinal)
+        );
     }
 
     // A statement without rows has no match, and no event of one.

@@ -19,11 +19,17 @@ ORDER BY o.id;
 
 -- name: CountShippedOrders
 -- summary: How many orders of each user have shipped.
--- column: shipped not null
 SELECT u.id, count(o.shipped_at) AS shipped
 FROM users AS u
 LEFT JOIN orders AS o ON o.user_id = u.id
 GROUP BY u.id
+ORDER BY u.id;
+
+-- name: ListUserDisplayNames
+-- summary: The name of each user with each word capitalized.
+-- column: display_name not null
+SELECT u.id, initcap(u.name) AS display_name
+FROM users AS u
 ORDER BY u.id;
 
 -- name: GetOrderTags
