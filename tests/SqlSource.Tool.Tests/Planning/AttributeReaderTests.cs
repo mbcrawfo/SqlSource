@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Text;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
@@ -38,6 +40,14 @@ public sealed class AttributeReaderTests : IDisposable
     {
         _ = _folder.WriteFile("App/Repo/Queries.cs", source);
         return AttributeReader.Read(Manifest(langVersion, constants, Source), TestContext.Current.CancellationToken);
+    }
+
+    // The file is written in Windows-1252, which is not UTF-8 once it holds a letter outside ASCII.
+    private ProjectClaims ReadLatin1(string source)
+    {
+        _ = _folder.CreateFolder("App/Repo");
+        File.WriteAllBytes(Source, Encoding.Latin1.GetBytes(source));
+        return AttributeReader.Read(Manifest("", [], Source), TestContext.Current.CancellationToken);
     }
 
     // The attribute lists start on the third line, in its first column.
@@ -133,6 +143,44 @@ public sealed class AttributeReaderTests : IDisposable
 
         claims.Errors.ShouldBeEmpty();
         claims.Claims.ShouldHaveSingleItem().Path.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Read_PathOutsideAsciiInAFileThatIsNotUtf8_IsSqlsrc271AtThePathAndNoClaim()
+    {
+        var claims = ReadLatin1(OnAClass(PathPrefix + "\"Requêtes\")]"));
+
+        claims.Claims.ShouldBeEmpty();
+        claims.Errors.ShouldBe([
+            ToolDiagnostic.At(ToolDiagnostics.FileNotUtf8, Source, new LinePosition(2, PathPrefix.Length), Source),
+        ]);
+    }
+
+    [Fact]
+    public void Read_AsciiPathInAFileThatIsNotUtf8_IsAClaim()
+    {
+        var claims = ReadLatin1("// café\n" + OnAClass("[SqlSourceGenerate(Path = \"Q\")]"));
+
+        claims.Errors.ShouldBeEmpty();
+        claims.Claims.ShouldHaveSingleItem().Path.ShouldBe("Q");
+    }
+
+    [Fact]
+    public void Read_PathEscapedInAFileThatIsNotUtf8_IsAClaimWithThatPath()
+    {
+        var claims = ReadLatin1("// café\n" + OnAClass(PathPrefix + "\"Requ\\u00eates\")]"));
+
+        claims.Errors.ShouldBeEmpty();
+        claims.Claims.ShouldHaveSingleItem().Path.ShouldBe("Requêtes");
+    }
+
+    [Fact]
+    public void Read_PathOutsideAsciiInUtf8_IsAClaimWithThatPath()
+    {
+        var claims = Read(OnAClass(PathPrefix + "\"Requêtes\")]"));
+
+        claims.Errors.ShouldBeEmpty();
+        claims.Claims.ShouldHaveSingleItem().Path.ShouldBe("Requêtes");
     }
 
     [Theory]
