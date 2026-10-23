@@ -9,12 +9,12 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// dropped.
 /// </summary>
 /// <remarks>
-/// The nullability is the server's <c>is_nullable</c> and is never narrowed: the server says it through every join,
-/// and the describer corrects it nowhere a test has not proved it wrong.  An origin is a column of a table or a view
-/// of the session's database alone.  The sidecar's origin names no database: a table of another database, of a linked
-/// server or of the system resource is not one the table match may find in the session's.  A table-valued function's
-/// column has none, as a function's column has none on PostgreSQL, and the table match cannot read a function whose
-/// parameters it does not have.
+/// The nullability is the server's <c>is_nullable</c>: the server says it through every join.  Only
+/// <see cref="Proofs.ColumnProofs" /> narrows it afterwards, where a proof shows a column cannot be <c>NULL</c>.  An
+/// origin is a column of a table or a view of the session's database alone.  The sidecar's origin names no database: a
+/// table of another database, of a linked server or of the system resource is not one the table match may find in the
+/// session's.  A table-valued function's column has none, as a function's column has none on PostgreSQL, and the
+/// table match cannot read a function whose parameters it does not have.
 /// </remarks>
 internal static class SqlServerColumns
 {

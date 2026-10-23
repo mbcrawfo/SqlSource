@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Describing.SqlServer.Proofs;
 using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing.SqlServer;
@@ -27,11 +28,12 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// </para>
 /// <para>
 /// A query's columns are those of its first result set as <c>sys.dm_exec_describe_first_result_set</c> describes it
-/// in browse mode 2, under the declarations of every parameter, with no correction: the server's nullability is
-/// recorded as it is given (<see cref="SqlServerColumns" />).  When every column comes from one table or view, the
-/// server's description of <c>SELECT *</c> from it is what the result is matched against
-/// (<see cref="SqlServerTableMatcher" />).  There is no plan walk, so an entry with rows records <c>plan</c> as
-/// <c>skipped</c>.
+/// in browse mode 2, under the declarations of every parameter (<see cref="SqlServerColumns" />).  The server's
+/// nullability is kept, except where a proof of the query's text, with the server's answer in <c>operands</c> about
+/// the operands the proof needs, shows a column cannot be <c>NULL</c> (<see cref="ColumnProofs" />).  When every column
+/// comes from one table or view, the server's description of <c>SELECT *</c> from it is what the result is matched
+/// against (<see cref="SqlServerTableMatcher" />).  There is no plan walk, so an entry with rows records <c>plan</c>
+/// as <c>skipped</c>.
 /// </para>
 /// </remarks>
 internal sealed partial class SqlServerSession : DescriberSession
@@ -120,8 +122,9 @@ internal sealed partial class SqlServerSession : DescriberSession
     /// reused parameters are renamed to copies and the declarations; then the comparison of the server's parameters
     /// with the list, before any <c>probe</c>, so that a text whose parameters the two read differently is not probed;
     /// then, for each reused parameter whose copies' types differ, the probes of its copies; then <c>columns</c>, with
-    /// the SQL as written and every parameter declared; then, when every column has an origin in one table,
-    /// <c>table</c> for it, and the match.
+    /// the SQL as written and every parameter declared; then <c>operands</c>, when a proof of a column needs the
+    /// server, with the same declarations; then, when every column has an origin in one table, <c>table</c> for it,
+    /// and the match.
     /// </para>
     /// <para>
     /// A <c>parameters</c> that fails with <see cref="SqlServerErrors.RefusedBatch" /> asks <c>columns</c> with the
@@ -236,8 +239,8 @@ internal sealed partial class SqlServerSession : DescriberSession
 
     public override ValueTask DisposeAsync() => Connection.DisposeAsync();
 
-    // The columns of the query's first result set, through "columns", and the match of its table, through "table",
-    // with the parameters already described.
+    // The columns of the query's first result set, through "columns", corrected by the proofs through "operands", and
+    // the match of its table, through "table", with the parameters already described.
     private async Task<Outcome<QueryDescription, DescribeFailure>> ResultAsync(
         DescribeRequest request,
         EquatableArray<DescribedParameter> parameters,
@@ -269,12 +272,13 @@ internal sealed partial class SqlServerSession : DescriberSession
             );
         }
 
-        foreach (var column in built.Value)
+        var proved = await ProvedAsync(request, built.Value, rows.Value, declarations, cancellationToken);
+        foreach (var column in proved)
         {
             SqlServerEvents.Column(_log, request.Name, column.Column, column.NoOriginReason);
         }
 
-        var columns = new EquatableArray<SidecarColumn>([.. built.Value.Select(static column => column.Column)]);
+        var columns = new EquatableArray<SidecarColumn>([.. proved.Select(static column => column.Column)]);
         var matched = await MatchAsync(request, columns, cancellationToken);
         if (!matched.Succeeded)
         {
@@ -292,6 +296,31 @@ internal sealed partial class SqlServerSession : DescriberSession
                 tableMatch
             )
         );
+    }
+
+    // The columns, each that a proof shows cannot be NULL answered not null, through "operands" when a proof needs the
+    // server.  What "operands" answers never fails the describe: an answer that proves nothing leaves the proofs of
+    // the text alone, and every other column keeps the server's answer.
+    private async Task<IReadOnlyList<BuiltColumn>> ProvedAsync(
+        DescribeRequest request,
+        IReadOnlyList<BuiltColumn> built,
+        IReadOnlyList<SqlServerColumnRow> rows,
+        string? declarations,
+        CancellationToken cancellationToken
+    )
+    {
+        var proofs = ColumnProofs.Read(request.Sql, built, rows);
+        if (proofs.OperandsSql is not { } operandsSql)
+        {
+            return proofs.Apply(null);
+        }
+
+        var answer = await OperandsAsync(
+            request.Name,
+            new SqlServerColumnsRequest(operandsSql, declarations),
+            cancellationToken
+        );
+        return proofs.Apply(OperandsQuery.NotNullOf(answer, proofs.OperandCount));
     }
 
     // The table whose column list the columns are, or the first check that failed.  "table" is asked only when every

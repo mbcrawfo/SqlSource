@@ -23,11 +23,11 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// for each number.  <c>open</c> has no event of its own: the run's <c>database.open</c> records what the session knows
 /// of its server, the four settings included.  A describe writes <c>declared</c> for each declared parameter, in the
 /// list's order, then <c>parameters</c>, then <c>probe</c> for each probe, one or two for each copy of a reused
-/// parameter whose copies' types differ, then <c>columns</c>; and for a statement with rows, <c>column</c> for each
-/// column in order, then <c>table</c> when every column has an origin in one table, then <c>table-match</c>.  An event
-/// is written only when its call was made or its step was reached, so a describe that fails writes nothing after the
-/// step that failed.  When <c>parameters</c> fails with 11501, <c>columns</c> follows it, asked with the declarations
-/// alone, and nothing after.
+/// parameter whose copies' types differ, then <c>columns</c>; and for a statement with rows, <c>operands</c> when a
+/// proof of a column needs the server, then <c>column</c> for each column in order, then <c>table</c> when every
+/// column has an origin in one table, then <c>table-match</c>.  An event is written only when its call was made or its
+/// step was reached, so a describe that fails writes nothing after the step that failed.  When <c>parameters</c> fails
+/// with 11501, <c>columns</c> follows it, asked with the declarations alone, and nothing after.
 /// </remarks>
 internal static class SqlServerEvents
 {
@@ -108,15 +108,20 @@ internal static class SqlServerEvents
         SqlServerColumnsRequest request,
         SqlServerColumnsAnswer answer,
         long durationMs
-    ) =>
-        log.Write(
-            SqlServerCallNames.Columns,
-            new("query", query),
-            new("sql", request.Sql),
-            new("params", request.Params),
-            DescribedOf(answer.Error, answer.Errors, answer.Rows, ColumnRowOf),
-            new(Duration, durationMs)
-        );
+    ) => Described(log, SqlServerCallNames.Columns, query, request, answer, durationMs);
+
+    /// <summary>
+    /// <c>mssql.operands</c>: the text that asks the server about the operands of the proofs and the declarations of
+    /// every parameter, and every row the server described, the hidden ones included, the error rows of the describe,
+    /// or the error of the call, as <c>mssql.columns</c> holds them.
+    /// </summary>
+    public static void Operands(
+        IRunLog log,
+        string query,
+        SqlServerColumnsRequest request,
+        SqlServerColumnsAnswer answer,
+        long durationMs
+    ) => Described(log, SqlServerCallNames.Operands, query, request, answer, durationMs);
 
     /// <summary>
     /// <c>mssql.table</c>: the schema and the table of the one origin, and every row the server described of
@@ -166,6 +171,24 @@ internal static class SqlServerEvents
     /// </summary>
     public static void TableMatch(IRunLog log, string query, SidecarTable? table, string tableMatch) =>
         log.Write("table-match", [new("query", query), .. DescriberEvents.TableMatchTail(table, tableMatch)]);
+
+    // The event of a call of sys.dm_exec_describe_first_result_set over a text and declarations.
+    private static void Described(
+        IRunLog log,
+        string name,
+        string query,
+        SqlServerColumnsRequest request,
+        SqlServerColumnsAnswer answer,
+        long durationMs
+    ) =>
+        log.Write(
+            name,
+            new("query", query),
+            new("sql", request.Sql),
+            new("params", request.Params),
+            DescribedOf(answer.Error, answer.Errors, answer.Rows, ColumnRowOf),
+            new(Duration, durationMs)
+        );
 
     // The answer of a call of sys.dm_exec_describe_first_result_set: the error of the call, the error rows of the
     // describe, or its rows, each a map.

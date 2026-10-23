@@ -21,10 +21,10 @@ public sealed class SqlServerEventsSessionTests
 {
     private static readonly TimeSpan CallTime = TimeSpan.FromMilliseconds(7);
 
-    // A describe of a statement with rows, one of whose columns has no origin: parameters, columns, a column for each
-    // and the match, with no table, each naming its query.
+    // A describe of a statement with rows, one of whose columns has no origin and is proved through the operand it
+    // asks: parameters, columns, operands, a column for each and the match, with no table, each naming its query.
     [Fact]
-    public async Task DescribeAsync_Rows_WritesColumnsEachColumnAndTheMatchInOrder()
+    public async Task DescribeAsync_Rows_WritesColumnsOperandsEachColumnAndTheMatchInOrder()
     {
         const string Sql = "SELECT id, 1 + id AS next FROM dbo.users";
         var next = IdColumn with
@@ -46,23 +46,32 @@ public sealed class SqlServerEventsSessionTests
                 "columns",
                 new SqlServerColumnsRequest(Sql, null),
                 new SqlServerColumnsAnswer([IdColumn, next, Rowstat with { ColumnOrdinal = 3 }], null, null)
+            )
+            .Add(
+                "operands",
+                new SqlServerColumnsRequest("SELECT id\nAS [1]\nFROM dbo.users", null),
+                new SqlServerColumnsAnswer([IdColumn with { Name = "1" }, Rowstat], null, null)
             );
         var log = new RecordingLog();
 
         _ = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql), log, new TestClock(), CallTime);
 
         log.Events.Select(written => written.Name)
-            .ShouldBe(["parameters", "columns", "column", "column", "table-match"]);
+            .ShouldBe(["parameters", "columns", "operands", "column", "column", "table-match"]);
         foreach (var (_, members) in log.Events)
         {
             Member(members, "query").ShouldBe((LogValue)Query);
         }
 
         Member(log.Events[1].Members, "durationMs").ShouldBe((LogValue)(long)CallTime.TotalMilliseconds);
-        Member(log.Events[2].Members, "name").ShouldBe((LogValue)"id");
-        Member(log.Events[3].Members, "name").ShouldBe((LogValue)"next");
-        Member(log.Events[3].Members, "noOrigin").ShouldBe((LogValue)SqlServerColumns.Expression);
-        Member(log.Events[4].Members, "tableMatch").ShouldBe((LogValue)"no-origin");
+        Member(log.Events[2].Members, "sql").ShouldBe((LogValue)"SELECT id\nAS [1]\nFROM dbo.users");
+        Member(log.Events[2].Members, "durationMs").ShouldBe((LogValue)(long)CallTime.TotalMilliseconds);
+        Member(log.Events[3].Members, "name").ShouldBe((LogValue)"id");
+        Member(log.Events[4].Members, "name").ShouldBe((LogValue)"next");
+        Member(log.Events[4].Members, "noOrigin").ShouldBe((LogValue)SqlServerColumns.Expression);
+        Member(log.Events[4].Members, "nullable").ShouldBe((LogValue)false);
+        Member(log.Events[4].Members, "nullableSource").ShouldBe((LogValue)"expression");
+        Member(log.Events[5].Members, "tableMatch").ShouldBe((LogValue)"no-origin");
     }
 
     // When every column comes from one table, "table" is written between the columns and the match.
@@ -90,6 +99,47 @@ public sealed class SqlServerEventsSessionTests
             .ShouldBe(["parameters", "columns", "column", "table", "table-match"]);
         Member(log.Events[3].Members, "durationMs").ShouldBe((LogValue)(long)CallTime.TotalMilliseconds);
         Member(log.Events[4].Members, "tableMatch").ShouldBe((LogValue)"matched");
+    }
+
+    // When every column comes from one table and a proof asks an operand: columns, operands, each column, table, then
+    // the match.
+    [Fact]
+    public async Task DescribeAsync_OperandsOfOneTable_WritesOperandsBeforeTheColumnsAndTable()
+    {
+        const string Sql = "SELECT id, nickname FROM dbo.users";
+        var nickname = SqlServerSessionCases.NameColumn with
+        {
+            Name = "nickname",
+            IsNullable = true,
+            SystemTypeName = "nvarchar(50)",
+            MaxLength = 100,
+            SourceColumn = "nickname",
+        };
+        var script = new SqlServerScript()
+            .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([], null))
+            .Add(
+                "columns",
+                new SqlServerColumnsRequest(Sql, null),
+                new SqlServerColumnsAnswer([IdColumn, nickname, Rowstat with { ColumnOrdinal = 3 }], null, null)
+            )
+            .Add(
+                "operands",
+                new SqlServerColumnsRequest("SELECT nickname\nAS [1]\nFROM dbo.users", null),
+                new SqlServerColumnsAnswer([nickname with { ColumnOrdinal = 1, Name = "1" }, Rowstat], null, null)
+            )
+            .Add(
+                "table",
+                new SqlServerTableRequest("dbo", "users"),
+                new SqlServerColumnsAnswer([IdColumn, nickname, Rowstat with { ColumnOrdinal = 3 }], null, null)
+            );
+        var log = new RecordingLog();
+
+        _ = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql), log, new TestClock(), CallTime);
+
+        log.Events.Select(written => written.Name)
+            .ShouldBe(["parameters", "columns", "operands", "column", "column", "table", "table-match"]);
+        Member(log.Events[4].Members, "nullableSource").ShouldBe((LogValue)"server");
+        Member(log.Events[6].Members, "tableMatch").ShouldBe((LogValue)"matched");
     }
 
     // A describe of a declared parameter and a reused one: declared, then parameters, then the probes of each copy,

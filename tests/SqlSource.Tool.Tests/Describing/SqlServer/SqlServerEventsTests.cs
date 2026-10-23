@@ -9,8 +9,8 @@ using static SqlSource.Tool.Tests.SqlServerScript;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer;
 
-// What the describer says in the run's log of parameters, probe and declared: each event's members for an answer with
-// rows and for an error.
+// What the describer says in the run's log of parameters, probe, declared and operands: each event's members for an
+// answer with rows and for an error.
 public sealed class SqlServerEventsTests
 {
     [Fact]
@@ -280,5 +280,39 @@ public sealed class SqlServerEventsTests
         var members = log.Events.ShouldHaveSingleItem().Members;
         NamesOf(members).ShouldBe(["query", "sql", "params", "rows", "durationMs"]);
         Member(members, "rows").ShouldBe(LogValue.ListOf([]));
+    }
+
+    // "operands" asks what "columns" asks, of another text: its event holds the members of "columns", in their order,
+    // for an answer with rows, one of error rows and one of an error.
+    [Fact]
+    public void Operands_Written_LikeColumns()
+    {
+        var request = new SqlServerColumnsRequest("SELECT nickname\nAS [1]\nFROM dbo.users WHERE id = @id", "@id int");
+        SqlServerColumnsAnswer[] answers =
+        [
+            new([IdColumn with { Name = "1" }, Rowstat], null, null),
+            new(null, [new SqlServerDescribeError(207, 2, "Invalid column name 'nickname'.")], null),
+            new(null, null, Lost),
+        ];
+
+        foreach (var answer in answers)
+        {
+            var operands = new RecordingLog();
+            var columns = new RecordingLog();
+
+            SqlServerEvents.Operands(operands, "GetUser", request, answer, 4);
+            SqlServerEvents.Columns(columns, "GetUser", request, answer, 4);
+
+            var (name, members) = operands.Events.ShouldHaveSingleItem();
+            name.ShouldBe("operands");
+            var written = columns.Events.ShouldHaveSingleItem().Members;
+            NamesOf(members).ShouldBe(NamesOf(written));
+            NamesOf(members)[..3].ShouldBe(["query", "sql", "params"]);
+            NamesOf(members)[^1].ShouldBe("durationMs");
+            foreach (var member in NamesOf(written))
+            {
+                Member(members, member).ShouldBe(Member(written, member));
+            }
+        }
     }
 }

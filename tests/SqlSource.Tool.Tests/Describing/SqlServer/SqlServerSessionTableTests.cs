@@ -94,7 +94,7 @@ public sealed class SqlServerSessionTableTests
         description.Plan.ShouldBe(SidecarValues.Plan.Skipped);
     }
 
-    // COUNT(*) names no source, so no table is asked.
+    // COUNT(*) names no source, so no table is asked.  It is proved not null from its text, with nothing to ask.
     [Fact]
     public async Task DescribeAsync_NoOrigin_AsksNoTable()
     {
@@ -121,7 +121,7 @@ public sealed class SqlServerSessionTableTests
         asked.Select(call => call.Method).ShouldBe(["parameters", "columns"]);
         var description = described.Value.ShouldNotBeNull();
         description.Columns.ShouldBe([
-            new SidecarColumn(0, "n", Int, true, SidecarValues.NullableSource.Server, null, null, null),
+            new SidecarColumn(0, "n", Int, false, SidecarValues.NullableSource.Expression, null, null, null),
         ]);
         description.MatchesTable.ShouldBeNull();
         description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);

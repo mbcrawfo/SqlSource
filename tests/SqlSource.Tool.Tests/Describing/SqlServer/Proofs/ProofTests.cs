@@ -20,7 +20,7 @@ public sealed class ProofTests
     public void Holds_OperandBeyondTheAnswers_DoesNotHold() => new Proof.Operand(1).Holds([true]).ShouldBeFalse();
 
     [Fact]
-    public void Holds_OperandNotNull_Holds() => new Proof.Operand(1).Holds([false, true]).ShouldBeTrue();
+    public void Holds_OperandAnsweredNotNull_IsTrue() => new Proof.Operand(1).Holds([false, true]).ShouldBeTrue();
 
     [Fact]
     public void Holds_AnyOf_IsTrueWhenOnePartHolds()
