@@ -2314,7 +2314,7 @@ See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)
 
 The tool reports a `.sql` file saved in another encoding, such as Windows-1252, when a query of it needs an entry in its sidecar or when the tool cannot read the file as SQL.  A file that starts with a byte order mark is never reported.  The build reads such a file in a different encoding from the tool, so the two would see different text.  The tool describes no query of the file until it is saved as UTF-8.  The build does not report this error itself: it reports the queries' entries as missing ([SQLSRC241](#sqlsrc241)) or out of date ([SQLSRC244](#sqlsrc244)).  A file whose queries all have the output `sql` is not reported.
 
-The tool also reports a C# file in another encoding whose `[SqlSourceGenerate]` has a `Path` with a character outside ASCII, at that `Path`.  The build reads that file in a different encoding from the tool as well, and the tool plans nothing for the type until the file is saved as UTF-8.  A C# file in another encoding is read as before when its `Path` holds only ASCII characters.
+The tool also reports a C# file in another encoding whose `[SqlSourceGenerate]` has a `Path` written with a character outside ASCII, at that `Path`.  The build reads that file in a different encoding from the tool as well, and the tool plans nothing for the type until the file is saved as UTF-8.  A C# file in another encoding is read as before when its `Path` is written with ASCII characters only, an escape such as `\u00ea` included.
 
 ```console
 /work/App/Queries/Users.sql : error SQLSRC271: '/work/App/Queries/Users.sql' is not saved as UTF-8, so the tool and the build read different text from it.  Save it as UTF-8.

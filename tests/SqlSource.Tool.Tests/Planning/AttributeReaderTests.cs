@@ -145,10 +145,13 @@ public sealed class AttributeReaderTests : IDisposable
         claims.Claims.ShouldHaveSingleItem().Path.ShouldBe(expected);
     }
 
-    [Fact]
-    public void Read_PathOutsideAsciiInAFileThatIsNotUtf8_IsSqlsrc271AtThePathAndNoClaim()
+    [Theory]
+    [InlineData("\"Requêtes\"")]
+    [InlineData("@\"Requêtes\"")]
+    [InlineData("\"\"\"Requêtes\"\"\"")]
+    public void Read_PathOutsideAsciiInAFileThatIsNotUtf8_IsSqlsrc271AtThePathAndNoClaim(string expression)
     {
-        var claims = ReadLatin1(OnAClass(PathPrefix + "\"Requêtes\")]"));
+        var claims = ReadLatin1(OnAClass(PathPrefix + expression + ")]"));
 
         claims.Claims.ShouldBeEmpty();
         claims.Errors.ShouldBe([
