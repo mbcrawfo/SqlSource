@@ -291,7 +291,7 @@ public sealed class PlanExpressionTests
         PlanExpression.ProvedTypeOf(entry, Context(catalogFunctions: true)).ShouldBe(expected);
 
     [Theory]
-    [InlineData("COALESCE(id, 0)")]
+    [InlineData("COALESCE(u.note, NULL::integer)")]
     [InlineData("id")]
     [InlineData("count(id)")]
     [InlineData("(l.quantity * l.unit_price)")]
@@ -613,6 +613,78 @@ public sealed class PlanExpressionTests
     [InlineData("jsonb_agg(o.note)")]
     public void NullableOf_PolymorphicNameNotInTheTable_IsUnknown(string entry) =>
         PlanExpression.NullableOf(entry, Alone(All, groupsHaveRows: true)).ShouldBeNull();
+
+    // A column of a domain over numeric.
+    private const long Amount = 16_400;
+
+    // The references of the tests of the type of COALESCE, GREATEST, LEAST and CASE: Polymorphic's, a numeric, an
+    // integer and a column of a domain, each bare.
+    private static long? CommonTyped(OutputReference reference) =>
+        reference switch
+        {
+            { Alias: null, Column: "total" } => BuiltInTypes.Numeric,
+            { Alias: null, Column: "quantity" } => BuiltInTypes.Int4,
+            { Alias: null, Column: "amount" } => Amount,
+            _ => Polymorphic(reference),
+        };
+
+    private static ExpressionContext CommonTypes(bool catalogFunctions = true, bool groupsHaveRows = false) =>
+        new(catalogFunctions, CommonTyped, GroupsHaveRows: groupsHaveRows);
+
+    // The parser casts every argument and every result to the common type, and the plan prints the casts: a form that
+    // is not NULL is of the one type its arguments proved of a known type have.
+    [Theory]
+    [InlineData("COALESCE(total, '0'::numeric)", BuiltInTypes.Numeric)]
+    [InlineData("COALESCE(o.note, 'x'::text)", BuiltInTypes.Text)]
+    [InlineData("GREATEST(quantity, 1)", BuiltInTypes.Int4)]
+    [InlineData("LEAST(o.id, '5'::bigint)", BuiltInTypes.Int8)]
+    [InlineData("CASE WHEN (quantity > 1) THEN '1'::numeric ELSE 2.5 END", BuiltInTypes.Numeric)]
+    [InlineData("COALESCE(o.id, (u.id)::bigint)", BuiltInTypes.Int8)]
+    [InlineData("COALESCE(COALESCE(o.note, 'x'::text), o.note)", BuiltInTypes.Text)]
+    [InlineData("(COALESCE(total, '0'::numeric))", BuiltInTypes.Numeric)]
+    [InlineData("COALESCE(o.note, o.note)", null)]
+    [InlineData("COALESCE(amount, '1'::numeric)", null)]
+    [InlineData("COALESCE(o.id, u.id)", null)]
+    [InlineData("CASE WHEN (quantity > 1) THEN o.note ELSE 'x'::text END", null)]
+    [InlineData("CASE WHEN (quantity > 1) THEN 'x'::text END", null)]
+    public void ProvedTypeOf_CommonTypeForm_IsItsArgumentsType(string entry, long? expected) =>
+        PlanExpression.ProvedTypeOf(entry, CommonTypes()).ShouldBe(expected);
+
+    // An argument proved of no known type is no argument of the common type.
+    [Theory]
+    [InlineData("COALESCE(u.id, 1)", BuiltInTypes.Int4)]
+    [InlineData("COALESCE(u.id, u.name)", null)]
+    [InlineData("CASE WHEN (u.id > 1) THEN u.id ELSE 'x'::text END", BuiltInTypes.Text)]
+    public void ProvedTypeOf_ArgumentOfNoKnownType_IsSkipped(string entry, long? expected) =>
+        PlanExpression.ProvedTypeOf(entry, Untyped(catalogFunctions: true, AllProved)).ShouldBe(expected);
+
+    // Every form of a type is read only when the session finds pg_catalog first.
+    [Theory]
+    [InlineData("COALESCE(total, '0'::numeric)")]
+    [InlineData("GREATEST(quantity, quantity)")]
+    [InlineData("CASE WHEN (quantity > 1) THEN quantity ELSE quantity END")]
+    public void ProvedTypeOf_CommonTypeFormWhenTheCatalogIsNotFirst_IsNull(string entry) =>
+        PlanExpression.ProvedTypeOf(entry, CommonTypes(catalogFunctions: false)).ShouldBeNull();
+
+    // A form of a type feeds an aggregate, an operator and a cast.
+    [Theory]
+    [InlineData("sum(COALESCE(total, '0'::numeric))")]
+    [InlineData("max(COALESCE(o.id, (u.id)::bigint))")]
+    [InlineData("sum(CASE WHEN (quantity > 1) THEN '1'::numeric ELSE 2.5 END)")]
+    [InlineData("(COALESCE(quantity, 0) + 1)")]
+    [InlineData("(GREATEST(quantity, 1))::bigint")]
+    public void NullableOf_FormsOverACommonType_AreRead(string entry) =>
+        PlanExpression.NullableOf(entry, CommonTypes(groupsHaveRows: true)).ShouldBe(false);
+
+    // A domain's column is proved of the domain, which no row of the tables takes, and a form of no known type feeds
+    // nothing.
+    [Theory]
+    [InlineData("sum(COALESCE(amount, '1'::numeric))")]
+    [InlineData("(COALESCE(amount, amount) + '1'::numeric)")]
+    [InlineData("(COALESCE(o.note, o.note) + 1)")]
+    [InlineData("sum(COALESCE(total, '0'::numeric)) FILTER (WHERE (quantity > 1))")]
+    public void NullableOf_FormsOverNoCommonType_AreUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, CommonTypes(groupsHaveRows: true)).ShouldBeNull();
 
     [Theory]
     [InlineData("count(*)", new string[0], new string[0])]

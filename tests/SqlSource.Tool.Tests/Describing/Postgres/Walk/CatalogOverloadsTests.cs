@@ -34,29 +34,42 @@ public sealed class CatalogOverloadsTests
     [Fact]
     public void Overloads_Count_IsEveryOverloadOfTheNames() => CatalogOverloads.Overloads.Count().ShouldBe(20);
 
-    // Every node's entries are read, a subplan's and a child's that the root does not print included, and each name
-    // is asked once, in ordinal order.
+    // Every node's entries are read, a subplan's, an InitPlan's, a subquery's and a child's that the root does not
+    // print included, and each name is asked once, in ordinal order.
     [Fact]
     public void RequestOf_NamesAnywhereInTheTree_AsksEachOnceInOrder()
     {
-        var plan = Over(
-            "Aggregate",
-            Join(
-                "Inner",
-                Scan("a", "a.id", "count(a.id)"),
-                SubPlan("SubPlan 1", Scan("b", "(b.during * tstzrange($1, $2))", "array_agg(b.id)"))
-            ) with
-            {
-                Output = ["a.id", "jsonb_build_object('k', a.id)"],
-            }
-        ) with
+        var withSubPlan = Scan("a", "a.id", "count(a.id)") with
         {
-            Output = ["count(a.id)", "count(*)"],
+            Plans = [SubPlan("SubPlan 1", Scan("b", "(b.during * tstzrange($1, $2))", "array_agg(b.id)"))],
         };
+        var subquery = Over("Subquery Scan", Scan("d", "json_build_object('k', d.id)"), "Subquery") with
+        {
+            Alias = "s",
+            Output = ["s.k"],
+        };
+        var join = Join("Inner", withSubPlan, subquery) with
+        {
+            Output = ["a.id", "jsonb_build_object('k', a.id)", "s.k"],
+        };
+        var initPlan = Scan("c", "int4range(c.id, 2)") with
+        {
+            ParentRelationship = "InitPlan",
+            SubplanName = "InitPlan 1",
+        };
+        var plan = Over("Aggregate", join) with { Output = ["count(a.id)", "count(*)"] };
+        plan = plan with { Plans = [.. plan.Plans, initPlan] };
 
         var request = CatalogOverloads.RequestOf(plan).ShouldNotBeNull();
 
-        request.Functions.ShouldBe(["array_agg", "count", "jsonb_build_object", "tstzrange"]);
+        request.Functions.ShouldBe([
+            "array_agg",
+            "count",
+            "int4range",
+            "json_build_object",
+            "jsonb_build_object",
+            "tstzrange",
+        ]);
         request.Operators.ShouldBe(["*"]);
     }
 

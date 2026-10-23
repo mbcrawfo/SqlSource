@@ -35,8 +35,11 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// argument types read, of the result it gives: the plan prints each argument with its implicit cast, so its type is
 /// what the text shows.  A cast, <c>(E)::T</c>, is not <c>NULL</c> when <c>E</c> is proved of a type that is
 /// <c>T</c> or in one family of <see cref="SetOperationTypes" /> with it; any other cast is unknown.
-/// <c>COALESCE</c>, <c>GREATEST</c>, <c>LEAST</c> and <c>CASE</c> are not <c>NULL</c> but of no known type, so they
-/// feed no operator, and a reference in parentheses of its own, <c>(u.id)</c>, is unknown.
+/// A <c>COALESCE</c>, a <c>GREATEST</c> or a <c>LEAST</c> that is not <c>NULL</c> is of the one type that every
+/// argument proved of a known type has, and a <c>CASE</c> whose every result is not <c>NULL</c> of the one its results
+/// proved of a known type have, when the session finds <c>pg_catalog</c> first: the parser casts each argument and
+/// each result to their common type, and the plan prints the casts.  With no such type, or two, the form is of no
+/// known type and feeds no operator.  A reference in parentheses of its own, <c>(u.id)</c>, is unknown.
 /// </para>
 /// <para>
 /// An aggregate, <c>name([DISTINCT] a, ... [ORDER BY ...])</c> with nothing after its parenthesis, is not <c>NULL</c>
@@ -112,8 +115,8 @@ internal static partial class PlanExpression
     /// <summary>
     /// The type of an entry that is, as a whole, a value proved not <c>NULL</c> of a known type, or null: a constant,
     /// a test, <c>count(*)</c> or a ranking as <see cref="TypeOf" /> types them, or an operator, a function or a cast
-    /// of the forms the remarks give.  <c>COALESCE</c>, <c>GREATEST</c>, <c>LEAST</c> and <c>CASE</c> are not
-    /// <c>NULL</c> but of no known type, and a reference that is the whole entry is never asked.
+    /// of the forms the remarks give, a <c>COALESCE</c>, a <c>GREATEST</c>, a <c>LEAST</c> and a <c>CASE</c> among
+    /// them, of the type their proved arguments or results share.  A reference that is the whole entry is never asked.
     /// </summary>
     /// <param name="entry">The entry as the plan prints it.</param>
     /// <param name="context">What the walk says of the plan the entry is read in.</param>
@@ -258,6 +261,9 @@ internal static partial class PlanExpression
 
         // The index of the token that closes each opening parenthesis or bracket, and -1 for any other.
         private readonly int[] _closes;
+
+        // The type Proved gave each span read so far, by the span and the state of _groupsHaveRows it was read in.
+        private readonly Dictionary<(int From, int To, bool GroupsHaveRows), long?> _proved = [];
 
         // Whether an aggregate of the span being read is one of the node's own, over a group that has a row: false
         // inside a group a child printed.

@@ -319,6 +319,20 @@ public sealed class ExpressionTests(PostgresContainer postgres)
             NotNullExpression,
         ]);
 
+    // COALESCE prints its arguments cast to their common type, so it is of that type, and the aggregate over it is
+    // read where it is under a GROUP BY: without one, the node is plain and returns a row for an input of none.
+    [Fact]
+    public async Task DescribeAsync_FormsOverCommonTypes_AreAnswered()
+    {
+        (
+            await AnswersAsync(
+                "SELECT sum(coalesce(o.total, 0)) AS spent, max(coalesce(o.id, o.user_id)) AS top "
+                    + "FROM orders o GROUP BY o.user_id"
+            )
+        ).ShouldBe([NotNullExpression, NotNullExpression]);
+        (await AnswersAsync("SELECT sum(coalesce(o.total, 0)) AS spent FROM orders o")).ShouldBe([UnknownNoOrigin]);
+    }
+
     // The aggregate of a type outside the families, over an enum or a domain, and a DISTINCT or an ORDER BY inside
     // an aggregate of the table, which change nothing.
     [Fact]
