@@ -53,6 +53,14 @@ internal sealed class ConnectionSecret(
     /// <summary>The length below which a part is dropped.</summary>
     public const int MinimumPartLength = 4;
 
+    // Both are made once, the parts from the wholes, since a part that equals a whole adds nothing.
+    private readonly (ImmutableArray<string> Wholes, ImmutableArray<string> Parts) _kept = Keep(
+        value,
+        parts,
+        runWords,
+        forms
+    );
+
     /// <summary>The connection's value.</summary>
     public string Value { get; } = value;
 
@@ -60,12 +68,12 @@ internal sealed class ConnectionSecret(
     /// The whole forms of the value that are kept: the value itself, its trimmed text and each form, longest first so
     /// that a form that holds another is replaced before the other is.
     /// </summary>
-    public ImmutableArray<string> Wholes { get; } = WholesOf(value, forms);
+    public ImmutableArray<string> Wholes => _kept.Wholes;
 
     /// <summary>
     /// The parts that are kept, longest first, so that a part that holds another is replaced before the other is.
     /// </summary>
-    public ImmutableArray<string> Parts { get; } = PartsOf(WholesOf(value, forms), parts, runWords);
+    public ImmutableArray<string> Parts => _kept.Parts;
 
     /// <summary>Whether the text holds a whole form anywhere, or a part as a token.</summary>
     public bool IsIn(string text) =>
@@ -74,6 +82,17 @@ internal sealed class ConnectionSecret(
 
     /// <summary>The secret without its value and its parts: it is a secret.</summary>
     public override string ToString() => nameof(ConnectionSecret);
+
+    private static (ImmutableArray<string> Wholes, ImmutableArray<string> Parts) Keep(
+        string value,
+        IEnumerable<string?>? parts,
+        IEnumerable<string>? runWords,
+        IEnumerable<string?>? forms
+    )
+    {
+        var wholes = WholesOf(value, forms);
+        return (wholes, PartsOf(wholes, parts, runWords));
+    }
 
     private static ImmutableArray<string> WholesOf(string value, IEnumerable<string?>? forms) =>
         [

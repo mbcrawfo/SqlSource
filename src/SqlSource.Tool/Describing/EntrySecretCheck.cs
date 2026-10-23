@@ -49,14 +49,20 @@ internal static class EntrySecretCheck
         }
 
         var text = TextOf(entry);
-        var without = TextOf(WithoutTheDescribersPart(entry));
-        return secret
+        var found = secret
             .Wholes
             // As written: the form between the quotes the builder puts round it.
             .Select(static whole => SidecarJsonBuilder.Quote(whole)[1..^1])
-            .Any(written =>
-                text.Contains(written, StringComparison.Ordinal) && !without.Contains(written, StringComparison.Ordinal)
-            );
+            .Where(written => text.Contains(written, StringComparison.Ordinal))
+            .ToList();
+        if (found.Count == 0)
+        {
+            return false;
+        }
+
+        // Made only when some form is in the entry's text: the other text is the cost of a finding.
+        var without = TextOf(WithoutTheDescribersPart(entry));
+        return found.Any(written => !without.Contains(written, StringComparison.Ordinal));
     }
 
     private static string TextOf(SidecarEntry entry) =>

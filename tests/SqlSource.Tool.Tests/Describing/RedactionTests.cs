@@ -524,7 +524,10 @@ public sealed class RedactionTests : IDisposable
     [Fact]
     public void Of_Failure_RewriteCutOverTwoServerLines_IsTheMark()
     {
-        var secret = new ConnectionSecret("host=db;password=hunter22", forms: ["Host=db;Port=5432\nPassword=hunter22"]);
+        var secret = new ConnectionSecret(
+            "host=db;password=hunter22",
+            forms: ["Host=db;Port=5432\r\nPassword=hunter22"]
+        );
         var failure = FakeDescriber.Failure("GetUser", "a Host=db;Port=5432", "Password=hunter22 b");
 
         Redaction.Of(failure, secret).ServerLines.ShouldBe(["a *** b"]);

@@ -136,4 +136,24 @@ public sealed class EntrySecretCheckTests
                 new ConnectionSecret("host=db", forms: ["Host=db;Port=5432"])
             )
             .ShouldBeTrue();
+
+    // A driver may trim the value, so the trimmed text is as much the value as the value is.
+    [Fact]
+    public void Holds_TrimmedValueInAMemberOfTheDescriber_IsTrue() =>
+        EntrySecretCheck
+            .Holds(Entry with { ServerVersion = "Host=db;Password=pw" }, new ConnectionSecret("Host=db;Password=pw \n"))
+            .ShouldBeTrue();
+
+    // What the plan gave is in the file whatever the describer does, for a form as for the value.
+    [Fact]
+    public void Holds_FormThatThePlanGave_IsFalse() =>
+        EntrySecretCheck
+            .Holds(
+                Entry with
+                {
+                    ServerVersion = "GetUser",
+                },
+                new ConnectionSecret("Host=db;Password=pw", forms: ["GetUser"])
+            )
+            .ShouldBeFalse();
 }
