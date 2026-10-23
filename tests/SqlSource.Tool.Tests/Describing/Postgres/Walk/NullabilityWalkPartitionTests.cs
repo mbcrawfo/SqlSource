@@ -86,38 +86,35 @@ public sealed class NullabilityWalkPartitionTests
 
     // Every member must prove it: a member without a row, a foreign partition, whose remote rows nothing holds to its
     // NOT NULL, a partition whose column is nullable, or two partitions whose column is of two types each leave it.
-    [Theory]
-    [InlineData("missing")]
-    [InlineData("foreign")]
-    [InlineData("nullable")]
-    [InlineData("another-type")]
-    public void Run_ExpressionOverPartitionsThatDoNotAllProveIt_KeepsNoOrigin(string reason)
+    [Fact]
+    public void Run_ExpressionOverAPartitionWithoutARow_KeepsNoOrigin() =>
+        AnswersOf(RunOverPartitions(PartitionOne)).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+
+    [Fact]
+    public void Run_ExpressionOverAForeignPartition_KeepsNoOrigin() =>
+        AnswersOf(RunOverPartitions(PartitionOne, PartitionTwo with { Relkind = "f" }))
+            .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+
+    [Fact]
+    public void Run_ExpressionOverAPartitionWhoseColumnIsNullable_KeepsNoOrigin()
     {
-        var (second, answers) = reason switch
+        var second = PartitionTwo with
         {
-            "missing" => ((PostgresTableRow?)null, new[] { UnknownNoOrigin, UnknownNoOrigin }),
-            "foreign" => (PartitionTwo with { Relkind = "f" }, [UnknownNoOrigin, UnknownNoOrigin]),
-            "nullable" => (
-                PartitionTwo with
-                {
-                    Columns = [PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid), Table.Columns[1]],
-                },
-                [UnknownNoOrigin, NotNullExpression]
-            ),
-            _ => (
-                PartitionTwo with
-                {
-                    Columns =
-                    [
-                        PostgresTables.Attribute(1, "id", PostgresRows.Int8.Oid, notNull: true),
-                        Table.Columns[1],
-                    ],
-                },
-                [UnknownNoOrigin, NotNullExpression]
-            ),
+            Columns = [PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid), Table.Columns[1]],
         };
 
-        AnswersOf(RunOverPartitions(second is null ? [PartitionOne] : [PartitionOne, second])).ShouldBe(answers);
+        AnswersOf(RunOverPartitions(PartitionOne, second)).ShouldBe([UnknownNoOrigin, NotNullExpression]);
+    }
+
+    [Fact]
+    public void Run_ExpressionOverPartitionsOfTwoTypes_KeepsNoOrigin()
+    {
+        var second = PartitionTwo with
+        {
+            Columns = [PostgresTables.Attribute(1, "id", PostgresRows.Int8.Oid, notNull: true), Table.Columns[1]],
+        };
+
+        AnswersOf(RunOverPartitions(PartitionOne, second)).ShouldBe([UnknownNoOrigin, NotNullExpression]);
     }
 
     // An Append that partition pruning removed a member of shows not every partition: its members' rows prove nothing.

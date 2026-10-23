@@ -75,21 +75,20 @@ public sealed class NullabilityWalkSystemColumnTests
 
     // A table whose NOT NULL column the catalog would not answer false proves no system column either: an inheritance
     // child, a foreign partition or an INSTEAD rule brings rows from elsewhere.
-    [Theory]
-    [InlineData("children")]
-    [InlineData("foreign-partition")]
-    [InlineData("instead-rule")]
-    public void Run_SystemColumnOfATableThatMayReadRowsFromElsewhere_KeepsNoOrigin(string reason)
-    {
-        var table = reason switch
-        {
-            "children" => Products with { Relhassubclass = true },
-            "foreign-partition" => Products with { Relkind = "p", HasForeignPartition = true },
-            _ => Products with { HasInsteadRule = true },
-        };
-
+    private static void ShouldKeepNoOrigin(PostgresTableRow table) =>
         AnswersOf(RunOver(table, InsertInto(table, "(products.xmax = 0)"))).ShouldBe([UnknownNoOrigin]);
-    }
+
+    [Fact]
+    public void Run_SystemColumnOfATableWithChildren_KeepsNoOrigin() =>
+        ShouldKeepNoOrigin(Products with { Relhassubclass = true });
+
+    [Fact]
+    public void Run_SystemColumnOfATableWithAForeignPartition_KeepsNoOrigin() =>
+        ShouldKeepNoOrigin(Products with { Relkind = "p", HasForeignPartition = true });
+
+    [Fact]
+    public void Run_SystemColumnOfATableWithAnInsteadRule_KeepsNoOrigin() =>
+        ShouldKeepNoOrigin(Products with { HasInsteadRule = true });
 
     // Only the six names of the server's system columns are one, each of its own type.
     [Theory]

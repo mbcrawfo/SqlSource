@@ -68,38 +68,72 @@ public sealed class NullabilityWalkSubPlanTests
             .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
 
     // A subplan that may return no row, or a row whose value may be NULL, or one whose name is no single subplan.
-    [Theory]
-    [InlineData("group-key")]
-    [InlineData("sorted-without-a-key")]
-    [InlineData("grouping-sets")]
-    [InlineData("filter")]
-    [InlineData("limit")]
-    [InlineData("max")]
-    [InlineData("two-outputs")]
-    [InlineData("found-twice")]
-    [InlineData("other-name")]
-    [InlineData("init-plan")]
-    public void Run_ScalarSubPlanThatMayReturnNoRow_KeepsNoOrigin(string shape)
-    {
-        var count = CountOfO();
-        PlanNode[] subPlans = shape switch
-        {
-            "group-key" => [SubPlan("SubPlan 1", count with { Strategy = "Sorted", HasGroupKey = true })],
-            "sorted-without-a-key" => [SubPlan("SubPlan 1", count with { Strategy = "Sorted" })],
-            "grouping-sets" => [SubPlan("SubPlan 1", count with { HasGroupingSets = true })],
-            "filter" => [SubPlan("SubPlan 1", count with { HasFilter = true })],
-            "limit" => [SubPlan("SubPlan 1", Over("Limit", count) with { Output = ["(count(*))"] })],
-            "max" => [SubPlan("SubPlan 1", count with { Output = ["max(o.placed_at)"] })],
-            "two-outputs" => [SubPlan("SubPlan 1", count with { Output = ["count(*)", "count(*)"] })],
-            "found-twice" => [SubPlan("SubPlan 1", count), SubPlan("SubPlan 1", count)],
-            "other-name" => [SubPlan("SubPlan 2", count)],
-            _ => [count with { ParentRelationship = "InitPlan", SubplanName = "SubPlan 1" }],
-        };
-        var type = shape == "max" ? BuiltInTypes.Timestamptz : BuiltInTypes.Int8;
-
+    private static void ShouldKeepNoOrigin(long type, params PlanNode[] subPlans) =>
         AnswersOf(RunTyped(ScanOfA("(SubPlan 1)", subPlans), BuiltInTypes.Int4, type))
             .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+
+    [Fact]
+    public void Run_ScalarSubPlanSortedByAGroupKey_KeepsNoOrigin() =>
+        ShouldKeepNoOrigin(
+            BuiltInTypes.Int8,
+            SubPlan("SubPlan 1", CountOfO() with { Strategy = "Sorted", HasGroupKey = true })
+        );
+
+    [Fact]
+    public void Run_ScalarSubPlanSortedWithoutAKey_KeepsNoOrigin() =>
+        ShouldKeepNoOrigin(BuiltInTypes.Int8, SubPlan("SubPlan 1", CountOfO() with { Strategy = "Sorted" }));
+
+    [Fact]
+    public void Run_ScalarSubPlanWithGroupingSets_KeepsNoOrigin() =>
+        ShouldKeepNoOrigin(BuiltInTypes.Int8, SubPlan("SubPlan 1", CountOfO() with { HasGroupingSets = true }));
+
+    [Fact]
+    public void Run_ScalarSubPlanWithAFilter_KeepsNoOrigin() =>
+        ShouldKeepNoOrigin(BuiltInTypes.Int8, SubPlan("SubPlan 1", CountOfO() with { HasFilter = true }));
+
+    [Fact]
+    public void Run_ScalarSubPlanUnderALimit_KeepsNoOrigin() =>
+        ShouldKeepNoOrigin(
+            BuiltInTypes.Int8,
+            SubPlan("SubPlan 1", Over("Limit", CountOfO()) with { Output = ["(count(*))"] })
+        );
+
+    [Fact]
+    public void Run_ScalarSubPlanOfMax_KeepsNoOrigin() =>
+        ShouldKeepNoOrigin(
+            BuiltInTypes.Timestamptz,
+            SubPlan("SubPlan 1", CountOfO() with { Output = ["max(o.placed_at)"] })
+        );
+
+    [Fact]
+    public void Run_ScalarSubPlanWithTwoOutputs_KeepsNoOrigin() =>
+        ShouldKeepNoOrigin(
+            BuiltInTypes.Int8,
+            SubPlan("SubPlan 1", CountOfO() with { Output = ["count(*)", "count(*)"] })
+        );
+
+    [Fact]
+    public void Run_ScalarSubPlanFoundTwice_KeepsNoOrigin()
+    {
+        var count = CountOfO();
+
+        ShouldKeepNoOrigin(BuiltInTypes.Int8, SubPlan("SubPlan 1", count), SubPlan("SubPlan 1", count));
     }
+
+    [Fact]
+    public void Run_ScalarSubPlanOfAnotherName_KeepsNoOrigin() =>
+        ShouldKeepNoOrigin(BuiltInTypes.Int8, SubPlan("SubPlan 2", CountOfO()));
+
+    [Fact]
+    public void Run_ScalarSubPlanThatIsAnInitPlan_KeepsNoOrigin() =>
+        ShouldKeepNoOrigin(
+            BuiltInTypes.Int8,
+            CountOfO() with
+            {
+                ParentRelationship = "InitPlan",
+                SubplanName = "SubPlan 1",
+            }
+        );
 
     // A subquery evaluated on the side a join null-extends is NULL for a row the join did not match, and one evaluated
     // on the side it keeps is answered.
