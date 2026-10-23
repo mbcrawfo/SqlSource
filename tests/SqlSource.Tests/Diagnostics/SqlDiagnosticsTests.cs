@@ -87,6 +87,18 @@ public sealed class SqlDiagnosticsTests
         SqlDiagnostics.ForParseError(SqlParseErrorKind.InputModelWithoutParameters).Id.ShouldBe("SQLSRC119");
 
     [Fact]
+    public void ForParseError_CommentInTokenDefault_IsSqlsrc120() =>
+        SqlDiagnostics.ForParseError(SqlParseErrorKind.CommentInTokenDefault).Id.ShouldBe("SQLSRC120");
+
+    [Fact]
+    public void CommentInTokenDefault_Message_HoldsTheTokenAndTheBraces() =>
+        Format(SqlDiagnostics.CommentInTokenDefault, "filter")
+            .ShouldBe(
+                "A comment inside the default of token 'filter' holds '}}', which does not end the token.  Move the "
+                    + "comment out of the default."
+            );
+
+    [Fact]
     public void InvalidDialect_Message_ListsTheNamesThatAreAccepted() =>
         SqlDiagnostics
             .InvalidDialect.MessageFormat.ToString(CultureInfo.InvariantCulture)

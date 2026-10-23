@@ -71,6 +71,16 @@ internal static class TokenScanner
         );
     }
 
+    /// <summary>
+    /// Finds the token whose default is open at <paramref name="offset" /> of <paramref name="sql" />: the first
+    /// opener of a default, <c>{{</c>, blanks, a valid name, blanks and a colon, after the last <c>}}</c> that ends at
+    /// or before the offset, and before the offset itself.  An ignored name opens a default too: <see cref="Scan" />
+    /// reads its token to the next <c>}}</c> as it does any other.  <see cref="OpenDefaultFinder" /> answers the
+    /// same for several offsets in one pass.
+    /// </summary>
+    /// <returns>The token's name, or null when no default is open there.</returns>
+    public static string? FindOpenDefault(string sql, int offset) => new OpenDefaultFinder(sql).At(offset);
+
     private static void AddLiteral(ImmutableArray<SqlSegment>.Builder segments, string sql, int start, int end)
     {
         if (end > start)
@@ -113,19 +123,11 @@ internal static class TokenScanner
         name = string.Empty;
         defaultSpan = null;
         end = 0;
-        if (SqlText.CharAt(sql, start) != '{' || SqlText.CharAt(sql, start + 1) != '{')
+        if (!TryReadOpener(sql, start, out var nameSpan, out var after))
         {
             return false;
         }
 
-        var nameStart = SkipBlanks(sql, start + 2);
-        var nameEnd = nameStart;
-        while (SyntaxFacts.IsIdentifierPartCharacter(SqlText.CharAt(sql, nameEnd)))
-        {
-            nameEnd++;
-        }
-
-        var after = SkipBlanks(sql, nameEnd);
         var hasDefault = SqlText.CharAt(sql, after) == ':';
         if (!hasDefault && (SqlText.CharAt(sql, after) != '}' || SqlText.CharAt(sql, after + 1) != '}'))
         {
@@ -133,7 +135,7 @@ internal static class TokenScanner
         }
 
         // The name is checked before the search for the closing braces, so that text such as "{{1a:" costs none.
-        name = sql.Substring(nameStart, nameEnd - nameStart);
+        name = sql.Substring(nameSpan.Start, nameSpan.Length);
         if (!SqlIdentifier.IsValid(name))
         {
             return false;
@@ -156,6 +158,35 @@ internal static class TokenScanner
         }
 
         end = close + 2;
+        return true;
+    }
+
+    /// <summary>
+    /// Reads what every token starts with: <c>{{</c>, blanks, the characters a name can hold, and blanks.
+    /// </summary>
+    /// <param name="sql">The SQL.</param>
+    /// <param name="start">Where to look for the opening braces.</param>
+    /// <param name="nameSpan">Where the name is, which may be empty or not a valid name.</param>
+    /// <param name="after">Where the token goes on, with a colon or <c>}}</c>.</param>
+    /// <returns>True when <paramref name="start" /> holds <c>{{</c>.</returns>
+    internal static bool TryReadOpener(string sql, int start, out TextSpan nameSpan, out int after)
+    {
+        nameSpan = default;
+        after = 0;
+        if (SqlText.CharAt(sql, start) != '{' || SqlText.CharAt(sql, start + 1) != '{')
+        {
+            return false;
+        }
+
+        var nameStart = SkipBlanks(sql, start + 2);
+        var nameEnd = nameStart;
+        while (SyntaxFacts.IsIdentifierPartCharacter(SqlText.CharAt(sql, nameEnd)))
+        {
+            nameEnd++;
+        }
+
+        nameSpan = TextSpan.FromBounds(nameStart, nameEnd);
+        after = SkipBlanks(sql, nameEnd);
         return true;
     }
 

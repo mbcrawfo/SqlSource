@@ -377,6 +377,18 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor CommentInTokenDefault = new(
+        id: "SQLSRC120",
+        title: "Comment hides the end of a token",
+        messageFormat: "A comment inside the default of token '{0}' holds '}}}}', which does not end the token.  Move "
+            + "the comment out of the default.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc120",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor SidecarMalformed = new(
         id: "SQLSRC237",
         title: "Sidecar cannot be read",
@@ -794,6 +806,7 @@ internal static class SqlDiagnostics
             MissingParameterType,
             UndeclaredParameter,
             InputModelWithoutParameters,
+            CommentInTokenDefault,
             SidecarMalformed,
             SidecarFormatTooNew,
             SidecarFormatTooOld,
@@ -850,6 +863,7 @@ internal static class SqlDiagnostics
             SqlParseErrorKind.MissingParameterType => MissingParameterType,
             SqlParseErrorKind.UndeclaredParameter => UndeclaredParameter,
             SqlParseErrorKind.InputModelWithoutParameters => InputModelWithoutParameters,
+            SqlParseErrorKind.CommentInTokenDefault => CommentInTokenDefault,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "No descriptor is defined for this kind."),
         };
 }

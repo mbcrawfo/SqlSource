@@ -319,6 +319,8 @@ internal static class SqlFileParser
                 _errors.Add(error with { Span = sql.ToSourceSpan(error.Span) });
             }
 
+            FindHiddenTokenEnds(sql, start, end);
+
             // A query without markers has no scope, and so no defaults and no declarations.
             var tokenDefaults = scope?.TokenDefaults ?? [];
             var tokens = SqlTokenList.Create(text, sql, scanned.Occurrences, tokenDefaults, _errors);
@@ -335,6 +337,26 @@ internal static class SqlFileParser
             );
 
             return new BuiltQuery(sql, scanned.Segments, tokens, parameters);
+        }
+
+        // A comment is gone from the SQL that the tokens are found in, and so is any "}}" it holds: in a default, that
+        // is not the end of the token.  Only a comment that holds "}}" is looked at further, and most hold none.  The
+        // comments come in order, and so do their places in the SQL, so one finder reads the SQL once for them all.
+        private void FindHiddenTokenEnds(SqlBlockText sql, int start, int end)
+        {
+            OpenDefaultFinder? finder = null;
+            for (var index = start; index < end; index++)
+            {
+                var lexeme = lexemes[index];
+                if (
+                    lexeme.Kind is SqlLexemeKind.LineComment or SqlLexemeKind.BlockComment
+                    && text.IndexOf("}}", lexeme.Span.Start, lexeme.Span.Length, StringComparison.Ordinal) >= 0
+                    && (finder ??= new OpenDefaultFinder(sql.Text)).At(sql.ToOutput(lexeme.Span.Start)) is { } name
+                )
+                {
+                    AddError(SqlParseErrorKind.CommentInTokenDefault, lexeme.Span, name);
+                }
+            }
         }
 
         // Step three: what the parser can resolve of the settings.  A query that has a list uses it whole, so it

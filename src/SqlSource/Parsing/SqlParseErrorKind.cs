@@ -91,4 +91,10 @@ internal enum SqlParseErrorKind
     /// A <c>-- input-model:</c> marker is on a query that has no parameters.  No argument.
     /// </summary>
     InputModelWithoutParameters,
+
+    /// <summary>
+    /// A comment inside the default of a token holds <c>}}</c>, which the SQL without comments does not have, so the
+    /// default does not end there.  Argument: the token's name.
+    /// </summary>
+    CommentInTokenDefault,
 }

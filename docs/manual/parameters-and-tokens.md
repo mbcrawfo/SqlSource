@@ -134,7 +134,7 @@ WHERE 1 = 1 {{filter}}
 ORDER BY {{orderBy:name}};
 ```
 
-A token can carry a default: `{{name:default}}`.  The default is everything after the first `:` up to the closing `}}`, without the white space around it, so `{{cast:x::int}}` is the token `cast` with the default `x::int`.  It may be empty, `{{extraWhere:}}`, and may run over several lines.
+A token can carry a default: `{{name:default}}`.  The default is everything after the first `:` up to the closing `}}`, without the white space around it, so `{{cast:x::int}}` is the token `cast` with the default `x::int`.  It may be empty, `{{extraWhere:}}`, and may run over several lines.  A comment inside a default must not hold `}}`: comments are removed before tokens are found, so those braces would not end the token, and the comment is [SQLSRC120](diagnostics.md#sqlsrc120).  A `--` comment runs to the end of its line, so `{{filter:AND a = 1 -- note}}` is one: put the comment on a line of its own, outside the default.  This holds for a name in a [`-- token-ignore:`](#token-ignore) marker too, since its text also runs to the first `}}` that is not in a comment.
 
 **A default is a sample of what the caller will pass.**  The generated method does not use it: it still takes every token as a `string`, and nothing uses the default when your code runs.  It is there for the tool.  A query that is described cannot be sent to a database with `{{where}}` in it, so the tool puts the token's default there.  A token without a default in a query that must be described is [SQLSRC210](diagnostics.md#sqlsrc210).  An empty default describes the query with nothing in the token's place.
 
@@ -195,6 +195,5 @@ With validation off the method checks nothing.  An empty argument leaves nothing
 
 ## Known issues
 
-- **A `--` comment inside a token's default swallows its closing braces.**  A line comment runs to the end of its line and takes the `}}` with it, so the token ends at the next `}}` further down, or not at all.  In `{{filter:AND a = 1 -- note}}` followed by a line holding `{{orderBy:name}}`, the default of `filter` runs to the braces of `orderBy`, and the token `orderBy` is gone.  Nothing is reported; the method is missing an argument, which you notice when it does not compile.  Keep line comments out of defaults, and put the comment on a line of its own.
 - **Under `mssql`, a parameter can be taken for a declared variable.**  After a `DECLARE` with no `;`, a statement that starts with a word SqlSource does not know to start a statement, such as `SEND` or a label, does not end the list.  A parameter after a comma in it, outside parentheses, is then taken for a variable and left out of the parameter list.  End the `DECLARE` with a `;`, or declare the parameter with its type: `-- param: @id int`.
 - **A user variable of MySQL or MariaDB, and a parameter of a procedure that the SQL creates, are listed as parameters.**  See [names that are read as parameters](#names-read-as-parameters).

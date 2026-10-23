@@ -405,6 +405,97 @@ public sealed class SqlFileParserTests
         Sql(Blocks(Text).ShouldHaveSingleItem()).ShouldBe("SELECT {{class}}");
     }
 
+    // The comment is stripped with the braces it holds, so the default of f would run on to the braces of o and take
+    // that token with it.
+    [Fact]
+    public void Parse_LineCommentThatHoldsTheClosingBraces_IsReported()
+    {
+        const string Text = "-- name: Q\nSELECT 1 {{f:AND a = 1 -- note}}\nORDER BY {{o:name}}\n";
+
+        Errors(Text)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.CommentInTokenDefault, SpanOf(Text, "-- note}}"), "f")]);
+    }
+
+    [Theory]
+    [InlineData("SELECT 1 {{f:a -- note}}", "-- note}}", "f")]
+    [InlineData("SELECT {{f:a /* }} */ b}}", "/* }} */", "f")]
+    [InlineData("SELECT {{f:a\n-- }}\n}}", "-- }}", "f")]
+    [InlineData("SELECT {{f:a}} {{g: b -- }}", "-- }}", "g")]
+    [InlineData("-- token-ignore: f\nSELECT {{f:a -- }}", "-- }}", "f")]
+    [InlineData("SELECT {{f:a -- }}\r\nORDER BY {{g:b}}\r", "-- }}", "f")]
+    public void Parse_CommentThatHoldsBracesInsideAnOpenDefault_IsReported(string sql, string comment, string name)
+    {
+        var text = "-- name: Q\n" + sql + "\n";
+
+        Errors(text)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.CommentInTokenDefault, SpanOf(text, comment), name)]);
+    }
+
+    // The scanner reads an ignored token to the next "}}" as it does any other, so a hidden "}}" takes g with it.
+    [Fact]
+    public void Parse_CommentThatHoldsTheBracesOfAnIgnoredTokenBeforeAnotherToken_IsReported()
+    {
+        const string Text = "-- name: Q\n-- token-ignore: f\nSELECT {{f:a -- }}\nORDER BY {{g:b}}\n";
+
+        Errors(Text)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.CommentInTokenDefault, SpanOf(Text, "-- }}"), "f")]);
+    }
+
+    // Under postgres a line comment may stand in the gap between the parts of a continued string.  The lexer gives
+    // each part as a quoted region, its prefix in the text before it, and the comment as a line comment between them,
+    // so it is reported as any other.
+    [Fact]
+    public void Parse_CommentInTheGapOfAContinuedStringInADefault_IsReported()
+    {
+        const string Text = "-- name: Q\nSELECT {{f:E'a' -- }}\n'b'}}\n";
+
+        SqlLexer
+            .Lex(Text, SqlDialectRules.PostgreSql)
+            .Lexemes.Select(lexeme => lexeme.Kind + ":" + Text.Substring(lexeme.Span.Start, lexeme.Span.Length))
+            .ShouldBe([
+                "LineComment:-- name: Q",
+                "Text:\nSELECT {{f:E",
+                "Quoted:'a'",
+                "Text: ",
+                "LineComment:-- }}",
+                "Text:\n",
+                "Quoted:'b'",
+                "Text:}}\n",
+            ]);
+        Errors(Text, dialect: SqlDialect.PostgreSql)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.CommentInTokenDefault, SpanOf(Text, "-- }}"), "f")]);
+    }
+
+    // A marker is a line comment, and is gone from the SQL as one, so its braces do not end the default either.
+    [Fact]
+    public void Parse_TokenMarkerInsideAnOpenDefault_IsReported()
+    {
+        const string Text = "-- name: Q\nSELECT {{f:a\n-- token: {{g:b}}\n}}\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.CommentInTokenDefault, SpanOf(Text, "-- token: {{g:b}}"), "f"),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_HashCommentOfMySqlThatHoldsTheClosingBraces_IsReported()
+    {
+        const string Text = "-- name: Q\nSELECT {{f:a # }}\n";
+
+        Errors(Text, dialect: SqlDialect.MySql)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.CommentInTokenDefault, SpanOf(Text, "# }}"), "f")]);
+    }
+
+    [Theory]
+    [InlineData("SELECT 1 -- {{x}}")]
+    [InlineData("SELECT {{f:a}} -- see }}")]
+    [InlineData("SELECT {{f:a -- note\n}}")]
+    [InlineData("SELECT {{f:a /*+ }} */ b}}")]
+    [InlineData("SELECT {{f:a # }}")]
+    public void Parse_CommentThatHidesNoClosingBracesOfADefault_IsNotReported(string sql) =>
+        Blocks("-- name: Q\n" + sql + "\n").ShouldHaveSingleItem();
+
     [Theory]
     [InlineData("/*\n-- name: A\n*/\nSELECT 1", "SELECT 1")]
     [InlineData("SELECT 1 -- name: A", "SELECT 1")]
