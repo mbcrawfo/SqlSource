@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
@@ -234,6 +235,59 @@ public sealed class RunPlannerErrorTests : IDisposable
 
         result.Errors.ShouldBeEmpty();
         result.Plan.Files.ShouldHaveSingleItem().State.ShouldBe(PlannedFileState.Ready);
+    }
+
+    [Fact]
+    public void Plan_FileNotUtf8WithAQueryThatNeedsAnEntry_IsSqlsrc271AtTheFileAndKeepsItsQueries()
+    {
+        var project = Project();
+        var sql = project.AddSqlBytes("Q/One.sql", Encoding.Latin1.GetBytes("-- name: One\nSELECT 'café';\n"));
+
+        var result = Plans.Result(project);
+
+        result.Errors.ShouldBe([ToolDiagnostic.ForFile(ToolDiagnostics.FileNotUtf8, sql)]);
+        var file = result.Plan.Files.ShouldHaveSingleItem();
+        file.State.ShouldBe(PlannedFileState.NotUtf8);
+        file.Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Plan_FileNotUtf8WhoseQueriesNeedNoEntry_IsReadyWithNoError()
+    {
+        var project = Project();
+        project.Properties["SqlSourceOutput"] = "sql";
+        _ = project.AddSqlBytes("Q/One.sql", Encoding.Latin1.GetBytes("-- name: One\nSELECT 'café';\n"));
+
+        var result = Plans.Result(project);
+
+        result.Errors.ShouldBeEmpty();
+        result.Plan.Files.ShouldHaveSingleItem().State.ShouldBe(PlannedFileState.Ready);
+    }
+
+    [Fact]
+    public void Plan_FileNotUtf8WithAParseError_IsSqlsrc271AloneWithNoQuery()
+    {
+        var project = Project();
+        var sql = project.AddSqlBytes("Q/One.sql", Encoding.Latin1.GetBytes("-- name: One\nSELECT 'café\n"));
+
+        var result = Plans.Result(project);
+
+        result.Errors.ShouldBe([ToolDiagnostic.ForFile(ToolDiagnostics.FileNotUtf8, sql)]);
+        var file = result.Plan.Files.ShouldHaveSingleItem();
+        file.State.ShouldBe(PlannedFileState.NotUtf8);
+        file.Queries.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Plan_FileNotUtf8UnderADialectThatCannotBeDescribed_IsSqlsrc271Alone()
+    {
+        var project = Project(dialect: "ansi");
+        var sql = project.AddSqlBytes("Q/One.sql", Encoding.Latin1.GetBytes("-- name: One\nSELECT 'café';\n"));
+
+        var result = Plans.Result(project);
+
+        result.Errors.ShouldBe([ToolDiagnostic.ForFile(ToolDiagnostics.FileNotUtf8, sql)]);
+        result.Plan.Files.ShouldHaveSingleItem().State.ShouldBe(PlannedFileState.NotUtf8);
     }
 
     [Fact]

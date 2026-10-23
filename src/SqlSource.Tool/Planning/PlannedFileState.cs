@@ -13,4 +13,7 @@ internal enum PlannedFileState
 
     /// <summary>A query of the file needs an entry and its dialect cannot be described (<c>SQLSRC209</c>).</summary>
     NotDescribable,
+
+    /// <summary>A file that is not UTF-8 has a parse error or a query that needs an entry (<c>SQLSRC271</c>).</summary>
+    NotUtf8,
 }
