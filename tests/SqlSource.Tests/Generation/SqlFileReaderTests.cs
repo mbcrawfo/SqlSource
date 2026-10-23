@@ -27,33 +27,16 @@ public sealed class SqlFileReaderTests
         file.FileName.ShouldBe("Users.sql");
         file.Errors.ShouldBeEmpty();
         file.Queries.ShouldBe([
-            new SqlQuery(
+            TestModels.Query(
                 "GetUser",
-                Location(new TextSpan(9, 7), 0, 9, 0, 16),
+                "SELECT 1;",
                 "Loads one user.",
-                null,
-                TestModels.Array(Literal("SELECT 1;")),
-                null,
-                EquatableArray<SqlToken>.Empty,
-                EquatableArray<SqlQueryParameter>.Empty,
-                SettingsLevel.None,
-                null,
-                null,
-                EquatableArray<ColumnMarker>.Empty
+                nameLocation: Location(new TextSpan(9, 7), 0, 9, 0, 16)
             ),
-            new SqlQuery(
+            TestModels.Query(
                 "ListUsers",
-                Location(new TextSpan(70, 9), 4, 9, 4, 18),
-                null,
-                null,
-                TestModels.Array(Literal("SELECT 2\nFROM t;")),
-                null,
-                EquatableArray<SqlToken>.Empty,
-                EquatableArray<SqlQueryParameter>.Empty,
-                SettingsLevel.None,
-                null,
-                null,
-                EquatableArray<ColumnMarker>.Empty
+                "SELECT 2\nFROM t;",
+                nameLocation: Location(new TextSpan(70, 9), 4, 9, 4, 18)
             ),
         ]);
     }
@@ -65,19 +48,10 @@ public sealed class SqlFileReaderTests
 
         file.FileName.ShouldBe("CountUsers.sql");
         file.Queries.ShouldBe([
-            new SqlQuery(
+            TestModels.Query(
                 "CountUsers",
-                new LocationInfo("C:\\app\\Repo\\CountUsers.sql", new TextSpan(0, 0), default),
-                null,
-                null,
-                TestModels.Array(Literal("SELECT 1;")),
-                null,
-                EquatableArray<SqlToken>.Empty,
-                EquatableArray<SqlQueryParameter>.Empty,
-                SettingsLevel.None,
-                null,
-                null,
-                EquatableArray<ColumnMarker>.Empty
+                "SELECT 1;",
+                nameLocation: new LocationInfo("C:\\app\\Repo\\CountUsers.sql", new TextSpan(0, 0), default)
             ),
         ]);
     }
@@ -151,11 +125,11 @@ public sealed class SqlFileReaderTests
         file.Queries.Select(query => query.Name).ShouldBe(["GetUser", "ListFrom", "Count"]);
         file.Queries[1]
             .Segments.ShouldBe([
-                Literal("SELECT * FROM "),
+                TestModels.Literal("SELECT * FROM "),
                 new SqlSegment(SqlSegmentKind.Token, "table"),
-                Literal(" t WHERE "),
+                TestModels.Literal(" t WHERE "),
                 new SqlSegment(SqlSegmentKind.Token, "filter"),
-                Literal(";"),
+                TestModels.Literal(";"),
             ]);
     }
 
@@ -179,7 +153,7 @@ public sealed class SqlFileReaderTests
     {
         var file = Read("-- token-ignore: raw\nSELECT '{{raw}}';\n");
 
-        file.Queries.ShouldHaveSingleItem().Segments.ShouldBe([Literal("SELECT '{{raw}}';")]);
+        file.Queries.ShouldHaveSingleItem().Segments.ShouldBe([TestModels.Literal("SELECT '{{raw}}';")]);
     }
 
     [Theory]
@@ -203,8 +177,8 @@ public sealed class SqlFileReaderTests
     {
         var query = Read("SELECT 1; -- c\n", commentsWanted: commentsWanted).Queries.ShouldHaveSingleItem();
 
-        query.Segments.ShouldBe(TestModels.Array(Literal("SELECT 1;")));
-        query.KeptSegments.ShouldBe(expected is null ? null : TestModels.Array(Literal(expected)));
+        query.Segments.ShouldBe(TestModels.Array(TestModels.Literal("SELECT 1;")));
+        query.KeptSegments.ShouldBe(expected is null ? null : TestModels.Array(TestModels.Literal(expected)));
     }
 
     [Fact]
@@ -215,8 +189,6 @@ public sealed class SqlFileReaderTests
         Read(Text).ShouldBe(Read(Text));
     }
 
-    private static SqlSegment Literal(string text) => new(SqlSegmentKind.Literal, text);
-
     [Fact]
     public void Read_Dialect_IsTheDialectTheFileIsParsedWith()
     {
@@ -224,7 +196,7 @@ public sealed class SqlFileReaderTests
 
         Read(Text, dialect: SqlDialect.MySql)
             .Queries.ShouldHaveSingleItem()
-            .Segments.ShouldBe(TestModels.Array(Literal("SELECT 'a\\'b'")));
+            .Segments.ShouldBe(TestModels.Array(TestModels.Literal("SELECT 'a\\'b'")));
         Read(Text).Errors.ShouldHaveSingleItem().Descriptor.ShouldBe(SqlDiagnostics.UnterminatedQuote);
     }
 
@@ -256,7 +228,7 @@ public sealed class SqlFileReaderTests
         );
 
         file.NormalizedPath.ShouldBe(GeneratorHarness.UsersNormalizedPath);
-        file.Queries.ShouldHaveSingleItem().Segments.ShouldBe(TestModels.Array(Literal("SELECT 1")));
+        file.Queries.ShouldHaveSingleItem().Segments.ShouldBe(TestModels.Array(TestModels.Literal("SELECT 1")));
         file.InvalidDialect.ShouldBe("nope");
     }
 
@@ -270,7 +242,8 @@ public sealed class SqlFileReaderTests
             TestContext.Current.CancellationToken
         );
 
-        file.Queries.ShouldHaveSingleItem().KeptSegments.ShouldBe(TestModels.Array(Literal("SELECT 1; -- c")));
+        file.Queries.ShouldHaveSingleItem()
+            .KeptSegments.ShouldBe(TestModels.Array(TestModels.Literal("SELECT 1; -- c")));
     }
 
     private static ParsedSqlFile Read(

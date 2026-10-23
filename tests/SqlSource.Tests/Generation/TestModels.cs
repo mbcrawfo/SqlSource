@@ -4,6 +4,8 @@ using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Emitting;
+using SqlSource.Parsing;
+using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 
 namespace SqlSource.Tests.Generation;
@@ -40,5 +42,40 @@ internal static class TestModels
             filePath,
             AttributeLocation,
             Array(diagnostics ?? [])
+        );
+
+    public static SqlSegment Literal(string text) => new(SqlSegmentKind.Literal, text);
+
+    // A query whose SQL is one literal, with no token, parameter or model.  Its name is at the name location of
+    // Users.sql unless the test gives another.
+    public static SqlQuery Query(
+        string name,
+        string sql,
+        string? summary = null,
+        LocationInfo? nameLocation = null,
+        string? keptSql = null,
+        SettingsLevel? markers = null
+    ) =>
+        new(
+            name,
+            nameLocation ?? NameLocation("Users.sql"),
+            summary,
+            null,
+            Array(Literal(sql)),
+            keptSql is null ? null : Array(Literal(keptSql)),
+            EquatableArray<SqlToken>.Empty,
+            EquatableArray<SqlQueryParameter>.Empty,
+            markers ?? SettingsLevel.None,
+            null,
+            null,
+            EquatableArray<ColumnMarker>.Empty
+        );
+
+    // Where "-- name: GetUser" on the first line of the file puts its name.
+    public static LocationInfo NameLocation(string file) =>
+        new(
+            "/app/Repo/" + file,
+            new TextSpan(9, 7),
+            new LinePositionSpan(new LinePosition(0, 9), new LinePosition(0, 16))
         );
 }

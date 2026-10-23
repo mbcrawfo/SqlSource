@@ -21,13 +21,13 @@ public sealed class MethodWriterTests
             "Lists <c>rows</c>.",
             "ListFrom",
             TestModels.Array(
-                Text("SELECT id FROM "),
+                TestModels.Literal("SELECT id FROM "),
                 Token("table"),
-                Text(" WHERE "),
+                TestModels.Literal(" WHERE "),
                 Token("filter"),
-                Text(" ORDER BY "),
+                TestModels.Literal(" ORDER BY "),
                 Token("table"),
-                Text(".id;")
+                TestModels.Literal(".id;")
             ),
             validate: true
         );
@@ -81,7 +81,13 @@ public sealed class MethodWriterTests
     [Fact]
     public void Append_ValidationOff_WritesNoCheckAndTheSameMethodOtherwise()
     {
-        SqlSegment[] segments = [Text("SELECT * FROM "), Token("table"), Text(" WHERE "), Token("filter")];
+        SqlSegment[] segments =
+        [
+            TestModels.Literal("SELECT * FROM "),
+            Token("table"),
+            TestModels.Literal(" WHERE "),
+            Token("filter"),
+        ];
 
         var validated = Write(validate: true, segments);
         var unvalidated = Write(validate: false, segments);
@@ -99,7 +105,7 @@ public sealed class MethodWriterTests
 
     [Fact]
     public void Append_OneToken_PassesTheParameterItselfAsTheState() =>
-        Body(Text("SELECT * FROM "), Token("table"), Text(";"))
+        Body(TestModels.Literal("SELECT * FROM "), Token("table"), TestModels.Literal(";"))
             .ShouldBe(
                 """
                 public static string Q(string table)
@@ -143,7 +149,7 @@ public sealed class MethodWriterTests
 
     [Fact]
     public void Append_TokensFirstLastAndAdjacent_CopiesEachSegmentInOrder() =>
-        Body(Token("a"), Token("b"), Text(" x "), Token("a"), Token("a"))
+        Body(Token("a"), Token("b"), TestModels.Literal(" x "), Token("a"), Token("a"))
             .ShouldBe(
                 """
                 public static string Q(string a, string b)
@@ -223,7 +229,7 @@ public sealed class MethodWriterTests
     [Fact]
     public void Append_OneTokenNamedState_ReadsTheStateByItsOtherName()
     {
-        var body = Body(Token("state"), Text(";"));
+        var body = Body(Token("state"), TestModels.Literal(";"));
 
         body.ShouldContain("        state,\n        static (span, state1) =>\n");
         body.ShouldContain("            state1.CopyTo(span);\n            span = span.Slice(state1.Length);\n");
@@ -246,7 +252,7 @@ public sealed class MethodWriterTests
     public void Append_LiteralThatNeedsEscaping_EscapesItAndCountsItsCharacters()
     {
         // 23 characters: the line feed, the tab, the backslash and each quote are one character each.
-        var body = Body(Text("SELECT \"a\",\n'\t', '\\' < "), Token("max"));
+        var body = Body(TestModels.Literal("SELECT \"a\",\n'\t', '\\' < "), Token("max"));
 
         body.ShouldContain("        checked(23 + max.Length),\n");
         body.ShouldContain("            \"SELECT \\\"a\\\",\\n'\\t', '\\\\' < \".CopyTo(span);\n");
@@ -256,7 +262,12 @@ public sealed class MethodWriterTests
     [Fact]
     public void Append_SqlOverSeveralLinesWithCharactersXmlReserves_DocumentsItLineByLineAndEscaped()
     {
-        var text = Write(validate: false, Text("SELECT id\nFROM "), Token("table"), Text("\nWHERE id < @max;"));
+        var text = Write(
+            validate: false,
+            TestModels.Literal("SELECT id\nFROM "),
+            Token("table"),
+            TestModels.Literal("\nWHERE id < @max;")
+        );
 
         text.ShouldContain(
             "/// <code>\n/// SELECT id\n/// FROM {{table}}\n/// WHERE id &lt; @max;\n/// </code>\n/// </remarks>\n"
@@ -265,8 +276,6 @@ public sealed class MethodWriterTests
                 + "public static string Q(string table)\n"
         );
     }
-
-    private static SqlSegment Text(string text) => new(SqlSegmentKind.Literal, text);
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);
 

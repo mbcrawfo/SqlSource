@@ -1,5 +1,4 @@
 using System;
-using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
@@ -19,8 +18,8 @@ public sealed class TypeEmitterTests
     {
         var users = File(
             "Users.sql",
-            Query("GetUser", "SELECT id, name\nFROM users\nWHERE id = @id;", "Loads one user by id."),
-            Query("ListUsers", "SELECT id, name FROM users;")
+            TestModels.Query("GetUser", "SELECT id, name\nFROM users\nWHERE id = @id;", "Loads one user by id."),
+            TestModels.Query("ListUsers", "SELECT id, name FROM users;")
         );
 
         var output = Emit(OutputKind.Sql, TestModels.Type(), users);
@@ -71,7 +70,7 @@ public sealed class TypeEmitterTests
         var output = Emit(
             OutputKind.Sql,
             TestModels.Type(placement: MemberPlacement.Direct),
-            File("Users.sql", Query("GetUser", "SELECT 1;"))
+            File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"))
         );
 
         output.Source.ShouldBe(
@@ -110,7 +109,7 @@ public sealed class TypeEmitterTests
             ]
         );
 
-        var output = Emit(OutputKind.Sql, type, File("Users.sql", Query("GetUser", "SELECT 1;")));
+        var output = Emit(OutputKind.Sql, type, File("Users.sql", TestModels.Query("GetUser", "SELECT 1;")));
 
         output.HintName.ShouldBe("IOuter-1.class-2.Inner.g.cs");
         output.Source.ShouldBe(
@@ -148,7 +147,7 @@ public sealed class TypeEmitterTests
         var output = Emit(
             OutputKind.Sql,
             TestModels.Type(@namespace: "App.@event.Data"),
-            File("Users.sql", Query("GetUser", "SELECT 1;"))
+            File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"))
         );
 
         output.HintName.ShouldBe("App.event.Data.UserRepository.g.cs");
@@ -160,7 +159,7 @@ public sealed class TypeEmitterTests
     {
         const string Sql = "SELECT \"a\", 'b\\c', '\t' WHERE x < 1 && y > 2;";
 
-        var output = Emit(OutputKind.Sql, TestModels.Type(), File("A&B.sql", Query("GetUser", Sql)));
+        var output = Emit(OutputKind.Sql, TestModels.Type(), File("A&B.sql", TestModels.Query("GetUser", Sql)));
 
         var source = output.Source.ShouldNotBeNull();
         source.ShouldContain("/// The <c>GetUser</c> query from <c>A&amp;B.sql</c>.\n");
@@ -176,7 +175,7 @@ public sealed class TypeEmitterTests
         var output = Emit(
             OutputKind.Sql,
             TestModels.Type(),
-            File("Users.sql", Query("GetUser", "SELECT 1;", "Users <b>with</b> a & b."))
+            File("Users.sql", TestModels.Query("GetUser", "SELECT 1;", "Users <b>with</b> a & b."))
         );
 
         output.Source.ShouldNotBeNull().ShouldContain("/// Users &lt;b&gt;with&lt;/b&gt; a &amp; b.\n");
@@ -188,8 +187,8 @@ public sealed class TypeEmitterTests
         var output = Emit(
             OutputKind.Sql,
             TestModels.Type(placement: MemberPlacement.Direct),
-            File("B.sql", Query("Zeta", "SELECT 1;"), Query("Alpha", "SELECT 2;")),
-            File("A.sql", Query("Mid", "SELECT 3;"))
+            File("B.sql", TestModels.Query("Zeta", "SELECT 1;"), TestModels.Query("Alpha", "SELECT 2;")),
+            File("A.sql", TestModels.Query("Mid", "SELECT 3;"))
         );
 
         var source = output.Source.ShouldNotBeNull();
@@ -219,7 +218,7 @@ public sealed class TypeEmitterTests
         var output = TypeEmitter.Emit(
             new TypeQueries(
                 typeFiles,
-                TestModels.Array(File("Users.sql", Query("GetUser", "SELECT 1;"))),
+                TestModels.Array(File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"))),
                 TestModels.Array(SettingsLevel.None),
                 "App.UserRepository.g.cs"
             ),
@@ -235,15 +234,19 @@ public sealed class TypeEmitterTests
         var output = Emit(
             OutputKind.Sql,
             TestModels.Type(),
-            File("A.sql", Query("GetUser", "SELECT 1;")),
-            File("B.sql", Query("Other", "SELECT 2;"), Query("GetUser", "SELECT 3;", file: "B.sql")),
-            File("C.sql", Query("Other", "SELECT 4;"))
+            File("A.sql", TestModels.Query("GetUser", "SELECT 1;")),
+            File(
+                "B.sql",
+                TestModels.Query("Other", "SELECT 2;"),
+                TestModels.Query("GetUser", "SELECT 3;", nameLocation: TestModels.NameLocation("B.sql"))
+            ),
+            File("C.sql", TestModels.Query("Other", "SELECT 4;"))
         );
 
         output.Diagnostics.ShouldBe([
             DiagnosticInfo.Create(
                 SqlDiagnostics.DuplicateQueryName,
-                NameLocation("B.sql"),
+                TestModels.NameLocation("B.sql"),
                 "GetUser",
                 "A.sql",
                 "UserRepository"
@@ -264,14 +267,14 @@ public sealed class TypeEmitterTests
         var output = Emit(
             OutputKind.Sql,
             TestModels.Type(placement: Placement(direct)),
-            File("A.sql", Query(name, "SELECT 1;"), Query("Other", "SELECT 2;")),
-            File("B.sql", Query("Kept", "SELECT 3;"))
+            File("A.sql", TestModels.Query(name, "SELECT 1;"), TestModels.Query("Other", "SELECT 2;")),
+            File("B.sql", TestModels.Query("Kept", "SELECT 3;"))
         );
 
         output.Diagnostics.ShouldBe([
             DiagnosticInfo.Create(
                 SqlDiagnostics.QueryNamedLikeContainingType,
-                NameLocation("Users.sql"),
+                TestModels.NameLocation("Users.sql"),
                 "UserRepository",
                 name
             ),
@@ -291,7 +294,7 @@ public sealed class TypeEmitterTests
         var output = Emit(
             OutputKind.Sql,
             TestModels.Type(placement: Placement(direct)),
-            File("A.sql", Query(name, "SELECT 1;"))
+            File("A.sql", TestModels.Query(name, "SELECT 1;"))
         );
 
         output.Diagnostics.ShouldBeEmpty();
@@ -304,7 +307,12 @@ public sealed class TypeEmitterTests
         var output = Emit(
             OutputKind.Sql,
             TestModels.Type(),
-            File("Users.sql", Query("GetUser", "SELECT 1;"), TokenQuery("ListFrom"), Query("Count", "SELECT 3;"))
+            File(
+                "Users.sql",
+                TestModels.Query("GetUser", "SELECT 1;"),
+                TokenQuery("ListFrom"),
+                TestModels.Query("Count", "SELECT 3;")
+            )
         );
 
         output.Diagnostics.ShouldBeEmpty();
@@ -421,7 +429,7 @@ public sealed class TypeEmitterTests
     [Fact]
     public void Emit_ValidationOff_LeavesAConstantAsItIs()
     {
-        var files = File("Users.sql", Query("GetUser", "SELECT 1;"));
+        var files = File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"));
 
         Emit(OutputKind.Sql, TestModels.Type(), validateTokens: false, files)
             .ShouldBe(Emit(OutputKind.Sql, TestModels.Type(), files));
@@ -433,20 +441,7 @@ public sealed class TypeEmitterTests
         var keep = new SettingsLevel { Parameters = GeneratorParameters.KeepComments };
         var none = new SettingsLevel { Parameters = GeneratorParameters.None };
         static SqlQuery Kept(string name, SettingsLevel markers) =>
-            new(
-                name,
-                NameLocation("Users.sql"),
-                null,
-                null,
-                TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, "SELECT 1;")),
-                TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, "SELECT 1; -- " + name)),
-                EquatableArray<SqlToken>.Empty,
-                EquatableArray<SqlQueryParameter>.Empty,
-                markers,
-                null,
-                null,
-                EquatableArray<ColumnMarker>.Empty
-            );
+            TestModels.Query(name, "SELECT 1;", keptSql: "SELECT 1; -- " + name, markers: markers);
 
         var output = TypeEmitter.Emit(
             new TypeQueries(
@@ -478,14 +473,14 @@ public sealed class TypeEmitterTests
         var output = Emit(
             OutputKind.Sql,
             TestModels.Type(),
-            File("A.sql", Query("GetUser", "SELECT 1;")),
+            File("A.sql", TestModels.Query("GetUser", "SELECT 1;")),
             File("B.sql", TokenQuery("GetUser", file: "B.sql"))
         );
 
         output.Diagnostics.ShouldBe([
             DiagnosticInfo.Create(
                 SqlDiagnostics.DuplicateQueryName,
-                NameLocation("B.sql"),
+                TestModels.NameLocation("B.sql"),
                 "GetUser",
                 "A.sql",
                 "UserRepository"
@@ -528,19 +523,11 @@ public sealed class TypeEmitterTests
     [Fact]
     public void Emit_QueryThatKeepsItsComments_EmitsTheKeptForm()
     {
-        var query = new SqlQuery(
+        var query = TestModels.Query(
             "GetUser",
-            NameLocation("Users.sql"),
-            null,
-            null,
-            TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, "SELECT 1;")),
-            TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, "SELECT 1; -- kept")),
-            EquatableArray<SqlToken>.Empty,
-            EquatableArray<SqlQueryParameter>.Empty,
-            new SettingsLevel { Parameters = GeneratorParameters.KeepComments },
-            null,
-            null,
-            EquatableArray<ColumnMarker>.Empty
+            "SELECT 1;",
+            keptSql: "SELECT 1; -- kept",
+            markers: new SettingsLevel { Parameters = GeneratorParameters.KeepComments }
         );
 
         Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql", query))
@@ -551,19 +538,10 @@ public sealed class TypeEmitterTests
     [Fact]
     public void Emit_QueryThatKeepsCommentsButHasNoKeptForm_EmitsTheStrippedOne()
     {
-        var query = new SqlQuery(
+        var query = TestModels.Query(
             "GetUser",
-            NameLocation("Users.sql"),
-            null,
-            null,
-            TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, "SELECT 1;")),
-            null,
-            EquatableArray<SqlToken>.Empty,
-            EquatableArray<SqlQueryParameter>.Empty,
-            new SettingsLevel { Parameters = GeneratorParameters.KeepComments },
-            null,
-            null,
-            EquatableArray<ColumnMarker>.Empty
+            "SELECT 1;",
+            markers: new SettingsLevel { Parameters = GeneratorParameters.KeepComments }
         );
 
         Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql", query))
@@ -575,7 +553,7 @@ public sealed class TypeEmitterTests
     public void Emit_SameInput_GivesEqualOutput()
     {
         static TypeOutput Create() =>
-            Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql", Query("GetUser", "SELECT 1;")));
+            Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql", TestModels.Query("GetUser", "SELECT 1;")));
 
         Create().ShouldBe(Create());
     }
@@ -633,33 +611,17 @@ public sealed class TypeEmitterTests
             SqlDialect.Ansi
         );
 
-    private static SqlQuery Query(string name, string sql, string? summary = null, string file = "Users.sql") =>
-        new(
-            name,
-            NameLocation(file),
-            summary,
-            null,
-            TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, sql)),
-            null,
-            EquatableArray<SqlToken>.Empty,
-            EquatableArray<SqlQueryParameter>.Empty,
-            SettingsLevel.None,
-            null,
-            null,
-            EquatableArray<ColumnMarker>.Empty
-        );
-
     // "SELECT * FROM {{table}};", which is a method with one parameter.
     private static SqlQuery TokenQuery(string name, bool? tokenValidation = null, string file = "Users.sql") =>
         new(
             name,
-            NameLocation(file),
+            TestModels.NameLocation(file),
             null,
             null,
             TestModels.Array(
-                new SqlSegment(SqlSegmentKind.Literal, "SELECT * FROM "),
+                TestModels.Literal("SELECT * FROM "),
                 new SqlSegment(SqlSegmentKind.Token, "table"),
-                new SqlSegment(SqlSegmentKind.Literal, ";")
+                TestModels.Literal(";")
             ),
             null,
             TestModels.Array(new SqlToken("table", null)),
@@ -673,12 +635,5 @@ public sealed class TypeEmitterTests
             null,
             null,
             EquatableArray<ColumnMarker>.Empty
-        );
-
-    private static LocationInfo NameLocation(string file) =>
-        new(
-            "/app/Repo/" + file,
-            new TextSpan(9, 7),
-            new LinePositionSpan(new LinePosition(0, 9), new LinePosition(0, 16))
         );
 }
