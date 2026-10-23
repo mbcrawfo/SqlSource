@@ -14,12 +14,27 @@ public sealed class JoinedRedactionTests
     public void Of_NothingFound_IsTheSameTexts() =>
         JoinedRedaction.Of(["a", "latest_hunt", "er22x", ""], Password).ShouldBe(["a", "latest_hunt", "er22x", ""]);
 
-    [Fact]
-    public void Of_OneTextWithNothingSplit_IsWhatOfIs()
+    [Theory]
+    [InlineData("refused Host=db;Password=pw00 for 'hunter22' at latest_hunter22")]
+    [InlineData("Host=db;Password=pw00hunter22 x")]
+    [InlineData("a hunter22Host=db;Password=pw00 b")]
+    public void Of_OneTextWithNothingSplit_IsWhatOfIs(string text)
     {
-        const string Text = "refused Host=db;Password=hunter22 for 'hunter22' at latest_hunter22";
+        var secret = new ConnectionSecret("Host=db;Password=pw00", ["hunter22"]);
 
-        JoinedRedaction.Of([Text], Password).ShouldBe([Redaction.Of(Text, Password)]);
+        JoinedRedaction.Of([text], secret).ShouldBe([Redaction.Of(text, secret)]);
+    }
+
+    // The password is no token against the value until the value is a mark; it is then, and is not left.
+    [Fact]
+    public void Of_PartGluedToAWhole_IsMarkedToo()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=pw00", ["hunter22"]);
+
+        var cleaned = JoinedRedaction.Of(["Host=db;Password=pw00hunter22 x"], secret);
+
+        cleaned.ShouldBe(["****** x"]);
+        cleaned[0].ShouldNotContain("hunter22");
     }
 
     // The password alone in the second text would have been cleaned first, and the whole value gone with it.

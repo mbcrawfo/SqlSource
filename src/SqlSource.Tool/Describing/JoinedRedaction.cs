@@ -17,6 +17,11 @@ namespace SqlSource.Tool.Describing;
 /// number; the slices of one text that overlap or touch make one mark.  A separator is in no text.
 /// </para>
 /// <para>
+/// A text that was marked is then cleaned alone by <see cref="Redaction.Of(string, ConnectionSecret)" />, so that the
+/// result is never less than what that gives: a part that stood against a whole is a token only once the whole is a
+/// mark, and a range judged on the original text would leave it.
+/// </para>
+/// <para>
 /// The ranges are those of each text alone, as <see cref="Redaction.Of(string, ConnectionSecret)" /> finds them, and
 /// those of the texts joined with nothing between them and with a line break between them: all of them, and each
 /// subset the caller names.  The line break is searched because a value that holds one is cut where it stands, and the
@@ -56,7 +61,12 @@ internal static class JoinedRedaction
             Cut(texts, group, Break, lineWholes, lineParts, cuts);
         }
 
-        return [.. texts.Select((text, index) => cuts[index] is { } slices ? Marked(text, slices) : text)];
+        return
+        [
+            .. texts.Select(
+                (text, index) => cuts[index] is { } slices ? Redaction.Of(Marked(text, slices), secret) : text
+            ),
+        ];
     }
 
     // The forms or parts as they are and written with the break, those that hold one.
