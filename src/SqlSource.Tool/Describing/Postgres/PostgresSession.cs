@@ -101,7 +101,7 @@ internal sealed partial class PostgresSession : IDescribeSession
             }
 
             var server = ServerOf(answer);
-            if (MajorVersionOf(server.Version) is { } major && major < MinimumMajorVersion)
+            if (Versions.LeadingMajor(server.Version) is { } major && major < MinimumMajorVersion)
             {
                 return Outcome<IDescribeSession, DescribeFailure>.Failed(
                     PostgresErrors.VersionNotSupported(request.Database, server.Version)

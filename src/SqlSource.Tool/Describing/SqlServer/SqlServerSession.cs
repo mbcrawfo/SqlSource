@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -521,19 +520,11 @@ internal sealed partial class SqlServerSession : IDescribeSession
     private static Outcome<QueryDescription, DescribeFailure> Failed(DescribeFailure failure) =>
         Outcome<QueryDescription, DescribeFailure>.Failed(failure);
 
-    // Below the floor, unless the edition is Azure's: a version whose first part is no number is not refused, since
-    // the tool cannot tell what it is.
+    // Below the floor, unless the edition is Azure's.  The leading digits of the version decide, as for PostgreSQL: a
+    // version that starts with no digit is not refused, since the tool cannot tell what it is.
     private static bool IsBelowTheFloor(string version, int? edition) =>
         edition is not (AzureSqlDatabase or AzureSqlManagedInstance)
-        && int.TryParse(
-            version.AsSpan(
-                0,
-                version.IndexOf('.', StringComparison.Ordinal) is var dot and >= 0 ? dot : version.Length
-            ),
-            NumberStyles.None,
-            CultureInfo.InvariantCulture,
-            out var major
-        )
+        && Versions.LeadingMajor(version) is { } major
         && major < MinimumMajorVersion;
 
     private static ServerInfo ServerOf(SqlServerOpenAnswer answer) =>

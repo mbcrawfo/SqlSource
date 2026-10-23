@@ -132,6 +132,20 @@ public sealed class SqlServerSessionTests
             );
     }
 
+    // The leading digits of a version decide, as for PostgreSQL: a suffix after them does not hide the major.
+    [Fact]
+    public async Task OpenAsync_ServerWithASuffixBelowTheFloor_IsSqlsrc235()
+    {
+        var opened = await OpenAsync(
+            SqlServerScript.Answering(SqlServerScript.Opened with { ProductVersion = "13beta1" })
+        );
+
+        opened.Value.ShouldBeNull();
+        var failure = opened.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC235");
+        failure.Arguments.ShouldBe([SqlServerScript.Database, "SQL Server", "13beta1", "14 (SQL Server 2017)"]);
+    }
+
     // An Azure SQL Database reports a version of its own, which is no release of SQL Server.
     [Fact]
     public async Task OpenAsync_AzureSqlDatabaseOfAnOlderVersion_Opens()

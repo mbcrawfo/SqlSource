@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
@@ -13,24 +12,6 @@ namespace SqlSource.Tool.Describing.Postgres;
 // What a describe makes of the answers, and reads no state of the session.
 internal sealed partial class PostgresSession
 {
-    /// <summary>
-    /// The major version of a version as a sidecar records it: its leading digits, so <c>13.12</c> is 13 and
-    /// <c>18beta1</c> is 18.  Null when it starts with no digit, or with more of them than an <see cref="int" />
-    /// holds: the tool cannot tell what it is.
-    /// </summary>
-    public static int? MajorVersionOf(string version)
-    {
-        var end = 0;
-        while (end < version.Length && char.IsAsciiDigit(version[end]))
-        {
-            end++;
-        }
-
-        return int.TryParse(version.AsSpan(0, end), NumberStyles.None, CultureInfo.InvariantCulture, out var major)
-            ? major
-            : null;
-    }
-
     private static ServerInfo ServerOf(PostgresOpenAnswer answer) =>
         new(
             answer.ServerVersion

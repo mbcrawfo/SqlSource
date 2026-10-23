@@ -12,15 +12,6 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 // test wrote fails.
 public sealed class PostgresSessionTests
 {
-    [Theory]
-    [InlineData("18.4", 18)]
-    [InlineData("13.12", 13)]
-    [InlineData("9.6.24", 9)]
-    [InlineData("18beta1", 18)]
-    [InlineData("devel", null)]
-    public void MajorVersionOf_VersionAsRecorded_IsItsLeadingDigits(string version, int? expected) =>
-        PostgresSession.MajorVersionOf(version).ShouldBe(expected);
-
     // The script holds "open" alone: the server is refused before any query is described.
     [Theory]
     [InlineData("13.12")]

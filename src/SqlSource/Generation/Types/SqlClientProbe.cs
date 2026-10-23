@@ -51,7 +51,7 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
     /// Whether the project references a Microsoft.Data.SqlClient of a major newer than the map knows, which is
     /// <c>SQLSRC268</c>.
     /// </summary>
-    public bool IsNewerThanKnown => Referenced && LeadingInteger(Version) > NewestKnownMajor;
+    public bool IsNewerThanKnown => Referenced && Versions.LeadingMajor(Version) > NewestKnownMajor;
 
     /// <summary>The version as a diagnostic names it.</summary>
     public string VersionText => Version ?? "of an unknown version";
@@ -129,30 +129,6 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
                     ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true }
                 },
             };
-
-    // The digits that start a version, or zero for a version that does not start with any or is too large.
-    private static int LeadingInteger(string? version)
-    {
-        if (version is null)
-        {
-            return 0;
-        }
-
-        var length = 0;
-        while (length < version.Length && version[length] is >= '0' and <= '9')
-        {
-            length++;
-        }
-
-        return int.TryParse(
-            version.Substring(0, length),
-            NumberStyles.None,
-            CultureInfo.InvariantCulture,
-            out var major
-        )
-            ? major
-            : 0;
-    }
 
     private static bool Has(Compilation compilation, string metadataName) =>
         !compilation.GetTypesByMetadataName(metadataName).IsEmpty;
