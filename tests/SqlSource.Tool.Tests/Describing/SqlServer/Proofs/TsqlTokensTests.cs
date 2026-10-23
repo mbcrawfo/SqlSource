@@ -116,11 +116,28 @@ public sealed class TsqlTokensTests
     [InlineData("@a#b")]
     [InlineData("@a$b")]
     [InlineData("@a#b@c")]
+    [InlineData("@a#@c")]
+    [InlineData("@a$@c")]
+    [InlineData("@a#@c#d")]
     public void Read_VariableWithNameCharactersAfterItsLetters_IsOneParameter(string name) =>
         TsqlTokens
             .Read($"{name} x")
             .ShouldBe([
                 new TsqlToken(TsqlTokenKind.Parameter, name, 0, name.Length),
+                new TsqlToken(TsqlTokenKind.Word, "x", name.Length + 1, name.Length + 2),
+            ]);
+
+    // The lexer reads the "@c" of "x#@c" as a parameter, since "#" is no character of a parameter's name, and the
+    // server reads one name.
+    [Theory]
+    [InlineData("x#@c")]
+    [InlineData("x$@c")]
+    [InlineData("x#@c#d")]
+    public void Read_NameWithAParameterAfterItsHash_IsOneWord(string name) =>
+        TsqlTokens
+            .Read($"{name} x")
+            .ShouldBe([
+                new TsqlToken(TsqlTokenKind.Word, name, 0, name.Length),
                 new TsqlToken(TsqlTokenKind.Word, "x", name.Length + 1, name.Length + 2),
             ]);
 

@@ -266,6 +266,7 @@ public sealed class SelectStatementTests
     [InlineData("SELECT N'x'")]
     [InlineData("SELECT @p = a FROM t")]
     [InlineData("SELECT @a#b")]
+    [InlineData("SELECT @a#@c")]
     [InlineData("SELECT $IDENTITY FROM t")]
     public void Read_ItemName_WhereItCannotBeRead_IsNull(string sql) =>
         Read(sql).Statement.ShouldNotBeNull().Body.Items.ShouldHaveSingleItem().Name.ShouldBeNull();

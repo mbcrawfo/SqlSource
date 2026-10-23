@@ -29,6 +29,16 @@ internal static class TsqlTokens
             {
                 ReadText(sql, start, end, tokens);
             }
+            else if (lexeme.Kind == SqlLexemeKind.Parameter && JoinsName(tokens, start) is { } name)
+            {
+                // The lexer starts a parameter after a "#" or a "$", which the server reads inside a name: "@a#@c"
+                // and "x#@c" are each one name.
+                tokens[^1] = name with
+                {
+                    Text = sql[name.Start..end],
+                    End = end,
+                };
+            }
             else if (lexeme.Kind == SqlLexemeKind.Parameter)
             {
                 tokens.Add(new TsqlToken(TsqlTokenKind.Parameter, sql[start..end], start, end));
@@ -67,18 +77,28 @@ internal static class TsqlTokens
         tokens.Add(new TsqlToken(TsqlTokenKind.String, sql[start..end], start, end));
     }
 
+    // The last token, when it is a parameter or a word that ends at start with no gap, so that what starts there is
+    // more of its name.
+    private static TsqlToken? JoinsName(List<TsqlToken> tokens, int start) =>
+        tokens.Count > 0
+        && tokens[^1] is { Kind: TsqlTokenKind.Parameter or TsqlTokenKind.Word } last
+        && last.End == start
+            ? last
+            : null;
+
     private static void ReadText(string sql, int at, int end, List<TsqlToken> tokens)
     {
         // The lexer ends a parameter at the first character that is not a letter, a digit or "_", but a variable's
-        // name goes on through "#", "$" and "@", as every name of SQL Server does: "@a#b" is one variable.
-        if (tokens.Count > 0 && tokens[^1] is { Kind: TsqlTokenKind.Parameter } parameter && parameter.End == at)
+        // name goes on through "#", "$" and "@", as every name of SQL Server does: "@a#b" is one variable.  A word
+        // ends right before a text only where a parameter was joined into it, as in "x#@c#d".
+        if (JoinsName(tokens, at) is { } name)
         {
             while (at < end && QuoteReader.IsNameCharacterOfSqlServer(sql[at]))
             {
                 at++;
             }
 
-            tokens[^1] = parameter with { Text = sql[parameter.Start..at], End = at };
+            tokens[^1] = name with { Text = sql[name.Start..at], End = at };
         }
 
         while (at < end)
