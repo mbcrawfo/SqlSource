@@ -30,8 +30,6 @@ internal static class PostgresErrors
     public const string SessionNotKeptHelp =
         "connect directly to the server, not through a pooler in transaction mode, and without Multiplexing=true";
 
-    public const string NotATypeName = "it is not written as a type name";
-
     public const string NotATypeNameHelp =
         "write the type as a column definition would: a name, a modifier in parentheses, []";
 
@@ -43,8 +41,6 @@ internal static class PostgresErrors
 
     public const string PositionalParameterHelp =
         "write the parameter as @name; generated code binds parameters by name";
-
-    public const string NoSuchType = "the database has no such type";
 
     public const string NoSuchTypeHelp =
         "write a type the database has, schema-qualified if it is not on the search path";
@@ -108,13 +104,7 @@ internal static class PostgresErrors
     public static DescribeFailure Open(PostgresServerError error, string database) =>
         error.SqlState is null && error.Message == PostgresConnection.MultiplexingRefused
             ? SessionNotKept(database, null, ServerLines(error, 0))
-            : new(
-                ToolDiagnostics.DatabaseCannotBeOpened,
-                new EquatableArray<string>([database]),
-                null,
-                ServerLines(error, 0),
-                OpenHelp
-            );
+            : DescribeFailures.Open(database, ServerLines(error, 0), OpenHelp);
 
     /// <summary>
     /// <c>SQLSRC236</c>: the connection does not keep one session, so the statement the tool prepared is not there
@@ -144,16 +134,11 @@ internal static class PostgresErrors
     /// <param name="database">The database.</param>
     /// <param name="version">The server's version, as it is recorded.</param>
     public static DescribeFailure VersionNotSupported(string database, string version) =>
-        new(
-            ToolDiagnostics.ServerVersionNotSupported,
-            new EquatableArray<string>([
-                database,
-                Engine,
-                version,
-                PostgresSession.MinimumMajorVersion.ToString(CultureInfo.InvariantCulture),
-            ]),
-            null,
-            EquatableArray<string>.Empty,
+        DescribeFailures.VersionNotSupported(
+            database,
+            Engine,
+            version,
+            PostgresSession.MinimumMajorVersion.ToString(CultureInfo.InvariantCulture),
             VersionNotSupportedHelp
         );
 
@@ -242,7 +227,7 @@ internal static class PostgresErrors
         DeclaredType(
             query,
             parameter,
-            NotATypeName,
+            DescribeFailures.NotATypeName,
             DescribeStep.DescribeParameters,
             EquatableArray<string>.Empty,
             NotATypeNameHelp
@@ -284,8 +269,22 @@ internal static class PostgresErrors
         if (DeclaredAt(error, query, prepare, head) is { } declared)
         {
             return error.SqlState == UndefinedObject
-                ? DeclaredType(query, declared, NoSuchType, DescribeStep.DescribeParameters, lines, NoSuchTypeHelp)
-                : DeclaredType(query, declared, NotATypeName, DescribeStep.DescribeParameters, lines, NotATypeNameHelp);
+                ? DeclaredType(
+                    query,
+                    declared,
+                    DescribeFailures.NoSuchType,
+                    DescribeStep.DescribeParameters,
+                    lines,
+                    NoSuchTypeHelp
+                )
+                : DeclaredType(
+                    query,
+                    declared,
+                    DescribeFailures.NotATypeName,
+                    DescribeStep.DescribeParameters,
+                    lines,
+                    NotATypeNameHelp
+                );
         }
 
         if (error.SqlState is IndeterminateDatatype or AmbiguousParameter && NamedIn(error.Message, query) is { } named)
@@ -630,12 +629,5 @@ internal static class PostgresErrors
         DescribeStep step,
         EquatableArray<string> serverLines,
         string help
-    ) =>
-        new(
-            ToolDiagnostics.DeclaredTypeNotValid,
-            new EquatableArray<string>([parameter.Type ?? string.Empty, Written(parameter), query.Name, reason]),
-            step,
-            serverLines,
-            help
-        );
+    ) => DescribeFailures.DeclaredType(query, Written(parameter), parameter.Type, reason, step, serverLines, help);
 }

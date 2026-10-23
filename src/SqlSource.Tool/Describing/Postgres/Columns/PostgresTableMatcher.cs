@@ -11,11 +11,12 @@ namespace SqlSource.Tool.Describing.Postgres.Columns;
 /// the relation and share it between every query that matches it.
 /// </summary>
 /// <remarks>
-/// The checks are the values of the sidecar format's <c>tableMatch</c>, in the format's order, and the first that
-/// fails is the answer: the order is the format's and is not to be changed.  A view, a materialized view and a
-/// foreign table may match as a table may.  The last check reads the nullability each column was given, so the
-/// match is made after everything that sets one.  It asks the server nothing: an origin holds its relation with
-/// every attribute that is not dropped, as <c>tables</c> answered it.
+/// The checks are the values of the sidecar format's <c>tableMatch</c>, in the format's order, which
+/// <see cref="TableMatchChecks" /> holds, and the first that fails is the answer: the order is the format's and is
+/// not to be changed.  A view, a materialized view and a foreign table may match as a table may.  The last check
+/// reads the nullability each column was given, so the match is made after everything that sets one.  It asks the
+/// server nothing: an origin holds its relation with every attribute that is not dropped, as <c>tables</c>
+/// answered it.
 /// </remarks>
 internal static class PostgresTableMatcher
 {

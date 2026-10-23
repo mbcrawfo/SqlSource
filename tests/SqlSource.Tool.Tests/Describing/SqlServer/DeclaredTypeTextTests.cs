@@ -1,4 +1,5 @@
 using Shouldly;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
 using Xunit;
 
@@ -102,7 +103,7 @@ public sealed class DeclaredTypeTextTests
     [InlineData("[a\u2028b]", DeclaredTypeText.OneLine)]
     [InlineData("\"a\u2029b\"", DeclaredTypeText.OneLine)]
     public void Read_AnythingElse_IsRefusedWithWhatWasFound(string text, string found) =>
-        DeclaredTypeText.Read(text).Failure.ShouldBe(DeclaredTypeText.NotATypeName + ": " + found, text);
+        DeclaredTypeText.Read(text).Failure.ShouldBe(DescribeFailures.NotATypeName + ": " + found, text);
 
     [Fact]
     public void Read_Semicolon_SaysItIsNotWrittenAsATypeName() =>

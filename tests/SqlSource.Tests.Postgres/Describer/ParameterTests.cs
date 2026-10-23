@@ -75,7 +75,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
             "int) AS SELECT 1; DROP TABLE users; --",
             "@id",
             DescribeRequests.Query,
-            PostgresErrors.NotATypeName,
+            DescribeFailures.NotATypeName,
         ]);
         MethodsOf(capture).ShouldBe(["open"]);
     }
@@ -187,7 +187,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
             "SQLSRC228"
         );
 
-        failure.Arguments.ShouldBe(["nope_t", "@p", DescribeRequests.Query, PostgresErrors.NoSuchType]);
+        failure.Arguments.ShouldBe(["nope_t", "@p", DescribeRequests.Query, DescribeFailures.NoSuchType]);
         failure.ServerLines.ShouldBe(["42704: type \"nope_t\" does not exist"]);
     }
 

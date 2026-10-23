@@ -12,8 +12,9 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The checks are the values of the sidecar format's <c>tableMatch</c>, in the format's order, and the first that
-/// fails is the answer: the order is the format's and is not to be changed.  A view may match as a table may.
+/// The checks are the values of the sidecar format's <c>tableMatch</c>, in the format's order, which
+/// <see cref="TableMatchChecks" /> holds, and the first that fails is the answer: the order is the format's and is
+/// not to be changed.  A view may match as a table may.
 /// </para>
 /// <para>
 /// The table's column list and each column's nullability are the server's description of <c>SELECT *</c> from it,

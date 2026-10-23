@@ -249,7 +249,7 @@ public sealed class ParameterTests(SqlServerContainer sqlServer)
             "SQLSRC228"
         );
 
-        failure.Arguments.ShouldBe(["dbo.Nope", "@p", Query, SqlServerErrors.NoSuchType]);
+        failure.Arguments.ShouldBe(["dbo.Nope", "@p", Query, DescribeFailures.NoSuchType]);
         failure.Step.ShouldBe(DescribeStep.ResolveType);
         failure.ServerLines[0].ShouldStartWith("Msg 2715: ");
     }

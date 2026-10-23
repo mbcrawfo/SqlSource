@@ -324,7 +324,7 @@ public sealed class SqlServerSessionTests
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC228");
         failure.Arguments[0].ShouldBe("int; DROP TABLE dbo.victim");
-        failure.Arguments[3].ShouldBe(DeclaredTypeText.NotATypeName + ": " + DeclaredTypeText.Semicolon);
+        failure.Arguments[3].ShouldBe(DescribeFailures.NotATypeName + ": " + DeclaredTypeText.Semicolon);
         asked.ShouldBeEmpty();
     }
 
@@ -464,7 +464,7 @@ public sealed class SqlServerSessionTests
         asked.ShouldBe([Call("declared", declared)]);
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC228");
-        failure.Arguments[3].ShouldBe(SqlServerErrors.NoSuchType);
+        failure.Arguments[3].ShouldBe(DescribeFailures.NoSuchType);
     }
 
     // Each column as the server gave it, the hidden row dropped; the table asked for the one origin; and the match.

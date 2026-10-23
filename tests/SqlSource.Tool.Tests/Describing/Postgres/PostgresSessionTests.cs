@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
@@ -129,7 +130,7 @@ public sealed class PostgresSessionTests
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC228");
         failure.Arguments[1].ShouldBe("@id");
-        failure.Arguments[3].ShouldBe(PostgresErrors.NotATypeName);
+        failure.Arguments[3].ShouldBe(DescribeFailures.NotATypeName);
     }
 
     // The statements are counted before the types are read: the first thing wrong is the first reported.

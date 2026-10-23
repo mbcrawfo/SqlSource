@@ -1,5 +1,6 @@
 using System;
 using SqlSource.Parsing.Quoting;
+using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Describing.SqlServer;
 
@@ -26,9 +27,6 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// </remarks>
 internal static class DeclaredTypeText
 {
-    /// <summary>What every refusal says first, before <c>": "</c> and what was found.</summary>
-    public const string NotATypeName = "it is not written as a type name";
-
     public const string Semicolon = "a ; is not part of a type name";
 
     public const string Comment = "a comment is not part of a type name";
@@ -44,8 +42,8 @@ internal static class DeclaredTypeText
     private const string Max = "max";
 
     /// <summary>
-    /// The type without the spaces around it, or why it is refused: <see cref="NotATypeName" />, <c>": "</c> and
-    /// what was found at the first place the text leaves the grammar.
+    /// The type without the spaces around it, or why it is refused: <see cref="DescribeFailures.NotATypeName" />,
+    /// <c>": "</c> and what was found at the first place the text leaves the grammar.
     /// </summary>
     public static Outcome<string, string> Read(string text)
     {
@@ -53,7 +51,7 @@ internal static class DeclaredTypeText
         var found = ReadName(text, ref position) ?? ReadModifier(text, ref position) ?? ReadEnd(text, position);
         return found is null
             ? Outcome<string, string>.Of(text.Trim(' ', '\t'))
-            : Outcome<string, string>.Failed(NotATypeName + ": " + found);
+            : Outcome<string, string>.Failed(DescribeFailures.NotATypeName + ": " + found);
     }
 
     // One part, or two joined by a dot.  Null when it was read, else what was found.  A dot with no part on one side
