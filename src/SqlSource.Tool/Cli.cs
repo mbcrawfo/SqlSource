@@ -269,8 +269,8 @@ public static class Cli
             "run.start",
             new("toolVersion", PackageVersion.Prefix),
             new("formatVersion", SidecarFormat.Version),
-            new("runtime", RuntimeInformation.FrameworkDescription),
-            new("os", RuntimeInformation.OSDescription),
+            new("runtime", host.Runtime),
+            new("os", host.OperatingSystem),
             new("arguments", LoggedArguments.Of(commandLine.Usage, args))
         );
         return true;
@@ -312,8 +312,9 @@ public static class Cli
         return await parsed.InvokeAsync(invocation, cancellationToken);
     }
 
-    // The last event, with the exit code of the process, and the file is closed.  A log that stopped being
-    // writable while the run went on did not end the run: it is an error now, once, and the exit code is 1.
+    // The last event, with the exit code of the run, and the file is closed.  A log that stopped being writable while
+    // the run went on did not end the run: it is an error now, once, and the exit code is 1.  So is a close that
+    // fails, which run.end, already flushed, cannot say: its exit code is the one before the close.
     private static int End(RunLogFile log, int exitCode, RunState state)
     {
         log.Write(

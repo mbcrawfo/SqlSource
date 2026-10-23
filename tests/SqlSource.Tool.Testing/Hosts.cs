@@ -8,9 +8,13 @@ namespace SqlSource.Tool.Testing;
 
 // A host for a test that calls a part of the tool and not the whole command: its output and its errors go nowhere,
 // and a file it makes is made on disk, as the released tool makes it.  Its clock stands still, unless the test brings
-// one.
+// one.  Its descriptions of .NET and of the system are its own, so a test of the log can fix them.
 internal static class Hosts
 {
+    public const string Runtime = ".NET of the test";
+
+    public const string OperatingSystem = "the system of the test";
+
     public static ToolHost Create(
         string workingDirectory,
         IProcessRunner processes,
@@ -30,7 +34,9 @@ internal static class Hosts
             DescriberRegistry.Empty,
             static _ => LiveExchange.Instance,
             time ?? new TestClock(),
-            ToolHost.NewFile
+            ToolHost.NewFile,
+            Runtime,
+            OperatingSystem
         );
 
     // The environment of the test process, for a run of the real "dotnet".
@@ -46,6 +52,8 @@ internal static class Hosts
             DescriberRegistry.Empty,
             static _ => LiveExchange.Instance,
             time ?? new TestClock(),
-            ToolHost.NewFile
+            ToolHost.NewFile,
+            Runtime,
+            OperatingSystem
         );
 }

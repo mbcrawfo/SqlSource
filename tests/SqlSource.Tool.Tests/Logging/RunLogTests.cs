@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -50,8 +49,8 @@ public sealed class RunLogTests : IDisposable
         start.GetProperty("time").GetString().ShouldBe(TestClock.StartIso);
         start.GetProperty("toolVersion").GetString().ShouldBe(PackageVersion.Prefix);
         start.GetProperty("formatVersion").GetInt32().ShouldBe(SidecarFormat.Version);
-        start.GetProperty("runtime").GetString().ShouldBe(RuntimeInformation.FrameworkDescription);
-        start.GetProperty("os").GetString().ShouldBe(RuntimeInformation.OSDescription);
+        start.GetProperty("runtime").GetString().ShouldBe(Hosts.Runtime);
+        start.GetProperty("os").GetString().ShouldBe(Hosts.OperatingSystem);
         Strings(start.GetProperty("arguments")).ShouldBe(["describe", "--log", "run.log"]);
         var end = events[^1];
         end.GetProperty("event").GetString().ShouldBe("run.end");
@@ -832,6 +831,39 @@ public sealed class RunLogTests : IDisposable
         result.Error.ShouldStartWith($"{Log} : error SQLSRC218: '{Log}' could not be written: No space left on device");
         result.Error.Split("error SQLSRC").Length.ShouldBe(2);
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeTrue();
+    }
+
+    // A log whose close fails is reported once the run has ended, after run.end, which holds the run's own exit code:
+    // no line written before the close can hold what the close did.
+    [Fact]
+    public async Task Run_LogWhoseCloseFails_IsOneSqlsrc218AndItsRunEndHoldsTheRunsExitCode()
+    {
+        _scene.Run.CreateFile = static path => new UnclosableStream(path);
+
+        var result = await _scene.DescribeAsync("--log", "run.log");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldStartWith(
+            $"{Log} : error SQLSRC218: '{Log}' could not be written: the file could not be closed"
+        );
+        result.Error.Split("error SQLSRC").Length.ShouldBe(2);
+        var end = LogReader.Read(Log)[^1];
+        end.GetProperty("event").GetString().ShouldBe("run.end");
+        end.GetProperty("exitCode").GetInt32().ShouldBe(0);
+    }
+
+    // A file that takes every line and whose close then fails, as when the system reports a failed write only then.
+    private sealed class UnclosableStream(string path)
+        : FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read)
+    {
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (disposing)
+            {
+                throw new IOException("the file could not be closed");
+            }
+        }
     }
 
     // A stream that takes no byte, whatever the system.
