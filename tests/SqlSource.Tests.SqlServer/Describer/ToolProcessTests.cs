@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
@@ -21,15 +20,13 @@ public sealed class ToolProcessTests(SqlServerContainer sqlServer) : IDisposable
 
     [Fact]
     public async Task Describe_BuiltToolAgainstTheContainer_WritesTheSidecar() =>
-        await Should.NotThrowAsync(() =>
-            ToolProcess.DescribeOneQueryAsync(
-                _fixtures,
-                _fixtures.Copy("SqlServer"),
-                SqlServerContainer.Database + "=" + sqlServer.ConnectionString,
-                "fixtures (mssql): 1 described, 0 skipped, 0 failed",
-                _fixtures.PathOf("SqlServer/Queries/Orders.sql"),
-                "GetOrders",
-                SidecarValues.Engine.SqlServer
-            )
+        await ToolProcess.ShouldDescribeOneQueryAsync(
+            _fixtures,
+            _fixtures.Copy("SqlServer"),
+            SqlServerContainer.Database + "=" + sqlServer.ConnectionString,
+            "fixtures (mssql): 1 described, 0 skipped, 0 failed",
+            _fixtures.PathOf("SqlServer/Queries/Orders.sql"),
+            "GetOrders",
+            SidecarValues.Engine.SqlServer
         );
 }

@@ -23,7 +23,7 @@ internal static class FixtureCaseRuns
     // Describes the case against the server and compares the sidecar with the case's expected.json, which only the
     // version of the server may differ in.  When recording, it writes the case's capture.json and expected.json
     // instead and compares nothing.
-    public static async Task DescribeOrRecordAsync(
+    public static async Task ShouldDescribeOrRecordAsync(
         FixtureCase fixture,
         string engine,
         Func<FixtureCase, IQueryDescriber> describer,

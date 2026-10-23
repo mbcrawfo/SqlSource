@@ -16,7 +16,7 @@ internal static class ToolProcess
     // Runs "describe" on the copy of a fixture project with the one --connection given ("name=connection string"),
     // through Programs.ToolStart, and checks the exit code is 0, nothing was written to the error stream, the output is
     // the one line given, and the sidecar of the .sql file holds one entry, of the query and the engine given.
-    public static async Task DescribeOneQueryAsync(
+    public static async Task ShouldDescribeOneQueryAsync(
         FixtureProjects fixtures,
         string project,
         string connection,

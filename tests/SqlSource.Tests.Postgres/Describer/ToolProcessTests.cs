@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Shouldly;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
@@ -24,16 +23,14 @@ public sealed class ToolProcessTests(PostgresContainer postgres) : IDisposable
         // Single has no type that claims its queries.
         _ = _fixtures.WriteFile("Single/Queries/Queries.cs", Plans.Type);
 
-        await Should.NotThrowAsync(() =>
-            ToolProcess.DescribeOneQueryAsync(
-                _fixtures,
-                project,
-                "billing=" + postgres.ConnectionString,
-                "billing (postgres): 1 described, 0 skipped, 0 failed",
-                _fixtures.PathOf("Single/Queries/Users.sql"),
-                "GetUser",
-                "postgres"
-            )
+        await ToolProcess.ShouldDescribeOneQueryAsync(
+            _fixtures,
+            project,
+            "billing=" + postgres.ConnectionString,
+            "billing (postgres): 1 described, 0 skipped, 0 failed",
+            _fixtures.PathOf("Single/Queries/Users.sql"),
+            "GetUser",
+            "postgres"
         );
     }
 }

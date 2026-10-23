@@ -7,7 +7,8 @@ using Xunit;
 namespace SqlSource.Tests.Postgres.Realistic.Generation;
 
 // The reading of a case's models: the model the generator names from its sidecar entry.  It reads the compiled models
-// and needs no server.
+// and needs no server.  The tests of OutputModelOf and InputModelOf name this project's own generated models, which the
+// other engine's project does not have, so they are not shared.
 public sealed class RealisticModelsTests
 {
     [Fact]

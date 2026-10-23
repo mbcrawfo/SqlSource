@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Testing;
 using Xunit;
@@ -32,13 +31,13 @@ public sealed class ErrorPathTests(PostgresContainer postgres) : IDisposable
 
     [Fact]
     public async Task Check_QueryEditedAfterDescribe_IsOutOfDate() =>
-        await Should.NotThrowAsync(_paths.QueryEditedAfterDescribeAsync);
+        await _paths.ShouldFindTheEditedQueryOutOfDateAsync();
 
     [Fact]
     public async Task Check_ColumnAddedAfterDescribe_IsOutOfDate() =>
-        await Should.NotThrowAsync(_paths.ColumnAddedAfterDescribeAsync);
+        await _paths.ShouldFindTheAddedColumnOutOfDateAsync();
 
     [Fact]
     public async Task Describe_QueryTheServerRefuses_ReportsItAndWritesNoSidecar() =>
-        await Should.NotThrowAsync(_paths.QueryTheServerRefusesAsync);
+        await _paths.ShouldReportTheRefusedQueryAsync();
 }

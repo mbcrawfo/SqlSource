@@ -9,7 +9,8 @@ using Xunit;
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
 // The queries of Queries/Shapes.sql, run on the seed of "app" with their class input models as the parameters, into
-// their record and class output models.
+// their record and class output models.  The tests read this project's own generated models, which the other engine's
+// project does not have, so they are not shared.
 [Collection(UsesSqlServer.Name)]
 public sealed class ShapeQueryTests(SqlServerContainer sqlServer)
 {

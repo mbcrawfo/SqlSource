@@ -34,7 +34,7 @@ internal sealed class ErrorPaths(ErrorPathEngine engine, string connection) : ID
     public void Dispose() => _projects.Dispose();
 
     // Describes, edits the query, and finds the sidecar out of date.
-    public async Task QueryEditedAfterDescribeAsync()
+    public async Task ShouldFindTheEditedQueryOutOfDateAsync()
     {
         var project = _projects.Copy("ErrorPaths");
         var queries = Path.Combine(Path.GetDirectoryName(project)!, "Widgets.sql");
@@ -58,7 +58,7 @@ internal sealed class ErrorPaths(ErrorPathEngine engine, string connection) : ID
     }
 
     // Describes, adds a column to the table, and finds the sidecar out of date.
-    public async Task ColumnAddedAfterDescribeAsync()
+    public async Task ShouldFindTheAddedColumnOutOfDateAsync()
     {
         var project = _projects.Copy("ErrorPaths");
         await WithWidgetsTableAsync(async () =>
@@ -76,7 +76,7 @@ internal sealed class ErrorPaths(ErrorPathEngine engine, string connection) : ID
     }
 
     // Describes a query on a table that is not there, and finds it reported with no sidecar.
-    public async Task QueryTheServerRefusesAsync()
+    public async Task ShouldReportTheRefusedQueryAsync()
     {
         var project = _projects.Copy("ErrorPaths");
         var folder = Path.GetDirectoryName(project)!;

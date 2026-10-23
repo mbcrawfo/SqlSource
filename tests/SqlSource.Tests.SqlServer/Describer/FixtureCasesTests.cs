@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Testing.Fixtures;
@@ -26,12 +25,10 @@ public sealed class FixtureCasesTests(SqlServerContainer sqlServer)
     [Theory]
     [MemberData(nameof(Cases))]
     public async Task DescribeAsync_Case_GivesTheExpectedEntry(string name) =>
-        await Should.NotThrowAsync(() =>
-            FixtureCaseRuns.DescribeOrRecordAsync(
-                Found.Single(found => found.Name == name),
-                SidecarValues.Engine.SqlServer,
-                static _ => new SqlServerDescriber(),
-                sqlServer.ConnectionString
-            )
+        await FixtureCaseRuns.ShouldDescribeOrRecordAsync(
+            Found.Single(found => found.Name == name),
+            SidecarValues.Engine.SqlServer,
+            static _ => new SqlServerDescriber(),
+            sqlServer.ConnectionString
         );
 }
