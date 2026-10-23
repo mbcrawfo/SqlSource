@@ -1,6 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Parsing;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using Xunit;
@@ -44,6 +46,7 @@ internal static class FixtureCaseRuns
                 fixture,
                 capture,
                 recorded,
+                SecretOf(fixture, describer(fixture), connection),
                 TestContext.Current.CancellationToken
             );
             return;
@@ -52,6 +55,19 @@ internal static class FixtureCaseRuns
         var live = await FixtureReplay.DescribeThroughAsync(fixture, describer, connection, LiveExchange.Instance);
 
         WithOneServerVersion(live).ShouldBe(WithOneServerVersion(fixture.Expected));
+    }
+
+    // What a run removes of the connection, made as DatabaseRuns makes it, for the database the case is planned for.
+    private static ConnectionSecret SecretOf(FixtureCase fixture, IQueryDescriber describer, string connection)
+    {
+        var (planned, dialect) = FixtureReplay.Plan(fixture, TestContext.Current.CancellationToken);
+        var database = planned.Database ?? throw new InvalidOperationException($"The case {fixture} has no database.");
+        return new ConnectionSecret(
+            connection,
+            describer.SecretsOf(connection, Environment.GetEnvironmentVariable),
+            [database, SqlDialectName.Canonical(dialect)],
+            [describer.RewriteOf(connection)]
+        );
     }
 
     // An expected.json keeps the version it was recorded against.  CI describes the same cases on two servers, so the

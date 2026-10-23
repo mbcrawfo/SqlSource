@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text.Json;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Capture;
 using Xunit;
 
@@ -256,5 +257,86 @@ public sealed class CaptureJsonTests
         text.ShouldNotContain("\r");
         var read = CaptureJson.Read(text).Value.ShouldNotBeNull();
         read.Calls[0].Request.GetProperty("sql").GetString().ShouldBe(CaptureInputs.AwkwardSql);
+    }
+
+    private const string Refused = "The capture holds the connection's value or a password of it.";
+
+    private static DescribeCapture WithAnswer<T>(T answer)
+    {
+        var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
+        capture.Add(new CaptureCall("open", CaptureJson.ToElement(new { }), CaptureJson.ToElement(answer)));
+        return capture;
+    }
+
+    [Fact]
+    public void Write_WithASecretNotInTheCapture_IsTheFile()
+    {
+        var secret = new ConnectionSecret(
+            "Host=db;Password=hunter22",
+            ["hunter22"],
+            forms: ["host=db;password=hunter22"]
+        );
+
+        var written = CaptureJson.Write(TwoCalls(), secret);
+
+        written.Value.ShouldBe(CaptureJson.Write(TwoCalls()));
+        written.Failure.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Write_ValueInAnAnswer_IsRefused()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=hunter22");
+
+        var written = CaptureJson.Write(WithAnswer(new { Error = "bad Host=db;Password=hunter22 here" }), secret);
+
+        written.Value.ShouldBeNull();
+        written.Failure.ShouldBe(Refused);
+    }
+
+    [Fact]
+    public void Write_RewriteInAnAnswer_IsRefused()
+    {
+        var secret = new ConnectionSecret("host=db;password=hunter22", forms: ["Host=db;Password=hunter22"]);
+
+        var written = CaptureJson.Write(WithAnswer(new { Error = "bad Host=db;Password=hunter22 here" }), secret);
+
+        written.Value.ShouldBeNull();
+        written.Failure.ShouldBe(Refused);
+    }
+
+    [Fact]
+    public void Write_PasswordAsATokenInAnError_IsRefused()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=hunter22", ["hunter22"]);
+
+        var written = CaptureJson.Write(WithAnswer(new { Error = "password hunter22 is wrong" }), secret);
+
+        written.Value.ShouldBeNull();
+        written.Failure.ShouldBe(Refused);
+    }
+
+    [Fact]
+    public void Write_PasswordInsideAWord_IsTheFile()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=hunter22", ["hunter22"]);
+        var capture = WithAnswer(new { Error = "password hunter22x is wrong" });
+
+        var written = CaptureJson.Write(capture, secret);
+
+        written.Value.ShouldBe(CaptureJson.Write(capture));
+    }
+
+    // The file holds the value as the writer escapes it, so a search for the value as it is would miss it.
+    [Fact]
+    public void Write_ValueWithAQuoteAndABackslash_IsFoundAsEscaped()
+    {
+        const string Value = "Password=\"a\\b\"";
+        var secret = new ConnectionSecret(Value);
+
+        var written = CaptureJson.Write(WithAnswer(new { Error = $"bad {Value} here" }), secret);
+
+        written.Value.ShouldBeNull();
+        written.Failure.ShouldBe(Refused);
     }
 }

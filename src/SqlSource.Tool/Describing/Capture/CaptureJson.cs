@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -14,7 +15,9 @@ namespace SqlSource.Tool.Describing.Capture;
 /// <remarks>
 /// The file is indented and its line ends are <c>\n</c> on every platform, so that a capture under version control
 /// differs line by line.  The encoder is the relaxed one, as the log's is: a capture holds SQL, and a reviewer reads
-/// its quotes and angle brackets as they are.
+/// its quotes and angle brackets as they are.  A capture is written with <see cref="Write(DescribeCapture)" /> only
+/// where it is known to hold no connection: the one that takes the connection's secret refuses a capture that holds
+/// it, and is how the fixtures are recorded.
 /// </remarks>
 internal static class CaptureJson
 {
@@ -95,7 +98,7 @@ internal static class CaptureJson
     /// </summary>
     public static string TextOf(JsonElement element) => JsonSerializer.Serialize(element, Options);
 
-    /// <summary>The file of a capture.</summary>
+    /// <summary>The file of a capture, whatever it holds.</summary>
     public static string Write(DescribeCapture capture)
     {
         using var stream = new MemoryStream();
@@ -124,6 +127,37 @@ internal static class CaptureJson
         // so only the writer's own are replaced.
         return Encoding.UTF8.GetString(stream.ToArray()).Replace("\r\n", "\n", StringComparison.Ordinal) + "\n";
     }
+
+    /// <summary>
+    /// The file of a capture, or the sentence that says it holds the connection's secret and so is not written.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A capture is a file that is committed or sent, and what a describer was answered goes into it as the server
+    /// said it, so a driver's message that quotes the connection string is in it.  The file is searched for each
+    /// whole form of the value (<see cref="ConnectionSecret.Wholes" />) anywhere, and for each part as a token
+    /// (<see cref="Redaction.HoldsToken" />), as <see cref="Options" />' encoder writes it inside a string: a value
+    /// with a quote or a backslash is in the file escaped, and a search for it as it is would not find it.
+    /// </para>
+    /// <para>
+    /// The answer is a refusal and not a removal: a capture is replayed, and one with a mark in place of a word
+    /// would answer a request that its describer never asked.  The failure does not name what was found.
+    /// </para>
+    /// </remarks>
+    public static Outcome<string, string> Write(DescribeCapture capture, ConnectionSecret secret)
+    {
+        var text = Write(capture);
+        return HoldsSecret(text, secret)
+            ? Outcome<string, string>.Failed("The capture holds the connection's value or a password of it.")
+            : Outcome<string, string>.Of(text);
+    }
+
+    private static bool HoldsSecret(string text, ConnectionSecret secret) =>
+        secret.Wholes.Any(whole => text.Contains(AsWritten(whole), StringComparison.Ordinal))
+        || secret.Parts.Any(part => Redaction.HoldsToken(text, AsWritten(part)));
+
+    // The text between the quotes that the serializer puts round a string.
+    private static string AsWritten(string text) => JsonSerializer.Serialize(text, Options)[1..^1];
 
     /// <summary>
     /// Reads the file of a capture, or says in a sentence why the text is none.  A <c>captureVersion</c> that

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
@@ -48,7 +49,13 @@ public sealed class FixtureReplayTests : IDisposable
             new CapturingExchange(LiveExchange.Instance, capture)
         );
 
-        await FixtureCaseFiles.WriteRecordingAsync(fixture, capture, expected, TestContext.Current.CancellationToken);
+        await FixtureCaseFiles.WriteRecordingAsync(
+            fixture,
+            capture,
+            expected,
+            new ConnectionSecret(Secrets.ConnectionWithMarker),
+            TestContext.Current.CancellationToken
+        );
         return describer;
     }
 
