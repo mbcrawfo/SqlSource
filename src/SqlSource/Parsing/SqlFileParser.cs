@@ -417,11 +417,21 @@ internal static class SqlFileParser
 
             FindCommentsInHeads(query, ignoredTokens, start, end, ref errors);
             FindOpenedDefaults(kept, start, end, ref errors);
+
+            if (errors is null)
+            {
+                return (scanned.Segments, EquatableArray<SqlParseError>.Empty);
+            }
+
+            // Each check finds its errors in order, and the three together are put in the file's order, as a file's
+            // errors are, with a stable sort.
             return (
                 scanned.Segments,
-                errors is null
-                    ? EquatableArray<SqlParseError>.Empty
-                    : new EquatableArray<SqlParseError>(errors.ToImmutable())
+                new EquatableArray<SqlParseError>(
+                    errors.Count == 1
+                        ? errors.ToImmutable()
+                        : errors.OrderBy(static error => error.Span.Start).ToImmutableArray()
+                )
             );
         }
 

@@ -570,6 +570,20 @@ public sealed class SqlFileParserTests
             ]);
     }
 
+    // The scan's error comes first from the checks and last in the file, so the errors are put in the file's order.
+    [Fact]
+    public void Parse_KeptErrorsOfSeveralChecks_AreInTheOrderOfTheFile()
+    {
+        const string Text = "-- name: Q\n-- generator: keep-comments\nSELECT {{f/* c */}} -- {{class}}\n";
+
+        Blocks(Text)
+            .ShouldHaveSingleItem()
+            .KeptErrors.ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, SpanOf(Text, "/* c */"), "f"),
+                SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(Text, "{{class}}"), "class"),
+            ]);
+    }
+
     // An ignored token is read to its closing braces as any other is, so a comment in its head changes what the two
     // forms read too: without comments the ignored f takes {{g}} into its text, with them f is no token and g is.
     [Theory]
