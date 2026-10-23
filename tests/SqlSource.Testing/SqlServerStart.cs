@@ -45,11 +45,11 @@ internal static class SqlServerStart
             await first.StartAsync(token);
             return first;
         }
-        catch
+        catch (Exception exception)
         {
             try
             {
-                crash = token.IsCancellationRequested ? null : await CrashOfAsync(first);
+                crash = token.IsCancellationRequested ? null : await CrashOfAsync(first, exception);
             }
             finally
             {
@@ -93,11 +93,12 @@ internal static class SqlServerStart
         }
     }
 
-    // The log from the fatal error on when the container stopped with it before it was ready, or null.  The state is
-    // the one Testcontainers read during its wait, and the log is read only when the container has exited.
-    private static async Task<string?> CrashOfAsync(IStartingContainer container)
+    // The log from the fatal error on when the container stopped with it before it was ready, or null.  The log is
+    // read only when the container has exited: Testcontainers says so by its exception, which it throws when its wait
+    // finds the container gone even if the state it read just before still says running, or by that state.
+    private static async Task<string?> CrashOfAsync(IStartingContainer container, Exception failure)
     {
-        if (container.State != TestcontainersStates.Exited)
+        if (failure is not ContainerNotRunningException && container.State != TestcontainersStates.Exited)
         {
             return null;
         }

@@ -60,6 +60,28 @@ public sealed class SqlServerStartTests
         report.ShouldContain("Crash Id: 1234");
     }
 
+    // Testcontainers reads the state, then runs its wait, which finds the container gone: its exception says the
+    // container stopped while the state it read still says running.
+    [Fact]
+    public async Task StartAsync_NotRunningWhileStateSaysRunning_DisposesItAndStartsAnother()
+    {
+        var first = new FakeContainer
+        {
+            Failure = new ContainerNotRunningException("id", CrashLog, "", 1, new InvalidOperationException()),
+            State = TestcontainersStates.Running,
+            Logs = (CrashLog, ""),
+        };
+        var second = new FakeContainer();
+        var builds = new Builds(first, second);
+
+        var started = await StartAsync(builds);
+
+        started.ShouldBeSameAs(second);
+        builds.Count.ShouldBe(2);
+        first.Disposals.ShouldBe(1);
+        _ = _reports.ShouldHaveSingleItem();
+    }
+
     [Fact]
     public async Task StartAsync_BothCrash_DisposesBothAndThrows()
     {
