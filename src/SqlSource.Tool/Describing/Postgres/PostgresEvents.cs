@@ -19,8 +19,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// writes <c>prepare</c>, <c>columns</c>, <c>tables</c>, <c>types</c>, <c>spellings</c>, one <c>column</c> for each
 /// column, <c>check</c>, <c>table-match</c> and <c>deallocate</c>, in that order, each only when its call was made,
 /// and <c>table-match</c> only for a statement with rows whose check agreed.  A query with rows that is gated or has
-/// a column of no origin writes, between <c>check</c> and <c>table-match</c>, <c>explain</c>, <c>partitions</c> and
-/// <c>relations</c> when each is asked, one <c>walk.node</c> for each node the walk visited, one
+/// a column of no origin writes, between <c>check</c> and <c>table-match</c>, <c>explain</c>, <c>partitions</c>,
+/// <c>relations</c> and <c>overloads</c> when each is asked, one <c>walk.node</c> for each node the walk visited, one
 /// <c>walk.column</c> for each column, and <c>walk</c>.
 /// </remarks>
 internal static class PostgresEvents

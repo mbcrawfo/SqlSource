@@ -10,11 +10,10 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class OverloadsCallTests(PostgresContainer postgres)
 {
-    // The names run first against a server that may hold the schema "shadow" from another test, so the test drops it.
+    // Every test that makes the schema "shadow" drops it, so the server holds none of these names but in pg_catalog.
     [Fact]
     public async Task OverloadsAsync_NamesOnlyTheCatalogHolds_AnswersNone()
     {
-        await postgres.ExecuteAsync(ScratchSchema.DropShadow);
         await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
         var live = new PostgresLive(connection);
 

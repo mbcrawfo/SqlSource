@@ -8,8 +8,8 @@ namespace SqlSource.Tests.Postgres.Describer;
 // here alone, made by SQL that can be run again, and is never dropped beyond what its own text replaces: the
 // container is thrown away, and the fixtures are recorded in one of their own.  So a class that runs it first makes
 // the same object as any other would.  An object that changes what another test sees while it exists,
-// public."numeric", the schema "user", describer_canary, command_widgets, error_path_widgets and session_gone, is made
-// by its test and dropped in a finally.
+// public."numeric", the schema "user", the schema shadow of ShadowCount and ShadowOperators, describer_canary,
+// command_widgets, error_path_widgets and session_gone, is made by its test and dropped in a finally.
 internal static class ScratchSchema
 {
     /// <summary>
@@ -57,8 +57,8 @@ internal static class ScratchSchema
 
     /// <summary>
     /// Drops the schema <c>shadow</c> with what <see cref="ShadowCount" /> and <see cref="ShadowOperators" /> made in
-    /// it.  A test that asks which names another schema holds runs this, so that it does not depend on the order of
-    /// the tests.
+    /// it.  Every test that runs either runs this in a finally: while <c>shadow</c> holds a <c>count</c> or a
+    /// <c>*</c>, the describer reads no <c>count(x)</c> and no range intersection of any other test.
     /// </summary>
     public const string DropShadow = "DROP SCHEMA IF EXISTS shadow CASCADE";
 

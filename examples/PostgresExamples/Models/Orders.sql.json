@@ -217,6 +217,53 @@
             "schema": "pg_catalog",
             "internalName": "int8"
           },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": null,
+          "computed": null
+        }
+      ]
+    },
+    "ListUserDisplayNames": {
+      "hash": "a6bb963ed27508bbcbac15edbdea5012de8c16643372a4fa9507d2851ecc31a7",
+      "engine": "postgres",
+      "database": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "walked",
+      "tableMatch": "no-origin",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "users",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "display_name",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
           "nullable": null,
           "nullableSource": "no-origin",
           "origin": null,

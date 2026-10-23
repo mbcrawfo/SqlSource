@@ -54,25 +54,93 @@ public sealed class ExpressionTests(PostgresContainer postgres)
             NotNullCatalog,
             NotNullExpression,
             NotNullExpression,
-            UnknownNoOrigin,
+            NotNullExpression,
             NotNullExpression,
             NotNullExpression,
             NotNullExpression,
         ]);
 
     // An aggregate of another schema whose argument's type is exact beats pg_catalog.count("any") whatever the path's
-    // order, and the plan prints it bare: only count(*) is the catalog's by its text.
+    // order, and the plan prints it bare: "overloads" answers that shadow holds a count, so count(u.id) stays unknown,
+    // and count(*) is the catalog's by its signature.
     [Fact]
     public async Task DescribeAsync_CountOfAnArgumentThatAnotherSchemaTakes_StaysUnknown()
     {
-        await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
 
+            (
+                await AnswersAsync(
+                    "SELECT count(u.id) AS n, count(*) AS m FROM users u",
+                    $"{postgres.ConnectionString};Search Path=pg_catalog,shadow,public"
+                )
+            ).ShouldBe([UnknownNoOrigin, NotNullExpression]);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropShadow);
+        }
+    }
+
+    // count, array_agg and jsonb_build_object are read by their name when no schema but pg_catalog holds one of it:
+    // a count with a FILTER is never NULL, and an array_agg of a group that has a row is not, whatever its inputs.  A
+    // FILTER may leave array_agg's group no row, and jsonb_build_object over a VARIADIC array is NULL for a NULL one.
+    [Fact]
+    public async Task DescribeAsync_FormsOfTheCatalogByName_AreAnswered() =>
         (
             await AnswersAsync(
-                "SELECT count(u.id) AS n, count(*) AS m FROM users u",
-                $"{postgres.ConnectionString};Search Path=pg_catalog,shadow,public"
+                "SELECT u.id, count(o.id) AS n, count(o.note) FILTER (WHERE o.id > 1) AS noted, "
+                    + "array_agg(o.id) AS ids, jsonb_build_object('id', u.id, 'email', u.email) AS doc, "
+                    + "array_agg(o.id) FILTER (WHERE o.id > 1) AS later, "
+                    + "jsonb_build_object(VARIADIC ARRAY['k', u.name]) AS pair "
+                    + "FROM users u LEFT JOIN orders o ON o.user_id = u.id GROUP BY u.id"
             )
-        ).ShouldBe([UnknownNoOrigin, NotNullExpression]);
+        ).ShouldBe([
+            NotNullCatalog,
+            NotNullExpression,
+            NotNullExpression,
+            NotNullExpression,
+            NotNullExpression,
+            UnknownNoOrigin,
+            UnknownNoOrigin,
+        ]);
+
+    // array_agg is NULL over no row: with no GROUP BY the node is plain, and a window's frame may be empty.
+    [Theory]
+    [InlineData("SELECT array_agg(id) FROM users")]
+    [InlineData("SELECT array_agg(id) OVER (ORDER BY id ROWS BETWEEN 1 FOLLOWING AND 2 FOLLOWING) FROM users")]
+    public async Task DescribeAsync_ArrayAggWithoutAGroup_KeepsNoOrigin(string sql) =>
+        (await AnswersAsync(sql)).ShouldBe([UnknownNoOrigin]);
+
+    // A range's constructor reads a NULL bound as infinite, and the intersection of two ranges that are not NULL is
+    // a range, the empty one when they do not overlap.
+    [Fact]
+    public async Task DescribeAsync_RangeIntersection_IsAnswered() =>
+        (await AnswersAsync("SELECT b.during * tstzrange(@from, @to) AS overlap FROM bookings b")).ShouldBe([
+            NotNullExpression,
+        ]);
+
+    // Another schema's operator * is no candidate for two ranges, but "overloads" answers that a schema holds the
+    // name, whatever the path's order and the argument types, and the intersection is not read.
+    [Fact]
+    public async Task DescribeAsync_RangeIntersectionWhenAnotherSchemaHoldsTheOperator_KeepsNoOrigin()
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.ShadowOperators);
+
+            (
+                await AnswersAsync(
+                    "SELECT b.during * tstzrange(@from, @to) AS overlap FROM bookings b",
+                    $"{postgres.ConnectionString};Search Path=pg_catalog,shadow,public"
+                )
+            ).ShouldBe([UnknownNoOrigin]);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropShadow);
+        }
     }
 
     // The root of a set operation prints its first branch: a constant there says nothing of the NULL of the other.
@@ -168,20 +236,27 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_CountShadowedOnTheSearchPath_StaysUnknown()
     {
-        await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
 
-        (
-            await AnswersAsync(
-                "SELECT count(*) AS n FROM users",
-                $"{postgres.ConnectionString};Search Path=shadow,pg_catalog,public"
-            )
-        ).ShouldBe([UnknownNoOrigin]);
-        (
-            await AnswersAsync(
-                "SELECT count(*) AS n FROM users",
-                $"{postgres.ConnectionString};Search Path=pg_catalog,shadow,public"
-            )
-        ).ShouldBe([NotNullExpression]);
+            (
+                await AnswersAsync(
+                    "SELECT count(*) AS n FROM users",
+                    $"{postgres.ConnectionString};Search Path=shadow,pg_catalog,public"
+                )
+            ).ShouldBe([UnknownNoOrigin]);
+            (
+                await AnswersAsync(
+                    "SELECT count(*) AS n FROM users",
+                    $"{postgres.ConnectionString};Search Path=pg_catalog,shadow,public"
+                )
+            ).ShouldBe([NotNullExpression]);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropShadow);
+        }
     }
 
     // An operator, a function or a cast of pg_catalog that is total, over values the plan proves, cannot be NULL.  A
@@ -224,8 +299,8 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     }
 
     // An aggregate other than count, at the node that computes it under a GROUP BY, sees every row of a group, and
-    // a group has a row.  A FILTER may leave none, a polymorphic aggregate is left, and max(o.note) sees a column
-    // that may be NULL.
+    // a group has a row.  A FILTER may leave none, and max(o.note) sees a column that may be NULL.  array_agg, read by
+    // its name, is not NULL over a group that has a row.
     [Fact]
     public async Task DescribeAsync_AggregatesOverAGroup_AreAnswered() =>
         (
@@ -241,7 +316,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
             NotNullExpression,
             UnknownNoOrigin,
             UnknownNoOrigin,
-            UnknownNoOrigin,
+            NotNullExpression,
         ]);
 
     // The aggregate of a type outside the families, over an enum or a domain, and a DISTINCT or an ORDER BY inside
@@ -398,28 +473,35 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_OperatorOfASchemaBeforeTheCatalog_KeepsNoOrigin()
     {
-        await postgres.ExecuteAsync(ScratchSchema.ShadowOperators);
-        const string Product = "SELECT u.id, u.balance * 2 AS twice FROM users u";
-        const string Latest =
-            "SELECT u.id, max(o.placed_at) AS latest FROM users u JOIN orders o ON o.user_id = u.id GROUP BY u.id";
-
-        var shadowed = $"{postgres.ConnectionString};Search Path=shadow,pg_catalog,public";
-        await using (var source = NpgsqlDataSource.Create(shadowed))
+        try
         {
-            // The premise: on this path the shadow operator and aggregate are the ones the server chooses.
-            await using var command = source.CreateCommand(
-                "SELECT 2::numeric * 2::numeric IS NULL, (SELECT max(x) FROM (VALUES (now())) v (x)) IS NULL"
-            );
-            await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
-            (await reader.ReadAsync(TestContext.Current.CancellationToken)).ShouldBeTrue();
-            (reader.GetBoolean(0), reader.GetBoolean(1)).ShouldBe((true, true));
+            await postgres.ExecuteAsync(ScratchSchema.ShadowOperators);
+            const string Product = "SELECT u.id, u.balance * 2 AS twice FROM users u";
+            const string Latest =
+                "SELECT u.id, max(o.placed_at) AS latest FROM users u JOIN orders o ON o.user_id = u.id GROUP BY u.id";
+
+            var shadowed = $"{postgres.ConnectionString};Search Path=shadow,pg_catalog,public";
+            await using (var source = NpgsqlDataSource.Create(shadowed))
+            {
+                // The premise: on this path the shadow operator and aggregate are the ones the server chooses.
+                await using var command = source.CreateCommand(
+                    "SELECT 2::numeric * 2::numeric IS NULL, (SELECT max(x) FROM (VALUES (now())) v (x)) IS NULL"
+                );
+                await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+                (await reader.ReadAsync(TestContext.Current.CancellationToken)).ShouldBeTrue();
+                (reader.GetBoolean(0), reader.GetBoolean(1)).ShouldBe((true, true));
+            }
+
+            (await AnswersAsync(Product, shadowed)).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
+            (await AnswersAsync(Latest, shadowed)).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
+
+            var catalogFirst = $"{postgres.ConnectionString};Search Path=pg_catalog,shadow,public";
+            (await AnswersAsync(Product, catalogFirst)).ShouldBe([NotNullCatalog, NotNullExpression]);
+            (await AnswersAsync(Latest, catalogFirst)).ShouldBe([NotNullCatalog, NotNullExpression]);
         }
-
-        (await AnswersAsync(Product, shadowed)).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
-        (await AnswersAsync(Latest, shadowed)).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
-
-        var catalogFirst = $"{postgres.ConnectionString};Search Path=pg_catalog,shadow,public";
-        (await AnswersAsync(Product, catalogFirst)).ShouldBe([NotNullCatalog, NotNullExpression]);
-        (await AnswersAsync(Latest, catalogFirst)).ShouldBe([NotNullCatalog, NotNullExpression]);
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropShadow);
+        }
     }
 }

@@ -1,0 +1,291 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.6",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "SELECT b.id, b.during * tstzrange($1, $2) AS overlap\nFROM bookings b\nWHERE b.id = $3",
+        "types": [
+          "unknown",
+          "unknown",
+          "unknown"
+        ]
+      },
+      "answer": {
+        "parameterTypes": [
+          1184,
+          1184,
+          20
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 3
+      },
+      "answer": {
+        "columns": [
+          {
+            "ordinal": 0,
+            "name": "id",
+            "typeOid": 20,
+            "tableOid": 16439,
+            "attributeNumber": 1,
+            "length": null,
+            "precision": null,
+            "scale": null,
+            "typeModifier": -1
+          },
+          {
+            "ordinal": 1,
+            "name": "overlap",
+            "typeOid": 3910,
+            "tableOid": 0,
+            "attributeNumber": 0,
+            "length": null,
+            "precision": null,
+            "scale": null,
+            "typeModifier": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "tables",
+      "request": {
+        "oids": [
+          16439
+        ]
+      },
+      "answer": {
+        "tables": [
+          {
+            "oid": 16439,
+            "relkind": "r",
+            "schema": "public",
+            "name": "bookings",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "d",
+                "generated": "",
+                "typeOid": 20,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 2,
+                "name": "user_id",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 23,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 3,
+                "name": "during",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 3910,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 4,
+                "name": "slots",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 4451,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 5,
+                "name": "tags",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1009,
+                "notNullValidated": true
+              }
+            ],
+            "relhassubclass": false,
+            "hasForeignPartition": false,
+            "hasInsteadRule": false
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "types",
+      "request": {
+        "oids": [
+          20,
+          1184,
+          3910
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 20,
+            "typname": "int8",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "bigint",
+            "enumLabels": null,
+            "typtypmod": -1
+          },
+          {
+            "oid": 1184,
+            "typname": "timestamptz",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "D",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "timestamp with time zone",
+            "enumLabels": null,
+            "typtypmod": -1
+          },
+          {
+            "oid": 3910,
+            "typname": "tstzrange",
+            "nspname": "pg_catalog",
+            "typtype": "r",
+            "typcategory": "R",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": 1184,
+            "multirangeRngsubtype": null,
+            "formatType": "tstzrange",
+            "enumLabels": null,
+            "typtypmod": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "SELECT b.id, b.during * tstzrange(@from, @to) AS overlap\nFROM bookings b\nWHERE b.id = @id",
+        "parameters": [
+          {
+            "name": "from",
+            "dataTypeName": "timestamp with time zone"
+          },
+          {
+            "name": "to",
+            "dataTypeName": "timestamp with time zone"
+          },
+          {
+            "name": "id",
+            "dataTypeName": "bigint"
+          }
+        ]
+      },
+      "answer": {
+        "columns": [
+          {
+            "name": "id",
+            "typeOid": 20,
+            "dataTypeName": "bigint"
+          },
+          {
+            "name": "overlap",
+            "typeOid": 3910,
+            "dataTypeName": "tstzrange"
+          }
+        ],
+        "error": null,
+        "driverError": null,
+        "sent": {
+          "text": "SELECT b.id, b.during * tstzrange($1, $2) AS overlap\nFROM bookings b\nWHERE b.id = $3",
+          "parameters": [
+            "from",
+            "to",
+            "id"
+          ]
+        },
+        "textRefused": null
+      }
+    },
+    {
+      "method": "explain",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 3,
+        "settings": []
+      },
+      "answer": {
+        "plan": "[\n  {\n    \"Plan\": {\n      \"Node Type\": \"Index Scan\",\n      \"Parallel Aware\": false,\n      \"Async Capable\": false,\n      \"Scan Direction\": \"Forward\",\n      \"Index Name\": \"bookings_pkey\",\n      \"Relation Name\": \"bookings\",\n      \"Schema\": \"public\",\n      \"Alias\": \"b\",\n      \"Startup Cost\": 0.15,\n      \"Total Cost\": 8.17,\n      \"Plan Rows\": 1,\n      \"Plan Width\": 40,\n      \"Disabled\": false,\n      \"Output\": [\"id\", \"(during * tstzrange($1, $2))\"],\n      \"Index Cond\": \"(b.id = $3)\"\n    }\n  }\n]",
+        "error": null
+      }
+    },
+    {
+      "method": "overloads",
+      "request": {
+        "functions": [
+          "tstzrange"
+        ],
+        "operators": [
+          "*"
+        ]
+      },
+      "answer": {
+        "functions": [],
+        "operators": [],
+        "error": null
+      }
+    },
+    {
+      "method": "deallocate",
+      "request": {
+        "statement": "sqlsource_1"
+      },
+      "answer": {
+        "error": null
+      }
+    }
+  ]
+}

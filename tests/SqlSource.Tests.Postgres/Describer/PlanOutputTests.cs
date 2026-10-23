@@ -742,15 +742,22 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
     [Fact]
     public async Task Explain_CountShadowedOnTheSearchPath_PrintsUnqualified()
     {
-        await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
-        var connection = $"{postgres.ConnectionString};Search Path=shadow,pg_catalog,public";
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
+            var connection = $"{postgres.ConnectionString};Search Path=shadow,pg_catalog,public";
 
-        var root = await ExplainAsync("SELECT count(*) FROM users", connection);
+            var root = await ExplainAsync("SELECT count(*) FROM users", connection);
 
-        root.Output.ShouldNotBeNull().ShouldBe(["count(*)"]);
-        await using var source = NpgsqlDataSource.Create(connection);
-        await using var command = source.CreateCommand("SELECT count(*) IS NULL FROM users");
-        (await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)).ShouldBe(true);
+            root.Output.ShouldNotBeNull().ShouldBe(["count(*)"]);
+            await using var source = NpgsqlDataSource.Create(connection);
+            await using var command = source.CreateCommand("SELECT count(*) IS NULL FROM users");
+            (await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)).ShouldBe(true);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropShadow);
+        }
     }
 
     // A Subquery Scan prints the subquery's columns in the order the query above needs them, and its child in the

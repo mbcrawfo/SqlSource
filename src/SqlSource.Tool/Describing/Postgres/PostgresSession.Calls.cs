@@ -111,8 +111,7 @@ internal sealed partial class PostgresSession
             cancellationToken
         );
 
-    // Asked once a describe has read a plan that prints a name of CatalogOverloads.
-    internal Task<PostgresOverloadsAnswer> OverloadsAsync(
+    private Task<PostgresOverloadsAnswer> OverloadsAsync(
         string query,
         PostgresOverloadsRequest request,
         CancellationToken cancellationToken

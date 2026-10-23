@@ -1452,6 +1452,31 @@ public sealed class NullabilityWalkTests
         AnswersOf(RunUngated(plan, OfA, Expression)).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
     }
 
+    // The count of an argument over the side a LEFT JOIN extends, computed by the grouped Aggregate above it, is the
+    // catalog's only when "overloads" answered that no other schema holds count.
+    [Fact]
+    public void Run_CountOfAnArgumentWithTheCatalogAlone_IsAnswered()
+    {
+        var plan = Aggregate(
+            "Hashed",
+            true,
+            Join("Left", Scan("a", "a.id"), Scan("b", "b.id")) with
+            {
+                Output = ["a.id", "b.id"],
+            },
+            "a.id",
+            "count(b.id)"
+        ) with
+        {
+            Output = ["a.id", "count(b.id)"],
+        };
+        var alone = new CatalogNames(new HashSet<string>(["count"], StringComparer.Ordinal), new HashSet<string>());
+
+        AnswersOf(RunAs(Scope(true) with { CatalogAlone = alone }, plan, OfA, Expression))
+            .ShouldBe([NotNullCatalog, NotNullExpression]);
+        AnswersOf(RunAs(Scope(true), plan, OfA, Expression)).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
+    }
+
     // A node that prints no Output may compute any value, so it must be preserved.
     [Fact]
     public void Run_ExpressionBesideAChildWithoutOutputThatIsExtended_KeepsNoOrigin() =>

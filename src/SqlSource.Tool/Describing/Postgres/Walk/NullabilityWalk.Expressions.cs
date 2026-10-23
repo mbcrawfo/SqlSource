@@ -65,13 +65,15 @@ internal static partial class NullabilityWalk
                 ?? ProvedTypeAt(root, entry, context);
         }
 
-        // What the reader is told of an entry, wherever the walk reads it: the references it proves, and the subplans.
+        // What the reader is told of an entry, wherever the walk reads it: the references it proves, the subplans, and
+        // the names of CatalogOverloads that only pg_catalog holds.
         private ExpressionContext ContextOf(string entry, long columnType) =>
             new(
                 _scope.CatalogFunctionsFirst,
                 ProvedTypeOf,
                 ScalarSubPlanTypeOf: name => IsWhole(entry, name) ? ScalarSubPlanTypeOf(name, columnType) : null,
-                SubPlanColumnTypeOf: SubPlanColumnTypeOf
+                SubPlanColumnTypeOf: SubPlanColumnTypeOf,
+                CatalogAlone: _scope.CatalogAlone
             );
 
         // Whether the entry is the subplan's value and nothing else, once the parentheses that wrap it whole are off.

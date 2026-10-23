@@ -11,11 +11,19 @@ ORDER BY a.id, n.id;
 
 -- name: CountAccountNotes
 -- summary: The number of notes of each account.
--- column: note_count not null
 SELECT a.id, count(n.id) AS note_count
 FROM accounts AS a
 LEFT JOIN notes AS n ON n.account_id = a.id
 GROUP BY a.id
+ORDER BY a.id;
+
+-- name: ListDisplayNames
+-- summary: The name of each account with each word capitalized.
+-- column: display_name not null
+-- initcap is never NULL for a name that is not, and the tool does not prove it, so the column would be nullable
+-- without its marker.
+SELECT a.id, initcap(a.name) AS display_name
+FROM accounts AS a
 ORDER BY a.id;
 
 -- name: ListMarkedNames

@@ -131,16 +131,17 @@ internal sealed class PostgresLive(PostgresConnection connection)
         """;
 
     // The names of the functions and of the operators, among the ones asked for, that a schema other than pg_catalog
-    // holds: two queries, one for each, with the names as one positional text[].
+    // holds: two queries, one for each, with the names as one positional text[].  Each name is of the collation "C",
+    // so that ORDER BY 1 gives ordinal order whatever the database's collation.
     private const string OverloadedFunctionsSql = """
-        SELECT DISTINCT p.proname::text
+        SELECT DISTINCT p.proname::text COLLATE "C"
         FROM pg_catalog.pg_proc AS p
         WHERE p.proname = ANY ($1::text[]) AND p.pronamespace <> 'pg_catalog'::pg_catalog.regnamespace
         ORDER BY 1
         """;
 
     private const string OverloadedOperatorsSql = """
-        SELECT DISTINCT o.oprname::text
+        SELECT DISTINCT o.oprname::text COLLATE "C"
         FROM pg_catalog.pg_operator AS o
         WHERE o.oprname = ANY ($1::text[]) AND o.oprnamespace <> 'pg_catalog'::pg_catalog.regnamespace
         ORDER BY 1

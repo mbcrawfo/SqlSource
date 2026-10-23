@@ -144,4 +144,29 @@ internal static class CatalogOverloads
 
     /// <summary>Whether the type is one of the built-in range types of the table.</summary>
     public static bool IsRange(long type) => RangeOids.Contains(type);
+
+    /// <summary>
+    /// What <c>overloads</c> is asked of a plan: the names of the table that
+    /// <see cref="PlanExpression.CatalogNamesIn" /> finds in any entry of <c>Output</c> of any node of the tree,
+    /// through every <c>Parent Relationship</c> (<c>SubPlan</c>, <c>InitPlan</c> and <c>Subquery</c> included), each
+    /// list in ordinal order with each name once; or null when the plan prints none.
+    /// </summary>
+    public static PostgresOverloadsRequest? RequestOf(PlanNode root)
+    {
+        var functions = new HashSet<string>(StringComparer.Ordinal);
+        var operators = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var entry in root.SelfAndDescendants().SelectMany(static node => node.Output ?? []))
+        {
+            var (calls, applied) = PlanExpression.CatalogNamesIn(entry);
+            functions.UnionWith(calls);
+            operators.UnionWith(applied);
+        }
+
+        return functions.Count == 0 && operators.Count == 0
+            ? null
+            : new PostgresOverloadsRequest(
+                [.. functions.Order(StringComparer.Ordinal)],
+                [.. operators.Order(StringComparer.Ordinal)]
+            );
+    }
 }
