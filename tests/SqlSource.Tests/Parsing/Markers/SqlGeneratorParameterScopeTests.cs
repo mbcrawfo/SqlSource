@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
@@ -59,7 +58,11 @@ public sealed class SqlGeneratorParameterScopeTests
         var (_, errors) = Read(line);
 
         errors.ShouldBe([
-            SqlParseError.Create(SqlParseErrorKind.UnknownGeneratorParameter, SpanOf(line, parameter), parameter),
+            SqlParseError.Create(
+                SqlParseErrorKind.UnknownGeneratorParameter,
+                TextSpans.Of(line, parameter, last: true),
+                parameter
+            ),
         ]);
     }
 
@@ -83,7 +86,9 @@ public sealed class SqlGeneratorParameterScopeTests
 
         var (_, errors) = Read(line);
 
-        errors.ShouldBe([SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(line, word), word, "")]);
+        errors.ShouldBe([
+            SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, TextSpans.Of(line, word, last: true), word, ""),
+        ]);
     }
 
     [Theory]
@@ -127,8 +132,16 @@ public sealed class SqlGeneratorParameterScopeTests
 
         scope.Parameters.ShouldBe(GeneratorParameters.KeepComments);
         errors.ShouldBe([
-            SqlParseError.Create(SqlParseErrorKind.UnknownGeneratorParameter, SpanOf(Line, "nope"), "nope"),
-            SqlParseError.Create(SqlParseErrorKind.UnknownGeneratorParameter, SpanOf(Line, "foo=bar"), "foo=bar"),
+            SqlParseError.Create(
+                SqlParseErrorKind.UnknownGeneratorParameter,
+                TextSpans.Of(Line, "nope", last: true),
+                "nope"
+            ),
+            SqlParseError.Create(
+                SqlParseErrorKind.UnknownGeneratorParameter,
+                TextSpans.Of(Line, "foo=bar", last: true),
+                "foo=bar"
+            ),
         ]);
     }
 
@@ -150,7 +163,4 @@ public sealed class SqlGeneratorParameterScopeTests
         var marker = SqlMarkerReader.Read(line, SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0]);
         return marker.ShouldNotBeNull();
     }
-
-    private static TextSpan SpanOf(string text, string value) =>
-        new(text.LastIndexOf(value, StringComparison.Ordinal), value.Length);
 }

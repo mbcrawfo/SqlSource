@@ -1,9 +1,6 @@
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
-using SqlSource.Parsing;
-using SqlSource.Parsing.Tokens;
-using SqlSource.Settings;
 using Xunit;
 
 namespace SqlSource.Tests.Generation;
@@ -44,19 +41,5 @@ public sealed class QueryNamesTests
         QueryNames.IndexOf(EquatableArray<SqlQuery>.Empty, "GetUser", 0).ShouldBe(-1);
 
     private static SqlQuery Query(string name) =>
-        new(
-            name,
-            new LocationInfo("/app/Repo/Users.sql", default, default),
-            null,
-            null,
-            TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, "SELECT 1;")),
-            null,
-            EquatableArray<SqlToken>.Empty,
-            EquatableArray<SqlQueryParameter>.Empty,
-            SettingsLevel.None,
-            null,
-            null,
-            EquatableArray<ColumnMarker>.Empty,
-            EquatableArray<DiagnosticInfo>.Empty
-        );
+        TestModels.Query(name, "SELECT 1;", nameLocation: new LocationInfo("/app/Repo/Users.sql", default, default));
 }

@@ -48,19 +48,35 @@ public sealed class TypeOverrideLevelTests
 
     private const string ThePropertyPlace = "the property SqlSourceTypeOverrides";
 
+    private const string TheMetadataPlace = "the metadata SqlSourceTypeOverrides of the file";
+
+    private const string TheHeaderPlace = "a -- type-override: marker in the file header";
+
+    private const string TheQueryPlace = "a -- type-override: marker of the query";
+
+    private const string QuotedKey = "\"my schema\".\"order-status\"";
+
     // The warning ids of a C# type whose use gives none.
     private static readonly EquatableArray<string> NoWarnings = EquatableArray<string>.Empty;
 
     private static readonly PostgresType Timestamptz = Catalog("timestamptz");
 
+    // A key of timestamptz at each level below a default's, from the least specific, each as its level writes it.
+    private static readonly (SettingLevel Level, string Value)[] KeysBelowADefault =
+    [
+        (SettingLevel.Property, "timestamptz=System.DateTimeOffset"),
+        (SettingLevel.Metadata, "timestamptz=long"),
+        (SettingLevel.Header, "timestamptz = string"),
+    ];
+
     // The place of each level, as SQLSRC250 to SQLSRC252 name it.
-    public static TheoryData<string, string> Places =>
+    public static TheoryData<SettingLevel, string> Places =>
         new()
         {
-            { "property", "the property SqlSourceTypeOverrides" },
-            { "metadata", "the metadata SqlSourceTypeOverrides of the file" },
-            { "header", "a -- type-override: marker in the file header" },
-            { "query", "a -- type-override: marker of the query" },
+            { SettingLevel.Property, ThePropertyPlace },
+            { SettingLevel.Metadata, TheMetadataPlace },
+            { SettingLevel.Header, TheHeaderPlace },
+            { SettingLevel.Query, TheQueryPlace },
         };
 
     // The property maps timestamptz for the project.  B's metadata replaces it for B, C's header for C, and the
@@ -103,32 +119,19 @@ public sealed class TypeOverrideLevelTests
 
     // Each level's default hides the key of every level below it, and the base map answers.
     [Theory]
-    [InlineData("property")]
-    [InlineData("metadata")]
-    [InlineData("header")]
-    [InlineData("query")]
-    public void Run_DefaultAtALevel_GivesTheBaseMapsType(string level)
+    [InlineData(SettingLevel.Property, "timestamptz=default")]
+    [InlineData(SettingLevel.Metadata, "timestamptz=default")]
+    [InlineData(SettingLevel.Header, "timestamptz = default")]
+    [InlineData(SettingLevel.Query, "timestamptz = default")]
+    public void Run_DefaultAtALevel_GivesTheBaseMapsType(SettingLevel level, string value)
     {
-        var header = level switch
-        {
-            "header" => "-- type-override: timestamptz = default\n\n",
-            "query" => "-- type-override: timestamptz = string\n\n",
-            _ => "",
-        };
-        var marker = level == "query" ? "-- type-override: timestamptz = default\n" : "";
-        var metadata = level == "metadata" ? "timestamptz=default" : "timestamptz=long";
-        var file = new SqlFile(
-            GeneratorHarness.UsersPath,
-            header + "-- name: GetUser\n" + marker + "SELECT 1;\n",
-            Metadata: level == "property"
-                ? null
-                : new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = metadata }
-        );
+        var settings = KeysBelowADefault
+            .Where(key => key.Level < level)
+            .Aggregate(new LevelSettings(), (settings, key) => settings.At(key.Level, Setting.TypeOverrides, key.Value))
+            .At(level, Setting.TypeOverrides, value);
+        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
 
-        var run = Run(
-            level == "property" ? "timestamptz=default" : "timestamptz=System.DateTimeOffset",
-            (file, [Entry(file, "GetUser", Timestamptz)])
-        );
+        var run = Run(settings.PropertyOf(Setting.TypeOverrides), (file, [Entry(file, "GetUser", Timestamptz)]));
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
@@ -157,19 +160,14 @@ public sealed class TypeOverrideLevelTests
     }
 
     [Theory]
-    [InlineData("property")]
-    [InlineData("metadata")]
-    public void Run_KeyTwiceInOneMSBuildValue_TheLastWins(string level)
+    [InlineData(SettingLevel.Property, ThePropertyPlace)]
+    [InlineData(SettingLevel.Metadata, TheMetadataPlace)]
+    public void Run_KeyTwiceInOneMSBuildValue_TheLastWins(SettingLevel level, string place)
     {
-        const string Value = "int4=long int4=short";
-        var file = new SqlFile(
-            GeneratorHarness.UsersPath,
-            SqlTexts.GetUser,
-            Metadata: level == "metadata" ? new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = Value } : null
-        );
+        var settings = new LevelSettings().At(level, Setting.TypeOverrides, "int4=long int4=short");
+        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser));
 
-        var run = Run(level == "property" ? Value : null, (file, [Entry(file, "GetUser", Int4)]));
-        var place = level == "property" ? ThePropertyPlace : "the metadata SqlSourceTypeOverrides of the file";
+        var run = Run(settings.PropertyOf(Setting.TypeOverrides), (file, [Entry(file, "GetUser", Int4)]));
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("short", true, true, NoWarnings, "int4", place)]);
@@ -244,25 +242,21 @@ public sealed class TypeOverrideLevelTests
     // nothing at any level: the query is reported, with the key to write, and has no types.
     [Theory]
     [MemberData(nameof(Places))]
-    public void Run_ArraysOwnKeyOutsideTheCatalog_IsSqlsrc261NamingTheKeyToWrite(string level, string place)
+    public void Run_ArraysOwnKeyOutsideTheCatalog_IsSqlsrc261NamingTheKeyToWrite(SettingLevel level, string place)
     {
-        const string Value = "public._user_status=System.Guid";
-        const string Marker = "-- type-override: public._user_status = System.Guid\n";
-        var header = level == "header" ? Marker + "\n" : "";
-        var marker = level == "query" ? Marker : "";
-        var text = header + "-- name: GetUser\n" + marker + "SELECT 1;\n";
-        var file = new SqlFile(
-            GeneratorHarness.UsersPath,
-            text,
-            Metadata: level == "metadata" ? new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = Value } : null
+        var settings = new LevelSettings().At(
+            level,
+            Setting.TypeOverrides,
+            EntryAt(level, "public._user_status", "System.Guid")
         );
+        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
 
         var run = Run(
-            level == "property" ? Value : null,
+            settings.PropertyOf(Setting.TypeOverrides),
             (file, [Entry(file, "GetUser", ArrayOf(EnumType("user_status"), "_user_status"))])
         );
 
-        run.Diagnostics.ShouldBe([ArrayEntryError(text, "public._user_status", place, "public.user_status[]")]);
+        run.Diagnostics.ShouldBe([ArrayEntryError(file.Text!, "public._user_status", place, "public.user_status[]")]);
         TextsOf(run).ShouldBeEmpty();
     }
 
@@ -589,30 +583,43 @@ public sealed class TypeOverrideLevelTests
     // The quotes let the key name a schema and a type that a plain key cannot, and the MSBuild value splits after
     // them.
     [Theory]
-    [MemberData(nameof(Places))]
-    public void Run_QuotedSchemaAndName_MapsTheType(string level, string place)
+    [InlineData(SettingLevel.Property, ThePropertyPlace)]
+    [InlineData(SettingLevel.Metadata, TheMetadataPlace)]
+    public void Run_QuotedSchemaAndNameInAnMSBuildValue_MapsTheTypeAndSplitsAfterThem(SettingLevel level, string place)
     {
-        const string Key = "\"my schema\".\"order-status\"";
-        var isMSBuild = level is "property" or "metadata";
-        var value = isMSBuild ? Key + "=System.Guid int4=long" : Key + " = System.Guid";
-        var header = level == "header" ? "-- type-override: " + value + "\n\n" : "";
-        var marker = level == "query" ? "-- type-override: " + value + "\n" : "";
-        var file = new SqlFile(
-            GeneratorHarness.UsersPath,
-            header + "-- name: GetUser\n" + marker + "SELECT 1;\n",
-            Metadata: level == "metadata" ? new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = value } : null
-        );
-        var status = Composite("my schema", "order-status");
+        var settings = new LevelSettings().At(level, Setting.TypeOverrides, QuotedKey + "=System.Guid int4=long");
+        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
 
         var run = Run(
-            level == "property" ? value : null,
-            (file, isMSBuild ? [Entry(file, "GetUser", status, Int4)] : [Entry(file, "GetUser", status)])
+            settings.PropertyOf(Setting.TypeOverrides),
+            (file, [Entry(file, "GetUser", Composite("my schema", "order-status"), Int4)])
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        var guid = new PropertyType("global::System.Guid", true, true, NoWarnings, Key, place);
         ColumnsOf(run, "GetUser")
-            .ShouldBe(isMSBuild ? [guid, new PropertyType("long", true, true, NoWarnings, "int4", place)] : [guid]);
+            .ShouldBe([
+                new PropertyType("global::System.Guid", true, true, NoWarnings, QuotedKey, place),
+                new PropertyType("long", true, true, NoWarnings, "int4", place),
+            ]);
+    }
+
+    // The quotes let a marker's key name a schema and a type that a plain key cannot.
+    [Theory]
+    [InlineData(SettingLevel.Header, TheHeaderPlace)]
+    [InlineData(SettingLevel.Query, TheQueryPlace)]
+    public void Run_QuotedSchemaAndNameInAMarker_MapsTheType(SettingLevel level, string place)
+    {
+        var settings = new LevelSettings().At(level, Setting.TypeOverrides, QuotedKey + " = System.Guid");
+        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+
+        var run = Run(
+            settings.PropertyOf(Setting.TypeOverrides),
+            (file, [Entry(file, "GetUser", Composite("my schema", "order-status"))])
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        ColumnsOf(run, "GetUser")
+            .ShouldBe([new PropertyType("global::System.Guid", true, true, NoWarnings, QuotedKey, place)]);
     }
 
     // Two markers of one header, whose keys differ by case, are two keys and not a repeat of one.
@@ -639,28 +646,21 @@ public sealed class TypeOverrideLevelTests
     // Both queries of int4 are reported, each at its name, and the query of text is typed.
     [Theory]
     [MemberData(nameof(Places))]
-    public void Run_MappedTypeNotFound_IsSqlsrc250AtEachQueryThatUsesItNamingThePlace(string level, string place)
+    public void Run_MappedTypeNotFound_IsSqlsrc250AtEachQueryThatUsesItNamingThePlace(SettingLevel level, string place)
     {
-        const string Marker = "-- type-override: int4 = MyApp.Missing\n";
-        var header = level == "header" ? Marker + "\n" : "";
-        var marker = level == "query" ? Marker : "";
-        var text =
-            header
-            + "-- name: GetFirst\n"
-            + marker
-            + "SELECT 1;\n\n-- name: GetSecond\n"
-            + marker
-            + "SELECT 2;\n\n-- name: GetText\nSELECT 3;\n";
-        var file = new SqlFile(
-            GeneratorHarness.UsersPath,
-            text,
-            Metadata: level == "metadata"
-                ? new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = "int4=MyApp.Missing" }
-                : null
+        var settings = new LevelSettings().At(level, Setting.TypeOverrides, EntryAt(level, "int4", "MyApp.Missing"));
+        var file = settings.File(
+            new SqlFile(
+                GeneratorHarness.UsersPath,
+                "-- name: GetFirst\nSELECT 1;\n\n-- name: GetSecond\nSELECT 2;\n\n-- name: GetText\nSELECT 3;\n"
+            ),
+            "GetFirst",
+            "GetSecond"
         );
+        var text = file.Text!;
 
         var run = Run(
-            level == "property" ? "int4=MyApp.Missing" : null,
+            settings.PropertyOf(Setting.TypeOverrides),
             (
                 file,
                 [Entry(file, "GetFirst", Int4), Entry(file, "GetSecond", Int4), Entry(file, "GetText", Catalog("text"))]
@@ -770,9 +770,7 @@ public sealed class TypeOverrideLevelTests
 
         var run = Run(source, "int4=MyApp.Inner", (file, [Entry(file, "GetUser", Int4)]));
 
-        run.Diagnostics.ShouldBeEmpty();
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.ShouldBeClean();
         ColumnsOf(run, "GetUser")
             .ShouldBe([new PropertyType("global::MyApp.Inner", true, false, NoWarnings, "int4", ThePropertyPlace)]);
     }
@@ -791,6 +789,11 @@ public sealed class TypeOverrideLevelTests
             [.. files.SelectMany(file => new[] { file.File, Sidecars.Of(file.File, file.Entries) })],
             new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = property }
         );
+
+    // The entry of the key as its level writes it: in an MSBuild value without spaces around =, and in a marker with
+    // them.
+    private static string EntryAt(SettingLevel level, string key, string type) =>
+        level is SettingLevel.Property or SettingLevel.Metadata ? key + "=" + type : key + " = " + type;
 
     // An entry of the query for its current hash, with a column of each type, named c0, c1 and so on.
     private static SidecarEntry Entry(SqlFile file, string name, params PostgresType[] columns) =>
