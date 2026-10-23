@@ -17,6 +17,11 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <remarks>
 /// Each function answers through <see cref="AnswerAsync{TAnswer}" />: what the server can cause is the answer's
 /// error.  A cancellation passes through, and anything else is a bug.
+/// <para>
+/// The SQL of the catalog calls runs under the user's <c>search_path</c>, so every type and function it names is
+/// written with <c>pg_catalog.</c>: a user's domain named <c>text</c> before <c>pg_catalog</c> on the path would
+/// otherwise take <c>::text</c>.  Its operators are not (TD-0077).
+/// </para>
 /// </remarks>
 internal sealed class PostgresLive(PostgresConnection connection)
 {
@@ -51,7 +56,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
         );
 
     private const string ParameterTypesSql =
-        "SELECT parameter_types::oid[] FROM pg_catalog.pg_prepared_statements WHERE name = $1 AND statement = $2";
+        "SELECT parameter_types::pg_catalog.oid[] FROM pg_catalog.pg_prepared_statements "
+        + "WHERE name = $1 AND statement = $2";
 
     // Every relation asked for with its columns, in one query: by OID for "tables", and by schema and name for
     // "relations", whose text is the same but for the FROM and the WHERE of the first CTE, which are in TablesSql and
@@ -86,14 +92,14 @@ internal sealed class PostgresLive(PostgresConnection connection)
         )
         SELECT
             r.oid,
-            r.relkind::text,
-            n.nspname::text,
-            r.relname::text,
+            r.relkind::pg_catalog.text,
+            n.nspname::pg_catalog.text,
+            r.relname::pg_catalog.text,
             a.attnum,
-            a.attname::text,
+            a.attname::pg_catalog.text,
             a.attnotnull,
-            a.attidentity::text,
-            a.attgenerated::text,
+            a.attidentity::pg_catalog.text,
+            a.attgenerated::pg_catalog.text,
             a.atttypid,
             k.convalidated,
             r.relhassubclass,
@@ -114,11 +120,15 @@ internal sealed class PostgresLive(PostgresConnection connection)
         {TableRowsTail}
         """;
 
-    // The same rows for the relations a plan scans, found by schema and name: unnest pairs the two arrays, as it does
-    // in PartitionsSql.
+    // The same rows for the relations a plan scans, found by schema and name: ROWS FROM pairs the two arrays, as it
+    // does in PartitionsSql.  unnest(a, b) would do the same, but only unqualified, so a function of the user's could
+    // take it.
     private const string RelationsSql = $"""
         {TableRowsHead}
-            FROM unnest($1::text[], $2::text[]) AS p (schema, name)
+            FROM ROWS FROM (
+                pg_catalog.unnest($1::pg_catalog.text[]),
+                pg_catalog.unnest($2::pg_catalog.text[])
+            ) AS p (schema, name)
             JOIN pg_catalog.pg_namespace AS s ON s.nspname = p.schema
             JOIN pg_catalog.pg_class AS c ON c.relnamespace = s.oid AND c.relname = p.name
         {TableRowsTail}
@@ -128,15 +138,18 @@ internal sealed class PostgresLive(PostgresConnection connection)
     // relation itself first, and nothing for a relation that is no partition.
     private const string PartitionsSql = """
         SELECT
-            n.nspname::text,
-            c.relname::text,
+            n.nspname::pg_catalog.text,
+            c.relname::pg_catalog.text,
             ARRAY(
-                SELECT a.relid::oid
+                SELECT a.relid::pg_catalog.oid
                 FROM pg_catalog.pg_partition_ancestors(c.oid) WITH ORDINALITY AS a (relid, position)
                 WHERE a.relid <> c.oid
                 ORDER BY a.position
             )
-        FROM unnest($1::text[], $2::text[]) AS p (schema, name)
+        FROM ROWS FROM (
+            pg_catalog.unnest($1::pg_catalog.text[]),
+            pg_catalog.unnest($2::pg_catalog.text[])
+        ) AS p (schema, name)
         JOIN pg_catalog.pg_namespace AS n ON n.nspname = p.schema
         JOIN pg_catalog.pg_class AS c ON c.relnamespace = n.oid AND c.relname = p.name
         ORDER BY 1, 2
@@ -145,7 +158,10 @@ internal sealed class PostgresLive(PostgresConnection connection)
     // The server's spelling of each pair of a type and a modifier, in one query.
     private const string SpellingsSql = """
         SELECT p.oid, p.typmod, pg_catalog.format_type(p.oid, p.typmod)
-        FROM unnest($1::oid[], $2::int4[]) AS p (oid, typmod)
+        FROM ROWS FROM (
+            pg_catalog.unnest($1::pg_catalog.oid[]),
+            pg_catalog.unnest($2::pg_catalog.int4[])
+        ) AS p (oid, typmod)
         ORDER BY 1, 2
         """;
 
@@ -172,17 +188,17 @@ internal sealed class PostgresLive(PostgresConnection connection)
         )
         SELECT
             t.oid,
-            t.typname::text,
-            n.nspname::text,
-            t.typtype::text,
-            t.typcategory::text,
+            t.typname::pg_catalog.text,
+            n.nspname::pg_catalog.text,
+            t.typtype::pg_catalog.text,
+            t.typcategory::pg_catalog.text,
             t.typelem,
             t.typbasetype,
             r.rngsubtype,
             mr.rngsubtype,
             pg_catalog.format_type(t.oid, -1),
             (
-                SELECT pg_catalog.array_agg(e.enumlabel::text ORDER BY e.enumsortorder)
+                SELECT pg_catalog.array_agg(e.enumlabel::pg_catalog.text ORDER BY e.enumsortorder)
                 FROM pg_catalog.pg_enum AS e
                 WHERE e.enumtypid = t.oid
             ),
@@ -392,7 +408,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
     private static NpgsqlParameter OidArray(IEnumerable<long> oids) =>
         new() { Value = oids.Select(static oid => (uint)oid).ToArray(), DataTypeName = "oid[]" };
 
-    // The schemas and the names of the relations as two positional text[], $1 and $2, which unnest pairs.
+    // The schemas and the names of the relations as two positional text[], $1 and $2, which ROWS FROM pairs.
     private static void AddRelations(NpgsqlCommand command, IReadOnlyList<PostgresRelationName> relations)
     {
         _ = command.Parameters.Add(
