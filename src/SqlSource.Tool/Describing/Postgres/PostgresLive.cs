@@ -152,17 +152,17 @@ internal sealed class PostgresLive(PostgresConnection connection)
     // one positional text[].  Each name is of the collation "C", so that ORDER BY 1 gives ordinal order whatever the
     // database's collation.
     private const string OverloadedFunctionsSql = $"""
-        SELECT DISTINCT p.proname::text COLLATE "C"
+        SELECT DISTINCT p.proname::pg_catalog.text COLLATE "C"
         FROM pg_catalog.pg_proc AS p
-        WHERE p.proname = ANY ($1::text[])
+        WHERE p.proname = ANY ($1::pg_catalog.text[])
             AND (p.pronamespace <> 'pg_catalog'::pg_catalog.regnamespace OR p.oid >= {FirstNormalObjectId})
         ORDER BY 1
         """;
 
     private const string OverloadedOperatorsSql = $"""
-        SELECT DISTINCT o.oprname::text COLLATE "C"
+        SELECT DISTINCT o.oprname::pg_catalog.text COLLATE "C"
         FROM pg_catalog.pg_operator AS o
-        WHERE o.oprname = ANY ($1::text[])
+        WHERE o.oprname = ANY ($1::pg_catalog.text[])
             AND (o.oprnamespace <> 'pg_catalog'::pg_catalog.regnamespace OR o.oid >= {FirstNormalObjectId})
         ORDER BY 1
         """;

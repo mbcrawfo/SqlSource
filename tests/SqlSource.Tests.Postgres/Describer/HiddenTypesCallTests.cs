@@ -10,8 +10,8 @@ namespace SqlSource.Tests.Postgres.Describer;
 
 // Each catalog call against a real server, on a connection whose search_path puts domains named like the built-in
 // types text, oid and int4 before pg_catalog: the casts and functions of its SQL are the catalog's, so it answers as
-// on any other path.  An error of tables, relations or partitions is logged and never reported, so only a test of
-// the call itself sees it.
+// on any other path.  An error of tables, relations, partitions or overloads is logged and never reported, so only a
+// test of the call itself sees it.
 [Collection(UsesPostgres.Name)]
 public sealed class HiddenTypesCallTests(PostgresContainer postgres)
 {
@@ -117,6 +117,22 @@ public sealed class HiddenTypesCallTests(PostgresContainer postgres)
                 (25L, "text", "pg_catalog", "pg_catalog.text"),
                 (1009L, "_text", "pg_catalog", "pg_catalog.text[]"),
             ]);
+    }
+
+    [Fact]
+    public async Task OverloadsAsync_SearchPathHidingBuiltInTypes_AnswersTheNames()
+    {
+        var (connection, live) = await HiddenAsync();
+        await using var _ = connection;
+
+        var answer = await live.OverloadsAsync(
+            new PostgresOverloadsRequest(["count", "jsonb_build_object"], ["*"]),
+            TestContext.Current.CancellationToken
+        );
+
+        answer.Error.ShouldBeNull(answer.Error?.Message);
+        answer.Functions.ShouldNotBeNull().ShouldBeEmpty();
+        answer.Operators.ShouldNotBeNull().ShouldBeEmpty();
     }
 
     [Fact]
