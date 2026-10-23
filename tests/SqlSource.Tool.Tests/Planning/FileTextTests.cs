@@ -53,6 +53,28 @@ public sealed class FileTextTests : IDisposable
     }
 
     [Fact]
+    public void Read_Utf16BigEndianWithMark_IsTheTextAndTheCompilerDoesNotFallBack()
+    {
+        var path = WriteBytes("Q.sql", [0xFE, 0xFF, .. Encoding.BigEndianUnicode.GetBytes(Query)]);
+
+        var contents = FileText.Read(path).ShouldNotBeNull();
+
+        contents.Text.ToString().ShouldBe(Query);
+        contents.CompilerFallsBack.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Read_EmptyFile_IsEmptyTextAndTheCompilerDoesNotFallBack()
+    {
+        var path = WriteBytes("Q.sql", []);
+
+        var contents = FileText.Read(path).ShouldNotBeNull();
+
+        contents.Text.ToString().ShouldBeEmpty();
+        contents.CompilerFallsBack.ShouldBeFalse();
+    }
+
+    [Fact]
     public void Read_Utf8MarkThenAByteThatIsNotUtf8_TheCompilerDoesNotFallBack()
     {
         var path = WriteBytes("Q.sql", [0xEF, 0xBB, 0xBF, .. Encoding.Latin1.GetBytes(Query)]);
