@@ -221,7 +221,7 @@ public sealed class NpgsqlRunLoggerTests
     // The list was read from this version's NpgsqlEventId.cs and LogMessages.cs.  An update of Npgsql reads the new
     // version's, adds the ids that are safe and that the describer reaches, and moves this test to it.
     [Fact]
-    public void Npgsql_IsTheVersionTheListWasReadFrom() =>
+    public void Npgsql_Loaded_IsTheVersionTheListWasReadFrom() =>
         typeof(NpgsqlEventId)
             .Assembly.GetName()
             .Version.ShouldBe(

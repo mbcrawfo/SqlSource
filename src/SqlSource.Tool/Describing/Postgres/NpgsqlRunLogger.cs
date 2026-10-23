@@ -22,7 +22,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// the server, whose text can name a role or a database; every message of id 0, the id of the messages that Npgsql
 /// writes without <c>LoggerMessage</c>, some of which quote the user's principal or the server's text; and so the
 /// whole of <c>Npgsql.Exception</c>, which writes nothing else.  Trace is never forwarded, a category with no listed
-/// id is never enabled, parameter logging is off, and a scope is not kept.
+/// id is never enabled, and a scope is not kept.  Parameter logging is off: <see cref="PostgresConnection" /> turns
+/// off the connection string's <c>Log Parameters</c>, which Npgsql honours whatever the data source's own setting.
 /// </para>
 /// <para>
 /// An exception is written as its type alone: its message is the server's or the socket's text, which can name the
