@@ -15,6 +15,10 @@ public sealed class ProgramsTests
 {
     private const string HostPath = "DOTNET_HOST_PATH";
 
+    // How soon RunAsync gives up a program whose patience is 200 ms: 100 times that, which a slow runner keeps, and far
+    // below any other limit of RunAsync or of the test.
+    private static readonly TimeSpan WithinThePatience = TimeSpan.FromSeconds(20);
+
     [Fact]
     public void Dotnet_HostPathSet_IsThatPath()
     {
@@ -91,7 +95,8 @@ public sealed class ProgramsTests
                     }
                 )
             ),
-            "RunAsync did not give the program up at its patience."
+            "RunAsync did not give the program up at its patience.",
+            WithinThePatience
         );
 
         thrown.Message.ShouldContain("did not end within");
