@@ -100,38 +100,78 @@ public sealed class CheckFilterTests : IDisposable
     private static bool ReportsGone(CliResult result) =>
         result.Error.Contains("for 'Gone': the query is not in the file", StringComparison.Ordinal);
 
-    // An entry of a query that is gone is reported when its own database is named, in whatever case, and not when
-    // another is.
+    // An entry of a query that is gone makes the file's text differ from what describe would write, so a describe
+    // with --database rewrites the file without it, whatever the entry's database: the check reports it whichever
+    // database is named, in whatever case.
     [Theory]
-    [InlineData("billing", true)]
-    [InlineData("BILLING", true)]
-    [InlineData("postgres", false)]
-    public async Task Check_EntryOfAQueryThatIsGoneUnderDatabase_IsReportedForItsOwnDatabaseAlone(
-        string named,
-        bool reported
-    )
+    [InlineData("billing")]
+    [InlineData("BILLING")]
+    [InlineData("postgres")]
+    public async Task Check_EntryOfAQueryThatIsGoneUnderDatabase_IsReportedWhenDescribeWouldWriteTheFile(string named)
     {
         (await DescribeAsync()).ExitCode.ShouldBe(0);
         await AddAnEntryOfAQueryThatIsGoneAsync("billing");
 
         var result = await DescribeAsync("--check", "--database", named);
 
-        result.ExitCode.ShouldBe(reported ? 2 : 0);
-        ReportsGone(result).ShouldBe(reported);
+        result.ExitCode.ShouldBe(2);
+        ReportsGone(result).ShouldBeTrue();
     }
 
-    // An entry with no database is nobody's, so a run for a database says nothing of it, though describe --database
-    // drops it when it rewrites the file: docs/tech-debt/TD-0036-two-small-gaps-of-check-and-the-log.md.
+    // An entry with no database is nobody's, and describe --database drops it all the same when it rewrites the file.
     [Fact]
-    public async Task Check_EntryOfAQueryThatIsGoneWithNoDatabase_IsNotReportedUnderDatabase()
+    public async Task Check_EntryOfAQueryThatIsGoneWithNoDatabase_IsReportedUnderDatabase()
     {
         (await DescribeAsync()).ExitCode.ShouldBe(0);
         await AddAnEntryOfAQueryThatIsGoneAsync(database: null);
 
         var result = await DescribeAsync("--check", "--database", "billing");
 
+        result.ExitCode.ShouldBe(2);
+        ReportsGone(result).ShouldBeTrue();
+    }
+
+    // What the check reports, describe with the same filter drops, and the same check then passes.
+    [Fact]
+    public async Task Check_EntryOfAnotherDatabaseThatIsGone_AgreesWithDescribe()
+    {
+        (await DescribeAsync()).ExitCode.ShouldBe(0);
+        await AddAnEntryOfAQueryThatIsGoneAsync("billing");
+
+        var reported = await DescribeAsync("--check", "--database", "postgres");
+        var described = await DescribeAsync("--database", "postgres");
+        var result = await DescribeAsync("--check", "--database", "postgres");
+
+        reported.ExitCode.ShouldBe(2);
+        ReportsGone(reported).ShouldBeTrue();
+        described.ExitCode.ShouldBe(0);
+        SidecarFiles.Read(_users).Find("Gone").ShouldBeNull();
+        result.ShouldBe(new CliResult(0, "postgres (postgres): 1 same, 0 differ, 0 failed\n", ""));
+    }
+
+    // A file that a query left out holds back is not written by describe with the same filter, so an entry of
+    // another database that is gone stays in it, and the check says nothing of it.
+    [Fact]
+    public async Task Check_EntryOfAnotherDatabaseThatIsGoneInAHeldBackFile_IsNotReported()
+    {
+        (await DescribeAsync()).ExitCode.ShouldBe(0);
+        await AddAnEntryOfAQueryThatIsGoneAsync("billing");
+        await File.WriteAllTextAsync(
+            _users,
+            SqlTexts.WithSecondQueryEdited(SqlTexts.Users),
+            TestContext.Current.CancellationToken
+        );
+        var before = await File.ReadAllTextAsync(SidecarFormat.PathFor(_users), TestContext.Current.CancellationToken);
+
+        var result = await DescribeAsync("--check", "--database", "postgres");
+        var described = await DescribeAsync("--database", "postgres");
+
         result.ExitCode.ShouldBe(0);
         ReportsGone(result).ShouldBeFalse();
+        described.ExitCode.ShouldBe(0);
+        (await File.ReadAllTextAsync(SidecarFormat.PathFor(_users), TestContext.Current.CancellationToken)).ShouldBe(
+            before
+        );
     }
 
     // Without --database a run knows no database to leave an entry to, whatever else it narrows to.

@@ -574,7 +574,7 @@ SidecarType, SQL Server     { Name, MaxLength, Precision, Scale, UserType: { Sch
 | `SQLSRC219` | 2.6 | A sidecar that `--check` found out of date |
 
   `SQLSRC209` and `SQLSRC210` are also the generator's, from sub-phase 5.1, at the same places as the tool's.
-- **What a filter lets a run change.**  A sidecar is written only for a file with a selected query, and deleted only in a run with no filter.  `--check` compares within the same bounds, so it reports what `describe` with the same filters would change, but for an entry of a query that is gone and of a database that `--database` does not name (`docs/tech-debt/TD-0036-two-small-gaps-of-check-and-the-log.md`).
+- **What a filter lets a run change.**  A sidecar is written only for a file with a selected query, and deleted only in a run with no filter.  `--check` compares within the same bounds, so it reports what `describe` with the same filters would change.
 - **A wrong command line** is reported by the tool, and never repeats the text of a token it did not expect: a misspelt `--connection` must not print the connection string after it.  Its lines have no id and do not go through the reporter.  Only the first unknown option is reported, and nothing after it is read.  `--` and a response file are given no meaning.  A flag is declared to take no value, so that the token after it is never read as one.
 - **The summary under `--check`** counts `same`, `differ` and `failed`.
 - **What `--check` says of a sidecar that `describe` would delete** it takes from the step that decides the deletion: in a run with no filter, in which nothing was reported, for a sidecar that can be opened and is not of a higher format version.  A difference that `describe` does not mend would be a build that stays red.

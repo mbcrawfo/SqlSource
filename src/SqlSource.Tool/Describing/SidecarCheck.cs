@@ -49,7 +49,9 @@ internal static class SidecarCheck
     /// <param name="outcomes">What <see cref="FileOutcomes" /> decided for the same files, in the same order.</param>
     /// <param name="databases">
     /// The names of <c>--database</c>.  An entry for a query that is gone is reported when its own database is one
-    /// of them, or when there are none: a run for one database says nothing of another's entries.
+    /// of them, when there are none, or when the file's outcome is <see cref="FileAction.Write" />: a run for one
+    /// database leaves another's entries alone, unless it writes their file, which drops each entry for a query that
+    /// is gone.
     /// </param>
     public static ImmutableArray<FileCheck> Compare(
         ImmutableArray<FileWork> files,
@@ -115,7 +117,7 @@ internal static class SidecarCheck
             }
         }
 
-        differences.AddRange(EntriesWithoutAQuery(file, onDisk, sidecar, databases));
+        differences.AddRange(EntriesWithoutAQuery(file, outcome, onDisk, sidecar, databases));
         return Of(outcome, differences);
     }
 
@@ -184,9 +186,11 @@ internal static class SidecarCheck
             ),
         };
 
-    // An entry for a name that no query of the file has, or for a query that needs none: writing drops it.
+    // An entry for a name that no query of the file has, or for a query that needs none: writing drops it.  Such an
+    // entry is in no target, so a file that has one and is not held back is written, whatever the entry's database.
     private static IEnumerable<ToolDiagnostic> EntriesWithoutAQuery(
         FileWork file,
+        FileOutcome outcome,
         SidecarOnDisk onDisk,
         Sidecar sidecar,
         ImmutableArray<string> databases
@@ -205,6 +209,7 @@ internal static class SidecarCheck
 
             if (
                 !databases.IsEmpty
+                && outcome.Action != FileAction.Write
                 && (entry.Database is not { } database || !databases.Contains(database, DatabaseName.Comparer))
             )
             {
