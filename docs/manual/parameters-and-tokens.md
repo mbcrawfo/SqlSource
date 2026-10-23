@@ -195,5 +195,6 @@ With validation off the method checks nothing.  An empty argument leaves nothing
 
 ## Known issues
 
+- **A comment inside a token's braces, before its default, loses the token where comments are kept.**  In `{{f/* c */}}`, `{{/* c */f}}` or `{{f/* c */:a}}`, a query that keeps its comments (the `keep-comments` [generator parameter](settings.md#setting-generator-parameters)) has no token `f`: the braces stay in its SQL as written, and its method has no argument for `f`.  Nothing is reported.  Keep comments out of a token's braces, or put them inside its default.
 - **Under `mssql`, a parameter can be taken for a declared variable.**  After a `DECLARE` with no `;`, a statement that starts with a word SqlSource does not know to start a statement, such as `SEND` or a label, does not end the list.  A parameter after a comma in it, outside parentheses, is then taken for a variable and left out of the parameter list.  End the `DECLARE` with a `;`, or declare the parameter with its type: `-- param: @id int`.
 - **A user variable of MySQL or MariaDB, and a parameter of a procedure that the SQL creates, are listed as parameters.**  See [names that are read as parameters](#names-read-as-parameters).

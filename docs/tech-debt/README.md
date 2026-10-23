@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0078`
+Next id: `TD-0079`
 
 ## Active items
 
@@ -41,6 +41,7 @@ Next id: `TD-0078`
 | [TD-0072](TD-0072-sql-server-2025-container-crashes-at-start-in-ci.md) | Open | 2026-10-22 | Low | A SQL Server 2025 test container sometimes crashes as it starts in CI, for a reason not known; the tests start another, once, and report it in the job's summary, but two crashes in a row still fail every test of that project |
 | [TD-0076](TD-0076-what-the-first-refusal-of-a-declared-type-says.md) | Open | 2026-10-23 | Low | PostgreSQL's first refusal of a `-- param:` type says only that it is not a type name, where SQL Server's says what was found, and SQL Server's refuses a name that holds a combining mark, a letter number or a format character after its first character, which the server takes |
 | [TD-0077](TD-0077-describer-catalog-sql-takes-a-users-operators.md) | Open | 2026-10-23 | Low | The SQL of the PostgreSQL describer's catalog calls runs under the user's `search_path` and writes its operators without `pg_catalog`, so a user's operator on a system type before `pg_catalog` changes what the catalog answers |
+| [TD-0078](TD-0078-comment-inside-a-tokens-name-is-lost-where-comments-are-kept.md) | Open | 2026-10-23 | Low | A comment between a token's braces and its name, or between its name and its colon or closing braces, as in `{{f/* c */}}`, leaves the token in the SQL without comments and not in the SQL with them, so a type that keeps the query's comments loses the token, and nothing is reported |
 
 ## Columns
 
