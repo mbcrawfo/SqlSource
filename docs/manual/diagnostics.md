@@ -163,6 +163,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC267](#sqlsrc267) | Microsoft.Data.SqlClient is older than 6.1 |
 | [SQLSRC268](#sqlsrc268) | Microsoft.Data.SqlClient is newer than SqlSource knows |
 | [SQLSRC269](#sqlsrc269) | Type needs Microsoft.Data.SqlClient |
+| [SQLSRC270](#sqlsrc270) | Type needs a newer Microsoft.Data.SqlClient |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236, and 262 to 266, are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
@@ -176,7 +177,7 @@ The ids `SQLSRC247` and `SQLSRC248` are reported by the build, about the version
 
 The ids `SQLSRC267` and `SQLSRC268` are reported by the build, about the version of Microsoft.Data.SqlClient that the project references, whenever a query of the `mssql` dialect has the output `models` or `codegen`.  They have no file and line, and each is reported once for the project, however many of its queries read the driver.
 
-`SQLSRC269` is reported by the build at a query of the `mssql` dialect whose output is `models` or `codegen` and whose entry in its sidecar is current, as `SQLSRC249` is under the `postgres` dialect: at the query's name, once for the query, for its first column or parameter that has no C# type, parameters before columns.
+`SQLSRC269` and `SQLSRC270` are reported by the build at a query of the `mssql` dialect whose output is `models` or `codegen` and whose entry in its sidecar is current, as `SQLSRC249` is under the `postgres` dialect: at the query's name, once for the query, for its first column or parameter that has no C# type, parameters before columns.
 
 The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type override names.  Each is reported at a query that has a column or a parameter of the database type the entry maps, and names the column or parameter, the entry and the place that wrote it.  An entry that no query uses is never an error, so a project can set its mappings before it has the queries.
 
@@ -2245,7 +2246,7 @@ The project references a version of Microsoft.Data.SqlClient older than 6.1, and
 CSC : error SQLSRC267: This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs Microsoft.Data.SqlClient 6.1 or later.  Update the package.
 ```
 
-Update the `Microsoft.Data.SqlClient` package to 6.1 or later.  When another package brings the older version, reference `Microsoft.Data.SqlClient` from the project itself, at the version you want.  EF Core 8 and 9 bring Microsoft.Data.SqlClient 5.1, so a project that uses either references Microsoft.Data.SqlClient 6.1 or later directly, beside the EF Core packages.  The error has no file and line, because it is about the project's references, and it is reported once for the project, only while a query's output is `models` or `codegen` under the `mssql` dialect.
+Update the `Microsoft.Data.SqlClient` package to 6.1 or later.  When another package brings the older version, reference `Microsoft.Data.SqlClient` from the project itself, at the version you want.  EF Core 8 and 9 bring Microsoft.Data.SqlClient 5.1, so a project that uses either references Microsoft.Data.SqlClient 6.1 or later directly, beside the EF Core packages.  The error has no file and line, because it is about the project's references, and it is reported once for the project, only while a query's output is `models` or `codegen` under the `mssql` dialect.  A query with a `vector` column or parameter also gets [SQLSRC270](#sqlsrc270), at its name, and the same update clears both.
 
 See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)
 
@@ -2282,5 +2283,19 @@ The project does not reference Microsoft.Data.SqlClient, and a column or a param
 ```
 
 Reference the `Microsoft.Data.SqlClient` package from the project, at 6.1 or later.  Every other type that Microsoft.Data.SqlClient reads without another package has a C# type of .NET itself, and needs no reference.  The error is reported at the query's name, once for the query, and the query's constant or method is still generated.
+
+See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)
+
+## SQLSRC270
+
+**Type needs a newer Microsoft.Data.SqlClient**
+
+The project references a version of Microsoft.Data.SqlClient older than 6.1, and a column or a parameter of a query of the `mssql` dialect has a type whose C# type that version does not have: `vector`, which Microsoft.Data.SqlClient reads as `Microsoft.Data.SqlTypes.SqlVector<float>`, first in 6.1.  The message names the column or parameter, its type, the version its C# type needs and the version the project references.
+
+```console
+/work/App/Queries/Documents.sql(1,10): error SQLSRC270: The column 'embedding' has the type 'vector(3)', whose C# type needs Microsoft.Data.SqlClient 6.1 or later, and this project references Microsoft.Data.SqlClient 6.0.5.  Update the package.
+```
+
+Update the `Microsoft.Data.SqlClient` package to 6.1 or later, which also clears [SQLSRC267](#sqlsrc267), reported for the project beside it.  When another package brings the older version, as EF Core 8 and 9 do, reference `Microsoft.Data.SqlClient` from the project itself, at the version you want.  The error is reported at the query's name, once for the query; the query has no models until it is fixed, and its constant or method is still generated.
 
 See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)

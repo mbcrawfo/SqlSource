@@ -10,6 +10,7 @@ using SqlSource.Generation;
 using SqlSource.Generation.Types;
 using SqlSource.Parsing;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
 
@@ -64,7 +65,7 @@ public sealed class SqlClientProbeTests
             "6.0" => (
                 SqlClientReferences.SqlClient60,
                 new SqlClientProbe(true, false, false, "6.0.5"),
-                SqlClientColumn.SqlClient61
+                SqlClientColumn.OlderThan61
             ),
             "6.1" => (
                 SqlClientReferences.SqlClient61,
@@ -105,6 +106,37 @@ public sealed class SqlClientProbeTests
         DriverDiagnostics(oneFile).ShouldBe([Expected]);
         oneFile.SeverityOf("SQLSRC267").ShouldBe(DiagnosticSeverity.Error);
         DriverDiagnostics(twoFiles).ShouldBe([Expected]);
+    }
+
+    // A vector column below 6.1 has no C# type, so the query has no model and the project compiles beside its two
+    // errors: the project's, and the query's.  On 6.1 the same entry gives a model that compiles.
+    [Fact]
+    public void Run_VectorColumnBelowSqlClient61_IsSqlsrc270AndCompiles()
+    {
+        const string Expected =
+            "SQLSRC270 /app/Repo/Users.sql(1,10)-(1,17): The column 'embedding' has the type 'vector(3)', whose C# "
+            + "type needs Microsoft.Data.SqlClient 6.1 or later, and this project references Microsoft.Data.SqlClient "
+            + "6.0.5.  Update the package.";
+        var entry = TestSidecars.Entry(
+            "GetUser",
+            Sidecars.HashOf(Users, "GetUser", SqlDialect.SqlServer),
+            "mssql",
+            columns: [TestSidecars.Column(0, "embedding", TestSidecars.SqlServer("vector(3)", 20, 0))]
+        );
+        SqlFile[] files = [Users, Sidecars.Of(Users, entry)];
+
+        var older = Run(OutputKind.Models, [SqlClientReferences.SqlClient60], files);
+        var current = Run(OutputKind.Models, [SqlClientReferences.SqlClient61], files);
+
+        older
+            .Diagnostics.Where(diagnostic => diagnostic.StartsWith("SQLSRC270 ", StringComparison.Ordinal))
+            .ShouldBe([Expected]);
+        DriverDiagnostics(older).ShouldHaveSingleItem().ShouldStartWith("SQLSRC267 ");
+        older.CompilationErrors.ShouldBeEmpty();
+        older.GeneratedCodeWarnings.ShouldBeEmpty();
+        current.Diagnostics.ShouldBeEmpty();
+        current.CompilationErrors.ShouldBeEmpty();
+        current.GeneratedCodeWarnings.ShouldBeEmpty();
     }
 
     [Fact]
@@ -282,6 +314,21 @@ public sealed class SqlClientProbeTests
         bool atLeast7,
         bool expected
     ) => new SqlClientProbe(referenced, atLeast61, atLeast7, null).IsBelowTheFloor.ShouldBe(expected);
+
+    // The column is the newest version the project's driver has, by its flags.
+    [Theory]
+    [InlineData(false, false, false, nameof(SqlClientColumn.None))]
+    [InlineData(true, false, false, nameof(SqlClientColumn.OlderThan61))]
+    // SqlVector`1 found without SqlConnection chooses the column of 6.1, as SspiContextProvider without it chooses 7's.
+    [InlineData(false, true, false, nameof(SqlClientColumn.SqlClient61))]
+    [InlineData(true, true, false, nameof(SqlClientColumn.SqlClient61))]
+    [InlineData(true, true, true, nameof(SqlClientColumn.SqlClient7))]
+    public void Column_Flags_IsTheNewestVersionTheProjectHas(
+        bool referenced,
+        bool atLeast61,
+        bool atLeast7,
+        string expected
+    ) => new SqlClientProbe(referenced, atLeast61, atLeast7, null).Column.ToString().ShouldBe(expected);
 
     [Fact]
     public void Findings_ProbeBelowTheFloor_IsSqlsrc267WithTheVersion() =>

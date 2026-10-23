@@ -66,4 +66,10 @@ internal enum TypeMappingKind
     /// <c>geography</c> and <c>geometry</c>.  <see cref="TypeMapping.Detail" /> is that package's C# type for it.
     /// </summary>
     NeedsSqlServerTypes,
+
+    /// <summary>
+    /// The project references a SqlClient older than the first version that has the type's C# type, which is
+    /// <see cref="TypeMapping.Detail" />: <c>vector</c> below 6.1.
+    /// </summary>
+    NeedsNewerSqlClient,
 }

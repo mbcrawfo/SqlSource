@@ -33,6 +33,11 @@ public sealed class QueryTyperTests
 
     private static readonly SqlClientProbe SqlClient61 = new(true, true, false, "6.1.7");
 
+    private static readonly SqlClientProbe SqlClient60 = new(true, false, false, "6.0.5");
+
+    // A driver below 6.1 merged into an assembly of another name, whose version is unknown.
+    private static readonly SqlClientProbe MergedSqlClient60 = new(true, false, false, null);
+
     // The reader refuses an array without its element, which only a sidecar edited by hand has.  Such an array has no
     // key to write, so an entry of its own name does not map it: it gets the help to describe again.
     [Fact]
@@ -108,6 +113,41 @@ public sealed class QueryTyperTests
             .Columns.ShouldNotBeNull()
             .ShouldHaveSingleItem()
             .Text.ShouldBe("global::Microsoft.Data.SqlTypes.SqlVector<float>");
+    }
+
+    // vector's C# type is first in SqlClient 6.1, which an older one lacks: the error names both versions, for a
+    // column and for a parameter alike.
+    [Theory]
+    [InlineData(true, "column 'c0'")]
+    [InlineData(false, "parameter 'p0'")]
+    public void Type_VectorBelowSqlClient61_IsSqlsrc270(bool asColumn, string subject)
+    {
+        SidecarType[] vector = [TestSidecars.SqlServer("vector(3)", maxLength: 20, precision: 0)];
+        var entry = asColumn
+            ? Entry(SidecarValues.Engine.SqlServer, columns: vector)
+            : Entry(SidecarValues.Engine.SqlServer, parameters: vector);
+
+        var types = QueryTyper.Type(InputOf(SqlDialect.SqlServer, entry, SettingsLevel.None, SqlClient60));
+
+        types.Queries.ShouldBeEmpty();
+        var diagnostic = types.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.TypeNeedsNewerSqlClient);
+        diagnostic.Arguments.ShouldBe([subject, "vector(3)", "6.1", "6.0.5"]);
+    }
+
+    [Fact]
+    public void Type_VectorBelowSqlClient61OfAnUnknownVersion_SaysTheVersionIsUnknown()
+    {
+        var entry = Entry(
+            SidecarValues.Engine.SqlServer,
+            columns: [TestSidecars.SqlServer("vector(3)", maxLength: 20, precision: 0)]
+        );
+
+        var types = QueryTyper.Type(InputOf(SqlDialect.SqlServer, entry, SettingsLevel.None, MergedSqlClient60));
+
+        types
+            .Diagnostics.ShouldHaveSingleItem()
+            .Arguments.ShouldBe(["column 'c0'", "vector(3)", "6.1", "of an unknown version"]);
     }
 
     // The help of each SQL Server type that has no C# type: a sidecar edited by hand, or written by a newer tool, gets
