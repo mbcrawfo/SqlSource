@@ -144,26 +144,31 @@ public sealed class CheckTests : IDisposable
         Directory.GetFiles(Path.GetDirectoryName(_users)!, "*.tmp").ShouldBeEmpty();
     }
 
-    [Theory]
-    [InlineData("a merge conflict")]
-    [InlineData("a directory")]
-    public async Task Check_SidecarThatCannotBeRead_IsOneDifferenceAtTheSidecar(string kind)
+    private async Task ShouldBeOneDifferenceAtTheSidecarAsync()
     {
-        var written = Encoding.UTF8.GetString(await DescribeFirstAsync());
-        if (kind == "a directory")
-        {
-            File.Delete(Sidecar);
-            _ = Directory.CreateDirectory(Sidecar);
-        }
-        else
-        {
-            await File.WriteAllTextAsync(Sidecar, "<<<<<<< HEAD\n" + written, TestContext.Current.CancellationToken);
-        }
-
         var result = await _scene.DescribeAsync("--check");
 
         result.ExitCode.ShouldBe(2);
         result.Error.ShouldBe(Difference($"{Sidecar} ", _users, "the sidecar cannot be read"));
+    }
+
+    [Fact]
+    public async Task Check_SidecarWithAMergeConflict_IsOneDifferenceAtTheSidecar()
+    {
+        var written = Encoding.UTF8.GetString(await DescribeFirstAsync());
+        await File.WriteAllTextAsync(Sidecar, "<<<<<<< HEAD\n" + written, TestContext.Current.CancellationToken);
+
+        await ShouldBeOneDifferenceAtTheSidecarAsync();
+    }
+
+    [Fact]
+    public async Task Check_SidecarThatIsADirectory_IsOneDifferenceAtTheSidecar()
+    {
+        _ = await DescribeFirstAsync();
+        File.Delete(Sidecar);
+        _ = Directory.CreateDirectory(Sidecar);
+
+        await ShouldBeOneDifferenceAtTheSidecarAsync();
     }
 
     [Theory]

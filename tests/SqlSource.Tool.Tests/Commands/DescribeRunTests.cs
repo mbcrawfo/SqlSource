@@ -104,31 +104,30 @@ public sealed class DescribeRunTests : IDisposable
         result.ShouldBe(new CliResult(0, "postgres (postgres): 0 described, 2 skipped, 0 failed\n", ""));
     }
 
-    [Theory]
-    [InlineData("another tool version")]
-    [InlineData("a lower format version")]
-    [InlineData("not a sidecar")]
-    public async Task Run_SidecarThatIsNotThisTools_IsWrittenAgainWithEveryQueryDescribed(string kind)
+    private async Task ShouldBeWrittenAgainAsync(Func<string, Sidecar, string> replace)
     {
         _ = await _scene.DescribeAsync();
         var written = await File.ReadAllTextAsync(Sidecar, TestContext.Current.CancellationToken);
         var sidecar = SidecarFiles.Read(_users);
-        await File.WriteAllTextAsync(
-            Sidecar,
-            kind switch
-            {
-                "another tool version" => SidecarWriter.Write(sidecar with { ToolVersion = "0.0.1" }),
-                "a lower format version" => SidecarWriter.Write(sidecar with { FormatVersion = 0 }),
-                _ => "<<<<<<< HEAD\n" + written,
-            },
-            TestContext.Current.CancellationToken
-        );
+        await File.WriteAllTextAsync(Sidecar, replace(written, sidecar), TestContext.Current.CancellationToken);
 
         var result = await _scene.DescribeAsync();
 
         result.ShouldBe(new CliResult(0, "postgres (postgres): 2 described, 0 skipped, 0 failed\n", ""));
         (await File.ReadAllTextAsync(Sidecar, TestContext.Current.CancellationToken)).ShouldBe(written);
     }
+
+    [Fact]
+    public Task Run_SidecarOfAnotherToolVersion_IsWrittenAgainWithEveryQueryDescribed() =>
+        ShouldBeWrittenAgainAsync((_, sidecar) => SidecarWriter.Write(sidecar with { ToolVersion = "0.0.1" }));
+
+    [Fact]
+    public Task Run_SidecarOfALowerFormatVersion_IsWrittenAgainWithEveryQueryDescribed() =>
+        ShouldBeWrittenAgainAsync((_, sidecar) => SidecarWriter.Write(sidecar with { FormatVersion = 0 }));
+
+    [Fact]
+    public Task Run_SidecarWithAMergeConflict_IsWrittenAgainWithEveryQueryDescribed() =>
+        ShouldBeWrittenAgainAsync((written, _) => "<<<<<<< HEAD\n" + written);
 
     [Fact]
     public async Task Run_SidecarOfAHigherFormatVersion_IsSqlsrc221AndTheFileIsLeftAlone()

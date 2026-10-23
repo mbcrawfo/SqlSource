@@ -300,30 +300,35 @@ public sealed class NullabilityWalkSetOperationTests
     // On 18 the planner drops its own leaf scan when it adds nothing, and an input may be a user's subquery of that
     // name: CREATE VIEW v AS SELECT "*SELECT* 9".b, "*SELECT* 9".a FROM (SELECT p.sku AS a, NULLIF(p.name, 'x') AS b
     // FROM products p OFFSET 0) AS "*SELECT* 9"; SELECT b, a FROM v EXCEPT SELECT 'zz', 'zz', whose b is NULL.
-    [Theory]
-    [InlineData("Except")]
-    [InlineData("Intersect")]
-    public void Run_SubqueryScanOfTheLeafAliasAsAnInputOn18_IsNotMappedByPosition(string command)
+    private static void ShouldNotMapTheLeafAliasByPosition(string command, PlanNode other)
     {
         var user = Over("Subquery Scan", Scan("u", "u.name", "NULLIF(u.name, 'x'::text)"), "Subquery") with
         {
             Alias = "*SELECT* 9",
             Output = ["\"*SELECT* 9\".b", "\"*SELECT* 9\".a"],
         };
-        // EXCEPT 'zz', 'zz'; and INTERSECT a nullable column, since an input of constants would prove it.
-        var other =
-            command == "Except"
-                ? Scan("x", "'zz'::text", "'zz'::text") with
-                {
-                    NodeType = "Result",
-                    Alias = null,
-                    RelationName = null,
-                }
-                : Scan("o", "o.note", "o.note");
 
         AnswersOf(RunSet(Inputs18(command, user, other), TextOid, TextOid))
             .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
     }
+
+    // EXCEPT 'zz', 'zz'.
+    [Fact]
+    public void Run_SubqueryScanOfTheLeafAliasAsAnExceptInputOn18_IsNotMappedByPosition() =>
+        ShouldNotMapTheLeafAliasByPosition(
+            "Except",
+            Scan("x", "'zz'::text", "'zz'::text") with
+            {
+                NodeType = "Result",
+                Alias = null,
+                RelationName = null,
+            }
+        );
+
+    // INTERSECT a nullable column, since an input of constants would prove it.
+    [Fact]
+    public void Run_SubqueryScanOfTheLeafAliasAsAnIntersectInputOn18_IsNotMappedByPosition() =>
+        ShouldNotMapTheLeafAliasByPosition("Intersect", Scan("o", "o.note", "o.note"));
 
     // UNION on 14 is a HashAggregate over the Append, which prints a value the branch computed in parentheses and its
     // cast to the result's type; on 18 a Unique over a Sort.

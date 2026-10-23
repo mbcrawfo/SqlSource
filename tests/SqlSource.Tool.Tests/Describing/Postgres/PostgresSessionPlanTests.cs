@@ -197,21 +197,24 @@ public sealed class PostgresSessionPlanTests
         AnswersOf(description).ShouldBe([NullableOuterJoin, UnknownNoOrigin]);
     }
 
-    private static readonly Dictionary<string, (string? Plan, string? Error)> PlansThatCannotBeUsedRows = new(
-        StringComparer.Ordinal
-    )
+    // Each row with the relations its plan asks for: the one plan that is read asks for its relations before the walk
+    // finds it unusable.
+    private static readonly Dictionary<
+        string,
+        (string? Plan, string? Error, PostgresRelationName[]? Relations)
+    > PlansThatCannotBeUsedRows = new(StringComparer.Ordinal)
     {
         // The server gave no plan: the error is logged and never reported.
-        { "no-plan-and-an-error", (null, "canceling statement due to statement timeout") },
+        { "no-plan-and-an-error", (null, "canceling statement due to statement timeout", null) },
         // The text is no plan.
-        { "text-that-is-no-json", ("not json", null) },
-        { "empty-list", ("[]", null) },
+        { "text-that-is-no-json", ("not json", null, null) },
+        { "empty-list", ("[]", null, null) },
         // An answer that holds neither.
-        { "no-plan-and-no-error", (null, null) },
+        { "no-plan-and-no-error", (null, null, null) },
         // A plan that is read and cannot be used.
         {
             "plan-the-walk-cannot-use",
-            (Text(Join("Sideways", Scan("u"), Scan("o")) with { Output = ["u.id", "n"] }), null)
+            (Text(Join("Sideways", Scan("u"), Scan("o")) with { Output = ["u.id", "n"] }), null, JoinedRelations)
         },
     };
 
@@ -223,18 +226,13 @@ public sealed class PostgresSessionPlanTests
         string name
     )
     {
-        var (plan, error) = PlansThatCannotBeUsedRows[name];
+        var (plan, error, relations) = PlansThatCannotBeUsedRows[name];
         var answer = new PostgresExplainAnswer(
             plan,
             error is null ? null : new PostgresServerError("57014", error, null, null, null)
         );
 
-        // The one plan that is read asks for its relations before the walk finds it unusable.
-        var description = await DescribeUsersIdAsync(
-            GatedUsersId,
-            answer,
-            name == "plan-the-walk-cannot-use" ? JoinedRelations : null
-        );
+        var description = await DescribeUsersIdAsync(GatedUsersId, answer, relations);
 
         description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
         description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
