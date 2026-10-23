@@ -2,6 +2,9 @@
 # The check steps mirror pre-commit-validation.sh: a check added to one is added to the other in the same commit.
 # Every job starts at once and none needs another, so that the run takes as long as its slowest job and a failure in
 # one job hides nothing in the others.  A job pays for its own build, which is cheaper than waiting for a shared one.
+# The NuGet cache of each job is keyed on the lock files of what it restores, with dotnet-tools.json when it restores
+# the tools.  The first job to finish saves the cache under its key, so two jobs that restore different packages must
+# never share a key, or the cache could hold only the packages of the smaller job.
 name: Build
 
 on:
@@ -70,7 +73,9 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: '**/packages.lock.json'
+          cache-dependency-path: |
+            **/packages.lock.json
+            dotnet-tools.json
 
       - name: Restore tools
         run: dotnet tool restore
@@ -113,7 +118,9 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: '**/packages.lock.json'
+          cache-dependency-path: |
+            **/packages.lock.json
+            dotnet-tools.json
 
       - name: Restore tools
         run: dotnet tool restore
@@ -199,7 +206,7 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: '**/packages.lock.json'
+          cache-dependency-path: tests/SqlSource.Tests.Postgres/packages.lock.json
 
       - name: Build
         run: dotnet build "$PROJECT" --configuration "$CONFIGURATION"
@@ -234,7 +241,7 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: '**/packages.lock.json'
+          cache-dependency-path: tests/SqlSource.Tests.SqlServer/packages.lock.json
 
       - name: Build
         run: dotnet build "$PROJECT" --configuration "$CONFIGURATION"
@@ -266,7 +273,7 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: '**/packages.lock.json'
+          cache-dependency-path: src/*/packages.lock.json
 
       - name: Pack
         id: pack
