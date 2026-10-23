@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using SqlSource.Snapshot;
+using SqlSource.Testing;
 using SqlSource.Tool.Testing.Realistic;
 
 namespace SqlSource.Tests.SqlServer.Realistic;
@@ -11,7 +12,7 @@ internal static class RealisticCases
 {
     // SQL Server, whose recorded majors a checkedFrom names one of.
     public static RealisticEngine Engine { get; } =
-        new(SidecarValues.Engine.SqlServer, "SQL Server", SqlServerContainer.RecordedMajors);
+        new(SidecarValues.Engine.SqlServer, EngineImage.SqlServer.Product, EngineImage.SqlServer.RecordedMajors);
 
     // The name of every folder of Cases, in order: each is a case, and a folder that is no case fails when it is
     // read.  Listing them reads no case.json, so that a broken one fails its own case and not every one.

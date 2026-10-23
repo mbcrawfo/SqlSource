@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Testing;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
@@ -21,7 +22,7 @@ public sealed class RealisticNullabilityNoiseTests(SqlServerContainer sqlServer)
     public void Budgets_RecordedMajors_EachHoldOneAndNoOtherDoes() =>
         Budgets
             .Keys.Order()
-            .ShouldBe(SqlServerContainer.RecordedMajors.Order(), "a recorded major and a budget differ");
+            .ShouldBe(EngineImage.SqlServer.RecordedMajors.Order(), "a recorded major and a budget differ");
 
     // A count that differs from the budget lists the noisy columns, each as the safety tests name a column, to read
     // against the cases' truths; the cases that changed are in the diff of their sidecars too.

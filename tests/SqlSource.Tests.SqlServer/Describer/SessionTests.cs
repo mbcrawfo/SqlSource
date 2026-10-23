@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Testing;
 using SqlSource.Tool;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
@@ -26,7 +27,7 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
 
         var server = session.Server;
-        server.Version.ShouldBe(SqlServerContainer.ImageBuilds[SqlServerContainer.Image]);
+        server.Version.ShouldBe(SqlServerContainer.ImageBuilds[EngineImage.SqlServer.Image]);
         server.Driver.ShouldBe("Microsoft.Data.SqlClient");
         server.DriverVersion.ShouldNotBeNull().ShouldStartWith("7.1.1");
         server.Settings.ShouldBe([

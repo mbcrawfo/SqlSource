@@ -30,7 +30,7 @@ public sealed class PostgresContainerTests(PostgresContainer postgres)
         reader.GetBoolean(2).ShouldBeTrue();
         reader.GetBoolean(3).ShouldBeTrue();
         // "postgres:18.6" runs a server whose server_version is "18.6 (Debian 18.6-1.pgdg13+1)".
-        reader.GetString(1).Split(' ')[0].ShouldBe(PostgresContainer.TagOf(PostgresContainer.Image));
+        reader.GetString(1).Split(' ')[0].ShouldBe(EngineImage.TagOf(EngineImage.Postgres.Image));
     }
 
     [Fact]
@@ -84,25 +84,15 @@ public sealed class PostgresContainerTests(PostgresContainer postgres)
     // bare major moves to each new minor unseen; see tests/SqlSource.Tests.Postgres/README.md.
     [Fact]
     public void Image_OfTheRun_IsPinnedToAMajorAndAMinor() =>
-        PostgresContainer.TagOf(PostgresContainer.Image).ShouldMatch(@"^\d+\.\d+$");
+        EngineImage.TagOf(EngineImage.Postgres.Image).ShouldMatch(@"^\d+\.\d+$");
 
     [Fact]
     public void Image_OfTheRun_IsTheVariablesValueOrTheDefault()
     {
-        var named = Environment.GetEnvironmentVariable(PostgresContainer.ImageVariable);
+        var named = Environment.GetEnvironmentVariable(EngineImage.Postgres.Variable);
 
-        PostgresContainer.Image.ShouldBe(string.IsNullOrEmpty(named) ? DefaultImages.Postgres : named);
+        EngineImage.Postgres.Image.ShouldBe(string.IsNullOrEmpty(named) ? DefaultImages.Postgres : named);
     }
-
-    [Fact]
-    public void SkipBelow_ServerOfThatMajor_DoesNotSkip() =>
-        Should.NotThrow(() => PostgresContainer.SkipBelow(18, 18, "a reason"));
-
-    [Fact]
-    public void SkipBelow_ServerBeforeThatMajor_SkipsWithTheReason() =>
-        Should
-            .Throw<SkipException>(() => PostgresContainer.SkipBelow(17, 18, "a reason"))
-            .Message.ShouldEndWith("a reason");
 
     [Fact]
     public void SkipBelow_OfTheContainer_AsksTheServersMajor()
@@ -110,18 +100,6 @@ public sealed class PostgresContainerTests(PostgresContainer postgres)
         Should.NotThrow(() => postgres.SkipBelow(postgres.Major, "a reason"));
         _ = Should.Throw<SkipException>(() => postgres.SkipBelow(postgres.Major + 1, "a reason"));
     }
-
-    [Theory]
-    [InlineData(14)]
-    [InlineData(18)]
-    public void SkipUnlessRecordedMajor_RecordedMajor_DoesNotSkip(int server) =>
-        Should.NotThrow(() => PostgresContainer.SkipUnlessRecordedMajor(server, "The things"));
-
-    [Fact]
-    public void SkipUnlessRecordedMajor_OtherMajor_SkipsNamingTheRecordedOnes() =>
-        Should
-            .Throw<SkipException>(() => PostgresContainer.SkipUnlessRecordedMajor(16, "The things"))
-            .Message.ShouldEndWith("The things are pinned for PostgreSQL 14 and 18 alone.");
 
     private async Task<long> CountAsync(string database, string table)
     {
