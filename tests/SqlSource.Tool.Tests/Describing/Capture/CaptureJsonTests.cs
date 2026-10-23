@@ -48,6 +48,8 @@ public sealed class CaptureJsonTests
 
     private static readonly int[] Int4 = [23];
 
+    private static readonly string[] SplitValue = ["bad Host=db;Pass", "word=hunter22"];
+
     private static DescribeCapture TwoCalls()
     {
         var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
@@ -338,5 +340,51 @@ public sealed class CaptureJsonTests
 
         written.Value.ShouldBeNull();
         written.Failure.ShouldBe(Refused);
+    }
+
+    // An escaped line break is a backslash and an n in the file, which would put a letter before the password.
+    [Fact]
+    public void Write_PasswordRightAfterALineBreak_IsRefused()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=hunter22", ["hunter22"]);
+
+        var written = CaptureJson.Write(WithAnswer(new { Error = "failed\nhunter22" }), secret);
+
+        written.Value.ShouldBeNull();
+        written.Failure.ShouldBe(Refused);
+    }
+
+    [Fact]
+    public void Write_PasswordWithAQuote_IsRefused()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=hu\"nter22", ["hu\"nter22"]);
+
+        var written = CaptureJson.Write(WithAnswer(new { Error = "password hu\"nter22 is wrong" }), secret);
+
+        written.Value.ShouldBeNull();
+        written.Failure.ShouldBe(Refused);
+    }
+
+    [Fact]
+    public void Write_ValueSplitOverTwoStringsOfAnAnswer_IsRefused()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=hunter22");
+
+        var written = CaptureJson.Write(WithAnswer(new { Lines = SplitValue }), secret);
+
+        written.Value.ShouldBeNull();
+        written.Failure.ShouldBe(Refused);
+    }
+
+    // The names of the members are the records' own, so a password that equals one is no finding.
+    [Fact]
+    public void Write_PasswordThatEqualsAMemberNameAndStandsOnlyAsOne_IsTheFile()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=error", ["error"]);
+        var capture = WithAnswer(new { Error = (string?)null });
+
+        var written = CaptureJson.Write(capture, secret);
+
+        written.Value.ShouldBe(CaptureJson.Write(capture));
     }
 }

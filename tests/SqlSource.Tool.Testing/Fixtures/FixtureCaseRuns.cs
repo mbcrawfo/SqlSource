@@ -34,10 +34,12 @@ internal static class FixtureCaseRuns
     {
         if (IsRecording)
         {
+            // One describer for the recording, so that the secret is the one of the describer that was asked.
+            var recording = describer(fixture);
             var capture = new DescribeCapture(engine);
             var recorded = await FixtureReplay.DescribeThroughAsync(
                 fixture,
-                describer,
+                _ => recording,
                 connection,
                 new CapturingExchange(LiveExchange.Instance, capture)
             );
@@ -46,7 +48,7 @@ internal static class FixtureCaseRuns
                 fixture,
                 capture,
                 recorded,
-                SecretOf(fixture, describer(fixture), connection),
+                SecretOf(fixture, recording, connection),
                 TestContext.Current.CancellationToken
             );
             return;

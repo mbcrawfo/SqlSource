@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -134,30 +135,68 @@ internal static class CaptureJson
     /// <remarks>
     /// <para>
     /// A capture is a file that is committed or sent, and what a describer was answered goes into it as the server
-    /// said it, so a driver's message that quotes the connection string is in it.  The file is searched for each
-    /// whole form of the value (<see cref="ConnectionSecret.Wholes" />) anywhere, and for each part as a token
-    /// (<see cref="Redaction.HoldsToken" />), as <see cref="Options" />' encoder writes it inside a string: a value
-    /// with a quote or a backslash is in the file escaped, and a search for it as it is would not find it.
+    /// said it, so a driver's message that quotes the connection string is in it.  The search is in the strings of
+    /// each request and each answer as they are, decoded, and not in the file's text: a quote, a backslash or a line
+    /// break is escaped in the file, and a password after an escaped line break (<c>\nhunter22</c>) has the letter
+    /// <c>n</c> before it there and is no token.  The strings of one request or answer are searched as the strings of
+    /// a log event are (<see cref="JoinedRedaction" />): each alone and joined, so that a value split over two of them
+    /// is found.
     /// </para>
     /// <para>
-    /// The answer is a refusal and not a removal: a capture is replayed, and one with a mark in place of a word
-    /// would answer a request that its describer never asked.  The failure does not name what was found.
+    /// Only the values of strings are searched, and no name of a member: those are fixed by the records of the calls,
+    /// and a password that equals one, <c>answer</c> or <c>sql</c>, would refuse a capture that holds nothing.  The
+    /// answer is a refusal and not a removal: a capture is replayed, and one with a mark in place of a word would
+    /// answer a request that its describer never asked.  The failure does not name what was found.
     /// </para>
     /// </remarks>
-    public static Outcome<string, string> Write(DescribeCapture capture, ConnectionSecret secret)
-    {
-        var text = Write(capture);
-        return HoldsSecret(text, secret)
+    public static Outcome<string, string> Write(DescribeCapture capture, ConnectionSecret secret) =>
+        capture.Calls.Any(call => HoldsSecret(call.Request, secret) || HoldsSecret(call.Answer, secret))
             ? Outcome<string, string>.Failed("The capture holds the connection's value or a password of it.")
-            : Outcome<string, string>.Of(text);
+            : Outcome<string, string>.Of(Write(capture));
+
+    private static bool HoldsSecret(JsonElement element, ConnectionSecret secret)
+    {
+        List<string> values = [];
+        StringsOf(element, values);
+        return JoinedRedaction.Of(values, secret).Where((cleaned, i) => cleaned != values[i]).Any();
     }
 
-    private static bool HoldsSecret(string text, ConnectionSecret secret) =>
-        secret.Wholes.Any(whole => text.Contains(AsWritten(whole), StringComparison.Ordinal))
-        || secret.Parts.Any(part => Redaction.HoldsToken(text, AsWritten(part)));
+    // Every string value, depth first and in the order of the document; a name is not one.
+    private static void StringsOf(JsonElement element, List<string> values)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.String:
+                values.Add(element.GetString() ?? string.Empty);
+                break;
+            case JsonValueKind.Object:
+                foreach (var member in element.EnumerateObject())
+                {
+                    StringsOf(member.Value, values);
+                }
 
-    // The text between the quotes that the serializer puts round a string.
-    private static string AsWritten(string text) => JsonSerializer.Serialize(text, Options)[1..^1];
+                break;
+            case JsonValueKind.Array:
+                foreach (var item in element.EnumerateArray())
+                {
+                    StringsOf(item, values);
+                }
+
+                break;
+            case JsonValueKind.Undefined:
+                break;
+            case JsonValueKind.Number:
+                break;
+            case JsonValueKind.True:
+                break;
+            case JsonValueKind.False:
+                break;
+            case JsonValueKind.Null:
+                break;
+            default:
+                break;
+        }
+    }
 
     /// <summary>
     /// Reads the file of a capture, or says in a sentence why the text is none.  A <c>captureVersion</c> that
