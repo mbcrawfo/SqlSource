@@ -7,18 +7,18 @@ The GitHub Actions workflows of the repository.  [`CONTRIBUTING.md`](../../CONTR
 | Workflow | Runs on | Does |
 |----|----|----|
 | `ci.yml` | Pull requests to `main`, pushes to `main` | Calls `build.yml` and ends with the `ci` job |
-| `build.yml` | Called by `ci.yml` and `publish.yml` | Every check in `pre-commit-validation.sh`, a `Release` build, the tests with coverage, the two PostgreSQL projects and the two SQL Server projects on their default images among them, the tests of `tests/SqlSource.Tests.Postgres` alone again on PostgreSQL 14 and of `tests/SqlSource.Tests.SqlServer` alone again on SQL Server 2017, `dotnet pack`, and the three package checks |
+| `build.yml` | Called by `ci.yml` and `publish.yml` | Seven jobs that start at once and need none of the others: `Lint`, the Docker-only checks; two halves of `format.sh --check`, `style` with `csharpier` and `analyzers`; a `Release` build and the tests with coverage, the two PostgreSQL projects and the two SQL Server projects on their default images among them; the tests of `tests/SqlSource.Tests.Postgres` alone again on PostgreSQL 14, and of `tests/SqlSource.Tests.SqlServer` alone again on SQL Server 2017, one job each; and `dotnet pack` of the two packages with the three package checks |
 | `publish.yml` | `v*` tags, manual runs on `main` | Calls `build.yml`, pushes the two packages to nuget.org, and creates a GitHub release for a tag |
 | `coverage-comment.yml` | A successful `ci.yml` run for a pull request | Posts the coverage report as a comment on the pull request, or updates the comment it posted before |
 | `nightly.yml` | Every night, manual runs, pull requests that change the file | Restores, builds in `Release` and runs the tests of every project but `tests/SqlSource.Tests.Postgres`, `tests/SqlSource.Tests.Postgres.Npgsql8`, `tests/SqlSource.Tests.SqlServer` and `tests/SqlSource.Tests.SqlServer.SqlClient61` on `windows-latest` and `macos-latest` |
 
 ## The test images
 
-The `build` job of `build.yml` names its two floor images once, as `POSTGRES_FLOOR_IMAGE` and `SQLSERVER_FLOOR_IMAGE` of the job's `env`.  The step "Pull test images" runs `tools/pull-test-images.sh` on them before the first step that runs a test: it pulls them and the default image of each engine, and the log shows the seconds of each pull, so that the time of a pull is apart from the time of a test.  "Test on PostgreSQL 14" and "Test on SQL Server 2017" start the tests of one project on a floor image.
+Each floor job of `build.yml` names its floor image once, as `POSTGRES_FLOOR_IMAGE` or `SQLSERVER_FLOOR_IMAGE` of the job's `env`, pulls it in a step of its own, "Pull test image", and runs the tests of one project on it.  The `build` job's step "Pull test images" runs `tools/pull-test-images.sh` after the build and before the first step that runs a test: it pulls the default image of each engine, and the log shows the seconds of each pull, so that the time of a pull is apart from the time of a test.  The pull does not run in the background during the build: tried that way, it saved no time, because it slowed the build by about as long as it took.
 
 ## Artifacts
 
-Each run of `build.yml` uploads two artifacts: `packages`, the two `.nupkg` files, and `coverage`, the HTML, Cobertura and markdown reports.  The test results and the coverage summary are also in the run's job summary.
+Each run of `build.yml` uploads two artifacts: `packages`, the two `.nupkg` files, from the `package` job, and `coverage`, from the `build` job, the HTML, Cobertura and markdown reports.  The test results and the coverage summary are also in the run's job summary.
 
 ## Continuous integration
 

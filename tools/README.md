@@ -55,7 +55,7 @@ Last, it runs `sqlsource --version` again with `DOTNET_ROLL_FORWARD` set to `Lat
 
 ## Pulling the test images
 
-`tools/pull-test-images.sh [image ...]` is a step of `build.yml` and no check, and `pre-commit-validation.sh` does not run it.  It runs `docker pull` once for the default image of each engine, which it reads from the lines of `tests/SqlSource.Testing/DefaultImages.cs` that declare `Postgres` and `SqlServer`, and once for each image given as an argument, and prints `<image>: <n> s` for each.  The workflow gives it the two floor images.  A person can run it to have every image before a first run of the tests, which on Apple silicon saves minutes of the first test.
+`tools/pull-test-images.sh [image ...]` is a step of `build.yml` and no check, and `pre-commit-validation.sh` does not run it.  It runs `docker pull` once for the default image of each engine, which it reads from the lines of `tests/SqlSource.Testing/DefaultImages.cs` that declare `Postgres` and `SqlServer`, and once for each image given as an argument, and prints `<image>: <n> s` for each.  The `build` job of the workflow runs it with no argument, after its build; each floor job pulls its own floor image with `docker pull`.  A person can run it to have every image before a first run of the tests, which on Apple silicon saves minutes of the first test.
 
 ## Recording scripts
 
