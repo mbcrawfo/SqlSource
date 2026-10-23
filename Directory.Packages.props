@@ -37,7 +37,9 @@
         <!--
             The driver of the PostgreSQL describer.  The tool's driver is its own: the floor of the Npgsql that a
             consumer's project may use is decided with the generated code, not here.
-            examples/PostgresExamples/README.md lists this version.
+            examples/PostgresExamples/README.md lists this version.  The event ids that NpgsqlRunLogger forwards to
+            the run's log were read from this version's source, and NpgsqlRunLoggerTests fails on another until they
+            are read again.
         -->
         <PackageVersion Include="Npgsql" Version="10.0.3" />
         <PackageVersion Include="NSubstitute" Version="6.2.0" />

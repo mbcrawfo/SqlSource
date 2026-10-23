@@ -1,8 +1,8 @@
-using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tests.SqlServer.Describer;
@@ -13,35 +13,35 @@ namespace SqlSource.Tests.SqlServer.Describer;
 [Collection(UsesSqlServer.Name)]
 public sealed class SafetyTests(SqlServerContainer sqlServer)
 {
-    // How long the call of the text that waits 30 seconds may take: far less than its delay, and generous enough for a
-    // server under emulation.
-    private static readonly TimeSpan AtOnce = TimeSpan.FromSeconds(10);
-
     [Theory]
     [InlineData("SELECT 1 AS a; DROP TABLE dbo.victim")]
     [InlineData("DROP TABLE dbo.victim; SELECT 1 AS a")]
     public async Task ColumnsAsync_TextThatDropsATable_DescribesItAndRunsNothing(string sql)
     {
-        var (answer, _) = await ColumnsAsync(sql);
+        var answer = await ColumnsAsync(sql);
 
         VisibleNames(answer).ShouldBe(["a"]);
         await ShouldStandAsync();
     }
 
-    // The server does not wait: TimeProvider.System, since the time the call takes on the machine is what is tested.
+    // The server does not wait.  Had it run the wait of a day, SqlClient's command timeout would have ended the call
+    // with an error and no rows, or the test's patience would have ended the test.
     [Fact]
-    public async Task ColumnsAsync_TextThatWaits_AnswersAtOnce()
+    public async Task ColumnsAsync_TextThatWaits_DescribesItAndWaitsForNothing()
     {
-        var (answer, elapsed) = await ColumnsAsync("WAITFOR DELAY '00:00:30'; SELECT 1 AS a");
+        var answer = await Eventually.WithinAsync(
+            ColumnsAsync("WAITFOR DELAY '23:59:59'; SELECT 1 AS a"),
+            "The call of a text that waits did not answer."
+        );
 
+        answer.Error.ShouldBeNull();
         VisibleNames(answer).ShouldBe(["a"]);
-        elapsed.ShouldBeLessThan(AtOnce);
     }
 
     [Fact]
     public async Task ColumnsAsync_TextThatShutsTheServerDown_HasNoRowsAndTheServerAnswers()
     {
-        var (answer, _) = await ColumnsAsync("SHUTDOWN WITH NOWAIT");
+        var answer = await ColumnsAsync("SHUTDOWN WITH NOWAIT");
 
         answer.Error.ShouldBeNull(
             string.Join("; ", answer.Error?.Errors.Select(error => $"Msg {error.Number}: {error.Message}") ?? [])
@@ -54,18 +54,13 @@ public sealed class SafetyTests(SqlServerContainer sqlServer)
         await ShouldStandAsync();
     }
 
-    // The answer of "columns" for the SQL, with no declarations, and how long the call alone took.
-    private async Task<(SqlServerColumnsAnswer Answer, TimeSpan Elapsed)> ColumnsAsync(string sql)
+    // The answer of "columns" for the SQL, with no declarations.
+    private async Task<SqlServerColumnsAnswer> ColumnsAsync(string sql)
     {
         await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
         var live = new SqlServerLive(session.Connection);
 
-        var started = TimeProvider.System.GetTimestamp();
-        var answer = await live.ColumnsAsync(
-            new SqlServerColumnsRequest(sql, null),
-            TestContext.Current.CancellationToken
-        );
-        return (answer, TimeProvider.System.GetElapsedTime(started));
+        return await live.ColumnsAsync(new SqlServerColumnsRequest(sql, null), TestContext.Current.CancellationToken);
     }
 
     // The names of the answer's visible columns, which must be there.

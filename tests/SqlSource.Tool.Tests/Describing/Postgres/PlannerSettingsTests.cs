@@ -44,5 +44,5 @@ public sealed class PlannerSettingsTests
         Should.Throw<ArgumentException>(() => PlannerSettings.Checked(["enable_nestloop=off", "work_mem=1"]));
 
     [Fact]
-    public void None_IsEmpty() => PlannerSettings.None.ShouldBeEmpty();
+    public void None_OfThePlannerSettings_IsEmpty() => PlannerSettings.None.ShouldBeEmpty();
 }

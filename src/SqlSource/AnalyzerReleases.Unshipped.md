@@ -107,3 +107,4 @@ SQLSRC266 | SqlSource | Error | Column has no name
 SQLSRC267 | SqlSource | Error | Microsoft.Data.SqlClient is older than 6.1
 SQLSRC268 | SqlSource | Info | Microsoft.Data.SqlClient is newer than SqlSource knows
 SQLSRC269 | SqlSource | Error | Type needs Microsoft.Data.SqlClient
+SQLSRC270 | SqlSource | Error | Type needs a newer Microsoft.Data.SqlClient

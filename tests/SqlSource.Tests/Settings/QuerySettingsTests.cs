@@ -60,7 +60,7 @@ public sealed class QuerySettingsTests
     }
 
     [Fact]
-    public void None_IsEqualToALevelThatSetsNothing() => new SettingsLevel().ShouldBe(SettingsLevel.None);
+    public void None_ComparedWithAnEmptyLevel_IsEqual() => new SettingsLevel().ShouldBe(SettingsLevel.None);
 
     [Fact]
     public void Resolve_Output_IsCodeGenUnlessALevelSaysOtherwise()
@@ -80,7 +80,7 @@ public sealed class QuerySettingsTests
     }
 
     [Fact]
-    public void Over_MembersAreTakenOneByOne()
+    public void Over_LevelsThatSetDifferentMembers_TakesMembersOneByOne()
     {
         var query = new SettingsLevel { Output = OutputKind.Sql };
         var preamble = new SettingsLevel { Output = OutputKind.Models, Database = "billing" };

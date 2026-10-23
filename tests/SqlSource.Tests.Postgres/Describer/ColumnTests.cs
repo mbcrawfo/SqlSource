@@ -127,7 +127,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
     // A domain named numeric in public, first on the search_path of the describe's connection, hides pg_catalog's
     // numeric.  A column of pg_catalog's numeric(10,2) is still numeric(10,2), with the facets of its modifier: the
-    // tool takes the server's spelling of a type of pg_catalog as it is, and puts no schema before it.  A parameter
+    // server spells a built-in type with a modifier without its schema, and the tool puts none before it.  A parameter
     // of pg_catalog's numeric binds by numeric, which does not depend on the session: it is returned as a column, so
     // a check that bound the domain, sent as text, would see a column of text.
     [Fact]
@@ -159,6 +159,50 @@ public sealed class ColumnTests(PostgresContainer postgres)
             await using var drop = own.CreateCommand("DROP DOMAIN IF EXISTS public.\"numeric\"");
             _ = await drop.ExecuteNonQueryAsync(token);
         }
+    }
+
+    // A domain of the same name, first on the search_path, makes format_type(oid, -1) write a type of pg_catalog
+    // with its schema: pg_catalog.text, pg_catalog."char".  The name is the one it has in any other session, quotes
+    // kept, and an array is its element's.  json is qualified so below 17 alone, which special-cases it.  The domains
+    // named text, oid and int4 would take the casts of the describer's own SQL, and the column of a table makes it
+    // ask tables and spellings too; HiddenTypesCallTests asks every catalog call so.
+    [Fact]
+    public async Task DescribeAsync_BuiltInTypesHiddenOnTheSearchPath_AreNamedAsInAnySession()
+    {
+        await postgres.ExecuteAsync(ScratchSchema.HidingTypes);
+
+        var description = await Sessions.ShouldDescribeAsync(
+            $"{postgres.ConnectionString};{ScratchSchema.HidingTypesPath}",
+            DescribeRequests.Of(
+                """
+                SELECT NULL::pg_catalog.text AS t, NULL::pg_catalog.jsonb AS j, NULL::pg_catalog.json AS js,
+                    NULL::pg_catalog.uuid AS u, NULL::pg_catalog.bpchar AS b, NULL::pg_catalog."char" AS c,
+                    NULL::pg_catalog."bit" AS bt, NULL::pg_catalog.text[] AS a, s.code, @p AS p
+                FROM public.samples AS s
+                """,
+                ("p", "pg_catalog.text")
+            )
+        );
+
+        var columns = description.Columns.ShouldNotBeNull();
+        TypeNamesOf(columns)
+            .ShouldBe([
+                "text",
+                "jsonb",
+                "json",
+                "uuid",
+                "bpchar",
+                "\"char\"",
+                "\"bit\"",
+                "text[]",
+                "character(2)",
+                "text",
+            ]);
+        columns[7].Type.ShouldBeOfType<PostgresType>().Element.ShouldNotBeNull().Name.ShouldBe("text");
+        description
+            .Parameters.ShouldHaveSingleItem()
+            .Type.ShouldNotBeNull()
+            .ShouldSatisfyAllConditions(type => type.Name.ShouldBe("text"), type => type.BindName.ShouldBe("text"));
     }
 
     [Fact]

@@ -6,11 +6,11 @@ namespace SqlSource.Tests;
 public sealed class PackageVersionTests
 {
     [Fact]
-    public void Prefix_IsThreeNumbers() => PackageVersion.Prefix.ShouldMatch(@"^[0-9]+\.[0-9]+\.[0-9]+$");
+    public void Prefix_OfThePackage_IsThreeNumbers() => PackageVersion.Prefix.ShouldMatch(@"^[0-9]+\.[0-9]+\.[0-9]+$");
 
     // The assembly's version is VersionPrefix and the run number, so no suffix can reach the value.
     [Fact]
-    public void Prefix_IsTheStartOfTheAssemblysVersion() =>
+    public void Prefix_OfThePackage_IsTheStartOfTheAssemblysVersion() =>
         typeof(SqlSourceGenerator)
             .Assembly.GetName()
             .Version.ShouldNotBeNull()

@@ -1,8 +1,9 @@
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Testing;
 using Xunit;
-using static SqlSource.Tool.Tests.PostgresEventCases;
+using static SqlSource.Tool.Testing.RecordingLog;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 

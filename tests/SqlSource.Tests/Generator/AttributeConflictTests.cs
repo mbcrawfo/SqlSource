@@ -19,8 +19,6 @@ public sealed class AttributeConflictTests
     private const string InternalsVisible =
         "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"TestAssembly\")]\n";
 
-    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
-
     [Theory]
     [InlineData("using SqlSource;\n[SqlSourceGenerate]\ninternal partial class Sample { }", "(2,2)-(2,19)")]
     [InlineData("using SqlSource;\n[SqlSourceGenerateAttribute]\ninternal partial class Sample { }", "(2,2)-(2,28)")]
@@ -35,11 +33,16 @@ public sealed class AttributeConflictTests
         var compilerAlone = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
             source,
-            [Users],
+            [GeneratorHarness.UsersFile],
             [Other(OutputKind.Sql)],
             packageAnalyzers: false
         );
-        var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, source, [Users], [Other(OutputKind.Sql)]);
+        var build = await GeneratorHarness.BuildAsync(
+            OutputKind.Sql,
+            source,
+            [GeneratorHarness.UsersFile],
+            [Other(OutputKind.Sql)]
+        );
 
         Places(compilerAlone).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}{span}"]);
         build.ShouldBeEmpty();
@@ -57,11 +60,16 @@ public sealed class AttributeConflictTests
         var compilerAlone = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
             Source,
-            [Users],
+            [GeneratorHarness.UsersFile],
             [Other(OutputKind.Sql)],
             packageAnalyzers: false
         );
-        var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, Source, [Users], [Other(OutputKind.Sql)]);
+        var build = await GeneratorHarness.BuildAsync(
+            OutputKind.Sql,
+            Source,
+            [GeneratorHarness.UsersFile],
+            [Other(OutputKind.Sql)]
+        );
 
         Places(compilerAlone)
             .ShouldBe([
@@ -83,11 +91,16 @@ public sealed class AttributeConflictTests
         var compilerAlone = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
             Source,
-            [Users],
+            [GeneratorHarness.UsersFile],
             [Other(OutputKind.Sql)],
             packageAnalyzers: false
         );
-        var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, Source, [Users], [Other(OutputKind.Sql)]);
+        var build = await GeneratorHarness.BuildAsync(
+            OutputKind.Sql,
+            Source,
+            [GeneratorHarness.UsersFile],
+            [Other(OutputKind.Sql)]
+        );
 
         Places(compilerAlone)
             .ShouldBe([
@@ -112,11 +125,16 @@ public sealed class AttributeConflictTests
         var compilerAlone = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
             Source,
-            [Users],
+            [GeneratorHarness.UsersFile],
             [Other(OutputKind.Sql)],
             packageAnalyzers: false
         );
-        var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, Source, [Users], [Other(OutputKind.Sql)]);
+        var build = await GeneratorHarness.BuildAsync(
+            OutputKind.Sql,
+            Source,
+            [GeneratorHarness.UsersFile],
+            [Other(OutputKind.Sql)]
+        );
 
         Places(compilerAlone)
             .ShouldBe([
@@ -137,7 +155,7 @@ public sealed class AttributeConflictTests
         var compilerAlone = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
             Source,
-            [Users],
+            [GeneratorHarness.UsersFile],
             [Other(OutputKind.Sql)],
             warningsAsErrors: true,
             packageAnalyzers: false
@@ -145,7 +163,7 @@ public sealed class AttributeConflictTests
         var build = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
             Source,
-            [Users],
+            [GeneratorHarness.UsersFile],
             [Other(OutputKind.Sql)],
             warningsAsErrors: true
         );
@@ -165,11 +183,16 @@ public sealed class AttributeConflictTests
         var compilerAlone = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
             source,
-            [Users],
+            [GeneratorHarness.UsersFile],
             [Other(OutputKind.Sql)],
             packageAnalyzers: false
         );
-        var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, source, [Users], [Other(OutputKind.Sql)]);
+        var build = await GeneratorHarness.BuildAsync(
+            OutputKind.Sql,
+            source,
+            [GeneratorHarness.UsersFile],
+            [Other(OutputKind.Sql)]
+        );
 
         Places(compilerAlone).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)", error], true);
         Places(build).ShouldBe([error]);

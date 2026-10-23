@@ -15,8 +15,6 @@ public sealed class TypeDiagnosticsTests
 {
     private const string AttributeOnly = "SqlSourceGenerateAttribute.g.cs";
 
-    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
-
     [Fact]
     public void Run_TypeThatIsNotPartial_IsAnErrorAtItsName()
     {
@@ -28,7 +26,7 @@ public sealed class TypeDiagnosticsTests
             [SqlSourceGenerate]
             public class Sample { }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBe([
@@ -59,7 +57,7 @@ public sealed class TypeDiagnosticsTests
                 }
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBe([
@@ -82,7 +80,7 @@ public sealed class TypeDiagnosticsTests
             [SqlSourceGenerate]
             file partial class Sample { }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBe([
@@ -107,7 +105,7 @@ public sealed class TypeDiagnosticsTests
                 public partial class Sample { }
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBe([
@@ -135,7 +133,7 @@ public sealed class TypeDiagnosticsTests
                     """
                 ),
             ],
-            [Users],
+            [GeneratorHarness.UsersFile],
             supportedFramework: false
         );
 
@@ -178,7 +176,7 @@ public sealed class TypeDiagnosticsTests
                     """
                 ),
             ],
-            [Users],
+            [GeneratorHarness.UsersFile],
             languageVersion: languageVersion
         );
 
@@ -212,7 +210,7 @@ public sealed class TypeDiagnosticsTests
                     """
                 ),
             ],
-            [Users],
+            [GeneratorHarness.UsersFile],
             supportedFramework: false,
             languageVersion: LanguageVersion.CSharp7_3
         );
@@ -240,7 +238,7 @@ public sealed class TypeDiagnosticsTests
             [SqlSourceGenerate(Path = "{{path}}")]
             public partial class Sample { }
             """,
-            Users,
+            GeneratorHarness.UsersFile,
             new SqlFile("/app/Repo/Sub/Deeper/Orders.sql", "SELECT 2;\n")
         );
 
@@ -290,7 +288,7 @@ public sealed class TypeDiagnosticsTests
             [SqlSourceGenerate(SqlLocation = {{location}})]
             public partial class Sample { }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBe([
@@ -319,7 +317,7 @@ public sealed class TypeDiagnosticsTests
                 {{member}}
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBe([
@@ -348,7 +346,7 @@ public sealed class TypeDiagnosticsTests
             [SqlSourceGenerate]
             {{declaration}} { }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBe([
@@ -371,7 +369,7 @@ public sealed class TypeDiagnosticsTests
             public static partial class Sql { }
             public static class Consumer { public const string Value = Sql.GetUser; }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -392,7 +390,7 @@ public sealed class TypeDiagnosticsTests
                 public static string Sql => GetUser;
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -423,7 +421,7 @@ public sealed class TypeDiagnosticsTests
                 SqlLocation = (SqlLocation)94)]
             public partial class Sample;
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.Select(static diagnostic =>
@@ -457,7 +455,7 @@ public sealed class TypeDiagnosticsTests
                 public int Sql;
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         // A location that is not valid is read as Nested, so the member named Sql is a problem too.
@@ -503,7 +501,7 @@ public sealed class TypeDiagnosticsTests
             [SqlSourceGenerate]
             public enum Kind { None }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBeEmpty();

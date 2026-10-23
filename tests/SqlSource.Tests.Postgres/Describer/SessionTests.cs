@@ -102,7 +102,7 @@ public sealed class SessionTests(PostgresContainer postgres)
         var failure = await ShouldNotOpenAsync(connection.ConnectionString);
 
         failure.ServerLines.ShouldBe([PostgresConnection.UnreadableFile]);
-        Sessions.TextsOf(failure).ShouldAllBe(text => !text.Contains(path, StringComparison.Ordinal));
+        Failures.TextsOf(failure).ShouldAllBe(text => !text.Contains(path, StringComparison.Ordinal));
     }
 
     // The exchange asks the server, so that the session's connection is open, and then fails.  The caller of the
@@ -116,9 +116,13 @@ public sealed class SessionTests(PostgresContainer postgres)
         var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString) { ApplicationName = application };
         var thrown = new InvalidOperationException("the exchange failed after the server answered");
         await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
-        var exchange = new ThrowsAfterTheServerAnswered(
-            thrown,
-            async () => await BackendsOfAsync(own, application, token)
+        var backendsWhileOpen = -1L;
+        var exchange = new HookedExchange(
+            after: async (_, _, _) =>
+            {
+                backendsWhileOpen = await BackendsOfAsync(own, application, token);
+                throw thrown;
+            }
         );
 
         var caught = await Should.ThrowAsync<InvalidOperationException>(
@@ -126,10 +130,7 @@ public sealed class SessionTests(PostgresContainer postgres)
         );
 
         caught.ShouldBeSameAs(thrown);
-        exchange.BackendsWhileOpen.ShouldBe(
-            1,
-            "the session did not connect, so the count of none below proves nothing"
-        );
+        backendsWhileOpen.ShouldBe(1, "the session did not connect, so the count of none below proves nothing");
         await Eventually.TrueAsync(
             async () => await BackendsOfAsync(own, application, token) == 0,
             "the failed session left its connection open"
@@ -183,8 +184,8 @@ public sealed class SessionTests(PostgresContainer postgres)
     public async Task DescribeAsync_ServerEndsTheSessionBetweenPrepareAndColumns_IsSqlsrc225AndNoThrow()
     {
         PostgresSession? ending = null;
-        var exchange = new AfterLiveExchange(
-            async (method, _, _) =>
+        var exchange = new HookedExchange(
+            after: async (method, _, _) =>
             {
                 if (method == "prepare" && ending is { } open)
                 {
@@ -214,8 +215,8 @@ public sealed class SessionTests(PostgresContainer postgres)
         try
         {
             var dropped = false;
-            var exchange = new AfterLiveExchange(
-                async (method, _, _) =>
+            var exchange = new HookedExchange(
+                after: async (method, _, _) =>
                 {
                     if (method == "columns" && !dropped)
                     {
@@ -265,8 +266,8 @@ public sealed class SessionTests(PostgresContainer postgres)
         PostgresSession? reading = null;
         PostgresPrepareRequest? sent = null;
         string? listed = null;
-        var exchange = new AfterLiveExchange(
-            async (method, request, token) =>
+        var exchange = new HookedExchange(
+            after: async (method, request, token) =>
             {
                 if (request is PostgresPrepareRequest prepare && reading is { } open)
                 {
@@ -302,50 +303,13 @@ public sealed class SessionTests(PostgresContainer postgres)
         return failure;
     }
 
-    // Asks the server, and then runs the test's hook with the call's method and request.  The hook also runs after
-    // "open", before the test holds its session, so a hook that needs the session acts only once it is set.
-    private sealed class AfterLiveExchange(Func<string, object?, CancellationToken, Task> after) : IDescribeExchange
-    {
-        public async Task<TAnswer> AskAsync<TRequest, TAnswer>(
-            string method,
-            TRequest request,
-            Func<TRequest, CancellationToken, Task<TAnswer>> live,
-            CancellationToken cancellationToken
-        )
-        {
-            var answer = await LiveExchange.Instance.AskAsync(method, request, live, cancellationToken);
-            await after(method, request, cancellationToken);
-            return answer;
-        }
-    }
-
-    // Asks the server, counts the backends of the test's application name while the connection is open, and then
-    // throws what it was given.
-    private sealed class ThrowsAfterTheServerAnswered(Exception exception, Func<Task<long>> countBackends)
-        : IDescribeExchange
-    {
-        public long BackendsWhileOpen { get; private set; } = -1;
-
-        public async Task<TAnswer> AskAsync<TRequest, TAnswer>(
-            string method,
-            TRequest request,
-            Func<TRequest, CancellationToken, Task<TAnswer>> live,
-            CancellationToken cancellationToken
-        )
-        {
-            _ = await live(request, cancellationToken);
-            BackendsWhileOpen = await countBackends();
-            throw exception;
-        }
-    }
-
     // No text of the failure holds any of the words: a host, a user or a database's own name.
     private static void ShouldNotName(DescribeFailure failure, params string?[] words)
     {
         foreach (var word in words)
         {
             var named = word.ShouldNotBeNull();
-            Sessions.TextsOf(failure).ShouldAllBe(text => !text.Contains(named, StringComparison.Ordinal));
+            Failures.TextsOf(failure).ShouldAllBe(text => !text.Contains(named, StringComparison.Ordinal));
         }
     }
 
@@ -359,7 +323,7 @@ public sealed class SessionTests(PostgresContainer postgres)
         failure.Descriptor.Id.ShouldBe("SQLSRC224");
         failure.Arguments.ShouldBe([PostgresContainer.Database]);
         failure.Step.ShouldBeNull();
-        Sessions
+        Failures
             .TextsOf(failure)
             .ShouldAllBe(text =>
                 !text.Contains(connection, StringComparison.Ordinal)

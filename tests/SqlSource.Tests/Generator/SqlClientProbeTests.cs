@@ -10,6 +10,7 @@ using SqlSource.Generation;
 using SqlSource.Generation.Types;
 using SqlSource.Parsing;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
 
@@ -29,17 +30,19 @@ public sealed class SqlClientProbeTests
         public partial class Sample;
         """;
 
-    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
-
     private static readonly SqlFile Orders = new("/app/Repo/Orders.sql", "-- name: GetOrder\nSELECT 2;\n");
 
-    private static readonly SqlFile[] UsersWithSidecar = [Users, CurrentSidecar(Users, "GetUser")];
+    private static readonly SqlFile[] UsersWithSidecar =
+    [
+        GeneratorHarness.UsersFile,
+        CurrentSidecar(GeneratorHarness.UsersFile, "GetUser"),
+    ];
 
     // Users as the postgres engine reads it, with the sidecar of its entry.
     private static readonly SqlFile[] PostgresUsers =
     [
-        Users,
-        Sidecars.Current(Users, SqlDialect.PostgreSql, "GetUser"),
+        GeneratorHarness.UsersFile,
+        Sidecars.Current(GeneratorHarness.UsersFile, SqlDialect.PostgreSql, "GetUser"),
     ];
 
     private static readonly SqlFile[] BothWithSidecars =
@@ -62,7 +65,7 @@ public sealed class SqlClientProbeTests
             "6.0" => (
                 SqlClientReferences.SqlClient60,
                 new SqlClientProbe(true, false, false, "6.0.5"),
-                SqlClientColumn.SqlClient61
+                SqlClientColumn.OlderThan61
             ),
             "6.1" => (
                 SqlClientReferences.SqlClient61,
@@ -105,6 +108,37 @@ public sealed class SqlClientProbeTests
         DriverDiagnostics(twoFiles).ShouldBe([Expected]);
     }
 
+    // A vector column below 6.1 has no C# type, so the query has no model and the project compiles beside its two
+    // errors: the project's, and the query's.  On 6.1 the same entry gives a model that compiles.
+    [Fact]
+    public void Run_VectorColumnBelowSqlClient61_IsSqlsrc270AndCompiles()
+    {
+        const string Expected =
+            "SQLSRC270 /app/Repo/Users.sql(1,10)-(1,17): The column 'embedding' has the type 'vector(3)', whose C# "
+            + "type needs Microsoft.Data.SqlClient 6.1 or later, and this project references Microsoft.Data.SqlClient "
+            + "6.0.5.  Update the package.";
+        var entry = TestSidecars.Entry(
+            "GetUser",
+            Sidecars.HashOf(GeneratorHarness.UsersFile, "GetUser", SqlDialect.SqlServer),
+            "mssql",
+            columns: [TestSidecars.Column(0, "embedding", TestSidecars.SqlServer("vector(3)", 20, 0))]
+        );
+        SqlFile[] files = [GeneratorHarness.UsersFile, Sidecars.Of(GeneratorHarness.UsersFile, entry)];
+
+        var older = Run(OutputKind.Models, [SqlClientReferences.SqlClient60], files);
+        var current = Run(OutputKind.Models, [SqlClientReferences.SqlClient61], files);
+
+        older
+            .Diagnostics.Where(diagnostic => diagnostic.StartsWith("SQLSRC270 ", StringComparison.Ordinal))
+            .ShouldBe([Expected]);
+        DriverDiagnostics(older).ShouldHaveSingleItem().ShouldStartWith("SQLSRC267 ");
+        older.CompilationErrors.ShouldBeEmpty();
+        older.GeneratedCodeWarnings.ShouldBeEmpty();
+        current.Diagnostics.ShouldBeEmpty();
+        current.CompilationErrors.ShouldBeEmpty();
+        current.GeneratedCodeWarnings.ShouldBeEmpty();
+    }
+
     [Fact]
     public void Run_SqlClientNewerThanTheGeneratorKnows_IsSqlsrc268()
     {
@@ -131,7 +165,7 @@ public sealed class SqlClientProbeTests
         var older = SqlClientReferences.SqlClient60;
         var newer = SqlClientReferences.Synthetic("8.0.0.0", true, true, true, "8.0.1");
 
-        var sql = Run(OutputKind.Sql, [older], Users, Orders);
+        var sql = Run(OutputKind.Sql, [older], GeneratorHarness.UsersFile, Orders);
         var postgres = Run(OutputKind.Models, [older], "postgres", PostgresUsers);
         var postgresNewer = Run(OutputKind.Models, [newer], "postgres", PostgresUsers);
 
@@ -280,6 +314,21 @@ public sealed class SqlClientProbeTests
         bool atLeast7,
         bool expected
     ) => new SqlClientProbe(referenced, atLeast61, atLeast7, null).IsBelowTheFloor.ShouldBe(expected);
+
+    // The column is the newest version the project's driver has, by its flags.
+    [Theory]
+    [InlineData(false, false, false, nameof(SqlClientColumn.None))]
+    [InlineData(true, false, false, nameof(SqlClientColumn.OlderThan61))]
+    // SqlVector`1 found without SqlConnection chooses the column of 6.1, as SspiContextProvider without it chooses 7's.
+    [InlineData(false, true, false, nameof(SqlClientColumn.SqlClient61))]
+    [InlineData(true, true, false, nameof(SqlClientColumn.SqlClient61))]
+    [InlineData(true, true, true, nameof(SqlClientColumn.SqlClient7))]
+    public void Column_Flags_IsTheNewestVersionTheProjectHas(
+        bool referenced,
+        bool atLeast61,
+        bool atLeast7,
+        string expected
+    ) => new SqlClientProbe(referenced, atLeast61, atLeast7, null).Column.ToString().ShouldBe(expected);
 
     [Fact]
     public void Findings_ProbeBelowTheFloor_IsSqlsrc267WithTheVersion() =>

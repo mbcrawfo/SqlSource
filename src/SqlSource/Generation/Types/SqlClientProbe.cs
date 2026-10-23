@@ -16,7 +16,8 @@ namespace SqlSource.Generation.Types;
 /// Whether <c>Microsoft.Data.SqlClient.SqlConnection</c>, which every version has, is found.
 /// </param>
 /// <param name="AtLeast61">
-/// Whether <c>Microsoft.Data.SqlTypes.SqlVector`1</c>, first in 6.1 on every target framework, is found.
+/// Whether <c>Microsoft.Data.SqlTypes.SqlVector`1</c>, first in 6.1 on every target framework, is found.  A driver
+/// without it is below the floor, and its column lacks the types that 6.1 brought.
 /// </param>
 /// <param name="AtLeast7">
 /// Whether <c>Microsoft.Data.SqlClient.SspiContextProvider</c>, first in 7.0 on every target framework and in no 6.x,
@@ -35,12 +36,15 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
     // The newest major whose types the map knows.
     private const int NewestKnownMajor = 7;
 
-    /// <summary>The column of the SQL Server map that the driver chooses.</summary>
+    /// <summary>
+    /// The column of the SQL Server map that the driver chooses: that of the newest version whose type the project has.
+    /// </summary>
     public SqlClientColumn Column =>
-        (AtLeast7, Referenced) switch
+        (AtLeast7, AtLeast61, Referenced) switch
         {
-            (true, _) => SqlClientColumn.SqlClient7,
-            (_, true) => SqlClientColumn.SqlClient61,
+            (true, _, _) => SqlClientColumn.SqlClient7,
+            (_, true, _) => SqlClientColumn.SqlClient61,
+            (_, _, true) => SqlClientColumn.OlderThan61,
             _ => SqlClientColumn.None,
         };
 

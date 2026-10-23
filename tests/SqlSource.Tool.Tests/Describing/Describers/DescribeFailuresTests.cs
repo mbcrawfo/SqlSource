@@ -13,14 +13,14 @@ public sealed class DescribeFailuresTests
     private static readonly DescribeRequest Query = new("GetUser", "SELECT 1", EquatableArray<SqlQueryParameter>.Empty);
 
     [Fact]
-    public void Texts_AreTheOnesBothEnginesReport()
+    public void Texts_OfTheFailures_AreTheOnesBothEnginesReport()
     {
         DescribeFailures.NoSuchType.ShouldBe("the database has no such type");
         DescribeFailures.NotATypeName.ShouldBe("it is not written as a type name");
     }
 
     [Fact]
-    public void Open_GivesTheDatabaseTheLinesAndTheHelp()
+    public void Open_WithLinesAndHelp_GivesTheDatabaseTheLinesAndTheHelp()
     {
         var lines = new EquatableArray<string>(["28P01: password authentication failed", "detail"]);
 
@@ -34,7 +34,7 @@ public sealed class DescribeFailuresTests
     }
 
     [Fact]
-    public void VersionNotSupported_GivesTheDatabaseTheEngineTheVersionAndTheMinimumInOrder()
+    public void VersionNotSupported_OfAServer_GivesTheDatabaseTheEngineTheVersionAndTheMinimumInOrder()
     {
         var failure = DescribeFailures.VersionNotSupported("app", "PostgreSQL", "13.4", "14", "upgrade the server");
 
@@ -46,7 +46,7 @@ public sealed class DescribeFailuresTests
     }
 
     [Fact]
-    public void DeclaredType_GivesTheTypeTheParameterTheQueryAndTheReasonInOrder()
+    public void DeclaredType_ThatIsNotValid_GivesTheTypeTheParameterTheQueryAndTheReasonInOrder()
     {
         var lines = new EquatableArray<string>(["42704: type \"nope_t\" does not exist"]);
 

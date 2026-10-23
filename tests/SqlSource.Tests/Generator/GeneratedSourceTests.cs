@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Settings;
+using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using Xunit;
 
@@ -13,12 +14,10 @@ namespace SqlSource.Tests.Generator;
 
 public sealed class GeneratedSourceTests
 {
-    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
-
     [Fact]
     public void Run_NoAttributedType_EmitsOnlyTheAttribute()
     {
-        var run = GeneratorHarness.Run(OutputKind.Sql, "public class Sample;", Users);
+        var run = GeneratorHarness.Run(OutputKind.Sql, "public class Sample;", GeneratorHarness.UsersFile);
 
         run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs"]);
         run.Sources["SqlSourceGenerateAttribute.g.cs"].ShouldBe(AttributeSource.Text);
@@ -125,7 +124,7 @@ public sealed class GeneratedSourceTests
                 public const string Value = Sample.GetUser;
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -194,7 +193,7 @@ public sealed class GeneratedSourceTests
                 public static string Value => Sql.GetUser;
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -227,7 +226,7 @@ public sealed class GeneratedSourceTests
                 }
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -281,7 +280,7 @@ public sealed class GeneratedSourceTests
                 public static string Value => GetUser;
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -331,7 +330,7 @@ public sealed class GeneratedSourceTests
                 }
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -363,7 +362,7 @@ public sealed class GeneratedSourceTests
                 public partial class Sample;
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -380,14 +379,7 @@ public sealed class GeneratedSourceTests
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            """
-            using SqlSource;
-
-            namespace App;
-
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
-            public partial class Sample;
-            """,
+            GeneratorHarness.SampleSource(null),
             new SqlFile("/app/Repo/c.sql", "-- name: Fifth\nSELECT 5;\n"),
             new SqlFile("/app/Repo/B.sql", "-- name: Third\nSELECT 3;\n-- name: Fourth\nSELECT 4;\n"),
             new SqlFile("/app/Repo/a.sql", "-- name: Second\nSELECT 2;\n"),
@@ -459,7 +451,7 @@ public sealed class GeneratedSourceTests
                         + "public partial class Sample { public string Value => Sql.GetUser; }\n"
                 ),
             ],
-            [new SqlFile(@"c:\App\repo\Users.sql", "-- name: GetUser\nSELECT 1;\n")]
+            [new SqlFile(@"c:\App\repo\Users.sql", SqlTexts.GetUser)]
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -490,7 +482,7 @@ public sealed class GeneratedSourceTests
                 public static string Value => GetUser;
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -724,23 +716,16 @@ public sealed class GeneratedSourceTests
     [Fact]
     public void Run_TokenWithADefault_GeneratesTheMethodItGeneratesWithout()
     {
-        const string Source = """
-            using SqlSource;
-
-            namespace App;
-
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
-            public partial class Sample;
-            """;
+        var source = GeneratorHarness.SampleSource(null);
 
         var plain = GeneratorHarness.Run(
             OutputKind.Sql,
-            Source,
+            source,
             new SqlFile("/app/Repo/Q.sql", "SELECT * FROM {{table}} {{filter}};\n")
         );
         var withDefaults = GeneratorHarness.Run(
             OutputKind.Sql,
-            Source,
+            source,
             new SqlFile(
                 "/app/Repo/Q.sql",
                 "-- token: {{filter:WHERE x = 1}}\nSELECT * FROM {{table:users}} {{filter}};\n"
@@ -789,14 +774,7 @@ public sealed class GeneratedSourceTests
 
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            """
-            using SqlSource;
-
-            namespace App;
-
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
-            public partial class Sample;
-            """,
+            GeneratorHarness.SampleSource(null),
             new SqlFile(GeneratorHarness.UsersPath, "-- summary: a < b & c\n" + Sql + "\n")
         );
 
@@ -846,14 +824,7 @@ public sealed class GeneratedSourceTests
         // string, and are not legal anywhere in an XML document.
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            """
-            using SqlSource;
-
-            namespace App;
-
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
-            public partial class Sample;
-            """,
+            GeneratorHarness.SampleSource(null),
             new SqlFile(GeneratorHarness.UsersPath, "-- summary: a\fb\nSELECT '\f\u001A';\n")
         );
 
@@ -991,7 +962,7 @@ public sealed class GeneratedSourceTests
                 public static string Value => Sql.GetUser;
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -1027,7 +998,7 @@ public sealed class GeneratedSourceTests
                 public partial class Sample { public static string Value => Sql.GetUser; }
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -1052,7 +1023,7 @@ public sealed class GeneratedSourceTests
                 public static string Value => Sql.GetUser;
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -1076,7 +1047,7 @@ public sealed class GeneratedSourceTests
                 public static string Value => Sql.GetUser;
             }
             """,
-            Users
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -1114,7 +1085,7 @@ public sealed class GeneratedSourceTests
                 new SourceFile("/app/Repo/Sample.cs", "[SqlSource.SqlSourceGenerate]\npublic partial class Sample;\n"),
                 new SourceFile("/app/Other/Sample.cs", "[SqlSource.SqlSourceGenerate]\npublic partial class Sample;\n"),
             ],
-            [Users, new SqlFile("/app/Other/Orders.sql", "SELECT 2;\n")]
+            [GeneratorHarness.UsersFile, new SqlFile("/app/Other/Orders.sql", "SELECT 2;\n")]
         );
 
         run.Diagnostics.ShouldBeEmpty();

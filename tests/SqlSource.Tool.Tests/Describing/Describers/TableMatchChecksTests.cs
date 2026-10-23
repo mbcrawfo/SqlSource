@@ -17,7 +17,7 @@ public sealed class TableMatchChecksTests
     private static bool MustNotRun() => throw new InvalidOperationException("A check ran after one had failed.");
 
     [Fact]
-    public void Order_IsTheFormatsOrder() =>
+    public void Order_OfTheChecks_IsTheFormatsOrder() =>
         TableMatchChecks.Order.ShouldBe([
             SidecarValues.TableMatch.NoOrigin,
             SidecarValues.TableMatch.SeveralTables,

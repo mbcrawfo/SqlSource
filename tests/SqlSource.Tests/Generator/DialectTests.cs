@@ -12,15 +12,6 @@ namespace SqlSource.Tests.Generator;
 // it is ANSI.
 public sealed class DialectTests
 {
-    private const string Source = """
-        using SqlSource;
-
-        namespace App;
-
-        [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
-        public partial class Sample;
-        """;
-
     // Three dialects read this line three ways.  ANSI: the # is SQL and the two dashes start a comment.  MySQL: the #
     // starts a comment.  SQL Server: the brackets are an identifier, and the comment starts after it.
     private const string Query = "SELECT 1 # x [y--z] -- c\n";
@@ -266,7 +257,7 @@ public sealed class DialectTests
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
             [new SqlFile("/app/Repo/Q.sql", Query)],
             generatorParameters: "mysql",
             dialect: "false"
@@ -278,5 +269,10 @@ public sealed class DialectTests
     }
 
     private static GeneratorRun Run(OutputKind? output, string? property, params SqlFile[] files) =>
-        GeneratorHarness.Run(output, [new SourceFile(GeneratorHarness.SourcePath, Source)], files, dialect: property);
+        GeneratorHarness.Run(
+            output,
+            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
+            files,
+            dialect: property
+        );
 }

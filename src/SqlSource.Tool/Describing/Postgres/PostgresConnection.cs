@@ -298,6 +298,13 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
             throw new NpgsqlException(MultiplexingRefused);
         }
 
+        // Npgsql logs the values of a command's parameters when the string asks it to, whatever the data source's own
+        // setting; the driver's log holds each command's text and none of its parameters.
+        if (builder.ConnectionStringBuilder.LogParameters)
+        {
+            builder.ConnectionStringBuilder.LogParameters = false;
+        }
+
         var driverLog = NpgsqlRunLogger.For(log);
         if (driverLog is not null)
         {

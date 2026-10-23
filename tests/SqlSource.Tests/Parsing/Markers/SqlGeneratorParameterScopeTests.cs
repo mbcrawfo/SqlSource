@@ -12,7 +12,7 @@ namespace SqlSource.Tests.Parsing.Markers;
 public sealed class SqlGeneratorParameterScopeTests
 {
     [Fact]
-    public void NewScope_HasNoList() => new SqlGeneratorParameterScope().Parameters.ShouldBeNull();
+    public void Parameters_OfANewScope_HaveNoList() => new SqlGeneratorParameterScope().Parameters.ShouldBeNull();
 
     [Theory]
     // An internal enum cannot be the parameter of a public test method, so a row gives the flags as a number.

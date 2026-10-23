@@ -135,7 +135,7 @@ public sealed class SqlClientRunListenerTests : IDisposable
     }
 
     [Fact]
-    public void Forward_StringsPassTheLogsRedaction()
+    public void Forward_StringWithTheSecret_PassesTheLogsRedaction()
     {
         var log = new SessionRunLog(_recording, new ConnectionSecret(Secrets.Connection), "mssql.");
         using var listener = SqlClientRunListener.For(log).ShouldNotBeNull();

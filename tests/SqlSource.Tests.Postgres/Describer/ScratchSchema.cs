@@ -26,6 +26,30 @@ internal static class ScratchSchema
         """;
 
     /// <summary>
+    /// The schema <c>hiding_types</c>, of domains over <c>integer</c> or <c>text</c> named like the built-in types
+    /// <c>text</c>, <c>jsonb</c>, <c>json</c>, <c>uuid</c>, <c>bpchar</c>, <c>"char"</c>, <c>"bit"</c>, <c>oid</c> and
+    /// <c>int4</c>.  On <see cref="HidingTypesPath" /> each hides the built-in type of its name; on any path that puts
+    /// <c>pg_catalog</c> first, or does not name the schema, it changes nothing.  CREATE DOMAIN has no IF NOT EXISTS,
+    /// so the text makes the schema again.
+    /// </summary>
+    public const string HidingTypes = """
+        DROP SCHEMA IF EXISTS hiding_types CASCADE;
+        CREATE SCHEMA hiding_types;
+        CREATE DOMAIN hiding_types.text AS integer;
+        CREATE DOMAIN hiding_types.jsonb AS integer;
+        CREATE DOMAIN hiding_types.json AS integer;
+        CREATE DOMAIN hiding_types.uuid AS integer;
+        CREATE DOMAIN hiding_types.bpchar AS integer;
+        CREATE DOMAIN hiding_types."char" AS integer;
+        CREATE DOMAIN hiding_types."bit" AS integer;
+        CREATE DOMAIN hiding_types.oid AS pg_catalog.text;
+        CREATE DOMAIN hiding_types.int4 AS pg_catalog.text;
+        """;
+
+    /// <summary>The part of a connection string that puts <see cref="HidingTypes" /> first.</summary>
+    public const string HidingTypesPath = "Search Path=hiding_types,pg_catalog";
+
+    /// <summary>
     /// Aggregates <c>shadow.count(*)</c> and <c>shadow.count(integer)</c> that always return <c>NULL</c>.  On a path
     /// that names <c>shadow</c> before <c>pg_catalog</c> the plan prints the first as <c>count(*)</c>; on any path that
     /// names <c>shadow</c>, the second beats <c>pg_catalog.count("any")</c> for an integer by its exact type and prints
