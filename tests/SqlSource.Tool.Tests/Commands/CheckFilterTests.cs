@@ -149,22 +149,25 @@ public sealed class CheckFilterTests : IDisposable
         result.ShouldBe(new CliResult(0, "postgres (postgres): 1 same, 0 differ, 0 failed\n", ""));
     }
 
-    // A file that a query left out holds back is not written by describe with the same filter, so an entry of
-    // another database that is gone stays in it, and the check says nothing of it.
-    [Fact]
-    public async Task Check_EntryOfAnotherDatabaseThatIsGoneInAHeldBackFile_IsNotReported()
+    // A file that a query left out holds back is not written by describe with the same filter, so an entry that is
+    // gone stays in it, of the named database or of another, and the check says nothing of it.  The query of the
+    // database that is not named is edited, so that it is left out.
+    [Theory]
+    [InlineData("postgres", "SELECT 2;")]
+    [InlineData("billing", "SELECT 1;")]
+    public async Task Check_EntryThatIsGoneInAHeldBackFile_IsNotReported(string named, string editedSql)
     {
         (await DescribeAsync()).ExitCode.ShouldBe(0);
         await AddAnEntryOfAQueryThatIsGoneAsync("billing");
         await File.WriteAllTextAsync(
             _users,
-            SqlTexts.WithSecondQueryEdited(SqlTexts.Users),
+            SqlTexts.Users.Replace(editedSql, "SELECT 22;", StringComparison.Ordinal),
             TestContext.Current.CancellationToken
         );
         var before = await File.ReadAllTextAsync(SidecarFormat.PathFor(_users), TestContext.Current.CancellationToken);
 
-        var result = await DescribeAsync("--check", "--database", "postgres");
-        var described = await DescribeAsync("--database", "postgres");
+        var result = await DescribeAsync("--check", "--database", named);
+        var described = await DescribeAsync("--database", named);
 
         result.ExitCode.ShouldBe(0);
         ReportsGone(result).ShouldBeFalse();

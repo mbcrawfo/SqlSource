@@ -48,10 +48,9 @@ internal static class SidecarCheck
     /// <param name="files">The files, with every selected query that needs an entry described or failed.</param>
     /// <param name="outcomes">What <see cref="FileOutcomes" /> decided for the same files, in the same order.</param>
     /// <param name="databases">
-    /// The names of <c>--database</c>.  An entry for a query that is gone is reported when its own database is one
-    /// of them, when there are none, or when the file's outcome is <see cref="FileAction.Write" />: a run for one
-    /// database leaves another's entries alone, unless it writes their file, which drops each entry for a query that
-    /// is gone.
+    /// The names of <c>--database</c>.  When there are any, an entry for a query that is gone is reported only when
+    /// the file's outcome is <see cref="FileAction.Write" />, whatever the entry's database: a run for some databases
+    /// drops such an entry only by writing its file, and a file it holds back keeps it.
     /// </param>
     public static ImmutableArray<FileCheck> Compare(
         ImmutableArray<FileWork> files,
@@ -187,7 +186,8 @@ internal static class SidecarCheck
         };
 
     // An entry for a name that no query of the file has, or for a query that needs none: writing drops it.  Such an
-    // entry is in no target, so a file that has one and is not held back is written, whatever the entry's database.
+    // entry is in no target, so a file that has one and is not held back is written.  A run with --database has a
+    // file held back by a query it left out, so it reports such an entry only for a file it writes.
     private static IEnumerable<ToolDiagnostic> EntriesWithoutAQuery(
         FileWork file,
         FileOutcome outcome,
@@ -207,11 +207,7 @@ internal static class SidecarCheck
                 continue;
             }
 
-            if (
-                !databases.IsEmpty
-                && outcome.Action != FileAction.Write
-                && (entry.Database is not { } database || !databases.Contains(database, DatabaseName.Comparer))
-            )
+            if (!databases.IsEmpty && outcome.Action != FileAction.Write)
             {
                 continue;
             }
