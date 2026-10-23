@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis.Text;
+using SqlSource.Parsing.Quoting;
 
 namespace SqlSource.Parsing;
 
@@ -127,7 +128,7 @@ internal sealed class SqlDeclaredVariables
             }
             else if (lexeme.Kind == SqlLexemeKind.Parameter && list.ExpectsName)
             {
-                (names ??= []).Add(new TextSpan(lexeme.Span.Start + 1, lexeme.Span.Length - 1));
+                (names ??= []).Add(lexeme.ParameterName);
                 list.ExpectsName = false;
             }
             else if (lexeme.Kind is SqlLexemeKind.Quoted or SqlLexemeKind.Parameter)
@@ -180,10 +181,10 @@ internal sealed class SqlDeclaredVariables
                 }
 
                 var value = sql[index];
-                if (IsWordCharacter(value))
+                if (QuoteReader.IsNameCharacterOfSqlServer(value))
                 {
                     var start = index;
-                    while (index < text.End && IsWordCharacter(sql[index]))
+                    while (index < text.End && QuoteReader.IsNameCharacterOfSqlServer(sql[index]))
                     {
                         index++;
                     }
@@ -215,10 +216,6 @@ internal sealed class SqlDeclaredVariables
             }
         }
 
-        // "@", "#" and "$" are part of a T-SQL identifier, so "#declare" is not the word.
-        private static bool IsWordCharacter(char value) =>
-            SqlLexer.IsParameterNameCharacter(value) || value is '@' or '#' or '$';
-
         // The offset of the next whole word DECLARE of the text, from an offset on, or -1.
         private static int FindDeclare(string sql, TextSpan text, int from)
         {
@@ -231,9 +228,10 @@ internal sealed class SqlDeclaredVariables
                 }
 
                 from = index + Declare.Length;
+                // "@", "#" and "$" are part of a T-SQL name, so "#declare" is not the word.
                 if (
-                    (index == text.Start || !IsWordCharacter(sql[index - 1]))
-                    && (from == text.End || !IsWordCharacter(sql[from]))
+                    (index == text.Start || !QuoteReader.IsNameCharacterOfSqlServer(sql[index - 1]))
+                    && (from == text.End || !QuoteReader.IsNameCharacterOfSqlServer(sql[from]))
                 )
                 {
                     return index;

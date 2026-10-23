@@ -18,11 +18,11 @@ namespace SqlSource.Tool.Describing.Postgres.Types;
 /// </remarks>
 internal static class PostgresTypeNames
 {
-    private const string Catalog = "pg_catalog";
-
     /// <summary>The name of a type that is no array.  Facets that the type does not carry are left out.</summary>
     public static string Spell(PostgresTypeRow row, PostgresFacets facets) =>
-        row.Nspname == Catalog ? InCatalog(row, facets) : $"{Identifier(row.Nspname)}.{Identifier(row.Typname)}";
+        row.Nspname == SystemSchemas.Postgres
+            ? InCatalog(row, facets)
+            : $"{Identifier(row.Nspname)}.{Identifier(row.Typname)}";
 
     /// <summary>
     /// The name of a type that is no array, from the text that <c>format_type(oid, modifier)</c> gave.  A type of
@@ -37,7 +37,7 @@ internal static class PostgresTypeNames
     /// </exception>
     public static string WithModifier(PostgresTypeRow row, string formatted)
     {
-        if (row.Nspname == Catalog)
+        if (row.Nspname == SystemSchemas.Postgres)
         {
             return formatted;
         }

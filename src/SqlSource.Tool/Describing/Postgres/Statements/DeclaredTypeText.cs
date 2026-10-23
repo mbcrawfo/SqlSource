@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
+using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Describing.Postgres.Statements;
 
@@ -44,10 +44,17 @@ internal static class DeclaredTypeText
         StringComparer.OrdinalIgnoreCase
     );
 
-    /// <summary>The text to put into the type list, or false for a text that is not written as a type name.</summary>
-    public static bool TryRead(string text, [NotNullWhen(true)] out string? type)
+    /// <summary>
+    /// The text to put into the type list, without the spaces around it, or
+    /// <see cref="DescribeFailures.NotATypeName" /> for a text that is not written as a type name.
+    /// </summary>
+    public static Outcome<string, string> Read(string text) =>
+        IsTypeName(text)
+            ? Outcome<string, string>.Of(text.Trim(' ', '\t'))
+            : Outcome<string, string>.Failed(DescribeFailures.NotATypeName);
+
+    private static bool IsTypeName(string text)
     {
-        type = null;
         var position = 0;
         if (!TryReadIdentifier(text, ref position))
         {
@@ -69,7 +76,6 @@ internal static class DeclaredTypeText
             return false;
         }
 
-        type = text.Trim(' ', '\t');
         return true;
     }
 

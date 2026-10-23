@@ -19,7 +19,7 @@ namespace SqlSource.Generation.Types;
 /// The type override of the metadata of the file's item, as a level that says nothing else.
 /// </param>
 /// <param name="Property">The type override of the project's property, as a level that says nothing else.</param>
-/// <param name="Probe">The Npgsql the project references, which chooses the column of PostgreSQL's map.</param>
+/// <param name="NpgsqlProbe">The Npgsql the project references, which chooses the column of PostgreSQL's map.</param>
 /// <param name="SqlClientProbe">
 /// The Microsoft.Data.SqlClient the project references, which chooses the column of SQL Server's map.
 /// </param>
@@ -29,7 +29,7 @@ internal sealed record FileTypesInput(
     ParsedSqlFile? File,
     SettingsLevel Metadata,
     SettingsLevel Property,
-    NpgsqlProbe Probe,
+    NpgsqlProbe NpgsqlProbe,
     SqlClientProbe SqlClientProbe,
     EquatableArray<MappedType> MappedTypes
 )
@@ -44,7 +44,7 @@ internal sealed record FileTypesInput(
         EquatableArray<ParsedSqlFile> files,
         EquatableArray<FileSettings> filesSettings,
         SettingsLevel property,
-        NpgsqlProbe probe,
+        NpgsqlProbe npgsqlProbe,
         SqlClientProbe sqlClientProbe,
         EquatableArray<MappedType> mappedTypes
     )
@@ -60,7 +60,7 @@ internal sealed record FileTypesInput(
                 null,
                 SettingsLevel.None,
                 SettingsLevel.None,
-                probe,
+                npgsqlProbe,
                 sqlClientProbe,
                 EquatableArray<MappedType>.Empty
             );
@@ -72,7 +72,7 @@ internal sealed record FileTypesInput(
             files[fileIndex],
             settingsIndex < 0 ? SettingsLevel.None : TypeOverridesOf(filesSettings[settingsIndex].Level),
             property,
-            probe,
+            npgsqlProbe,
             sqlClientProbe,
             mappedTypes
         );

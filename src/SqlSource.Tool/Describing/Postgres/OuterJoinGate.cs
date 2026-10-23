@@ -1,6 +1,6 @@
 using System;
 using SqlSource.Parsing;
-using SqlSource.Tool.Describing.Postgres.Statements;
+using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Describing.Postgres;
 
@@ -73,7 +73,7 @@ internal static class OuterJoinGate
     private static bool HoldsAnyOf(string sql, string[] words)
     {
         SqlLexeme? before = null;
-        foreach (var lexeme in PostgresSql.Lex(sql))
+        foreach (var lexeme in DescriberSql.Lex(sql, SqlDialectRules.PostgreSql))
         {
             var text = sql.AsSpan(lexeme.Span.Start, lexeme.Span.Length);
             if (

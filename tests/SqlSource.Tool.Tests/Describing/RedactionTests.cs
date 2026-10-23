@@ -10,6 +10,7 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Reporting;
@@ -391,6 +392,25 @@ public sealed class RedactionTests : IDisposable
 
         text.ShouldNotContain(Secrets.Marker);
         var logged = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "postgres.table-match");
+        logged.GetProperty("tableMatch").GetString().ShouldBe("***");
+        logged.GetProperty("table").GetProperty("schema").GetString().ShouldBe("***");
+        logged.GetProperty("table").GetProperty("table").GetString().ShouldBe("***");
+    }
+
+    [Fact]
+    public async Task Run_PostgresDescriberThatLogsATableMatchEventWithItsConnection_HasTheMarkInResultAndTableMatch()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+        {
+            var value = request.Connection;
+            PostgresEvents.TableMatch(log, "GetUser", new SidecarTable(value, value), value);
+        };
+
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
+
+        text.ShouldNotContain(Secrets.Marker);
+        var logged = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "postgres.table-match");
+        logged.GetProperty("result").GetString().ShouldBe("***");
         logged.GetProperty("tableMatch").GetString().ShouldBe("***");
         logged.GetProperty("table").GetProperty("schema").GetString().ShouldBe("***");
         logged.GetProperty("table").GetProperty("table").GetString().ShouldBe("***");

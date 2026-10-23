@@ -1,6 +1,7 @@
 using System;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres.Statements;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
@@ -89,7 +90,7 @@ public sealed class ParameterPlaceholdersTests
         var types = ParameterPlaceholders.TypeList(List(Declared("a", "int"), refused, Declared("c", "nope nope")));
 
         types.Value.ShouldBeNull();
-        types.Failure.ShouldBe(refused);
+        types.Failure.ShouldBe((refused, DescribeFailures.NotATypeName));
     }
 
     // The list ends on a line of its own: whatever a type's text held, the ") AS" is not on its line.

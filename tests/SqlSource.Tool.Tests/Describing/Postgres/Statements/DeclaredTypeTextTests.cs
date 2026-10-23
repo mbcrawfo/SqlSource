@@ -1,4 +1,5 @@
 using Shouldly;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres.Statements;
 using Xunit;
 
@@ -33,20 +34,11 @@ public sealed class DeclaredTypeTextTests
     // A name with "$", or with a character above U+007F that is no letter, is accepted quoted.
     [InlineData("\"my$type\"")]
     [InlineData("\"€type\"")]
-    public void TryRead_TypeName_IsAccepted(string text)
-    {
-        DeclaredTypeText.TryRead(text, out var type).ShouldBeTrue(text);
-
-        type.ShouldBe(text);
-    }
+    public void Read_TypeName_IsTheText(string text) => DeclaredTypeText.Read(text).Value.ShouldBe(text);
 
     [Fact]
-    public void TryRead_SpaceAroundTheName_IsLeftOut()
-    {
-        DeclaredTypeText.TryRead("  varchar(50) \t", out var type).ShouldBeTrue();
-
-        type.ShouldBe("varchar(50)");
-    }
+    public void Read_SpaceAroundTheName_IsLeftOut() =>
+        DeclaredTypeText.Read("  varchar(50) \t").Value.ShouldBe("varchar(50)");
 
     [Theory]
     [InlineData("")]
@@ -89,10 +81,6 @@ public sealed class DeclaredTypeTextTests
     [InlineData("1$$")]
     [InlineData("1$1")]
     [InlineData("€type")]
-    public void TryRead_AnythingElse_IsRefused(string text)
-    {
-        DeclaredTypeText.TryRead(text, out var type).ShouldBeFalse(text);
-
-        type.ShouldBeNull();
-    }
+    public void Read_AnythingElse_IsNotATypeName(string text) =>
+        DeclaredTypeText.Read(text).Failure.ShouldBe(DescribeFailures.NotATypeName, text);
 }

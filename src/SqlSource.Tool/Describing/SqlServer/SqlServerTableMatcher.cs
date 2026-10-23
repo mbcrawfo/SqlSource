@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Describing.SqlServer;
 
@@ -11,8 +12,9 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The checks are the values of the sidecar format's <c>tableMatch</c>, in the format's order, and the first that
-/// fails is the answer: the order is the format's and is not to be changed.  A view may match as a table may.
+/// The checks are the values of the sidecar format's <c>tableMatch</c>, in the format's order, which
+/// <see cref="TableMatchChecks" /> holds, and the first that fails is the answer: the order is the format's and is
+/// not to be changed.  A view may match as a table may.
 /// </para>
 /// <para>
 /// The table's column list and each column's nullability are the server's description of <c>SELECT *</c> from it,
@@ -69,53 +71,50 @@ internal static class SqlServerTableMatcher
 
         string[] origins = [.. columns.Select(static column => column.Origin!.Column!)];
         SqlServerColumnRow[] visible = [.. table.Where(static row => !row.IsHidden)];
-
-        // The name as the server returned it: an alias and an override suffix are each another name.
-        if (!columns.Select(static column => column.Name).SequenceEqual(origins, StringComparer.Ordinal))
-        {
-            return (null, SidecarValues.TableMatch.NamesDiffer);
-        }
-
-        // As lists and not as sets: a column that is left out and a column that is there twice both differ.
         string?[] names = [.. visible.Select(static row => row.Name)];
-        if (
-            !origins
-                .Order(StringComparer.Ordinal)
-                .SequenceEqual(names.Order(StringComparer.Ordinal), StringComparer.Ordinal)
-        )
-        {
-            return (null, SidecarValues.TableMatch.ColumnsDiffer);
-        }
-
-        if (!origins.SequenceEqual(names, StringComparer.Ordinal))
-        {
-            return (null, SidecarValues.TableMatch.OrderDiffers);
-        }
-
-        // In the table's order now, so each column's row is the one in its place.  A column the server cannot say of
-        // is nullable, as the describer records it.
-        return columns
-            .Select(static column => column.Nullable)
-            .SequenceEqual(visible.Select(static row => (bool?)(row.IsNullable ?? true)))
-            ? (new SidecarTable(found.Schema, found.Table), SidecarValues.TableMatch.Matched)
-            : (null, SidecarValues.TableMatch.NullabilityDiffers);
+        var result = TableMatchChecks.OfTheTable(
+            // The name as the server returned it: an alias and an override suffix are each another name.
+            () => columns.Select(static column => column.Name).SequenceEqual(origins, StringComparer.Ordinal),
+            // As lists and not as sets: a column that is left out and a column that is there twice both differ.
+            () =>
+                origins
+                    .Order(StringComparer.Ordinal)
+                    .SequenceEqual(names.Order(StringComparer.Ordinal), StringComparer.Ordinal),
+            () => origins.SequenceEqual(names, StringComparer.Ordinal),
+            // In the table's order now, so each column's row is the one in its place.  A column the server cannot say
+            // of is nullable, as the describer records it.
+            () =>
+                columns
+                    .Select(static column => column.Nullable)
+                    .SequenceEqual(visible.Select(static row => (bool?)(row.IsNullable ?? true)))
+        );
+        return result == SidecarValues.TableMatch.Matched
+            ? (new SidecarTable(found.Schema, found.Table), result)
+            : (null, result);
     }
 
     // The table of the columns, or the first of no-origin and several-tables that fails.  Schemas and tables are
     // compared ordinally, as the server gave both.
     private static (SidecarOrigin? Table, string? Failed) OneTable(IReadOnlyList<SidecarColumn> columns)
     {
-        if (columns.Any(static column => column.Origin is not { Schema: not null, Table: not null, Column: not null }))
+        var failed = TableMatchChecks.OfTheOrigins(
+            () =>
+                columns.All(static column => column.Origin is { Schema: not null, Table: not null, Column: not null }),
+            () =>
+            {
+                var first = columns[0].Origin!;
+                return columns.All(column =>
+                    string.Equals(column.Origin!.Schema, first.Schema, StringComparison.Ordinal)
+                    && string.Equals(column.Origin.Table, first.Table, StringComparison.Ordinal)
+                );
+            }
+        );
+        if (failed is not null)
         {
-            return (null, SidecarValues.TableMatch.NoOrigin);
+            return (null, failed);
         }
 
-        var first = columns[0].Origin!;
-        return columns.All(column =>
-            string.Equals(column.Origin!.Schema, first.Schema, StringComparison.Ordinal)
-            && string.Equals(column.Origin.Table, first.Table, StringComparison.Ordinal)
-        )
-            ? (new SidecarOrigin(first.Schema, first.Table, null), null)
-            : (null, SidecarValues.TableMatch.SeveralTables);
+        var origin = columns[0].Origin!;
+        return (new SidecarOrigin(origin.Schema, origin.Table, null), null);
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Net.Sockets;
 using Npgsql;
+using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Describing.Postgres;
 
@@ -100,12 +101,12 @@ internal static class ConnectionErrors
             return Fixed(null, NoPassword);
         }
 
-        if (InChain<TimeoutException>(exception) is not null)
+        if (ExceptionChain.Find<TimeoutException>(exception) is not null)
         {
             return Fixed(null, ConnectTimedOut);
         }
 
-        return InChain<SocketException>(exception) is { } socket
+        return ExceptionChain.Find<SocketException>(exception) is { } socket
             ? Fixed(null, UnreachablePrefix + ": " + socket.SocketErrorCode.ToString())
             : Fixed(null, NotOpenedPrefix + " (" + Innermost(exception).GetType().Name + ")");
     }
@@ -122,7 +123,9 @@ internal static class ConnectionErrors
         {
             return Fixed(
                 null,
-                InChain<TimeoutException>(exception) is not null ? NoAnswerInTime : PostgresConnection.LostConnection
+                ExceptionChain.Find<TimeoutException>(exception) is not null
+                    ? NoAnswerInTime
+                    : PostgresConnection.LostConnection
             );
         }
 
@@ -156,20 +159,6 @@ internal static class ConnectionErrors
         exception is not PostgresException
         && exception.InnerException is null
         && PostgresConnection.OwnTexts.Contains(exception.Message, StringComparer.Ordinal);
-
-    private static T? InChain<T>(Exception exception)
-        where T : Exception
-    {
-        for (var current = exception; current is not null; current = current.InnerException)
-        {
-            if (current is T found)
-            {
-                return found;
-            }
-        }
-
-        return null;
-    }
 
     private static Exception Innermost(Exception exception)
     {

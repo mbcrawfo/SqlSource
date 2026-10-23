@@ -165,6 +165,9 @@ public sealed class SqlServerTableMatcherTests
             .Match([Expression, From("id", nullable: false, table: "other"), .. Whole()], null)
             .ShouldBe((null, SidecarValues.TableMatch.NoOrigin));
         SqlServerTableMatcher
+            .Match([From("id", nullable: false, table: "other") with { Name = "label" }, .. Whole()], null)
+            .ShouldBe((null, SidecarValues.TableMatch.SeveralTables));
+        SqlServerTableMatcher
             .Match([From("name", nullable: false) with { Name = "label" }, From("id", nullable: true)], Items)
             .ShouldBe((null, SidecarValues.TableMatch.NamesDiffer));
         SqlServerTableMatcher

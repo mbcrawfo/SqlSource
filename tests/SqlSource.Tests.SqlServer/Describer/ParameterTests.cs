@@ -215,6 +215,32 @@ public sealed class ParameterTests(SqlServerContainer sqlServer)
         failure.ServerLines.ShouldHaveSingleItem().ShouldStartWith(line);
     }
 
+    // The server takes a letter of any script in an unbracketed name, so the tool's first reading of the type does too.
+    [Fact]
+    public async Task DescribeAsync_DeclaredTypeWithALetterThatIsNotAscii_IsTheUserType()
+    {
+        await sqlServer.ExecuteAsync("DROP TYPE IF EXISTS dbo.Größe");
+        await sqlServer.ExecuteAsync("CREATE TYPE dbo.Größe FROM int");
+        try
+        {
+            var description = await ShouldDescribeAsync(
+                Of(SqlDialectRules.SqlServer, "SELECT @p AS v", ("p", "dbo.Größe"))
+            );
+
+            description.Parameters.ShouldBe([
+                new DescribedParameter(
+                    "p",
+                    new SqlServerType("int", 4, 10, 0, new SqlServerUserType("dbo", "Größe", null)),
+                    SidecarValues.TypeSource.Declared
+                ),
+            ]);
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync("DROP TYPE dbo.Größe");
+        }
+    }
+
     [Fact]
     public async Task DescribeAsync_DeclaredTypeTheDatabaseLacks_IsSqlsrc228()
     {
@@ -223,7 +249,7 @@ public sealed class ParameterTests(SqlServerContainer sqlServer)
             "SQLSRC228"
         );
 
-        failure.Arguments.ShouldBe(["dbo.Nope", "@p", Query, SqlServerErrors.NoSuchType]);
+        failure.Arguments.ShouldBe(["dbo.Nope", "@p", Query, DescribeFailures.NoSuchType]);
         failure.Step.ShouldBe(DescribeStep.ResolveType);
         failure.ServerLines[0].ShouldStartWith("Msg 2715: ");
     }
