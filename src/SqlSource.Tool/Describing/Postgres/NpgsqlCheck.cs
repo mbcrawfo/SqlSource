@@ -135,7 +135,8 @@ internal static class NpgsqlCheck
         var order = new List<SqlQueryParameter>(parameters.Count);
         foreach (var placed in sent.Parameters)
         {
-            var name = placed.StartsWith('@') || placed.StartsWith(':') ? placed[1..] : placed;
+            // "@" and ":" are the prefixes Npgsql places a parameter by.
+            var name = SqlParameterName.WithoutPrefix(placed, "@:");
             var parameter =
                 parameters.FirstOrDefault(parameter =>
                     string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase)

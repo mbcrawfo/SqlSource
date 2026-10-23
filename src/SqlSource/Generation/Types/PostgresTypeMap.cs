@@ -7,7 +7,7 @@ using SqlSource.Snapshot;
 namespace SqlSource.Generation.Types;
 
 /// <summary>The type override's answer for <paramref name="type" />, or null when it names none.</summary>
-internal delegate TypeMapping? OverrideOf(PostgresType type);
+internal delegate TypeMapping? PostgresOverrideOf(PostgresType type);
 
 /// <summary>
 /// The base map: the C# type Npgsql boxes for each PostgreSQL type it reads, under the column of a project's driver.
@@ -16,7 +16,6 @@ internal delegate TypeMapping? OverrideOf(PostgresType type);
 /// </summary>
 internal static class PostgresTypeMap
 {
-    private const string SystemSchema = "pg_catalog";
     private const string BitArray = "global::System.Collections.BitArray";
     private const string DateTime = "global::System.DateTime";
     private const string DateOnly = "global::System.DateOnly";
@@ -37,7 +36,7 @@ internal static class PostgresTypeMap
     /// its base's, and any other type the map's row or the rule of its kind.  An array's or a domain's failure is its
     /// element's or base's, with that key.  Never throws.
     /// </summary>
-    public static TypeMapping Map(PostgresType type, DriverColumn column, OverrideOf? overrideOf = null)
+    public static TypeMapping Map(PostgresType type, NpgsqlColumn column, PostgresOverrideOf? overrideOf = null)
     {
         if (overrideOf?.Invoke(type) is { } overridden)
         {
@@ -49,7 +48,7 @@ internal static class PostgresTypeMap
             IsSystemType(type)
             || (
                 type.Kind.Equals(SidecarValues.Kind.Base, StringComparison.Ordinal)
-                && TypeKeys.IsExtension(type.InternalName)
+                && TypeKeyNames.IsExtension(type.InternalName)
             );
         if (isOfTheMap && IsBit(type.InternalName))
         {
@@ -98,13 +97,13 @@ internal static class PostgresTypeMap
     /// <summary>
     /// The key of <paramref name="type" />, written as the type override reads it: its <c>InternalName</c> for a type
     /// of <c>pg_catalog</c>, and <c>Schema.InternalName</c> for any other, each part in quotes when it needs them,
-    /// as <see cref="TypeKeys.WritePart" /> writes it: <c>public."Status"</c> and <c>"my schema"."order-status"</c>,
+    /// as <see cref="TypeKeyText.WritePart" /> writes it: <c>public."Status"</c> and <c>"my schema"."order-status"</c>,
     /// and in the escaped form for a name with a line break: <c>"my schema".U&amp;"Order\000AItem"</c>.
     /// </summary>
     public static string KeyOf(PostgresType type) =>
         IsSystemType(type)
-            ? TypeKeys.WritePart(type.InternalName)
-            : TypeKeys.WritePart(type.Schema) + "." + TypeKeys.WritePart(type.InternalName);
+            ? TypeKeyText.WritePart(type.InternalName)
+            : TypeKeyText.WritePart(type.Schema) + "." + TypeKeyText.WritePart(type.InternalName);
 
     /// <summary>A C# type as a user writes it in the type override, without <c>global::</c>.</summary>
     public static string AsWritten(string text) => text.Replace("global::", string.Empty);
@@ -114,7 +113,8 @@ internal static class PostgresTypeMap
         internalName.Equals("bit", StringComparison.OrdinalIgnoreCase)
         || internalName.Equals("varbit", StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsSystemType(PostgresType type) => type.Schema.Equals(SystemSchema, StringComparison.Ordinal);
+    private static bool IsSystemType(PostgresType type) =>
+        type.Schema.Equals(SystemSchemas.Postgres, StringComparison.Ordinal);
 
     // An array of a type that a cast reads is read by a cast to an array, of the same rank.
     private static TypeMapping ArrayOf(TypeMapping element)
@@ -242,25 +242,25 @@ internal static class PostgresTypeMap
         // With no driver, a type whose two cells are both C# types differs between the drivers, which wins over
         // needing the driver: only the override can say which one the project runs on, and the failure's detail
         // gives the entry for each.
-        public TypeMapping Under(DriverColumn column, string key)
+        public TypeMapping Under(NpgsqlColumn column, string key)
         {
             if (Refusal is { } refusal)
             {
                 return refusal with { Key = key };
             }
 
-            if (column == DriverColumn.None && Npgsql8 is not null && Npgsql10 is not null)
+            if (column == NpgsqlColumn.None && Npgsql8 is not null && Npgsql10 is not null)
             {
                 return TypeMapping.Failed(TypeMappingKind.DiffersByDriver, key, EntriesFor(key, Npgsql8, Npgsql10));
             }
 
-            if (column == DriverColumn.None && IsOfNpgsql)
+            if (column == NpgsqlColumn.None && IsOfNpgsql)
             {
                 return TypeMapping.Failed(TypeMappingKind.NeedsDriver, key);
             }
 
             // A row that only Npgsql 10 reads has no C# type on 8 and 9.
-            var text = column == DriverColumn.Npgsql10 ? Npgsql10 ?? Npgsql8 : Npgsql8;
+            var text = column == NpgsqlColumn.Npgsql10 ? Npgsql10 ?? Npgsql8 : Npgsql8;
             return text is null
                 ? TypeMapping.Failed(TypeMappingKind.NeedsNpgsql10, key, TextType)
                 : TypeMapping.Mapped(key, text, IsValueType);

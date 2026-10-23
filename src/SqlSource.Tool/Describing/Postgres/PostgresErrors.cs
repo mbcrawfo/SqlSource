@@ -28,9 +28,8 @@ internal static class PostgresErrors
         + " or later";
 
     public const string SessionNotKeptHelp =
-        "connect directly to the server, not through a pooler in transaction mode, and without Multiplexing=true";
-
-    public const string NotATypeName = "it is not written as a type name";
+        "connect directly to the server or through a pooler in session or transaction mode, and without "
+        + "Multiplexing=true";
 
     public const string NotATypeNameHelp =
         "write the type as a column definition would: a name, a modifier in parentheses, []";
@@ -43,8 +42,6 @@ internal static class PostgresErrors
 
     public const string PositionalParameterHelp =
         "write the parameter as @name; generated code binds parameters by name";
-
-    public const string NoSuchType = "the database has no such type";
 
     public const string NoSuchTypeHelp =
         "write a type the database has, schema-qualified if it is not on the search path";
@@ -62,8 +59,8 @@ internal static class PostgresErrors
         "cast the column to a concrete type, or give the expression an alias and a cast";
 
     public const string CheckHelp =
-        "a @ that one of the two reads as a parameter and the other as text; the server's lines say where; a table, a "
-        + "column or a type that another session changed during the run shows the same way, so run describe again";
+        "a @ that one of the two reads as a parameter and the other as text; the server's lines say where; a type that "
+        + "another session changed during the run shows the same way, so run describe again";
 
     public const string PlacementHelp =
         "a @ or a : that one of the two reads as a parameter and the other as text; the message says where the two "
@@ -93,6 +90,7 @@ internal static class PostgresErrors
     private const string UndefinedObject = "42704";
     private const string UtilityStatement = "42P14";
     private const string DuplicatePreparedStatement = "42P05";
+    private const string ProtocolViolation = "08P01";
     public const string InvalidSqlStatementName = "26000";
     private const string IndeterminateDatatype = "42P18";
     private const string AmbiguousParameter = "42P08";
@@ -108,18 +106,13 @@ internal static class PostgresErrors
     public static DescribeFailure Open(PostgresServerError error, string database) =>
         error.SqlState is null && error.Message == PostgresConnection.MultiplexingRefused
             ? SessionNotKept(database, null, ServerLines(error, 0))
-            : new(
-                ToolDiagnostics.DatabaseCannotBeOpened,
-                new EquatableArray<string>([database]),
-                null,
-                ServerLines(error, 0),
-                OpenHelp
-            );
+            : DescribeFailures.Open(database, ServerLines(error, 0), OpenHelp);
 
     /// <summary>
     /// <c>SQLSRC236</c>: the connection does not keep one session, so the statement the tool prepared is not there
     /// for a later call.  At <c>open</c> it is a connection string that sets <c>Multiplexing=true</c>; at a query it
-    /// is a pooler in transaction mode.
+    /// is a pooler in statement mode, which refuses the describe's transaction, or a connection that reached another
+    /// backend within one describe.
     /// </summary>
     /// <param name="database">The database.</param>
     /// <param name="step">The step whose call found out, or null at <c>open</c>.</param>
@@ -144,16 +137,11 @@ internal static class PostgresErrors
     /// <param name="database">The database.</param>
     /// <param name="version">The server's version, as it is recorded.</param>
     public static DescribeFailure VersionNotSupported(string database, string version) =>
-        new(
-            ToolDiagnostics.ServerVersionNotSupported,
-            new EquatableArray<string>([
-                database,
-                Engine,
-                version,
-                PostgresSession.MinimumMajorVersion.ToString(CultureInfo.InvariantCulture),
-            ]),
-            null,
-            EquatableArray<string>.Empty,
+        DescribeFailures.VersionNotSupported(
+            database,
+            Engine,
+            version,
+            PostgresSession.MinimumMajorVersion.ToString(CultureInfo.InvariantCulture),
             VersionNotSupportedHelp
         );
 
@@ -238,23 +226,27 @@ internal static class PostgresErrors
     /// <summary>
     /// <c>SQLSRC228</c> for a type that <see cref="DeclaredTypeText" /> refuses.  Nothing of the query is sent.
     /// </summary>
-    public static DescribeFailure TypeRefused(DescribeRequest query, SqlQueryParameter parameter) =>
+    /// <param name="query">The query.</param>
+    /// <param name="parameter">The declared parameter.</param>
+    /// <param name="reason">What <see cref="DeclaredTypeText.Read" /> gave.</param>
+    public static DescribeFailure TypeRefused(DescribeRequest query, SqlQueryParameter parameter, string reason) =>
         DeclaredType(
             query,
             parameter,
-            NotATypeName,
+            reason,
             DescribeStep.DescribeParameters,
             EquatableArray<string>.Empty,
             NotATypeNameHelp
         );
 
     /// <summary>
-    /// What a failed <c>prepare</c> is reported as.  A statement that is not listed after it, and <c>42P05</c>, a
-    /// statement that already exists, are a connection that does not keep a session, <c>SQLSRC236</c>, whichever
-    /// the position; <c>42P14</c>, a utility statement, is <c>SQLSRC233</c>, as a backstop for what
-    /// <see cref="StatementShape" /> misses; an error the server positions inside the type list is the declared
-    /// type's, <c>SQLSRC228</c>; <c>42P18</c> and <c>42P08</c> name a parameter, <c>SQLSRC226</c> and
-    /// <c>SQLSRC227</c>; anything else is the server rejecting the query, <c>SQLSRC225</c>.  <c>42P05</c> is
+    /// What a failed <c>prepare</c> is reported as.  A statement that is not listed after it, <c>42P05</c>, a
+    /// statement that already exists, and a transaction the server refused, <c>08P01</c> with
+    /// <see cref="PostgresLive.TransactionRefused" />, are a connection that does not keep a session,
+    /// <c>SQLSRC236</c>, whichever the position; <c>42P14</c>, a utility statement, is <c>SQLSRC233</c>, as a
+    /// backstop for what <see cref="StatementShape" /> misses; an error the server positions inside the type list
+    /// is the declared type's, <c>SQLSRC228</c>; <c>42P18</c> and <c>42P08</c> name a parameter, <c>SQLSRC226</c>
+    /// and <c>SQLSRC227</c>; anything else is the server rejecting the query, <c>SQLSRC225</c>.  <c>42P05</c> is
     /// matched by its SQLSTATE alone: the message may be translated.
     /// </summary>
     public static DescribeFailure Prepare(
@@ -268,6 +260,7 @@ internal static class PostgresErrors
         if (
             error.SqlState == DuplicatePreparedStatement
             || (error.SqlState is null && error.Message == PostgresLive.StatementNotListed)
+            || (error.SqlState == ProtocolViolation && error.Message == PostgresLive.TransactionRefused)
         )
         {
             return SessionNotKept(database, DescribeStep.DescribeParameters, ServerLinesWithoutPosition(error));
@@ -284,8 +277,22 @@ internal static class PostgresErrors
         if (DeclaredAt(error, query, prepare, head) is { } declared)
         {
             return error.SqlState == UndefinedObject
-                ? DeclaredType(query, declared, NoSuchType, DescribeStep.DescribeParameters, lines, NoSuchTypeHelp)
-                : DeclaredType(query, declared, NotATypeName, DescribeStep.DescribeParameters, lines, NotATypeNameHelp);
+                ? DeclaredType(
+                    query,
+                    declared,
+                    DescribeFailures.NoSuchType,
+                    DescribeStep.DescribeParameters,
+                    lines,
+                    NoSuchTypeHelp
+                )
+                : DeclaredType(
+                    query,
+                    declared,
+                    DescribeFailures.NotATypeName,
+                    DescribeStep.DescribeParameters,
+                    lines,
+                    NotATypeNameHelp
+                );
         }
 
         if (error.SqlState is IndeterminateDatatype or AmbiguousParameter && NamedIn(error.Message, query) is { } named)
@@ -630,12 +637,5 @@ internal static class PostgresErrors
         DescribeStep step,
         EquatableArray<string> serverLines,
         string help
-    ) =>
-        new(
-            ToolDiagnostics.DeclaredTypeNotValid,
-            new EquatableArray<string>([parameter.Type ?? string.Empty, Written(parameter), query.Name, reason]),
-            step,
-            serverLines,
-            help
-        );
+    ) => DescribeFailures.DeclaredType(query, Written(parameter), parameter.Type, reason, step, serverLines, help);
 }

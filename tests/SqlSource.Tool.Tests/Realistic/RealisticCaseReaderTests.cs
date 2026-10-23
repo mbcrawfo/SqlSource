@@ -17,12 +17,30 @@ public sealed class RealisticCaseReaderTests
 
     private static RealisticEngine SqlServer => RealisticTestCases.SqlServer;
 
+    // A folder of the case of the name, which holds the query and the case.json given.  A test that leaves one out
+    // gives null for it, and one that gives neither has an empty folder.  Gives the path of the folder.
+    private static string CaseFolder(TempFolder temp, string name, string? query = Query, string? json = null)
+    {
+        var folder = temp.CreateFolder(name);
+        if (query is not null)
+        {
+            _ = temp.WriteFile(name + "/query.sql", query);
+        }
+
+        if (json is not null)
+        {
+            _ = temp.WriteFile(name + "/case.json", json);
+        }
+
+        return folder;
+    }
+
     [Fact]
     public void NamesIn_FolderWithoutQuerySql_IsNamedAndNotSkipped()
     {
         using var temp = new TempFolder();
-        _ = temp.WriteFile("b/query.sql", Query);
-        _ = temp.CreateFolder("a");
+        _ = CaseFolder(temp, "b");
+        _ = CaseFolder(temp, "a", query: null);
 
         RealisticCaseReader.NamesIn(temp.Path).ShouldBe(["a", "b"]);
     }
@@ -31,7 +49,7 @@ public sealed class RealisticCaseReaderTests
     public void AllIn_FolderWithoutQuerySql_ThrowsNamingTheCase()
     {
         using var temp = new TempFolder();
-        _ = temp.CreateFolder("queryless");
+        _ = CaseFolder(temp, "queryless", query: null);
 
         var thrown = Should.Throw<InvalidOperationException>(() => RealisticCaseReader.AllIn(temp.Path, Postgres));
 
@@ -43,11 +61,9 @@ public sealed class RealisticCaseReaderTests
     public void Read_FolderWithoutCaseJson_ThrowsNamingTheCase()
     {
         using var temp = new TempFolder();
-        _ = temp.WriteFile("lonely/query.sql", Query);
+        var folder = CaseFolder(temp, "lonely");
 
-        var thrown = Should.Throw<InvalidOperationException>(() =>
-            RealisticCaseReader.Read(temp.PathOf("lonely"), Postgres)
-        );
+        var thrown = Should.Throw<InvalidOperationException>(() => RealisticCaseReader.Read(folder, Postgres));
 
         thrown.Message.ShouldContain("realistic/lonely");
         thrown.Message.ShouldContain(RealisticCase.CaseFile);
@@ -57,14 +73,15 @@ public sealed class RealisticCaseReaderTests
     public void Read_FolderWithoutQuerySql_ThrowsNamingTheCase()
     {
         using var temp = new TempFolder();
-        _ = temp.WriteFile(
-            "queryless/case.json", /*lang=json,strict*/
+        var folder = CaseFolder(
+            temp,
+            "queryless",
+            query: null,
+            json: /*lang=json,strict*/
             "{ \"columns\": [] }"
         );
 
-        var thrown = Should.Throw<InvalidOperationException>(() =>
-            RealisticCaseReader.Read(temp.PathOf("queryless"), Postgres)
-        );
+        var thrown = Should.Throw<InvalidOperationException>(() => RealisticCaseReader.Read(folder, Postgres));
 
         thrown.Message.ShouldContain("realistic/queryless");
         thrown.Message.ShouldContain(RealisticCase.QueryFile);
@@ -74,13 +91,14 @@ public sealed class RealisticCaseReaderTests
     public void Read_SampleKeys_AreComparedIgnoringCase()
     {
         using var temp = new TempFolder();
-        _ = temp.WriteFile("cased/query.sql", Query);
-        _ = temp.WriteFile(
-            "cased/case.json", /*lang=json,strict*/
+        var folder = CaseFolder(
+            temp,
+            "cased",
+            json: /*lang=json,strict*/
             "{ \"columns\": [], \"samples\": [ { \"Limit\": \"10\" } ] }"
         );
 
-        var found = RealisticCaseReader.Read(temp.PathOf("cased"), Postgres);
+        var found = RealisticCaseReader.Read(folder, Postgres);
 
         found.Samples[0]["limit"].ShouldBe("10");
         found.Samples[0]["LIMIT"].ShouldBe("10");
@@ -90,15 +108,14 @@ public sealed class RealisticCaseReaderTests
     public void Read_SampleThatNamesAParameterTwiceIgnoringCase_ThrowsNamingIt()
     {
         using var temp = new TempFolder();
-        _ = temp.WriteFile("twice/query.sql", Query);
-        _ = temp.WriteFile(
-            "twice/case.json", /*lang=json,strict*/
+        var folder = CaseFolder(
+            temp,
+            "twice",
+            json: /*lang=json,strict*/
             "{ \"columns\": [], \"samples\": [ { \"limit\": \"10\", \"LIMIT\": \"20\" } ] }"
         );
 
-        var thrown = Should.Throw<InvalidOperationException>(() =>
-            RealisticCaseReader.Read(temp.PathOf("twice"), Postgres)
-        );
+        var thrown = Should.Throw<InvalidOperationException>(() => RealisticCaseReader.Read(folder, Postgres));
 
         thrown.Message.ShouldContain("realistic/twice");
         thrown.Message.ShouldContain("@LIMIT twice");
@@ -108,12 +125,9 @@ public sealed class RealisticCaseReaderTests
     public void Read_CaseJsonThatDoesNotParse_ThrowsNamingTheCase()
     {
         using var temp = new TempFolder();
-        _ = temp.WriteFile("broken/query.sql", Query);
-        _ = temp.WriteFile("broken/case.json", "{ \"columns\": [ { \"name\": ");
+        var folder = CaseFolder(temp, "broken", json: "{ \"columns\": [ { \"name\": ");
 
-        var thrown = Should.Throw<InvalidOperationException>(() =>
-            RealisticCaseReader.Read(temp.PathOf("broken"), Postgres)
-        );
+        var thrown = Should.Throw<InvalidOperationException>(() => RealisticCaseReader.Read(folder, Postgres));
 
         thrown.Message.ShouldContain("realistic/broken");
         thrown.Message.ShouldContain(RealisticCase.CaseFile);
@@ -221,12 +235,9 @@ public sealed class RealisticCaseReaderTests
     public void Read_CaseJsonThatIsWrong_ThrowsNamingTheCaseAndTheFault(string json, string fault)
     {
         using var temp = new TempFolder();
-        _ = temp.WriteFile("wrong/query.sql", Query);
-        _ = temp.WriteFile("wrong/case.json", json);
+        var folder = CaseFolder(temp, "wrong", json: json);
 
-        var thrown = Should.Throw<InvalidOperationException>(() =>
-            RealisticCaseReader.Read(temp.PathOf("wrong"), Postgres)
-        );
+        var thrown = Should.Throw<InvalidOperationException>(() => RealisticCaseReader.Read(folder, Postgres));
 
         thrown.Message.ShouldContain("realistic/wrong");
         thrown.Message.ShouldContain(fault);
@@ -236,13 +247,14 @@ public sealed class RealisticCaseReaderTests
     public void Read_CaseWithModelRefusal_ReadsIt()
     {
         using var temp = new TempFolder();
-        _ = temp.WriteFile("refused/query.sql", Query);
-        _ = temp.WriteFile(
-            "refused/case.json", /*lang=json,strict*/
+        var folder = CaseFolder(
+            temp,
+            "refused",
+            json: /*lang=json,strict*/
             "{ \"columns\": [], \"models\": { \"refusal\": \"SQLSRC255\", \"why\": \"two ids\" } }"
         );
 
-        var found = RealisticCaseReader.Read(temp.PathOf("refused"), Postgres);
+        var found = RealisticCaseReader.Read(folder, Postgres);
 
         found.Models.ShouldBe(new ModelRefusal("SQLSRC255", "two ids"));
         found.HasModels.ShouldBeFalse();
@@ -252,41 +264,42 @@ public sealed class RealisticCaseReaderTests
     public void Read_CaseWithCheckedFrom_ReadsIt()
     {
         using var temp = new TempFolder();
-        _ = temp.WriteFile("later/query.sql", Query);
-        _ = temp.WriteFile(
-            "later/case.json", /*lang=json,strict*/
+        var folder = CaseFolder(
+            temp,
+            "later",
+            json: /*lang=json,strict*/
             "{ \"columns\": [], \"checkedFrom\": { \"major\": 18, \"why\": \"a later plan\" } }"
         );
 
-        RealisticCaseReader
-            .Read(temp.PathOf("later"), Postgres)
-            .CheckedFrom.ShouldBe(new CheckedFrom(18, "a later plan"));
+        RealisticCaseReader.Read(folder, Postgres).CheckedFrom.ShouldBe(new CheckedFrom(18, "a later plan"));
     }
 
     [Fact]
     public void Read_CaseWithDapper_ReadsIt()
     {
         using var temp = new TempFolder();
-        _ = temp.WriteFile("unbound/query.sql", Query);
-        _ = temp.WriteFile(
-            "unbound/case.json", /*lang=json,strict*/
+        var folder = CaseFolder(
+            temp,
+            "unbound",
+            json: /*lang=json,strict*/
             "{ \"columns\": [], \"dapper\": { \"why\": \"a string sent as text\" } }"
         );
 
-        RealisticCaseReader.Read(temp.PathOf("unbound"), Postgres).Dapper.ShouldBe("a string sent as text");
+        RealisticCaseReader.Read(folder, Postgres).Dapper.ShouldBe("a string sent as text");
     }
 
     [Fact]
     public void Read_CaseWithoutSamples_HasOneEmptySet()
     {
         using var temp = new TempFolder();
-        _ = temp.WriteFile("plain/query.sql", Query);
-        _ = temp.WriteFile(
-            "plain/case.json", /*lang=json,strict*/
+        var folder = CaseFolder(
+            temp,
+            "plain",
+            json: /*lang=json,strict*/
             "{ \"columns\": [ { \"name\": \"one\", \"nullable\": false } ] }"
         );
 
-        var found = RealisticCaseReader.Read(temp.PathOf("plain"), Postgres);
+        var found = RealisticCaseReader.Read(folder, Postgres);
 
         found.Name.ShouldBe("plain");
         found.ToString().ShouldBe("realistic/plain");
@@ -301,27 +314,29 @@ public sealed class RealisticCaseReaderTests
     public void Read_CheckedFromOfTheEnginesRecordedMajor_ReadsIt()
     {
         using var temp = new TempFolder();
-        _ = temp.WriteFile("later/query.sql", Query);
-        _ = temp.WriteFile(
-            "later/case.json", /*lang=json,strict*/
+        var folder = CaseFolder(
+            temp,
+            "later",
+            json: /*lang=json,strict*/
             "{ \"columns\": [], \"checkedFrom\": { \"major\": 17, \"why\": \"w\" } }"
         );
 
-        RealisticCaseReader.Read(temp.PathOf("later"), SqlServer).CheckedFrom.ShouldBe(new CheckedFrom(17, "w"));
+        RealisticCaseReader.Read(folder, SqlServer).CheckedFrom.ShouldBe(new CheckedFrom(17, "w"));
     }
 
     [Fact]
     public void Read_CheckedFromOfAnotherEnginesRecordedMajor_ThrowsNamingTheEnginesOnes()
     {
         using var temp = new TempFolder();
-        _ = temp.WriteFile("later/query.sql", Query);
-        _ = temp.WriteFile(
-            "later/case.json", /*lang=json,strict*/
+        var folder = CaseFolder(
+            temp,
+            "later",
+            json: /*lang=json,strict*/
             "{ \"columns\": [], \"checkedFrom\": { \"major\": 18, \"why\": \"w\" } }"
         );
 
         Should
-            .Throw<InvalidOperationException>(() => RealisticCaseReader.Read(temp.PathOf("later"), SqlServer))
+            .Throw<InvalidOperationException>(() => RealisticCaseReader.Read(folder, SqlServer))
             .Message.ShouldContain("checkedFrom names 18, which is not a recorded major: 14 or 17");
     }
 }

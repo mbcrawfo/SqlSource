@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Logging;
 
@@ -180,39 +181,25 @@ internal static class PostgresEvents
     public static void Column(IRunLog log, string query, SidecarColumn column, bool gated) =>
         log.Write(
             "column",
-            new("query", query),
-            new("ordinal", column.Ordinal),
-            new("name", column.Name),
-            new("type", column.Type.Name),
-            new(
-                "origin",
-                column.Origin is { } origin
-                    ? LogValue.MapOf(
-                        new("schema", origin.Schema),
-                        new("table", origin.Table),
-                        new("column", origin.Column)
-                    )
-                    : LogValue.Null
-            ),
-            new("nullable", LogValue.Of(column.Nullable)),
-            new("nullableSource", column.NullableSource),
-            new("gated", gated)
+            [
+                .. DescriberEvents.ColumnHead(query, column),
+                new("nullable", LogValue.Of(column.Nullable)),
+                new("nullableSource", column.NullableSource),
+                new("gated", gated),
+            ]
         );
 
     /// <summary>
     /// <c>postgres.table-match</c>: <c>matched</c> with the relation whose column list the result is, or the first
     /// check of the match that failed with no table.  The relation is its schema and its name apart, as the origin
-    /// of a <c>column</c> is: a name may hold a dot.
+    /// of a <c>column</c> is: a name may hold a dot.  The verdict is written twice, as <c>result</c>, the name this
+    /// event began with, and as <c>tableMatch</c>, the name SQL Server's event has; the members are
+    /// <c>query</c>, <c>result</c>, <c>tableMatch</c> and <c>table</c>.
     /// </summary>
     public static void TableMatch(IRunLog log, string query, SidecarTable? table, string result) =>
         log.Write(
             "table-match",
-            new("query", query),
-            new("result", result),
-            new(
-                "table",
-                table is null ? LogValue.Null : LogValue.MapOf(new("schema", table.Schema), new("table", table.Table))
-            )
+            [new("query", query), new("result", result), .. DescriberEvents.TableMatchTail(table, result)]
         );
 
     /// <summary>
@@ -302,9 +289,7 @@ internal static class PostgresEvents
                 new("alias", node.Alias),
                 new(
                     "relation",
-                    node.RelationName is { } relation
-                        ? LogValue.MapOf(new("schema", node.Schema), new("table", relation))
-                        : LogValue.Null
+                    node.RelationName is { } relation ? DescriberEvents.TableOf(node.Schema, relation) : LogValue.Null
                 ),
                 new("nullExtends", TextOf(visited.NullExtends))
             );
@@ -383,14 +368,13 @@ internal static class PostgresEvents
         );
 
     private static LogValue RelationOf(PostgresRelationName relation) =>
-        LogValue.MapOf(new("schema", relation.Schema), new("table", relation.Name));
+        DescriberEvents.TableOf(relation.Schema, relation.Name);
 
     private static LogValue PartitionOf(PostgresPartitionRow row) =>
-        LogValue.MapOf(
-            new("schema", row.Schema),
-            new("table", row.Name),
-            new("ancestors", LogValue.ListOf(row.Ancestors.Select(static oid => (LogValue)oid)))
-        );
+        LogValue.MapOf([
+            .. DescriberEvents.TableMembers(row.Schema, row.Name),
+            new("ancestors", LogValue.ListOf(row.Ancestors.Select(static oid => (LogValue)oid))),
+        ]);
 
     private static LogValue TableOf(PostgresTableRow table) =>
         LogValue.MapOf(

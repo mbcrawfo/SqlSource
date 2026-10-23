@@ -13,6 +13,8 @@
     <ItemGroup>
         <!-- The version the tool itself references: central pinning would otherwise hold it at the generator's. -->
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
+        <!-- The arguments of a realistic case's run through Dapper, which RealisticInputs builds. -->
+        <PackageReference Include="Dapper" />
         <PackageReference Include="Shouldly" />
         <!-- Assert and TestContext, without what makes a project a test executable. -->
         <PackageReference Include="xunit.v3.assert" />

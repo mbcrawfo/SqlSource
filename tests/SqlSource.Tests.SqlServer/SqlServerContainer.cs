@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Globalization;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using SqlSource.Testing;
+using SqlSource.Tests.SqlServer.Realistic;
 using Testcontainers.MsSql;
 using Xunit;
 
@@ -17,9 +17,6 @@ namespace SqlSource.Tests.SqlServer;
 // killed.
 public sealed class SqlServerContainer : IAsyncLifetime
 {
-    // Names another image: CI runs the tests again on the oldest SQL Server that is supported.
-    public const string ImageVariable = "SQLSOURCE_TESTS_SQLSERVER_IMAGE";
-
     public const string Database = "fixtures";
 
     // The second database, for the corpus of realistic queries: its own schema and seed, so that the fixture schema
@@ -31,19 +28,14 @@ public sealed class SqlServerContainer : IAsyncLifetime
 
     public const string BillingDatabase = "billing";
 
-    private readonly MsSqlContainer _container = new MsSqlBuilder(Image).Build();
+    // Set by InitializeAsync, which starts it through EngineImage, and that through SqlServerStart (TD-0072).
+    private MsSqlContainer? _container;
 
     // The server's major version, read once when the container has started: 14 for SQL Server 2017, 17 for 2025.
     public int Major { get; private set; }
 
-    // The majors that CI runs and that the tests pin answers for.
-    public static IReadOnlyList<int> RecordedMajors { get; } = [14, 17];
-
     // The databases of the end-to-end tests, in the order they are built.
     public static IReadOnlyList<string> EndToEndDatabases { get; } = [AppDatabase, BillingDatabase];
-
-    public static string Image =>
-        Environment.GetEnvironmentVariable(ImageVariable) is { Length: > 0 } image ? image : DefaultImages.SqlServer;
 
     // The build that SERVERPROPERTY('ProductVersion') reports on each image the tests run, the default and the floor,
     // recorded when its tag was chosen.  Moving a tag changes its row; see tests/SqlSource.Tests.SqlServer/README.md.
@@ -54,10 +46,6 @@ public sealed class SqlServerContainer : IAsyncLifetime
             ["mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04"] = "14.0.3560.2",
         };
 
-    // The tag of an image, which for a pinned image names its update: "...:2025-CU9-GDR1-ubuntu-24.04" is
-    // "2025-CU9-GDR1-ubuntu-24.04".
-    public static string TagOf(string image) => image[(image.LastIndexOf(':') + 1)..];
-
     // Of the database "fixtures".
     public string ConnectionString => ConnectionStringOf(Database);
 
@@ -66,7 +54,7 @@ public sealed class SqlServerContainer : IAsyncLifetime
 
     // Of the named database of the container.  The container's own string trusts the server's certificate.
     public string ConnectionStringOf(string database) =>
-        new SqlConnectionStringBuilder(_container.GetConnectionString()) { InitialCatalog = database }.ConnectionString;
+        new SqlConnectionStringBuilder(Container.GetConnectionString()) { InitialCatalog = database }.ConnectionString;
 
     // A source of the named database of the container, which the caller disposes.
     public DbDataSource SourceOf(string database) =>
@@ -93,26 +81,15 @@ public sealed class SqlServerContainer : IAsyncLifetime
     }
 
     // Skips the test on a server before that major, which lacks what the reason names.
-    public void SkipBelow(int major, string reason) => SkipBelow(Major, major, reason);
-
-    public static void SkipBelow(int server, int major, string reason) => Assert.SkipWhen(server < major, reason);
+    public void SkipBelow(int major, string reason) => EngineImage.SkipBelow(Major, major, reason);
 
     // Skips the test on a server whose major is not recorded, where what it pins is not known.
-    public void SkipUnlessRecordedMajor(string what) => SkipUnlessRecordedMajor(Major, what);
-
-    public static void SkipUnlessRecordedMajor(int server, string what) =>
-        Assert.SkipUnless(
-            RecordedMajors.Contains(server),
-            string.Create(
-                CultureInfo.InvariantCulture,
-                $"{what} are pinned for SQL Server {string.Join(" and ", RecordedMajors)} alone."
-            )
-        );
+    public void SkipUnlessRecordedMajor(string what) => EngineImage.SqlServer.SkipUnlessRecordedMajor(Major, what);
 
     public async ValueTask InitializeAsync()
     {
         var token = TestContext.Current.CancellationToken;
-        await _container.StartAsync(token);
+        _container = await EngineImage.SqlServer.StartAsync(new MsSqlBuilder(EngineImage.SqlServer.Image).Build, token);
         try
         {
             await using var server = SourceOf("master");
@@ -131,7 +108,7 @@ public sealed class SqlServerContainer : IAsyncLifetime
                 EndToEndEngine.SqlServer,
                 RealisticDatabase,
                 SourceOf,
-                [RepositoryPaths.RealisticSchema, RepositoryPaths.RealisticSeed],
+                [RealisticCases.Corpus.Schema, RealisticCases.Corpus.Seed],
                 token
             );
 
@@ -175,5 +152,8 @@ public sealed class SqlServerContainer : IAsyncLifetime
         return database == AppDatabase && major >= 17 ? [.. built, RepositoryPaths.NewTypesSchema] : built;
     }
 
-    public ValueTask DisposeAsync() => _container.DisposeAsync();
+    public ValueTask DisposeAsync() => _container?.DisposeAsync() ?? ValueTask.CompletedTask;
+
+    private MsSqlContainer Container =>
+        _container ?? throw new InvalidOperationException("The container has not started.");
 }

@@ -130,7 +130,7 @@ public sealed class SqlDialectNameTests
     }
 
     [Fact]
-    public void Accepted_ListsTheNameOfEveryDialect() =>
+    public void Accepted_OfEveryDialect_ListsItsName() =>
         SqlDialectName.Accepted.ShouldBe("ansi, mssql, postgres, cockroachdb, mysql, mariadb, sqlite and oracle");
 
     [Theory]
@@ -152,5 +152,5 @@ public sealed class SqlDialectNameTests
     }
 
     [Fact]
-    public void Ansi_IsTheDefaultValue() => default(SqlDialect).ShouldBe(SqlDialect.Ansi);
+    public void Ansi_AsADialect_IsTheDefaultValue() => default(SqlDialect).ShouldBe(SqlDialect.Ansi);
 }

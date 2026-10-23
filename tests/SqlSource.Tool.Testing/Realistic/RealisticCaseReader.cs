@@ -9,7 +9,7 @@ using System.Text.Json.Serialization;
 namespace SqlSource.Tool.Testing.Realistic;
 
 // The cases of a corpus, each a folder of its root, read for an engine.  A case folder that is wrong fails naming the
-// case and the fault.  Each test project's RealisticCases reads its own corpus through it.
+// case and the fault.  Each engine's RealisticCorpus reads its cases through it.
 internal static class RealisticCaseReader
 {
     private static readonly JsonSerializerOptions Options = new()

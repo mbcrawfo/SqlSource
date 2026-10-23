@@ -4,6 +4,7 @@ using Shouldly;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Testing;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 
@@ -163,7 +164,7 @@ public sealed class PostgresSessionCheckTests
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.ServerLines.ShouldBe(["57014: canceling statement due to statement timeout"]);
         var (_, check) = log.Events.Single(written => written.Name == "check");
-        check.Single(member => member.Name == "result").Value.ShouldBe((LogValue)NpgsqlCheck.Error);
+        RecordingLog.Member(check, "result").ShouldBe((LogValue)NpgsqlCheck.Error);
         exchange.Unused.ShouldBeEmpty();
     }
 

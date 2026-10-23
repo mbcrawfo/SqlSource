@@ -102,7 +102,7 @@ public sealed class SessionTests(PostgresContainer postgres)
         var failure = await ShouldNotOpenAsync(connection.ConnectionString);
 
         failure.ServerLines.ShouldBe([PostgresConnection.UnreadableFile]);
-        Sessions.TextsOf(failure).ShouldAllBe(text => !text.Contains(path, StringComparison.Ordinal));
+        Failures.TextsOf(failure).ShouldAllBe(text => !text.Contains(path, StringComparison.Ordinal));
     }
 
     // The exchange asks the server, so that the session's connection is open, and then fails.  The caller of the
@@ -116,9 +116,13 @@ public sealed class SessionTests(PostgresContainer postgres)
         var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString) { ApplicationName = application };
         var thrown = new InvalidOperationException("the exchange failed after the server answered");
         await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
-        var exchange = new ThrowsAfterTheServerAnswered(
-            thrown,
-            async () => await BackendsOfAsync(own, application, token)
+        var backendsWhileOpen = -1L;
+        var exchange = new HookedExchange(
+            after: async (_, _, _) =>
+            {
+                backendsWhileOpen = await BackendsOfAsync(own, application, token);
+                throw thrown;
+            }
         );
 
         var caught = await Should.ThrowAsync<InvalidOperationException>(
@@ -126,10 +130,7 @@ public sealed class SessionTests(PostgresContainer postgres)
         );
 
         caught.ShouldBeSameAs(thrown);
-        exchange.BackendsWhileOpen.ShouldBe(
-            1,
-            "the session did not connect, so the count of none below proves nothing"
-        );
+        backendsWhileOpen.ShouldBe(1, "the session did not connect, so the count of none below proves nothing");
         await Eventually.TrueAsync(
             async () => await BackendsOfAsync(own, application, token) == 0,
             "the failed session left its connection open"
@@ -183,8 +184,8 @@ public sealed class SessionTests(PostgresContainer postgres)
     public async Task DescribeAsync_ServerEndsTheSessionBetweenPrepareAndColumns_IsSqlsrc225AndNoThrow()
     {
         PostgresSession? ending = null;
-        var exchange = new AfterLiveExchange(
-            async (method, _, _) =>
+        var exchange = new HookedExchange(
+            after: async (method, _, _) =>
             {
                 if (method == "prepare" && ending is { } open)
                 {
@@ -204,49 +205,73 @@ public sealed class SessionTests(PostgresContainer postgres)
         CaptureJson.Write(capture).ShouldNotContain(new NpgsqlConnectionStringBuilder(postgres.ConnectionString).Host!);
     }
 
-    // Another session drops the table the query reads after "columns" named it: "tables" answers nothing for it.  That
-    // is SQLSRC225 at the catalog and not a throw, "types" and "check" are not asked, the statement is freed, and the
-    // session describes another query afterwards.
-    [Fact]
-    public async Task DescribeAsync_TableDroppedBetweenColumnsAndTables_IsSqlsrc225AtCatalogAndNoThrow()
+    // The describe's transaction keeps the lock that preparing took on the table the query reads, so another session
+    // that drops the table during the describe waits for it, which gives its answer; the drop is made once the
+    // describe has ended.  After "explain" the describe has rolled back to its savepoint, which must not give the
+    // lock up.  The query is gated, so that "explain" is asked.
+    [Theory]
+    [InlineData("columns")]
+    [InlineData("explain")]
+    public async Task DescribeAsync_TableDroppedDuringTheDescribe_WaitsForIt(string after)
     {
         await postgres.ExecuteAsync("CREATE TABLE IF NOT EXISTS session_gone (id int)");
         try
         {
-            var dropped = false;
-            var exchange = new AfterLiveExchange(
-                async (method, _, _) =>
+            string? refused = null;
+            var exchange = new HookedExchange(
+                after: async (method, _, _) =>
                 {
-                    if (method == "columns" && !dropped)
+                    if (method == after && refused is null)
                     {
-                        dropped = true;
-                        await postgres.ExecuteAsync("DROP TABLE session_gone");
+                        refused = await DropSessionGoneWithinAsync("200ms");
                     }
                 }
             );
-            var (opened, capture) = await Sessions.OpenCapturedAsync(postgres.ConnectionString, exchange);
-            await using var session = opened;
-            var token = TestContext.Current.CancellationToken;
+            await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString, exchange);
 
-            var described = await session.DescribeAsync(DescribeRequests.Of("SELECT id FROM session_gone"), token);
-            var later = await session.DescribeAsync(DescribeRequests.Of("SELECT 1 AS one"), token);
+            var described = await session.DescribeAsync(
+                DescribeRequests.Of(
+                    "SELECT g.id, h.id AS other FROM session_gone g LEFT JOIN session_gone h ON h.id = g.id"
+                ),
+                TestContext.Current.CancellationToken
+            );
 
-            var failure = ShouldBeRejected(described, DescribeStep.Catalog);
-            failure.Arguments.ShouldBe([DescribeRequests.Query, "the table of the column 'id' no longer exists"]);
-            failure.ServerLines.ShouldBeEmpty();
-            failure.Help.ShouldBe(PostgresErrors.SchemaChangedHelp);
-            capture
-                .Calls.Take(5)
-                .Select(call => call.Method)
-                .ShouldBe(["open", "prepare", "columns", "tables", "deallocate"]);
-            later.Failure.ShouldBeNull();
-            _ = later.Value.ShouldNotBeNull();
+            refused.ShouldBe("55P03", "the drop did not wait for the describe");
+            described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
             (await Sessions.PreparedStatementsAsync(session)).ShouldBe(0);
+            (await DropSessionGoneWithinAsync("10s")).ShouldBeNull();
         }
         finally
         {
-            // A run that fails before the hook drops the table leaves none for the next test.
+            // A run that fails before the drop leaves no table for the next test.
             await postgres.ExecuteAsync("DROP TABLE IF EXISTS session_gone");
+        }
+    }
+
+    // Drops session_gone from a connection of the test's own, waiting for its lock no longer than the timeout: the
+    // SQLSTATE of the server's refusal, or null when the table was dropped.
+    private async Task<string?> DropSessionGoneWithinAsync(string timeout)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = await own.OpenConnectionAsync(token);
+        await using (
+            var limit = new NpgsqlCommand("SELECT pg_catalog.set_config('lock_timeout', @timeout, false)", connection)
+        )
+        {
+            _ = limit.Parameters.AddWithValue("timeout", timeout);
+            _ = await limit.ExecuteScalarAsync(token);
+        }
+
+        try
+        {
+            await using var drop = new NpgsqlCommand("DROP TABLE session_gone", connection);
+            _ = await drop.ExecuteNonQueryAsync(token);
+            return null;
+        }
+        catch (PostgresException refused)
+        {
+            return refused.SqlState;
         }
     }
 
@@ -265,8 +290,8 @@ public sealed class SessionTests(PostgresContainer postgres)
         PostgresSession? reading = null;
         PostgresPrepareRequest? sent = null;
         string? listed = null;
-        var exchange = new AfterLiveExchange(
-            async (method, request, token) =>
+        var exchange = new HookedExchange(
+            after: async (method, request, token) =>
             {
                 if (request is PostgresPrepareRequest prepare && reading is { } open)
                 {
@@ -302,50 +327,13 @@ public sealed class SessionTests(PostgresContainer postgres)
         return failure;
     }
 
-    // Asks the server, and then runs the test's hook with the call's method and request.  The hook also runs after
-    // "open", before the test holds its session, so a hook that needs the session acts only once it is set.
-    private sealed class AfterLiveExchange(Func<string, object?, CancellationToken, Task> after) : IDescribeExchange
-    {
-        public async Task<TAnswer> AskAsync<TRequest, TAnswer>(
-            string method,
-            TRequest request,
-            Func<TRequest, CancellationToken, Task<TAnswer>> live,
-            CancellationToken cancellationToken
-        )
-        {
-            var answer = await LiveExchange.Instance.AskAsync(method, request, live, cancellationToken);
-            await after(method, request, cancellationToken);
-            return answer;
-        }
-    }
-
-    // Asks the server, counts the backends of the test's application name while the connection is open, and then
-    // throws what it was given.
-    private sealed class ThrowsAfterTheServerAnswered(Exception exception, Func<Task<long>> countBackends)
-        : IDescribeExchange
-    {
-        public long BackendsWhileOpen { get; private set; } = -1;
-
-        public async Task<TAnswer> AskAsync<TRequest, TAnswer>(
-            string method,
-            TRequest request,
-            Func<TRequest, CancellationToken, Task<TAnswer>> live,
-            CancellationToken cancellationToken
-        )
-        {
-            _ = await live(request, cancellationToken);
-            BackendsWhileOpen = await countBackends();
-            throw exception;
-        }
-    }
-
     // No text of the failure holds any of the words: a host, a user or a database's own name.
     private static void ShouldNotName(DescribeFailure failure, params string?[] words)
     {
         foreach (var word in words)
         {
             var named = word.ShouldNotBeNull();
-            Sessions.TextsOf(failure).ShouldAllBe(text => !text.Contains(named, StringComparison.Ordinal));
+            Failures.TextsOf(failure).ShouldAllBe(text => !text.Contains(named, StringComparison.Ordinal));
         }
     }
 
@@ -359,7 +347,7 @@ public sealed class SessionTests(PostgresContainer postgres)
         failure.Descriptor.Id.ShouldBe("SQLSRC224");
         failure.Arguments.ShouldBe([PostgresContainer.Database]);
         failure.Step.ShouldBeNull();
-        Sessions
+        Failures
             .TextsOf(failure)
             .ShouldAllBe(text =>
                 !text.Contains(connection, StringComparison.Ordinal)

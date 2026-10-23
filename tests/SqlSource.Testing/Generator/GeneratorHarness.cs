@@ -31,6 +31,9 @@ internal static class GeneratorHarness
     // That path as the generator normalises it, relative to the project's folder.
     public const string UsersNormalizedPath = "app/Repo/Users.sql";
 
+    // The file that most tests give the generator: one query, GetUser, at UsersPath.
+    public static readonly SqlFile UsersFile = new(UsersPath, SqlTexts.GetUser);
+
     // The newest language version that Roslyn 4.8.0 parses.  Documentation comments are checked, as they are in a
     // project that builds a documentation file, so that a malformed or missing one in generated code is reported.
     public static readonly CSharpParseOptions ParseOptions = new(LanguageVersion.CSharp12, DocumentationMode.Diagnose);
@@ -49,6 +52,13 @@ internal static class GeneratorHarness
         typeof(SqlSourceGenerator).Assembly.Location,
         new LoadedAssembly()
     ).GetAnalyzers(LanguageNames.CSharp);
+
+    // The source of the type App.Sample, whose attribute has SqlLocation.Direct and these arguments after it: null for
+    // none, or text such as Parameters = "keep-comments".
+    public static string SampleSource(string? arguments) =>
+        "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate(SqlLocation = SqlLocation.Direct"
+        + (arguments is null ? string.Empty : ", " + arguments)
+        + ")]\npublic partial class Sample;\n";
 
     // Every run states its output, the project's SqlSourceOutput: null leaves it unset, for a test that needs the
     // project not to set it, of the default or of the output's levels.

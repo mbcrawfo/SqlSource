@@ -18,6 +18,45 @@ internal static class SqlServerAllTypesRows
 
     public const int NullRowId = 2;
 
+    // The properties of AllTypesDto, the model of all_types, in the order of the columns, each with its type and
+    // whether it can be null, as the generator gives them on SqlClient 6.1 and 7 alike.  This library cannot reference
+    // SqlClient, so the three properties of new_types, one of them a SqlVector<float>, are in the tests that read them.
+    public static IReadOnlyList<(string Name, Type Type, bool Nullable)> AllTypesProperties { get; } =
+    [
+        ("Id", typeof(int), false),
+        ("BigintValue", typeof(long?), true),
+        ("IntValue", typeof(int?), true),
+        ("SmallintValue", typeof(short?), true),
+        ("TinyintValue", typeof(byte?), true),
+        ("BitValue", typeof(bool?), true),
+        ("DecimalValue", typeof(decimal?), true),
+        ("NumericValue", typeof(decimal?), true),
+        ("MoneyValue", typeof(decimal?), true),
+        ("SmallmoneyValue", typeof(decimal?), true),
+        ("FloatValue", typeof(double?), true),
+        ("RealValue", typeof(float?), true),
+        ("DateValue", typeof(DateTime?), true),
+        ("DatetimeValue", typeof(DateTime?), true),
+        ("Datetime2Value", typeof(DateTime?), true),
+        ("SmalldatetimeValue", typeof(DateTime?), true),
+        ("TimeValue", typeof(TimeSpan?), true),
+        ("DatetimeoffsetValue", typeof(DateTimeOffset?), true),
+        ("CharValue", typeof(string), true),
+        ("VarcharValue", typeof(string), true),
+        ("TextValue", typeof(string), true),
+        ("NcharValue", typeof(string), true),
+        ("NvarcharValue", typeof(string), true),
+        ("NtextValue", typeof(string), true),
+        ("XmlValue", typeof(string), true),
+        ("BinaryValue", typeof(byte[]), true),
+        ("VarbinaryValue", typeof(byte[]), true),
+        ("ImageValue", typeof(byte[]), true),
+        ("RowversionValue", typeof(byte[]), true),
+        ("UniqueidentifierValue", typeof(Guid?), true),
+        ("SqlVariantValue", typeof(object), true),
+        ("SysnameValue", typeof(string), true),
+    ];
+
     private const string Rowversion = "RowversionValue";
 
     private const string SqlVector = "Microsoft.Data.SqlTypes.SqlVector`1";

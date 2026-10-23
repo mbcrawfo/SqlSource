@@ -57,7 +57,7 @@ internal static class QueryTyper
         foreach (var entry in check.UsableEntries)
         {
             // The entries are in the order of their queries in the file, so each search starts after the last.
-            var at = IndexOf(file.Queries, entry.Name, next);
+            var at = QueryNames.IndexOf(file.Queries, entry.Name, next);
             if (at < 0)
             {
                 continue;
@@ -66,8 +66,9 @@ internal static class QueryTyper
             next = at + 1;
             var query = file.Queries[at];
             var typing = new Typing(
-                input.Probe.Column,
+                input.NpgsqlProbe.Column,
                 input.SqlClientProbe.Column,
+                input.SqlClientProbe.VersionText,
                 LookupOf(query.Markers, input, engine, lookups),
                 query.NameLocation,
                 diagnostics
@@ -164,25 +165,24 @@ internal static class QueryTyper
             );
         }
 
-        typing.Diagnostics.Add(
-            Diagnose(mapping, MessageSubject.Of(owner, name), type.Name, typing.Location, typing.Column, engine)
-        );
+        typing.Diagnostics.Add(Diagnose(mapping, MessageSubject.Of(owner, name), type.Name, typing, engine));
         return null;
     }
 
     // The failure's diagnostic.  NeedsDriver and Unreadable occur for both engines, and their helps name the engine's
-    // driver and system schema; NeedsSqlServerTypes is SQL Server's alone, and NotWrittenByTheTool and the type
-    // override's failures read the same for both.  Every other kind is PostgreSQL's alone.
+    // driver and system schema; NeedsSqlServerTypes and NeedsNewerSqlClient are SQL Server's alone, and
+    // NotWrittenByTheTool and the type override's failures read the same for both.  Every other kind is PostgreSQL's
+    // alone.
     private static DiagnosticInfo Diagnose(
         TypeMapping failure,
         string subject,
         string typeName,
-        LocationInfo at,
-        DriverColumn column,
+        Typing typing,
         DatabaseEngine engine
     )
     {
         var key = failure.Key;
+        var at = typing.Location;
         return failure.Kind switch
         {
             TypeMappingKind.CastToOid or TypeMappingKind.CastToText => DiagnosticInfo.Create(
@@ -212,7 +212,7 @@ internal static class QueryTyper
                 at,
                 subject,
                 typeName,
-                (column == DriverColumn.None ? "Reference Npgsql, then map" : "Map")
+                (typing.Column == NpgsqlColumn.None ? "Reference Npgsql, then map" : "Map")
                     + " it with the type override, as "
                     + key
                     + "=NpgsqlTypes.NpgsqlRange<T> with the data source's EnableUnmappedTypes()"
@@ -223,6 +223,14 @@ internal static class QueryTyper
                 subject,
                 typeName,
                 "Reference Microsoft.Data.SqlClient"
+            ),
+            TypeMappingKind.NeedsNewerSqlClient => DiagnosticInfo.Create(
+                SqlDiagnostics.TypeNeedsNewerSqlClient,
+                at,
+                subject,
+                typeName,
+                failure.Detail ?? "",
+                typing.SqlClientVersion
             ),
             TypeMappingKind.NeedsDriver => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeNeedsNpgsql,
@@ -297,7 +305,7 @@ internal static class QueryTyper
     // schema already, which is found by splitting the key, as a dot inside quotes is no schema's.
     private static string AsAKey(string key, DatabaseEngine engine)
     {
-        if (!TypeKeys.TrySplit(key.AsSpan(), out var schema, out _, out _) || !schema.IsEmpty)
+        if (!TypeKeyText.TrySplit(key.AsSpan(), out var schema, out _, out _) || !schema.IsEmpty)
         {
             return key;
         }
@@ -310,10 +318,10 @@ internal static class QueryTyper
                 TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out var normalized)
                 && string.Equals(normalized, key, StringComparison.Ordinal)
                 ? key
-                : "sys." + key;
+                : SystemSchemas.SqlServer + "." + key;
         }
 
-        return TypeKeys.TryNormalize(key.AsSpan(), out _) ? key : "pg_catalog." + key;
+        return TypeKeys.TryNormalizePostgres(key.AsSpan(), out _) ? key : SystemSchemas.Postgres + "." + key;
     }
 
     // A failure of a mapped type keeps the type the override names in its text, which the message gives as a user
@@ -356,23 +364,12 @@ internal static class QueryTyper
         return made;
     }
 
-    private static int IndexOf(EquatableArray<SqlQuery> queries, string name, int from)
-    {
-        for (var index = from; index < queries.Count; index++)
-        {
-            if (string.Equals(queries[index].Name, name, StringComparison.Ordinal))
-            {
-                return index;
-            }
-        }
-
-        return -1;
-    }
-
-    // What the typing of one query reads, and where its error goes.
+    // What the typing of one query reads, and where its error goes.  SqlClientVersion is the probe's VersionText, for
+    // the message of a type that the project's SqlClient is too old for.
     private readonly record struct Typing(
-        DriverColumn Column,
+        NpgsqlColumn Column,
         SqlClientColumn SqlClientColumn,
+        string SqlClientVersion,
         OverrideLookup? Lookup,
         LocationInfo Location,
         ImmutableArray<DiagnosticInfo>.Builder Diagnostics
@@ -420,7 +417,7 @@ internal static class QueryTyper
         }
 
         /// <summary>The lookup of a PostgreSQL file's types, or null in a SQL Server file.</summary>
-        public OverrideOf? OfPostgres { get; }
+        public PostgresOverrideOf? OfPostgres { get; }
 
         /// <summary>The lookup of a SQL Server file's types, or null in a PostgreSQL file.</summary>
         public SqlServerOverrideOf? OfSqlServer { get; }
@@ -461,14 +458,14 @@ internal static class QueryTyper
         private TypeOverride? EntryOf(PostgresType type, string suffix)
         {
             var key = PostgresTypeMap.KeyOf(type);
-            var bare = TypeKeys.WritePart(type.InternalName);
+            var bare = TypeKeyText.WritePart(type.InternalName);
             return TypeOverrideMap.Find(_map, key + suffix)
                 ?? (key.Length > bare.Length && IsExtension(type) ? TypeOverrideMap.Find(_map, bare + suffix) : null);
         }
 
         private static bool IsExtension(PostgresType type) =>
             type.Kind.Equals(SidecarValues.Kind.Base, StringComparison.Ordinal)
-            && TypeKeys.IsExtension(type.InternalName);
+            && TypeKeyNames.IsExtension(type.InternalName);
 
         private TypeMapping? MappingOf(TypeOverride entry)
         {

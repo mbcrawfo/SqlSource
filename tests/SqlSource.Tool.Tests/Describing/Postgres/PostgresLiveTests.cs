@@ -1,4 +1,6 @@
 using System;
+using System.Threading.Tasks;
+using Npgsql;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
@@ -54,4 +56,85 @@ public sealed class PostgresLiveTests
         Should.Throw<ArgumentException>(() =>
             PostgresLive.SetTexts(new PostgresExplainRequest("sqlsource_1", 0, ["work_mem=1"]))
         );
+
+    // PgBouncer in statement mode refuses a BEGIN with 08P01: the answer of "prepare" keeps the SQLSTATE and the tool's
+    // own text in place of the pooler's.
+    [Fact]
+    public void RefusedTransaction_ProtocolViolation_IsTheAnswerOfARefusedTransaction() =>
+        PostgresLive
+            .RefusedTransaction(
+                new PostgresException(
+                    "transaction blocks not allowed in statement pooling mode",
+                    "ERROR",
+                    "ERROR",
+                    "08P01"
+                )
+            )
+            .ShouldBe(
+                new PostgresPrepareAnswer(
+                    null,
+                    new PostgresServerError("08P01", PostgresLive.TransactionRefused, null, null, null)
+                )
+            );
+
+    // Another error of the pooler has the same SQLSTATE, as a full pool's query_wait_timeout in transaction mode: it is
+    // no refusal of the transaction, and is answered as any other server error.
+    [Theory]
+    [InlineData("57P01", "terminating connection")]
+    [InlineData("08006", "terminating connection")]
+    [InlineData("08P01", "query_wait_timeout")]
+    [InlineData("08P01", "server login failed: wrong password type")]
+    public void RefusedTransaction_OtherServerError_IsNull(string state, string message) =>
+        PostgresLive.RefusedTransaction(new PostgresException(message, "FATAL", "FATAL", state)).ShouldBeNull();
+
+    [Fact]
+    public void RefusedTransaction_LostConnection_IsNull() =>
+        PostgresLive.RefusedTransaction(new NpgsqlException(PostgresConnection.LostConnection)).ShouldBeNull();
+
+    // An NpgsqlException the call throws, whatever its cause, is the answer's error, made by errorOf.  AnswerAsync has
+    // no cancellation filter: it catches by the exception's type alone, and a cancellation that is no NpgsqlException
+    // passes through, as the next test pins.
+    [Fact]
+    public async Task AnswerAsync_CallThatThrowsAnNpgsqlException_IsTheFailedAnswer()
+    {
+        var thrown = new NpgsqlException("the connection failed");
+        NpgsqlException? seen = null;
+
+        var answer = await PostgresLive.AnswerAsync(
+            () => throw thrown,
+            exception =>
+            {
+                seen = exception;
+                return new PostgresServerError("08006", "made by errorOf", null, null, null);
+            },
+            error => new PostgresDeallocateAnswer(error)
+        );
+
+        seen.ShouldBeSameAs(thrown);
+        answer.ShouldBe(
+            new PostgresDeallocateAnswer(new PostgresServerError("08006", "made by errorOf", null, null, null))
+        );
+    }
+
+    [Fact]
+    public async Task AnswerAsync_CallThatIsCancelled_Throws() =>
+        await Should.ThrowAsync<OperationCanceledException>(() =>
+            PostgresLive.AnswerAsync<PostgresDeallocateAnswer>(
+                () => throw new OperationCanceledException(),
+                _ => throw new InvalidOperationException("errorOf must not run"),
+                _ => throw new InvalidOperationException("failed must not run")
+            )
+        );
+
+    [Fact]
+    public async Task AnswerAsync_CallThatAnswers_IsItsAnswer()
+    {
+        var answer = await PostgresLive.AnswerAsync(
+            () => Task.FromResult(new PostgresDeallocateAnswer(null)),
+            _ => throw new InvalidOperationException("errorOf must not run"),
+            _ => throw new InvalidOperationException("failed must not run")
+        );
+
+        answer.ShouldBe(new PostgresDeallocateAnswer(null));
+    }
 }

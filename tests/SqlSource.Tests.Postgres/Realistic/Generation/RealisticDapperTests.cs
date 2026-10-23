@@ -1,11 +1,8 @@
-using System;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
 using Shouldly;
-using SqlSource.Snapshot;
 using SqlSource.Tests.Postgres.EndToEnd;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
@@ -23,12 +20,12 @@ public sealed class RealisticDapperTests(PostgresContainer postgres)
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
     public async Task QueryAsync_Case_ReadsEveryRowIntoItsModel(string name)
     {
-        var found = RealisticCases.ReadNamed(name);
-        SkipUnlessRead(found, postgres.Major);
+        var found = RealisticCases.Corpus.ReadNamed(name);
+        RealisticModels.SkipUnlessReadThroughDapper(found, postgres.Major);
         var entry = RealisticModels.EntryOf(found);
-        var output = RealisticModels.OutputModelOf(entry);
-        var input = RealisticModels.InputModelOf(entry);
-        var sql = SqlOf(found, entry);
+        var output = RealisticCases.Models.OutputModelOf(entry);
+        var input = RealisticCases.Models.InputModelOf(entry);
+        var sql = RealisticCases.Models.SqlOf(RealisticCases.Corpus, found, entry);
         await using var source = EndToEndSources.Realistic(postgres);
 
         var rows = 0;
@@ -36,7 +33,7 @@ public sealed class RealisticDapperTests(PostgresContainer postgres)
         {
             var arguments = input is null
                 ? null
-                : RealisticParameters.ArgumentsOf(
+                : RealisticInputs.ArgumentsOf(
                     await RealisticParameters.InputModelAsync(source, input, entry.Parameters, sample),
                     entry.Parameters
                 );
@@ -54,32 +51,5 @@ public sealed class RealisticDapperTests(PostgresContainer postgres)
         {
             Assert.Fail($"{found} read no row for any sample");
         }
-    }
-
-    // Skips a case that the run does not read, with the reason.
-    private static void SkipUnlessRead(RealisticCase found, int major)
-    {
-        if (found.IsReadThroughDapperOn(major))
-        {
-            return;
-        }
-
-        RealisticModels.SkipUnlessHasModels(found);
-        found.SkipUnlessRunsOn(major);
-        Assert.Skip($"{found} has a parameter that Dapper cannot send: {found.Dapper}.");
-    }
-
-    // The SQL of the case's query, the constant of its claiming class named as the query, which SqlLocation.Direct
-    // writes on the class itself.
-    private static string SqlOf(RealisticCase found, SidecarEntry entry)
-    {
-        var claim = RealisticClaims.Of(found);
-        var assembly = typeof(RealisticDapperTests).Assembly;
-        var type =
-            assembly.GetType($"{typeof(RealisticDapperTests).Namespace}.{claim.TypeName}")
-            ?? throw new InvalidOperationException($"The class {claim.TypeName} of {found} is not compiled");
-        return type.GetField(entry.Name, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)
-                ?.GetValue(null) as string
-            ?? throw new InvalidOperationException($"The class {claim.TypeName} of {found} has no SQL {entry.Name}");
     }
 }

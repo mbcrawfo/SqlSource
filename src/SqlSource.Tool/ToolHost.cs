@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.SqlServer;
@@ -9,8 +10,9 @@ namespace SqlSource.Tool;
 
 /// <summary>
 /// What the tool takes from outside itself.  Nothing in the tool reads <see cref="Console" />,
-/// <see cref="Environment" /> or the current directory except <see cref="Create" /> and
-/// <see cref="Cli.Run(string[])" />, the entry of a real run, so that a test can give a run its own.
+/// <see cref="Environment" />, <see cref="RuntimeInformation" /> or the current directory except
+/// <see cref="Create" /> and <see cref="Cli.Run(string[])" />, the entry of a real run, so that a test can give a run
+/// its own.
 /// </summary>
 /// <param name="Out">Where everything but an error goes.</param>
 /// <param name="Error">Where an error goes.</param>
@@ -25,6 +27,8 @@ namespace SqlSource.Tool;
 /// <param name="CreateFile">
 /// Makes the file at a full path for writing, or empties the one that is there, and gives its stream.
 /// </param>
+/// <param name="Runtime">The .NET that runs the tool, as the log's <c>run.start</c> names it.</param>
+/// <param name="OperatingSystem">The system the tool runs on, as the log's <c>run.start</c> names it.</param>
 internal sealed record ToolHost(
     TextWriter Out,
     TextWriter Error,
@@ -36,12 +40,14 @@ internal sealed record ToolHost(
     DescriberRegistry Describers,
     Func<string, IDescribeExchange> Exchange,
     TimeProvider Time,
-    Func<string, Stream> CreateFile
+    Func<string, Stream> CreateFile,
+    string Runtime,
+    string OperatingSystem
 )
 {
     /// <summary>
-    /// The host of a real run: the console, the current directory, the environment and the processes of the
-    /// machine.  Its describers are PostgreSQL's and SQL Server's.
+    /// The host of a real run: the console, the current directory, the environment, the processes and the
+    /// descriptions of .NET and of the system of the machine.  Its describers are PostgreSQL's and SQL Server's.
     /// </summary>
     public static ToolHost Create() =>
         new(
@@ -55,7 +61,9 @@ internal sealed record ToolHost(
             new DescriberRegistry([new PostgresDescriber(), new SqlServerDescriber()]),
             static _ => LiveExchange.Instance,
             TimeProvider.System,
-            NewFile
+            NewFile,
+            RuntimeInformation.FrameworkDescription,
+            RuntimeInformation.OSDescription
         );
 
     /// <summary>

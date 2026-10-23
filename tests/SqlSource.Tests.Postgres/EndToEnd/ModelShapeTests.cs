@@ -5,11 +5,12 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Reflection;
 using NpgsqlTypes;
 using Shouldly;
+using SqlSource.Testing.EndToEnd;
 using SqlSource.Tests.Postgres.EndToEnd.Types;
 using Xunit;
+using static SqlSource.Testing.EndToEnd.ModelReflection;
 
 namespace SqlSource.Tests.Postgres.EndToEnd;
 
@@ -20,14 +21,6 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 public sealed class ModelShapeTests
 {
     private const string Namespace = "SqlSource.Tests.Postgres.EndToEnd";
-
-    private enum Shape
-    {
-        Record,
-        SealedRecord,
-        Class,
-        SealedClass,
-    }
 
     // The columns of the table accounts, by the project's type override for timestamptz.
     private static readonly (string Name, Type Type, bool Nullable)[] AccountsProperties =
@@ -51,13 +44,13 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(GetAccountArgs),
             $"{Namespace}.GetAccountArgs",
-            Shape.Record,
+            ModelShape.Record,
             ("AccountId", typeof(int), false)
         );
         ShouldBeModel(
             typeof(GetAccountDto),
             $"{Namespace}.GetAccountDto",
-            Shape.SealedRecord,
+            ModelShape.SealedRecord,
             ("Name", typeof(string), false),
             ("Id", typeof(int), false),
             ("Email", typeof(string), false)
@@ -67,7 +60,7 @@ public sealed class ModelShapeTests
     [Fact]
     public void Build_WholeTable_IsTheTableModel()
     {
-        ShouldBeModel(typeof(AccountsDto), $"{Namespace}.AccountsDto", Shape.SealedRecord, AccountsProperties);
+        ShouldBeModel(typeof(AccountsDto), $"{Namespace}.AccountsDto", ModelShape.SealedRecord, AccountsProperties);
         ModelNamed($"{Namespace}.ListAccountsDto").ShouldBeNull();
         ModelNamed($"{Namespace}.ListAccountsInTableOrderDto").ShouldBeNull();
     }
@@ -77,7 +70,7 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(ListAccountsUntabledDto),
             $"{Namespace}.ListAccountsUntabledDto",
-            Shape.SealedRecord,
+            ModelShape.SealedRecord,
             AccountsProperties
         );
 
@@ -87,20 +80,20 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(AccountName),
             $"{Namespace}.AccountName",
-            Shape.SealedRecord,
+            ModelShape.SealedRecord,
             ("Id", typeof(int), false),
             ("Name", typeof(string), false)
         );
         ShouldBeModel(
             typeof(GetAccountNameArgs),
             $"{Namespace}.GetAccountNameArgs",
-            Shape.Record,
+            ModelShape.Record,
             ("AccountId", typeof(int), false)
         );
         ShouldBeModel(
             typeof(FindAccountNameArgs),
             $"{Namespace}.FindAccountNameArgs",
-            Shape.Record,
+            ModelShape.Record,
             ("Email", typeof(string), false)
         );
         ModelNamed($"{Namespace}.GetAccountNameDto").ShouldBeNull();
@@ -112,7 +105,7 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(ListClosedBeforeArgs),
             $"{Namespace}.ListClosedBeforeArgs",
-            Shape.Record,
+            ModelShape.Record,
             ("ClosedBefore", typeof(DateTimeOffset?), true)
         );
 
@@ -121,7 +114,7 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(ListClosedBeforeDto),
             $"{Namespace}.ListClosedBeforeDto",
-            Shape.SealedRecord,
+            ModelShape.SealedRecord,
             ("Id", typeof(int), false),
             ("Name", typeof(string), false),
             ("ClosedAt", typeof(DateTimeOffset?), true)
@@ -134,13 +127,13 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(Reporting.GetAccountArgs),
             $"{ReportingNamespace}.GetAccountArgs",
-            Shape.Record,
+            ModelShape.Record,
             ("AccountId", typeof(int), false)
         );
         ShouldBeModel(
             typeof(Reporting.GetAccountDto),
             $"{ReportingNamespace}.GetAccountDto",
-            Shape.SealedRecord,
+            ModelShape.SealedRecord,
             ("Name", typeof(string), false),
             ("Id", typeof(int), false),
             ("Email", typeof(string), false)
@@ -148,44 +141,44 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(Reporting.AccountsDto),
             $"{ReportingNamespace}.AccountsDto",
-            Shape.SealedRecord,
+            ModelShape.SealedRecord,
             AccountsProperties
         );
         ShouldBeModel(
             typeof(Reporting.ListAccountsUntabledDto),
             $"{ReportingNamespace}.ListAccountsUntabledDto",
-            Shape.SealedRecord,
+            ModelShape.SealedRecord,
             AccountsProperties
         );
         ShouldBeModel(
             typeof(Reporting.AccountName),
             $"{ReportingNamespace}.AccountName",
-            Shape.SealedRecord,
+            ModelShape.SealedRecord,
             ("Id", typeof(int), false),
             ("Name", typeof(string), false)
         );
         ShouldBeModel(
             typeof(Reporting.GetAccountNameArgs),
             $"{ReportingNamespace}.GetAccountNameArgs",
-            Shape.Record,
+            ModelShape.Record,
             ("AccountId", typeof(int), false)
         );
         ShouldBeModel(
             typeof(Reporting.FindAccountNameArgs),
             $"{ReportingNamespace}.FindAccountNameArgs",
-            Shape.Record,
+            ModelShape.Record,
             ("Email", typeof(string), false)
         );
         ShouldBeModel(
             typeof(Reporting.ListClosedBeforeArgs),
             $"{ReportingNamespace}.ListClosedBeforeArgs",
-            Shape.Record,
+            ModelShape.Record,
             ("ClosedBefore", typeof(DateTimeOffset?), true)
         );
         ShouldBeModel(
             typeof(Reporting.ListClosedBeforeDto),
             $"{ReportingNamespace}.ListClosedBeforeDto",
-            Shape.SealedRecord,
+            ModelShape.SealedRecord,
             ("Id", typeof(int), false),
             ("Name", typeof(string), false),
             ("ClosedAt", typeof(DateTimeOffset?), true)
@@ -200,7 +193,7 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(ListAccountNotesDto),
             $"{Namespace}.ListAccountNotesDto",
-            Shape.SealedRecord,
+            ModelShape.SealedRecord,
             ("Id", typeof(int), false),
             ("Name", typeof(string), false),
             ("NoteId", typeof(int?), true),
@@ -213,7 +206,7 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(CountAccountNotesDto),
             $"{Namespace}.CountAccountNotesDto",
-            Shape.SealedRecord,
+            ModelShape.SealedRecord,
             ("Id", typeof(int), false),
             ("NoteCount", typeof(long), false)
         );
@@ -223,7 +216,7 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(ListMarkedNamesDto),
             $"{Namespace}.ListMarkedNamesDto",
-            Shape.SealedRecord,
+            ModelShape.SealedRecord,
             ("Id", typeof(int?), true),
             ("InitcapName", typeof(string), false)
         );
@@ -233,7 +226,7 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(ListNoteKindsDto),
             $"{Namespace}.ListNoteKindsDto",
-            Shape.SealedRecord,
+            ModelShape.SealedRecord,
             ("Kind", typeof(NoteKind), false),
             ("Email", typeof(Email), false)
         );
@@ -244,14 +237,14 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(Shapes.SearchAccountsFilter),
             $"{Namespace}.Shapes.SearchAccountsFilter",
-            Shape.SealedClass,
+            ModelShape.SealedClass,
             ("AccountId", typeof(int), false),
             ("Name", typeof(string), false)
         );
         ShouldBeModel(
             typeof(Shapes.SearchAccountsView),
             $"{Namespace}.Shapes.SearchAccountsView",
-            Shape.Record,
+            ModelShape.Record,
             ("Id", typeof(int), false),
             ("Name", typeof(string), false)
         );
@@ -262,7 +255,7 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(Shapes.ListAccountColumnsView),
             $"{Namespace}.Shapes.ListAccountColumnsView",
-            Shape.Class,
+            ModelShape.Class,
             ("Id", typeof(int), false),
             ("Name", typeof(string), false),
             ("Status", typeof(string), false)
@@ -274,14 +267,14 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(Shapes.AccountHeadline),
             $"{Namespace}.Shapes.AccountHeadline",
-            Shape.Record,
+            ModelShape.Record,
             ("Id", typeof(int), false),
             ("Headline", typeof(string), false)
         );
         ShouldBeModel(
             typeof(Shapes.GetHeadlineFilter),
             $"{Namespace}.Shapes.GetHeadlineFilter",
-            Shape.SealedClass,
+            ModelShape.SealedClass,
             ("AccountId", typeof(int), false)
         );
     }
@@ -292,13 +285,13 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(Shared.AccountLookup),
             $"{Namespace}.Shared.AccountLookup",
-            Shape.Class,
+            ModelShape.Class,
             ("Email", typeof(string), false)
         );
         ShouldBeModel(
             typeof(Shapes.LookUpAccountView),
             $"{Namespace}.Shapes.LookUpAccountView",
-            Shape.Record,
+            ModelShape.Record,
             ("Id", typeof(int), false),
             ("Name", typeof(string), false),
             ("Status", typeof(string), false)
@@ -320,7 +313,7 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(Billing.BillingInvoicesRow),
             $"{Namespace}.Billing.BillingInvoicesRow",
-            Shape.SealedClass,
+            ModelShape.SealedClass,
             ("Id", typeof(int), false),
             ("AccountId", typeof(int), false),
             ("Number", typeof(string), false),
@@ -344,13 +337,13 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(Billing.GetInvoiceArgs),
             $"{Namespace}.Billing.GetInvoiceArgs",
-            Shape.Record,
+            ModelShape.Record,
             ("InvoiceId", typeof(int), false)
         );
         ShouldBeModel(
             typeof(Billing.GetInvoiceRow),
             $"{Namespace}.Billing.GetInvoiceRow",
-            Shape.SealedClass,
+            ModelShape.SealedClass,
             ("Id", typeof(int), false),
             ("Number", typeof(string), false),
             ("Amount", typeof(decimal), false),
@@ -360,16 +353,16 @@ public sealed class ModelShapeTests
 
     [Fact]
     public void Build_FolderOverride_MakesTimestamptzADateTime() =>
-        PropertiesOf(typeof(Billing.GetInvoiceRow)).ShouldContain(("PaidAt", typeof(DateTime?), true));
+        TypedPropertiesOf(typeof(Billing.GetInvoiceRow)).ShouldContain(("PaidAt", typeof(DateTime?), true));
 
     [Fact]
     public void Build_QueryOverride_ReturnsTimestamptzToDateTime() =>
-        PropertiesOf(typeof(AllTypesDto)).ShouldContain(("TimestamptzValue", typeof(DateTime?), true));
+        TypedPropertiesOf(typeof(AllTypesDto)).ShouldContain(("TimestamptzValue", typeof(DateTime?), true));
 
     [Fact]
     public void Build_AllTypes_HasNpgsql10sTypes()
     {
-        var properties = PropertiesOf(typeof(AllTypesDto));
+        var properties = TypedPropertiesOf(typeof(AllTypesDto));
 
         properties.ShouldContain(("DateValue", typeof(DateOnly?), true));
         properties.ShouldContain(("TimeValue", typeof(TimeOnly?), true));
@@ -382,12 +375,12 @@ public sealed class ModelShapeTests
     public void Build_InsertReturningEveryColumn_SharesTheTableModel()
     {
         ModelNamed($"{Namespace}.InsertAllTypesDto").ShouldBeNull();
-        ShapeOf(typeof(InsertAllTypesArgs)).ShouldBe(Shape.Record);
+        ShapeOf(typeof(InsertAllTypesArgs)).ShouldBe(ModelShape.Record);
 
         // A parameter for each column that the query writes, in its order, with the column's type, and none can be
         // null, since no -- param: marker says null.  It writes every column but those whose parameter Dapper cannot
         // send.  A parameter of bit(1) has no length, so it is a BitArray where the column is a bool.
-        var columns = PropertiesOf(typeof(AllTypesDto));
+        var columns = TypedPropertiesOf(typeof(AllTypesDto));
         var expected = columns
             .Where(static column => !AllTypesQueryTests.WriteSideLeftOut.ContainsKey(column.Name))
             .Select(column =>
@@ -399,8 +392,8 @@ public sealed class ModelShapeTests
                     false
                 )
             );
-        PropertiesOf(typeof(InsertAllTypesArgs)).ShouldBe(expected);
-        PropertiesOf(typeof(InsertAllTypesArgs)).Length.ShouldBe(39);
+        TypedPropertiesOf(typeof(InsertAllTypesArgs)).ShouldBe(expected);
+        TypedPropertiesOf(typeof(InsertAllTypesArgs)).Length.ShouldBe(39);
     }
 
     [Fact]
@@ -408,7 +401,7 @@ public sealed class ModelShapeTests
         ShouldBeModel(
             typeof(AllTypesDto),
             $"{Namespace}.AllTypesDto",
-            Shape.SealedRecord,
+            ModelShape.SealedRecord,
             ("Id", typeof(int), false),
             ("BoolValue", typeof(bool?), true),
             ("Int2Value", typeof(short?), true),
@@ -487,45 +480,6 @@ public sealed class ModelShapeTests
             ("StatusValue", typeof(string), true)
         );
 
-    private static Type? ModelNamed(string fullName) => typeof(ModelShapeTests).Assembly.GetType(fullName);
-
-    private static void ShouldBeModel(
-        Type model,
-        string fullName,
-        Shape shape,
-        params (string Name, Type Type, bool Nullable)[] properties
-    )
-    {
-        model.FullName.ShouldBe(fullName);
-        ShapeOf(model).ShouldBe(shape);
-        PropertiesOf(model).ShouldBe(properties);
-    }
-
-    // A record has the compiler's clone method, which a class has not.
-    private static Shape ShapeOf(Type model) =>
-        (model.GetMethod("<Clone>$") is not null, model.IsSealed) switch
-        {
-            (true, false) => Shape.Record,
-            (true, true) => Shape.SealedRecord,
-            (false, false) => Shape.Class,
-            (false, true) => Shape.SealedClass,
-        };
-
-    // The public properties in the order they are declared, each with its type and whether it can be null.
-    private static (string Name, Type Type, bool Nullable)[] PropertiesOf(Type model)
-    {
-        var context = new NullabilityInfoContext();
-        return
-        [
-            .. model
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Select(property =>
-                    (
-                        property.Name,
-                        property.PropertyType,
-                        context.Create(property).ReadState == NullabilityState.Nullable
-                    )
-                ),
-        ];
-    }
+    private static Type? ModelNamed(string fullName) =>
+        ModelReflection.ModelNamed(typeof(ModelShapeTests).Assembly, fullName);
 }

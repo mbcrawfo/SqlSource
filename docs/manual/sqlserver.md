@@ -147,7 +147,7 @@ The build gives these types to each query whose output is `models` or `codegen` 
 Microsoft.Data.SqlClient 6.1 and 7 read every type as the same C# type, so the types are those of the table below whatever version of 6.1 or later the project references, directly or through another package:
 
 - **Microsoft.Data.SqlClient 6.1 or 7** gets the table's types.
-- **Microsoft.Data.SqlClient older than 6.1** is [SQLSRC267](diagnostics.md#sqlsrc267), an error.  Update it to 6.1 or later.  EF Core 8 and 9 bring an older one: see [known issues](#known-issues).
+- **Microsoft.Data.SqlClient older than 6.1** is [SQLSRC267](diagnostics.md#sqlsrc267), an error.  Update it to 6.1 or later.  EF Core 8 and 9 bring an older one: see [known issues](#known-issues).  Until then, every type but `vector` gets the table's type, and a `vector` column or parameter, whose C# type is first in Microsoft.Data.SqlClient 6.1, is [SQLSRC270](diagnostics.md#sqlsrc270) at its query.
 - **Microsoft.Data.SqlClient 8 or later** gets the types of Microsoft.Data.SqlClient 7, with the information [SQLSRC268](diagnostics.md#sqlsrc268), since this version of SqlSource does not know a newer one.
 - **No Microsoft.Data.SqlClient**, as in a library that holds the queries and leaves the driver to the application, gets the table's types too, but for `vector`, whose C# type is Microsoft.Data.SqlClient's own: it is [SQLSRC269](diagnostics.md#sqlsrc269) until the project references Microsoft.Data.SqlClient.  The older `System.Data.SqlClient` package is not Microsoft.Data.SqlClient, and a project that references it alone has no Microsoft.Data.SqlClient.
 
@@ -174,7 +174,7 @@ The names are SQL Server's, which are the [type override's](settings.md#setting-
 | `binary`, `varbinary`, `image`, `timestamp` (`rowversion`) | `byte[]` |
 | `uniqueidentifier` | `System.Guid` |
 | `sql_variant` | `object` |
-| `vector` | `Microsoft.Data.SqlTypes.SqlVector<float>`.  Without Microsoft.Data.SqlClient, SQLSRC269 |
+| `vector` | `Microsoft.Data.SqlTypes.SqlVector<float>`.  Without Microsoft.Data.SqlClient, SQLSRC269; with one older than 6.1, SQLSRC270 |
 | `hierarchyid`, `geography`, `geometry` | None: SQLSRC246.  Reference the package `Microsoft.SqlServer.Types` and map the type with the type override: `hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId`, `geography=Microsoft.SqlServer.Types.SqlGeography`, `geometry=Microsoft.SqlServer.Types.SqlGeometry` |
 
 A type that the table does not name gets its C# type by what it is:
@@ -242,8 +242,8 @@ A described SQL Server query gets the [models](generator.md#models) that every d
   </ItemGroup>
   ```
 
-- **A `vector` column in a project that references a Microsoft.Data.SqlClient older than 6.1** gets, beside [SQLSRC267](diagnostics.md#sqlsrc267), a compiler error in the generated model, because the `SqlVector<float>` it names is not in that version.  The error goes away with the package update that clears SQLSRC267.
-
 - **Some columns that are never null get a property that can be null.**  SQL Server treats a column as possibly null when it cannot show that it never is, and SqlSource keeps its answer, so counts, sums and maxima of a group, window functions, casts, `COALESCE` with an argument that is never null, computed columns and the columns of a recursive `WITH` query, among others, get a property such as `int?` where `int` would do.  No value is wrong, but your code checks for a null that never comes.  Give such a column a `-- column: name not null` marker, or end its alias with `!`, as [which columns can be null](#nullability) shows, or write `ISNULL` in the place of `COALESCE`.
 
 - **A query that returns several result sets gets a model of the first alone**, and nothing is reported of the others.  Give each `SELECT` a `-- name:` of its own, or read the result sets after the first with your own code.
+
+- **A `-- param:` type whose name holds an accent written as a separate combining mark, a letter number such as `Ⅰ`, or an invisible formatting character after its first character** is refused as [SQLSRC228](diagnostics.md#sqlsrc228), "it is not written as a type name", though SQL Server accepts the name.  Write that part of the name in brackets, as in `-- param: @p dbo.[PartⅠ]`, or write an accented letter as one character.

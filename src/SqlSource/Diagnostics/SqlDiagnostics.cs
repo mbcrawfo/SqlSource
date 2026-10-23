@@ -742,6 +742,21 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the column or parameter, as "column 'id'", {1} its type as the database spells it, {2} the version of
+    // Microsoft.Data.SqlClient that first has its C# type, and {3} the version the project references, as
+    // SqlClientProbe.VersionText gives it: "6.0.5", or "of an unknown version".
+    public static readonly DiagnosticDescriptor TypeNeedsNewerSqlClient = new(
+        id: "SQLSRC270",
+        title: "Type needs a newer Microsoft.Data.SqlClient",
+        messageFormat: "The {0} has the type '{1}', whose C# type needs Microsoft.Data.SqlClient {2} or later, and "
+            + "this project references Microsoft.Data.SqlClient {3}.  Update the package.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc270",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -806,7 +821,8 @@ internal static class SqlDiagnostics
             ArrayEntryMapsNothing,
             SqlClientTooOld,
             SqlClientNewerThanKnown,
-            TypeNeedsSqlClient
+            TypeNeedsSqlClient,
+            TypeNeedsNewerSqlClient
         );
 
     /// <summary>

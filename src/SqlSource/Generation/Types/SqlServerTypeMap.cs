@@ -15,7 +15,6 @@ internal delegate TypeMapping? SqlServerOverrideOf(string key);
 /// </summary>
 internal static class SqlServerTypeMap
 {
-    private const string SystemSchema = "sys";
     private const string StringKeyword = "string";
     private const string DateTime = "global::System.DateTime";
     private const string SqlServerTypesNamespace = "Microsoft.SqlServer.Types.";
@@ -71,7 +70,7 @@ internal static class SqlServerTypeMap
     /// <summary>
     /// The key of <paramref name="type" />, written as the type override reads it: the bare name of a user type of
     /// <c>sys</c>, <c>Schema.Name</c> for any other user type, and the base name of the type otherwise, each part in
-    /// quotes when it needs them, as <see cref="TypeKeys.WritePart" /> writes it: <c>dbo."Email"</c>.
+    /// quotes when it needs them, as <see cref="TypeKeyText.WritePart" /> writes it: <c>dbo."Email"</c>.
     /// </summary>
     public static string KeyOf(SqlServerType type)
     {
@@ -80,12 +79,12 @@ internal static class SqlServerTypeMap
             // A system type's name is case-insensitive: a row is keyed by its own name, so the key asked of the
             // override and the key of the mapping agree.
             var baseName = BaseName(type.Name);
-            return Rows.TryGetValue(baseName, out var row) ? row.Key : TypeKeys.WritePart(baseName);
+            return Rows.TryGetValue(baseName, out var row) ? row.Key : TypeKeyText.WritePart(baseName);
         }
 
         return IsSystemSchema(userType)
-            ? TypeKeys.WritePart(userType.Name!)
-            : TypeKeys.WritePart(userType.Schema ?? string.Empty) + "." + TypeKeys.WritePart(userType.Name!);
+            ? TypeKeyText.WritePart(userType.Name!)
+            : TypeKeyText.WritePart(userType.Schema ?? string.Empty) + "." + TypeKeyText.WritePart(userType.Name!);
     }
 
     /// <summary>
@@ -102,8 +101,7 @@ internal static class SqlServerTypeMap
     private static SqlServerUserType? UserTypeOf(SqlServerType type) =>
         string.IsNullOrEmpty(type.UserType?.Name) ? null : type.UserType;
 
-    private static bool IsSystemSchema(SqlServerUserType userType) =>
-        string.Equals(userType.Schema, SystemSchema, StringComparison.Ordinal);
+    private static bool IsSystemSchema(SqlServerUserType userType) => SystemSchemas.IsSqlServer(userType.Schema);
 
     private static Dictionary<string, Row> BuildRows()
     {
@@ -143,31 +141,60 @@ internal static class SqlServerTypeMap
         Add(Row.Same("byte[]", false), "binary", "varbinary", "image", "timestamp");
         Add(Row.Same("global::System.Guid", true), "uniqueidentifier");
         Add(Row.Same("object", false), "sql_variant");
-        Add(Row.OfSqlClient("global::Microsoft.Data.SqlTypes.SqlVector<float>", true), "vector");
+        Add(
+            Row.OfSqlClient("global::Microsoft.Data.SqlTypes.SqlVector<float>", true, SqlClientColumn.SqlClient61),
+            "vector"
+        );
         Add(Row.NeedsTypes("SqlHierarchyId"), "hierarchyid");
         Add(Row.NeedsTypes("SqlGeography"), "geography");
         Add(Row.NeedsTypes("SqlGeometry"), "geometry");
         return rows;
     }
 
+    /// <summary>
+    /// Whether a project whose SqlClient chooses <paramref name="column" /> lacks a type that SqlClient first has in
+    /// the version of <paramref name="since" />: its column is of an older version, or there is no SqlClient.
+    /// </summary>
+    internal static bool Lacks(SqlClientColumn column, SqlClientColumn since) => Order(column) < Order(since);
+
+    // The columns in the order of their versions, oldest first, no SqlClient before any.
+    private static int Order(SqlClientColumn column) =>
+        column switch
+        {
+            SqlClientColumn.None => 0,
+            SqlClientColumn.OlderThan61 => 1,
+            SqlClientColumn.SqlClient61 => 2,
+            SqlClientColumn.SqlClient7 => 3,
+            _ => 0,
+        };
+
     /// <summary>A row of the map.</summary>
     /// <param name="Key">The row's name, set when it is added.</param>
     /// <param name="Text">The C# type, or null when SqlClient cannot read the type without a package.</param>
     /// <param name="IsValueType">Whether the C# type is a value type.</param>
-    /// <param name="IsOfSqlClient">Whether the C# type is SqlClient's own, so a project without it has none.</param>
+    /// <param name="SqlClientSince">
+    /// The column of the first version of SqlClient that has the C# type, when it is SqlClient's own, or null.  A
+    /// project without SqlClient, or with an older one, has no such type, as <see cref="Lacks" /> decides.
+    /// </param>
     /// <param name="Package">The package's C# type for a type that SqlClient reads only with it, or null.</param>
-    private sealed record Row(string Key, string? Text, bool IsValueType, bool IsOfSqlClient, string? Package)
+    private sealed record Row(
+        string Key,
+        string? Text,
+        bool IsValueType,
+        SqlClientColumn? SqlClientSince,
+        string? Package
+    )
     {
         // Whether SqlClient reads the type only with the package, which makes it a CLR type.
         public bool IsClr => Package is not null;
 
-        public static Row Same(string text, bool isValueType) => new(string.Empty, text, isValueType, false, null);
+        public static Row Same(string text, bool isValueType) => new(string.Empty, text, isValueType, null, null);
 
-        public static Row OfSqlClient(string text, bool isValueType) =>
-            new(string.Empty, text, isValueType, true, null);
+        public static Row OfSqlClient(string text, bool isValueType, SqlClientColumn since) =>
+            new(string.Empty, text, isValueType, since, null);
 
         public static Row NeedsTypes(string package) =>
-            new(string.Empty, null, false, false, SqlServerTypesNamespace + package);
+            new(string.Empty, null, false, null, SqlServerTypesNamespace + package);
 
         public TypeMapping Under(SqlClientColumn column)
         {
@@ -176,9 +203,23 @@ internal static class SqlServerTypeMap
                 return TypeMapping.Failed(TypeMappingKind.NeedsSqlServerTypes, Key, Package);
             }
 
-            return column == SqlClientColumn.None && IsOfSqlClient
-                ? TypeMapping.Failed(TypeMappingKind.NeedsDriver, Key)
-                : TypeMapping.Mapped(Key, Text!, IsValueType);
+            if (SqlClientSince is { } since && Lacks(column, since))
+            {
+                return column == SqlClientColumn.None
+                    ? TypeMapping.Failed(TypeMappingKind.NeedsDriver, Key)
+                    : TypeMapping.Failed(TypeMappingKind.NeedsNewerSqlClient, Key, VersionOf(since));
+            }
+
+            return TypeMapping.Mapped(Key, Text!, IsValueType);
         }
+
+        // The version of a column's first release, as a message names it.
+        private static string VersionOf(SqlClientColumn column) =>
+            column switch
+            {
+                SqlClientColumn.SqlClient61 => "6.1",
+                SqlClientColumn.SqlClient7 => "7.0",
+                SqlClientColumn.OlderThan61 or SqlClientColumn.None or _ => string.Empty,
+            };
     }
 }

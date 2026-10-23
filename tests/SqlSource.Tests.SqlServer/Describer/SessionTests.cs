@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Testing;
 using SqlSource.Tool;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
@@ -26,7 +28,7 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
 
         var server = session.Server;
-        server.Version.ShouldBe(SqlServerContainer.ImageBuilds[SqlServerContainer.Image]);
+        server.Version.ShouldBe(SqlServerContainer.ImageBuilds[EngineImage.SqlServer.Image]);
         server.Driver.ShouldBe("Microsoft.Data.SqlClient");
         server.DriverVersion.ShouldNotBeNull().ShouldStartWith("7.1.1");
         server.Settings.ShouldBe([
@@ -115,7 +117,8 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
     [Fact]
     public async Task OpenAsync_TokenCancelled_ThrowsOperationCanceled()
     {
-        var exchange = new TokenExchange();
+        List<CancellationToken> tokens = [];
+        var exchange = TokenExchange(tokens);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await cancel.CancelAsync();
 
@@ -123,14 +126,15 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
             Sessions.OpenAsync(sqlServer.ConnectionString, exchange, cancellationToken: cancel.Token)
         );
 
-        exchange.Tokens.ShouldBe([cancel.Token]);
+        tokens.ShouldBe([cancel.Token]);
     }
 
     // A describe that is cancelled ends as a cancellation, and its call is given the describe's own token.
     [Fact]
     public async Task DescribeAsync_TokenCancelled_ThrowsOperationCanceledWithTheTokenOfTheDescribe()
     {
-        var exchange = new TokenExchange();
+        List<CancellationToken> tokens = [];
+        var exchange = TokenExchange(tokens);
         await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString, exchange);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await cancel.CancelAsync();
@@ -142,33 +146,66 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
             )
         );
 
-        exchange.Tokens.ShouldBe([TestContext.Current.CancellationToken, cancel.Token]);
+        tokens.ShouldBe([TestContext.Current.CancellationToken, cancel.Token]);
     }
 
     // SqlClient reports a command that is cancelled while the server runs it as a SqlException: it is the cancellation
-    // all the same, and no answer.  The command waits for longer than the test, so it is the token that ends it.
+    // all the same, and no answer.  The token is cancelled once the server shows the session's WAITFOR running, so
+    // that path is the one that runs.  The command has no timeout and waits for a day, so the token alone ends it.
     [Fact]
     public async Task AnswerAsync_CommandCancelledWhileTheServerRunsIt_ThrowsOperationCanceled()
     {
         await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var token = cancel.Token;
-        cancel.CancelAfter(TimeSpan.FromMilliseconds(200));
+        await using var read = await session.Connection.CommandAsync("SELECT CAST(@@SPID AS int)", token);
+        var id = (int)await read.ExecuteScalarAsync(token);
+        SqlException? thrown = null;
 
         var answered = SqlServerLive.AnswerAsync<SqlServerServerError?>(
             async () =>
             {
-                await using var command = await session.Connection.CommandAsync("WAITFOR DELAY '00:00:30'", token);
-                _ = await command.ExecuteNonQueryAsync(token);
+                await using var command = await session.Connection.CommandAsync("WAITFOR DELAY '23:59:59'", token);
+                command.CommandTimeout = 0;
+                try
+                {
+                    _ = await command.ExecuteNonQueryAsync(token);
+                }
+                catch (SqlException exception)
+                {
+                    thrown = exception;
+                    throw;
+                }
+
                 return null;
             },
             ConnectionErrors.Of,
             static error => error,
             token
         );
+        try
+        {
+            await Eventually.TrueAsync(
+                async () => await sqlServer.ScalarAsync(RunningWaitOf(id)) is 1,
+                "The server never showed the session's WAITFOR running."
+            );
+        }
+        finally
+        {
+            // A wait that was never seen is ended too, so that the session is not closed under a running command.
+            await cancel.CancelAsync();
+        }
 
         _ = await Should.ThrowAsync<OperationCanceledException>(answered);
+        _ = thrown.ShouldNotBeNull("the token was cancelled before the server ran the command");
     }
+
+    // How many requests of the session wait in a WAITFOR: 1 while the server runs the test's command.
+    private static string RunningWaitOf(int session) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"SELECT COUNT(*) FROM sys.dm_exec_requests WHERE session_id = {session} AND wait_type = 'WAITFOR'"
+        );
 
     // No session, SQLSRC224 at no step for the database, and nothing of the value in any text of the failure or in
     // the capture: not the password, the host, or the database's name when it is not the logical name, which the run
@@ -186,7 +223,7 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         ];
         foreach (var word in words.Where(static word => word.Length > 0))
         {
-            Sessions.TextsOf(failure).ShouldAllBe(text => !text.Contains(word, StringComparison.Ordinal));
+            Failures.TextsOf(failure).ShouldAllBe(text => !text.Contains(word, StringComparison.Ordinal));
             CaptureJson.Write(capture).ShouldNotContain(word);
         }
 
@@ -203,7 +240,7 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         failure.Descriptor.Id.ShouldBe("SQLSRC224");
         failure.Arguments.ShouldBe([SqlServerContainer.Database]);
         failure.Step.ShouldBeNull();
-        Sessions
+        Failures
             .TextsOf(failure)
             .ShouldAllBe(text =>
                 !text.Contains(connection, StringComparison.Ordinal)
@@ -213,19 +250,12 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
     }
 
     // Asks the server as the live exchange does, and keeps the token each call was given, in order.
-    private sealed class TokenExchange : IDescribeExchange
-    {
-        public List<CancellationToken> Tokens { get; } = [];
-
-        public Task<TAnswer> AskAsync<TRequest, TAnswer>(
-            string method,
-            TRequest request,
-            Func<TRequest, CancellationToken, Task<TAnswer>> live,
-            CancellationToken cancellationToken
-        )
-        {
-            Tokens.Add(cancellationToken);
-            return live(request, cancellationToken);
-        }
-    }
+    private static HookedExchange TokenExchange(List<CancellationToken> tokens) =>
+        new(
+            before: (_, _, token) =>
+            {
+                tokens.Add(token);
+                return Task.CompletedTask;
+            }
+        );
 }

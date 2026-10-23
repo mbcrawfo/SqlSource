@@ -5,6 +5,7 @@ using System.Threading;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
+using SqlSource.Testing;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Testing;

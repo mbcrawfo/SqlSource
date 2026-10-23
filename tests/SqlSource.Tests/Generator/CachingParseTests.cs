@@ -31,25 +31,8 @@ public sealed class CachingParseTests
         var result = Run(driver.ReplaceAdditionalText(_scene.Users, edited), compilation);
 
         // Only the edited file was read: the other one, and the claimed paths, are the inputs the read had.
-        ParseInputs(result)
-            .ShouldBe(
-                new Dictionary<string, IncrementalStepRunReason>
-                {
-                    [_scene.Users.Path] = IncrementalStepRunReason.Modified,
-                    [_scene.Orders.Path] = IncrementalStepRunReason.Cached,
-                },
-                ignoreOrder: true
-            );
+        _scene.ShouldHaveReadOnly(result, _scene.Users, IncrementalStepRunReason.Cached);
         AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
-        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
-            .ShouldBe(
-                new Dictionary<string, IncrementalStepRunReason>
-                {
-                    ["Users.sql"] = IncrementalStepRunReason.Modified,
-                    ["Orders.sql"] = IncrementalStepRunReason.Cached,
-                },
-                ignoreOrder: true
-            );
         Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>

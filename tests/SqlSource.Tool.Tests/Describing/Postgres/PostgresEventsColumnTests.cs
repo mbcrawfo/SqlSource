@@ -4,7 +4,9 @@ using Shouldly;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Testing;
 using Xunit;
+using static SqlSource.Tool.Testing.RecordingLog;
 using static SqlSource.Tool.Tests.PostgresEventCases;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
@@ -169,9 +171,10 @@ public sealed class PostgresEventsColumnTests
         Member(check, "differs").ShouldBe(LogValue.Null);
 
         var match = log.Events[11].Members;
-        NamesOf(match).ShouldBe(["query", "result", "table"]);
+        NamesOf(match).ShouldBe(["query", "result", "tableMatch", "table"]);
         Member(match, "query").ShouldBe((LogValue)"ListUsers");
         Member(match, "result").ShouldBe((LogValue)"no-origin");
+        Member(match, "tableMatch").ShouldBe(Member(match, "result"));
         Member(match, "table").ShouldBe(LogValue.Null);
     }
 

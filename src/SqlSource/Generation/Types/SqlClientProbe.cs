@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
+using SqlSource.Diagnostics;
 
 namespace SqlSource.Generation.Types;
 
@@ -14,7 +16,8 @@ namespace SqlSource.Generation.Types;
 /// Whether <c>Microsoft.Data.SqlClient.SqlConnection</c>, which every version has, is found.
 /// </param>
 /// <param name="AtLeast61">
-/// Whether <c>Microsoft.Data.SqlTypes.SqlVector`1</c>, first in 6.1 on every target framework, is found.
+/// Whether <c>Microsoft.Data.SqlTypes.SqlVector`1</c>, first in 6.1 on every target framework, is found.  A driver
+/// without it is below the floor, and its column lacks the types that 6.1 brought.
 /// </param>
 /// <param name="AtLeast7">
 /// Whether <c>Microsoft.Data.SqlClient.SspiContextProvider</c>, first in 7.0 on every target framework and in no 6.x,
@@ -26,19 +29,22 @@ namespace SqlSource.Generation.Types;
 /// identity of a package's assembly keeps its major and no more.  Null when there is none.  For the diagnostics alone:
 /// the flags choose the column.
 /// </param>
-internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLeast7, string? Version)
+internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLeast7, string? Version) : IDriverProbe
 {
     private const string AssemblyName = "Microsoft.Data.SqlClient";
 
     // The newest major whose types the map knows.
     private const int NewestKnownMajor = 7;
 
-    /// <summary>The column of the SQL Server map that the driver chooses.</summary>
+    /// <summary>
+    /// The column of the SQL Server map that the driver chooses: that of the newest version whose type the project has.
+    /// </summary>
     public SqlClientColumn Column =>
-        (AtLeast7, Referenced) switch
+        (AtLeast7, AtLeast61, Referenced) switch
         {
-            (true, _) => SqlClientColumn.SqlClient7,
-            (_, true) => SqlClientColumn.SqlClient61,
+            (true, _, _) => SqlClientColumn.SqlClient7,
+            (_, true, _) => SqlClientColumn.SqlClient61,
+            (_, _, true) => SqlClientColumn.OlderThan61,
             _ => SqlClientColumn.None,
         };
 
@@ -51,7 +57,24 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
     /// Whether the project references a Microsoft.Data.SqlClient of a major newer than the map knows, which is
     /// <c>SQLSRC268</c>.
     /// </summary>
-    public bool IsNewerThanKnown => Referenced && LeadingInteger(Version) > NewestKnownMajor;
+    public bool IsNewerThanKnown => Referenced && Versions.LeadingMajor(Version) > NewestKnownMajor;
+
+    /// <inheritdoc />
+    public IEnumerable<DriverFinding> Findings
+    {
+        get
+        {
+            if (IsBelowTheFloor)
+            {
+                yield return new DriverFinding(SqlDiagnostics.SqlClientTooOld, VersionText);
+            }
+
+            if (IsNewerThanKnown)
+            {
+                yield return new DriverFinding(SqlDiagnostics.SqlClientNewerThanKnown, VersionText);
+            }
+        }
+    }
 
     /// <summary>The version as a diagnostic names it.</summary>
     public string VersionText => Version ?? "of an unknown version";
@@ -66,8 +89,8 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
         var connections = compilation.GetTypesByMetadataName("Microsoft.Data.SqlClient.SqlConnection");
         return new(
             !connections.IsEmpty,
-            Has(compilation, "Microsoft.Data.SqlTypes.SqlVector`1"),
-            Has(compilation, "Microsoft.Data.SqlClient.SspiContextProvider"),
+            DriverProbes.Has(compilation, "Microsoft.Data.SqlTypes.SqlVector`1"),
+            DriverProbes.Has(compilation, "Microsoft.Data.SqlClient.SspiContextProvider"),
             connections.IsEmpty ? null : ReadVersion(connections)
         );
     }
@@ -129,31 +152,4 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
                     ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true }
                 },
             };
-
-    // The digits that start a version, or zero for a version that does not start with any or is too large.
-    private static int LeadingInteger(string? version)
-    {
-        if (version is null)
-        {
-            return 0;
-        }
-
-        var length = 0;
-        while (length < version.Length && version[length] is >= '0' and <= '9')
-        {
-            length++;
-        }
-
-        return int.TryParse(
-            version.Substring(0, length),
-            NumberStyles.None,
-            CultureInfo.InvariantCulture,
-            out var major
-        )
-            ? major
-            : 0;
-    }
-
-    private static bool Has(Compilation compilation, string metadataName) =>
-        !compilation.GetTypesByMetadataName(metadataName).IsEmpty;
 }

@@ -17,8 +17,6 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </remarks>
 internal static class PostgresSearchPath
 {
-    private const string Catalog = "pg_catalog";
-
     /// <summary>Whether the path names <c>pg_catalog</c> first, or not at all.</summary>
     /// <param name="searchPath">The value of <c>search_path</c>, as <c>SHOW</c> gives it, or null.</param>
     public static bool PutsCatalogFirst(string? searchPath)
@@ -35,7 +33,7 @@ internal static class PostgresSearchPath
     private static bool IsCatalog((string Name, bool Quoted) schema) =>
         string.Equals(
             schema.Name,
-            Catalog,
+            SystemSchemas.Postgres,
             schema.Quoted ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase
         );
 

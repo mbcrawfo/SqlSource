@@ -87,18 +87,18 @@ public sealed class SqlServerContainerTests(SqlServerContainer sqlServer)
     // or -latest moves to each new update unseen; see tests/SqlSource.Tests.SqlServer/README.md.
     [Fact]
     public void Image_OfTheRun_NamesItsCumulativeUpdate() =>
-        SqlServerContainer.TagOf(SqlServerContainer.Image).ShouldMatch(PinnedTag);
+        EngineImage.TagOf(EngineImage.SqlServer.Image).ShouldMatch(PinnedTag);
 
     [Fact]
     public void Image_OfTheRun_IsInTheMapOfBuilds() =>
-        SqlServerContainer.ImageBuilds.ShouldContainKey(SqlServerContainer.Image);
+        SqlServerContainer.ImageBuilds.ShouldContainKey(EngineImage.SqlServer.Image);
 
     [Fact]
     public void Image_OfTheRun_IsTheVariablesValueOrTheDefault()
     {
-        var named = Environment.GetEnvironmentVariable(SqlServerContainer.ImageVariable);
+        var named = Environment.GetEnvironmentVariable(EngineImage.SqlServer.Variable);
 
-        SqlServerContainer.Image.ShouldBe(string.IsNullOrEmpty(named) ? DefaultImages.SqlServer : named);
+        EngineImage.SqlServer.Image.ShouldBe(string.IsNullOrEmpty(named) ? DefaultImages.SqlServer : named);
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public sealed class SqlServerContainerTests(SqlServerContainer sqlServer)
     {
         var build = await sqlServer.ScalarAsync("SELECT CAST(SERVERPROPERTY('ProductVersion') AS nvarchar(128))");
 
-        build.ShouldBe(SqlServerContainer.ImageBuilds[SqlServerContainer.Image]);
+        build.ShouldBe(SqlServerContainer.ImageBuilds[EngineImage.SqlServer.Image]);
     }
 
     [Fact]
@@ -114,19 +114,9 @@ public sealed class SqlServerContainerTests(SqlServerContainer sqlServer)
     {
         foreach (var image in SqlServerContainer.ImageBuilds.Keys)
         {
-            SqlServerContainer.TagOf(image).ShouldMatch(PinnedTag);
+            EngineImage.TagOf(image).ShouldMatch(PinnedTag);
         }
     }
-
-    [Fact]
-    public void SkipBelow_ServerOfThatMajor_DoesNotSkip() =>
-        Should.NotThrow(() => SqlServerContainer.SkipBelow(17, 17, "a reason"));
-
-    [Fact]
-    public void SkipBelow_ServerBeforeThatMajor_SkipsWithTheReason() =>
-        Should
-            .Throw<SkipException>(() => SqlServerContainer.SkipBelow(14, 17, "a reason"))
-            .Message.ShouldEndWith("a reason");
 
     [Fact]
     public void SkipBelow_OfTheContainer_AsksTheServersMajor()
@@ -134,18 +124,6 @@ public sealed class SqlServerContainerTests(SqlServerContainer sqlServer)
         Should.NotThrow(() => sqlServer.SkipBelow(sqlServer.Major, "a reason"));
         _ = Should.Throw<SkipException>(() => sqlServer.SkipBelow(sqlServer.Major + 1, "a reason"));
     }
-
-    [Theory]
-    [InlineData(14)]
-    [InlineData(17)]
-    public void SkipUnlessRecordedMajor_RecordedMajor_DoesNotSkip(int server) =>
-        Should.NotThrow(() => SqlServerContainer.SkipUnlessRecordedMajor(server, "The things"));
-
-    [Fact]
-    public void SkipUnlessRecordedMajor_OtherMajor_SkipsNamingTheRecordedOnes() =>
-        Should
-            .Throw<SkipException>(() => SqlServerContainer.SkipUnlessRecordedMajor(16, "The things"))
-            .Message.ShouldEndWith("The things are pinned for SQL Server 14 and 17 alone.");
 
     private static async Task<List<string>> NullColumnsAsync(DbDataReader reader)
     {

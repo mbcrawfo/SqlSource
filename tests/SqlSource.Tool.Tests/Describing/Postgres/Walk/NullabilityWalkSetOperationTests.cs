@@ -742,4 +742,61 @@ public sealed class NullabilityWalkSetOperationTests
         NullabilityWalk.ReachesSetOperation(Join("Left", Scan("u"), node)).ShouldBeFalse();
         NullabilityWalk.ReachesSetOperation(Over("Aggregate", node) with { HasGroupingSets = true }).ShouldBeFalse();
     }
+
+    private static readonly Dictionary<string, string> SetOperationsRows = new(StringComparer.Ordinal)
+    {
+        {
+            "aggregate-over-an-append",
+            Text(
+                Over(
+                    "Aggregate",
+                    Over("Append", Scan("a"), "Member") with
+                    {
+                        Plans =
+                        [
+                            Scan("a") with
+                            {
+                                ParentRelationship = "Member",
+                            },
+                            Scan("b") with
+                            {
+                                ParentRelationship = "Member",
+                            },
+                        ],
+                    }
+                ) with
+                {
+                    Output = ["('a'::text)"],
+                }
+            )
+        },
+        {
+            "sort-over-an-append",
+            Text(Over("Sort", Over("Append", Scan("a"), "Member")) with { Output = ["('a'::text)"] })
+        },
+        {
+            "set-op-over-two-scans",
+            Text(
+                Join("Inner", Scan("a"), Scan("b")) with
+                {
+                    NodeType = "SetOp",
+                    JoinType = null,
+                    Output = ["('a'::text)"],
+                }
+            )
+        },
+    };
+
+    public static TheoryData<string> SetOperations => [.. SetOperationsRows.Keys];
+
+    // The root of a set operation prints its first branch, which says nothing of the others.
+    [Theory]
+    [MemberData(nameof(SetOperations))]
+    public void Run_ExpressionOverASetOperation_KeepsNoOrigin(string name)
+    {
+        var outcome = RunUngated(PlanNode.Read(SetOperationsRows[name]).ShouldNotBeNull(), Expression);
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(outcome).ShouldBe([UnknownNoOrigin]);
+    }
 }

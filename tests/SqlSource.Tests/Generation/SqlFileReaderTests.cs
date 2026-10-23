@@ -7,6 +7,7 @@ using SqlSource.Generation.Paths;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using Xunit;
 
@@ -209,7 +210,7 @@ public sealed class SqlFileReaderTests
     [Fact]
     public void Read_SameText_GivesEqualResults()
     {
-        const string Text = "-- name: GetUser\nSELECT 1;\n";
+        const string Text = SqlTexts.GetUser;
 
         Read(Text).ShouldBe(Read(Text));
     }

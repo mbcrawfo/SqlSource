@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,7 +16,10 @@ internal sealed class SqlServerDescriber : IQueryDescriber
 {
     public SqlDialect Dialect => SqlDialect.SqlServer;
 
-    public IReadOnlyList<string> SecretsOf(string connection) => SqlServerConnection.SecretsOf(connection);
+    public IReadOnlyList<string> SecretsOf(string connection, Func<string, string?> getEnvironmentVariable) =>
+        SqlServerConnection.SecretsOf(connection);
+
+    public string? RewriteOf(string connection) => SqlServerConnection.RewriteOf(connection);
 
     public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,

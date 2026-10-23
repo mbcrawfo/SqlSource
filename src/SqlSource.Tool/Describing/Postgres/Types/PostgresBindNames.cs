@@ -31,9 +31,8 @@ namespace SqlSource.Tool.Describing.Postgres.Types;
 /// <c>search_path</c> and whatever type of the same name another schema holds.
 /// </item>
 /// <item>
-/// Any other type of <c>pg_catalog</c> is its <c>format_type(oid, -1)</c> without a leading <c>pg_catalog.</c>.  The
-/// server qualifies the name when a user type of the same name stands before <c>pg_catalog</c> on the
-/// <c>search_path</c> (TD-0050), and the name that Npgsql binds must not depend on the session.
+/// Any other type of <c>pg_catalog</c> is its <c>format_type(oid, -1)</c> without a leading <c>pg_catalog.</c>, as
+/// its <c>name</c> is (<see cref="PostgresTypeNames.WithoutCatalog" />), so that it does not depend on the session.
 /// </item>
 /// <item>
 /// A type of any other schema is the schema, a <c>.</c> and the name, neither quoted, as Npgsql takes it.  A <c>.</c>
@@ -43,9 +42,6 @@ namespace SqlSource.Tool.Describing.Postgres.Types;
 /// </remarks>
 internal static class PostgresBindNames
 {
-    private const string Catalog = "pg_catalog";
-    private const string CatalogPrefix = Catalog + ".";
-
     /// <summary>
     /// The text that <c>SQLSRC232</c>'s server line gives for a type that has no candidate name.
     /// </summary>
@@ -82,9 +78,9 @@ internal static class PostgresBindNames
 
         return row switch
         {
-            { Nspname: Catalog, Typname: "bit" } => "bit",
-            { Nspname: Catalog, Typname: "char" } => "char",
-            { Nspname: Catalog } => WithoutCatalog(row.FormatType),
+            { Nspname: SystemSchemas.Postgres, Typname: "bit" } => "bit",
+            { Nspname: SystemSchemas.Postgres, Typname: "char" } => "char",
+            { Nspname: SystemSchemas.Postgres } => PostgresTypeNames.WithoutCatalog(row.FormatType),
             _ => Qualified(row),
         };
     }
@@ -116,9 +112,4 @@ internal static class PostgresBindNames
 
         return current;
     }
-
-    private static string WithoutCatalog(string formatType) =>
-        formatType.StartsWith(CatalogPrefix, StringComparison.Ordinal)
-            ? formatType[CatalogPrefix.Length..]
-            : formatType;
 }

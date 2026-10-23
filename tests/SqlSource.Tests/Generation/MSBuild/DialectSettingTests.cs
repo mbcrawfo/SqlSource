@@ -112,7 +112,7 @@ public sealed class DialectSettingTests
     [InlineData("nope", "oracle", nameof(SqlDialect.Ansi), "nope")]
     // A property that is not a dialect is ANSI too.  It is reported from the project's setting, not from each file.
     [InlineData(null, "nope", nameof(SqlDialect.Ansi), null)]
-    public void Resolve_MetadataThenPropertyThenAnsi(
+    public void Resolve_EachCombination_TakesMetadataThenPropertyThenAnsi(
         string? metadata,
         string? property,
         string dialect,

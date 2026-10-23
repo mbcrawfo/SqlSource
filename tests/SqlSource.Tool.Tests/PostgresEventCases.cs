@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Threading.Tasks;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing.Describers;
@@ -11,7 +10,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests;
 
 // What the classes of the events' tests share: a query with a parameter as the session prepares and checks it, a query
-// of users.id and an aggregate with its script, a describe through a log, and the members of a written event.
+// of users.id and an aggregate with its script, and a describe through a log.
 internal static class PostgresEventCases
 {
     public static readonly DescribeRequest Query = new(
@@ -30,11 +29,6 @@ internal static class PostgresEventCases
 
     public static readonly PostgresColumnsRequest ColumnsOfQuery = new(PostgresScript.Statement(1), 1);
 
-    public static LogValue Member(LogMember[] members, string name) =>
-        members.Single(member => member.Name == name).Value;
-
-    public static string[] NamesOf(LogMember[] members) => [.. members.Select(member => member.Name)];
-
     // What each call of a describe through DescribeAsync takes: the clock moves this far before it is answered.
     public static readonly TimeSpan CallTime = TimeSpan.FromMilliseconds(7);
 
@@ -43,7 +37,7 @@ internal static class PostgresEventCases
     {
         var clock = new TestClock();
         await using var session = await PostgresScript.SessionAsync(
-            new ClockedExchange(script.Play(), clock, CallTime),
+            HookedExchange.Clocked(clock, CallTime, script.Play()),
             log,
             time: clock
         );

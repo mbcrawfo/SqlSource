@@ -114,7 +114,7 @@ public sealed class DapperRecipeTests(PostgresContainer postgres)
             row.Id == AllTypesRows.FullRowId
         );
         var value = typeof(AllTypesDto).GetProperty(property).ShouldNotBeNull(property).GetValue(full);
-        var column = AllTypesQueryTests.ColumnOf(property);
+        var column = ModelReflection.ColumnOf(property);
         var (typeName, sqlType) = await connection.QuerySingleAsync<(string, string)>(
             """
             SELECT t.typname, format_type(a.atttypid, a.atttypmod)

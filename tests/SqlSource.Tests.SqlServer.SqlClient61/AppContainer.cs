@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -7,25 +8,29 @@ using Xunit;
 
 namespace SqlSource.Tests.SqlServer.SqlClient61;
 
-// A SQL Server of DefaultImages.SqlServer, the end-to-end project's default image, with the end-to-end database "app":
-// its schema, its seed and the table of the types of SQL Server 2025.
+// A SQL Server of EngineImage.SqlServer.Default, the end-to-end project's default image, with the end-to-end database
+// "app": its schema, its seed and the table of the types of SQL Server 2025.
 public sealed class AppContainer : IAsyncLifetime
 {
     private const string Database = "app";
 
-    private readonly MsSqlContainer _container = new MsSqlBuilder(DefaultImages.SqlServer).Build();
+    // Set by InitializeAsync, which starts it through EngineImage, and that through SqlServerStart (TD-0072).
+    private MsSqlContainer? _container;
 
     // Of the database "app".  The container's own string trusts the server's certificate.
     public string ConnectionString =>
-        new SqlConnectionStringBuilder(_container.GetConnectionString()) { InitialCatalog = Database }.ConnectionString;
+        new SqlConnectionStringBuilder(Container.GetConnectionString()) { InitialCatalog = Database }.ConnectionString;
 
     public async ValueTask InitializeAsync()
     {
         var token = TestContext.Current.CancellationToken;
-        await _container.StartAsync(token);
+        _container = await EngineImage.SqlServer.StartAsync(
+            new MsSqlBuilder(EngineImage.SqlServer.Default).Build,
+            token
+        );
         try
         {
-            await using var server = SqlClientFactory.Instance.CreateDataSource(_container.GetConnectionString());
+            await using var server = SqlClientFactory.Instance.CreateDataSource(Container.GetConnectionString());
             await EndToEndFiles.CreateAsync(
                 server,
                 EndToEndEngine.SqlServer,
@@ -48,5 +53,8 @@ public sealed class AppContainer : IAsyncLifetime
         }
     }
 
-    public ValueTask DisposeAsync() => _container.DisposeAsync();
+    public ValueTask DisposeAsync() => _container?.DisposeAsync() ?? ValueTask.CompletedTask;
+
+    private MsSqlContainer Container =>
+        _container ?? throw new InvalidOperationException("The container has not started.");
 }

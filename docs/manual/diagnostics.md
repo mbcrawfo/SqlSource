@@ -163,6 +163,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC267](#sqlsrc267) | Microsoft.Data.SqlClient is older than 6.1 |
 | [SQLSRC268](#sqlsrc268) | Microsoft.Data.SqlClient is newer than SqlSource knows |
 | [SQLSRC269](#sqlsrc269) | Type needs Microsoft.Data.SqlClient |
+| [SQLSRC270](#sqlsrc270) | Type needs a newer Microsoft.Data.SqlClient |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236, and 262 to 266, are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
@@ -176,7 +177,7 @@ The ids `SQLSRC247` and `SQLSRC248` are reported by the build, about the version
 
 The ids `SQLSRC267` and `SQLSRC268` are reported by the build, about the version of Microsoft.Data.SqlClient that the project references, whenever a query of the `mssql` dialect has the output `models` or `codegen`.  They have no file and line, and each is reported once for the project, however many of its queries read the driver.
 
-`SQLSRC269` is reported by the build at a query of the `mssql` dialect whose output is `models` or `codegen` and whose entry in its sidecar is current, as `SQLSRC249` is under the `postgres` dialect: at the query's name, once for the query, for its first column or parameter that has no C# type, parameters before columns.
+`SQLSRC269` and `SQLSRC270` are reported by the build at a query of the `mssql` dialect whose output is `models` or `codegen` and whose entry in its sidecar is current, as `SQLSRC249` is under the `postgres` dialect: at the query's name, once for the query, for its first column or parameter that has no C# type, parameters before columns.
 
 The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type override names.  Each is reported at a query that has a column or a parameter of the database type the entry maps, and names the column or parameter, the entry and the place that wrote it.  An entry that no query uses is never an error, so a project can set its mappings before it has the queries.
 
@@ -1103,7 +1104,7 @@ See: [Logs](tool.md#logs)
 - **Columns and parameters are counted from 0**: `columns[2]` is the third column.
 - **Only the first difference of a query is named.**
 - **What is compared is what changes generated code**: the query as written (its SQL, its `-- param:` markers and its tokens' defaults), its database and the kind of that database, whether it returns rows and which table's rows they match, if any, and the name, position, type and nullability of each parameter and column.  The versions of the tool and of the server are not compared.
-- **With `--database`**, an entry for a query that is no longer in the file, or that needs none, is reported only when its database is one of those that `--database` names: an entry of another database, or one with no database, is not.
+- **With `--database`**, an entry for a query that is no longer in the file, or that needs none, is reported, whatever its database, when `describe` with the same filters would rewrite the sidecar, which drops it.  A sidecar that such a `describe` leaves as it is, because another query of the file, of a database that `--database` does not name, has changed or was never described, keeps the entry, and the check does not report it.
 
 The tool exits with the code 2 when it reported this error and no other, so that a build can tell a sidecar that is out of date from a check that could not be made.  A query that could not be described has an error of its own, and the exit code is then 1.
 
@@ -1256,7 +1257,7 @@ Write the type meant in the place of `<type>`: here `@age::interval`, or `-- par
 
 A statement that the server cannot prepare, though its SQL is valid, such as `CALL` or `CREATE TABLE`, is [SQLSRC233](#sqlsrc233) and not this error.
 
-It is also given when a table, a column or a type that the query uses was dropped while the tool described it, since another session changed the schema between two of the tool's questions.  The message says what went, as in `the table of the column 'id' no longer exists`; there is no `server:` line, since the server said nothing, and the help says to run the tool again.
+It is also given when a type that the query uses was dropped while the tool described it, since another session changed the schema between two of the tool's questions.  A table or a column that the query reads cannot be dropped then: a `DROP TABLE`, or an `ALTER TABLE` that drops or changes a column, waits until the tool has described the query.  The message says what went, as in `the type of the column 'id' no longer exists`; there is no `server:` line, since the server said nothing, and the help says to run the tool again.
 
 It is also what a connection that the server ended while the queries were described is reported as.  The query that finds it out has the server's SQLSTATE and `the server ended the session`, as in `57P01: the server ended the session` for a backend that was ended, and it names neither the host nor the user.  When the server said nothing, the line is `the connection to the server was lost`, or `the server did not answer in time` when Npgsql stopped waiting for its answer, with no SQLSTATE.  Every query of that database after it has the line `the connection to the server was lost`, with no SQLSTATE: start the run again.
 
@@ -1440,7 +1441,7 @@ For PostgreSQL, the generated query methods of a later release will send the SQL
     query: ListUsers, database app, postgres 18.6, Npgsql 10.0.3
     step: check parameters
     server: 42601: syntax error at or near "@"
-    help: a @ that one of the two reads as a parameter and the other as text; the server's lines say where; a table, a column or a type that another session changed during the run shows the same way, so run describe again
+    help: a @ that one of the two reads as a parameter and the other as text; the server's lines say where; a type that another session changed during the run shows the same way, so run describe again
 ```
 
 **Fix:** look for a `@` that stands where only one of the two would read a parameter: inside an unusual string or an identifier, or directly after another character of a name.  Put a space before the parameter, or write the text so that the `@` is plainly inside a string.
@@ -1458,11 +1459,11 @@ A difference may leave the columns the same, and then the server accepts both re
 
 The query is `SELECT id FROM users WHERE id = @id AND tags[:id] IS NOT NULL`.  The position counts the characters of the SQL as the tool sent it, with `$1` in the place of each parameter and without the query's comments: it is not a position in the file.  Rename the parameter so that it is not the name of a column that a slice reads.  Where the `:` follows a bound, `tags[1:id]`, Npgsql sends `tags[1$1]` and the server answers a `42601` like the first example's.
 
-The error also follows a schema that changed while the tool ran: a table, a column or a type that another session dropped between two of the tool's questions gives an error of class `42` at this step, which cannot be told from a misread `@`.  Run `describe` again.
+The error also follows a schema that changed while the tool ran: a type that another session dropped between two of the tool's questions gives an error of class `42` at this step, which cannot be told from a misread `@`.  A table or a column that the query reads cannot be dropped or changed then: a `DROP TABLE`, or an `ALTER TABLE` that drops or changes a column, waits until the tool has described the query.  Run `describe` again.
 
 One difference has no `@` in it: a parameter that is an array of a domain, `-- param: @p email_t[]`, and is returned as a column.  Npgsql sends it as an array of the domain's base type, so the column is `character varying[]` for Npgsql and `email_t[]` for SqlSource, and the help is `Npgsql sends a parameter that is an array of a domain as an array of the domain's base type, so the column it is returned as has another type; cast the column, @p::varchar[] for an array of a domain over varchar` in place of the first example's help.  Cast the column to the type you want, `@p::varchar[]`.
 
-A pooler in transaction mode, such as PgBouncer, can also show as this error: the describe of a statement that is missing on another backend can answer no columns and no error, so the message ends "... columns for Npgsql and 0 for SqlSource", and a statement that an earlier run left on a pooled backend can give the wrong column names.  The fix is a direct connection to the server, as [SQLSRC236](#sqlsrc236) says.  An error of the check that says nothing of how Npgsql reads the SQL, such as a lost connection, is [SQLSRC225](#sqlsrc225) at the same step.  If the SQL is plain and the two still differ, report it.
+An error of the check that says nothing of how Npgsql reads the SQL, such as a lost connection, is [SQLSRC225](#sqlsrc225) at the same step.  If the SQL is plain and the two still differ, report it.
 
 For SQL Server, the tool compares the parameters that SqlSource reads in the query with those that SQL Server reports, ignoring case, and the message names each one that only one of them reads.  Under `mssql`, SqlSource reads a name as a [variable declared with `DECLARE`](parameters-and-tokens.md#declared-variables) when it stands after a comma of a list of declarations, and that list ends at a `;` or at a word that starts a statement, such as `SELECT` or `SET`.  A label is no such word, and neither is a word of the statements of Service Broker, such as `RECEIVE`.  So in this query SqlSource reads `@p` as a variable, and SQL Server as a parameter:
 
@@ -1565,10 +1566,12 @@ See: [Connecting](postgresql.md#connecting), [connecting to SQL Server](sqlserve
 
 **Connection does not keep a session**
 
-The tool prepares a statement on the server and asks about it in later steps, which only works when every step reaches the same session.  This connection does not keep one.  There are two causes:
+The tool prepares a statement on the server and asks about it in later steps, in one transaction, which only works when every step reaches the same session.  This connection does not keep one.  There are two causes:
 
 - The connection string sets `Multiplexing=true`, which shares physical connections between commands.  It is found when the database is opened, before the tool connects.
-- A pooler in transaction mode, such as PgBouncer, sits between the tool and the server.  It hands each transaction to a backend of its own, so a later step can miss the statement the tool prepared.  The tool finds out at a query: the server does not list the statement, or answers `26000` (it does not exist) or `42P05` (it already exists).  Behind a pooler a describe can also answer no columns and no error, which the run reports as [SQLSRC231](#sqlsrc231); the fix is the same.
+- A pooler in statement mode, such as PgBouncer with `pool_mode = statement`, sits between the tool and the server.  It refuses the transaction and closes the connection, so the first query of the database reports this error and every query after it reports [SQLSRC225](#sqlsrc225) with `the connection to the server was lost`.
+
+The tool also reports this error at a query when a step finds that it reached another session: the server does not list the statement it just prepared, or answers `26000` (it does not exist) or `42P05` (it already exists).
 
 For `Multiplexing=true` the tool refuses before it connects, so no query has been sent and the server is not yet known; the `server:` line is the tool's own text:
 
@@ -1576,20 +1579,20 @@ For `Multiplexing=true` the tool refuses before it connects, so no query has bee
 /work/App/Queries/Users.sql(1,10): error SQLSRC236: The connection to the database 'app' does not keep one session
     query: GetUser, database app, postgres
     server: Multiplexing=true does not keep one session
-    help: connect directly to the server, not through a pooler in transaction mode, and without Multiplexing=true
+    help: connect directly to the server or through a pooler in session or transaction mode, and without Multiplexing=true
 ```
 
-Behind a pooler the session has opened, so the query line names the server and the driver, and the error is at the step whose call found out.  Here the server did not list the statement it had just prepared, and the `server:` line is the tool's own text; for `26000` and `42P05` it is the server's:
+Behind a pooler in statement mode the session has opened, so the query line names the server and the driver, and the error is at the first step.  The `server:` line is the tool's own text, after the pooler's SQLSTATE; for `26000` and `42P05` it is the server's:
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC236: The connection to the database 'app' does not keep one session
     query: GetUser, database app, postgres 18.6, Npgsql 10.0.3
     step: describe parameters
-    server: the server does not list the statement it prepared
-    help: connect directly to the server, not through a pooler in transaction mode, and without Multiplexing=true
+    server: 08P01: the server refused the transaction of a describe
+    help: connect directly to the server or through a pooler in session or transaction mode, and without Multiplexing=true
 ```
 
-Connect directly to the server: the address of the database itself, not of the pooler, and without `Multiplexing=true`.  Hosted providers that pool connections offer a direct endpoint beside the pooled one.  Only the tool needs this: your application can still connect through the pooler.  The error for `Multiplexing=true` is reported once, at the first query of the database that the run would have described, as [SQLSRC224](#sqlsrc224) is, and each of the database's queries counts as failed; one found at a query is reported at that query.
+Connect directly to the server, or through a pooler in session or transaction mode, and without `Multiplexing=true`.  With PgBouncer, give the tool a database entry or a user whose `pool_mode` is `session` or `transaction`.  Only the tool needs this: your application can keep its own connection.  The error for `Multiplexing=true` is reported once, at the first query of the database that the run would have described, as [SQLSRC224](#sqlsrc224) is, and each of the database's queries counts as failed; one found at a query is reported at that query.
 
 See: [Connecting](postgresql.md#connecting)
 
@@ -2245,7 +2248,7 @@ The project references a version of Microsoft.Data.SqlClient older than 6.1, and
 CSC : error SQLSRC267: This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs Microsoft.Data.SqlClient 6.1 or later.  Update the package.
 ```
 
-Update the `Microsoft.Data.SqlClient` package to 6.1 or later.  When another package brings the older version, reference `Microsoft.Data.SqlClient` from the project itself, at the version you want.  EF Core 8 and 9 bring Microsoft.Data.SqlClient 5.1, so a project that uses either references Microsoft.Data.SqlClient 6.1 or later directly, beside the EF Core packages.  The error has no file and line, because it is about the project's references, and it is reported once for the project, only while a query's output is `models` or `codegen` under the `mssql` dialect.
+Update the `Microsoft.Data.SqlClient` package to 6.1 or later.  When another package brings the older version, reference `Microsoft.Data.SqlClient` from the project itself, at the version you want.  EF Core 8 and 9 bring Microsoft.Data.SqlClient 5.1, so a project that uses either references Microsoft.Data.SqlClient 6.1 or later directly, beside the EF Core packages.  The error has no file and line, because it is about the project's references, and it is reported once for the project, only while a query's output is `models` or `codegen` under the `mssql` dialect.  A query with a `vector` column or parameter also gets [SQLSRC270](#sqlsrc270), at its name, and the same update clears both.
 
 See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)
 
@@ -2282,5 +2285,19 @@ The project does not reference Microsoft.Data.SqlClient, and a column or a param
 ```
 
 Reference the `Microsoft.Data.SqlClient` package from the project, at 6.1 or later.  Every other type that Microsoft.Data.SqlClient reads without another package has a C# type of .NET itself, and needs no reference.  The error is reported at the query's name, once for the query, and the query's constant or method is still generated.
+
+See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)
+
+## SQLSRC270
+
+**Type needs a newer Microsoft.Data.SqlClient**
+
+The project references a version of Microsoft.Data.SqlClient older than 6.1, and a column or a parameter of a query of the `mssql` dialect has a type whose C# type that version does not have: `vector`, which Microsoft.Data.SqlClient reads as `Microsoft.Data.SqlTypes.SqlVector<float>`, first in 6.1.  The message names the column or parameter, its type, the version its C# type needs and the version the project references.
+
+```console
+/work/App/Queries/Documents.sql(1,10): error SQLSRC270: The column 'embedding' has the type 'vector(3)', whose C# type needs Microsoft.Data.SqlClient 6.1 or later, and this project references Microsoft.Data.SqlClient 6.0.5.  Update the package.
+```
+
+Update the `Microsoft.Data.SqlClient` package to 6.1 or later, which also clears [SQLSRC267](#sqlsrc267), reported for the project beside it.  When another package brings the older version, as EF Core 8 and 9 do, reference `Microsoft.Data.SqlClient` from the project itself, at the version you want.  The error is reported at the query's name, once for the query; the query has no models until it is fixed, and its constant or method is still generated.
 
 See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)

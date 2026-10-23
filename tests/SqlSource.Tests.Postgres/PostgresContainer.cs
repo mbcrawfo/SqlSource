@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
-using System.Globalization;
-using System.Linq;
 using System.Threading.Tasks;
 using Npgsql;
 using SqlSource.Testing;
+using SqlSource.Tests.Postgres.Realistic;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -16,9 +15,6 @@ namespace SqlSource.Tests.Postgres;
 // Testcontainers removes the container when the tests end, and its reaper does when the process is killed.
 public sealed class PostgresContainer : IAsyncLifetime
 {
-    // Names another image: CI runs the tests again on the oldest PostgreSQL that is supported.
-    public const string ImageVariable = "SQLSOURCE_TESTS_POSTGRES_IMAGE";
-
     public const string Database = "fixtures";
 
     // The second database, for the corpus of realistic queries: its own schema and seed, so that the fixture schema
@@ -35,27 +31,18 @@ public sealed class PostgresContainer : IAsyncLifetime
     // Why a test of old and new in RETURNING skips before PostgreSQL 18.
     public const string NoOldAndNewInReturning = "PostgreSQL before 18 has no old and new in RETURNING.";
 
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder(Image).WithDatabase(Database).Build();
+    // Set by InitializeAsync, which starts it through EngineImage.
+    private PostgreSqlContainer? _container;
 
     // The server's major version, read once when the container has started.
     public int Major { get; private set; }
-
-    // The majors that CI runs and that the tests pin answers for: a realistic case's committed entry, the noise
-    // budget and the forms of a plan.
-    public static IReadOnlyList<int> RecordedMajors { get; } = [14, 18];
-
-    public static string Image =>
-        Environment.GetEnvironmentVariable(ImageVariable) is { Length: > 0 } image ? image : DefaultImages.Postgres;
-
-    // The tag of an image, which for a pinned image is the server's version: "postgres:18.6" is "18.6".
-    public static string TagOf(string image) => image[(image.LastIndexOf(':') + 1)..];
 
     // The databases that the end-to-end tests are described and run against, each built from its folder of
     // tests/SqlSource.Tests.Postgres/EndToEnd/.
     public static IReadOnlyList<string> EndToEndDatabases { get; } = [AppDatabase, BillingDatabase];
 
     // Of the database "fixtures".
-    public string ConnectionString => _container.GetConnectionString();
+    public string ConnectionString => Container.GetConnectionString();
 
     // Of the database "realistic".
     public string RealisticConnectionString => ConnectionStringOf(RealisticDatabase);
@@ -84,26 +71,18 @@ public sealed class PostgresContainer : IAsyncLifetime
     }
 
     // Skips the test on a server before that major, which lacks what the reason names.
-    public void SkipBelow(int major, string reason) => SkipBelow(Major, major, reason);
-
-    public static void SkipBelow(int server, int major, string reason) => Assert.SkipWhen(server < major, reason);
+    public void SkipBelow(int major, string reason) => EngineImage.SkipBelow(Major, major, reason);
 
     // Skips the test on a server whose major is not recorded, where what it pins is not known.
-    public void SkipUnlessRecordedMajor(string what) => SkipUnlessRecordedMajor(Major, what);
-
-    public static void SkipUnlessRecordedMajor(int server, string what) =>
-        Assert.SkipUnless(
-            RecordedMajors.Contains(server),
-            string.Create(
-                CultureInfo.InvariantCulture,
-                $"{what} are pinned for PostgreSQL {string.Join(" and ", RecordedMajors)} alone."
-            )
-        );
+    public void SkipUnlessRecordedMajor(string what) => EngineImage.Postgres.SkipUnlessRecordedMajor(Major, what);
 
     public async ValueTask InitializeAsync()
     {
         var token = TestContext.Current.CancellationToken;
-        await _container.StartAsync(token);
+        _container = await EngineImage.Postgres.StartAsync(
+            new PostgreSqlBuilder(EngineImage.Postgres.Image).WithDatabase(Database).Build,
+            token
+        );
         try
         {
             await using var source = NpgsqlDataSource.Create(ConnectionString);
@@ -118,7 +97,7 @@ public sealed class PostgresContainer : IAsyncLifetime
                 EndToEndEngine.Postgres,
                 RealisticDatabase,
                 SourceOf,
-                [RepositoryPaths.RealisticSchema, RepositoryPaths.RealisticSeed],
+                [RealisticCases.Corpus.Schema, RealisticCases.Corpus.Seed],
                 token
             );
 
@@ -140,5 +119,8 @@ public sealed class PostgresContainer : IAsyncLifetime
         }
     }
 
-    public ValueTask DisposeAsync() => _container.DisposeAsync();
+    public ValueTask DisposeAsync() => _container?.DisposeAsync() ?? ValueTask.CompletedTask;
+
+    private PostgreSqlContainer Container =>
+        _container ?? throw new InvalidOperationException("The container has not started.");
 }

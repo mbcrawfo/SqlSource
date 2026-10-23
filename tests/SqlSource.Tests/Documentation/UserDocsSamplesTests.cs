@@ -21,14 +21,14 @@ public sealed class UserDocsSamplesTests
 
     // A parser that finds no block would make the test below pass.
     [Fact]
-    public void UserDocs_HaveSqlSamples() =>
+    public void FencedBlocks_OfTheUserDocs_IncludeSqlSamples() =>
         UserDocs
             .FencedBlocks()
             .Count(block => block.Info.StartsWith("sql", StringComparison.OrdinalIgnoreCase))
             .ShouldBeGreaterThan(0);
 
     [Fact]
-    public void SqlSamples_Parse()
+    public void SqlSamples_OfTheUserDocs_Parse()
     {
         var problems = new List<string>();
 

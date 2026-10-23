@@ -76,7 +76,7 @@ internal static class ModelReader
         {
             // The entries, the queries and the types, which are of some of the entries, are all in the order of the
             // file, so each search starts after the last.
-            var queryAt = IndexOfQuery(parsed.Queries, entry.Name, nextQuery);
+            var queryAt = QueryNames.IndexOf(parsed.Queries, entry.Name, nextQuery);
             if (queryAt < 0)
             {
                 continue;
@@ -423,19 +423,6 @@ internal static class ModelReader
 
     // The 1-based position of the index.
     private static string PositionOf(int index) => (index + 1).ToString(CultureInfo.InvariantCulture);
-
-    private static int IndexOfQuery(EquatableArray<SqlQuery> queries, string name, int from)
-    {
-        for (var index = from; index < queries.Count; index++)
-        {
-            if (string.Equals(queries[index].Name, name, StringComparison.Ordinal))
-            {
-                return index;
-            }
-        }
-
-        return -1;
-    }
 
     // Where one file's errors go, a builder its documentation is written in, and the property names a model has so
     // far, by name ignoring case, each with its name, its parameter's or column's name as the sidecar has it and its

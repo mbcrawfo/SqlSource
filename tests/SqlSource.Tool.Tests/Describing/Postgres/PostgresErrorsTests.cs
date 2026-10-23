@@ -101,7 +101,7 @@ public sealed class PostgresErrorsTests
     {
         var parameter = Declared("tenant", "int) AS SELECT 1");
 
-        var failure = PostgresErrors.TypeRefused(Query(parameter), parameter);
+        var failure = PostgresErrors.TypeRefused(Query(parameter), parameter, DescribeFailures.NotATypeName);
 
         failure.Descriptor.Id.ShouldBe("SQLSRC228");
         failure.Arguments.ShouldBe(["int) AS SELECT 1", "@tenant", "Q", "it is not written as a type name"]);
@@ -134,11 +134,12 @@ public sealed class PostgresErrorsTests
         failure.Help.ShouldBe(PostgresErrors.NotDescribableHelp);
     }
 
-    // A statement that is not listed after PREPARE, and one that already exists: both are a backend that is not the
-    // one the tool prepared on.  The first carries no SQLSTATE and the second is matched by its SQLSTATE alone, so
-    // the message may be translated.
+    // A statement that is not listed after PREPARE, one that already exists, and a transaction that the server
+    // refused: each is a connection that does not keep a session.  The first carries no SQLSTATE, the second is
+    // matched by its SQLSTATE alone, so the message may be translated, and the third is the tool's own text.
     [Theory]
     [InlineData(null, PostgresLive.StatementNotListed)]
+    [InlineData("08P01", PostgresLive.TransactionRefused)]
     [InlineData("42P05", "prepared statement \"sqlsource_1\" already exists")]
     [InlineData("42P05", "la sentencia preparada \"sqlsource_1\" ya existe")]
     public void Prepare_StatementNotListedOrAlreadyExists_IsSqlsrc236(string? state, string message)
@@ -163,6 +164,13 @@ public sealed class PostgresErrorsTests
     public void Prepare_NotListedMessageWithASqlState_IsSqlsrc225() =>
         PostgresErrors
             .Prepare(Error("42601", PostgresLive.StatementNotListed), Query(), Prepared(1), "app")
+            .Descriptor.Id.ShouldBe("SQLSRC225");
+
+    // The refused transaction's text with another SQLSTATE is no refusal of the transaction.
+    [Fact]
+    public void Prepare_TransactionRefusedMessageWithAnotherSqlState_IsSqlsrc225() =>
+        PostgresErrors
+            .Prepare(Error("08006", PostgresLive.TransactionRefused), Query(), Prepared(1), "app")
             .Descriptor.Id.ShouldBe("SQLSRC225");
 
     // 26000 is matched by its SQLSTATE alone.

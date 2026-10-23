@@ -172,7 +172,7 @@ public sealed class SqlDialectRulesTests
     }
 
     [Fact]
-    public void ParameterPrefix_IsTheAtSignInEveryDialectAndOptionSet()
+    public void ParameterPrefix_EveryDialectAndOptionSet_IsTheAtSign()
     {
         foreach (var dialect in Enum.GetValues<SqlDialect>())
         {

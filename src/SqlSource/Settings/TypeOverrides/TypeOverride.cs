@@ -6,7 +6,7 @@ namespace SqlSource.Settings.TypeOverrides;
 /// One entry of the type override: the C# type a database type maps to.
 /// </summary>
 /// <param name="Key">
-/// The type's key, as one engine reads it: <see cref="TypeKeys.TryNormalize" /> or
+/// The type's key, as one engine reads it: <see cref="TypeKeys.TryNormalizePostgres" /> or
 /// <see cref="TypeKeys.TryNormalizeSqlServer" /> gives it.
 /// </param>
 /// <param name="Type">

@@ -225,9 +225,7 @@ public sealed class GeneratorParameterLevelTests
     }
 
     private static string Source(string? attribute) =>
-        "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate(SqlLocation = SqlLocation.Direct"
-        + (attribute is null ? string.Empty : ", Parameters = \"" + attribute + "\"")
-        + ")]\npublic partial class Sample;\n";
+        GeneratorHarness.SampleSource(attribute is null ? null : "Parameters = \"" + attribute + "\"");
 
     private static GeneratorRun Run(OutputKind? output, string? property, string? attribute) =>
         GeneratorHarness.Run(

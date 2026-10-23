@@ -272,18 +272,18 @@ public sealed class PostgresTypeMapTests
             kind = SidecarValues.Kind.Range;
         }
 
-        var schema = TypeKeys.IsExtension(internalName) ? "public" : "pg_catalog";
+        var schema = TypeKeyNames.IsExtension(internalName) ? "public" : "pg_catalog";
         var type = TestSidecars.Postgres(name: internalName, kind: kind, schema: schema, internalName: internalName);
 
-        ShouldMapTo(PostgresTypeMap.Map(type, DriverColumn.Npgsql8), under8, isValueType, internalName);
-        ShouldMapTo(PostgresTypeMap.Map(type, DriverColumn.Npgsql10), under10, isValueType, internalName);
-        ShouldMapTo(PostgresTypeMap.Map(type, DriverColumn.None), underNone, isValueType, internalName);
+        ShouldMapTo(PostgresTypeMap.Map(type, NpgsqlColumn.Npgsql8), under8, isValueType, internalName);
+        ShouldMapTo(PostgresTypeMap.Map(type, NpgsqlColumn.Npgsql10), under10, isValueType, internalName);
+        ShouldMapTo(PostgresTypeMap.Map(type, NpgsqlColumn.None), underNone, isValueType, internalName);
     }
 
     // The names a key may be written with are the map's own keys, so the map and the settings never drift apart.
     [Fact]
-    public void Keys_OfTheMap_AreTheKnownNamesOfTheSettings() =>
-        PostgresTypeMap.Keys.ShouldBe(TypeKeys.KnownNames, ignoreOrder: true);
+    public void Keys_OfTheMap_AreTheKnownPostgresNamesOfTheSettings() =>
+        PostgresTypeMap.Keys.ShouldBe(TypeKeyNames.KnownPostgresNames, ignoreOrder: true);
 
     [Theory]
     [InlineData("citext", "public", "string")]
@@ -295,7 +295,7 @@ public sealed class PostgresTypeMapTests
     {
         var type = TestSidecars.Postgres(name: internalName, schema: schema, internalName: internalName);
 
-        foreach (var column in Enum.GetValues<DriverColumn>())
+        foreach (var column in Enum.GetValues<NpgsqlColumn>())
         {
             ShouldMapTo(PostgresTypeMap.Map(type, column), expected, false, internalName);
         }
@@ -310,7 +310,7 @@ public sealed class PostgresTypeMapTests
     [InlineData("varbit", null, BitArray, false)]
     public void Map_Bit_IsDecidedByItsLength(string internalName, int? length, string expected, bool isValueType)
     {
-        foreach (var column in Enum.GetValues<DriverColumn>())
+        foreach (var column in Enum.GetValues<NpgsqlColumn>())
         {
             ShouldMapTo(PostgresTypeMap.Map(Bit(internalName, length), column), expected, isValueType, internalName);
         }
@@ -322,20 +322,20 @@ public sealed class PostgresTypeMapTests
     {
         var (type, expected, isValueType, key) = Kinds[name];
 
-        ShouldMapTo(PostgresTypeMap.Map(type, DriverColumn.Npgsql10), expected, isValueType, key);
+        ShouldMapTo(PostgresTypeMap.Map(type, NpgsqlColumn.Npgsql10), expected, isValueType, key);
     }
 
     [Fact]
     public void Map_ArrayOrDomainOfATypeThatDiffers_DiffersWithoutTheDriver()
     {
         ShouldMapTo(
-            PostgresTypeMap.Map(ArrayOf(Catalog("date")), DriverColumn.None),
+            PostgresTypeMap.Map(ArrayOf(Catalog("date")), NpgsqlColumn.None),
             "!DiffersByDriver",
             false,
             "date"
         );
         ShouldMapTo(
-            PostgresTypeMap.Map(DomainOf("birthday", Catalog("date")), DriverColumn.None),
+            PostgresTypeMap.Map(DomainOf("birthday", Catalog("date")), NpgsqlColumn.None),
             "!DiffersByDriver",
             false,
             "date"
@@ -350,16 +350,16 @@ public sealed class PostgresTypeMapTests
     [InlineData("daterange", null)]
     [InlineData("datemultirange", null)]
     public void Map_TypeThatDiffersWithoutTheDriver_NamesTheEntryForEachDriver(string internalName, string? detail) =>
-        PostgresTypeMap.Map(Catalog(internalName), DriverColumn.None).Detail.ShouldBe(detail);
+        PostgresTypeMap.Map(Catalog(internalName), NpgsqlColumn.None).Detail.ShouldBe(detail);
 
     // The cast reads an array of the type as an array of oid.
     [Fact]
     public void Map_TypeReadByACastToOid_NamesTheCastOfItsRank()
     {
-        PostgresTypeMap.Map(Catalog("regclass"), DriverColumn.Npgsql10).Detail.ShouldBe("oid");
-        PostgresTypeMap.Map(ArrayOf(Catalog("regclass")), DriverColumn.Npgsql10).Detail.ShouldBe("oid[]");
+        PostgresTypeMap.Map(Catalog("regclass"), NpgsqlColumn.Npgsql10).Detail.ShouldBe("oid");
+        PostgresTypeMap.Map(ArrayOf(Catalog("regclass")), NpgsqlColumn.Npgsql10).Detail.ShouldBe("oid[]");
         PostgresTypeMap
-            .Map(ArrayOf(DomainOf("relation", Catalog("regclass"))), DriverColumn.Npgsql10)
+            .Map(ArrayOf(DomainOf("relation", Catalog("regclass"))), NpgsqlColumn.Npgsql10)
             .Detail.ShouldBe("oid[]");
     }
 
@@ -373,13 +373,13 @@ public sealed class PostgresTypeMapTests
     {
         var type = TestSidecars.Postgres(name: internalName, schema: schema, internalName: internalName);
 
-        PostgresTypeMap.Map(type, DriverColumn.Npgsql8).Detail.ShouldBe("text");
-        PostgresTypeMap.Map(ArrayOf(type), DriverColumn.Npgsql8).Detail.ShouldBe("text[]");
+        PostgresTypeMap.Map(type, NpgsqlColumn.Npgsql8).Detail.ShouldBe("text");
+        PostgresTypeMap.Map(ArrayOf(type), NpgsqlColumn.Npgsql8).Detail.ShouldBe("text[]");
     }
 
     [Fact]
     public void Map_ArrayOfATypeOfNpgsqlTypes_NeedsTheDriverWithoutIt() =>
-        ShouldMapTo(PostgresTypeMap.Map(ArrayOf(Catalog("point")), DriverColumn.None), "!NeedsDriver", false, "point");
+        ShouldMapTo(PostgresTypeMap.Map(ArrayOf(Catalog("point")), NpgsqlColumn.None), "!NeedsDriver", false, "point");
 
     [Fact]
     public void Map_Override_IsAskedAtEveryLevelFirst()
@@ -391,21 +391,21 @@ public sealed class PostgresTypeMapTests
             ("int4", "global::MyApp.Id", true)
         );
 
-        ShouldMapTo(PostgresTypeMap.Map(array, DriverColumn.Npgsql10, ofElement), "global::MyApp.Id[]", false, "int4");
+        ShouldMapTo(PostgresTypeMap.Map(array, NpgsqlColumn.Npgsql10, ofElement), "global::MyApp.Id[]", false, "int4");
         ShouldMapTo(
-            PostgresTypeMap.Map(array, DriverColumn.Npgsql10, ofArrayAndElement),
+            PostgresTypeMap.Map(array, NpgsqlColumn.Npgsql10, ofArrayAndElement),
             "global::System.Collections.Generic.List<int>",
             false,
             "_int4"
         );
         ShouldMapTo(
-            PostgresTypeMap.Map(DomainOf("user_id", TestSidecars.Postgres()), DriverColumn.Npgsql10, ofElement),
+            PostgresTypeMap.Map(DomainOf("user_id", TestSidecars.Postgres()), NpgsqlColumn.Npgsql10, ofElement),
             "global::MyApp.Id",
             true,
             "int4"
         );
         ShouldMapTo(
-            PostgresTypeMap.Map(Catalog("date"), DriverColumn.None, Overrides(("date", DateOnly, true))),
+            PostgresTypeMap.Map(Catalog("date"), NpgsqlColumn.None, Overrides(("date", DateOnly, true))),
             DateOnly,
             true,
             "date"
@@ -441,7 +441,7 @@ public sealed class PostgresTypeMapTests
         mapping.WarningIds.ShouldBeEmpty();
     }
 
-    private static OverrideOf Overrides(params (string Key, string Text, bool IsValueType)[] entries) =>
+    private static PostgresOverrideOf Overrides(params (string Key, string Text, bool IsValueType)[] entries) =>
         type =>
         {
             var key = PostgresTypeMap.KeyOf(type);
