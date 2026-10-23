@@ -163,6 +163,25 @@ public sealed class ExpressionTests(PostgresContainer postgres)
         }
     }
 
+    // An operator added to pg_catalog itself is not built in: "overloads" answers that * is held elsewhere, and the
+    // intersection is not read.
+    [Fact]
+    public async Task DescribeAsync_RangeIntersectionWhenCatalogHoldsAnAddedOperator_KeepsNoOrigin()
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.CatalogOperator);
+
+            (await AnswersAsync("SELECT b.during * tstzrange(@from, @to) AS overlap FROM bookings b")).ShouldBe([
+                UnknownNoOrigin,
+            ]);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropCatalogOperator);
+        }
+    }
+
     // The root of a set operation prints its first branch: a constant there says nothing of the NULL of the other.
     [Theory]
     [InlineData("SELECT 'a'::text AS k FROM users UNION SELECT NULL FROM orders")]

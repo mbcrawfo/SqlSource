@@ -80,6 +80,30 @@ public sealed class OverloadsCallTests(PostgresContainer postgres)
     }
 
     [Fact]
+    public async Task OverloadsAsync_OperatorAddedToTheCatalog_AnswersIt()
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.CatalogOperator);
+            await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
+            var live = new PostgresLive(connection);
+
+            var answer = await live.OverloadsAsync(
+                new PostgresOverloadsRequest([], ["*", "+"]),
+                TestContext.Current.CancellationToken
+            );
+
+            answer.Error.ShouldBeNull(answer.Error?.Message);
+            answer.Functions.ShouldNotBeNull().ShouldBeEmpty();
+            answer.Operators.ShouldBe(["*"]);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropCatalogOperator);
+        }
+    }
+
+    [Fact]
     public async Task OverloadsAsync_NoNames_AnswersNone()
     {
         await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);

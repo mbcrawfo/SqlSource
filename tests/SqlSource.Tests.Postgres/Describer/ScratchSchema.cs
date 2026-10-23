@@ -9,8 +9,8 @@ namespace SqlSource.Tests.Postgres.Describer;
 // container is thrown away, and the fixtures are recorded in one of their own.  So a class that runs it first makes
 // the same object as any other would.  An object that changes what another test sees while it exists,
 // public."numeric", the schema "user", the schema shadow of ShadowCount and ShadowOperators, the aggregate
-// pg_catalog.count(text) of CatalogCount, describer_canary, command_widgets, error_path_widgets and session_gone, is
-// made by its test and dropped in a finally.
+// pg_catalog.count(text) of CatalogCount, the operator pg_catalog.* of CatalogOperator, describer_canary,
+// command_widgets, error_path_widgets and session_gone, is made by its test and dropped in a finally.
 internal static class ScratchSchema
 {
     /// <summary>
@@ -83,6 +83,27 @@ internal static class ScratchSchema
     public const string DropCatalogCount = """
         DROP AGGREGATE IF EXISTS pg_catalog.count(text);
         DROP FUNCTION IF EXISTS pg_catalog.sqlsource_test_nulls(int8, text);
+        """;
+
+    /// <summary>
+    /// An operator <c>pg_catalog.*</c> over <c>(text, text)</c>, for which <c>pg_catalog</c> has none, that always
+    /// returns <c>NULL</c>, added to <c>pg_catalog</c> itself.  Its function is PL/pgSQL and in <c>pg_catalog</c> too.
+    /// </summary>
+    public const string CatalogOperator = """
+        CREATE OR REPLACE FUNCTION pg_catalog.sqlsource_test_null_text(text, text) RETURNS text
+            LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END';
+        DROP OPERATOR IF EXISTS pg_catalog.* (text, text);
+        CREATE OPERATOR pg_catalog.* (leftarg = text, rightarg = text, function = pg_catalog.sqlsource_test_null_text);
+        """;
+
+    /// <summary>
+    /// Drops what <see cref="CatalogOperator" /> made.  Every test that runs it runs this in a finally: while
+    /// <c>pg_catalog</c> holds a <c>*</c> that is not built in, the describer reads no range intersection of any other
+    /// test.
+    /// </summary>
+    public const string DropCatalogOperator = """
+        DROP OPERATOR IF EXISTS pg_catalog.* (text, text);
+        DROP FUNCTION IF EXISTS pg_catalog.sqlsource_test_null_text(text, text);
         """;
 
     /// <summary>
