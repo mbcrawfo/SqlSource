@@ -125,7 +125,7 @@ public sealed class FileDiagnosticsTests
             OutputKind.Sql,
             Source,
             new SqlFile("/app/Repo/Broken.sql", "/* open\nSELECT 1;\n"),
-            new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser)
+            GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBe(["SQLSRC102 /app/Repo/Broken.sql(1,1)-(1,3): A block comment or hint is not closed"]);
@@ -182,7 +182,7 @@ public sealed class FileDiagnosticsTests
     public void Run_FileListedTwice_GivesEachMemberAndEachErrorOnce()
     {
         var broken = new SqlFile("/app/Repo/Broken.sql", "-- name: 1x\nSELECT 1;\n");
-        var users = new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser);
+        var users = GeneratorHarness.UsersFile;
 
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
@@ -209,7 +209,7 @@ public sealed class FileDiagnosticsTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             Source,
-            new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser),
+            GeneratorHarness.UsersFile,
             new SqlFile(second, "-- name: GetOrder\nSELECT 2;\n")
         );
 
@@ -225,7 +225,7 @@ public sealed class FileDiagnosticsTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             Source,
-            new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser),
+            GeneratorHarness.UsersFile,
             new SqlFile("/app/Repo/users.sql", "-- name: GetOrder\nSELECT 2;\n"),
             new SqlFile("/app/Repo/./users.sql", "-- name: GetOrder\nSELECT 2;\n"),
             new SqlFile("/app/Repo/USERS.sql", "-- name: GetItem\nSELECT 3;\n")
@@ -242,7 +242,7 @@ public sealed class FileDiagnosticsTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             Source,
-            new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser),
+            GeneratorHarness.UsersFile,
             new SqlFile("/app/Migrations/001_init.sql", "SELECT 1;\n"),
             new SqlFile("/app/Migrations/001_INIT.sql", "SELECT 2;\n")
         );
@@ -258,7 +258,7 @@ public sealed class FileDiagnosticsTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             Source,
-            new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser),
+            GeneratorHarness.UsersFile,
             new SqlFile("../Users.sql", "-- name: 1x\nSELECT 2;\n")
         );
 
@@ -273,7 +273,7 @@ public sealed class FileDiagnosticsTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             Source,
-            new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser),
+            GeneratorHarness.UsersFile,
             new SqlFile("/app/Migrations/001_init.sql", "SELECT 'unfinished;\n"),
             new SqlFile("/app/Repo/Sub/002-more.sql", "/* open\n")
         );
