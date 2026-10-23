@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
@@ -483,6 +484,140 @@ public sealed class PlanExpressionTests
         PlanExpression
             .NullableOf(entry, SubPlans(BuiltInTypes.Int8, BuiltInTypes.Int4, catalogFunctions: false))
             .ShouldBe(expected);
+
+    // The walk's typed proof of the references of the tests of the names only pg_catalog holds.
+    private static long? Polymorphic(OutputReference reference) =>
+        (reference.Alias is null ? reference.Column : reference.Alias + "." + reference.Column) switch
+        {
+            "o.id" => BuiltInTypes.Int8,
+            "u.id" => BuiltInTypes.Int4,
+            "during" or "b.during" => BuiltInTypes.Tstzrange,
+            "u.name" => BuiltInTypes.Varchar,
+            _ => null,
+        };
+
+    // Every name of CatalogOverloads held by pg_catalog alone.
+    private static readonly CatalogNames All = new(
+        CatalogOverloads.FunctionNames.ToFrozenSet(StringComparer.Ordinal),
+        CatalogOverloads.OperatorNames.ToFrozenSet(StringComparer.Ordinal)
+    );
+
+    private static ExpressionContext Alone(
+        CatalogNames names,
+        bool catalogFunctions = true,
+        bool groupsHaveRows = false
+    ) => new(catalogFunctions, Polymorphic, GroupsHaveRows: groupsHaveRows, CatalogAlone: names);
+
+    private static readonly string[] CountsOfAnArgument =
+    [
+        "count(o.id)",
+        "count(DISTINCT status)",
+        "count(email) FILTER (WHERE (id > 1))",
+        "count(email) OVER (?)",
+        "count(email) OVER w1",
+        "(count(o.id))",
+    ];
+
+    public static TheoryData<string> CountTexts => [.. CountsOfAnArgument];
+
+    [Theory]
+    [MemberData(nameof(CountTexts))]
+    public void NullableOf_CatalogsAloneCount_IsNotNull(string entry) =>
+        PlanExpression.NullableOf(entry, Alone(All)).ShouldBe(false);
+
+    // With no name held by pg_catalog alone, or with the names but another schema's found first, count may be a user's.
+    [Theory]
+    [MemberData(nameof(CountTexts))]
+    public void NullableOf_CountThatMayBeAnotherSchemas_IsUnknown(string entry)
+    {
+        PlanExpression.NullableOf(entry, Alone(CatalogNames.None)).ShouldBeNull();
+        PlanExpression.NullableOf(entry, Alone(All, catalogFunctions: false)).ShouldBeNull();
+    }
+
+    [Fact]
+    public void NullableOf_CountOfAStarWhenNoNameIsTheCatalogsAlone_IsNotNull() =>
+        PlanExpression.NullableOf("count(*)", Alone(CatalogNames.None)).ShouldBe(false);
+
+    [Theory]
+    [InlineData("array_agg(DISTINCT p.id ORDER BY p.id)")]
+    [InlineData("array_agg(o.note)")]
+    public void NullableOf_ArrayAggOverAGroupWithARow_IsNotNull(string entry) =>
+        PlanExpression.NullableOf(entry, Alone(All, groupsHaveRows: true)).ShouldBe(false);
+
+    // A group may have no row, a FILTER may leave it none, a window's frame may be empty, and array_agg may be a
+    // user's.
+    [Theory]
+    [InlineData("array_agg(o.note)", false, true)]
+    [InlineData("array_agg(DISTINCT p.id ORDER BY p.id)", false, true)]
+    [InlineData("array_agg(o.note) FILTER (WHERE (o.id > 1))", true, true)]
+    [InlineData("array_agg(o.note) OVER w1", true, true)]
+    [InlineData("array_agg(o.note)", true, false)]
+    public void NullableOf_ArrayAggThatMayBeNull_IsUnknown(string entry, bool groupsHaveRows, bool catalogAlone) =>
+        PlanExpression
+            .NullableOf(entry, Alone(catalogAlone ? All : CatalogNames.None, groupsHaveRows: groupsHaveRows))
+            .ShouldBeNull();
+
+    [Theory]
+    [InlineData("jsonb_build_object('id', id, 'email', email)", false)]
+    [InlineData("json_build_object()", false)]
+    [InlineData("jsonb_build_object(VARIADIC $1)", null)]
+    public void NullableOf_JsonBuildObject_IsNotNullButForVariadic(string entry, bool? expected) =>
+        PlanExpression.NullableOf(entry, Alone(All)).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("tstzrange($1, $2)", false)]
+    [InlineData("int4range(1, 2, '[]'::text)", false)]
+    [InlineData("(during * tstzrange($1, $2))", false)]
+    [InlineData("tstzrange($1)", null)]
+    [InlineData("(during * (u.id)::numeric)", null)]
+    public void NullableOf_RangeConstructorAndIntersection_AreNotNull(string entry, bool? expected) =>
+        PlanExpression.NullableOf(entry, Alone(All)).ShouldBe(expected);
+
+    // Another schema's * may be the one the server chose for two ranges.
+    [Fact]
+    public void NullableOf_IntersectionWhenAnotherSchemaHoldsTheOperator_IsUnknown() =>
+        PlanExpression
+            .NullableOf("(during * tstzrange($1, $2))", Alone(new CatalogNames(All.Functions, FrozenSet<string>.Empty)))
+            .ShouldBeNull();
+
+    [Theory]
+    [InlineData("count(o.id)", BuiltInTypes.Int8)]
+    [InlineData("count(email) OVER w1", BuiltInTypes.Int8)]
+    [InlineData("jsonb_build_object('id', id, 'email', email)", BuiltInTypes.Jsonb)]
+    [InlineData("json_build_object()", BuiltInTypes.Json)]
+    [InlineData("tstzrange($1, $2)", BuiltInTypes.Tstzrange)]
+    [InlineData("int4range(1, 2, '[]'::text)", BuiltInTypes.Int4range)]
+    [InlineData("(during * tstzrange($1, $2))", BuiltInTypes.Tstzrange)]
+    public void ProvedTypeOf_CatalogsAloneForm_IsItsType(string entry, long expected) =>
+        PlanExpression.ProvedTypeOf(entry, Alone(All)).ShouldBe(expected);
+
+    // upper and lower of a range are NULL for an infinite or an empty one, and json_agg and jsonb_agg are in no table.
+    [Theory]
+    [InlineData("upper(during)")]
+    [InlineData("lower(during)")]
+    [InlineData("json_agg(o.note)")]
+    [InlineData("jsonb_agg(o.note)")]
+    public void NullableOf_PolymorphicNameNotInTheTable_IsUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, Alone(All, groupsHaveRows: true)).ShouldBeNull();
+
+    [Theory]
+    [InlineData("count(*)", new string[0], new string[0])]
+    [InlineData("(count(o.id) + count(*))", new[] { "count" }, new string[0])]
+    [InlineData("(during * tstzrange($1, $2))", new[] { "tstzrange" }, new[] { "*" })]
+    [InlineData("jsonb_build_object('a'::text, (x * 2))", new[] { "jsonb_build_object" }, new[] { "*" })]
+    [InlineData("(count(a.id) + count(DISTINCT a.id))", new[] { "count" }, new string[0])]
+    [InlineData("upper(during)", new string[0], new string[0])]
+    [InlineData("'count(x)'::text", new string[0], new string[0])]
+    [InlineData("shadow.count(id)", new string[0], new string[0])]
+    [InlineData("\"count\"(id)", new string[0], new string[0])]
+    [InlineData("count(o.id", new string[0], new string[0])]
+    public void CatalogNamesIn_Entry_GivesTheNamesItCalls(string entry, string[] functions, string[] operators)
+    {
+        var (foundFunctions, foundOperators) = PlanExpression.CatalogNamesIn(entry);
+
+        foundFunctions.ShouldBe(functions);
+        foundOperators.ShouldBe(operators);
+    }
 
     [Fact]
     public void Groups_Entry_IsTheTextInsideEachPairOfParenthesesOutermostFirst() =>

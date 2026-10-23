@@ -52,6 +52,11 @@ internal static partial class PlanExpression
                 return _context.CatalogFunctions ? false : null;
             }
 
+            if (IsCatalogsCount(from, to))
+            {
+                return false;
+            }
+
             if (IsVariadicCall(from, to))
             {
                 return AnyArgumentIsNotNull(from + 2, to - 1) ? false : null;

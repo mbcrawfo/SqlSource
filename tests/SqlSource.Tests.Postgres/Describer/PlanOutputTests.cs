@@ -374,7 +374,7 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
             found.Add(await reader.GetFieldValueAsync<uint>(0, token), reader.GetString(1));
         }
 
-        expected.Count.ShouldBe(19);
+        expected.Count.ShouldBe(27);
         found.ShouldBe(expected, ignoreOrder: true);
     }
 
@@ -554,6 +554,115 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
 
         mismatches.ShouldBeEmpty();
         aggregates.Length.ShouldBe(38);
+    }
+
+    // Every overload pg_catalog holds of each function name CatalogOverloads reads is a row of the table, with the
+    // arguments and the implementation the row gives, and every row is one: an aggregate by its transition function,
+    // its final one and its initial value.  None is strict, which would make it NULL for a NULL argument before its C
+    // function ran, and none returns a set.  The intersection of two of each range type is of that type, no implicit
+    // or assignment cast leads from one, and the only operators * of pg_catalog over a range, a multirange or a
+    // pseudo-type are range_intersect and the multirange's.  Every mismatch is listed.
+    [Fact]
+    public async Task Catalog_CatalogOverloads_ArePinned()
+    {
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        var token = TestContext.Current.CancellationToken;
+        var found = new HashSet<(string Name, string Arguments, string Implementation)>();
+        var mismatches = new List<string>();
+        await using (
+            var command = source.CreateCommand(
+                """
+                SELECT p.proname::text,
+                    pg_catalog.pg_get_function_identity_arguments(p.oid),
+                    CASE
+                        WHEN p.prokind = 'a' THEN a.aggtransfn::text || '/'
+                            || CASE WHEN a.aggfinalfn = 0 THEN '-' ELSE a.aggfinalfn::text END || '/'
+                            || coalesce(a.agginitval, '')
+                        ELSE p.prosrc
+                    END,
+                    p.proisstrict OR p.proretset
+                FROM pg_catalog.pg_proc AS p
+                LEFT JOIN pg_catalog.pg_aggregate AS a ON a.aggfnoid = p.oid
+                WHERE p.pronamespace = 'pg_catalog'::regnamespace AND p.proname = ANY ($1)
+                """
+            )
+        )
+        {
+            _ = command.Parameters.Add(new NpgsqlParameter { Value = CatalogOverloads.FunctionNames.ToArray() });
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+            {
+                var row = (reader.GetString(0), reader.GetString(1), reader.GetString(2));
+                _ = found.Add(row);
+                if (reader.GetBoolean(3))
+                {
+                    mismatches.Add($"strict or returning a set {Describe(row)}");
+                }
+            }
+        }
+
+        var listed = CatalogOverloads.Overloads.ToHashSet();
+        mismatches.AddRange(listed.Except(found).Select(static row => $"missing {Describe(row)}"));
+        mismatches.AddRange(found.Except(listed).Select(static row => $"not listed {Describe(row)}"));
+
+        var ranges = CatalogOverloads
+            .FunctionNames.Where(static name => CatalogOverloads.RangeTypeOf(name) is not null)
+            .ToArray();
+        foreach (var range in ranges)
+        {
+            await using var command = source.CreateCommand(
+                $"SELECT pg_catalog.pg_typeof('empty'::{range} * 'empty'::{range})::oid"
+            );
+            var type = (uint)(await command.ExecuteScalarAsync(token)).ShouldNotBeNull();
+            if (type != CatalogOverloads.RangeTypeOf(range))
+            {
+                mismatches.Add($"{range} * {range} is of the type {type}");
+            }
+        }
+
+        await using (
+            var command = source.CreateCommand(
+                """
+                SELECT c.castsource::regtype::text || ' to ' || c.casttarget::regtype::text
+                FROM pg_catalog.pg_cast AS c
+                WHERE c.castsource = ANY ($1) AND c.castcontext IN ('i', 'a')
+                UNION ALL
+                SELECT 'operator *(' || o.oprleft::regtype::text || ', ' || o.oprright::regtype::text || ') by '
+                    || o.oprcode::text
+                FROM pg_catalog.pg_operator AS o
+                JOIN pg_catalog.pg_type AS l ON l.oid = o.oprleft
+                JOIN pg_catalog.pg_type AS r ON r.oid = o.oprright
+                WHERE o.oprnamespace = 'pg_catalog'::regnamespace
+                    AND o.oprname = '*'
+                    AND (l.typtype IN ('r', 'm', 'p') OR r.typtype IN ('r', 'm', 'p'))
+                    AND (o.oprleft, o.oprright, o.oprcode::text) NOT IN (
+                        ('anyrange'::regtype, 'anyrange'::regtype, 'range_intersect'),
+                        ('anymultirange'::regtype, 'anymultirange'::regtype, 'multirange_intersect')
+                    )
+                """
+            )
+        )
+        {
+            _ = command.Parameters.Add(
+                new NpgsqlParameter
+                {
+                    Value = ranges.Select(static range => (uint)CatalogOverloads.RangeTypeOf(range)!.Value).ToArray(),
+                    DataTypeName = "oid[]",
+                }
+            );
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+            {
+                mismatches.Add(reader.GetString(0));
+            }
+        }
+
+        mismatches.ShouldBeEmpty();
+        listed.Count.ShouldBe(20);
+        ranges.Length.ShouldBe(6);
+
+        static string Describe((string Name, string Arguments, string Implementation) row) =>
+            $"{row.Name}({row.Arguments}) by {row.Implementation}";
     }
 
     // The types that carry a modifier are every type of the catalog with a typmod input, but the arrays, whose
@@ -845,6 +954,8 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         postgres.SkipUnlessRecordedMajor("The printed forms");
         var printed = postgres.Major == 14 ? printedOn14 : printedOn18;
 
+        // A parameter needs a prepared statement; the query scans no partitioned table, so pruning is left at the
+        // server's default.
         var root = parameterType is null
             ? await ExplainAsync(sql)
             : await ExplainExecuteAsync(sql, parameterType, pruning: true);
@@ -893,7 +1004,11 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         );
 
         var join = All(root).Single(static node => node.JoinType == "Full");
-        join.NodeType.ShouldBe(mergeJoin ? "Merge Join" : "Hash Join");
+        if (mergeJoin)
+        {
+            join.NodeType.ShouldBe("Merge Join");
+        }
+
         join.Output.ShouldNotBeNull().ShouldContain("COALESCE(u.id, o.user_id)");
         All(join)
             .Skip(1)

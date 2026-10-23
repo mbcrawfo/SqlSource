@@ -32,10 +32,12 @@ internal static partial class PlanExpression
     {
         /// <summary>
         /// The type of the span as a whole when it is a value that is never <c>NULL</c> of a known type, or null.  A
-        /// constant, a test, <c>count(*)</c> or a ranking is of the type <see cref="TypeOid" /> gives; a reference
-        /// that is part of the entry is of the type the walk proves; an operator, a function or a cast of
-        /// <c>pg_catalog</c> over such values is of the type <see cref="TotalFunctions" /> or the cast gives.  A
-        /// value of no known type, <see cref="TotalFunctions.UnknownType" />, matches no operator, function or cast.
+        /// constant, a test, <c>count(*)</c>, a ranking or a <c>count</c> only <c>pg_catalog</c> holds is of the type
+        /// <see cref="TypeOid" /> gives; a reference that is part of the entry is of the type the walk proves; an
+        /// operator, a function or a cast of <c>pg_catalog</c> over such values is of the type
+        /// <see cref="TotalFunctions" /> or the cast gives, and a call of <see cref="CatalogOverloads" /> of the type
+        /// it gives.  A value of no known type, <see cref="TotalFunctions.UnknownType" />, matches no operator,
+        /// function or cast.
         /// </summary>
         public long? Proved(int from, int to)
         {
@@ -77,7 +79,7 @@ internal static partial class PlanExpression
                 return proved;
             }
 
-            if (Constant(from, to) == false || IsCountOrRanking(from, to))
+            if (Constant(from, to) == false || IsCountOrRanking(from, to) || IsCatalogsCount(from, to))
             {
                 return TypeOid(from, to);
             }

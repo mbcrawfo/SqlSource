@@ -48,6 +48,17 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// read, since the child computed it under its own grouping.
 /// </para>
 /// <para>
+/// A name of <see cref="CatalogOverloads" /> that only <c>pg_catalog</c> holds
+/// (<see cref="ExpressionContext.CatalogAlone" />) is read by its name, since the call is then one of
+/// <c>pg_catalog</c>'s overloads of it, whichever the server chose: <c>count(...)</c> with any argument, a
+/// <c>bigint</c>; <c>array_agg(...)</c> of one argument where an aggregate of the table would be read, of no known
+/// type; <c>jsonb_build_object(...)</c> and <c>json_build_object(...)</c> with no argument written <c>VARIADIC</c>, a
+/// <c>jsonb</c> and a <c>json</c>; the constructor of a built-in range type with two or three arguments, of that type;
+/// and <c>(A * B)</c> over two values proved of one of those range types, of that type.  The arguments of all but the
+/// intersection are read for their balance only.  <see cref="CatalogNamesIn" /> gives the names of the table an entry
+/// calls.
+/// </para>
+/// <para>
 /// A subquery is a <c>SubPlan</c> that the plan prints by its name, and the walk says what its plan proves.
 /// <c>(SubPlan n)</c> is of the type <see cref="ExpressionContext.ScalarSubPlanTypeOf" /> gives.  <c>EXISTS(SubPlan
 /// n)</c> is a boolean that is never <c>NULL</c>, and so is <c>(ANY (L op (SubPlan n).colk))</c>, with
@@ -223,6 +234,17 @@ internal static partial class PlanExpression
         groups.Reverse();
         return groups;
     }
+
+    /// <summary>
+    /// The names of <see cref="CatalogOverloads" /> the entry calls, each once in the order first found: a lower-case
+    /// bare name followed by its parenthesis, but <c>count</c> whose parenthesis holds only <c>*</c>, and an operator
+    /// between two operands.  None when its quotes or its parentheses do not balance.  A name found that the reader
+    /// does not read costs a name to ask about, and is never wrong.
+    /// </summary>
+    /// <param name="entry">The entry as the plan prints it.</param>
+    /// <returns>The names of functions and the names of operators.</returns>
+    public static (IReadOnlyList<string> Functions, IReadOnlyList<string> Operators) CatalogNamesIn(string entry) =>
+        PlanTokens.Read(entry) is { } tokens ? new Reader(entry, tokens, NoContext).CatalogNames() : ([], []);
 
     // Reads spans of the tokens, each [from, to), as one form or none.  This part holds the reader's state, its span
     // helpers and the grammar that both its jobs read, of a test, a constant, count, a ranking and a type's name; the
@@ -402,7 +424,8 @@ internal static partial class PlanExpression
         // catalog's count("any") whatever the order of the path, and prints bare, while one of the catalog's own
         // signature, count(*) or rank(), is found in pg_catalog first.  With anyArgument count may hold an
         // argument too, which TypeOf takes: the type is the catalog's bigint, and a form that NullableOf does not
-        // answer false never makes its column not null.
+        // answer false never makes its column not null.  Such a count is read only where no other schema holds a
+        // count (IsCatalogsCount).
         private bool IsCountOrRanking(int from, int to, bool anyArgument = false)
         {
             var isCount = IsWord(from, "count");
@@ -453,6 +476,64 @@ internal static partial class PlanExpression
                 ? _closes[window] == to - 1
                 : (Is(window, Kind.Word) || Is(window, Kind.QuotedName)) && window == to - 1;
         }
+
+        // count with any argument, an optional FILTER and an optional OVER, to the end, where only pg_catalog holds a
+        // function of the name: then it is count("any"), which is never NULL.
+        private bool IsCatalogsCount(int from, int to) =>
+            IsWord(from, "count") && HeldAlone("count") && IsCountOrRanking(from, to, anyArgument: true);
+
+        // The names of CatalogOverloads the tokens call, as CatalogNamesIn gives them.
+        public (IReadOnlyList<string> Functions, IReadOnlyList<string> Operators) CatalogNames()
+        {
+            var functions = new List<string>();
+            var operators = new List<string>();
+            for (var at = 0; at < _tokens.Count; at++)
+            {
+                var text = Text(at);
+                if (IsBareCall(at) && CatalogOverloads.FunctionNames.Contains(text, StringComparer.Ordinal))
+                {
+                    if (
+                        !(text == "count" && _closes[at + 1] == at + 3 && Text(at + 2) == "*")
+                        && !functions.Contains(text)
+                    )
+                    {
+                        functions.Add(text);
+                    }
+                }
+                else if (
+                    Is(at, Kind.Other)
+                    && CatalogOverloads.OperatorNames.Contains(text, StringComparer.Ordinal)
+                    && at > 0
+                    && EndsOperand(at - 1)
+                    && at + 1 < _tokens.Count
+                    && StartsOperand(at + 1)
+                    && !operators.Contains(text)
+                )
+                {
+                    operators.Add(text);
+                }
+            }
+
+            return (functions, operators);
+        }
+
+        // A lower-case name with no schema before it, followed by its parenthesis.
+        private bool IsBareCall(int at) =>
+            IsLowerWord(at) && (at == 0 || !Is(at - 1, Kind.Dot)) && at + 1 < _tokens.Count && Is(at + 1, Kind.Open);
+
+        private bool EndsOperand(int at) =>
+            _tokens[at].Kind
+                is Kind.Close
+                    or Kind.Word
+                    or Kind.Number
+                    or Kind.String
+                    or Kind.QuotedName
+                    or Kind.CloseBracket;
+
+        // A parameter, $1, is a symbol and its number.
+        private bool StartsOperand(int at) =>
+            _tokens[at].Kind is Kind.Open or Kind.Word or Kind.Number or Kind.String or Kind.QuotedName
+            || (Is(at, Kind.Other) && Text(at).StartsWith('$'));
 
         // Inside one pair of parentheses: x IS NULL, x IS NOT NULL, x IS DISTINCT FROM y, or NOT of the last in a
         // pair of its own.  Each operand is one primary with an optional cast.

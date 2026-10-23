@@ -36,6 +36,11 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// The type of a column, by its number from 1, of the root of the <c>SubPlan</c> of a name, when the walk proves it
 /// not <c>NULL</c>; or null.
 /// </param>
+/// <param name="CatalogAlone">
+/// The names of <see cref="CatalogOverloads" /> that no schema but <c>pg_catalog</c> holds a function or an operator
+/// of, or null for none.  A call of such a name is read by its name, and only when
+/// <paramref name="CatalogFunctions" /> holds too; a name it leaves out is read as no form of that table.
+/// </param>
 internal sealed record ExpressionContext(
     bool CatalogFunctions,
     Func<OutputReference, long?> ProvedTypeOf,
@@ -43,5 +48,6 @@ internal sealed record ExpressionContext(
     Func<string, bool>? GroupFromChild = null,
     bool GroupsHaveRows = false,
     Func<string, long?>? ScalarSubPlanTypeOf = null,
-    Func<string, int, long?>? SubPlanColumnTypeOf = null
+    Func<string, int, long?>? SubPlanColumnTypeOf = null,
+    CatalogNames? CatalogAlone = null
 );
