@@ -133,8 +133,8 @@ jobs:
         run: dotnet build "$SOLUTION" --configuration "$CONFIGURATION" --no-restore
 
       # A pull is a step of its own, so that the time it takes shows apart from the time the tests take.  It pulls the
-      # default image of each engine.  It runs after the build, not beside it: a pull in the background during the build
-      # slowed the build by more than the pull took.
+      # default image of each engine.  It runs after the build, not beside it: in the background during the build it
+      # saved no time, because it slowed the build by about as long as it took.
       - name: Pull test images
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: tools/pull-test-images.sh

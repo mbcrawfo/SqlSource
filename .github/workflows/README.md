@@ -14,7 +14,7 @@ The GitHub Actions workflows of the repository.  [`CONTRIBUTING.md`](../../CONTR
 
 ## The test images
 
-Each floor job of `build.yml` names its floor image once, as `POSTGRES_FLOOR_IMAGE` or `SQLSERVER_FLOOR_IMAGE` of the job's `env`, pulls it in a step of its own, "Pull test image", and runs the tests of one project on it.  The `build` job's step "Pull test images" runs `tools/pull-test-images.sh` after the build and before the first step that runs a test: it pulls the default image of each engine, and the log shows the seconds of each pull, so that the time of a pull is apart from the time of a test.  The pull does not run in the background during the build, because that slowed the build by more than the pull took.
+Each floor job of `build.yml` names its floor image once, as `POSTGRES_FLOOR_IMAGE` or `SQLSERVER_FLOOR_IMAGE` of the job's `env`, pulls it in a step of its own, "Pull test image", and runs the tests of one project on it.  The `build` job's step "Pull test images" runs `tools/pull-test-images.sh` after the build and before the first step that runs a test: it pulls the default image of each engine, and the log shows the seconds of each pull, so that the time of a pull is apart from the time of a test.  The pull does not run in the background during the build: tried that way, it saved no time, because it slowed the build by about as long as it took.
 
 ## Artifacts
 
