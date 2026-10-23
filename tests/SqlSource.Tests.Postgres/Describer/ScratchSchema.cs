@@ -56,6 +56,13 @@ internal static class ScratchSchema
         """;
 
     /// <summary>
+    /// Drops the schema <c>shadow</c> with what <see cref="ShadowCount" /> and <see cref="ShadowOperators" /> made in
+    /// it.  A test that asks which names another schema holds runs this, so that it does not depend on the order of
+    /// the tests.
+    /// </summary>
+    public const string DropShadow = "DROP SCHEMA IF EXISTS shadow CASCADE";
+
+    /// <summary>
     /// The extension <c>postgres_fdw</c> and one loopback server, <c>scratch_loop</c>, to the container's own
     /// database at the server's port inside the container, with a user mapping for the connection's user.  Every
     /// foreign table of the tests is through it; each text that makes one starts with this.

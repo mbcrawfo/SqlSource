@@ -307,6 +307,31 @@ internal sealed record PostgresRelationName(string Schema, string Name);
 /// </param>
 internal sealed record PostgresRelationsRequest(IReadOnlyList<PostgresRelationName> Relations);
 
+/// <summary>The request of <c>overloads</c>.</summary>
+/// <param name="Functions">
+/// The names of the functions, aggregates among them, that the plan's expressions print and that the walk reads by
+/// their name in <c>pg_catalog</c>, in ordinal order, each once.
+/// </param>
+/// <param name="Operators">The names of the operators of the same kind, in ordinal order, each once.</param>
+internal sealed record PostgresOverloadsRequest(IReadOnlyList<string> Functions, IReadOnlyList<string> Operators);
+
+/// <summary>
+/// Which of the names asked for a schema other than <c>pg_catalog</c> holds, or why it could not be read.
+/// </summary>
+/// <param name="Functions">
+/// The names of the request's functions that some other schema holds, whatever the arguments, in ordinal order, or
+/// null with an error.
+/// </param>
+/// <param name="Operators">
+/// The names of the request's operators that some other schema holds, or null with an error.
+/// </param>
+/// <param name="Error">What the server said, or null.  It is logged and never reported.</param>
+internal sealed record PostgresOverloadsAnswer(
+    IReadOnlyList<string>? Functions,
+    IReadOnlyList<string>? Operators,
+    PostgresServerError? Error
+);
+
 /// <summary>The request of <c>partitions</c>.</summary>
 /// <param name="Relations">
 /// The relations the members of a plan's <c>Append</c>s scan (<see cref="PlanPartitions" />), in schema and name

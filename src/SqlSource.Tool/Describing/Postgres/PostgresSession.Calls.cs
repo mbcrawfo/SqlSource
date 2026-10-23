@@ -111,6 +111,20 @@ internal sealed partial class PostgresSession
             cancellationToken
         );
 
+    // Asked once a describe has read a plan that prints a name of CatalogOverloads.
+    internal Task<PostgresOverloadsAnswer> OverloadsAsync(
+        string query,
+        PostgresOverloadsRequest request,
+        CancellationToken cancellationToken
+    ) =>
+        AskAsync(
+            PostgresCallNames.Overloads,
+            request,
+            _live.OverloadsAsync,
+            (asked, answer, durationMs) => PostgresEvents.Overloads(_log, query, asked, answer, durationMs),
+            cancellationToken
+        );
+
     // The error of the call is logged and never reported.
     private Task<PostgresDeallocateAnswer> DeallocateAsync(
         string query,

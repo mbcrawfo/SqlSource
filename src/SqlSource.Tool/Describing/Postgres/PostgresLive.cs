@@ -130,6 +130,22 @@ internal sealed class PostgresLive(PostgresConnection connection)
         ORDER BY 1, 2
         """;
 
+    // The names of the functions and of the operators, among the ones asked for, that a schema other than pg_catalog
+    // holds: two queries, one for each, with the names as one positional text[].
+    private const string OverloadedFunctionsSql = """
+        SELECT DISTINCT p.proname::text
+        FROM pg_catalog.pg_proc AS p
+        WHERE p.proname = ANY ($1::text[]) AND p.pronamespace <> 'pg_catalog'::pg_catalog.regnamespace
+        ORDER BY 1
+        """;
+
+    private const string OverloadedOperatorsSql = """
+        SELECT DISTINCT o.oprname::text
+        FROM pg_catalog.pg_operator AS o
+        WHERE o.oprname = ANY ($1::text[]) AND o.oprnamespace <> 'pg_catalog'::pg_catalog.regnamespace
+        ORDER BY 1
+        """;
+
     // The server's spelling of each pair of a type and a modifier, in one query.
     private const string SpellingsSql = """
         SELECT p.oid, p.typmod, pg_catalog.format_type(p.oid, p.typmod)
@@ -421,6 +437,37 @@ internal sealed class PostgresLive(PostgresConnection connection)
             ConnectionErrors.Of,
             static error => new PostgresPartitionsAnswer(null, error)
         );
+
+    /// <summary>
+    /// Asks <c>overloads</c>: which of the function names and of the operator names asked for a schema other than
+    /// <c>pg_catalog</c> holds, whatever its arguments and whether or not the session's search path names it.
+    /// </summary>
+    public Task<PostgresOverloadsAnswer> OverloadsAsync(PostgresOverloadsRequest asked, CancellationToken token) =>
+        AnswerAsync(
+            async () =>
+            {
+                var functions = await NamesAsync(OverloadedFunctionsSql, asked.Functions, token);
+                var operators = await NamesAsync(OverloadedOperatorsSql, asked.Operators, token);
+                return new PostgresOverloadsAnswer(functions, operators, null);
+            },
+            ConnectionErrors.Of,
+            static error => new PostgresOverloadsAnswer(null, null, error)
+        );
+
+    // The one text column of a query that takes the names as its $1.
+    private async Task<List<string>> NamesAsync(string sql, IReadOnlyList<string> names, CancellationToken token)
+    {
+        await using var command = await connection.CommandAsync(sql, token);
+        _ = command.Parameters.Add(new NpgsqlParameter { Value = names.ToArray(), DataTypeName = "text[]" });
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var held = new List<string>();
+        while (await reader.ReadAsync(token))
+        {
+            held.Add(reader.GetString(0));
+        }
+
+        return held;
+    }
 
     /// <summary>
     /// The text <c>columns</c> sends: the statement with a <c>NULL</c> for each parameter.  The server describes an

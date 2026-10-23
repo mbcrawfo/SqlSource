@@ -266,6 +266,35 @@ internal static class PostgresEvents
         );
 
     /// <summary>
+    /// <c>postgres.overloads</c>: the names of functions and of operators that were asked for, and those of them that
+    /// a schema other than <c>pg_catalog</c> holds, or the error.  A name that is not among the answer's is held by
+    /// the catalog alone.
+    /// </summary>
+    public static void Overloads(
+        IRunLog log,
+        string query,
+        PostgresOverloadsRequest request,
+        PostgresOverloadsAnswer answer,
+        long durationMs
+    ) =>
+        log.Write(
+            PostgresCallNames.Overloads,
+            new("query", query),
+            new("functions", LogValue.ListOfTexts(request.Functions)),
+            new("operators", LogValue.ListOfTexts(request.Operators)),
+            answer.Error is { } error
+                ? new LogMember(Error, ErrorOf(error))
+                : new LogMember(
+                    "held",
+                    LogValue.MapOf(
+                        new("functions", LogValue.ListOfTexts(answer.Functions ?? [])),
+                        new("operators", LogValue.ListOfTexts(answer.Operators ?? []))
+                    )
+                ),
+            new(Duration, durationMs)
+        );
+
+    /// <summary>
     /// The events of a walk, in this order: <c>postgres.walk.node</c> for each node that was visited,
     /// <c>postgres.walk.column</c> for each column, and <c>postgres.walk</c> with the plan's value and the reason when
     /// there is one: why the plan is <c>unavailable</c>, or <c>output-differs</c> for a <c>walked</c> one.  It is the

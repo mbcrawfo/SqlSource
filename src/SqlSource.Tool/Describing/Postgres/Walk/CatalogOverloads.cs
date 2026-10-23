@@ -67,8 +67,9 @@ internal sealed record CatalogNames(IReadOnlySet<string> Functions, IReadOnlySet
 /// <c>Finalize</c> node combines the partial counts with <c>int8pl</c>, each of them a count from <c>0</c>.  From
 /// PostgreSQL 16, <c>array_agg</c> has <c>array_agg_combine</c> and <c>array_agg_array_combine</c>, which are not
 /// strict and give a state that saw no row only when both of theirs saw none, with <c>array_agg_serialize</c>,
-/// <c>array_agg_deserialize</c> and the arrays' own, which pass a state across unchanged; before 16 it has none, and
-/// no plan computes it in parts.  So over a group that has a row, the state the final function reads saw one.
+/// <c>array_agg_deserialize</c> and the arrays' own, which serialize and deserialize the state and keep a state that
+/// saw a row not null; before 16 it has none, and no plan computes it in parts.  So over a group that has a row, the
+/// state the final function reads saw one.
 /// </para>
 /// <para>
 /// A row goes in this table only with <c>Catalog_CatalogOverloads_ArePinned</c> in <c>PlanOutputTests</c>, which holds

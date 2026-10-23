@@ -89,7 +89,8 @@ flowchart TD
     check -->|"otherwise"| match["Table match, nothing asked"]
     explain -->|"a plan"| partitions["partitions, when needed"]
     partitions --> relations["relations, when needed"]
-    relations --> walk["The walk"]
+    relations --> overloads["overloads, when needed"]
+    overloads --> walk["The walk"]
     walk --> match
     explain -->|"an error: logged, the heuristic stands"| match
     explain -->|"26000"| gone["SQLSRC236"]
@@ -110,14 +111,14 @@ The steps of `DescribePreparedAsync`, in the order it runs them:
 8. **The parameters typed**, as [parameters](#parameters) says.
 9. **The columns built.**  `OuterJoinGate.IsGated` decides whether a statement with rows is gated, and each column is built with the catalog's answer or the heuristic's, as [the nullability page](postgres-nullability.md#nullability) says.  A column of a pseudo-type ends the describe.
 10. **`check`.**  Npgsql describes the SQL as generated code will send it, as [the check against Npgsql](#the-check-against-npgsql) says.
-11. **The plan.**  For a statement with rows that is gated or has a column of no origin, `explain` asks for the plan, `partitions` and `relations` answer what the walk needs of it, and `NullabilityWalk` walks it, as [the plan](postgres-nullability.md#the-plan) and [the plan walk](postgres-nullability.md#the-plan-walk) say.  A query that is neither asks nothing more, and pays nothing.
+11. **The plan.**  For a statement with rows that is gated or has a column of no origin, `explain` asks for the plan, `partitions`, `relations` and `overloads` answer what the walk needs of it, and `NullabilityWalk` walks it, as [the plan](postgres-nullability.md#the-plan) and [the plan walk](postgres-nullability.md#the-plan-walk) say.  A query that is neither asks nothing more, and pays nothing.
 12. **The table match**, which asks nothing, as [matching a table](#matching-a-table) says.
 
 A statement without rows is `SidecarResultKind.None`, with its parameters and no columns, no table and no provenance.  What one with rows records as `plan` is in [the plan](postgres-nullability.md#the-plan).  The events each step writes, and their order, are in the remarks of [`PostgresEvents`](../../src/SqlSource.Tool/Describing/Postgres/PostgresEvents.cs).
 
 ### Calls that are not made
 
-A call is not made when it has nothing to ask: `tables` when no column names a table, `types` when there is no OID, `spellings` when there is no pair, `partitions` when the plan holds no `Append` that may scan partitions, and `relations` when every column has an origin or `tables` answered every relation the plan scans.  Each of these five requests is sorted and holds each item once, so that it is the same however a query orders what it names, and a capture of the same query is the same.
+A call is not made when it has nothing to ask: `tables` when no column names a table, `types` when there is no OID, `spellings` when there is no pair, `partitions` when the plan holds no `Append` that may scan partitions, `relations` when every column has an origin or `tables` answered every relation the plan scans, and `overloads` when every column has an origin, when the session does not find `pg_catalog` first, or when the plan prints no name of `CatalogOverloads`: a function's name followed by its parenthesis, `count` only when the parenthesis holds more than `*`, or an operator of the table between two operands.  Each of these six requests is sorted and holds each item once, so that it is the same however a query orders what it names, and a capture of the same query is the same.
 
 ### Why `PREPARE`
 
@@ -157,9 +158,10 @@ The names of the calls are the constants of [`PostgresCallNames`](../../src/SqlS
 | `explain` | The generic plan, in a transaction that is rolled back |
 | `partitions` | The ancestors of each relation an `Append` may scan as a partition |
 | `relations` | The relations a plan scans that `tables` did not answer, by schema and name, answered as `tables` answers |
+| `overloads` | Which of the function and operator names a plan prints a schema other than `pg_catalog` holds |
 | `deallocate` | `DEALLOCATE` of the statement |
 
-An OID is a `long`.  A row of `types` names its members as the catalog does, `typtypmod` for the modifier a domain fixes, and its `formatType` is `format_type(oid, -1)`.  A row of `spellings` is a type, a modifier and `format_type(oid, modifier)`.  A row of `tables` names its members as the catalog does where the catalog has one word, `attnum`, `relkind`, `relhassubclass`, and `hasForeignPartition` and `hasInsteadRule`, which are no catalog columns, are named for what they say.  A column of `columns` holds Npgsql's three numbers as it gave them, undecoded, and beside them its `typeModifier`.  A row of `partitions` is a relation's schema and name and its `ancestors`, the OIDs of `pg_partition_ancestors` without itself, nearest first; a relation that is gone has no row.  `check`'s record of a parameter holds the `bindName` as its `dataTypeName`.  The tool's own rewrite of the SQL that `check` compares with is built by `NpgsqlCheck.Read` from the query's SQL and parameters, which are its arguments, and is not a member of the request, so the requests of older captures still match.
+An OID is a `long`.  A row of `types` names its members as the catalog does, `typtypmod` for the modifier a domain fixes, and its `formatType` is `format_type(oid, -1)`.  A row of `spellings` is a type, a modifier and `format_type(oid, modifier)`.  A row of `tables` names its members as the catalog does where the catalog has one word, `attnum`, `relkind`, `relhassubclass`, and `hasForeignPartition` and `hasInsteadRule`, which are no catalog columns, are named for what they say.  A column of `columns` holds Npgsql's three numbers as it gave them, undecoded, and beside them its `typeModifier`.  A row of `partitions` is a relation's schema and name and its `ancestors`, the OIDs of `pg_partition_ancestors` without itself, nearest first; a relation that is gone has no row.  The request of `overloads` is two lists of names, `functions` from `pg_proc.proname` and `operators` from `pg_operator.oprname`, and its answer is the names of each that a schema other than `pg_catalog` holds, whatever the arguments and whether or not the session's path names the schema; an empty list means that `pg_catalog` alone holds every name asked, and an error leaves both lists null.  `check`'s record of a parameter holds the `bindName` as its `dataTypeName`.  The tool's own rewrite of the SQL that `check` compares with is built by `NpgsqlCheck.Read` from the query's SQL and parameters, which are its arguments, and is not a member of the request, so the requests of older captures still match.
 
 Several members came after captures that lack them, and each null reads as what a capture recorded before it meant:
 
@@ -269,7 +271,7 @@ The other calls:
 | `check`'s verdict `error` | `SQLSRC225` | `check parameters` |
 | `explain`'s `26000` | `SQLSRC236` | `explain` |
 
-Which errors of `check` are a disagreement is decided in one place, `NpgsqlCheck.Read`.  An error is `differ` when it is what a misread `@` looks like: a class `42` SQLSTATE, or Npgsql's own refusal of the text (`textRefused`).  Anything else, a lost connection or a cancel, is `error`, and `PostgresErrors.Check` reports from the verdict.  A table dropped between two calls is class `42` and stays `SQLSRC231`, whose help, `PostgresErrors.CheckHelp`, says so.  None of `check`'s failures has an `at character` line, since the server counts in Npgsql's rewrite, a text the user did not write.  Any other error of `explain`, `partitions` and `relations`, and every error of `deallocate`, is logged and never reported.
+Which errors of `check` are a disagreement is decided in one place, `NpgsqlCheck.Read`.  An error is `differ` when it is what a misread `@` looks like: a class `42` SQLSTATE, or Npgsql's own refusal of the text (`textRefused`).  Anything else, a lost connection or a cancel, is `error`, and `PostgresErrors.Check` reports from the verdict.  A table dropped between two calls is class `42` and stays `SQLSRC231`, whose help, `PostgresErrors.CheckHelp`, says so.  None of `check`'s failures has an `at character` line, since the server counts in Npgsql's rewrite, a text the user did not write.  Any other error of `explain`, `partitions`, `relations` and `overloads`, and every error of `deallocate`, is logged and never reported.
 
 ## Why a query cannot run a statement
 

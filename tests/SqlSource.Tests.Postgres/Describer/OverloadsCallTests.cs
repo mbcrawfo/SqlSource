@@ -1,0 +1,72 @@
+using System.Threading.Tasks;
+using Shouldly;
+using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Logging;
+using Xunit;
+
+namespace SqlSource.Tests.Postgres.Describer;
+
+// "overloads" against a real server: which of the names asked for a schema other than pg_catalog holds.
+[Collection(UsesPostgres.Name)]
+public sealed class OverloadsCallTests(PostgresContainer postgres)
+{
+    // The names run first against a server that may hold the schema "shadow" from another test, so the test drops it.
+    [Fact]
+    public async Task OverloadsAsync_NamesOnlyTheCatalogHolds_AnswersNone()
+    {
+        await postgres.ExecuteAsync(ScratchSchema.DropShadow);
+        await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
+        var live = new PostgresLive(connection);
+
+        var answer = await live.OverloadsAsync(
+            new PostgresOverloadsRequest(["count", "jsonb_build_object", "tstzrange"], ["*"]),
+            TestContext.Current.CancellationToken
+        );
+
+        answer.Error.ShouldBeNull(answer.Error?.Message);
+        answer.Functions.ShouldNotBeNull().ShouldBeEmpty();
+        answer.Operators.ShouldNotBeNull().ShouldBeEmpty();
+    }
+
+    // The schema is not on the connection's search path: another schema holds a name whatever the path says.
+    [Fact]
+    public async Task OverloadsAsync_NamesAnotherSchemaHolds_AnswersThem()
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
+            await postgres.ExecuteAsync(ScratchSchema.ShadowOperators);
+            await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
+            var live = new PostgresLive(connection);
+
+            var answer = await live.OverloadsAsync(
+                new PostgresOverloadsRequest(["array_agg", "count", "max"], ["*", "+"]),
+                TestContext.Current.CancellationToken
+            );
+
+            answer.Error.ShouldBeNull(answer.Error?.Message);
+            answer.Functions.ShouldBe(["count", "max"]);
+            answer.Operators.ShouldBe(["*"]);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropShadow);
+        }
+    }
+
+    [Fact]
+    public async Task OverloadsAsync_NoNames_AnswersNone()
+    {
+        await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
+        var live = new PostgresLive(connection);
+
+        var answer = await live.OverloadsAsync(
+            new PostgresOverloadsRequest([], []),
+            TestContext.Current.CancellationToken
+        );
+
+        answer.Error.ShouldBeNull(answer.Error?.Message);
+        answer.Functions.ShouldNotBeNull().ShouldBeEmpty();
+        answer.Operators.ShouldNotBeNull().ShouldBeEmpty();
+    }
+}
