@@ -1,4 +1,7 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
+using DotNet.Testcontainers.Containers;
 using Shouldly;
 using SqlSource.Testing;
 using Xunit;
@@ -53,6 +56,31 @@ public sealed class EngineImageTests
         EngineImage.SqlServer.Default.ShouldBe(DefaultImages.SqlServer);
     }
 
+    [Fact]
+    public async Task StartOnceAsync_StartThatThrows_DisposesTheContainerAndRethrows()
+    {
+        await using var container = new FakeContainer(new InvalidOperationException("It did not start."));
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            EngineImage.StartOnceAsync(() => container, TestContext.Current.CancellationToken)
+        );
+
+        exception.Message.ShouldBe("It did not start.");
+        container.Disposals.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task StartOnceAsync_StartThatSucceeds_ReturnsTheContainerUndisposed()
+    {
+        await using var container = new FakeContainer(null);
+
+        var started = await EngineImage.StartOnceAsync(() => container, TestContext.Current.CancellationToken);
+
+        started.ShouldBeSameAs(container);
+        container.Started.ShouldBeTrue();
+        container.Disposals.ShouldBe(0);
+    }
+
     private static EngineImage EngineImageNamed(string engine) =>
         engine switch
         {
@@ -60,4 +88,30 @@ public sealed class EngineImageTests
             nameof(EngineImage.SqlServer) => EngineImage.SqlServer,
             _ => throw new ArgumentOutOfRangeException(nameof(engine), engine, "No such engine."),
         };
+
+    // A container whose start throws the exception it is given, or succeeds when given none.
+    private sealed class FakeContainer(Exception? failure) : IStartingContainer
+    {
+        public bool Started { get; private set; }
+
+        public int Disposals { get; private set; }
+
+        public string Image => "fake:1";
+
+        public TestcontainersStates State => TestcontainersStates.Undefined;
+
+        public Task StartAsync(CancellationToken token)
+        {
+            Started = true;
+            return failure is null ? Task.CompletedTask : Task.FromException(failure);
+        }
+
+        public Task<(string Stdout, string Stderr)> GetLogsAsync() => Task.FromResult((string.Empty, string.Empty));
+
+        public ValueTask DisposeAsync()
+        {
+            Disposals++;
+            return ValueTask.CompletedTask;
+        }
+    }
 }

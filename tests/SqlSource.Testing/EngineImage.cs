@@ -14,19 +14,29 @@ namespace SqlSource.Testing;
 // the start of a container.  The default image of each is in DefaultImages.
 internal sealed class EngineImage
 {
-    private EngineImage(string product, string variable, string defaultImage, IReadOnlyList<int> recordedMajors)
+    private readonly bool _retriesCrashAtStart;
+
+    // retriesCrashAtStart is true for the engine whose container starts again after sqlservr's crash (TD-0072).
+    private EngineImage(
+        string product,
+        string variable,
+        string defaultImage,
+        IReadOnlyList<int> recordedMajors,
+        bool retriesCrashAtStart
+    )
     {
         Product = product;
         Variable = variable;
         Default = defaultImage;
         RecordedMajors = recordedMajors;
+        _retriesCrashAtStart = retriesCrashAtStart;
     }
 
     public static EngineImage Postgres { get; } =
-        new("PostgreSQL", "SQLSOURCE_TESTS_POSTGRES_IMAGE", DefaultImages.Postgres, [14, 18]);
+        new("PostgreSQL", "SQLSOURCE_TESTS_POSTGRES_IMAGE", DefaultImages.Postgres, [14, 18], false);
 
     public static EngineImage SqlServer { get; } =
-        new("SQL Server", "SQLSOURCE_TESTS_SQLSERVER_IMAGE", DefaultImages.SqlServer, [14, 17]);
+        new("SQL Server", "SQLSOURCE_TESTS_SQLSERVER_IMAGE", DefaultImages.SqlServer, [14, 17], true);
 
     // The name of the engine in a message.
     public string Product { get; }
@@ -62,12 +72,20 @@ internal sealed class EngineImage
     // Builds the container and starts it, and returns it started.  Xunit does not dispose a fixture whose start threw,
     // so a container that fails to start is disposed before the exception leaves.  SQL Server's goes through
     // SqlServerStart, which also starts it again when sqlservr crashed (TD-0072).
-    public Task<TContainer> StartAsync<TContainer>(Func<TContainer> build, CancellationToken token)
-        where TContainer : IContainer =>
-        this == SqlServer ? SqlServerStart.StartAsync(build, token) : StartOnceAsync(build, token);
-
-    private static async Task<TContainer> StartOnceAsync<TContainer>(Func<TContainer> build, CancellationToken token)
+    public async Task<TContainer> StartAsync<TContainer>(Func<TContainer> build, CancellationToken token)
         where TContainer : IContainer
+    {
+        if (_retriesCrashAtStart)
+        {
+            return await SqlServerStart.StartAsync(build, token);
+        }
+
+        return (await StartOnceAsync(() => new Testcontainer<TContainer>(build()), token)).Container;
+    }
+
+    // Builds a container and starts it, once, and disposes it before the exception leaves when the start throws.
+    internal static async Task<TStart> StartOnceAsync<TStart>(Func<TStart> build, CancellationToken token)
+        where TStart : IStartingContainer
     {
         var container = build();
         try
