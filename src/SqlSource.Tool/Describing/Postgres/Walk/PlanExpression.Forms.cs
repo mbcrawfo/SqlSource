@@ -7,11 +7,20 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 // The reader's forms of pg_catalog, which a search path decides and the proofs of types read
 // (PlanExpression.Proofs.cs): an operator, a function, a cast, an aggregate and the ANY over a subplan's column, with
-// how a subplan's name and its column are printed.
+// how a subplan's name and its column are printed, and the names of CatalogOverloads that only pg_catalog holds.
 internal static partial class PlanExpression
 {
     private sealed partial class Reader
     {
+        // Whether the session finds pg_catalog first and no other schema holds a function of the name: a name of
+        // CatalogOverloads that the walk says only pg_catalog holds.
+        private bool HeldAlone(string name) =>
+            _context.CatalogFunctions && _context.CatalogAlone?.Functions.Contains(name) == true;
+
+        // Whether the session finds pg_catalog first and no other schema holds an operator of the name.
+        private bool OperatorHeldAlone(string name) =>
+            _context.CatalogFunctions && _context.CatalogAlone?.Operators.Contains(name) == true;
+
         // An operator in a group of its own, a cast or a function call, each the catalog's only when the session finds
         // pg_catalog first, and so is the name of the type a cast prints: the one place that reads any of them.
         private long? CatalogForm(int from, int to)
@@ -133,8 +142,13 @@ internal static partial class PlanExpression
                 return null;
             }
 
-            return TotalFunctions.OperatorResult(Text(at), left, right);
+            return TotalFunctions.OperatorResult(Text(at), left, right) ?? Intersection(Text(at), left, right);
         }
+
+        // (A * B) over two values of one built-in range type, where only pg_catalog holds an operator *: then it is
+        // range_intersect, the one * that takes two ranges, which is of their type and never NULL for two that are not.
+        private long? Intersection(string name, long left, long right) =>
+            name == "*" && left == right && CatalogOverloads.IsRange(left) && OperatorHeldAlone(name) ? left : null;
 
         // (E)::T, where E is proved of a type that carries to T within a family of SetOperationTypes: pg_cast holds
         // one row for a pair, the server ships one for every ordered pair of a family and pins it, and none returns
@@ -160,13 +174,23 @@ internal static partial class PlanExpression
             return source is { } proved && SetOperationTypes.Carries(proved, target) ? target : null;
         }
 
-        // name(a, ...) with a lower-case bare name, to the end, a function of the table over proved arguments.  A name
-        // with a schema or in quotes is not the one the session resolves from the bare name.
+        // name(a, ...) with a lower-case bare name, to the end, a function of the table over proved arguments, or one
+        // of CatalogOverloads that only pg_catalog holds.  A name with a schema or in quotes is not the one the session
+        // resolves from the bare name.
         private long? Function(int from, int to)
         {
+            if (!IsCall(from, to))
+            {
+                return null;
+            }
+
+            if (ByName(from, to) is { } byName)
+            {
+                return byName;
+            }
+
             if (
-                !IsCall(from, to)
-                || !TotalFunctions.HasFunction(Text(from), ArgumentCount(from + 2, to - 1))
+                !TotalFunctions.HasFunction(Text(from), ArgumentCount(from + 2, to - 1))
                 || Arguments(from + 2, to - 1) is not { } arguments
             )
             {
@@ -176,9 +200,57 @@ internal static partial class PlanExpression
             return TotalFunctions.FunctionResult(Text(from), arguments);
         }
 
+        // A call of a name of CatalogOverloads that only pg_catalog holds, whose arguments are read for their balance
+        // only, since none can make it NULL: jsonb_build_object or json_build_object with no argument written VARIADIC,
+        // since a VARIADIC array that is NULL makes it NULL, or the constructor of a range of two or three arguments.
+        private long? ByName(int from, int to)
+        {
+            var name = Text(from);
+            if (!HeldAlone(name))
+            {
+                return null;
+            }
+
+            if (name is "jsonb_build_object" or "json_build_object")
+            {
+                if (!NoVariadic(from + 2, to - 1))
+                {
+                    return null;
+                }
+
+                return name == "jsonb_build_object" ? BuiltInTypes.Jsonb : BuiltInTypes.Json;
+            }
+
+            return CatalogOverloads.RangeTypeOf(name) is { } range && ArgumentCount(from + 2, to - 1) is 2 or 3
+                ? range
+                : null;
+        }
+
+        // Whether no argument of [from, to), between the commas of depth zero, starts with the word VARIADIC, which the
+        // plan prints as the call wrote it.
+        private bool NoVariadic(int from, int to)
+        {
+            if (IsWord(from, "VARIADIC"))
+            {
+                return false;
+            }
+
+            for (var at = from; at < to; at = Next(at))
+            {
+                if (Is(at, Kind.Comma) && IsWord(at + 1, "VARIADIC"))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         // name([DISTINCT] a, ... [ORDER BY ...]) as a function is, an aggregate of the table over proved arguments,
         // read only where the node's groups each have a row.  Nothing follows its parenthesis: a FILTER, an OVER or a
         // WITHIN GROUP makes it no such form.  The ORDER BY and the DISTINCT change neither whether it can be NULL.
+        // array_agg of one argument, where only pg_catalog holds the name, is not NULL whatever its argument, and of no
+        // known type.
         private long? Aggregate(int from, int to)
         {
             if (!_groupsHaveRows || !IsCall(from, to))
@@ -196,6 +268,11 @@ internal static partial class PlanExpression
                     end = at;
                     break;
                 }
+            }
+
+            if (IsWord(from, "array_agg") && HeldAlone("array_agg"))
+            {
+                return ArgumentCount(start, end) == 1 ? TotalFunctions.UnknownType : null;
             }
 
             return

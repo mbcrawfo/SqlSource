@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
@@ -13,24 +14,26 @@ using Xunit;
 namespace SqlSource.Tests.Postgres.Describer;
 
 // Sessions of the PostgreSQL describer for a container test, on the database fixtures unless given, opened through
-// Describers.OpenAsync.
+// Describers.OpenAsync, by the describer the tool makes unless the test gives the planner's settings.
 internal static class Sessions
 {
     public static Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         string connection,
         IDescribeExchange? exchange = null,
         IRunLog? log = null,
-        string database = PostgresContainer.Database
-    ) => new PostgresDescriber().OpenAsync(database, connection, exchange, log);
+        string database = PostgresContainer.Database,
+        IReadOnlyList<string>? plannerSettings = null
+    ) => new PostgresDescriber(plannerSettings ?? PlannerSettings.None).OpenAsync(database, connection, exchange, log);
 
     // A session that must open, as the describer's own type.
     public static async Task<PostgresSession> OpenSessionAsync(
         string connection,
         IDescribeExchange? exchange = null,
-        IRunLog? log = null
+        IRunLog? log = null,
+        IReadOnlyList<string>? plannerSettings = null
     )
     {
-        var opened = await OpenAsync(connection, exchange, log);
+        var opened = await OpenAsync(connection, exchange, log, plannerSettings: plannerSettings);
         return opened.Value.ShouldBeOfType<PostgresSession>();
     }
 
@@ -53,10 +56,11 @@ internal static class Sessions
     public static async Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
         string connection,
         DescribeRequest request,
-        IDescribeExchange? exchange = null
+        IDescribeExchange? exchange = null,
+        IReadOnlyList<string>? plannerSettings = null
     )
     {
-        await using var session = await OpenSessionAsync(connection, exchange);
+        await using var session = await OpenSessionAsync(connection, exchange, plannerSettings: plannerSettings);
 
         var described = await session.DescribeAsync(request, TestContext.Current.CancellationToken);
 
@@ -88,13 +92,19 @@ internal static class Sessions
     public static async Task<(
         Outcome<QueryDescription, DescribeFailure> Described,
         DescribeCapture Capture
-    )> DescribeCapturedAsync(string connection, DescribeRequest request, IDescribeExchange? exchange = null)
+    )> DescribeCapturedAsync(
+        string connection,
+        DescribeRequest request,
+        IDescribeExchange? exchange = null,
+        IReadOnlyList<string>? plannerSettings = null
+    )
     {
         var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
         var described = await DescribeAsync(
             connection,
             request,
-            new CapturingExchange(exchange ?? LiveExchange.Instance, capture)
+            new CapturingExchange(exchange ?? LiveExchange.Instance, capture),
+            plannerSettings
         );
         return (described, capture);
     }

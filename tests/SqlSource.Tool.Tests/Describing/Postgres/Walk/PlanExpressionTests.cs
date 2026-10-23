@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
@@ -290,7 +291,7 @@ public sealed class PlanExpressionTests
         PlanExpression.ProvedTypeOf(entry, Context(catalogFunctions: true)).ShouldBe(expected);
 
     [Theory]
-    [InlineData("COALESCE(id, 0)")]
+    [InlineData("COALESCE(id, u.name)")]
     [InlineData("id")]
     [InlineData("count(id)")]
     [InlineData("(l.quantity * l.unit_price)")]
@@ -483,6 +484,269 @@ public sealed class PlanExpressionTests
         PlanExpression
             .NullableOf(entry, SubPlans(BuiltInTypes.Int8, BuiltInTypes.Int4, catalogFunctions: false))
             .ShouldBe(expected);
+
+    // The walk's typed proof of the references of the tests of the names only pg_catalog holds.
+    private static long? Polymorphic(OutputReference reference) =>
+        (reference.Alias is null ? reference.Column : reference.Alias + "." + reference.Column) switch
+        {
+            "o.id" => BuiltInTypes.Int8,
+            "u.id" => BuiltInTypes.Int4,
+            "during" or "b.during" => BuiltInTypes.Tstzrange,
+            "u.name" => BuiltInTypes.Varchar,
+            _ => null,
+        };
+
+    // Every name of CatalogOverloads held by pg_catalog alone.
+    private static readonly CatalogNames All = new(
+        CatalogOverloads.FunctionNames.ToFrozenSet(StringComparer.Ordinal),
+        CatalogOverloads.OperatorNames.ToFrozenSet(StringComparer.Ordinal)
+    );
+
+    private static ExpressionContext Alone(
+        CatalogNames names,
+        bool catalogFunctions = true,
+        bool groupsHaveRows = false
+    ) => new(catalogFunctions, Polymorphic, GroupsHaveRows: groupsHaveRows, CatalogAlone: names);
+
+    private static readonly string[] CountsOfAnArgument =
+    [
+        "count(o.id)",
+        "count(DISTINCT status)",
+        "count(email) FILTER (WHERE (id > 1))",
+        "count(email) OVER (?)",
+        "count(email) OVER w1",
+        "(count(o.id))",
+    ];
+
+    public static TheoryData<string> CountTexts => [.. CountsOfAnArgument];
+
+    [Theory]
+    [MemberData(nameof(CountTexts))]
+    public void NullableOf_CatalogsAloneCount_IsNotNull(string entry) =>
+        PlanExpression.NullableOf(entry, Alone(All)).ShouldBe(false);
+
+    // With no name held by pg_catalog alone, or with the names but another schema's found first, count may be a user's.
+    [Theory]
+    [MemberData(nameof(CountTexts))]
+    public void NullableOf_CountThatMayBeAnotherSchemas_IsUnknown(string entry)
+    {
+        PlanExpression.NullableOf(entry, Alone(CatalogNames.None)).ShouldBeNull();
+        PlanExpression.NullableOf(entry, Alone(All, catalogFunctions: false)).ShouldBeNull();
+    }
+
+    [Fact]
+    public void NullableOf_CountOfAStarWhenNoNameIsTheCatalogsAlone_IsNotNull() =>
+        PlanExpression.NullableOf("count(*)", Alone(CatalogNames.None)).ShouldBe(false);
+
+    [Theory]
+    [InlineData("array_agg(DISTINCT p.id ORDER BY p.id)")]
+    [InlineData("array_agg(o.note)")]
+    public void NullableOf_ArrayAggOverAGroupWithARow_IsNotNull(string entry) =>
+        PlanExpression.NullableOf(entry, Alone(All, groupsHaveRows: true)).ShouldBe(false);
+
+    // A group may have no row, a FILTER may leave it none, a window's frame may be empty, and array_agg may be a
+    // user's.
+    [Theory]
+    [InlineData("array_agg(o.note)", false, true)]
+    [InlineData("array_agg(DISTINCT p.id ORDER BY p.id)", false, true)]
+    [InlineData("array_agg(o.note) FILTER (WHERE (o.id > 1))", true, true)]
+    [InlineData("array_agg(o.note) OVER w1", true, true)]
+    [InlineData("array_agg(o.note)", true, false)]
+    public void NullableOf_ArrayAggThatMayBeNull_IsUnknown(string entry, bool groupsHaveRows, bool catalogAlone) =>
+        PlanExpression
+            .NullableOf(entry, Alone(catalogAlone ? All : CatalogNames.None, groupsHaveRows: groupsHaveRows))
+            .ShouldBeNull();
+
+    [Theory]
+    [InlineData("jsonb_build_object('id', id, 'email', email)", false)]
+    [InlineData("json_build_object()", false)]
+    [InlineData("jsonb_build_object(VARIADIC $1)", null)]
+    public void NullableOf_JsonBuildObject_IsNotNullButForVariadic(string entry, bool? expected) =>
+        PlanExpression.NullableOf(entry, Alone(All)).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("tstzrange($1, $2)", false)]
+    [InlineData("int4range(1, 2, '[]'::text)", false)]
+    [InlineData("(during * tstzrange($1, $2))", false)]
+    [InlineData("tstzrange($1)", null)]
+    [InlineData("(during * (u.id)::numeric)", null)]
+    public void NullableOf_RangeConstructorAndIntersection_AreNotNull(string entry, bool? expected) =>
+        PlanExpression.NullableOf(entry, Alone(All)).ShouldBe(expected);
+
+    // Another schema's * may be the one the server chose for two ranges.
+    [Fact]
+    public void NullableOf_IntersectionWhenAnotherSchemaHoldsTheOperator_IsUnknown() =>
+        PlanExpression
+            .NullableOf("(during * tstzrange($1, $2))", Alone(new CatalogNames(All.Functions, FrozenSet<string>.Empty)))
+            .ShouldBeNull();
+
+    // With no name held by pg_catalog alone, or with the names but another schema's found first, a call of the name
+    // may be a user's function or aggregate.
+    [Theory]
+    [InlineData("jsonb_build_object('id', id, 'email', email)")]
+    [InlineData("json_build_object()")]
+    [InlineData("tstzrange($1, $2)")]
+    [InlineData("int4range(1, 2, '[]'::text)")]
+    [InlineData("array_agg(o.note)")]
+    public void NullableOf_NameThatMayBeAnotherSchemas_IsUnknown(string entry)
+    {
+        PlanExpression.NullableOf(entry, Alone(CatalogNames.None, groupsHaveRows: true)).ShouldBeNull();
+        PlanExpression.NullableOf(entry, Alone(All, catalogFunctions: false, groupsHaveRows: true)).ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("count(o.id)", BuiltInTypes.Int8)]
+    [InlineData("count(email) OVER w1", BuiltInTypes.Int8)]
+    [InlineData("jsonb_build_object('id', id, 'email', email)", BuiltInTypes.Jsonb)]
+    [InlineData("json_build_object()", BuiltInTypes.Json)]
+    [InlineData("tstzrange($1, $2)", BuiltInTypes.Tstzrange)]
+    [InlineData("int4range(1, 2, '[]'::text)", BuiltInTypes.Int4range)]
+    [InlineData("(during * tstzrange($1, $2))", BuiltInTypes.Tstzrange)]
+    public void ProvedTypeOf_CatalogsAloneForm_IsItsType(string entry, long expected) =>
+        PlanExpression.ProvedTypeOf(entry, Alone(All)).ShouldBe(expected);
+
+    // upper and lower of a range are NULL for an infinite or an empty one, and json_agg and jsonb_agg are in no table.
+    [Theory]
+    [InlineData("upper(during)")]
+    [InlineData("lower(during)")]
+    [InlineData("json_agg(o.note)")]
+    [InlineData("jsonb_agg(o.note)")]
+    public void NullableOf_PolymorphicNameNotInTheTable_IsUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, Alone(All, groupsHaveRows: true)).ShouldBeNull();
+
+    // A column of a domain over numeric.
+    private const long Amount = 16_400;
+
+    // The references of the tests of the type of COALESCE, GREATEST, LEAST and CASE: Polymorphic's, a numeric, an
+    // integer and a column of a domain, each bare.
+    private static long? CommonTyped(OutputReference reference) =>
+        reference switch
+        {
+            { Alias: null, Column: "total" } => BuiltInTypes.Numeric,
+            { Alias: null, Column: "quantity" } => BuiltInTypes.Int4,
+            { Alias: null, Column: "amount" } => Amount,
+            _ => Polymorphic(reference),
+        };
+
+    private static ExpressionContext CommonTypes(bool catalogFunctions = true, bool groupsHaveRows = false) =>
+        new(catalogFunctions, CommonTyped, GroupsHaveRows: groupsHaveRows);
+
+    // The parser casts every argument and every result to the common type, and the plan prints the casts: a form that
+    // is not NULL is of the one type its arguments proved of a known type have.
+    [Theory]
+    [InlineData("COALESCE(total, '0'::numeric)", BuiltInTypes.Numeric)]
+    [InlineData("COALESCE(o.note, 'x'::text)", BuiltInTypes.Text)]
+    [InlineData("GREATEST(quantity, 1)", BuiltInTypes.Int4)]
+    [InlineData("LEAST(o.id, '5'::bigint)", BuiltInTypes.Int8)]
+    [InlineData("CASE WHEN (quantity > 1) THEN '1'::numeric ELSE 2.5 END", BuiltInTypes.Numeric)]
+    [InlineData("COALESCE(o.id, (u.id)::bigint)", BuiltInTypes.Int8)]
+    [InlineData("COALESCE(COALESCE(o.note, 'x'::text), o.note)", BuiltInTypes.Text)]
+    [InlineData("(COALESCE(total, '0'::numeric))", BuiltInTypes.Numeric)]
+    [InlineData("COALESCE(o.note, o.note)", null)]
+    [InlineData("COALESCE(amount, '1'::numeric)", null)]
+    [InlineData("COALESCE(o.id, u.id)", null)]
+    [InlineData("CASE WHEN (quantity > 1) THEN o.note ELSE 'x'::text END", null)]
+    [InlineData("CASE WHEN (quantity > 1) THEN 'x'::text END", null)]
+    public void ProvedTypeOf_CommonTypeForm_IsItsArgumentsType(string entry, long? expected) =>
+        PlanExpression.ProvedTypeOf(entry, CommonTypes()).ShouldBe(expected);
+
+    // An argument proved of no known type is no argument of the common type.
+    [Theory]
+    [InlineData("COALESCE(u.id, 1)", BuiltInTypes.Int4)]
+    [InlineData("COALESCE(u.id, u.name)", null)]
+    [InlineData("CASE WHEN (u.id > 1) THEN u.id ELSE 'x'::text END", BuiltInTypes.Text)]
+    public void ProvedTypeOf_ArgumentOfNoKnownType_IsSkipped(string entry, long? expected) =>
+        PlanExpression.ProvedTypeOf(entry, Untyped(catalogFunctions: true, AllProved)).ShouldBe(expected);
+
+    // Every form of a type is read only when the session finds pg_catalog first.
+    [Theory]
+    [InlineData("COALESCE(total, '0'::numeric)")]
+    [InlineData("GREATEST(quantity, quantity)")]
+    [InlineData("CASE WHEN (quantity > 1) THEN quantity ELSE quantity END")]
+    public void ProvedTypeOf_CommonTypeFormWhenTheCatalogIsNotFirst_IsNull(string entry) =>
+        PlanExpression.ProvedTypeOf(entry, CommonTypes(catalogFunctions: false)).ShouldBeNull();
+
+    // A form of a type feeds an aggregate, an operator and a cast.
+    [Theory]
+    [InlineData("sum(COALESCE(total, '0'::numeric))")]
+    [InlineData("max(COALESCE(o.id, (u.id)::bigint))")]
+    [InlineData("sum(CASE WHEN (quantity > 1) THEN '1'::numeric ELSE 2.5 END)")]
+    [InlineData("(COALESCE(quantity, 0) + 1)")]
+    [InlineData("(GREATEST(quantity, 1))::bigint")]
+    public void NullableOf_FormsOverACommonType_AreRead(string entry) =>
+        PlanExpression.NullableOf(entry, CommonTypes(groupsHaveRows: true)).ShouldBe(false);
+
+    // A domain's column is proved of the domain, which no row of the tables takes, and a form of no known type feeds
+    // nothing.
+    [Theory]
+    [InlineData("sum(COALESCE(amount, '1'::numeric))")]
+    [InlineData("(COALESCE(amount, amount) + '1'::numeric)")]
+    [InlineData("(COALESCE(o.note, o.note) + 1)")]
+    [InlineData("sum(COALESCE(total, '0'::numeric)) FILTER (WHERE (quantity > 1))")]
+    public void NullableOf_FormsOverNoCommonType_AreUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, CommonTypes(groupsHaveRows: true)).ShouldBeNull();
+
+    // The walk's answer at a full join of "a", its outer side, and "r", its inner one.
+    private static (bool OuterSide, long Type)? SideOf(OutputReference reference) =>
+        (reference.Alias, reference.Column) switch
+        {
+            ("a", "id") => (true, BuiltInTypes.Int4),
+            ("r", "account_id") => (false, BuiltInTypes.Int4),
+            ("r", "id") => (false, BuiltInTypes.Int8),
+            _ => null,
+        };
+
+    private static ExpressionContext AtAFullJoin(bool catalogFunctions = true) =>
+        new(catalogFunctions, static _ => null, ProvedOnFullJoinSide: SideOf);
+
+    // A row of a full join has a row of one side at least, and COALESCE, GREATEST and LEAST are NULL only when every
+    // argument is: over a plain reference to each side the walk proves but for the join, the form is not NULL, of
+    // their type when they share one.  Both of one side, a cast of a side's column, a reference in parentheses, a CASE
+    // and an operator prove nothing.
+    [Theory]
+    [InlineData("COALESCE(a.id, r.account_id)", false, BuiltInTypes.Int4)]
+    [InlineData("GREATEST(a.id, r.account_id)", false, BuiltInTypes.Int4)]
+    [InlineData("LEAST(r.account_id, a.id)", false, BuiltInTypes.Int4)]
+    [InlineData("COALESCE(a.id, r.account_id, NULL::integer)", false, BuiltInTypes.Int4)]
+    [InlineData("COALESCE(a.id, r.id)", false, null)]
+    [InlineData("COALESCE(a.id, a.id)", null, null)]
+    [InlineData("COALESCE(a.id, (r.account_id)::bigint)", null, null)]
+    [InlineData("COALESCE((a.id), r.account_id)", null, null)]
+    [InlineData("COALESCE(a.id, x.id)", null, null)]
+    [InlineData("CASE WHEN (a.id > 1) THEN a.id ELSE r.account_id END", null, null)]
+    [InlineData("(a.id + r.account_id)", null, null)]
+    public void NullableOf_CoalesceOverBothSidesOfAFullJoin_IsNotNull(string entry, bool? expected, long? type)
+    {
+        PlanExpression.NullableOf(entry, AtAFullJoin()).ShouldBe(expected);
+        PlanExpression.ProvedTypeOf(entry, AtAFullJoin()).ShouldBe(type);
+    }
+
+    // At a node that is no full join, and where the session does not find pg_catalog first, the form is not read.
+    [Fact]
+    public void NullableOf_CoalesceOverBothSidesWithoutTheFullJoin_IsUnknown()
+    {
+        PlanExpression.NullableOf("COALESCE(a.id, r.account_id)", new(true, static _ => null)).ShouldBeNull();
+        PlanExpression.NullableOf("COALESCE(a.id, r.account_id)", AtAFullJoin(catalogFunctions: false)).ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("count(*)", new string[0], new string[0])]
+    [InlineData("(count(o.id) + count(*))", new[] { "count" }, new string[0])]
+    [InlineData("(during * tstzrange($1, $2))", new[] { "tstzrange" }, new[] { "*" })]
+    [InlineData("jsonb_build_object('a'::text, (x * 2))", new[] { "jsonb_build_object" }, new[] { "*" })]
+    [InlineData("(count(a.id) + count(DISTINCT a.id))", new[] { "count" }, new string[0])]
+    [InlineData("upper(during)", new string[0], new string[0])]
+    [InlineData("'count(x)'::text", new string[0], new string[0])]
+    [InlineData("shadow.count(id)", new string[0], new string[0])]
+    [InlineData("\"count\"(id)", new string[0], new string[0])]
+    [InlineData("count(o.id", new string[0], new string[0])]
+    public void CatalogNamesIn_Entry_GivesTheNamesItCalls(string entry, string[] functions, string[] operators)
+    {
+        var (foundFunctions, foundOperators) = PlanExpression.CatalogNamesIn(entry);
+
+        foundFunctions.ShouldBe(functions);
+        foundOperators.ShouldBe(operators);
+    }
 
     [Fact]
     public void Groups_Entry_IsTheTextInsideEachPairOfParenthesesOutermostFirst() =>

@@ -12,11 +12,11 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Fixtures;
 
 // The matrix of the nullability walk: what the expected.json of each walk-* case must say, written here by hand.  It
-// began as "The matrix" of docs/superpowers/specs/2026-10-12-query-generation-phase-3-5-nullability-walk-design.md,
-// and the walk has since come to answer walk-subquery-kept, walk-cte-materialized, walk-aggregate and walk-union.  A
-// recording that says otherwise is a bug of the walk or of the case, never a reason to change this table without
-// knowing which.  DescriberFixtureTests replays the same cases, and tests/SqlSource.Tests.Postgres describes them on
-// PostgreSQL 14 and 18.
+// began as "The matrix" of docs/superpowers/specs/2026-10-12-query-generation-phase-3-5-nullability-walk-design.md, and
+// the walk has since come to answer walk-subquery-kept, walk-cte-materialized, walk-aggregate, walk-union and the
+// merged columns of walk-using and walk-natural.  A recording that says otherwise is a bug of the walk or of the case,
+// never a reason to change this table without knowing which.  DescriberFixtureTests replays the same cases, and
+// tests/SqlSource.Tests.Postgres describes them on PostgreSQL 14 and 18.
 public sealed class WalkMatrixTests
 {
     // A NOT NULL column that nothing extends.
@@ -68,9 +68,10 @@ public sealed class WalkMatrixTests
         ["walk-lateral"] = (Walked, [Kept, Joined]),
         ["walk-view"] = (Walked, [OfView, OfView, Joined, Joined, Joined]),
         ["walk-view-nullable-side"] = (Walked, [Kept, Joined]),
-        ["walk-using"] = (Walked, [NoOrigin, Joined, Joined]),
-        ["walk-natural"] = (Walked, [NoOrigin, NoOrigin, Joined, Joined]),
+        ["walk-using"] = (Walked, [Expression, Joined, Joined]),
+        ["walk-natural"] = (Walked, [Expression, Expression, Joined, Joined]),
         ["walk-aggregate"] = (Walked, [Kept, Joined, Expression]),
+        ["walk-count-argument"] = (Walked, [Kept, Expression]),
         ["walk-union"] = (Walked, [NoOrigin, NoOrigin]),
         ["walk-returning"] = (Walked, [Kept, Kept, Joined]),
         ["walk-proved-empty"] = (Walked, [Kept, Heuristic]),

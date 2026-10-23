@@ -146,6 +146,13 @@ internal sealed class PostgresScript
     public PostgresScript Relations(IReadOnlyList<PostgresRelationName> names, params PostgresTableRow[] tables) =>
         Relations(new PostgresRelationsRequest(names), new PostgresTablesAnswer(tables, null));
 
+    public PostgresScript Overloads(PostgresOverloadsRequest request, PostgresOverloadsAnswer answer) =>
+        Answer("overloads", request, answer);
+
+    // "overloads" answering that no schema but pg_catalog holds any of the names the test gives.
+    public PostgresScript Overloads(IReadOnlyList<string> functions, IReadOnlyList<string> operators) =>
+        Overloads(new PostgresOverloadsRequest(functions, operators), new PostgresOverloadsAnswer([], [], null));
+
     // Made when the script is whole.
     public ReplayingExchange Play() => new(_capture);
 

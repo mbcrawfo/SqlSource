@@ -49,8 +49,8 @@
               "internalName": "int4"
             }
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": null,
           "identity": null,
           "computed": null

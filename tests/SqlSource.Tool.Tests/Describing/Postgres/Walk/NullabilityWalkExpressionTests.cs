@@ -1,4 +1,6 @@
 using Shouldly;
+using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
 using static SqlSource.Tool.Tests.PostgresPlans;
@@ -159,6 +161,93 @@ public sealed class NullabilityWalkExpressionTests
         };
 
         AnswersOf(RunUngated(plan, OfA, Expression)).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
+    }
+
+    // A table of reservations whose account_id is NOT NULL, for the scan "r".
+    private static readonly PostgresTableRow ReservationsR = PostgresTables.TableOf(
+        16711,
+        "r",
+        PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true),
+        PostgresTables.Attribute(2, "account_id", PostgresRows.Int4.Oid, notNull: true)
+    );
+
+    private static WalkOutcome RunOverAAndR(PlanNode root, bool catalogFunctionsFirst = true)
+    {
+        var (columns, origins) = Built(false, Expression);
+        return NullabilityWalk.Run(
+            new PlanInstancesCache(root, null),
+            columns,
+            origins,
+            new WalkScope(false, false, catalogFunctionsFirst, PostgresTables.Of(TableA, TableB, ReservationsR), [])
+        );
+    }
+
+    private const string CoalesceOfBothSides = "COALESCE(a.id, r.account_id)";
+
+    // A full join of "a" and "r" that computes the COALESCE of a column of each side, with "a" its outer side.
+    private static PlanNode FullJoinOfAAndR(PlanNode outer) =>
+        Join(
+            "Full",
+            outer,
+            Over("Hash", Scan("r", "r.id", "r.account_id"), Inner) with
+            {
+                Output = ["r.account_id"],
+            }
+        ) with
+        {
+            Output = [CoalesceOfBothSides],
+        };
+
+    // A row of a full join has a row of one side at least, so a COALESCE the join computes over a column of each side
+    // that only the join extends is not NULL.
+    [Fact]
+    public void Run_CoalesceAtAFullJoin_IsAnswered()
+    {
+        var plan = Over("Sort", FullJoinOfAAndR(Scan("a", "a.id"))) with { Output = ["(" + CoalesceOfBothSides + ")"] };
+
+        AnswersOf(RunOverAAndR(plan)).ShouldBe([NotNullExpression]);
+        AnswersOf(RunOverAAndR(plan, catalogFunctionsFirst: false)).ShouldBe([UnknownNoOrigin]);
+    }
+
+    // The full join on the side a LEFT JOIN extends returns a row of NULL for a row it did not match.
+    [Fact]
+    public void Run_CoalesceAtAFullJoinUnderALeftJoin_KeepsNoOrigin()
+    {
+        var plan = Join("Left", Scan("b", "b.id"), FullJoinOfAAndR(Scan("a", "a.id"))) with
+        {
+            Output = ["(" + CoalesceOfBothSides + ")"],
+        };
+
+        AnswersOf(RunOverAAndR(plan)).ShouldBe([UnknownNoOrigin]);
+    }
+
+    // A join that null-extends under a side may make that side's column NULL, whichever side it extends.
+    [Fact]
+    public void Run_CoalesceAtAFullJoinOverAnExtendedSide_KeepsNoOrigin()
+    {
+        var left = Join("Left", Scan("a", "a.id"), Scan("b", "b.id")) with { Output = ["a.id"] };
+
+        AnswersOf(RunOverAAndR(FullJoinOfAAndR(left))).ShouldBe([UnknownNoOrigin]);
+    }
+
+    // A row of the full join has a row of one side at least, but that side's column may itself be NULL.
+    [Fact]
+    public void Run_CoalesceAtAFullJoinOverANullableColumn_KeepsNoOrigin()
+    {
+        var join = FullJoinOfAAndR(Scan("a", "a.opt")) with { Output = ["COALESCE(a.opt, r.account_id)"] };
+
+        AnswersOf(RunOverAAndR(Over("Sort", join) with { Output = ["(COALESCE(a.opt, r.account_id))"] }))
+            .ShouldBe([UnknownNoOrigin]);
+    }
+
+    // A node above the join that computes the COALESCE reads each column as the join extends it.
+    [Fact]
+    public void Run_CoalesceAboveAFullJoin_KeepsNoOrigin()
+    {
+        var join = FullJoinOfAAndR(Scan("a", "a.id")) with { Output = ["a.id", "r.account_id"] };
+
+        AnswersOf(RunOverAAndR(Over("Result", join) with { Output = [CoalesceOfBothSides] }))
+            .ShouldBe([UnknownNoOrigin]);
     }
 
     // A node that prints no Output may compute any value, so it must be preserved.

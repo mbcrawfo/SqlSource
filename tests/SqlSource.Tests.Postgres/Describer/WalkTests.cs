@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Testing;
 using Xunit;
@@ -220,5 +221,67 @@ public sealed class WalkTests(PostgresContainer postgres)
             NotNullCatalog,
             NullableOuterJoin,
         ]);
+    }
+
+    // A query described with the planner's settings, with the plan "explain" answered.
+    private async Task<(QueryDescription Description, string Plan)> DescribeWithSettingsAsync(
+        string sql,
+        params string[] settings
+    )
+    {
+        var (described, capture) = await Sessions.DescribeCapturedAsync(
+            postgres.ConnectionString,
+            DescribeRequests.Of(sql),
+            plannerSettings: settings
+        );
+
+        described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
+        var explain = capture.Calls.Single(static call => call.Method == "explain");
+        return (described.Value.ShouldNotBeNull(), CaptureJson.TextOf(explain.Answer));
+    }
+
+    // A row of a full join has a row of one side at least, so the COALESCE of a NOT NULL column of each side, which
+    // 14 and 18 compute at the join, a hash join and a merge join alike, is never NULL.
+    [Theory]
+    [InlineData("Hash Join", "enable_mergejoin=off", "enable_nestloop=off")]
+    [InlineData("Merge Join", "enable_hashjoin=off", "enable_nestloop=off")]
+    public async Task DescribeAsync_CoalesceOverBothSidesOfAFullJoin_IsNotNull(string join, string first, string second)
+    {
+        var (description, plan) = await DescribeWithSettingsAsync(
+            "SELECT coalesce(u.id, o.user_id) AS k FROM users u FULL JOIN orders o ON o.user_id = u.id",
+            first,
+            second
+        );
+
+        plan.ShouldContain(join);
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullExpression]);
+    }
+
+    // A COALESCE at a full join that is not over one NOT NULL column of each side, each extended by that join alone:
+    // both of one side, a side with a LEFT JOIN under it, the full join on the side a LEFT JOIN extends, a cast of a
+    // side's column, and a side's column that may be NULL.  The upper condition of the third is not strict in either
+    // side, so the planner keeps the full join, and each plan is asserted to hold one.
+    [Theory]
+    [InlineData("SELECT coalesce(o.user_id, o.user_id) AS k FROM users u FULL JOIN orders o ON o.user_id = u.id")]
+    [InlineData(
+        "SELECT coalesce(u.id, o.user_id) AS k "
+            + "FROM (users u LEFT JOIN bookings b ON b.user_id = u.id) FULL JOIN orders o ON o.user_id = u.id"
+    )]
+    [InlineData(
+        "SELECT coalesce(u.id, o.user_id) AS k "
+            + "FROM bookings b LEFT JOIN (users u FULL JOIN orders o ON o.user_id = u.id) "
+            + "ON b.user_id = coalesce(u.id, o.user_id)"
+    )]
+    [InlineData("SELECT coalesce(o.id, u.id) AS k FROM users u FULL JOIN orders o ON o.user_id = u.id")]
+    [InlineData("SELECT coalesce(u.deleted_at, o.placed_at) AS k FROM users u FULL JOIN orders o ON o.user_id = u.id")]
+    public async Task DescribeAsync_CoalesceAtAFullJoinNotOverEachSide_KeepsNoOrigin(string sql)
+    {
+        var (description, plan) = await DescribeWithSettingsAsync(sql);
+
+        var compact = plan.Replace("\\", "", StringComparison.Ordinal).Replace(" ", "", StringComparison.Ordinal);
+        compact.ShouldContain("\"JoinType\":\"Full\"", Case.Sensitive, "the plan holds no full join");
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([UnknownNoOrigin]);
     }
 }

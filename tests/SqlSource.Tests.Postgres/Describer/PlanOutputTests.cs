@@ -374,7 +374,7 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
             found.Add(await reader.GetFieldValueAsync<uint>(0, token), reader.GetString(1));
         }
 
-        expected.Count.ShouldBe(19);
+        expected.Count.ShouldBe(27);
         found.ShouldBe(expected, ignoreOrder: true);
     }
 
@@ -556,6 +556,163 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         aggregates.Length.ShouldBe(38);
     }
 
+    // Every overload pg_catalog holds of each function name CatalogOverloads reads is a row of the table, with the
+    // arguments and the implementation the row gives, and every row is one: an aggregate by its transition function,
+    // its final one and its initial value.  None is strict, which would make it NULL for a NULL argument before its C
+    // function ran, and none returns a set.  Each aggregate's functions of a moving window and of a plan in parts are
+    // the ones CatalogOverloads' remarks name.  The intersection of two of each range type is of that type, no implicit
+    // or assignment cast leads from one, and the only operators * of pg_catalog over a range, a multirange or a
+    // pseudo-type are range_intersect and the multirange's.  Every mismatch is listed.
+    [Fact]
+    public async Task Catalog_CatalogOverloads_ArePinned()
+    {
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        var token = TestContext.Current.CancellationToken;
+        var found = new HashSet<(string Name, string Arguments, string Implementation)>();
+        var mismatches = new List<string>();
+        await using (
+            var command = source.CreateCommand(
+                """
+                SELECT p.proname::text,
+                    pg_catalog.pg_get_function_identity_arguments(p.oid),
+                    CASE
+                        WHEN p.prokind = 'a' THEN a.aggtransfn::text || '/'
+                            || CASE WHEN a.aggfinalfn = 0 THEN '-' ELSE a.aggfinalfn::text END || '/'
+                            || coalesce(a.agginitval, '')
+                        ELSE p.prosrc
+                    END,
+                    p.proisstrict OR p.proretset
+                FROM pg_catalog.pg_proc AS p
+                LEFT JOIN pg_catalog.pg_aggregate AS a ON a.aggfnoid = p.oid
+                WHERE p.pronamespace = 'pg_catalog'::regnamespace AND p.proname = ANY ($1)
+                """
+            )
+        )
+        {
+            _ = command.Parameters.Add(new NpgsqlParameter { Value = CatalogOverloads.FunctionNames.ToArray() });
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+            {
+                var row = (reader.GetString(0), reader.GetString(1), reader.GetString(2));
+                _ = found.Add(row);
+                if (reader.GetBoolean(3))
+                {
+                    mismatches.Add($"strict or returning a set {Describe(row)}");
+                }
+            }
+        }
+
+        var listed = CatalogOverloads.Overloads.ToHashSet();
+        mismatches.AddRange(listed.Except(found).Select(static row => $"missing {Describe(row)}"));
+        mismatches.AddRange(found.Except(listed).Select(static row => $"not listed {Describe(row)}"));
+
+        // The functions of the moving and the partial modes, aggcombinefn/aggserialfn/aggdeserialfn/aggmtransfn/
+        // aggminvtransfn/aggmfinalfn/aggminitval: array_agg is computed in parts from 16.
+        var parts = postgres.Major >= 16;
+        var support = new HashSet<(string Name, string Arguments, string Implementation)>
+        {
+            ("count", "", "int8pl/-/-/int8inc/int8dec/-/0"),
+            ("count", "\"any\"", "int8pl/-/-/int8inc_any/int8dec_any/-/0"),
+            (
+                "array_agg",
+                "anynonarray",
+                parts ? "array_agg_combine/array_agg_serialize/array_agg_deserialize/-/-/-/" : "-/-/-/-/-/-/"
+            ),
+            (
+                "array_agg",
+                "anyarray",
+                parts
+                    ? "array_agg_array_combine/array_agg_array_serialize/array_agg_array_deserialize/-/-/-/"
+                    : "-/-/-/-/-/-/"
+            ),
+        };
+        var foundSupport = new HashSet<(string Name, string Arguments, string Implementation)>();
+        await using (
+            var command = source.CreateCommand(
+                """
+                SELECT p.proname::text,
+                    pg_catalog.pg_get_function_identity_arguments(p.oid),
+                    a.aggcombinefn::text || '/' || a.aggserialfn::text || '/' || a.aggdeserialfn::text || '/'
+                        || a.aggmtransfn::text || '/' || a.aggminvtransfn::text || '/' || a.aggmfinalfn::text || '/'
+                        || coalesce(a.aggminitval, '')
+                FROM pg_catalog.pg_proc AS p
+                JOIN pg_catalog.pg_aggregate AS a ON a.aggfnoid = p.oid
+                WHERE p.pronamespace = 'pg_catalog'::regnamespace AND p.proname = ANY ($1)
+                """
+            )
+        )
+        {
+            _ = command.Parameters.Add(new NpgsqlParameter { Value = CatalogOverloads.FunctionNames.ToArray() });
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+            {
+                _ = foundSupport.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+            }
+        }
+
+        mismatches.AddRange(support.Except(foundSupport).Select(static row => $"missing modes {Describe(row)}"));
+        mismatches.AddRange(foundSupport.Except(support).Select(static row => $"other modes {Describe(row)}"));
+
+        var ranges = CatalogOverloads
+            .FunctionNames.Where(static name => CatalogOverloads.RangeTypeOf(name) is not null)
+            .ToArray();
+        foreach (var range in ranges)
+        {
+            await using var command = source.CreateCommand(
+                $"SELECT pg_catalog.pg_typeof('empty'::{range} * 'empty'::{range})::oid"
+            );
+            var type = (uint)(await command.ExecuteScalarAsync(token)).ShouldNotBeNull();
+            if (type != CatalogOverloads.RangeTypeOf(range))
+            {
+                mismatches.Add($"{range} * {range} is of the type {type}");
+            }
+        }
+
+        await using (
+            var command = source.CreateCommand(
+                """
+                SELECT c.castsource::regtype::text || ' to ' || c.casttarget::regtype::text
+                FROM pg_catalog.pg_cast AS c
+                WHERE c.castsource = ANY ($1) AND c.castcontext IN ('i', 'a')
+                UNION ALL
+                SELECT 'operator *(' || o.oprleft::regtype::text || ', ' || o.oprright::regtype::text || ') by '
+                    || o.oprcode::text
+                FROM pg_catalog.pg_operator AS o
+                JOIN pg_catalog.pg_type AS l ON l.oid = o.oprleft
+                JOIN pg_catalog.pg_type AS r ON r.oid = o.oprright
+                WHERE o.oprnamespace = 'pg_catalog'::regnamespace
+                    AND o.oprname = '*'
+                    AND (l.typtype IN ('r', 'm', 'p') OR r.typtype IN ('r', 'm', 'p'))
+                    AND (o.oprleft, o.oprright, o.oprcode::text) NOT IN (
+                        ('anyrange'::regtype, 'anyrange'::regtype, 'range_intersect'),
+                        ('anymultirange'::regtype, 'anymultirange'::regtype, 'multirange_intersect')
+                    )
+                """
+            )
+        )
+        {
+            _ = command.Parameters.Add(
+                new NpgsqlParameter
+                {
+                    Value = ranges.Select(static range => (uint)CatalogOverloads.RangeTypeOf(range)!.Value).ToArray(),
+                    DataTypeName = "oid[]",
+                }
+            );
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+            {
+                mismatches.Add(reader.GetString(0));
+            }
+        }
+
+        mismatches.ShouldBeEmpty();
+        listed.Count.ShouldBe(20);
+        ranges.Length.ShouldBe(6);
+
+        static string Describe((string Name, string Arguments, string Implementation) row) =>
+            $"{row.Name}({row.Arguments}) by {row.Implementation}";
+    }
+
     // The types that carry a modifier are every type of the catalog with a typmod input, but the arrays, whose
     // element carries it.
     [Fact]
@@ -585,15 +742,22 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
     [Fact]
     public async Task Explain_CountShadowedOnTheSearchPath_PrintsUnqualified()
     {
-        await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
-        var connection = $"{postgres.ConnectionString};Search Path=shadow,pg_catalog,public";
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
+            var connection = $"{postgres.ConnectionString};Search Path=shadow,pg_catalog,public";
 
-        var root = await ExplainAsync("SELECT count(*) FROM users", connection);
+            var root = await ExplainAsync("SELECT count(*) FROM users", connection);
 
-        root.Output.ShouldNotBeNull().ShouldBe(["count(*)"]);
-        await using var source = NpgsqlDataSource.Create(connection);
-        await using var command = source.CreateCommand("SELECT count(*) IS NULL FROM users");
-        (await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)).ShouldBe(true);
+            root.Output.ShouldNotBeNull().ShouldBe(["count(*)"]);
+            await using var source = NpgsqlDataSource.Create(connection);
+            await using var command = source.CreateCommand("SELECT count(*) IS NULL FROM users");
+            (await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)).ShouldBe(true);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropShadow);
+        }
     }
 
     // A Subquery Scan prints the subquery's columns in the order the query above needs them, and its child in the
@@ -780,6 +944,131 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
 
         root.Output.ShouldBe([printed]);
         All(root).Count(static node => node.ParentRelationship == "SubPlan").ShouldBe(1);
+    }
+
+    // A call whose argument types the server resolves from its arguments prints as the reader reads it, with the
+    // table's alias left out of a one-table query: the text is the same on 14 and on 18.  The recogniser reads these
+    // calls by the name and the printed arguments.
+    [Theory]
+    [InlineData("count(o.note)", "orders o", "count(note)")]
+    [InlineData("count(DISTINCT u.status)", "users u", "count(DISTINCT status)")]
+    [InlineData("count(u.email) FILTER (WHERE u.id > 1)", "users u", "count(email) FILTER (WHERE (id > 1))")]
+    [InlineData(
+        "jsonb_build_object('id', u.id, 'email', u.email)",
+        "users u",
+        "jsonb_build_object('id', id, 'email', email)"
+    )]
+    [InlineData("json_build_object()", "users u", "json_build_object()")]
+    [InlineData("b.during * tstzrange(now(), now())", "bookings b", "(during * tstzrange(now(), now()))")]
+    public async Task Explain_PolymorphicForm_PrintsWhatTheReaderReads(string selectList, string from, string expected)
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+
+        var root = await ExplainAsync($"SELECT {selectList} FROM {from}");
+
+        root.Output.ShouldBe([expected]);
+    }
+
+    // A window aggregate prints its window as ? on 14 and as the window's name on 18.  A call with a VARIADIC array
+    // prints the keyword and the parameter, and an ordered, distinct aggregate prints its order inside the call and is
+    // computed at the Aggregate that has the Group Key.
+    [Theory]
+    [InlineData(
+        "SELECT count(u.email) OVER (PARTITION BY u.status) FROM users u",
+        null,
+        "WindowAgg",
+        false,
+        "count(email) OVER (?)",
+        "count(email) OVER w1"
+    )]
+    [InlineData(
+        "SELECT jsonb_build_object(VARIADIC $1) FROM users u",
+        "text[]",
+        "Seq Scan",
+        false,
+        "jsonb_build_object(VARIADIC $1)",
+        "jsonb_build_object(VARIADIC $1)"
+    )]
+    [InlineData(
+        "SELECT array_agg(DISTINCT o.id ORDER BY o.id) FROM orders o GROUP BY o.user_id",
+        null,
+        "Aggregate",
+        true,
+        "array_agg(DISTINCT id ORDER BY id)",
+        "array_agg(DISTINCT id ORDER BY id)"
+    )]
+    public async Task Explain_PolymorphicFormsOfTheMajor_PrintAsEach(
+        string sql,
+        string? parameterType,
+        string nodeType,
+        bool hasGroupKey,
+        string printedOn14,
+        string printedOn18
+    )
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+        var printed = postgres.Major == 14 ? printedOn14 : printedOn18;
+
+        // A parameter needs a prepared statement; the query scans no partitioned table, so pruning is left at the
+        // server's default.
+        var root = parameterType is null
+            ? await ExplainAsync(sql)
+            : await ExplainExecuteAsync(sql, parameterType, pruning: true);
+
+        root.NodeType.ShouldBe(nodeType);
+        root.HasGroupKey.ShouldBe(hasGroupKey);
+        root.Output.ShouldNotBeNull()[0].ShouldBe(printed);
+    }
+
+    // The arguments of COALESCE, CASE and the like are cast to their common type, and print with the casts: a
+    // constant as a quoted literal of the type, and a column of another type in a cast.  The Aggregate prints each
+    // call bare.
+    [Theory]
+    [InlineData("sum(coalesce(o.total, 0))", "sum(COALESCE(total, '0'::numeric))")]
+    [InlineData("max(coalesce(o.id, o.user_id))", "max(COALESCE(id, (user_id)::bigint))")]
+    [InlineData(
+        "sum(CASE WHEN o.id > 1 THEN 1 ELSE 2.5 END)",
+        "sum(CASE WHEN (id > 1) THEN '1'::numeric ELSE 2.5 END)"
+    )]
+    public async Task Explain_CommonType_PrintsTheCastsOfTheArguments(string expression, string expected)
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+
+        var root = await ExplainAsync($"SELECT {expression} FROM orders o GROUP BY o.user_id");
+
+        root.NodeType.ShouldBe("Aggregate");
+        root.HasGroupKey.ShouldBeTrue();
+        root.Output.ShouldNotBeNull()[0].ShouldBe(expected);
+    }
+
+    // The COALESCE over the two sides of a full join is computed at the join, whichever join the planner picks: the
+    // node of Join Type Full prints it as itself, and no node under it does.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Explain_FullJoinCoalesce_IsComputedAtTheJoin(bool mergeJoin)
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+        var connection = mergeJoin
+            ? $"{postgres.ConnectionString};Options=-c enable_hashjoin=off -c enable_nestloop=off"
+            : null;
+
+        var root = await ExplainAsync(
+            "SELECT coalesce(u.id, o.user_id) AS k, o.total FROM users u FULL JOIN orders o ON o.user_id = u.id",
+            connection
+        );
+
+        var join = All(root).Single(static node => node.JoinType == "Full");
+        if (mergeJoin)
+        {
+            join.NodeType.ShouldBe("Merge Join");
+        }
+
+        join.Output.ShouldNotBeNull().ShouldContain("COALESCE(u.id, o.user_id)");
+        All(join)
+            .Skip(1)
+            .SelectMany(static node => node.Output ?? [])
+            .ShouldNotContain(static entry => entry.Contains("COALESCE"));
     }
 
     // A system column of a table prints as a column, qualified by the table's name on an INSERT's RETURNING.
