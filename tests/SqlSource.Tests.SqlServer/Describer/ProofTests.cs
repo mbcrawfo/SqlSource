@@ -27,12 +27,14 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
         "GREATEST, LEAST, JSON_OBJECT, JSON_ARRAY and WINDOW are new in SQL Server 2022";
 
     // One query of each proved form, with the major it needs.  The arithmetic, GREATEST and LEAST are proved because
-    // a is not null in every row, which "operands" asks the server; b and g are NULL in some.
+    // a is not null in every row, which "operands" asks the server; b and g are NULL in some.  No divisor is ever 0,
+    // since a division by 0 is an error under ANSI_WARNINGS on, and not a NULL.
     public static TheoryData<int, string> ProvedForms =>
         new()
         {
             { 0, "SELECT COUNT(b) AS c FROM dbo.proof_rows WHERE 1 = 0" },
             { 0, "SELECT COUNT(b) OVER (PARTITION BY g) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT COUNT_BIG(b) AS c FROM dbo.proof_rows GROUP BY g" },
             {
                 0,
                 "SELECT (SELECT COUNT(*) FROM dbo.proof_other AS o WHERE o.rows_id = r.id) AS c "
@@ -48,13 +50,18 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
                     + "FROM dbo.proof_rows"
             },
             { 0, "SELECT MAX(a) OVER (PARTITION BY g) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT SUM(a) OVER (PARTITION BY g ORDER BY id) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT ROW_NUMBER() OVER (ORDER BY b) AS c FROM dbo.proof_rows" },
             { 0, "SELECT RANK() OVER (PARTITION BY g ORDER BY b) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT DENSE_RANK() OVER (PARTITION BY g ORDER BY b) AS c FROM dbo.proof_rows" },
             { 0, "SELECT NTILE(2) OVER (ORDER BY b) AS c FROM dbo.proof_rows" },
             { 0, "SELECT COALESCE(b, a) AS c FROM dbo.proof_rows" },
             { 0, "SELECT COALESCE(g, 0) AS c FROM dbo.proof_rows GROUP BY ROLLUP (g)" },
             { 0, "SELECT CAST(a AS bigint) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT CONVERT(bigint, a) AS c FROM dbo.proof_rows" },
             { 0, "SELECT CONVERT(varchar(30), CAST(a AS money), 1) AS c FROM dbo.proof_rows" },
             { 0, "SELECT a * 2 - a % 7 + 1 AS c FROM dbo.proof_rows" },
+            { 0, "SELECT a / id - a % (id + 1) AS c FROM dbo.proof_rows" },
             { NewFunctions, "SELECT JSON_OBJECT('a': b) AS c FROM dbo.proof_rows" },
             { NewFunctions, "SELECT JSON_ARRAY(b) AS c FROM dbo.proof_rows" },
             { NewFunctions, "SELECT GREATEST(b, a) AS c FROM dbo.proof_rows" },
@@ -63,7 +70,8 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
 
     // The queries that try to break a proof, with the major they need, each NULL in some row: the design's list, then
     // the same forms wrapped or written another way.  Under ROLLUP the grouping column is NULL in the total's row even
-    // where the table holds none, which the rows of a show and those of g, NULL in the table too, do not.  The scalar
+    // where the table holds none: the rows of a, which the table never makes NULL, show it, and those of g, NULL in
+    // the table too, do not.  The scalar
     // subqueries of COUNT that a set operator, an OFFSET, a TOP or a grouping can leave with no row are inside
     // arithmetic, so that the item is not one leaf alone, which would ask nothing.
     public static TheoryData<int, string> BreakingAttempts =>
@@ -90,6 +98,7 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
             { 0, "SELECT TRY_CAST(N'x' + CAST(a AS nvarchar(10)) AS int) AS c FROM dbo.proof_rows" },
             { 0, "SELECT COALESCE(b, NULL) AS c FROM dbo.proof_rows" },
             { 0, "SELECT dbo.COUNT(a) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT [dbo].[COUNT](a) AS c FROM dbo.proof_rows" },
             {
                 NewFunctions,
                 "SELECT (SELECT TOP (1) JSON_OBJECT('a': a) FROM dbo.proof_rows WHERE 1 = 0) AS c FROM dbo.proof_rows"
@@ -125,19 +134,20 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
 
     [Theory]
     [MemberData(nameof(ProvedForms))]
-    public async Task Describe_ProvedForm_NotNullAndNoNullRow(int major, string sql)
+    public async Task DescribeAsync_ProvedForm_NotNullAndNoNullRow(int major, string sql)
     {
         sqlServer.SkipBelow(major, NewFunctionsReason);
         await WithRowsAsync(async () =>
         {
             await ShouldDescribeColumnAsync(sql, false, SidecarValues.NullableSource.Expression);
+            (await RowsAsync(sql)).ShouldBeGreaterThan(0, sql);
             (await NullRowsAsync(sql)).ShouldBe(0, sql);
         });
     }
 
     [Theory]
     [MemberData(nameof(BreakingAttempts))]
-    public async Task Describe_BreakingAttempt_NullableAndNullRow(int major, string sql)
+    public async Task DescribeAsync_BreakingAttempt_NullableAndNullRow(int major, string sql)
     {
         sqlServer.SkipBelow(major, NewFunctionsReason);
         await WithRowsAsync(async () =>
@@ -151,11 +161,12 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
     // its expression nullable (it answers "(1) PERSISTED NOT NULL" not null itself, design fact 5); through an outer
     // join that finds no row, or in the total of a ROLLUP, it is NULL, and the server still names it as the source.
     [Fact]
-    public Task Describe_PersistedNotNull_OnlyFromOneTable() =>
+    public Task DescribeAsync_PersistedNotNull_OnlyFromOneTable() =>
         WithRowsAsync(async () =>
         {
             var alone = "SELECT c FROM dbo.proof_computed";
             await ShouldDescribeColumnAsync(alone, false, SidecarValues.NullableSource.Catalog);
+            (await RowsAsync(alone)).ShouldBeGreaterThan(0);
             (await NullRowsAsync(alone)).ShouldBe(0);
 
             var joined = "SELECT pc.c FROM dbo.proof_rows AS r LEFT JOIN dbo.proof_computed AS pc ON pc.id = r.id";
@@ -167,6 +178,18 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
             (await NullRowsAsync(rolledUp)).ShouldBeGreaterThan(0);
         });
 
+    // NTILE of a parameter proves nothing: run with @n NULL it raises error 4116 (design fact 7), so there is no NULL
+    // row to show, and the describe alone is held.
+    [Fact]
+    public Task DescribeAsync_NtileOfAParameter_StaysNullable() =>
+        WithRowsAsync(() =>
+            ShouldDescribeColumnAsync(
+                "SELECT NTILE(@n) OVER (ORDER BY id) AS c FROM dbo.proof_rows",
+                true,
+                SidecarValues.NullableSource.Server
+            )
+        );
+
     // Design fact 3: no grouping returns a row for an empty input, so every row of a query with a GROUP BY is of a
     // group with at least one row, a total's included.  Without a GROUP BY the same input gives one row.
     [Theory]
@@ -174,31 +197,31 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
     [InlineData("GROUP BY CUBE (g)")]
     [InlineData("GROUP BY GROUPING SETS ((g), ())")]
     [InlineData("GROUP BY ()")]
-    public Task Grouping_EmptyInput_ReturnsNoRow(string groupBy) =>
+    public Task GroupBy_EmptyInput_ReturnsNoRow(string groupBy) =>
         WithRowsAsync(async () =>
         {
             (await RowsAsync($"SELECT MAX(a) AS c FROM dbo.proof_rows WHERE 1 = 0 {groupBy}")).ShouldBe(0);
             (await RowsAsync("SELECT MAX(a) AS c FROM dbo.proof_rows WHERE 1 = 0")).ShouldBe(1);
         });
 
-    // Design fact 1, the assumption of decision 5: with ANSI_WARNINGS and ARITHABORT off, an overflow is NULL; with
-    // ANSI_WARNINGS on, as SqlClient connects, it is error 220 whatever ARITHABORT says.  The settings are made on a
-    // connection of the test's own, outside the pool, so that no other test reads them.
-    [Fact]
-    public async Task Settings_AnsiWarningsOff_OverflowIsNull()
+    // Design fact 1, the assumption of decision 5: with ANSI_WARNINGS and ARITHABORT off, a conversion overflow, a
+    // SUM of two ints over one group and an int's arithmetic that overflow are NULL; with ANSI_WARNINGS on, whatever
+    // ARITHABORT says, and as SqlClient connects, each is an error.  The settings are made on a connection of the
+    // test's own, outside the pool, so that no other test reads them.
+    [Theory]
+    [InlineData("SELECT CAST(300 AS tinyint)", 220)]
+    [InlineData("SELECT SUM(x) FROM (VALUES (1, 2147483647), (1, 2147483647)) AS v (g, x) GROUP BY g", 8115)]
+    [InlineData("SELECT x + 1 FROM (VALUES (2147483647)) AS v (x)", 8115)]
+    public async Task Set_AnsiWarningsOff_OverflowIsNull(string sql, int error)
     {
-        (await UnpooledScalarAsync("SET ANSI_WARNINGS OFF; SET ARITHABORT OFF; SELECT CAST(300 AS tinyint)")).ShouldBe(
-            DBNull.Value
-        );
+        (await UnpooledScalarAsync($"SET ANSI_WARNINGS OFF; SET ARITHABORT OFF; {sql}")).ShouldBe(DBNull.Value);
 
         (
-            await Should.ThrowAsync<SqlException>(() => sqlServer.ScalarAsync("SELECT CAST(300 AS tinyint)"))
-        ).Number.ShouldBe(220);
-        (
             await Should.ThrowAsync<SqlException>(() =>
-                UnpooledScalarAsync("SET ANSI_WARNINGS ON; SET ARITHABORT OFF; SELECT CAST(300 AS tinyint)")
+                UnpooledScalarAsync($"SET ANSI_WARNINGS ON; SET ARITHABORT OFF; {sql}")
             )
-        ).Number.ShouldBe(220);
+        ).Number.ShouldBe(error);
+        (await Should.ThrowAsync<SqlException>(() => sqlServer.ScalarAsync(sql))).Number.ShouldBe(error);
     }
 
     // The tables of the proofs and their rows, made for the body and dropped after it.  g and b are NULL in some rows
@@ -254,10 +277,11 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
         (column.Nullable, column.NullableSource).ShouldBe((nullable, source), sql);
     }
 
-    // The rows of the query in which c is NULL, @style bound to NULL where the query names it.
+    // The rows of the query in which c is NULL.
     private Task<int> NullRowsAsync(string sql) => RowsAsync($"SELECT * FROM ({sql}) AS q WHERE q.c IS NULL");
 
-    // The number of rows of the query, run through SqlClient's own connection, whose ANSI_WARNINGS are on.
+    // The number of rows of the query, run through SqlClient's own connection, whose ANSI_WARNINGS are on, @style bound
+    // to NULL where the query names it.
     private async Task<int> RowsAsync(string sql)
     {
         var token = TestContext.Current.CancellationToken;
