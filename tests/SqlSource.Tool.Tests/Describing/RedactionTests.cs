@@ -500,6 +500,36 @@ public sealed class RedactionTests : IDisposable
         Redaction.Of(failure, secret).ServerLines.ShouldBe(["x *** y"]);
     }
 
+    // A describer may write the value again as its driver does, which is not the text of the value.
+    [Fact]
+    public void Of_RewrittenValueInAMessage_IsTheMark() =>
+        Redaction
+            .Of(
+                "bad 'Host=db;Port=5432;Password=hunter22'",
+                new ConnectionSecret(
+                    "host=db;password=hunter22",
+                    ["hunter22"],
+                    forms: ["Host=db;Port=5432;Password=hunter22"]
+                )
+            )
+            .ShouldBe("bad '***'");
+
+    [Fact]
+    public void Of_ValueTrimmedInAMessage_IsTheMark() =>
+        Redaction
+            .Of("cannot use Host=db;Database=app", new ConnectionSecret("Host=db;Database=app \n"))
+            .ShouldBe("cannot use ***");
+
+    // A value that was in two lines leaves one, as it does for a part.
+    [Fact]
+    public void Of_Failure_RewriteCutOverTwoServerLines_IsTheMark()
+    {
+        var secret = new ConnectionSecret("host=db;password=hunter22", forms: ["Host=db;Port=5432\nPassword=hunter22"]);
+        var failure = FakeDescriber.Failure("GetUser", "a Host=db;Port=5432", "Password=hunter22 b");
+
+        Redaction.Of(failure, secret).ServerLines.ShouldBe(["a *** b"]);
+    }
+
     // A descriptor of the fake's id with the format a describer built.  The id is no constant, so release tracking
     // has no row for it.
     private static DiagnosticDescriptor WithFormat(string format) =>

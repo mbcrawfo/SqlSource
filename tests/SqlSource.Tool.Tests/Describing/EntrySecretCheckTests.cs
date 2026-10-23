@@ -40,35 +40,36 @@ public sealed class EntrySecretCheckTests
         new EquatableArray<SidecarColumn>([Email])
     );
 
+    private static readonly ConnectionSecret Secret = new(Secrets.Connection);
+
     private static EquatableArray<SidecarParameter> Parameters(SidecarParameter parameter) => new([parameter]);
 
     [Fact]
-    public void Holds_EntryWithoutTheValue_IsFalse() =>
-        EntrySecretCheck.Holds(Entry, Secrets.Connection).ShouldBeFalse();
+    public void Holds_EntryWithoutTheValue_IsFalse() => EntrySecretCheck.Holds(Entry, Secret).ShouldBeFalse();
 
     [Fact]
     public void Holds_ValueInTheServersVersion_IsTrue() =>
-        EntrySecretCheck.Holds(Entry with { ServerVersion = Secrets.Connection }, Secrets.Connection).ShouldBeTrue();
+        EntrySecretCheck.Holds(Entry with { ServerVersion = Secrets.Connection }, Secret).ShouldBeTrue();
 
     [Fact]
     public void Holds_ValueInTheSchemaOfTheMatchedTable_IsTrue() =>
         EntrySecretCheck
-            .Holds(Entry with { MatchesTable = new SidecarTable(Secrets.Connection, "users") }, Secrets.Connection)
+            .Holds(Entry with { MatchesTable = new SidecarTable(Secrets.Connection, "users") }, Secret)
             .ShouldBeTrue();
 
     [Fact]
     public void Holds_ValueInTheNameOfTheMatchedTable_IsTrue() =>
         EntrySecretCheck
-            .Holds(Entry with { MatchesTable = new SidecarTable("public", Secrets.Connection) }, Secrets.Connection)
+            .Holds(Entry with { MatchesTable = new SidecarTable("public", Secrets.Connection) }, Secret)
             .ShouldBeTrue();
 
     [Fact]
     public void Holds_ValueInThePlan_IsTrue() =>
-        EntrySecretCheck.Holds(Entry with { Plan = Secrets.Connection }, Secrets.Connection).ShouldBeTrue();
+        EntrySecretCheck.Holds(Entry with { Plan = Secrets.Connection }, Secret).ShouldBeTrue();
 
     [Fact]
     public void Holds_ValueInTheTableMatch_IsTrue() =>
-        EntrySecretCheck.Holds(Entry with { TableMatch = Secrets.Connection }, Secrets.Connection).ShouldBeTrue();
+        EntrySecretCheck.Holds(Entry with { TableMatch = Secrets.Connection }, Secret).ShouldBeTrue();
 
     [Fact]
     public void Holds_ValueInTheTypeOfAParameter_IsTrue() =>
@@ -78,20 +79,14 @@ public sealed class EntrySecretCheckTests
                 {
                     Parameters = Parameters(Id with { Type = new OtherEngineType(Secrets.Connection) }),
                 },
-                Secrets.Connection
+                Secret
             )
             .ShouldBeTrue();
 
     [Fact]
     public void Holds_ValueInTheTypeSourceOfAParameter_IsTrue() =>
         EntrySecretCheck
-            .Holds(
-                Entry with
-                {
-                    Parameters = Parameters(Id with { TypeSource = Secrets.Connection }),
-                },
-                Secrets.Connection
-            )
+            .Holds(Entry with { Parameters = Parameters(Id with { TypeSource = Secrets.Connection }) }, Secret)
             .ShouldBeTrue();
 
     [Fact]
@@ -102,7 +97,7 @@ public sealed class EntrySecretCheckTests
                 {
                     Columns = new EquatableArray<SidecarColumn>([Email with { Name = Secrets.Connection }]),
                 },
-                Secrets.Connection
+                Secret
             )
             .ShouldBeTrue();
 
@@ -114,5 +109,31 @@ public sealed class EntrySecretCheckTests
     [InlineData("main")]
     [InlineData("id")]
     public void Holds_ValueThatThePlanGave_IsFalse(string value) =>
-        EntrySecretCheck.Holds(Entry, value).ShouldBeFalse();
+        EntrySecretCheck.Holds(Entry, new ConnectionSecret(value)).ShouldBeFalse();
+
+    // The owner's decision: a part is never searched for in an entry, so a password that stands in one is no fault.
+    [Fact]
+    public void Holds_PasswordInAnEntry_IsFalse() =>
+        EntrySecretCheck
+            .Holds(
+                Entry with
+                {
+                    ServerVersion = "hunter22",
+                },
+                new ConnectionSecret("host=db;password=hunter22", ["hunter22"])
+            )
+            .ShouldBeFalse();
+
+    // A form of the value counts as the whole value.
+    [Fact]
+    public void Holds_FormInTheServersVersion_IsTrue() =>
+        EntrySecretCheck
+            .Holds(
+                Entry with
+                {
+                    ServerVersion = "Host=db;Port=5432",
+                },
+                new ConnectionSecret("host=db", forms: ["Host=db;Port=5432"])
+            )
+            .ShouldBeTrue();
 }

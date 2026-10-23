@@ -16,7 +16,9 @@ namespace SqlSource.Tool.Describing;
 /// A describer's rule is to put the value in nothing it returns.  The run does not rely on it: a driver's message
 /// for a connection string that is wrong can quote the string, and one for a password that is wrong can quote the
 /// password.  The whole value is replaced wherever it stands, and each part the describer said is secret where it
-/// stands as a token (<see cref="HoldsToken" />).
+/// stands as a token (<see cref="HoldsToken" />).  A whole form is the value, the value without the white space at its
+/// ends, and each rewrite of it that the describer gave (<see cref="ConnectionSecret.Wholes" />): a driver that
+/// trims the value or writes it again quotes the other text in a message.
 /// </remarks>
 internal static class Redaction
 {
@@ -24,10 +26,10 @@ internal static class Redaction
     public const string Mark = "***";
 
     /// <summary>
-    /// The text with the whole value wherever it stands, and then each part where it stands as a token, written as
-    /// <see cref="Mark" />.
+    /// The text with each whole form of the value wherever it stands, and then each part where it stands as a token,
+    /// written as <see cref="Mark" />.
     /// </summary>
-    public static string Of(string text, ConnectionSecret secret) => Of(text, secret.Value, secret.Parts);
+    public static string Of(string text, ConnectionSecret secret) => Of(text, secret.Wholes, secret.Parts);
 
     /// <summary>
     /// The failure with the secret taken out of its descriptor and of what the server said.  Its arguments and its
@@ -147,9 +149,14 @@ internal static class Redaction
     private static bool IsInAsPrinted(string text, ConnectionSecret secret) =>
         secret.IsIn(text) || secret.IsIn(OneLine.Of(text));
 
-    private static string Of(string text, string value, IEnumerable<string> parts)
+    private static string Of(string text, IEnumerable<string> wholes, IEnumerable<string> parts)
     {
-        var cleaned = value.Length == 0 ? text : text.Replace(value, Mark, StringComparison.Ordinal);
+        var cleaned = text;
+        foreach (var whole in wholes)
+        {
+            cleaned = cleaned.Replace(whole, Mark, StringComparison.Ordinal);
+        }
+
         foreach (var part in parts)
         {
             cleaned = OfToken(cleaned, part);
@@ -158,7 +165,7 @@ internal static class Redaction
         return cleaned;
     }
 
-    // The cut dropped the kind of each line break, so the value and each part are searched as they are and with
+    // The cut dropped the kind of each line break, so each whole form and each part are searched as they are and with
     // their breaks as the one the lines are joined with.  A value that was in two lines leaves one.
     private static EquatableArray<string> OfLines(EquatableArray<string> lines, ConnectionSecret secret)
     {
@@ -166,7 +173,9 @@ internal static class Redaction
         var joined = string.Join(Break, lines);
         var cleaned = Of(
             Of(joined, secret),
-            secret.Value.ReplaceLineEndings(Break),
+            secret
+                .Wholes.Select(static whole => whole.ReplaceLineEndings(Break))
+                .OrderByDescending(static whole => whole.Length),
             secret.Parts.Select(static part => part.ReplaceLineEndings(Break))
         );
         return string.Equals(cleaned, joined, StringComparison.Ordinal)

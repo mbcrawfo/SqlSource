@@ -162,7 +162,7 @@ internal static class DatabaseRuns
                 query.Entry = guard.Call(() =>
                     NoSecretIn(
                         EntryBuilder.Build(planned, database.Dialect, database.Name, server, description),
-                        secret.Value
+                        secret
                     )
                 );
                 query.State = QueryState.Described;
@@ -198,8 +198,8 @@ internal static class DatabaseRuns
     }
 
     // What a describer gave goes into a sidecar, which is committed: a value in it is a bug of the describer.
-    private static SidecarEntry NoSecretIn(SidecarEntry entry, string value) =>
-        EntrySecretCheck.Holds(entry, value)
+    private static SidecarEntry NoSecretIn(SidecarEntry entry, ConnectionSecret secret) =>
+        EntrySecretCheck.Holds(entry, secret)
             ? throw new InvalidOperationException(
                 $"The describer put the connection's value in its description of the query '{entry.Name}'."
             )
