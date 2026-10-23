@@ -83,6 +83,36 @@ public sealed class TransactionTests(PostgresContainer postgres)
         (await PreparedStatementsAsync(connection)).ShouldBe(0);
     }
 
+    // "overloads", the call after "relations", rolls back to the savepoint when it fails too: the server refuses a name
+    // that holds a NUL, and the next call and deallocate still run.
+    [Fact]
+    public async Task OverloadsAsync_NameTheServerRefuses_LeavesTheNextCallAndDeallocateWorking()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
+        var live = new PostgresLive(connection);
+        var prepared = await live.PrepareAsync(
+            new PostgresPrepareRequest(Statement, "SELECT id FROM users", []),
+            token
+        );
+        prepared.Error.ShouldBeNull(prepared.Error?.Message);
+
+        var overloads = await live.OverloadsAsync(new PostgresOverloadsRequest(["co\0unt"], []), token);
+        var relations = await live.RelationsAsync(
+            new PostgresRelationsRequest([new PostgresRelationName("public", "users")]),
+            token
+        );
+        var deallocated = await live.DeallocateAsync(new PostgresDeallocateRequest(Statement), token);
+
+        overloads.Error.ShouldNotBeNull().SqlState.ShouldBe("22021");
+        relations.Error.ShouldBeNull(relations.Error?.Message);
+        relations.Tables.ShouldNotBeNull().ShouldHaveSingleItem().Name.ShouldBe("users");
+        deallocated.Error.ShouldBeNull(deallocated.Error?.Message);
+        connection.InDescribe.ShouldBeFalse();
+        (await InTransactionAsync(connection)).ShouldBeFalse();
+        (await PreparedStatementsAsync(connection)).ShouldBe(0);
+    }
+
     // The rollback to the savepoint after a call that fails keeps the lock that preparing took: another session's
     // drop of the table still waits for the describe.
     [Fact]

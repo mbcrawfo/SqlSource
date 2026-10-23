@@ -543,15 +543,15 @@ internal sealed class PostgresLive(PostgresConnection connection)
     /// and whether or not the session's search path names it.
     /// </summary>
     public Task<PostgresOverloadsAnswer> OverloadsAsync(PostgresOverloadsRequest asked, CancellationToken token) =>
-        AnswerAsync(
+        InDescribeAsync(
             async () =>
             {
                 var functions = await NamesAsync(OverloadedFunctionsSql, asked.Functions, token);
                 var operators = await NamesAsync(OverloadedOperatorsSql, asked.Operators, token);
                 return new PostgresOverloadsAnswer(functions, operators, null);
             },
-            ConnectionErrors.Of,
-            static error => new PostgresOverloadsAnswer(null, null, error)
+            static error => new PostgresOverloadsAnswer(null, null, error),
+            token
         );
 
     // The one text column of a query that takes the names as its $1.

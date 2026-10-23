@@ -18,8 +18,8 @@ Low.  It needs a user's operator on the exact argument types of a system column,
 
 ## Proposed fix
 
-Run the catalog calls under a fixed path: `SET LOCAL search_path = pg_catalog, pg_temp` inside a transaction around each, `pg_temp` named last since an unlisted one is searched first for types.  The `PREPARE`, `columns`, `explain` and `check` keep the user's path.  Or write each operator of those texts as `OPERATOR(pg_catalog.op)`.  Or cast each operand to the exact argument types of the catalog's operator, as `overloads` does (`0::pg_catalog.oid`), which serves only where `pg_catalog` is first and not for `conkey`, whose catalog operator is polymorphic: that one is written `OPERATOR(pg_catalog.=)`, or compares `pg_catalog.array_length(k.conkey, 1) = 1 AND k.conkey[1] = a.attnum`.  Any of them needs a container case on PostgreSQL 14 and 18 with a user's `=` on `oid` before `pg_catalog`; the requests and answers of the calls do not change, so no capture is recorded again.
+Run the catalog calls under a fixed path: `SET LOCAL search_path = pg_catalog, pg_temp` in the describe's transaction before each, ended by a rollback to the describe's savepoint after it, as `explain` ends its settings, `pg_temp` named last since an unlisted one is searched first for types.  The `PREPARE`, `columns`, `explain` and `check` keep the user's path.  Or write each operator of those texts as `OPERATOR(pg_catalog.op)`.  Or cast each operand to the exact argument types of the catalog's operator, as `overloads` does (`0::pg_catalog.oid`), which serves only where `pg_catalog` is first and not for `conkey`, whose catalog operator is polymorphic: that one is written `OPERATOR(pg_catalog.=)`, or compares `pg_catalog.array_length(k.conkey, 1) = 1 AND k.conkey[1] = a.attnum`.  Any of them needs a container case on PostgreSQL 14 and 18 with a user's `=` on `oid` before `pg_catalog`; the requests and answers of the calls do not change, so no capture is recorded again.
 
 ## Trigger
 
-A user's report, or any other work on the SQL of the catalog calls, such as a pooler's transaction (TD-0049).
+A user's report, or any other work on the SQL of the catalog calls.
