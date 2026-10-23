@@ -20,7 +20,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <para>
 /// The SQL of the catalog calls runs under the user's <c>search_path</c>, so every type and function it names is
 /// written with <c>pg_catalog.</c>: a user's domain named <c>text</c> before <c>pg_catalog</c> on the path would
-/// otherwise take <c>::text</c>.  Its operators are not (TD-0077).
+/// otherwise take <c>::text</c>.  Its operators are not (TD-0077), but those of <c>overloads</c> compare only by the
+/// exact argument types of an operator of <c>pg_catalog</c>'s.
 /// </para>
 /// </remarks>
 internal sealed class PostgresLive(PostgresConnection connection)
@@ -150,12 +151,18 @@ internal sealed class PostgresLive(PostgresConnection connection)
     // The names of the functions and of the operators, among the ones asked for, that a schema other than pg_catalog
     // holds, or that pg_catalog holds as an object that is not built in: two queries, one for each, with the names as
     // one positional text[].  Each name is of the collation "C", so that ORDER BY 1 gives ordinal order whatever the
-    // database's collation.
+    // database's collation.  The call is made only when the session finds pg_catalog first, and each comparison is of
+    // the exact argument types of an operator of pg_catalog's, (name, text) and (oid, oid), so that one is taken: a
+    // user's operator of a comparison's exact types beats one of pg_catalog's that needs a cast, wherever it stands on
+    // the path.
     private const string OverloadedFunctionsSql = $"""
         SELECT DISTINCT p.proname::pg_catalog.text COLLATE "C"
         FROM pg_catalog.pg_proc AS p
         WHERE p.proname = ANY ($1::pg_catalog.text[])
-            AND (p.pronamespace <> 'pg_catalog'::pg_catalog.regnamespace OR p.oid >= {FirstNormalObjectId})
+            AND (
+                p.pronamespace <> 'pg_catalog'::pg_catalog.regnamespace::pg_catalog.oid
+                OR p.oid >= {FirstNormalObjectId}::pg_catalog.oid
+            )
         ORDER BY 1
         """;
 
@@ -163,7 +170,10 @@ internal sealed class PostgresLive(PostgresConnection connection)
         SELECT DISTINCT o.oprname::pg_catalog.text COLLATE "C"
         FROM pg_catalog.pg_operator AS o
         WHERE o.oprname = ANY ($1::pg_catalog.text[])
-            AND (o.oprnamespace <> 'pg_catalog'::pg_catalog.regnamespace OR o.oid >= {FirstNormalObjectId})
+            AND (
+                o.oprnamespace <> 'pg_catalog'::pg_catalog.regnamespace::pg_catalog.oid
+                OR o.oid >= {FirstNormalObjectId}::pg_catalog.oid
+            )
         ORDER BY 1
         """;
 

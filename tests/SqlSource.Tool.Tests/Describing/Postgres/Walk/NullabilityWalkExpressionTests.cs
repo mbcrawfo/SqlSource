@@ -230,6 +230,16 @@ public sealed class NullabilityWalkExpressionTests
         AnswersOf(RunOverAAndR(FullJoinOfAAndR(left))).ShouldBe([UnknownNoOrigin]);
     }
 
+    // A row of the full join has a row of one side at least, but that side's column may itself be NULL.
+    [Fact]
+    public void Run_CoalesceAtAFullJoinOverANullableColumn_KeepsNoOrigin()
+    {
+        var join = FullJoinOfAAndR(Scan("a", "a.opt")) with { Output = ["COALESCE(a.opt, r.account_id)"] };
+
+        AnswersOf(RunOverAAndR(Over("Sort", join) with { Output = ["(COALESCE(a.opt, r.account_id))"] }))
+            .ShouldBe([UnknownNoOrigin]);
+    }
+
     // A node above the join that computes the COALESCE reads each column as the join extends it.
     [Fact]
     public void Run_CoalesceAboveAFullJoin_KeepsNoOrigin()

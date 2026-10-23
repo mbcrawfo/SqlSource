@@ -5,7 +5,6 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Testing;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
@@ -230,16 +229,11 @@ public sealed class WalkTests(PostgresContainer postgres)
         params string[] settings
     )
     {
-        var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
-        var opened = await new PostgresDescriber(settings).OpenAsync(
-            PostgresContainer.Database,
+        var (described, capture) = await Sessions.DescribeCapturedAsync(
             postgres.ConnectionString,
-            new CapturingExchange(LiveExchange.Instance, capture),
-            null
+            DescribeRequests.Of(sql),
+            plannerSettings: settings
         );
-        await using var session = opened.Value.ShouldNotBeNull();
-
-        var described = await session.DescribeAsync(DescribeRequests.Of(sql), TestContext.Current.CancellationToken);
 
         described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
         var explain = capture.Calls.Single(static call => call.Method == "explain");
@@ -264,10 +258,10 @@ public sealed class WalkTests(PostgresContainer postgres)
         Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullExpression]);
     }
 
-    // A COALESCE at a full join that is not over one column of each side, each extended by that join alone: both of
-    // one side, a side with a LEFT JOIN under it, the full join on the side a LEFT JOIN extends, and a cast of a
-    // side's column.  The upper condition of the third is not strict in either side, so the planner keeps the full
-    // join, and each plan is asserted to hold one.
+    // A COALESCE at a full join that is not over one NOT NULL column of each side, each extended by that join alone:
+    // both of one side, a side with a LEFT JOIN under it, the full join on the side a LEFT JOIN extends, a cast of a
+    // side's column, and a side's column that may be NULL.  The upper condition of the third is not strict in either
+    // side, so the planner keeps the full join, and each plan is asserted to hold one.
     [Theory]
     [InlineData("SELECT coalesce(o.user_id, o.user_id) AS k FROM users u FULL JOIN orders o ON o.user_id = u.id")]
     [InlineData(
@@ -280,6 +274,7 @@ public sealed class WalkTests(PostgresContainer postgres)
             + "ON b.user_id = coalesce(u.id, o.user_id)"
     )]
     [InlineData("SELECT coalesce(o.id, u.id) AS k FROM users u FULL JOIN orders o ON o.user_id = u.id")]
+    [InlineData("SELECT coalesce(u.deleted_at, o.placed_at) AS k FROM users u FULL JOIN orders o ON o.user_id = u.id")]
     public async Task DescribeAsync_CoalesceAtAFullJoinNotOverEachSide_KeepsNoOrigin(string sql)
     {
         var (description, plan) = await DescribeWithSettingsAsync(sql);

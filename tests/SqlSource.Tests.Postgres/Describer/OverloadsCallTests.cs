@@ -103,6 +103,36 @@ public sealed class OverloadsCallTests(PostgresContainer postgres)
         }
     }
 
+    // The call is made only when the session finds pg_catalog first, yet a user's operator of a comparison's exact
+    // argument types, wherever it stands on the path, beats one of pg_catalog's that needs a cast: each comparison
+    // must have the exact types of one of pg_catalog's.
+    [Fact]
+    public async Task OverloadsAsync_OperatorsOfExactTypesAfterTheCatalog_AnswersTheNamesHeld()
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.OperatorsAfterTheCatalog);
+            await using var connection = new PostgresConnection(
+                $"{postgres.ConnectionString};{ScratchSchema.OperatorsAfterTheCatalogPath}",
+                NullRunLog.Instance
+            );
+            var live = new PostgresLive(connection);
+
+            var answer = await live.OverloadsAsync(
+                new PostgresOverloadsRequest(["count"], ["<>"]),
+                TestContext.Current.CancellationToken
+            );
+
+            answer.Error.ShouldBeNull(answer.Error?.Message);
+            answer.Functions.ShouldBe(["count"]);
+            answer.Operators.ShouldBe(["<>"]);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropOperatorsAfterTheCatalog);
+        }
+    }
+
     [Fact]
     public async Task OverloadsAsync_NoNames_AnswersNone()
     {

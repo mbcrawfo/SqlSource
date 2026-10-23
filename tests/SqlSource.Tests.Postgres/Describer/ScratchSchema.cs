@@ -9,7 +9,8 @@ namespace SqlSource.Tests.Postgres.Describer;
 // container is thrown away, and the fixtures are recorded in one of their own.  So a class that runs it first makes
 // the same object as any other would.  An object that changes what another test sees while it exists,
 // public."numeric", the schema "user", the schema shadow of ShadowCount and ShadowOperators, the aggregate
-// pg_catalog.count(text) of CatalogCount, the operator pg_catalog.* of CatalogOperator, describer_canary,
+// pg_catalog.count(text) of CatalogCount, the operator pg_catalog.* of CatalogOperator, the schema zz of
+// OperatorsAfterTheCatalog, describer_canary,
 // command_widgets, error_path_widgets and session_gone, is made by its test and dropped in a finally.
 internal static class ScratchSchema
 {
@@ -129,6 +130,39 @@ internal static class ScratchSchema
         DROP OPERATOR IF EXISTS pg_catalog.* (text, text);
         DROP FUNCTION IF EXISTS pg_catalog.sqlsource_test_null_text(text, text);
         """;
+
+    /// <summary>
+    /// The schema <c>zz</c>, of an aggregate <c>zz.count(text)</c> that always returns <c>NULL</c> and of operators
+    /// that always return false: <c>&lt;&gt;</c> of <c>(oid, regnamespace)</c> and <c>&gt;=</c> of
+    /// <c>(oid, integer)</c>, of which <c>pg_catalog</c> has none of the exact argument types, and <c>=</c> of
+    /// <c>(name, text)</c>, which <c>pg_catalog</c> has.  On <see cref="OperatorsAfterTheCatalogPath" /> a comparison
+    /// of exactly the first two's types takes them, and one of <c>(name, text)</c> takes the catalog's.  CREATE
+    /// OPERATOR has no OR REPLACE, so the text makes the schema again.
+    /// </summary>
+    public const string OperatorsAfterTheCatalog = """
+        DROP SCHEMA IF EXISTS zz CASCADE;
+        CREATE SCHEMA zz;
+        CREATE FUNCTION zz.never(oid, regnamespace) RETURNS boolean LANGUAGE sql AS 'SELECT false';
+        CREATE OPERATOR zz.<> (leftarg = oid, rightarg = regnamespace, function = zz.never);
+        CREATE FUNCTION zz.never(oid, integer) RETURNS boolean LANGUAGE sql AS 'SELECT false';
+        CREATE OPERATOR zz.>= (leftarg = oid, rightarg = integer, function = zz.never);
+        CREATE FUNCTION zz.never(name, text) RETURNS boolean LANGUAGE sql AS 'SELECT false';
+        CREATE OPERATOR zz.= (leftarg = name, rightarg = text, function = zz.never);
+        CREATE FUNCTION zz.nulls(int8, text) RETURNS int8 LANGUAGE sql AS 'SELECT NULL::int8';
+        CREATE AGGREGATE zz.count(text) (sfunc = zz.nulls, stype = int8);
+        """;
+
+    /// <summary>
+    /// The part of a connection string that puts <see cref="OperatorsAfterTheCatalog" /> after <c>pg_catalog</c>.
+    /// </summary>
+    public const string OperatorsAfterTheCatalogPath = "Search Path=pg_catalog,zz,public";
+
+    /// <summary>
+    /// Drops the schema <c>zz</c> with what <see cref="OperatorsAfterTheCatalog" /> made in it.  Every test that makes
+    /// the schema runs this in a finally: while <c>zz</c> holds a <c>count</c>, the describer reads no
+    /// <c>count(x)</c> of any other test.
+    /// </summary>
+    public const string DropOperatorsAfterTheCatalog = "DROP SCHEMA IF EXISTS zz CASCADE";
 
     /// <summary>
     /// The extension <c>postgres_fdw</c> and one loopback server, <c>scratch_loop</c>, to the container's own
