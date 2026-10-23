@@ -176,7 +176,7 @@ Under mode 2 a view's column has the view as its source.  An `OUTPUT` column has
 
 `SqlServerTableMatcher` says whether a result is exactly one table's or view's column list, so that the generator can name the model after it.  `SqlServerSession.MatchAsync` runs it once for a statement with rows, after the columns are built.  Before it does, it asks `table` for the table that `SqlServerTableMatcher.TableOf` finds, and only when it finds one, which every column has as its origin.  The first two checks need no table, and a call that failed for a table the match never reads would fail the query.  `table`'s text is the tool's own, `SqlServerLive.TableSelect`: `SELECT * FROM [schema].[table]`, each name a catalog name the server gave as the origin, in brackets with a `]` written twice, and never the user's text.
 
-The checks are the values of the format's `tableMatch`, in the format's order, and the first that fails is the answer, as PostgreSQL's are:
+The checks are the values of the format's `tableMatch`, in the format's order, held once by [`TableMatchChecks`](../../src/SqlSource.Tool/Describing/Describers/TableMatchChecks.cs) for both engines, and the first that fails is the answer, as PostgreSQL's are.  `SqlServerTableMatcher` gives `TableMatchChecks` its own predicate for each check, and a predicate runs only when every check before it passed, so the names check may read the origin of every column:
 
 | Check | Fails when |
 |----|----|

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Describing.Postgres.Columns;
 
@@ -39,45 +40,35 @@ internal static class PostgresTableMatcher
         }
 
         ColumnOrigin[] found = [.. origins.OfType<ColumnOrigin>()];
-        if (found.Length != columns.Count)
+        var failed = TableMatchChecks.OfTheOrigins(
+            () => found.Length == columns.Count,
+            () => found.All(origin => origin.Table.Oid == found[0].Table.Oid)
+        );
+        if (failed is not null)
         {
-            return (null, SidecarValues.TableMatch.NoOrigin);
+            return (null, failed);
         }
 
         var table = found[0].Table;
-        if (found.Any(origin => origin.Table.Oid != table.Oid))
-        {
-            return (null, SidecarValues.TableMatch.SeveralTables);
-        }
-
-        // The name as the server returned it: an alias and an override suffix are each another name.
-        if (
-            !columns
-                .Select(static column => column.Name)
-                .SequenceEqual(found.Select(static origin => origin.Attribute.Name), StringComparer.Ordinal)
-        )
-        {
-            return (null, SidecarValues.TableMatch.NamesDiffer);
-        }
-
-        // As lists and not as sets: a column that is left out and a column that is there twice both differ.
         int[] numbers = [.. found.Select(static origin => origin.Attribute.Attnum)];
-        if (!numbers.Order().SequenceEqual(table.Columns.Select(static attribute => attribute.Attnum).Order()))
-        {
-            return (null, SidecarValues.TableMatch.ColumnsDiffer);
-        }
-
-        if (!numbers.SequenceEqual(numbers.Order()))
-        {
-            return (null, SidecarValues.TableMatch.OrderDiffers);
-        }
-
-        // What the relation's column has is what a query that is not gated records for it: the rule of a NOT NULL,
-        // of one that is not validated and of a view is ColumnNullability's, and is not written twice.
-        return columns
-            .Select(static column => column.Nullable)
-            .SequenceEqual(found.Select(static origin => ColumnNullability.Of(origin, gated: false).Nullable))
-            ? (new SidecarTable(table.Schema, table.Name), SidecarValues.TableMatch.Matched)
-            : (null, SidecarValues.TableMatch.NullabilityDiffers);
+        var result = TableMatchChecks.OfTheTable(
+            // The name as the server returned it: an alias and an override suffix are each another name.
+            () =>
+                columns
+                    .Select(static column => column.Name)
+                    .SequenceEqual(found.Select(static origin => origin.Attribute.Name), StringComparer.Ordinal),
+            // As lists and not as sets: a column that is left out and a column that is there twice both differ.
+            () => numbers.Order().SequenceEqual(table.Columns.Select(static attribute => attribute.Attnum).Order()),
+            () => numbers.SequenceEqual(numbers.Order()),
+            // What the relation's column has is what a query that is not gated records for it: the rule of a NOT
+            // NULL, of one that is not validated and of a view is ColumnNullability's, and is not written twice.
+            () =>
+                columns
+                    .Select(static column => column.Nullable)
+                    .SequenceEqual(found.Select(static origin => ColumnNullability.Of(origin, gated: false).Nullable))
+        );
+        return result == SidecarValues.TableMatch.Matched
+            ? (new SidecarTable(table.Schema, table.Name), result)
+            : (null, result);
     }
 }

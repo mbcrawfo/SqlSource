@@ -14,7 +14,8 @@ internal static class DescriberEvents
 {
     /// <summary>
     /// The members that name a relation in every log: its <c>schema</c> and its <c>table</c> apart, as a name may hold
-    /// a dot.  A map or an event that has more members of its own writes these first.
+    /// a dot.  A map or an event that has more members of its own writes these in this order, after its <c>query</c>
+    /// where it has one.
     /// </summary>
     /// <param name="schema">The relation's schema, or null.</param>
     /// <param name="table">The relation's name, or null.</param>
