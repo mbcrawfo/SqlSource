@@ -18,6 +18,18 @@ internal sealed class HookedExchange(
 {
     private readonly IDescribeExchange _inner = inner ?? LiveExchange.Instance;
 
+    // An exchange that moves the clock by perCall before each call that inner answers, so that every call takes the
+    // same time and the durations in the log are exact.
+    public static HookedExchange Clocked(TestClock clock, TimeSpan perCall, IDescribeExchange inner) =>
+        new(
+            before: (_, _, _) =>
+            {
+                clock.Advance(perCall);
+                return Task.CompletedTask;
+            },
+            inner: inner
+        );
+
     public async Task<TAnswer> AskAsync<TRequest, TAnswer>(
         string method,
         TRequest request,

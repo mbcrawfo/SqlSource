@@ -106,7 +106,7 @@ public sealed class PostgresSessionStatementTests
         _ = described.Value.ShouldNotBeNull();
         described.Failure.ShouldBeNull();
         var (_, members) = log.Events.Last(written => written.Name == "deallocate");
-        var error = members.Single(member => member.Name == "error").Value.ShouldBeOfType<LogValue.Members>();
+        var error = RecordingLog.Member(members, "error").ShouldBeOfType<LogValue.Members>();
         error.Values[0].ShouldBe(new LogMember("sqlState", "26000"));
     }
 

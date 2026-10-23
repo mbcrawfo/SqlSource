@@ -73,12 +73,42 @@ public sealed class HookedExchangeTests
         after.ShouldBe(source.Token);
     }
 
+    [Fact]
+    public async Task Clocked_EachCall_MovesTheClockByTheTimeOfACallBeforeTheInnerAnswers()
+    {
+        var clock = new TestClock();
+        var start = clock.GetUtcNow();
+        List<string> order = [];
+        var exchange = HookedExchange.Clocked(clock, TimeSpan.FromMilliseconds(7), new Seen(clock, start, order));
+
+        _ = await exchange.AskAsync("ask", 8, Live(order), TestContext.Current.CancellationToken);
+        _ = await exchange.AskAsync("ask", 9, Live(order), TestContext.Current.CancellationToken);
+
+        order.ShouldBe(["7ms", "live", "14ms", "live"]);
+        (clock.GetUtcNow() - start).ShouldBe(TimeSpan.FromMilliseconds(14));
+    }
+
     private static Func<int, CancellationToken, Task<string>> Live(List<string> order) =>
         (request, _) =>
         {
             order.Add("live");
             return Task.FromResult($"answer {request}");
         };
+
+    // An exchange that notes how far the clock has moved since start and then asks for the answer.
+    private sealed class Seen(TestClock clock, DateTimeOffset start, List<string> order) : IDescribeExchange
+    {
+        public Task<TAnswer> AskAsync<TRequest, TAnswer>(
+            string method,
+            TRequest request,
+            Func<TRequest, CancellationToken, Task<TAnswer>> live,
+            CancellationToken cancellationToken
+        )
+        {
+            order.Add($"{(clock.GetUtcNow() - start).TotalMilliseconds}ms");
+            return live(request, cancellationToken);
+        }
+    }
 
     // An exchange that notes its call and then asks for the answer.
     private sealed class Inner(List<string> order) : IDescribeExchange

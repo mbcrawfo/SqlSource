@@ -39,6 +39,51 @@ internal sealed class SqlServerScript
             Database
         );
 
+    // The types, errors and rows that the tests of the session and of its events build their answers from.
+    public static readonly SqlServerType Int = new("int", 4, 10, 0, null);
+
+    public static readonly SqlServerServerError Lost = new([
+        new SqlServerErrorRow(0, 0, 0, ConnectionErrors.LostConnection),
+    ]);
+
+    // dbo.users.id as browse mode 2 describes it in the session's database.
+    public static readonly SqlServerColumnRow IdColumn = new(
+        IsHidden: false,
+        ColumnOrdinal: 1,
+        Name: "id",
+        IsNullable: false,
+        SystemTypeName: "int",
+        MaxLength: 4,
+        Precision: 10,
+        Scale: 0,
+        UserTypeSchema: null,
+        UserTypeName: null,
+        AssemblyQualifiedTypeName: null,
+        SourceServer: null,
+        SourceDatabase: Database,
+        SourceSchema: "dbo",
+        SourceTable: "users",
+        SourceColumn: "id",
+        IsIdentityColumn: true,
+        IsComputedColumn: false,
+        SourceType: "U"
+    );
+
+    // The one hidden row that browse mode 2 adds.
+    public static readonly SqlServerColumnRow Rowstat = IdColumn with
+    {
+        IsHidden = true,
+        ColumnOrdinal = 2,
+        Name = "ROWSTAT",
+        SourceDatabase = null,
+        SourceSchema = null,
+        SourceTable = null,
+        SourceColumn = null,
+        SourceType = null,
+        IsIdentityColumn = null,
+        IsComputedColumn = null,
+    };
+
     public SqlServerScript()
     {
         _ = Add("open", SqlServerOpenRequest.Instance, Opened);
@@ -69,16 +114,7 @@ internal sealed class SqlServerScript
     {
         var replay = new ReplayingExchange(_capture);
         var asked = new DescribeCapture(SidecarValues.Engine.SqlServer);
-        IDescribeExchange answering = clock is null
-            ? replay
-            : new HookedExchange(
-                before: (_, _, _) =>
-                {
-                    clock.Advance(perCall);
-                    return Task.CompletedTask;
-                },
-                inner: replay
-            );
+        IDescribeExchange answering = clock is null ? replay : HookedExchange.Clocked(clock, perCall, replay);
         var opened = await new SqlServerDescriber().OpenAsync(
             Database,
             FixtureReplay.Connection,

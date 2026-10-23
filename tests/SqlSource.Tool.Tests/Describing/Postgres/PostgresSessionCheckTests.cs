@@ -164,7 +164,7 @@ public sealed class PostgresSessionCheckTests
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.ServerLines.ShouldBe(["57014: canceling statement due to statement timeout"]);
         var (_, check) = log.Events.Single(written => written.Name == "check");
-        check.Single(member => member.Name == "result").Value.ShouldBe((LogValue)NpgsqlCheck.Error);
+        RecordingLog.Member(check, "result").ShouldBe((LogValue)NpgsqlCheck.Error);
         exchange.Unused.ShouldBeEmpty();
     }
 

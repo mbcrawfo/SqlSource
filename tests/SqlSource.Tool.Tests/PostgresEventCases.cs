@@ -37,14 +37,7 @@ internal static class PostgresEventCases
     {
         var clock = new TestClock();
         await using var session = await PostgresScript.SessionAsync(
-            new HookedExchange(
-                before: (_, _, _) =>
-                {
-                    clock.Advance(CallTime);
-                    return Task.CompletedTask;
-                },
-                inner: script.Play()
-            ),
+            HookedExchange.Clocked(clock, CallTime, script.Play()),
             log,
             time: clock
         );
