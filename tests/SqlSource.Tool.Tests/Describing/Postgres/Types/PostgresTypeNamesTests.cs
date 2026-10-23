@@ -45,6 +45,40 @@ public sealed class PostgresTypeNamesTests
             .Spell(PostgresRows.BaseOf(1, typname, formatType, "X"), new PostgresFacets(length, precision, scale))
             .ShouldBe(expected);
 
+    // format_type writes a type of the catalog with its schema when a type of the same name stands before pg_catalog
+    // on the session's search_path.  The name is the one it has in any other session, quotes kept.
+    [Theory]
+    [InlineData("text", "pg_catalog.text", null, "text")]
+    [InlineData("jsonb", "pg_catalog.jsonb", null, "jsonb")]
+    [InlineData("bpchar", "pg_catalog.bpchar", null, "bpchar")]
+    [InlineData("char", "pg_catalog.\"char\"", null, "\"char\"")]
+    [InlineData("bit", "pg_catalog.\"bit\"", null, "\"bit\"")]
+    [InlineData("bit", "pg_catalog.\"bit\"", 8, "bit(8)")]
+    public void Spell_TypeOfTheCatalogHiddenOnTheSearchPath_IsItsNameInAnySession(
+        string typname,
+        string formatType,
+        int? length,
+        string expected
+    ) =>
+        PostgresTypeNames
+            .Spell(PostgresRows.BaseOf(1, typname, formatType, "X"), new PostgresFacets(length, null, null))
+            .ShouldBe(expected);
+
+    // Only a type of pg_catalog loses the prefix: a type of another schema is its own schema and name.
+    [Fact]
+    public void Spell_TypeOfAnotherSchemaNamedLikeTheCatalogs_KeepsItsSchema() =>
+        PostgresTypeNames
+            .Spell(PostgresRows.BaseOf(1, "pg_catalog.text", "\"pg_catalog.text\"", "U", "public"), PostgresFacets.None)
+            .ShouldBe("public.\"pg_catalog.text\"");
+
+    [Theory]
+    [InlineData("pg_catalog.text", "text")]
+    [InlineData("pg_catalog.\"char\"", "\"char\"")]
+    [InlineData("text", "text")]
+    [InlineData("\"pg_catalog.x\"", "\"pg_catalog.x\"")]
+    public void WithoutCatalog_Text_HasNoLeadingCatalogSchema(string formatted, string expected) =>
+        PostgresTypeNames.WithoutCatalog(formatted).ShouldBe(expected);
+
     // Whatever the session's search_path: the name does not depend on the session.  A facet is not written, since
     // the tool knows how to spell only the modifier of a type of the catalog.
     [Theory]
@@ -80,6 +114,14 @@ public sealed class PostgresTypeNamesTests
     [Fact]
     public void WithModifier_TypeOfTheCatalog_IsTheServersTextAsItIs() =>
         PostgresTypeNames.WithModifier(PostgresRows.Varchar, "character varying(10)").ShouldBe("character varying(10)");
+
+    // No built-in type with a modifier is written with its schema, which the server special-cases; one that were
+    // would still be named without it.
+    [Fact]
+    public void WithModifier_TypeOfTheCatalogQualifiedByTheServer_IsWithoutTheSchema() =>
+        PostgresTypeNames
+            .WithModifier(PostgresRows.BaseOf(1, "tagged", "pg_catalog.tagged", "U"), "pg_catalog.tagged(7)")
+            .ShouldBe("tagged(7)");
 
     // The tail is what format_type holds after format_type(oid, -1), behind the tool's own schema and name.
     [Fact]
