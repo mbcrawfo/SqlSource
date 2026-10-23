@@ -1,6 +1,6 @@
 # `.sql` files
 
-A `.sql` file holds one or more queries.  Each query starts with a `-- name:` line, and the markers that describe it stand under that line:
+A `.sql` file holds one or more queries.  Save it as UTF-8, which current editors write: the tool reports a file in another encoding ([SQLSRC271](diagnostics.md#sqlsrc271)).  Each query starts with a `-- name:` line, and the markers that describe it stand under that line:
 
 ```sql
 -- name: GetUser
@@ -192,5 +192,4 @@ An error in how a `.sql` file is written, such as a marker in the wrong place, i
 
 ## Known issues
 
-- **A file that is not saved as UTF-8.**  Save your `.sql` files as UTF-8, which current editors write.  A file in another encoding, such as Windows-1252, that has a character outside ASCII in its SQL (comments do not count), is read one way by the tool and another by the compiler.  The query then has two different texts, so the build reports its entry in the sidecar as out of date ([SQLSRC244](diagnostics.md#sqlsrc244)) however often you describe it.  Saving the file as UTF-8 fixes it.
 - **A `.sql` file that two projects list.**  When two projects of one solution include the same `.sql` file, each with a type that claims it, the file has one sidecar.  The tool describes it with the dialect and database of the first project in the run that claims it, and ignores what the second project says.  A run on only one of the two projects does not see what the other needs: it can write a sidecar that lacks entries the other project needs, or delete a sidecar that the other project needs, and the other project's build then reports [SQLSRC241](diagnostics.md#sqlsrc241) for them.  Each project's build checks the sidecar against what its own types need, so a project in which a query has the output `sql` warns of the entry that the other project needs ([SQLSRC245](diagnostics.md#sqlsrc245)).  A run over both projects keeps that entry, so the warning stays, and a run over only the project that warns removes it, so the other project's build reports [SQLSRC241](diagnostics.md#sqlsrc241).  The warning clears when the query needs an entry in both projects or in neither, which is an output other than `sql` in both or `sql` in both, or when the project lists `SQLSRC245` in `NoWarn`.  Give the file the same dialect, database and output in both projects, and describe the whole solution in one run.
