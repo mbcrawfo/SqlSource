@@ -20,6 +20,14 @@ public sealed class ExpressionProofsTests
     [InlineData("COUNT_BIG(t.a) OVER (PARTITION BY t.b)", "", true, true, "")]
     [InlineData("-COUNT(*)", "", true, true, "")]
     [InlineData("COUNT(*) OVER w", "WINDOW w AS (ORDER BY t.id)", false, false, "")]
+    // COUNT is never null, whatever the window it names inside its parentheses.
+    [InlineData(
+        "COUNT(*) OVER (w)",
+        "WINDOW w AS (ORDER BY t.id ROWS BETWEEN 1 FOLLOWING AND 2 FOLLOWING)",
+        true,
+        true,
+        ""
+    )]
     [InlineData("(SELECT COUNT(*) FROM o WHERE o.c = t.id)", "", true, true, "")]
     [InlineData("((SELECT COUNT_BIG(*) AS n FROM o))", "", true, true, "")]
     [InlineData("(SELECT COUNT(*) FROM o WHERE o.c = t.a)", "GROUP BY ROLLUP (t.a)", true, true, "")]
@@ -30,6 +38,7 @@ public sealed class ExpressionProofsTests
     [InlineData("(SELECT COUNT(*) FROM o ORDER BY 1 OFFSET 1 ROWS)", "", false, false, "")]
     [InlineData("(SELECT COUNT(*) OVER () FROM o)", "", false, false, "")]
     [InlineData("(SELECT COUNT(*) FROM o UNION ALL SELECT COUNT(*) FROM p)", "", false, false, "")]
+    [InlineData("(SELECT COUNT(*) FROM o FOR XML PATH(''))", "", false, false, "")]
     // A subquery of another form is a leaf, asked whole unless it holds an aggregate, OVER or a user's function.
     [InlineData("(SELECT TOP (1) o.x FROM o)", "", true, false, "(SELECT TOP (1) o.x FROM o)")]
     [InlineData("(SELECT MAX(o.x) FROM o)", "", false, false, "")]
@@ -52,6 +61,7 @@ public sealed class ExpressionProofsTests
     [InlineData("NTILE(4) OVER (ORDER BY t.a)", "", true, true, "")]
     [InlineData("NTILE(@n) OVER (ORDER BY t.a)", "", false, false, "")]
     [InlineData("NTILE(4.5) OVER (ORDER BY t.a)", "", false, false, "")]
+    [InlineData("NTILE((4)) OVER (ORDER BY t.a)", "", false, false, "")]
     [InlineData("ROW_NUMBER()", "", false, false, "")]
     [InlineData("ROW_NUMBER() OVER w", "WINDOW w AS (ORDER BY t.a)", false, false, "")]
     // SUM, MAX and MIN over a group: the operand is asked over the rows.
@@ -86,7 +96,27 @@ public sealed class ExpressionProofsTests
     [InlineData("SUM(t.a) OVER (ORDER BY t.id ROWS BETWEEN @n PRECEDING AND CURRENT ROW)", "", false, false, "")]
     [InlineData("SUM(t.a) OVER (ORDER BY t.id ROWS UNBOUNDED FOLLOWING)", "", false, false, "")]
     [InlineData("SUM(t.a) OVER (ORDER BY t.id ROWS 1 FOLLOWING)", "", false, false, "")]
+    [InlineData("SUM(t.a) OVER (ORDER BY t.id ROWS 0 PRECEDING)", "", true, false, "t.a")]
+    [InlineData("SUM(t.a) OVER (ORDER BY t.id RANGE CURRENT ROW)", "", true, false, "t.a")]
+    [InlineData("SUM(t.a) OVER (ORDER BY t.id ROWS BETWEEN CURRENT ROW AND CURRENT ROW)", "", true, false, "t.a")]
+    [InlineData(
+        "SUM(t.a) OVER (ORDER BY t.id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)",
+        "",
+        true,
+        false,
+        "t.a"
+    )]
+    [InlineData("SUM(t.a) OVER (ORDER BY t.id ROWS BETWEEN 0 FOLLOWING AND 1 FOLLOWING)", "", false, false, "")]
     [InlineData("MAX(t.a) OVER w", "WINDOW w AS (ORDER BY t.id)", false, false, "")]
+    // "partition" is no reserved word, so a window may be named so.
+    [InlineData(
+        "SUM(t.a) OVER (partition)",
+        "WINDOW partition AS (ORDER BY t.id ROWS BETWEEN 1 FOLLOWING AND 2 FOLLOWING)",
+        false,
+        false,
+        ""
+    )]
+    [InlineData("SUM(t.a) OVER (partition ORDER BY t.id)", "WINDOW partition AS (PARTITION BY t.b)", false, false, "")]
     // A column named like a frame's word is no frame; one that comes before the frame makes it unread.
     [InlineData("MAX(t.a) OVER (ORDER BY [rows])", "", true, false, "t.a")]
     [InlineData("MAX(t.a) OVER (ORDER BY range ROWS BETWEEN 1 FOLLOWING AND 2 FOLLOWING)", "", false, false, "")]
@@ -134,6 +164,8 @@ public sealed class ExpressionProofsTests
     [InlineData("CONVERT(varchar(10), t.d)", "", true, false, "t.d")]
     [InlineData("CONVERT(varchar(10), t.d, @style)", "", false, false, "")]
     [InlineData("CONVERT(varchar(10), t.d, NULL)", "", false, false, "")]
+    [InlineData("CONVERT(varchar(10), t.d, -1)", "", false, false, "")]
+    [InlineData("CONVERT(varchar(10), t.d, (23))", "", false, false, "")]
     // TRY_CAST is no form: it is asked whole, and the server answers it.
     [InlineData("TRY_CAST(t.a AS int)", "", true, false, "TRY_CAST(t.a AS int)")]
     // JSON_OBJECT and JSON_ARRAY.
@@ -161,16 +193,33 @@ public sealed class ExpressionProofsTests
     [InlineData("t.a COLLATE Latin1_General_BIN", "", true, false, "t.a COLLATE Latin1_General_BIN")]
     [InlineData("t.a AT TIME ZONE 'UTC'", "", true, false, "t.a AT TIME ZONE 'UTC'")]
     [InlineData("ISNULL(t.a, 0)", "", true, false, "ISNULL(t.a, 0)")]
+    [InlineData("NULLIF(t.a, 0)", "", true, false, "NULLIF(t.a, 0)")]
+    [InlineData("IIF(t.a > 0, 1, 0)", "", true, false, "IIF(t.a > 0, 1, 0)")]
+    [InlineData("TRY_CONVERT(int, t.a)", "", true, false, "TRY_CONVERT(int, t.a)")]
+    [InlineData("PARSE(t.s AS int USING 'en-US')", "", true, false, "PARSE(t.s AS int USING 'en-US')")]
+    // A ":" of JSON_OBJECT is no "::".
+    [InlineData(
+        "ISNULL(JSON_OBJECT('a': UPPER(t.x)), '')",
+        "",
+        true,
+        false,
+        "ISNULL(JSON_OBJECT('a': UPPER(t.x)), '')"
+    )]
     // A user's function, or anything that holds one, is never asked.
     [InlineData("dbo.COUNT(t.a)", "", false, false, "")]
     [InlineData("dbo.f(t.a) + 1", "", false, false, "")]
     [InlineData("ISNULL(dbo.f(t.a), 0)", "", false, false, "")]
     [InlineData("t.x.value('(/a)[1]', 'int')", "", false, false, "")]
     [InlineData("geography::Point(1, 2, 4326)", "", false, false, "")]
+    [InlineData("CAST(t.a AS int).ToString()", "", false, false, "")]
+    [InlineData("x.SUM(t.a)", "GROUP BY t.b", false, false, "")]
+    // An old table hint after a schema's table reads as a call of a schema's name.
+    [InlineData("ISNULL((SELECT o.x FROM dbo.o (NOLOCK)), 0)", "", false, false, "")]
     // Nor is anything that holds an aggregate or OVER that is not a form.
     [InlineData("AVG(t.a)", "GROUP BY t.b", false, false, "")]
     [InlineData("[COUNT](t.a)", "GROUP BY t.b", false, false, "")]
     [InlineData("JSON_ARRAYAGG(t.a)", "GROUP BY t.b", false, false, "")]
+    [InlineData("JSON_OBJECTAGG(t.k : t.v)", "GROUP BY t.b", false, false, "")]
     [InlineData("ISNULL(MAX(t.a), 0)", "GROUP BY t.b", false, false, "")]
     [InlineData("CASE WHEN SUM(t.a) > 0 THEN 1 ELSE 0 END", "GROUP BY t.b", false, false, "")]
     [InlineData("LAG(t.a, 1, 0) OVER (ORDER BY t.id)", "", false, false, "")]

@@ -8,10 +8,10 @@ namespace SqlSource.Tool.Tests.Describing.SqlServer.Proofs;
 public sealed class ProofTests
 {
     [Fact]
-    public void Holds_Yes_WithoutOperands() => Proof.Yes.Holds(null).ShouldBeTrue();
+    public void Holds_YesWithoutAnswers_IsTrue() => Proof.Yes.Holds(null).ShouldBeTrue();
 
     [Fact]
-    public void Holds_No_WithOperandsNotNull() => Proof.No.Holds([true]).ShouldBeFalse();
+    public void Holds_NoWithOperandsNotNull_IsFalse() => Proof.No.Holds([true]).ShouldBeFalse();
 
     [Fact]
     public void Holds_OperandWithoutAnswers_DoesNotHold() => new Proof.Operand(0).Holds(null).ShouldBeFalse();
@@ -23,7 +23,7 @@ public sealed class ProofTests
     public void Holds_OperandNotNull_Holds() => new Proof.Operand(1).Holds([false, true]).ShouldBeTrue();
 
     [Fact]
-    public void Holds_AnyOf_WhenOnePartHolds()
+    public void Holds_AnyOf_IsTrueWhenOnePartHolds()
     {
         var proof = new Proof.AnyOf([new Proof.Operand(0), new Proof.Operand(1)]);
 
@@ -32,7 +32,7 @@ public sealed class ProofTests
     }
 
     [Fact]
-    public void Holds_AllOf_WhenEveryPartHolds()
+    public void Holds_AllOf_IsTrueWhenEveryPartHolds()
     {
         var proof = new Proof.AllOf([new Proof.Operand(0), new Proof.Operand(1)]);
 

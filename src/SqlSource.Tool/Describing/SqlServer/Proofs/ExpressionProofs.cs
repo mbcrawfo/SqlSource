@@ -352,7 +352,13 @@ internal sealed class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBo
         if (at + 2 < piece.End && tokens[at].Is("WITHIN") && tokens[at + 1].Is("GROUP") && tokens[at + 2].IsSymbol("("))
         {
             withinGroup = true;
-            at = SelectBody.ClosingParenthesis(tokens, at + 2, piece.End) + 1;
+            var groupClose = SelectBody.ClosingParenthesis(tokens, at + 2, piece.End);
+            if (groupClose < 0)
+            {
+                return null;
+            }
+
+            at = groupClose + 1;
         }
 
         TokenRange? window = null;
@@ -360,6 +366,11 @@ internal sealed class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBo
         if (at + 1 < piece.End && tokens[at].Is("OVER") && tokens[at + 1].IsSymbol("("))
         {
             var end = SelectBody.ClosingParenthesis(tokens, at + 1, piece.End);
+            if (end < 0)
+            {
+                return null;
+            }
+
             window = new TokenRange(at + 2, end);
             at = end + 1;
         }
@@ -425,7 +436,9 @@ internal sealed class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBo
     }
 
     // A window with no frame holds the current row, as one whose frame starts at or before it and ends at or after
-    // it.  One that names another window, "OVER (w ...)", takes that window's frame, which is not read.
+    // it.  One that names another window, "OVER (w ...)", takes that window's frame, which is not read; so a window
+    // that does not start with PARTITION BY, ORDER BY or a frame's word may be named, as "partition" may be, and
+    // proves nothing.
     private bool HoldsCurrentRow(TokenRange window)
     {
         if (window.IsEmpty)
@@ -434,7 +447,10 @@ internal sealed class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBo
         }
 
         var first = tokens[window.Start];
-        if (!first.Is("PARTITION") && !first.Is("ORDER") && !first.Is("ROWS") && !first.Is("RANGE"))
+        var byFollows = window.Count > 1 && tokens[window.Start + 1].Is("BY");
+        var isClause =
+            ((first.Is("PARTITION") || first.Is("ORDER")) && byFollows) || first.Is("ROWS") || first.Is("RANGE");
+        if (!isClause)
         {
             return false;
         }
@@ -506,6 +522,13 @@ internal sealed class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBo
         return parts;
     }
 
+    // True when the token at "at" is the second ":" of a "::", which the tokens give as two adjacent symbols.
+    private bool IsDoubleColon(TokenRange range, int at) =>
+        at - 1 >= range.Start
+        && tokens[at].IsSymbol(":")
+        && tokens[at - 1].IsSymbol(":")
+        && tokens[at - 1].End == tokens[at].Start;
+
     // An operand to ask, when the context allows and the server's answer about it would hold in the item.
     private Proof Leaf(TokenRange range, bool rows)
     {
@@ -526,8 +549,9 @@ internal sealed class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBo
         return new Proof.Operand(_leaves.Count - 1);
     }
 
-    // OVER, an aggregate's name before "(", or a name after "." or ":" before "(", a call of a schema's name or a
-    // type's method, anywhere in the range, its subqueries included.
+    // OVER, an aggregate's name before "(", or a name after "." or "::" before "(", a call of a schema's name or a
+    // type's method, anywhere in the range, its subqueries included.  An old table hint after a schema's table,
+    // "FROM dbo.o (NOLOCK)", reads as such a call, and so makes the leaf never asked.
     private bool HoldsWhatIsNeverAsked(TokenRange range)
     {
         for (var index = range.Start; index < range.End; index++)
@@ -544,7 +568,7 @@ internal sealed class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBo
 
             var name = tokens[index - 1];
             var isQualified =
-                index - 2 >= range.Start && (tokens[index - 2].IsSymbol(".") || tokens[index - 2].IsSymbol(":"));
+                index - 2 >= range.Start && (tokens[index - 2].IsSymbol(".") || IsDoubleColon(range, index - 2));
             if (isQualified || Aggregates.Contains(name.Name!))
             {
                 return true;
