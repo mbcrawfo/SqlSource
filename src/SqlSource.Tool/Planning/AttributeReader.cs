@@ -43,7 +43,10 @@ internal static class AttributeReader
 
             // A file that cannot be read is the build's to report.  Most files do not hold the word, and are not
             // parsed.
-            if (FileText.Read(path) is not { } text || !text.ToString().Contains(ShortName, StringComparison.Ordinal))
+            if (
+                FileText.Read(path) is not { Text: var text }
+                || !text.ToString().Contains(ShortName, StringComparison.Ordinal)
+            )
             {
                 continue;
             }
