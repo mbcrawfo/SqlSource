@@ -11,7 +11,7 @@ The rule the reader shares with `SqlDeclaredVariables` and `SqlServerErrors` is 
 
 ## Why it exists
 
-TD-0073 made the copies of one rule agree and changed no behaviour beyond where its copies already disagreed.  Giving PostgreSQL's refusal a second part changes the text of `SQLSRC228` and its section of the manual, and a new reading of the server's categories needs a check against it, so both were left out of that change.
+The change that made the copies of one rule agree changed no behaviour beyond where its copies already disagreed.  Giving PostgreSQL's refusal a second part changes the text of `SQLSRC228` and its section of the manual, and a new reading of the server's categories needs a check against it, so both were left out of that change.
 
 ## Impact
 
