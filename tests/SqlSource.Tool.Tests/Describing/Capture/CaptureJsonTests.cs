@@ -178,7 +178,7 @@ public sealed class CaptureJsonTests
 
     // A change to the options would change every fixture, so no caller can make one.
     [Fact]
-    public void Options_AreReadOnly()
+    public void Options_OfCaptureJson_AreReadOnly()
     {
         CaptureJson.Options.IsReadOnly.ShouldBeTrue();
         _ = Should.Throw<InvalidOperationException>(() => CaptureJson.Options.WriteIndented = true);

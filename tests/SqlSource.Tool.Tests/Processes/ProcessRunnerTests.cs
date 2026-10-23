@@ -22,8 +22,11 @@ public sealed class ProcessRunnerTests
         Programs.Request(program, arguments);
 
     // Waits for half a minute.
-    private static ProcessRequest Wait() =>
-        OperatingSystem.IsWindows() ? Request("ping", "-n", "30", "127.0.0.1") : Request("sleep", "30");
+    private static ProcessRequest Wait()
+    {
+        var (program, arguments) = Programs.Waiter(30);
+        return Request(program, arguments);
+    }
 
     // Writes its id to one file, starts a program that waits, writes that one's id to the other, and waits for it.
     // Windows has no shell that knows its own id but PowerShell.  The files reach the script as variables, which

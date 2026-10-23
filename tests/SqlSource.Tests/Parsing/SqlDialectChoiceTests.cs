@@ -7,7 +7,7 @@ namespace SqlSource.Tests.Parsing;
 public sealed class SqlDialectChoiceTests
 {
     [Fact]
-    public void Default_IsAnsiWithNoOptions() =>
+    public void Default_OfTheChoice_IsAnsiWithNoOptions() =>
         default(SqlDialectChoice).ShouldBe(new SqlDialectChoice(SqlDialect.Ansi, SqlDialectOptions.None));
 
     [Fact]
@@ -19,7 +19,7 @@ public sealed class SqlDialectChoiceTests
     }
 
     [Fact]
-    public void Equality_ComparesTheDialectAndTheOptions()
+    public void Equality_OfTwoChoices_ComparesTheDialectAndTheOptions()
     {
         var ansiQuotes = new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes);
 

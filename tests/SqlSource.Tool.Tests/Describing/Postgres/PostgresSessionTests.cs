@@ -1,8 +1,8 @@
-using System.Globalization;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Testing;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 
@@ -31,11 +31,8 @@ public sealed class PostgresSessionTests
         failure.Arguments.ShouldBe([PostgresScript.Database, "PostgreSQL", version, "14"]);
         failure.Step.ShouldBeNull();
         failure.ServerLines.ShouldBeEmpty();
-        string.Format(
-                CultureInfo.InvariantCulture,
-                failure.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
-                [.. failure.Arguments]
-            )
+        Failures
+            .MessageOf(failure)
             .ShouldBe($"The database 'app' runs PostgreSQL {version}, and the tool supports 14 and later");
     }
 

@@ -137,25 +137,8 @@ public sealed class CachingOptionsTests
         );
 
         AllReasons(result, TrackingNames.ProjectDialect).ShouldBe([IncrementalStepRunReason.Modified]);
-        ParseInputs(result)
-            .ShouldBe(
-                new Dictionary<string, IncrementalStepRunReason>
-                {
-                    [_scene.Users.Path] = IncrementalStepRunReason.Modified,
-                    [_scene.Orders.Path] = IncrementalStepRunReason.Unchanged,
-                },
-                ignoreOrder: true
-            );
+        _scene.ShouldHaveReadOnly(result, _scene.Users, IncrementalStepRunReason.Unchanged);
         AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
-        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
-            .ShouldBe(
-                new Dictionary<string, IncrementalStepRunReason>
-                {
-                    ["Users.sql"] = IncrementalStepRunReason.Modified,
-                    ["Orders.sql"] = IncrementalStepRunReason.Cached,
-                },
-                ignoreOrder: true
-            );
         Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
@@ -202,25 +185,8 @@ public sealed class CachingOptionsTests
         );
 
         AllReasons(result, TrackingNames.ProjectDialect).ShouldBe([IncrementalStepRunReason.Unchanged]);
-        ParseInputs(result)
-            .ShouldBe(
-                new Dictionary<string, IncrementalStepRunReason>
-                {
-                    [_scene.Users.Path] = IncrementalStepRunReason.Modified,
-                    [_scene.Orders.Path] = IncrementalStepRunReason.Cached,
-                },
-                ignoreOrder: true
-            );
+        _scene.ShouldHaveReadOnly(result, _scene.Users, IncrementalStepRunReason.Cached);
         AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
-        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
-            .ShouldBe(
-                new Dictionary<string, IncrementalStepRunReason>
-                {
-                    ["Users.sql"] = IncrementalStepRunReason.Modified,
-                    ["Orders.sql"] = IncrementalStepRunReason.Cached,
-                },
-                ignoreOrder: true
-            );
         Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
@@ -453,25 +419,8 @@ public sealed class CachingOptionsTests
             compilation
         );
 
-        ParseInputs(result)
-            .ShouldBe(
-                new Dictionary<string, IncrementalStepRunReason>
-                {
-                    [_scene.Users.Path] = IncrementalStepRunReason.Modified,
-                    [_scene.Orders.Path] = IncrementalStepRunReason.Cached,
-                },
-                ignoreOrder: true
-            );
+        _scene.ShouldHaveReadOnly(result, _scene.Users, IncrementalStepRunReason.Cached);
         AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
-        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
-            .ShouldBe(
-                new Dictionary<string, IncrementalStepRunReason>
-                {
-                    ["Users.sql"] = IncrementalStepRunReason.Modified,
-                    ["Orders.sql"] = IncrementalStepRunReason.Cached,
-                },
-                ignoreOrder: true
-            );
         Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>

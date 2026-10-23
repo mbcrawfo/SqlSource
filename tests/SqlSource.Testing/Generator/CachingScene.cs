@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
+using SqlSource.Generation;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
@@ -50,7 +52,7 @@ internal sealed class CachingScene
         ),
     ];
 
-    public InMemoryAdditionalText Users { get; } = new("/app/Users/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+    public InMemoryAdditionalText Users { get; } = new("/app/Users/Users.sql", SqlTexts.GetUser);
 
     public InMemoryAdditionalText Orders { get; } = new("/app/Orders/Orders.sql", "-- name: GetOrder\nSELECT 2;\n");
 
@@ -215,6 +217,39 @@ internal sealed class CachingScene
     {
         var sidecar = Sidecars.Current(ToSqlFile(sqlFile), dialect, queryName);
         return new InMemoryAdditionalText(sidecar.Path, sidecar.Text);
+    }
+
+    // Only this file of Users and Orders was read again: it is Modified at the input of the read, and so at ParsedFile,
+    // by its name, while the other one is the input it was (the reason given: Cached, or Unchanged where the step that
+    // resolves its input ran) and Cached at ParsedFile.
+    public void ShouldHaveReadOnly(
+        GeneratorDriverRunResult result,
+        InMemoryAdditionalText file,
+        IncrementalStepRunReason otherInput
+    )
+    {
+        var other = file.Path == Users.Path ? Orders : Users;
+
+        StepReasons
+            .ParseInputs(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [file.Path] = IncrementalStepRunReason.Modified,
+                    [other.Path] = otherInput,
+                },
+                ignoreOrder: true
+            );
+        StepReasons
+            .Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, parsed => parsed.FileName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [Path.GetFileName(file.Path)] = IncrementalStepRunReason.Modified,
+                    [Path.GetFileName(other.Path)] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
     }
 
     public static SqlFile ToSqlFile(InMemoryAdditionalText file) => new(file.Path, file.GetText()!.ToString());

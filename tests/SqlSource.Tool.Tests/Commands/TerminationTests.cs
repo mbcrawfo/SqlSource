@@ -72,8 +72,8 @@ public sealed class TerminationTests : IDisposable
         Assert.SkipUnless(OperatingSystem.IsWindows(), "Only Windows closes the console of a process.");
         Programs.SkipUnlessOnPath("cmd");
         Programs.SkipUnlessOnPath("taskkill");
-        var waiting = _fixtures.PathOf("waiting");
-        var project = ProjectThatWaits(waiting);
+        var answers = _fixtures.PathOf("answers");
+        var project = ProjectThatWaits(_fixtures.PathOf("waiting"), answers);
         var temp = Directory.CreateDirectory(_fixtures.PathOf("tmp")).FullName;
         var title = "sqlsource-test-" + Guid.NewGuid().ToString("N");
 
@@ -93,11 +93,10 @@ public sealed class TerminationTests : IDisposable
             Eventually.Patience,
             async shell =>
             {
-                // The target of the project has begun its wait.  A wait that failed would end the run by itself, and
-                // the test would take that for the close: so the run is seen to go on for a while first.  Nothing
-                // here says what the tool wrote, which went to its console.
-                await Eventually.TrueAsync(() => File.Exists(waiting), $"Nothing wrote '{waiting}'.");
-                await Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+                // The target of the project has begun its wait, and ping has answered twice, a second apart.  A wait
+                // that failed would end the run by itself, and the test would take that for the close: so the wait is
+                // seen to go on first.  Nothing here says what the tool wrote, which went to its console.
+                await Eventually.TrueAsync(() => HasAnswered(answers), $"ping did not answer twice in '{answers}'.");
                 shell.HasExited.ShouldBeFalse("the run ended by itself, before its console was closed");
                 _ = Directory.EnumerateDirectories(temp, RunFolders).ShouldHaveSingleItem();
 
@@ -119,11 +118,15 @@ public sealed class TerminationTests : IDisposable
     }
 
     // A copy of a fixture whose manifest target writes the file given and then waits for two minutes, so that a
-    // run of it ends only when it is told to: a test that failed to tell it sees a run that goes on.
-    private string ProjectThatWaits(string waiting)
+    // run of it ends only when it is told to: a test that failed to tell it sees a run that goes on.  On Windows the
+    // waiter, ping, writes its answers to the file "answers" names, or to nothing.
+    private string ProjectThatWaits(string waiting, string? answers = null)
     {
         var project = _fixtures.Copy("Single");
-        var wait = OperatingSystem.IsWindows() ? "ping -n 120 127.0.0.1 &gt; nul" : "sleep 120";
+        var (program, arguments) = Programs.Waiter(120);
+        var target = answers is null ? "nul" : $"\"{answers}\"";
+        var output = OperatingSystem.IsWindows() ? " > " + target : "";
+        var wait = SecurityElement.Escape(string.Join(' ', [program, .. arguments]) + output);
         _ = _fixtures.WriteFile(
             "Single/Directory.Build.targets",
             $"""
@@ -137,6 +140,28 @@ public sealed class TerminationTests : IDisposable
             """
         );
         return project;
+    }
+
+    // Whether ping has answered twice: its first line and each answer name the address, in every language.  cmd
+    // holds the file open for writing while ping runs.
+    private static bool HasAnswered(string answers)
+    {
+        try
+        {
+            using var stream = new FileStream(
+                answers,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete
+            );
+            using var reader = new StreamReader(stream);
+            var text = reader.ReadToEnd();
+            return text.Split("127.0.0.1").Length > 3;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
     }
 
     // Closes the console whose window has the title, and gives what "taskkill" said, for a test that fails.

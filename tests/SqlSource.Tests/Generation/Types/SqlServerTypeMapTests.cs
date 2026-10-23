@@ -19,55 +19,71 @@ public sealed class SqlServerTypeMapTests
     private const string DateTime = "global::System.DateTime";
     private const string Vector = "global::Microsoft.Data.SqlTypes.SqlVector<float>";
     private const string NeedsDriver = "!NeedsDriver";
+    private const string NeedsNewer = "!NeedsNewerSqlClient";
     private const string NeedsTypes = "!NeedsSqlServerTypes";
     private const string Assembly = "Microsoft.SqlServer.Types, Version=11.0.0.0";
 
     // A failing cell is '!' and the kind's name.
-    public static TheoryData<string, string, string, string, bool> Rows =>
+    public static TheoryData<string, string, string, string, string, bool> Rows =>
         new()
         {
-            { "bigint", "long", "long", "long", true },
-            { "int", "int", "int", "int", true },
-            { "smallint", "short", "short", "short", true },
-            { "tinyint", "byte", "byte", "byte", true },
-            { "bit", "bool", "bool", "bool", true },
-            { "decimal", "decimal", "decimal", "decimal", true },
-            { "numeric", "decimal", "decimal", "decimal", true },
-            { "money", "decimal", "decimal", "decimal", true },
-            { "smallmoney", "decimal", "decimal", "decimal", true },
-            { "float", "double", "double", "double", true },
-            { "real", "float", "float", "float", true },
-            { "date", DateTime, DateTime, DateTime, true },
-            { "datetime", DateTime, DateTime, DateTime, true },
-            { "datetime2", DateTime, DateTime, DateTime, true },
-            { "smalldatetime", DateTime, DateTime, DateTime, true },
-            { "time", "global::System.TimeSpan", "global::System.TimeSpan", "global::System.TimeSpan", true },
+            { "bigint", "long", "long", "long", "long", true },
+            { "int", "int", "int", "int", "int", true },
+            { "smallint", "short", "short", "short", "short", true },
+            { "tinyint", "byte", "byte", "byte", "byte", true },
+            { "bit", "bool", "bool", "bool", "bool", true },
+            { "decimal", "decimal", "decimal", "decimal", "decimal", true },
+            { "numeric", "decimal", "decimal", "decimal", "decimal", true },
+            { "money", "decimal", "decimal", "decimal", "decimal", true },
+            { "smallmoney", "decimal", "decimal", "decimal", "decimal", true },
+            { "float", "double", "double", "double", "double", true },
+            { "real", "float", "float", "float", "float", true },
+            { "date", DateTime, DateTime, DateTime, DateTime, true },
+            { "datetime", DateTime, DateTime, DateTime, DateTime, true },
+            { "datetime2", DateTime, DateTime, DateTime, DateTime, true },
+            { "smalldatetime", DateTime, DateTime, DateTime, DateTime, true },
+            {
+                "time",
+                "global::System.TimeSpan",
+                "global::System.TimeSpan",
+                "global::System.TimeSpan",
+                "global::System.TimeSpan",
+                true
+            },
             {
                 "datetimeoffset",
                 "global::System.DateTimeOffset",
                 "global::System.DateTimeOffset",
                 "global::System.DateTimeOffset",
+                "global::System.DateTimeOffset",
                 true
             },
-            { "char", "string", "string", "string", false },
-            { "varchar", "string", "string", "string", false },
-            { "text", "string", "string", "string", false },
-            { "nchar", "string", "string", "string", false },
-            { "nvarchar", "string", "string", "string", false },
-            { "ntext", "string", "string", "string", false },
-            { "xml", "string", "string", "string", false },
-            { "json", "string", "string", "string", false },
-            { "sysname", "string", "string", "string", false },
-            { "binary", "byte[]", "byte[]", "byte[]", false },
-            { "varbinary", "byte[]", "byte[]", "byte[]", false },
-            { "image", "byte[]", "byte[]", "byte[]", false },
-            { "timestamp", "byte[]", "byte[]", "byte[]", false },
-            { "uniqueidentifier", "global::System.Guid", "global::System.Guid", "global::System.Guid", true },
-            { "sql_variant", "object", "object", "object", false },
-            { "vector", Vector, Vector, NeedsDriver, true },
-            { "hierarchyid", NeedsTypes, NeedsTypes, NeedsTypes, false },
-            { "geography", NeedsTypes, NeedsTypes, NeedsTypes, false },
-            { "geometry", NeedsTypes, NeedsTypes, NeedsTypes, false },
+            { "char", "string", "string", "string", "string", false },
+            { "varchar", "string", "string", "string", "string", false },
+            { "text", "string", "string", "string", "string", false },
+            { "nchar", "string", "string", "string", "string", false },
+            { "nvarchar", "string", "string", "string", "string", false },
+            { "ntext", "string", "string", "string", "string", false },
+            { "xml", "string", "string", "string", "string", false },
+            { "json", "string", "string", "string", "string", false },
+            { "sysname", "string", "string", "string", "string", false },
+            { "binary", "byte[]", "byte[]", "byte[]", "byte[]", false },
+            { "varbinary", "byte[]", "byte[]", "byte[]", "byte[]", false },
+            { "image", "byte[]", "byte[]", "byte[]", "byte[]", false },
+            { "timestamp", "byte[]", "byte[]", "byte[]", "byte[]", false },
+            {
+                "uniqueidentifier",
+                "global::System.Guid",
+                "global::System.Guid",
+                "global::System.Guid",
+                "global::System.Guid",
+                true
+            },
+            { "sql_variant", "object", "object", "object", "object", false },
+            { "vector", Vector, Vector, NeedsDriver, NeedsNewer, true },
+            { "hierarchyid", NeedsTypes, NeedsTypes, NeedsTypes, NeedsTypes, false },
+            { "geography", NeedsTypes, NeedsTypes, NeedsTypes, NeedsTypes, false },
+            { "geometry", NeedsTypes, NeedsTypes, NeedsTypes, NeedsTypes, false },
         };
 
     [Theory]
@@ -77,6 +93,7 @@ public sealed class SqlServerTypeMapTests
         string under61,
         string under7,
         string underNone,
+        string underOlder,
         bool isValueType
     )
     {
@@ -87,6 +104,7 @@ public sealed class SqlServerTypeMapTests
         ShouldMapTo(SqlServerTypeMap.Map(type, SqlClientColumn.SqlClient61), under61, isValueType, name);
         ShouldMapTo(SqlServerTypeMap.Map(type, SqlClientColumn.SqlClient7), under7, isValueType, name);
         ShouldMapTo(SqlServerTypeMap.Map(type, SqlClientColumn.None), underNone, isValueType, name);
+        ShouldMapTo(SqlServerTypeMap.Map(type, SqlClientColumn.OlderThan61), underOlder, isValueType, name);
     }
 
     [Fact]
@@ -176,6 +194,46 @@ public sealed class SqlServerTypeMapTests
         var other = SqlServerTypeMap.Map(money, SqlClientColumn.SqlClient7);
         other.Kind.ShouldBe(TypeMappingKind.Unreadable);
         other.Key.ShouldBe("dbo.\"Money\"");
+    }
+
+    // A type that a Microsoft.Data.SqlClient older than 6.1 lacks names the version that first has it.
+    [Fact]
+    public void Map_VectorBelow61_NamesTheVersionItNeeds()
+    {
+        var mapping = SqlServerTypeMap.Map(TestSidecars.SqlServer(name: "vector(3)"), SqlClientColumn.OlderThan61);
+
+        mapping.Kind.ShouldBe(TypeMappingKind.NeedsNewerSqlClient);
+        mapping.Key.ShouldBe("vector");
+        mapping.Detail.ShouldBe("6.1");
+    }
+
+    // A type that SqlClient first has in a version is lacked by every column of an older one, and by no SqlClient.
+    [Theory]
+    [InlineData(nameof(SqlClientColumn.None), nameof(SqlClientColumn.SqlClient61), true)]
+    [InlineData(nameof(SqlClientColumn.OlderThan61), nameof(SqlClientColumn.SqlClient61), true)]
+    [InlineData(nameof(SqlClientColumn.SqlClient61), nameof(SqlClientColumn.SqlClient61), false)]
+    [InlineData(nameof(SqlClientColumn.SqlClient7), nameof(SqlClientColumn.SqlClient61), false)]
+    [InlineData(nameof(SqlClientColumn.None), nameof(SqlClientColumn.SqlClient7), true)]
+    [InlineData(nameof(SqlClientColumn.OlderThan61), nameof(SqlClientColumn.SqlClient7), true)]
+    [InlineData(nameof(SqlClientColumn.SqlClient61), nameof(SqlClientColumn.SqlClient7), true)]
+    [InlineData(nameof(SqlClientColumn.SqlClient7), nameof(SqlClientColumn.SqlClient7), false)]
+    public void Lacks_ColumnAndFirstColumnOfTheType_IsAnOlderColumn(string column, string since, bool expected) =>
+        SqlServerTypeMap
+            .Lacks(Enum.Parse<SqlClientColumn>(column), Enum.Parse<SqlClientColumn>(since))
+            .ShouldBe(expected);
+
+    // An entry of the type override answers below 6.1 as it does under every column.
+    [Fact]
+    public void Map_VectorBelow61WithAnEntry_IsTheEntry()
+    {
+        var mapping = SqlServerTypeMap.Map(
+            TestSidecars.SqlServer(name: "vector(3)"),
+            SqlClientColumn.OlderThan61,
+            Overrides(("vector", "Floats"))
+        );
+
+        mapping.Kind.ShouldBe(TypeMappingKind.Mapped);
+        mapping.Text.ShouldBe("Floats");
     }
 
     [Theory]

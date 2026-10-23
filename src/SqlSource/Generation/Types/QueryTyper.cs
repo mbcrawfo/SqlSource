@@ -68,6 +68,7 @@ internal static class QueryTyper
             var typing = new Typing(
                 input.NpgsqlProbe.Column,
                 input.SqlClientProbe.Column,
+                input.SqlClientProbe.VersionText,
                 LookupOf(query.Markers, input, engine, lookups),
                 query.NameLocation,
                 diagnostics
@@ -164,25 +165,24 @@ internal static class QueryTyper
             );
         }
 
-        typing.Diagnostics.Add(
-            Diagnose(mapping, MessageSubject.Of(owner, name), type.Name, typing.Location, typing.Column, engine)
-        );
+        typing.Diagnostics.Add(Diagnose(mapping, MessageSubject.Of(owner, name), type.Name, typing, engine));
         return null;
     }
 
     // The failure's diagnostic.  NeedsDriver and Unreadable occur for both engines, and their helps name the engine's
-    // driver and system schema; NeedsSqlServerTypes is SQL Server's alone, and NotWrittenByTheTool and the type
-    // override's failures read the same for both.  Every other kind is PostgreSQL's alone.
+    // driver and system schema; NeedsSqlServerTypes and NeedsNewerSqlClient are SQL Server's alone, and
+    // NotWrittenByTheTool and the type override's failures read the same for both.  Every other kind is PostgreSQL's
+    // alone.
     private static DiagnosticInfo Diagnose(
         TypeMapping failure,
         string subject,
         string typeName,
-        LocationInfo at,
-        NpgsqlColumn column,
+        Typing typing,
         DatabaseEngine engine
     )
     {
         var key = failure.Key;
+        var at = typing.Location;
         return failure.Kind switch
         {
             TypeMappingKind.CastToOid or TypeMappingKind.CastToText => DiagnosticInfo.Create(
@@ -212,7 +212,7 @@ internal static class QueryTyper
                 at,
                 subject,
                 typeName,
-                (column == NpgsqlColumn.None ? "Reference Npgsql, then map" : "Map")
+                (typing.Column == NpgsqlColumn.None ? "Reference Npgsql, then map" : "Map")
                     + " it with the type override, as "
                     + key
                     + "=NpgsqlTypes.NpgsqlRange<T> with the data source's EnableUnmappedTypes()"
@@ -223,6 +223,14 @@ internal static class QueryTyper
                 subject,
                 typeName,
                 "Reference Microsoft.Data.SqlClient"
+            ),
+            TypeMappingKind.NeedsNewerSqlClient => DiagnosticInfo.Create(
+                SqlDiagnostics.TypeNeedsNewerSqlClient,
+                at,
+                subject,
+                typeName,
+                failure.Detail ?? "",
+                typing.SqlClientVersion
             ),
             TypeMappingKind.NeedsDriver => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeNeedsNpgsql,
@@ -356,10 +364,12 @@ internal static class QueryTyper
         return made;
     }
 
-    // What the typing of one query reads, and where its error goes.
+    // What the typing of one query reads, and where its error goes.  SqlClientVersion is the probe's VersionText, for
+    // the message of a type that the project's SqlClient is too old for.
     private readonly record struct Typing(
         NpgsqlColumn Column,
         SqlClientColumn SqlClientColumn,
+        string SqlClientVersion,
         OverrideLookup? Lookup,
         LocationInfo Location,
         ImmutableArray<DiagnosticInfo>.Builder Diagnostics

@@ -1,6 +1,6 @@
 using System;
 
-namespace SqlSource.Tool.Tests;
+namespace SqlSource.Testing;
 
 // The .sql texts that many tests put in a project.  A test whose text differs for its own sake keeps it.
 internal static class SqlTexts

@@ -14,8 +14,6 @@ public sealed class NestedClassTests
 {
     private const string AttributeOnly = "SqlSourceGenerateAttribute.g.cs";
 
-    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
-
     [Fact]
     public void Run_NestedClassProperty_NamesTheClass()
     {
@@ -247,7 +245,7 @@ public sealed class NestedClassTests
         GeneratorHarness.Run(
             OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, source)],
-            [Users],
+            [GeneratorHarness.UsersFile],
             properties: new Dictionary<string, string?> { ["SqlSourceNestedClass"] = nestedClass }
         );
 }

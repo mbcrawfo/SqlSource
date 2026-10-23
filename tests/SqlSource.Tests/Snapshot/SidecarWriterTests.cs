@@ -2,6 +2,7 @@ using System.Globalization;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
+using SqlSource.Testing;
 using Xunit;
 using static SqlSource.Testing.Snapshot.TestSidecars;
 
@@ -406,17 +407,9 @@ public sealed class SidecarWriterTests
     [Fact]
     public void Write_UnderAnotherCulture_WritesNumbersTheSameWay()
     {
-        var culture = CultureInfo.CurrentCulture;
-        try
-        {
-            CultureInfo.CurrentCulture = new CultureInfo("sv-SE");
+        using var swedish = new CultureScope(new CultureInfo("sv-SE"));
 
-            WriteColumnOf(SqlServer("nvarchar(max)", -1, 0, 0)).ShouldContain("\"maxLength\": -1,");
-        }
-        finally
-        {
-            CultureInfo.CurrentCulture = culture;
-        }
+        WriteColumnOf(SqlServer("nvarchar(max)", -1, 0, 0)).ShouldContain("\"maxLength\": -1,");
     }
 
     private static string WriteColumnOf(SidecarType type, string engine = SidecarValues.Engine.Postgres) =>

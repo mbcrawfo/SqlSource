@@ -1,10 +1,10 @@
-using System.Globalization;
 using System.Linq;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Testing;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 
@@ -286,7 +286,8 @@ public sealed class SqlServerErrorsTests
         failure.Step.ShouldBe(DescribeStep.DescribeParameters);
         failure.ServerLines.ShouldBeEmpty();
         failure.Help.ShouldBe("declare the parameter's type with -- param:");
-        MessageOf(failure)
+        Failures
+            .MessageOf(failure)
             .ShouldBe("The copies of the parameter '@p' of the query 'Q' have the types 'int' and 'nvarchar(100)'");
     }
 
@@ -323,7 +324,8 @@ public sealed class SqlServerErrorsTests
             "rewrite the query so that SqlSource and SQL Server read the same parameters, or give a parameter that "
                 + "SqlSource reads as a variable a -- param: marker with its type"
         );
-        MessageOf(failure)
+        Failures
+            .MessageOf(failure)
             .ShouldBe(
                 "SQL Server reads the parameters of the query 'Q' differently from SqlSource: SqlSource reads '@id' "
                     + "as a parameter and SQL Server does not; SQL Server reads '@x' as a parameter and SqlSource does "
@@ -376,7 +378,7 @@ public sealed class SqlServerErrorsTests
         failure.Step.ShouldBe(DescribeStep.DescribeColumns);
         failure.ServerLines.ShouldBe([$"Msg 11509: {Message}"]);
         failure.Help.ShouldBeNull();
-        MessageOf(failure).ShouldBe("The query 'Q' returns rows of different shapes on different paths");
+        Failures.MessageOf(failure).ShouldBe("The query 'Q' returns rows of different shapes on different paths");
     }
 
     [Fact]
@@ -397,7 +399,7 @@ public sealed class SqlServerErrorsTests
         failure.Step.ShouldBe(DescribeStep.DescribeColumns);
         failure.ServerLines.ShouldBe([$"Msg 11513: {Message}"]);
         failure.Help.ShouldBeNull();
-        MessageOf(failure).ShouldBe("The query 'Q' runs SQL that the server cannot read until it runs");
+        Failures.MessageOf(failure).ShouldBe("The query 'Q' runs SQL that the server cannot read until it runs");
     }
 
     // The cause is the row of its type, wherever it stands, and every row is still a line.
@@ -422,7 +424,7 @@ public sealed class SqlServerErrorsTests
         failure.Step.ShouldBe(DescribeStep.DescribeColumns);
         failure.ServerLines.ShouldBe(["Msg 208: Invalid object name '#y'.", $"Msg 11525: {Message}"]);
         failure.Help.ShouldBe("make the query one statement, or use a table variable in place of the temporary table");
-        MessageOf(failure).ShouldBe("The query 'Q' uses a temporary table in a batch of several statements");
+        Failures.MessageOf(failure).ShouldBe("The query 'Q' uses a temporary table in a batch of several statements");
     }
 
     // Every parameter is declared, so this cannot happen: it is reported as the server rejecting the query, to be
@@ -613,7 +615,7 @@ public sealed class SqlServerErrorsTests
     }
 
     [Fact]
-    public void NoColumnName_Is266()
+    public void NoColumnName_SecondColumn_Is266()
     {
         var failure = SqlServerErrors.NoColumnName(Of(SqlDialectRules.SqlServer, "SELECT id, 1 FROM dbo.users"), 2);
 
@@ -622,7 +624,7 @@ public sealed class SqlServerErrorsTests
         failure.Step.ShouldBe(DescribeStep.DescribeColumns);
         failure.ServerLines.ShouldBeEmpty();
         failure.Help.ShouldBe("give the column a name with AS");
-        MessageOf(failure).ShouldBe("Column 2 of the query 'Q' has no name");
+        Failures.MessageOf(failure).ShouldBe("Column 2 of the query 'Q' has no name");
     }
 
     private static CopiedSql Copied(DescribeRequest query) => ParameterCopies.Rename(query.Sql, query.Parameters);
@@ -640,11 +642,4 @@ public sealed class SqlServerErrorsTests
 
     private static SqlServerDeclaredAnswer DescribeErrors(params (int Number, string Message)[] errors) =>
         new(null, [.. errors.Select(error => new SqlServerDescribeError(error.Number, 1, error.Message))], null);
-
-    private static string MessageOf(DescribeFailure failure) =>
-        string.Format(
-            CultureInfo.InvariantCulture,
-            failure.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
-            [.. failure.Arguments]
-        );
 }

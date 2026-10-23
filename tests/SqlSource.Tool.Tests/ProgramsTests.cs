@@ -15,6 +15,10 @@ public sealed class ProgramsTests
 {
     private const string HostPath = "DOTNET_HOST_PATH";
 
+    // How soon RunAsync gives up a program whose patience is 200 ms: 100 times that, which a slow runner keeps, and far
+    // below any other limit of RunAsync or of the test.
+    private static readonly TimeSpan WithinThePatience = TimeSpan.FromSeconds(20);
+
     [Fact]
     public void Dotnet_HostPathSet_IsThatPath()
     {
@@ -78,23 +82,26 @@ public sealed class ProgramsTests
     {
         var start = Sleeper();
         var seen = 0;
-        var wall = Stopwatch.StartNew();
 
-        var thrown = await Should.ThrowAsync<TimeoutException>(() =>
-            Programs.RunAsync(
-                start,
-                TimeSpan.FromMilliseconds(200),
-                program =>
-                {
-                    seen = program.Id;
-                    return Task.CompletedTask;
-                }
-            )
+        var thrown = await Eventually.WithinAsync(
+            Should.ThrowAsync<TimeoutException>(() =>
+                Programs.RunAsync(
+                    start,
+                    TimeSpan.FromMilliseconds(200),
+                    program =>
+                    {
+                        seen = program.Id;
+                        return Task.CompletedTask;
+                    }
+                )
+            ),
+            "RunAsync did not give the program up at its patience.",
+            WithinThePatience
         );
 
         thrown.Message.ShouldContain("did not end within");
         thrown.Message.ShouldContain(start.FileName);
-        wall.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(10));
+        // The program would have waited for a day: gone, it was killed.
         ShouldHaveExited(seen);
     }
 
@@ -141,17 +148,12 @@ public sealed class ProgramsTests
         ShouldHaveExited(seen);
     }
 
-    // A program that outlives any patience of these tests.  Windows has no sleep, but ping waits as long.
+    // A program that outlives any run of these tests, so that one that is gone was killed.
     private static ProcessStartInfo Sleeper()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            Programs.SkipUnlessOnPath("ping");
-            return new ProcessStartInfo("ping", ["-n", "30", "127.0.0.1"]);
-        }
-
-        Programs.SkipUnlessOnPath("sleep");
-        return new ProcessStartInfo("sleep", ["30"]);
+        var (program, arguments) = Programs.Waiter(86_400);
+        Programs.SkipUnlessOnPath(program);
+        return new ProcessStartInfo(program, arguments);
     }
 
     // RunAsync does not give the program up before it is gone.  Its Process is disposed by then, so the test asks

@@ -19,7 +19,8 @@ namespace SqlSource.Generation.Types;
 /// an array of it for an array; for <see cref="TypeMappingKind.DiffersByDriver" />, the entry of the type
 /// override for each driver whose C# type is not of <c>NpgsqlTypes</c>, or null when neither is; and for a type the
 /// override names, found or not, and for <see cref="TypeMappingKind.ArrayNamedByItsOwnKey" />, the place that wrote
-/// the entry; for <see cref="TypeMappingKind.NeedsSqlServerTypes" />, the package's C# type for the type.
+/// the entry; for <see cref="TypeMappingKind.NeedsSqlServerTypes" />, the package's C# type for the type; and for
+/// <see cref="TypeMappingKind.NeedsNewerSqlClient" />, the version of SqlClient that first has its C# type.
 /// </param>
 internal sealed record TypeMapping(
     TypeMappingKind Kind,

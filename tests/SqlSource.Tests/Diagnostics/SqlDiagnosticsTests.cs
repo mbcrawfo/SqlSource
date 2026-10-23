@@ -191,6 +191,14 @@ public sealed class SqlDiagnosticsTests
             );
 
     [Fact]
+    public void TypeNeedsNewerSqlClient_Message_HoldsBothVersions() =>
+        Format(SqlDiagnostics.TypeNeedsNewerSqlClient, "column 'embedding'", "vector(3)", "6.1", "6.0.5")
+            .ShouldBe(
+                "The column 'embedding' has the type 'vector(3)', whose C# type needs Microsoft.Data.SqlClient 6.1 or "
+                    + "later, and this project references Microsoft.Data.SqlClient 6.0.5.  Update the package."
+            );
+
+    [Fact]
     public void ForParseError_UndefinedKind_Throws() =>
         Should.Throw<ArgumentOutOfRangeException>(() => SqlDiagnostics.ForParseError((SqlParseErrorKind)(-1)));
 

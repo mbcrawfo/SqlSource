@@ -269,7 +269,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     // GROUP BY () the node is plain; a LEFT JOIN may extend the group's rows; a window aggregate's frame may be empty;
     // the fifth reads the value of a plain aggregate through a subquery; and in the sixth the outer aggregate is
     // plain, so a grouped subquery under it may hold no group.  An aggregate inside a span that a child of a grouped
-    // node printed is owned by the unit tests of NullabilityWalkTests.
+    // node printed is owned by the unit tests of NullabilityWalkAggregateTests.
     [Theory]
     [InlineData("SELECT max(created_at), sum(balance) FROM users", 0)]
     [InlineData("SELECT max(created_at), sum(balance) FROM users GROUP BY ()", 0)]
