@@ -36,7 +36,7 @@ internal static class TypeModels
             return EquatableArray<ModelRequest>.Empty;
         }
 
-        var usable = TypeEmitter.FindUsableFiles(target, type.Files, null);
+        var usable = TypeEmitter.FindUsableFiles(target, type.Files, type.FileSettings, property, null);
         var requests = ImmutableArray.CreateBuilder<ModelRequest>();
         (string Key, string Name)? claimingType = null;
         for (var index = 0; index < type.Files.Count; index++)

@@ -274,6 +274,16 @@ public sealed class SqlFileParserParameterTests
             .ShouldBe([SqlParseError.Create(SqlParseErrorKind.UndeclaredParameter, TextSpans.Of(Text, "@b"), "@b")]);
     }
 
+    // The default is compared without its comment, and the parameter is still found in the default as written.
+    [Fact]
+    public void Parse_ParameterInAMarkerDefaultAfterAComment_IsReportedWhereItIsWritten()
+    {
+        const string Text = "-- name: Q\n-- token: {{f:/* c */ @p}}\nSELECT {{f}}\n";
+
+        Errors(Text)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.UndeclaredParameter, TextSpans.Of(Text, "@p"), "@p")]);
+    }
+
     [Fact]
     public void Parse_ParameterInADefaultThatIsDeclaredWithAType_IsADeclaredOnlyParameter() =>
         Parameters(

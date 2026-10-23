@@ -335,6 +335,7 @@ internal sealed class SqlMarkerScope(
 
     // The value is exactly one token with a default, as the SQL would write it.  The default is lexed alone, as the
     // parameter list reads it later: a quote or a comment that does not close inside it would swallow what follows.
+    // Two defaults are compared without their comments, as a default in the SQL is read.
     private void ReadToken(SqlMarker marker)
     {
         var value = text.Substring(marker.ValueSpan.Start, marker.ValueSpan.Length);
@@ -355,11 +356,14 @@ internal sealed class SqlMarkerScope(
         }
 
         var defaultText = value.Substring(place.Start, place.Length);
-        if (SqlLexer.Lex(defaultText, rules).Error is not null)
+        var lexed = SqlLexer.Lex(defaultText, rules);
+        if (lexed.Error is not null)
         {
             AddInvalid(marker);
             return;
         }
+
+        var defaultValue = WithoutComments(defaultText, lexed.Lexemes);
 
         _tokenDefaults ??= [];
         foreach (var existing in _tokenDefaults)
@@ -369,7 +373,7 @@ internal sealed class SqlMarkerScope(
                 continue;
             }
 
-            if (!string.Equals(existing.Text, defaultText, StringComparison.Ordinal))
+            if (!string.Equals(existing.Value, defaultValue, StringComparison.Ordinal))
             {
                 AddConflict(marker);
             }
@@ -377,7 +381,26 @@ internal sealed class SqlMarkerScope(
             return;
         }
 
-        _tokenDefaults.Add(new SqlTokenDefault(name, defaultText, marker.ValueSpan.Start + place.Start, marker));
+        _tokenDefaults.Add(
+            new SqlTokenDefault(name, defaultText, defaultValue, marker.ValueSpan.Start + place.Start, marker)
+        );
+    }
+
+    // The default as one in the SQL is read: built without comments by the builder of a query's SQL, then trimmed as
+    // the token scanner trims it.  A default without a comment is its own text and costs nothing more.
+    private static string WithoutComments(string defaultText, EquatableArray<SqlLexeme> lexemes)
+    {
+        for (var index = 0; index < lexemes.Count; index++)
+        {
+            if (lexemes[index].Kind is SqlLexemeKind.LineComment or SqlLexemeKind.BlockComment)
+            {
+                var built = SqlTextBuilder.Build(defaultText, lexemes, 0, lexemes.Count, keepComments: false).Text;
+                var trimmed = SqlText.Trim(built, 0, built.Length);
+                return trimmed.Length == built.Length ? built : built.Substring(trimmed.Start, trimmed.Length);
+            }
+        }
+
+        return defaultText;
     }
 
     // The value is one name, as a C# identifier is written.  A keyword is allowed: it is a token that is not one.

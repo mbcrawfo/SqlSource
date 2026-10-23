@@ -165,6 +165,31 @@ public sealed class SqlTextBuilderTests
         }
     }
 
+    // A stripped comment is not in the built text, so its place maps to where the text before it ends: after the
+    // trimmed blanks and before the line break.
+    [Theory]
+    [InlineData("SELECT a -- c\nFROM t", "--", "SELECT a")]
+    [InlineData("SELECT a -- c", "--", "SELECT a")]
+    [InlineData("SELECT a /* c */ b", "/*", "SELECT a ")]
+    [InlineData("SELECT a /* c */ b", "b", "SELECT a   ")]
+    [InlineData("SELECT a\r\n-- c\r\n\r\nFROM t", "--", "SELECT a")]
+    [InlineData("-- c\nSELECT a", "--", "")]
+    [InlineData("SELECT 'x\r\ny' -- c", "--", "SELECT 'x\ny'")]
+    [InlineData("SELECT a -- c\nFROM t", "FROM", "SELECT a\n")]
+    public void ToOutput_OffsetInTheFile_MapsToTheEndOfTheTextCopiedFromBeforeIt(
+        string text,
+        string at,
+        string expected
+    )
+    {
+        var lexemes = SqlLexer.Lex(text, SqlDialectRules.Ansi).Lexemes;
+        var built = SqlTextBuilder.Build(text, lexemes, 0, lexemes.Count, keepComments: false);
+
+        var output = built.ToOutput(text.IndexOf(at, StringComparison.Ordinal));
+
+        built.Text[..output].ShouldBe(expected);
+    }
+
     [Theory]
     [InlineData("SELECT 1 # c\n# d\nFROM t # e", false, "SELECT 1\nFROM t")]
     [InlineData("SELECT 1 # c\n# d\nFROM t # e", true, "SELECT 1 # c\n# d\nFROM t # e")]

@@ -68,7 +68,8 @@ internal static class TestModels
             markers ?? SettingsLevel.None,
             null,
             null,
-            EquatableArray<ColumnMarker>.Empty
+            EquatableArray<ColumnMarker>.Empty,
+            EquatableArray<DiagnosticInfo>.Empty
         );
 
     // Where "-- name: GetUser" on the first line of the file puts its name.

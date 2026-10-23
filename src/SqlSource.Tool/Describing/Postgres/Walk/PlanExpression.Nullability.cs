@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Kind = SqlSource.Tool.Describing.Postgres.Walk.PlanTokens.Kind;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk;
@@ -52,9 +53,16 @@ internal static partial class PlanExpression
                 return _context.CatalogFunctions ? false : null;
             }
 
+            if (IsCatalogsCount(from, to))
+            {
+                return false;
+            }
+
             if (IsVariadicCall(from, to))
             {
-                return AnyArgumentIsNotNull(from + 2, to - 1) ? false : null;
+                return AnyArgumentIsNotNull(from + 2, to - 1) || FullJoinSides(from + 2, to - 1) is not null
+                    ? false
+                    : null;
             }
 
             if (IsCase(from, to) && CaseResultsAreNotNull(from, to))
@@ -75,26 +83,56 @@ internal static partial class PlanExpression
             && _closes[from + 1] == to - 1;
 
         // Whether an argument, between the commas of depth zero of [from, to), cannot be NULL.
-        private bool AnyArgumentIsNotNull(int from, int to)
+        private bool AnyArgumentIsNotNull(int from, int to) =>
+            ArgumentSpans(from, to).Any(argument => IsNotNull(argument.From, argument.To));
+
+        // The types of the plain references among the arguments of [from, to) that the walk proves on a side of the
+        // full join that computes the entry, when one is on each side; or null.  A row of a full join has a row of one
+        // side at least, so one of the two is not NULL, and COALESCE, GREATEST and LEAST are NULL only when every
+        // argument is.  Read only where the session finds pg_catalog first, as the forms read by their name are.
+        private List<long>? FullJoinSides(int from, int to)
         {
+            if (!_context.CatalogFunctions || _context.ProvedOnFullJoinSide is not { } sideOf)
+            {
+                return null;
+            }
+
+            var types = new List<long>();
+            var outer = false;
+            var inner = false;
+            foreach (var (start, end) in ArgumentSpans(from, to))
+            {
+                if (
+                    end > start
+                    && OutputReference.Parse(Text(start, end)) is { } reference
+                    && sideOf(reference) is { } side
+                )
+                {
+                    outer |= side.OuterSide;
+                    inner |= !side.OuterSide;
+                    types.Add(side.Type);
+                }
+            }
+
+            return outer && inner ? types : null;
+        }
+
+        // The arguments of [from, to), each between the commas of depth zero: one empty span for an empty span.
+        private List<(int From, int To)> ArgumentSpans(int from, int to)
+        {
+            var arguments = new List<(int From, int To)>();
             var start = from;
-            var at = from;
-            while (at < to)
+            for (var at = from; at < to; at = Next(at))
             {
                 if (Is(at, Kind.Comma))
                 {
-                    if (IsNotNull(start, at))
-                    {
-                        return true;
-                    }
-
+                    arguments.Add((start, at));
                     start = at + 1;
                 }
-
-                at = Next(at);
             }
 
-            return IsNotNull(start, to);
+            arguments.Add((start, to));
+            return arguments;
         }
 
         // A value that cannot be NULL: a form that answers false, or a reference the walk proves.
@@ -110,11 +148,17 @@ internal static partial class PlanExpression
 
         private bool IsCase(int from, int to) => to - from >= 2 && IsWord(from, "CASE") && IsWord(to - 1, "END");
 
+        // Whether the CASE has an ELSE and its every result cannot be NULL.
+        private bool CaseResultsAreNotNull(int from, int to) =>
+            CaseResults(from, to) is { } results && results.TrueForAll(result => IsNotNull(result.From, result.To));
+
         // The results of the outermost CASE are after each THEN and after its ELSE, each up to the next WHEN, ELSE or
         // its END; a CASE nested without parentheses is counted, and one in parentheses is skipped whole.  A CASE whose
-        // END comes before the last token is no CASE of the whole span.
-        private bool CaseResultsAreNotNull(int from, int to)
+        // END comes before the last token is no CASE of the whole span, and one without a THEN or an ELSE has no
+        // results: null.
+        private List<(int From, int To)>? CaseResults(int from, int to)
         {
+            var results = new List<(int From, int To)>();
             var nested = 0;
             var resultStart = -1;
             var sawThen = false;
@@ -139,7 +183,7 @@ internal static partial class PlanExpression
                     // The outermost END must be the span's last token.
                     if (at != to - 1)
                     {
-                        return false;
+                        return null;
                     }
 
                     closed = true;
@@ -149,9 +193,9 @@ internal static partial class PlanExpression
                     continue;
                 }
 
-                if (resultStart >= 0 && !IsNotNull(resultStart, at))
+                if (resultStart >= 0)
                 {
-                    return false;
+                    results.Add((resultStart, at));
                 }
 
                 resultStart = -1;
@@ -167,7 +211,7 @@ internal static partial class PlanExpression
                 }
             }
 
-            return closed && sawThen && sawElse;
+            return closed && sawThen && sawElse ? results : null;
         }
     }
 }

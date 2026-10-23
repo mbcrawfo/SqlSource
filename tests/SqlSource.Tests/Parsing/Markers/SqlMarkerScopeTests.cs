@@ -270,6 +270,28 @@ public sealed class SqlMarkerScopeTests
         ]);
     }
 
+    // A comment means nothing to the database, so two defaults that differ only in one are the same default.
+    [Fact]
+    public void Read_TwoTokenDefaultsThatDifferOnlyInAComment_AreNoConflict()
+    {
+        var (scope, errors) = Scope(SqlScopeKind.Query, "-- token: {{f:a /* x */ b}}", "-- token: {{f:a /* y */ b}}");
+
+        errors.ShouldBeEmpty();
+        var tokenDefault = scope.TokenDefaults.ShouldHaveSingleItem();
+        tokenDefault.Text.ShouldBe("a /* x */ b");
+        tokenDefault.Value.ShouldBe("a   b");
+    }
+
+    // A line comment leaves nothing, so a default with one is the default without it.
+    [Fact]
+    public void Read_TokenDefaultWithALineCommentBesideTheSameWithout_IsNoConflict()
+    {
+        var (scope, errors) = Scope(SqlScopeKind.Query, "-- token: {{f:a -- c}}", "-- token: {{f:a}}");
+
+        errors.ShouldBeEmpty();
+        scope.TokenDefaults.ShouldHaveSingleItem().Value.ShouldBe("a");
+    }
+
     // A value that is not valid is another error, and is not what is asked here.
     private static bool IsTaken(string line, SqlScopeKind kind)
     {

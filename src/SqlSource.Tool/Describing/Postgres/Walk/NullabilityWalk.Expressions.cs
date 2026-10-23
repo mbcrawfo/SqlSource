@@ -9,14 +9,15 @@ internal static partial class NullabilityWalk
 {
     // The entries of a plan read as expressions, with a reference inside one answered as the walk answers a column:
     // through an instance that no join extends, to a column of a relation that "tables" or "relations" answered, by the
-    // catalog's rule.  A bare name is the plan's one relation's (PlanInstances.BareAlias): a plan of several prints
-    // every name with its alias but the columns of a relation the planner proved empty, a Result under an outer join,
-    // and at a ModifyTable that may return the old or the new row only the target's alias is a relation.  An entry is
-    // read in a plan where no join null-extends a side, or where the walk follows it to the node that computes it and
-    // no join null-extends that node: a node prints a value computed under it in one pair of parentheses, at every
-    // node up to the root.  An aggregate is read only where the walk follows the entry to the node that computes it.  A
-    // subquery's SubPlan is found by its name in the whole plan and read as a plan of its own, as deep as
-    // Plans.MaxDepth allows.
+    // catalog's rule.  At a Full join that computes the entry, the reader is told too which side an instance that only
+    // that join extends is under (ProvedOnSideOf), for a COALESCE over both sides.  A bare name is the plan's one
+    // relation's (PlanInstances.BareAlias): a plan of several prints every name with its alias but the columns of a
+    // relation the planner proved empty, a Result under an outer join, and at a ModifyTable that may return the old or
+    // the new row only the target's alias is a relation.  An entry is read in a plan where no join null-extends a side,
+    // or where the walk follows it to the node that computes it and no join null-extends that node: a node prints a
+    // value computed under it in one pair of parentheses, at every node up to the root.  An aggregate is read only
+    // where the walk follows the entry to the node that computes it.  A subquery's SubPlan is found by its name in the
+    // whole plan and read as a plan of its own, as deep as Plans.MaxDepth allows.
     private sealed class Expressions(
         Plans plans,
         PlanNode root,
@@ -65,13 +66,15 @@ internal static partial class NullabilityWalk
                 ?? ProvedTypeAt(root, entry, context);
         }
 
-        // What the reader is told of an entry, wherever the walk reads it: the references it proves, and the subplans.
+        // What the reader is told of an entry, wherever the walk reads it: the references it proves, the subplans, and
+        // the names of CatalogOverloads that only pg_catalog holds.
         private ExpressionContext ContextOf(string entry, long columnType) =>
             new(
                 _scope.CatalogFunctionsFirst,
                 ProvedTypeOf,
                 ScalarSubPlanTypeOf: name => IsWhole(entry, name) ? ScalarSubPlanTypeOf(name, columnType) : null,
-                SubPlanColumnTypeOf: SubPlanColumnTypeOf
+                SubPlanColumnTypeOf: SubPlanColumnTypeOf,
+                CatalogAlone: _scope.CatalogAlone
             );
 
         // Whether the entry is the subplan's value and nothing else, once the parentheses that wrap it whole are off.
@@ -229,6 +232,7 @@ internal static partial class NullabilityWalk
                                         .All(found => Preserved(found.Child, found.Printed, depth + 1)),
                                 GroupFromChild = group => Printing(children, group).Any(),
                                 GroupsHaveRows = GroupsHaveRows(node),
+                                ProvedOnFullJoinSide = ProvedOnFullJoinSideOf(node),
                             }
                         ),
                     ];
@@ -329,16 +333,51 @@ internal static partial class NullabilityWalk
         /// table would be not nullable.  When the instance's rows are a partitioned table's partitions
         /// (<see cref="RowsOf" />), each must prove the column, and all of one type.
         /// </summary>
-        public long? ProvedTypeOf(OutputReference reference)
+        public long? ProvedTypeOf(OutputReference reference) =>
+            InstanceOf(reference) is { Instance.NullExtended: false } found
+                ? ProvedTypeThrough(found.Instance, reference.Column)
+                : null;
+
+        // What the reader is told of the sides of the node that computes an entry: only a Full join has any.
+        private Func<OutputReference, (bool OuterSide, long Type)?>? ProvedOnFullJoinSideOf(PlanNode node) =>
+            node.JoinType == PlanJoinTypes.Full ? reference => ProvedOnSideOf(node, reference) : null;
+
+        // Which side of the full join an instance of the reference is under, its Outer child or not, and the type of
+        // its column, when the walk would prove it but for that join: the join computes the entry and no join above
+        // extends it (ComputedAt), and no join under that side extends either, so the join alone extends the instance.
+        private (bool OuterSide, long Type)? ProvedOnSideOf(PlanNode join, OutputReference reference)
+        {
+            if (InstanceOf(reference) is not { } found)
+            {
+                return null;
+            }
+
+            PlanNode[] sides = [.. join.JoinChildren.Where(child => instances.IsUnder(found.Alias, child))];
+            return
+                sides is [var side]
+                && !PlanInstances.ExtendsUnder(side)
+                && ProvedTypeThrough(found.Instance, reference.Column) is { } type
+                ? (side.ParentRelationship == PlanRelationships.Outer, type)
+                : null;
+        }
+
+        // The alias a reference names and its instance: a bare name is the plan's one relation's, unless the
+        // statement may name OLD or NEW, and only the plan's one alias where it has one.
+        private (string Alias, PlanInstance Instance)? InstanceOf(OutputReference reference)
         {
             var alias = reference.Alias ?? (_scope.OldAndNewMayBeNamed ? null : instances.BareAlias);
-            if (
-                alias is null
-                || (onlyAlias is not null && !string.Equals(alias, onlyAlias, StringComparison.Ordinal))
-                || !instances.TryFind(alias, out var instance)
-                || instance.NullExtended
-                || RowsOf(instance) is not [_, ..] rows
-            )
+            return
+                alias is not null
+                && (onlyAlias is null || string.Equals(alias, onlyAlias, StringComparison.Ordinal))
+                && instances.TryFind(alias, out var instance)
+                ? (alias, instance)
+                : null;
+        }
+
+        // The type of the column of the name through the instance's rows, when each proves it, all of one type.
+        private long? ProvedTypeThrough(PlanInstance instance, string column)
+        {
+            if (RowsOf(instance) is not [_, ..] rows)
             {
                 return null;
             }
@@ -346,7 +385,7 @@ internal static partial class NullabilityWalk
             long? type = null;
             foreach (var row in rows)
             {
-                if (ProvedTypeIn(row, reference.Column) is not { } own || (type is { } seen && seen != own))
+                if (ProvedTypeIn(row, column) is not { } own || (type is { } seen && seen != own))
                 {
                     return null;
                 }

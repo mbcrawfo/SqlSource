@@ -23,6 +23,7 @@ public sealed class SqlFileParserTests
         block.Summary.ShouldBeNull();
         block.Markers.ShouldBeSameAs(SettingsLevel.None);
         block.KeptSegments.ShouldBeNull();
+        block.KeptErrors.ShouldBeEmpty();
         block.Segments.ShouldBe([new SqlSegment(SqlSegmentKind.Literal, "SELECT 1;")]);
     }
 

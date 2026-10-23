@@ -765,6 +765,36 @@ public sealed class ModelTests
         ModelFiles(run).ShouldBe(["Other.SqlDto-Model.g.cs"]);
     }
 
+    // A keyword in braces in a comment is SQLSRC114 for First, which keeps the comments, and not for Second, which
+    // does not.
+    [Fact]
+    public void Run_FileExcludedByAnErrorInAKeptComment_GetsNoModelsForThatType()
+    {
+        var source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Parameters = "keep-comments")]
+                public partial class First;
+            }
+
+            namespace Other
+            {
+                [SqlSourceGenerate]
+                public partial class Second;
+            }
+            """;
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1 AS one; -- {{class}}\n");
+
+        var run = Run(source, [file, Sidecars.Of(file, Entry(file, "GetUser", [], [Column("one")]))]);
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC114 ");
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        ModelFiles(run).ShouldBe(["Other.GetUserDto-Model.g.cs"]);
+    }
+
     [Fact]
     public void Run_RecordWithAnArrayColumn_HasAPrivateConstructorWithoutParameters()
     {

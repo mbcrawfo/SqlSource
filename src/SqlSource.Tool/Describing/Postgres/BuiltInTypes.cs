@@ -25,6 +25,7 @@ internal static class BuiltInTypes
     public const long Xid = 28;
     public const long Cid = 29;
     public const long Oidvector = 30;
+    public const long Json = 114;
     public const long Float4 = 700;
     public const long Float8 = 701;
     public const long Bpchar = 1042;
@@ -33,6 +34,13 @@ internal static class BuiltInTypes
     public const long Timestamp = 1114;
     public const long Timestamptz = 1184;
     public const long Numeric = 1700;
+    public const long Jsonb = 3802;
+    public const long Int4range = 3904;
+    public const long Numrange = 3906;
+    public const long Tsrange = 3908;
+    public const long Tstzrange = 3910;
+    public const long Daterange = 3912;
+    public const long Int8range = 3926;
 
     /// <summary>
     /// The internal names of the types that carry a modifier: every built-in type with a typmod input.

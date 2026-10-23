@@ -68,6 +68,12 @@ public sealed class SqlQueryHashTests
         Hash("-- name: Q\n-- param: @a int\n-- param: @b text\nSELECT @a, @b\n")
             .ShouldBe(Hash("-- name: Q\n-- param: @b text\n-- param: @a int\nSELECT @a, @b\n"));
 
+    // A marker's default is hashed without its comments, as an inline one is.
+    [Fact]
+    public void Compute_MarkerDefaultsThatDifferOnlyInAComment_AreEqual() =>
+        Hash("-- name: Q\n-- token: {{f:a /* x */ b}}\nSELECT {{f}}\n")
+            .ShouldBe(Hash("-- name: Q\n-- token: {{f:a /* y */ b}}\nSELECT {{f}}\n"));
+
     [Fact]
     public void Compute_AnyQuery_IsSixtyFourLowerCaseHexCharacters() => Hash(Simple).ShouldMatch("^[0-9a-f]{64}$");
 

@@ -181,6 +181,27 @@ public sealed class SqlFileReaderTests
         query.KeptSegments.ShouldBe(expected is null ? null : TestModels.Array(TestModels.Literal(expected)));
     }
 
+    // "{{class}}" is the 9 characters from 23, on the second line.  Only a type that keeps the comments reports it.
+    [Fact]
+    public void Read_ReservedTokenInAKeptComment_IsAnErrorOfTheQueryAndNotOfTheFile()
+    {
+        var file = Read("-- name: Q\nSELECT 1 -- {{class}}\n", commentsWanted: true);
+
+        file.Errors.ShouldBeEmpty();
+        file.Queries.ShouldHaveSingleItem()
+            .KeptErrors.ShouldBe([
+                DiagnosticInfo.Create(
+                    SqlDiagnostics.ReservedTokenName,
+                    Location(new TextSpan(23, 9), 1, 12, 1, 21),
+                    "class"
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Read_QueryWithoutAKeptForm_HasNoErrorsOfIt() =>
+        Read("-- name: Q\nSELECT 1 -- {{class}}\n").Queries.ShouldHaveSingleItem().KeptErrors.ShouldBeEmpty();
+
     [Fact]
     public void Read_SameText_GivesEqualResults()
     {

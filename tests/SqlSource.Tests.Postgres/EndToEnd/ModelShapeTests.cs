@@ -202,13 +202,23 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Build_ColumnMarker_MakesTheCountNotNull() =>
+    public void Build_CountOfAnExtendedSide_IsNotNull() =>
         ShouldBeModel(
             typeof(CountAccountNotesDto),
             $"{Namespace}.CountAccountNotesDto",
             ModelShape.SealedRecord,
             ("Id", typeof(int), false),
             ("NoteCount", typeof(long), false)
+        );
+
+    [Fact]
+    public void Build_ColumnMarker_MakesTheExpressionNotNull() =>
+        ShouldBeModel(
+            typeof(ListDisplayNamesDto),
+            $"{Namespace}.ListDisplayNamesDto",
+            ModelShape.SealedRecord,
+            ("Id", typeof(int), false),
+            ("DisplayName", typeof(string), false)
         );
 
     [Fact]
