@@ -4,8 +4,11 @@ using Microsoft.CodeAnalysis.CSharp;
 namespace SqlSource.Parsing.Tokens;
 
 /// <summary>
-/// Finds the token whose default is open at each of a series of offsets of one SQL text, as
-/// <see cref="TokenScanner.FindOpenDefault" /> does for one, reading each character once over the series.
+/// Finds the token whose default is open at each of a series of offsets of one SQL text, reading each character once
+/// over the series.  A default is open at an offset when the first opener of a default after the last <c>}}</c> that
+/// ends at or before the offset, <c>{{</c>, blanks, a valid name, blanks and a colon, starts before the offset.  An
+/// ignored name opens a default too: <see cref="TokenScanner.Scan" /> reads its token to the next <c>}}</c> as it
+/// does any other.
 /// </summary>
 /// <param name="sql">The SQL.</param>
 internal sealed class OpenDefaultFinder(string sql)
@@ -19,6 +22,11 @@ internal sealed class OpenDefaultFinder(string sql)
 
     // The offset of the last call.
     private int _offset;
+
+    /// <summary>
+    /// Where the opener of the default that the last call found starts, or -1 when it found none.
+    /// </summary>
+    public int OpenerStart { get; private set; } = -1;
 
     /// <summary>
     /// Gives the name of the token whose default is open at <paramref name="offset" />, or null.  The offsets of
@@ -38,10 +46,12 @@ internal sealed class OpenDefaultFinder(string sql)
             if (index + 2 <= offset && sql[index] == '}' && sql[index + 1] == '}')
             {
                 _open = null;
+                OpenerStart = -1;
             }
-            else
+            else if (_open is null && ReadOpener(index) is { } name)
             {
-                _open ??= ReadOpener(index);
+                _open = name;
+                OpenerStart = index;
             }
         }
 

@@ -23,6 +23,8 @@ public sealed class GeneratorParameterLevelTests
 
     private const string ReservedTokenInAComment = "-- name: Q\nSELECT 1 -- {{class}}\n";
 
+    private const string DefaultOpenedInAComment = "-- name: Q\nSELECT * -- e.g. {{note: here\nFROM t WHERE {{w}}\n";
+
     private const string Check = "global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);";
 
     [Theory]
@@ -162,6 +164,44 @@ public sealed class GeneratorParameterLevelTests
         ]);
         run.CompilationErrors.ShouldBeEmpty();
         run.Sources["App.Plain.g.cs"].ShouldContain("public const string Q = \"SELECT 1\";");
+        run.Sources["App.Kept.g.cs"].ShouldNotContain("string Q");
+    }
+
+    // The comment opens a default that the SQL closes, so with the comments kept the query reads another token.  It
+    // is an error only for the type that keeps the comments, whose file then gives no members, and the other type
+    // emits the query with its token w.
+    [Fact]
+    public void Run_CommentThatOpensATokenDefault_IsReportedOnlyForATypeThatKeepsComments()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App;
+
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct, Parameters = "default")]
+            public partial class Plain
+            {
+                public static string Sql() => Q("x");
+            }
+
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            public partial class Kept { }
+            """;
+
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [new SqlFile("/app/Repo/Q.sql", DefaultOpenedInAComment)],
+            generatorParameters: "keep-comments"
+        );
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC120 /app/Repo/Q.sql(2,10)-(2,30): The default of token 'note' starts and ends on different sides of "
+                + "a comment's edge, so it is read differently where comments are kept.  Keep the whole token inside "
+                + "the comment or outside it.",
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources["App.Plain.g.cs"].ShouldContain("public static string Q(string w)");
         run.Sources["App.Kept.g.cs"].ShouldNotContain("string Q");
     }
 

@@ -43,7 +43,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC117](#sqlsrc117) | Parameter has no type |
 | [SQLSRC118](#sqlsrc118) | Parameter is not declared |
 | [SQLSRC119](#sqlsrc119) | Query has no parameters |
-| [SQLSRC120](#sqlsrc120) | Comment hides the end of a token |
+| [SQLSRC120](#sqlsrc120) | Token default crosses a comment |
 
 **The tool**
 
@@ -774,9 +774,11 @@ See: [Name of one query's model](settings.md#setting-model-name)
 
 ## SQLSRC120
 
-**Comment hides the end of a token**
+**Token default crosses a comment**
 
-A comment inside the default of a token holds `}}`.  Comments are removed before tokens are found, so those braces do not end the token: its default runs on to the next `}}`, and a token written before that `}}` is lost.  A `--` comment runs to the end of its line, so the `}}` written after one on that line is part of the comment.  The same holds for a name in a `-- token-ignore:` marker, whose text runs to the same `}}`.
+A token's default starts on one side of a comment's edge and ends on the other.  Comments are removed before tokens are found, and a query that keeps its comments (the `keep-comments` [generator parameter](settings.md#setting-generator-parameters)) has its tokens found in the SQL with them as well, so the two would read different tokens.  It happens two ways.
+
+A comment inside a default holds `}}`.  Without the comment those braces are gone, so the default runs on to the next `}}`, and a token written before that `}}` is lost.  A `--` comment runs to the end of its line, so the `}}` written after one on that line is part of the comment.  The comment is an error wherever the file is used.
 
 ```sql error
 -- name: ListUsers
@@ -784,7 +786,16 @@ SELECT id FROM users WHERE 1 = 1 {{filter:AND active -- only live rows}}
 ORDER BY {{orderBy:name}};
 ```
 
-Move the comment out of the default, onto a line of its own before the query or after the token's `}}`.
+A comment opens a default, `{{name:`, and the SQL after the comment closes it.  Without comments the query is as you wrote it, but where comments are kept the default runs from the comment to the next `}}`, and the token after it is lost.  This is an error only for a type that keeps the query's comments, and that type gets no members from the file until it is fixed.  A token written whole inside a comment, such as `-- see {{note:x}}`, is fine.
+
+```sql error
+-- name: ListUsers
+-- generator: keep-comments
+SELECT id -- e.g. {{note: here
+FROM users WHERE {{filter}};
+```
+
+Both hold for a name in a `-- token-ignore:` marker too, whose text runs to the same `}}`.  Keep the whole token inside the comment or outside it: move the comment out of the default, onto a line of its own, or close the token inside the comment.
 
 See: [Defaults](parameters-and-tokens.md#token-defaults)
 

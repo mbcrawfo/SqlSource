@@ -71,16 +71,6 @@ internal static class TokenScanner
         );
     }
 
-    /// <summary>
-    /// Finds the token whose default is open at <paramref name="offset" /> of <paramref name="sql" />: the first
-    /// opener of a default, <c>{{</c>, blanks, a valid name, blanks and a colon, after the last <c>}}</c> that ends at
-    /// or before the offset, and before the offset itself.  An ignored name opens a default too: <see cref="Scan" />
-    /// reads its token to the next <c>}}</c> as it does any other.  <see cref="OpenDefaultFinder" /> answers the
-    /// same for several offsets in one pass.
-    /// </summary>
-    /// <returns>The token's name, or null when no default is open there.</returns>
-    public static string? FindOpenDefault(string sql, int offset) => new OpenDefaultFinder(sql).At(offset);
-
     private static void AddLiteral(ImmutableArray<SqlSegment>.Builder segments, string sql, int start, int end)
     {
         if (end > start)

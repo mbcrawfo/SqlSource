@@ -87,15 +87,15 @@ public sealed class SqlDiagnosticsTests
         SqlDiagnostics.ForParseError(SqlParseErrorKind.InputModelWithoutParameters).Id.ShouldBe("SQLSRC119");
 
     [Fact]
-    public void ForParseError_CommentInTokenDefault_IsSqlsrc120() =>
-        SqlDiagnostics.ForParseError(SqlParseErrorKind.CommentInTokenDefault).Id.ShouldBe("SQLSRC120");
+    public void ForParseError_TokenDefaultCrossesComment_IsSqlsrc120() =>
+        SqlDiagnostics.ForParseError(SqlParseErrorKind.TokenDefaultCrossesComment).Id.ShouldBe("SQLSRC120");
 
     [Fact]
-    public void CommentInTokenDefault_Message_HoldsTheTokenAndTheBraces() =>
-        Format(SqlDiagnostics.CommentInTokenDefault, "filter")
+    public void TokenDefaultCrossesComment_Message_HoldsTheToken() =>
+        Format(SqlDiagnostics.TokenDefaultCrossesComment, "filter")
             .ShouldBe(
-                "A comment inside the default of token 'filter' holds '}}', which does not end the token.  Move the "
-                    + "comment out of the default."
+                "The default of token 'filter' starts and ends on different sides of a comment's edge, so it is read "
+                    + "differently where comments are kept.  Keep the whole token inside the comment or outside it."
             );
 
     [Fact]

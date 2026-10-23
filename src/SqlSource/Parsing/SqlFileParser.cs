@@ -354,7 +354,7 @@ internal static class SqlFileParser
                     && (finder ??= new OpenDefaultFinder(sql.Text)).At(sql.ToOutput(lexeme.Span.Start)) is { } name
                 )
                 {
-                    AddError(SqlParseErrorKind.CommentInTokenDefault, lexeme.Span, name);
+                    AddError(SqlParseErrorKind.TokenDefaultCrossesComment, lexeme.Span, name);
                 }
             }
         }
@@ -383,10 +383,10 @@ internal static class SqlFileParser
         }
 
         // The SQL with its comments, or null when it is the stripped SQL: one form then serves.  A token can stand
-        // in a comment, so this form is scanned too.  Its errors are not the file's: a type that claims the file may
-        // not keep the comments, so they go with the block, for the type that emits this form to report.  An error
-        // of the stripped form is the file's already, and a file with one has no blocks, so only the comments' own
-        // errors are seen.
+        // in a comment, so this form is scanned too, and a comment can open a default that the SQL after it closes.
+        // These errors are not the file's: a type that claims the file may not keep the comments, so they go with the
+        // block, for the type that emits this form to report.  An error of the stripped form is the file's already,
+        // and a file with one has no blocks, so only the comments' own errors are seen.
         private (EquatableArray<SqlSegment>? Segments, EquatableArray<SqlParseError> Errors) BuildKept(
             int start,
             int end,
@@ -401,18 +401,63 @@ internal static class SqlFileParser
             }
 
             var scanned = TokenScanner.Scan(kept.Text, ignoredTokens);
-            if (scanned.Errors.Count == 0)
-            {
-                return (scanned.Segments, EquatableArray<SqlParseError>.Empty);
-            }
 
-            var errors = ImmutableArray.CreateBuilder<SqlParseError>(scanned.Errors.Count);
+            // Created at the first error: most kept forms have none.
+            ImmutableArray<SqlParseError>.Builder? errors = null;
             foreach (var error in scanned.Errors)
             {
-                errors.Add(error with { Span = kept.ToSourceSpan(error.Span) });
+                (errors ??= ImmutableArray.CreateBuilder<SqlParseError>()).Add(
+                    error with
+                    {
+                        Span = kept.ToSourceSpan(error.Span),
+                    }
+                );
             }
 
-            return (scanned.Segments, new EquatableArray<SqlParseError>(errors.MoveToImmutable()));
+            FindOpenedDefaults(kept, start, end, ref errors);
+            return (
+                scanned.Segments,
+                errors is null
+                    ? EquatableArray<SqlParseError>.Empty
+                    : new EquatableArray<SqlParseError>(errors.ToImmutable())
+            );
+        }
+
+        // The mirror of FindHiddenTokenEnds: a comment that opens a default which the SQL after it closes is a token
+        // only where the comments are kept, and its default takes the SQL up to those braces.  A default open at the
+        // comment's end whose opener is before the comment is the same token in both forms.  Only a comment that holds
+        // "{{" is looked at further, and the comments' places in the kept SQL only grow, so one finder reads it once.
+        private void FindOpenedDefaults(
+            SqlBlockText kept,
+            int start,
+            int end,
+            ref ImmutableArray<SqlParseError>.Builder? errors
+        )
+        {
+            OpenDefaultFinder? finder = null;
+            for (var index = start; index < end; index++)
+            {
+                var lexeme = lexemes[index];
+                if (
+                    lexeme.Kind is not (SqlLexemeKind.LineComment or SqlLexemeKind.BlockComment)
+                    || text.IndexOf("{{", lexeme.Span.Start, lexeme.Span.Length, StringComparison.Ordinal) < 0
+                )
+                {
+                    continue;
+                }
+
+                var commentEnd = kept.ToOutput(lexeme.Span.End);
+                if (
+                    (finder ??= new OpenDefaultFinder(kept.Text)).At(commentEnd) is { } name
+                    && finder.OpenerStart >= kept.ToOutput(lexeme.Span.Start)
+                    && kept.Text.IndexOf("}}", commentEnd, StringComparison.Ordinal) >= 0
+                )
+                {
+                    (errors ??= ImmutableArray.CreateBuilder<SqlParseError>()).Add(
+                        SqlParseError.Create(SqlParseErrorKind.TokenDefaultCrossesComment, lexeme.Span, name)
+                    );
+                }
+            }
         }
 
         // The place is checked first: a marker in the wrong place is reported as that, whatever it names.

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using Shouldly;
 using SqlSource.Parsing.Tokens;
@@ -21,7 +22,7 @@ public sealed partial class OpenDefaultFinderTests
 
         for (var offset = 0; offset <= sql.Length; offset++)
         {
-            finder.At(offset).ShouldBe(Expected(sql, offset), $"offset {offset}");
+            (finder.At(offset), finder.OpenerStart).ShouldBe(Expected(sql, offset), $"offset {offset}");
         }
     }
 
@@ -33,7 +34,7 @@ public sealed partial class OpenDefaultFinderTests
 
         foreach (var offset in new[] { 0, 3, 3, 7, 7, 15, 16, 25, 25 })
         {
-            finder.At(offset).ShouldBe(Expected(Sql, offset), $"offset {offset}");
+            (finder.At(offset), finder.OpenerStart).ShouldBe(Expected(Sql, offset), $"offset {offset}");
         }
     }
 
@@ -47,19 +48,53 @@ public sealed partial class OpenDefaultFinderTests
     }
 
     [Theory]
+    [InlineData("{{f:a ", 6, "f", 0)]
+    [InlineData("{{f:a}} ", 8, null, -1)]
+    [InlineData("{{1:a ", 6, null, -1)]
+    [InlineData("{{ :a ", 6, null, -1)]
+    [InlineData("{{f a ", 6, null, -1)]
+    [InlineData("{{f:{{g:a ", 10, "f", 0)]
+    [InlineData("{{ f :a ", 8, "f", 0)]
+    [InlineData("{{f:a}} {{g:b ", 14, "g", 8)]
+    [InlineData("{{f:a}} {{g:b ", 8, null, -1)]
+    [InlineData("{{1:x {{g:b ", 12, "g", 6)]
+    [InlineData("{{f:a ", 0, null, -1)]
+    [InlineData("", 0, null, -1)]
+    public void At_Offset_GivesTheTokenWhoseDefaultIsOpenThereAndWhereItsOpenerStarts(
+        string sql,
+        int offset,
+        string? expected,
+        int openerStart
+    )
+    {
+        var finder = new OpenDefaultFinder(sql);
+
+        finder.At(offset).ShouldBe(expected);
+        finder.OpenerStart.ShouldBe(openerStart);
+    }
+
+    // The scanner reads an ignored token to its closing braces as it does any other, so its default is open too.
+    [Fact]
+    public void At_OpenerOfAnIgnoredName_GivesThatName()
+    {
+        TokenScanner.Scan("{{f:x {{g:a}}", new HashSet<string> { "f" }).Occurrences.ShouldBeEmpty();
+        new OpenDefaultFinder("{{f:x {{g:a ").At(12).ShouldBe("f");
+    }
+
+    [Theory]
     [InlineData("{{f:a}} {{g:b }} c {{h:d ")]
     [InlineData("x}}}{{f:{{g:a}}}}{{ h :b}")]
-    public void FindOpenDefault_EveryOffset_GivesTheRulesAnswer(string sql)
+    public void At_NewFinderAtEachOffset_GivesTheRulesAnswer(string sql)
     {
         for (var offset = 0; offset <= sql.Length; offset++)
         {
-            TokenScanner.FindOpenDefault(sql, offset).ShouldBe(Expected(sql, offset), $"offset {offset}");
+            new OpenDefaultFinder(sql).At(offset).ShouldBe(Expected(sql, offset).Name, $"offset {offset}");
         }
     }
 
     // The rule, written out for ASCII names: search back for the last "}}" that ends at or before the offset, then
     // forward for the first opener that starts before it.
-    private static string? Expected(string sql, int offset)
+    private static (string? Name, int OpenerStart) Expected(string sql, int offset)
     {
         var bound = 0;
         for (var index = offset - 2; index >= 0; index--)
@@ -75,11 +110,11 @@ public sealed partial class OpenDefaultFinderTests
         {
             if (match.Index < offset)
             {
-                return match.Groups[1].Value;
+                return (match.Groups[1].Value, match.Index);
             }
         }
 
-        return null;
+        return (null, -1);
     }
 
     [GeneratedRegex(@"(?=\{\{[ \t]*([A-Za-z_][A-Za-z0-9_]*)[ \t]*:)", RegexOptions.CultureInvariant)]

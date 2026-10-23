@@ -180,30 +180,6 @@ public sealed class TokenScannerTests
         Defaults("{{1a: {{b:x}}").ShouldBe(["b=x"]);
     }
 
-    [Theory]
-    [InlineData("{{f:a ", 6, "f")]
-    [InlineData("{{f:a}} ", 8, null)]
-    [InlineData("{{1:a ", 6, null)]
-    [InlineData("{{ :a ", 6, null)]
-    [InlineData("{{f a ", 6, null)]
-    [InlineData("{{f:{{g:a ", 10, "f")]
-    [InlineData("{{ f :a ", 8, "f")]
-    [InlineData("{{f:a}} {{g:b ", 14, "g")]
-    [InlineData("{{f:a}} {{g:b ", 8, null)]
-    [InlineData("{{1:x {{g:b ", 12, "g")]
-    [InlineData("{{f:a ", 0, null)]
-    [InlineData("", 0, null)]
-    public void FindOpenDefault_Offset_GivesTheTokenWhoseDefaultIsOpenThere(string sql, int offset, string? expected) =>
-        TokenScanner.FindOpenDefault(sql, offset).ShouldBe(expected);
-
-    // The scanner reads an ignored token to its closing braces as it does any other, so its default is open too.
-    [Fact]
-    public void FindOpenDefault_OpenerOfAnIgnoredName_GivesThatName()
-    {
-        TokenScanner.Scan("{{f:x {{g:a}}", new HashSet<string> { "f" }).Occurrences.ShouldBeEmpty();
-        TokenScanner.FindOpenDefault("{{f:x {{g:a ", 12).ShouldBe("f");
-    }
-
     private static string[] Defaults(string sql, params string[] ignoredNames) =>
         [
             .. TokenScanner

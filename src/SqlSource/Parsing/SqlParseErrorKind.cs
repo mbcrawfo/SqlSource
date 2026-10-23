@@ -93,8 +93,10 @@ internal enum SqlParseErrorKind
     InputModelWithoutParameters,
 
     /// <summary>
-    /// A comment inside the default of a token holds <c>}}</c>, which the SQL without comments does not have, so the
-    /// default does not end there.  Argument: the token's name.
+    /// The default of a token starts on one side of a comment's edge and ends on the other, so the SQL without
+    /// comments and the SQL with them read it differently: a comment holds the <c>}}</c> of a default that is open in
+    /// the SQL without comments, an error of the file; or a comment opens a default that the SQL after it closes, an
+    /// error of the form with comments alone.  Argument: the token's name.
     /// </summary>
-    CommentInTokenDefault,
+    TokenDefaultCrossesComment,
 }
