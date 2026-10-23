@@ -2348,7 +2348,7 @@ See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)
 
 **File is not saved as UTF-8**
 
-The tool reports a `.sql` file saved in another encoding, such as Windows-1252, when a query of it needs an entry in its sidecar or when the tool cannot read the file as SQL.  A file that starts with a byte order mark is never reported.  Such a file has no one text: a build on Windows reads it in the system's code page, while the tool, and a build on macOS or Linux, read each character that is not UTF-8 as a replacement character, `�`, which then stands in the generated SQL too.  The tool describes no query of the file until it is saved as UTF-8.  A file whose queries all have the output `sql` is not reported.
+The tool reports a `.sql` file saved in another encoding, such as Windows-1252, when a query of it needs an entry in its sidecar or when the tool cannot read the file as SQL.  A file that starts with a byte order mark is never reported.  Such a file has no one text: a build on Windows reads it in the system's code page, while the tool, and a build on macOS or Linux, read each character that is not UTF-8 as a replacement character, `�`, which then stands in the generated SQL too.  The tool describes no query of the file until it is saved as UTF-8.  A file that the tool can read as SQL and whose queries all have the output `sql` is not reported.
 
 The build does not report this error itself.  It reports a query of the file that has no entry as missing one ([SQLSRC241](#sqlsrc241)), and on Windows, when the characters outside ASCII are in a query's SQL and not only in its comments, reports the query's entry as out of date ([SQLSRC244](#sqlsrc244)).  Otherwise the build may report nothing while the tool reports the file.
 
