@@ -77,13 +77,15 @@ public sealed class PostgresLiveTests
                 )
             );
 
+    // Another error of the pooler has the same SQLSTATE, as a full pool's query_wait_timeout in transaction mode: it is
+    // no refusal of the transaction, and is answered as any other server error.
     [Theory]
-    [InlineData("57P01")]
-    [InlineData("08006")]
-    public void RefusedTransaction_OtherServerError_IsNull(string state) =>
-        PostgresLive
-            .RefusedTransaction(new PostgresException("terminating connection", "FATAL", "FATAL", state))
-            .ShouldBeNull();
+    [InlineData("57P01", "terminating connection")]
+    [InlineData("08006", "terminating connection")]
+    [InlineData("08P01", "query_wait_timeout")]
+    [InlineData("08P01", "server login failed: wrong password type")]
+    public void RefusedTransaction_OtherServerError_IsNull(string state, string message) =>
+        PostgresLive.RefusedTransaction(new PostgresException(message, "FATAL", "FATAL", state)).ShouldBeNull();
 
     [Fact]
     public void RefusedTransaction_LostConnection_IsNull() =>

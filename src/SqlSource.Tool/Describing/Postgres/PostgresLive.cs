@@ -33,16 +33,18 @@ internal sealed class PostgresLive(PostgresConnection connection)
     public const string StatementNotListed = "the server does not list the statement it prepared";
 
     /// <summary>
-    /// What <c>prepare</c> answers, beside the SQLSTATE <c>08P01</c>, when the server refuses the describe's
-    /// transaction with that SQLSTATE, as a pooler in statement mode does: such a connection does not keep a session
-    /// for the calls of a describe.  The text of the refusal is not kept, since an error of class <c>08</c> holds
-    /// the describer's own text (<see cref="ConnectionErrors" />).
+    /// What <c>prepare</c> answers, beside the SQLSTATE <c>08P01</c>, when a pooler in statement mode refuses the
+    /// describe's transaction: such a connection does not keep a session for the calls of a describe.  The text of
+    /// the refusal is not kept, since an error of class <c>08</c> holds the describer's own text
+    /// (<see cref="ConnectionErrors" />).
     /// </summary>
     public const string TransactionRefused = "the server refused the transaction of a describe";
 
-    // The SQLSTATE of a protocol violation, which PgBouncer in statement mode answers a BEGIN with.  PostgreSQL itself
-    // answers no BEGIN or SAVEPOINT with it.
+    // The SQLSTATE of a protocol violation, which PgBouncer gives every error of its own, and the message with which
+    // PgBouncer in statement mode refuses a transaction.  PgBouncer does not translate its messages, so the refusal is
+    // told from its other errors, a full pool's query_wait_timeout for one, by the message.
     private const string ProtocolViolation = "08P01";
+    private const string StatementModeRefusal = "transaction blocks not allowed in statement pooling mode";
 
     // The settings of a session that change a description, in the order "open" answers them.
     private static readonly string[] SettingNames = ["search_path", "plan_cache_mode", "standard_conforming_strings"];
@@ -304,11 +306,12 @@ internal sealed class PostgresLive(PostgresConnection connection)
         );
 
     /// <summary>
-    /// The answer of <c>prepare</c> when the exception that began the describe's transaction is the server's refusal
-    /// of it, <c>08P01</c>, or null for any other.  Internal for a test.
+    /// The answer of <c>prepare</c> when the exception that began the describe's transaction is a pooler's refusal of
+    /// it in statement mode, <c>08P01</c> with PgBouncer's message, or null for any other, which
+    /// <see cref="ConnectionErrors.Of" /> answers.  Internal for a test.
     /// </summary>
     internal static PostgresPrepareAnswer? RefusedTransaction(NpgsqlException exception) =>
-        exception is PostgresException { SqlState: ProtocolViolation }
+        exception is PostgresException { SqlState: ProtocolViolation, MessageText: StatementModeRefusal }
             ? new PostgresPrepareAnswer(
                 null,
                 new PostgresServerError(ProtocolViolation, TransactionRefused, null, null, null)
