@@ -533,6 +533,14 @@ public sealed class RedactionTests : IDisposable
         Redaction.Of(failure, secret).ServerLines.ShouldBe(["a *** b"]);
     }
 
+    [Fact]
+    public void OfJoined_NothingFound_IsTheSameTexts()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=hunter22", ["hunter22"]);
+
+        Redaction.OfJoined(["a", "latest_hunt", "er22x", ""], secret).ShouldBe(["a", "latest_hunt", "er22x", ""]);
+    }
+
     // A descriptor of the fake's id with the format a describer built.  The id is no constant, so release tracking
     // has no row for it.
     private static DiagnosticDescriptor WithFormat(string format) =>
