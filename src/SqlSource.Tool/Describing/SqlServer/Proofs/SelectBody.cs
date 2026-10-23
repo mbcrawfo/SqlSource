@@ -217,8 +217,10 @@ internal sealed record SelectBody(
         return depth == 0;
     }
 
-    // The indexes of a balanced range's tokens that stand at its own level.
-    private static IEnumerable<int> AtLevel(IReadOnlyList<TsqlToken> tokens, TokenRange range)
+    /// <summary>
+    /// The indexes of a balanced range's tokens that stand at its own level, by <see cref="DepthChange" />.
+    /// </summary>
+    internal static IEnumerable<int> AtLevel(IReadOnlyList<TsqlToken> tokens, TokenRange range)
     {
         var depth = 0;
         for (var index = range.Start; index < range.End; index++)
