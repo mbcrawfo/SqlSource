@@ -45,7 +45,7 @@ Next id: `TD-0076`
 | [TD-0072](TD-0072-sql-server-2025-container-crashes-at-start-in-ci.md) | Open | 2026-10-22 | Low | A SQL Server 2025 test container sometimes crashes as it starts in CI, for a reason not known; the tests start another, once, and report it in the job's summary, but two crashes in a row still fail every test of that project |
 | [TD-0073](TD-0073-duplicated-and-uneven-patterns-in-src.md) | Open | 2026-10-22 | Low | Duplicated and uneven patterns in `src/`, most between the two describers: the opening of a session, errors, events, the reading of a version, of a parameter's name and of a system schema, and names that differ by engine |
 | [TD-0074](TD-0074-duplicated-tests-across-the-engine-projects.md) | Open | 2026-10-22 | Low | Tests copied between the engine projects and helpers written per project: the realistic harness, reading a model by reflection, the driver tests' file and type, the containers' gates, and classes that cover several subjects |
-| [TD-0075](TD-0075-tests-that-depend-on-the-clock-or-the-runtime.md) | Open | 2026-10-22 | Low | A few tests depend on the real clock: one can pass without testing what it names, and others can fail on a slow runner |
+| [TD-0075](TD-0075-tests-that-depend-on-the-real-clock.md) | Open | 2026-10-22 | Low | A few tests depend on the real clock: one can pass without testing what it names, and others can fail on a slow runner |
 
 ## Columns
 

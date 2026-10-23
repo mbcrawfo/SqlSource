@@ -1,6 +1,7 @@
 using System;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Generation;
@@ -11,29 +12,29 @@ public sealed class RealisticModelsTests
 {
     [Fact]
     public void OutputModelOf_EntryThatMatchesATable_IsTheTableModel() =>
-        RealisticModels.OutputModelOf(EntryOf("table-statement")).ShouldBe(typeof(BillingInvoicesDto));
+        RealisticCases.Models.OutputModelOf(EntryOf("table-statement")).ShouldBe(typeof(BillingInvoicesDto));
 
     [Fact]
     public void OutputModelOf_Entry_IsTheQueryModel() =>
-        RealisticModels.OutputModelOf(EntryOf("cte-chain")).ShouldBe(typeof(ListCustomerLifetimeValueDto));
+        RealisticCases.Models.OutputModelOf(EntryOf("cte-chain")).ShouldBe(typeof(ListCustomerLifetimeValueDto));
 
     [Fact]
     public void OutputModelOf_EntryWithoutAModel_ThrowsNamingTheType()
     {
         var entry = EntryOf("cte-chain") with { Name = "Missing" };
 
-        var thrown = Should.Throw<InvalidOperationException>(() => RealisticModels.OutputModelOf(entry));
+        var thrown = Should.Throw<InvalidOperationException>(() => RealisticCases.Models.OutputModelOf(entry));
 
-        thrown.Message.ShouldContain($"{typeof(RealisticModels).Namespace}.MissingDto");
+        thrown.Message.ShouldContain($"{typeof(RealisticModelsTests).Namespace}.MissingDto");
     }
 
     [Fact]
     public void InputModelOf_EntryWithParameters_IsTheQueryModel() =>
-        RealisticModels.InputModelOf(EntryOf("table-statement")).ShouldBe(typeof(ListLatestInvoicesArgs));
+        RealisticCases.Models.InputModelOf(EntryOf("table-statement")).ShouldBe(typeof(ListLatestInvoicesArgs));
 
     [Fact]
     public void InputModelOf_EntryWithoutParameters_IsNull() =>
-        RealisticModels.InputModelOf(EntryOf("cte-chain")).ShouldBeNull();
+        RealisticCases.Models.InputModelOf(EntryOf("cte-chain")).ShouldBeNull();
 
-    private static SidecarEntry EntryOf(string name) => RealisticModels.EntryOf(RealisticCases.ReadNamed(name));
+    private static SidecarEntry EntryOf(string name) => RealisticModels.EntryOf(RealisticCases.Corpus.ReadNamed(name));
 }

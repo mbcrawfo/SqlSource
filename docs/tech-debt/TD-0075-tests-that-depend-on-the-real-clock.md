@@ -1,4 +1,4 @@
-# TD-0075 - Tests that depend on the clock or the runtime
+# TD-0075 - Tests that depend on the real clock
 
 ## Problem
 

@@ -32,14 +32,14 @@ public sealed class RealisticNullabilityNoiseTests(PostgresContainer postgres)
         var held = Budgets[major];
 
         var count = 0;
-        foreach (var found in RealisticCases.All.Where(candidate => candidate.Refusal is null))
+        foreach (var found in RealisticCases.Corpus.All.Where(candidate => candidate.Refusal is null))
         {
             if (!found.RunsOn(major))
             {
                 continue;
             }
 
-            var described = await RealisticDescribe.DescribeOnceAsync(found, postgres.RealisticConnectionString);
+            var described = await RealisticCases.Describe.DescribeOnceAsync(found, postgres.RealisticConnectionString);
             count += RealisticNoise.CountOf(found, RealisticDescriptions.ColumnsOf(found, described));
         }
 

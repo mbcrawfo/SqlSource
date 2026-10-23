@@ -25,11 +25,11 @@ public sealed class RealisticDapperTests(SqlServerContainer sqlServer)
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
     public async Task QueryAsync_Case_ReadsEveryRowIntoItsModel(string name)
     {
-        var found = RealisticCases.ReadNamed(name);
+        var found = RealisticCases.Corpus.ReadNamed(name);
         SkipUnlessRead(found, sqlServer.Major);
         var entry = RealisticModels.EntryOf(found);
-        var output = RealisticModels.OutputModelOf(entry);
-        var input = RealisticModels.InputModelOf(entry);
+        var output = RealisticCases.Models.OutputModelOf(entry);
+        var input = RealisticCases.Models.InputModelOf(entry);
         var sql = SqlOf(found, entry);
         await using var connection = EndToEndSources.Realistic(sqlServer);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
@@ -75,7 +75,7 @@ public sealed class RealisticDapperTests(SqlServerContainer sqlServer)
     // writes on the class itself.
     private static string SqlOf(RealisticCase found, SidecarEntry entry)
     {
-        var claim = RealisticClaims.Of(found);
+        var claim = RealisticClaims.Of(RealisticCases.Corpus, found);
         var assembly = typeof(RealisticDapperTests).Assembly;
         var type =
             assembly.GetType($"{typeof(RealisticDapperTests).Namespace}.{claim.TypeName}")

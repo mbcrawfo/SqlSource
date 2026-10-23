@@ -1,7 +1,6 @@
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
-using SqlSource.Tests.Postgres.Realistic.Generation;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
@@ -26,9 +25,9 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
     public async Task DescribeAsync_Case_IsRefusedOnlyAsItsCaseSays(string name)
     {
-        var found = RealisticDescribe.Start(name, postgres.Major);
+        var found = RealisticCases.Describe.Start(name, postgres.Major);
 
-        var described = await RealisticDescribe.DescribeOnceAsync(found, postgres.RealisticConnectionString);
+        var described = await RealisticCases.Describe.DescribeOnceAsync(found, postgres.RealisticConnectionString);
 
         if (found.Refusal is { } refusal)
         {
@@ -47,7 +46,7 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
     public async Task DescribeAsync_Case_IsItsCommittedEntry(string name)
     {
-        var found = RealisticDescribe.Start(name, postgres.Major);
+        var found = RealisticCases.Describe.Start(name, postgres.Major);
         postgres.SkipUnlessRecordedMajor("The committed entries");
         Assert.SkipUnless(found.HasModels, $"{found} has no models, and so no sidecar.");
         Assert.SkipUnless(
@@ -56,10 +55,10 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
         );
         var committed = RealisticModels.EntryOf(found);
 
-        var described = await RealisticDescribe.DescribeOnceAsync(found, postgres.RealisticConnectionString);
+        var described = await RealisticCases.Describe.DescribeOnceAsync(found, postgres.RealisticConnectionString);
 
         _ = RealisticDescriptions.ColumnsOf(found, described);
-        TextOf(RealisticDescribe.EntryOf(found, AnyServer, described.Value!))
+        TextOf(RealisticCases.Describe.EntryOf(found, AnyServer, described.Value!))
             .ShouldBe(
                 TextOf(committed with { ServerVersion = AnyVersion }),
                 $"{found} is described otherwise than {found.SidecarPath} holds: read the difference, then write the "

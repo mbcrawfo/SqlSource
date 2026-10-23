@@ -8,15 +8,16 @@ using Dapper;
 using Npgsql;
 using SqlSource.Generation.Models;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Generation;
 
 // The parameters of a case's query in the run through Dapper.  A sample is a SQL literal for each parameter, so it
 // becomes a C# value as the server reads it: cast to the parameter's type and read by GetValue.  The input model is
-// built from those values by its constructor, which fails when the driver gives a value of another type than the
-// property's.  The query names its parameters in snake_case, which Dapper does not bind to the model's PascalCase
-// properties, so the model's values go to Dapper under the SQL's names (D-0004).
+// built from those values by RealisticInputs of tests/SqlSource.Tool.Testing, which fails when the driver gives a value
+// of another type than the property's.  The query names its parameters in snake_case, which Dapper does not bind to
+// the model's PascalCase properties, so the model's values go to Dapper under the SQL's names (D-0004).
 internal static class RealisticParameters
 {
     // A select of each of the sample's literals cast to its parameter's type, in the parameters' order.
@@ -38,10 +39,7 @@ internal static class RealisticParameters
             })
         );
 
-    // A value as a model holds it: a column's NULL, which the driver reads as DBNull, is null.
-    public static object? ValueOf(object value) => value is DBNull ? null : value;
-
-    // The input model of the sample, built by ModelOf from the values the server reads its literals as.
+    // The input model of the sample, built by RealisticInputs.ModelOf from the values the server reads its literals as.
     [SuppressMessage(
         "Security",
         "CA2100:Review SQL queries for security vulnerabilities",
@@ -65,71 +63,10 @@ internal static class RealisticParameters
         var values = new object?[parameters.Count];
         for (var ordinal = 0; ordinal < parameters.Count; ordinal++)
         {
-            values[ordinal] = ValueOf(reader.GetValue(ordinal));
+            values[ordinal] = RealisticInputs.ValueOf(reader.GetValue(ordinal));
         }
 
-        return ModelOf(input, parameters, values);
-    }
-
-    // An input model, a record, built by its constructor with each parameter's value, in the parameters' order, as
-    // the argument named as the parameter in PascalCase.  A value must be of the argument's type, and a null must be
-    // one the argument can hold: Invoke would give 0 for a null where the type is a value type that cannot be null.
-    // There is one value for each parameter.
-    public static object ModelOf(Type input, IReadOnlyList<SidecarParameter> parameters, IReadOnlyList<object?> values)
-    {
-        if (values.Count != parameters.Count)
-        {
-            throw new InvalidOperationException(
-                $"The input model {input.Name} takes one value for each parameter, but the count of values is "
-                    + $"{values.Count} and the count of parameters is {parameters.Count}."
-            );
-        }
-
-        var byName = new Dictionary<string, (SidecarParameter Parameter, object? Value)>(StringComparer.Ordinal);
-        for (var ordinal = 0; ordinal < parameters.Count; ordinal++)
-        {
-            byName.Add(PropertyNames.PascalCase(parameters[ordinal].Name), (parameters[ordinal], values[ordinal]));
-        }
-
-        var constructor =
-            input
-                .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
-                .SingleOrDefault(candidate => candidate.GetParameters().Length == parameters.Count)
-            ?? throw new InvalidOperationException(
-                $"The input model {input.Name} has no public constructor of {parameters.Count} parameters."
-            );
-        var arguments = constructor
-            .GetParameters()
-            .Select(argument =>
-            {
-                if (argument.Name is not { } argumentName || !byName.TryGetValue(argumentName, out var given))
-                {
-                    throw new InvalidOperationException(
-                        $"The constructor of {input.Name} takes {argument.Name}, which is no parameter of the query."
-                    );
-                }
-
-                var type = argument.ParameterType;
-                if (given.Value is null && type.IsValueType && Nullable.GetUnderlyingType(type) is null)
-                {
-                    throw new InvalidOperationException(
-                        $"@{given.Parameter.Name} is NULL, and {input.Name}.{argumentName} is a {type.Name}, which "
-                            + "cannot be null."
-                    );
-                }
-
-                if (given.Value is { } value && !type.IsInstanceOfType(value))
-                {
-                    throw new InvalidOperationException(
-                        $"@{given.Parameter.Name} is read as a {value.GetType().Name}, and {input.Name}.{argumentName} "
-                            + $"is a {type.Name}."
-                    );
-                }
-
-                return given.Value;
-            })
-            .ToArray();
-        return constructor.Invoke(arguments);
+        return RealisticInputs.ModelOf(input, parameters, values);
     }
 
     // The model's values, each under its parameter's name in the SQL.

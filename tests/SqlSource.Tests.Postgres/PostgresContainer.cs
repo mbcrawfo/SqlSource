@@ -4,6 +4,7 @@ using System.Data.Common;
 using System.Threading.Tasks;
 using Npgsql;
 using SqlSource.Testing;
+using SqlSource.Tests.Postgres.Realistic;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -96,7 +97,7 @@ public sealed class PostgresContainer : IAsyncLifetime
                 EndToEndEngine.Postgres,
                 RealisticDatabase,
                 SourceOf,
-                [RepositoryPaths.RealisticSchema, RepositoryPaths.RealisticSeed],
+                [RealisticCases.Corpus.Schema, RealisticCases.Corpus.Seed],
                 token
             );
 

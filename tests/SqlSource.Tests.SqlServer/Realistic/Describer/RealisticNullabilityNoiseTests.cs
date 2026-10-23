@@ -35,14 +35,14 @@ public sealed class RealisticNullabilityNoiseTests(SqlServerContainer sqlServer)
 
         var count = 0;
         var noisy = new List<string>();
-        foreach (var found in RealisticCases.All.Where(candidate => candidate.Refusal is null))
+        foreach (var found in RealisticCases.Corpus.All.Where(candidate => candidate.Refusal is null))
         {
             if (!found.RunsOn(major))
             {
                 continue;
             }
 
-            var described = await RealisticDescribe.DescribeOnceAsync(found, sqlServer.RealisticConnectionString);
+            var described = await RealisticCases.Describe.DescribeOnceAsync(found, sqlServer.RealisticConnectionString);
             var columns = RealisticDescriptions.ColumnsOf(found, described);
             var noisyOfCase = RealisticNoise.NoisyOf(found, columns);
             count += noisyOfCase.Count;

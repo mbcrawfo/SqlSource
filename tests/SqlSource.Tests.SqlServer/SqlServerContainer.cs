@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using SqlSource.Testing;
+using SqlSource.Tests.SqlServer.Realistic;
 using Testcontainers.MsSql;
 using Xunit;
 
@@ -107,7 +108,7 @@ public sealed class SqlServerContainer : IAsyncLifetime
                 EndToEndEngine.SqlServer,
                 RealisticDatabase,
                 SourceOf,
-                [RepositoryPaths.RealisticSchema, RepositoryPaths.RealisticSeed],
+                [RealisticCases.Corpus.Schema, RealisticCases.Corpus.Seed],
                 token
             );
 

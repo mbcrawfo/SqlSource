@@ -16,8 +16,8 @@ public sealed class RealisticNullabilitySafetyTests(SqlServerContainer sqlServer
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
     public async Task DescribeAsync_Case_IsNotNullOnlyWhereTheTruthIs(string name)
     {
-        var found = RealisticDescribe.Start(name, sqlServer.Major);
-        var (columns, _) = await RealisticDescribe.DescribedAsync(found, sqlServer.RealisticConnectionString);
+        var found = RealisticCases.Describe.Start(name, sqlServer.Major);
+        var (columns, _) = await RealisticCases.Describe.DescribedAsync(found, sqlServer.RealisticConnectionString);
 
         for (var index = 0; index < columns.Count; index++)
         {
@@ -35,8 +35,11 @@ public sealed class RealisticNullabilitySafetyTests(SqlServerContainer sqlServer
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
     public async Task Execute_Case_ReturnsNoNullWhereEitherSaysNotNull(string name)
     {
-        var found = RealisticDescribe.Start(name, sqlServer.Major);
-        var (columns, parameters) = await RealisticDescribe.DescribedAsync(found, sqlServer.RealisticConnectionString);
+        var found = RealisticCases.Describe.Start(name, sqlServer.Major);
+        var (columns, parameters) = await RealisticCases.Describe.DescribedAsync(
+            found,
+            sqlServer.RealisticConnectionString
+        );
         var request = RealisticDescribe.RequestOf(found);
         RealisticSampleChecks.CheckKeys(found, parameters.Select(static parameter => parameter.Name));
         RealisticSampleChecks.CheckNulls(found, request.Parameters);

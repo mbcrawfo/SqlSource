@@ -17,8 +17,8 @@ public sealed class RealisticNullabilitySafetyTests(PostgresContainer postgres)
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
     public async Task DescribeAsync_Case_IsNotNullOnlyWhereTheTruthIs(string name)
     {
-        var found = RealisticDescribe.Start(name, postgres.Major);
-        var (columns, _) = await RealisticDescribe.DescribedAsync(found, postgres.RealisticConnectionString);
+        var found = RealisticCases.Describe.Start(name, postgres.Major);
+        var (columns, _) = await RealisticCases.Describe.DescribedAsync(found, postgres.RealisticConnectionString);
 
         for (var index = 0; index < columns.Count; index++)
         {
@@ -34,8 +34,11 @@ public sealed class RealisticNullabilitySafetyTests(PostgresContainer postgres)
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
     public async Task Execute_Case_ReturnsNoNullWhereEitherSaysNotNull(string name)
     {
-        var found = RealisticDescribe.Start(name, postgres.Major);
-        var (columns, parameters) = await RealisticDescribe.DescribedAsync(found, postgres.RealisticConnectionString);
+        var found = RealisticCases.Describe.Start(name, postgres.Major);
+        var (columns, parameters) = await RealisticCases.Describe.DescribedAsync(
+            found,
+            postgres.RealisticConnectionString
+        );
         var request = RealisticDescribe.RequestOf(found);
         RealisticSampleChecks.CheckKeys(found, parameters.Select(static parameter => parameter.Name));
         RealisticSampleChecks.CheckNulls(found, request.Parameters);
