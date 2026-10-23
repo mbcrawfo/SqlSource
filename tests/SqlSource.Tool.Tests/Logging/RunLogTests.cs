@@ -833,6 +833,39 @@ public sealed class RunLogTests : IDisposable
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeTrue();
     }
 
+    // A log whose close fails is reported once the run has ended, after run.end, which holds the run's own exit code:
+    // no line written before the close can hold what the close did.
+    [Fact]
+    public async Task Run_LogWhoseCloseFails_IsOneSqlsrc218AndItsRunEndHoldsTheRunsExitCode()
+    {
+        _scene.Run.CreateFile = static path => new UnclosableStream(path);
+
+        var result = await _scene.DescribeAsync("--log", "run.log");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldStartWith(
+            $"{Log} : error SQLSRC218: '{Log}' could not be written: the file could not be closed"
+        );
+        result.Error.Split("error SQLSRC").Length.ShouldBe(2);
+        var end = LogReader.Read(Log)[^1];
+        end.GetProperty("event").GetString().ShouldBe("run.end");
+        end.GetProperty("exitCode").GetInt32().ShouldBe(0);
+    }
+
+    // A file that takes every line and whose close then fails, as when the system reports a failed write only then.
+    private sealed class UnclosableStream(string path)
+        : FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read)
+    {
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (disposing)
+            {
+                throw new IOException("the file could not be closed");
+            }
+        }
+    }
+
     // A stream that takes no byte, whatever the system.
     private sealed class FullStream : Stream
     {

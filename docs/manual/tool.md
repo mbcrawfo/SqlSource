@@ -297,7 +297,7 @@ $ dotnet sqlsource describe --log sqlsource.log
 - the paths of your projects and files, and the names of your queries and databases;
 - the SQL of your queries as the tool sent it to the database, and what the server answered, its errors and warnings included;
 - for a database that could not be opened, what went wrong, in the tool's own words and with the server's SQLSTATE, or SQL Server's error number, which names neither its host nor its user;
-- each error, and how the run ended.
+- each error, and how the run ended, with its exit code.  A log that cannot be finished, as when the disk is full, is an error of its own once the run has ended ([SQLSRC218](diagnostics.md#sqlsrc218)): the tool then exits with `1`, and the log's last line may still hold the exit code the run had before.
 
 <a id="requirements"></a>
 
