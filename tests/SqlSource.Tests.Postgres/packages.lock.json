@@ -485,6 +485,7 @@
           "Microsoft.CodeAnalysis.CSharp": "[4.8.0, )",
           "Shouldly": "[4.3.0, )",
           "SqlSource": "[0.1.0-dev, )",
+          "Testcontainers.MsSql": "[4.16.0, )",
           "xunit.v3.extensibility.core": "[4.0.1, )"
         }
       },
@@ -553,6 +554,15 @@
         "requested": "[9.0.21, )",
         "resolved": "9.0.21",
         "contentHash": "KD+oHoYIxwNCajjVe58WVwq9cRpum+Pg3tRveDRtkcaw6w3oc7sNBoMRtb5P5OehI3bgv1ucMpgjf8lpj5J96A=="
+      },
+      "Testcontainers.MsSql": {
+        "type": "CentralTransitive",
+        "requested": "[4.16.0, )",
+        "resolved": "4.16.0",
+        "contentHash": "UVLYLyq9CDSfLZUeu+CyDmwV7wo2LMNlpBLP8ZO9HG42WT3KTMI/p7qYesiCAZmo6GUeWH/Z6SOIw66Y4qnWuw==",
+        "dependencies": {
+          "Testcontainers": "4.16.0"
+        }
       },
       "xunit.analyzers": {
         "type": "CentralTransitive",
