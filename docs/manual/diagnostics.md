@@ -164,8 +164,9 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC268](#sqlsrc268) | Microsoft.Data.SqlClient is newer than SqlSource knows |
 | [SQLSRC269](#sqlsrc269) | Type needs Microsoft.Data.SqlClient |
 | [SQLSRC270](#sqlsrc270) | Type needs a newer Microsoft.Data.SqlClient |
+| [SQLSRC271](#sqlsrc271) | File is not saved as UTF-8 |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236, and 262 to 266, are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
@@ -1706,7 +1707,7 @@ The query has changed since its entry in the sidecar was written: its SQL, a `--
 /work/App/Queries/Users.sql(1,10): error SQLSRC244: The query 'GetUser' has changed since its entry was written.  Run 'sqlsource describe'.
 ```
 
-Run `dotnet sqlsource describe` and commit the sidecar it writes.
+Run `dotnet sqlsource describe` and commit the sidecar it writes.  When the tool reports [SQLSRC271](#sqlsrc271) for the file, saving it as UTF-8 is the fix.
 
 See: [Describing again](tool.md#describing-again)
 
@@ -2301,3 +2302,17 @@ The project references a version of Microsoft.Data.SqlClient older than 6.1, and
 Update the `Microsoft.Data.SqlClient` package to 6.1 or later, which also clears [SQLSRC267](#sqlsrc267), reported for the project beside it.  When another package brings the older version, as EF Core 8 and 9 do, reference `Microsoft.Data.SqlClient` from the project itself, at the version you want.  The error is reported at the query's name, once for the query; the query has no models until it is fixed, and its constant or method is still generated.
 
 See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)
+
+## SQLSRC271
+
+**File is not saved as UTF-8**
+
+The tool reports a `.sql` file saved in another encoding, such as Windows-1252, when a query of it needs an entry in its sidecar or when the tool cannot read the file as SQL, and a C# file in another encoding whose `[SqlSourceGenerate]` has a `Path` with a character outside ASCII.  A file that starts with a byte order mark is never reported.  The build reads such a file in another encoding than the tool, so the two would see different text.  The tool describes no query of the file, or plans no type of the C# file, until it is saved as UTF-8.  The build does not report this error itself: it reports the queries' entries as missing ([SQLSRC241](#sqlsrc241)) or out of date ([SQLSRC244](#sqlsrc244)).  A file whose queries all have the output `sql` is not reported, and a C# file in another encoding is read as before when its `Path` holds only ASCII characters.
+
+```console
+/work/App/Queries/Users.sql : error SQLSRC271: '/work/App/Queries/Users.sql' is not saved as UTF-8, so the tool and the build read different text from it.  Save it as UTF-8.
+```
+
+Save the file as UTF-8, with the "Save with encoding" command of your editor, and run `dotnet sqlsource describe` again.  That fixes the entries the build reported as missing or out of date.  For a `.sql` file the error is reported once, at the file with no line or column; for a C# file it is reported at the `Path` argument.  When the file has a parse error of its own, the tool reports this error instead of the parse errors, since what it read is not what the build reads.  A file that is also [SQLSRC209](#sqlsrc209) gets this error alone.
+
+See: [Describing again](tool.md#describing-again)

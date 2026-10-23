@@ -398,4 +398,16 @@ public sealed class ToolDiagnosticsTests
                 "FindUsers"
             )
             .ShouldBe("The first use of the parameter '@name' of the query 'FindUsers' does not fix its type");
+
+    [Fact]
+    public void FileNotUtf8_Message_HoldsTheFile() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.FileNotUtf8.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/App/Queries/Users.sql"
+            )
+            .ShouldBe(
+                "'/work/App/Queries/Users.sql' is not saved as UTF-8, "
+                    + "so the tool and the build read different text from it.  Save it as UTF-8."
+            );
 }
