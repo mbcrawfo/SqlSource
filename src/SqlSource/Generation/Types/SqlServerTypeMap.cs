@@ -15,7 +15,6 @@ internal delegate TypeMapping? SqlServerOverrideOf(string key);
 /// </summary>
 internal static class SqlServerTypeMap
 {
-    private const string SystemSchema = "sys";
     private const string StringKeyword = "string";
     private const string DateTime = "global::System.DateTime";
     private const string SqlServerTypesNamespace = "Microsoft.SqlServer.Types.";
@@ -102,8 +101,7 @@ internal static class SqlServerTypeMap
     private static SqlServerUserType? UserTypeOf(SqlServerType type) =>
         string.IsNullOrEmpty(type.UserType?.Name) ? null : type.UserType;
 
-    private static bool IsSystemSchema(SqlServerUserType userType) =>
-        string.Equals(userType.Schema, SystemSchema, StringComparison.Ordinal);
+    private static bool IsSystemSchema(SqlServerUserType userType) => SystemSchemas.IsSqlServer(userType.Schema);
 
     private static Dictionary<string, Row> BuildRows()
     {

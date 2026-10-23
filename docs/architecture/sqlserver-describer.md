@@ -144,7 +144,7 @@ A parameter that the server reports and the list lacks is one that the lexer too
 
 `bindName` is never written for SQL Server; the [sidecar format](../superpowers/specs/2026-10-07-sidecar-format-design.md#23-sql-server-mssql) records why.
 
-`SqlServerTypes.Spelled` names a type as a message does: `schema.name` of a user type that is not of `sys`, and the system type name otherwise.  `SqlServerTypes.Declared` writes it as a declaration of `@params` does: the same, but each name of a user type in brackets with a `]` written twice, since the server refuses `dbo.User`, whose name is a keyword, with `156`.
+`SqlServerTypes.Spelled` names a type as a message does: `schema.name` of a user type that is not of `sys`, and the system type name otherwise.  The schema is compared with `sys` exactly (`SystemSchemas.IsSqlServer`), since the server reports its own as `sys` and in a case-sensitive database `SYS` is a user's schema.  `SqlServerTypes.Declared` writes it as a declaration of `@params` does: the same, but each name of a user type in brackets with a `]` written twice, since the server refuses `dbo.User`, whose name is a keyword, with `156`.
 
 ## Columns and the table match
 

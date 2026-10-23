@@ -13,13 +13,12 @@ namespace SqlSource.Settings.TypeOverrides;
 /// settings check a key here, and the map reads the names of the extensions' types here.  Each map keeps its own rows,
 /// and <c>PostgresTypeMapTests.Keys_OfTheMap_AreTheKnownNamesOfTheSettings</c> and
 /// <c>SqlServerTypeMapTests.Keys_OfTheMap_AreTheKnownSqlServerNamesOfTheSettings</c> hold them equal to the names here.
+/// A written key is read as an identifier is: the system schema, <c>pg_catalog</c> or <c>sys</c>, is bare in any case
+/// or quoted exactly.  A schema that a server reported is not a written key, and is compared with
+/// <see cref="SystemSchemas.IsSqlServer" />.
 /// </summary>
 internal static class TypeKeys
 {
-    private const string SystemSchema = "pg_catalog";
-
-    private const string SqlServerSystemSchema = "sys";
-
     // The start of a part in the escaped form, with the U in either case.
     private const string EscapedOpening = "U&\"";
 
@@ -279,7 +278,7 @@ internal static class TypeKeys
             return false;
         }
 
-        if (!schema.IsEmpty && !IsSchema(schema, SystemSchema) && !IsSchema(schema, SqlServerSystemSchema))
+        if (!schema.IsEmpty && !IsSchema(schema, SystemSchemas.Postgres) && !IsSchema(schema, SystemSchemas.SqlServer))
         {
             postgreSql = UsersKey(key, schema, name, isArray);
             sqlServer = isArray ? null : postgreSql;
@@ -316,7 +315,7 @@ internal static class TypeKeys
                 : TryNormalizePlain(name.ToString(), isArray, out normalized);
         }
 
-        if (!IsSchema(schema, SystemSchema))
+        if (!IsSchema(schema, SystemSchemas.Postgres))
         {
             normalized = UsersKey(key, schema, name, isArray);
         }
@@ -387,13 +386,13 @@ internal static class TypeKeys
             return true;
         }
 
-        if (IsSchema(schema, SqlServerSystemSchema))
+        if (IsSchema(schema, SystemSchemas.SqlServer))
         {
             normalized = IsQuoted(name) ? NormalizeQuotedSqlServerName(name) : NormalizePlainSqlServerName(name);
             return true;
         }
 
-        if (IsSchema(schema, SystemSchema))
+        if (IsSchema(schema, SystemSchemas.Postgres))
         {
             return false;
         }
@@ -676,7 +675,9 @@ internal static class TypeKeys
     private static bool TryGetExactName(Dictionary<string, string> names, string text, out string known) =>
         names.TryGetValue(text, out known) && string.Equals(known, text, StringComparison.Ordinal);
 
-    // Whether schema is the engine's system schema, pg_catalog or sys: plain in any case, or quoted in lower case.
+    // Whether a schema as a user wrote it in a key is the engine's system schema, pg_catalog or sys: an identifier is
+    // read as an engine reads it, so a bare one in any case and a quoted one exactly.  A schema that a server reported
+    // is another rule: SystemSchemas.IsSqlServer compares it exactly.
     private static bool IsSchema(ReadOnlySpan<char> schema, string systemSchema) =>
         IsQuoted(schema)
             ? TextOf(schema).Equals(systemSchema.AsSpan(), StringComparison.Ordinal)

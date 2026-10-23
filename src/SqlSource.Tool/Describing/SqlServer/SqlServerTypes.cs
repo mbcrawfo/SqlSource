@@ -15,9 +15,6 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// </remarks>
 internal static class SqlServerTypes
 {
-    // The schema of the built-in types, whose user type a message does not name.
-    private const string SystemSchema = "sys";
-
     /// <summary>The type the server suggests for an undeclared parameter.</summary>
     /// <exception cref="InvalidOperationException">
     /// The row has no type name or lacks a facet: the server typed the parameter, or it would have raised an error.
@@ -35,13 +32,12 @@ internal static class SqlServerTypes
     /// <summary>
     /// The type as a message names it: <c>schema.name</c> of a user type that is not of <c>sys</c>, as
     /// <c>dbo.Email</c>, and the system type name otherwise.
+    /// The schema is compared with <c>sys</c> exactly (<see cref="SystemSchemas.IsSqlServer" />): in a case-sensitive
+    /// database <c>SYS</c> is a user's schema.
     /// </summary>
     public static string Spelled(SqlServerType type)
     {
-        if (
-            type.UserType is not { Name: { } name } user
-            || string.Equals(user.Schema, SystemSchema, StringComparison.OrdinalIgnoreCase)
-        )
+        if (type.UserType is not { Name: { } name } user || SystemSchemas.IsSqlServer(user.Schema))
         {
             return type.Name;
         }
@@ -57,10 +53,7 @@ internal static class SqlServerTypes
     /// </summary>
     public static string Declared(SqlServerType type)
     {
-        if (
-            type.UserType is not { Name: { } name } user
-            || string.Equals(user.Schema, SystemSchema, StringComparison.OrdinalIgnoreCase)
-        )
+        if (type.UserType is not { Name: { } name } user || SystemSchemas.IsSqlServer(user.Schema))
         {
             return type.Name;
         }

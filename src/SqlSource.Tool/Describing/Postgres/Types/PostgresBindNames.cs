@@ -43,8 +43,7 @@ namespace SqlSource.Tool.Describing.Postgres.Types;
 /// </remarks>
 internal static class PostgresBindNames
 {
-    private const string Catalog = "pg_catalog";
-    private const string CatalogPrefix = Catalog + ".";
+    private const string CatalogPrefix = SystemSchemas.Postgres + ".";
 
     /// <summary>
     /// The text that <c>SQLSRC232</c>'s server line gives for a type that has no candidate name.
@@ -82,9 +81,9 @@ internal static class PostgresBindNames
 
         return row switch
         {
-            { Nspname: Catalog, Typname: "bit" } => "bit",
-            { Nspname: Catalog, Typname: "char" } => "char",
-            { Nspname: Catalog } => WithoutCatalog(row.FormatType),
+            { Nspname: SystemSchemas.Postgres, Typname: "bit" } => "bit",
+            { Nspname: SystemSchemas.Postgres, Typname: "char" } => "char",
+            { Nspname: SystemSchemas.Postgres } => WithoutCatalog(row.FormatType),
             _ => Qualified(row),
         };
     }

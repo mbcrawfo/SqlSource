@@ -310,10 +310,10 @@ internal static class QueryTyper
                 TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out var normalized)
                 && string.Equals(normalized, key, StringComparison.Ordinal)
                 ? key
-                : "sys." + key;
+                : SystemSchemas.SqlServer + "." + key;
         }
 
-        return TypeKeys.TryNormalize(key.AsSpan(), out _) ? key : "pg_catalog." + key;
+        return TypeKeys.TryNormalize(key.AsSpan(), out _) ? key : SystemSchemas.Postgres + "." + key;
     }
 
     // A failure of a mapped type keeps the type the override names in its text, which the message gives as a user

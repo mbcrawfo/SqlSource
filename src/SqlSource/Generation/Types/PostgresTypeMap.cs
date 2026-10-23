@@ -16,7 +16,6 @@ internal delegate TypeMapping? OverrideOf(PostgresType type);
 /// </summary>
 internal static class PostgresTypeMap
 {
-    private const string SystemSchema = "pg_catalog";
     private const string BitArray = "global::System.Collections.BitArray";
     private const string DateTime = "global::System.DateTime";
     private const string DateOnly = "global::System.DateOnly";
@@ -114,7 +113,8 @@ internal static class PostgresTypeMap
         internalName.Equals("bit", StringComparison.OrdinalIgnoreCase)
         || internalName.Equals("varbit", StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsSystemType(PostgresType type) => type.Schema.Equals(SystemSchema, StringComparison.Ordinal);
+    private static bool IsSystemType(PostgresType type) =>
+        type.Schema.Equals(SystemSchemas.Postgres, StringComparison.Ordinal);
 
     // An array of a type that a cast reads is read by a cast to an array, of the same rank.
     private static TypeMapping ArrayOf(TypeMapping element)
