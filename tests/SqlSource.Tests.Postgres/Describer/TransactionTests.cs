@@ -83,6 +83,64 @@ public sealed class TransactionTests(PostgresContainer postgres)
         (await PreparedStatementsAsync(connection)).ShouldBe(0);
     }
 
+    // The rollback to the savepoint after a call that fails keeps the lock that preparing took: another session's
+    // drop of the table still waits for the describe.
+    [Fact]
+    public async Task LiveCalls_CallThatFails_KeepsTheLockOfThePrepare()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await postgres.ExecuteAsync("CREATE TABLE IF NOT EXISTS transaction_kept (id int)");
+        try
+        {
+            await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
+            var live = new PostgresLive(connection);
+            var prepared = await live.PrepareAsync(
+                new PostgresPrepareRequest(Statement, "SELECT id FROM transaction_kept", []),
+                token
+            );
+            prepared.Error.ShouldBeNull(prepared.Error?.Message);
+            var check = await live.CheckAsync(new PostgresCheckRequest("SELECT nope FROM users", []), token);
+            check.Error.ShouldNotBeNull().SqlState.ShouldBe("42703");
+
+            var refused = await DropTransactionKeptWithinAsync("200ms");
+
+            refused.ShouldBe("55P03", "the drop did not wait for the describe");
+            (await live.DeallocateAsync(new PostgresDeallocateRequest(Statement), token)).Error.ShouldBeNull();
+            (await DropTransactionKeptWithinAsync("10s")).ShouldBeNull();
+        }
+        finally
+        {
+            await postgres.ExecuteAsync("DROP TABLE IF EXISTS transaction_kept");
+        }
+    }
+
+    // Drops transaction_kept from a connection of the test's own, waiting for its lock no longer than the timeout:
+    // the SQLSTATE of the server's refusal, or null when the table was dropped.
+    private async Task<string?> DropTransactionKeptWithinAsync(string timeout)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = await own.OpenConnectionAsync(token);
+        await using (
+            var limit = new NpgsqlCommand("SELECT pg_catalog.set_config('lock_timeout', @timeout, false)", connection)
+        )
+        {
+            _ = limit.Parameters.AddWithValue("timeout", timeout);
+            _ = await limit.ExecuteScalarAsync(token);
+        }
+
+        try
+        {
+            await using var drop = new NpgsqlCommand("DROP TABLE transaction_kept", connection);
+            _ = await drop.ExecuteNonQueryAsync(token);
+            return null;
+        }
+        catch (PostgresException refused)
+        {
+            return refused.SqlState;
+        }
+    }
+
     // No deallocate follows a prepare that failed, so the prepare ends the transaction itself, and the next one
     // begins its own.
     [Fact]

@@ -242,9 +242,11 @@ internal sealed class PostgresLive(PostgresConnection connection)
     /// a call is ever added between the two, this needs revisiting.  The read matches the statement's name and the
     /// text of the <c>PREPARE</c>, which the server lists exactly as it was sent, so that a statement of the same name
     /// that is not this one is never read for it.  A read that finds no row is <see cref="StatementNotListed" />, an
-    /// answer and not a fault: it is a backend that is not the one prepared on.  An answer with an error ends the
-    /// transaction, since no <c>deallocate</c> follows it; a cancellation ends nothing, and the transaction dies with
-    /// the session, as the statement does.
+    /// answer and not a fault: it is a backend that is not the one prepared on.  After an answer without an error the
+    /// savepoint is moved after the <c>PREPARE</c> (<see cref="PostgresConnection.KeepPreparedAsync" />), so that no
+    /// later rollback to it gives up the locks that preparing took.  An answer with an error ends the transaction,
+    /// since no <c>deallocate</c> follows it; a cancellation ends nothing, and the transaction dies with the session,
+    /// as the statement does.
     /// </remarks>
     public Task<PostgresPrepareAnswer> PrepareAsync(PostgresPrepareRequest asked, CancellationToken token) =>
         AnswerAsync(
@@ -263,6 +265,10 @@ internal sealed class PostgresLive(PostgresConnection connection)
                 try
                 {
                     answer = await PreparedAsync(asked, token);
+                    if (answer.Error is null)
+                    {
+                        await connection.KeepPreparedAsync(token);
+                    }
                 }
                 catch (NpgsqlException)
                 {

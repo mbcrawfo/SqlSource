@@ -352,13 +352,14 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     /// <remarks>
     /// <para>
     /// A pooler in transaction mode keeps a transaction on one backend, so every call of the describe reaches the
-    /// statement it prepared.  A prepared statement is session state and survives a rollback, which is why the
-    /// savepoint can stand before the <c>PREPARE</c>: rolling back to it frees nothing the <c>PREPARE</c> made, and
-    /// <c>deallocate</c> frees the statement inside the transaction, on its backend, before the end.
+    /// statement it prepared.  A prepared statement is session state and survives a rollback, so <c>deallocate</c>
+    /// frees the statement inside the transaction, on its backend, before the end.
     /// </para>
     /// <para>
-    /// The transaction keeps the locks that preparing and planning took until it ends, so another session's change
-    /// to a relation the query reads waits for the describe.  Npgsql sends the <c>BEGIN</c> with the
+    /// A rollback to a savepoint gives up the locks taken since it, so <see cref="KeepPreparedAsync" /> moves the
+    /// savepoint after the <c>PREPARE</c>: the transaction then keeps the locks that preparing took until it ends, and
+    /// another session's <c>DROP</c> or <c>ALTER</c> of a relation the query reads waits for the describe.  Npgsql
+    /// sends the <c>BEGIN</c> with the
     /// <c>SAVEPOINT</c>, in one round trip, here and not with the <c>PREPARE</c>, so that a server that refuses a
     /// transaction, as PgBouncer in statement mode does, refuses it at this call.  When either fails, the transaction
     /// is disposed and none is held.
@@ -389,6 +390,27 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
         }
 
         _describe = transaction;
+    }
+
+    /// <summary>
+    /// Moves the describe's savepoint after the <c>PREPARE</c>: <c>RELEASE SAVEPOINT</c>, which gives the locks taken
+    /// since it to the transaction, then <c>SAVEPOINT</c> again, in one round trip.  A later rollback to the savepoint
+    /// keeps the locks that preparing took.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No describe's transaction is held.</exception>
+    /// <exception cref="NpgsqlException">The connection is lost.</exception>
+    public async Task KeepPreparedAsync(CancellationToken cancellationToken)
+    {
+        if (_describe is null)
+        {
+            throw new InvalidOperationException("No describe's transaction is held to keep the PREPARE in.");
+        }
+
+        await using var move = await CommandAsync(
+            $"RELEASE SAVEPOINT {DescribeSavepoint}; SAVEPOINT {DescribeSavepoint}",
+            cancellationToken
+        );
+        _ = await move.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>

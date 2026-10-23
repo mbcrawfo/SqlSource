@@ -206,10 +206,13 @@ public sealed class SessionTests(PostgresContainer postgres)
     }
 
     // The describe's transaction keeps the lock that preparing took on the table the query reads, so another session
-    // that drops the table between "columns" and "tables" waits for the describe, which gives its answer; the drop is
-    // made once the describe has ended.
-    [Fact]
-    public async Task DescribeAsync_TableDroppedDuringTheDescribe_WaitsForIt()
+    // that drops the table during the describe waits for it, which gives its answer; the drop is made once the
+    // describe has ended.  After "explain" the describe has rolled back to its savepoint, which must not give the
+    // lock up.  The query is gated, so that "explain" is asked.
+    [Theory]
+    [InlineData("columns")]
+    [InlineData("explain")]
+    public async Task DescribeAsync_TableDroppedDuringTheDescribe_WaitsForIt(string after)
     {
         await postgres.ExecuteAsync("CREATE TABLE IF NOT EXISTS session_gone (id int)");
         try
@@ -218,7 +221,7 @@ public sealed class SessionTests(PostgresContainer postgres)
             var exchange = new HookedExchange(
                 after: async (method, _, _) =>
                 {
-                    if (method == "columns" && refused is null)
+                    if (method == after && refused is null)
                     {
                         refused = await DropSessionGoneWithinAsync("200ms");
                     }
@@ -227,7 +230,9 @@ public sealed class SessionTests(PostgresContainer postgres)
             await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString, exchange);
 
             var described = await session.DescribeAsync(
-                DescribeRequests.Of("SELECT id FROM session_gone"),
+                DescribeRequests.Of(
+                    "SELECT g.id, h.id AS other FROM session_gone g LEFT JOIN session_gone h ON h.id = g.id"
+                ),
                 TestContext.Current.CancellationToken
             );
 
