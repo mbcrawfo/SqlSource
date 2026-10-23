@@ -968,6 +968,25 @@ public sealed class SqlFileParserTests
         Errors(text)
             .ShouldBe([SqlParseError.Create(SqlParseErrorKind.ConflictingSettings, SpanOf(text, at), argument)]);
 
+    // A marker's default loses its comments as an inline one does: a block comment leaves one space, and the default
+    // is trimmed.  A hint is not a comment, and both keep it.
+    [Theory]
+    [InlineData("a /* c */ b", "f=a   b")]
+    [InlineData("/* c */ a", "f=a")]
+    [InlineData("a /* c */", "f=a")]
+    [InlineData("/* c */", "f=")]
+    [InlineData("hint /*+ x */ b", "f=hint /*+ x */ b")]
+    public void Parse_MarkerDefaultWithACommentBesideTheSameInlineDefault_IsOneDefault(string written, string token) =>
+        Tokens(
+                Blocks("-- name: Q\n-- token: {{f:" + written + "}}\nSELECT {{f:" + written + "}}\n")
+                    .ShouldHaveSingleItem()
+            )
+            .ShouldBe([token]);
+
+    [Fact]
+    public void Parse_MarkerDefaultWithALineComment_IsTheDefaultWithoutIt() =>
+        Tokens(Blocks("-- name: Q\n-- token: {{f:a -- c}}\nSELECT {{f}}\n").ShouldHaveSingleItem()).ShouldBe(["f=a"]);
+
     [Theory]
     [InlineData("{{a}}")]
     [InlineData("{{a:x}} y")]
@@ -1134,6 +1153,15 @@ public sealed class SqlFileParserTests
         const string Text = "-- name: Q\n-- token: {{f:AND x = @b AND y = '@c'}}\nSELECT 1 {{f}}\n";
 
         Errors(Text).ShouldBe([SqlParseError.Create(SqlParseErrorKind.UndeclaredParameter, SpanOf(Text, "@b"), "@b")]);
+    }
+
+    // The default is compared without its comment, and the parameter is still found in the default as written.
+    [Fact]
+    public void Parse_ParameterInAMarkerDefaultAfterAComment_IsReportedWhereItIsWritten()
+    {
+        const string Text = "-- name: Q\n-- token: {{f:/* c */ @p}}\nSELECT {{f}}\n";
+
+        Errors(Text).ShouldBe([SqlParseError.Create(SqlParseErrorKind.UndeclaredParameter, SpanOf(Text, "@p"), "@p")]);
     }
 
     [Fact]

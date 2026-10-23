@@ -379,7 +379,7 @@ The marker, the property and the metadata all read a dialect through [`SqlDialec
 
 [`SqlTextBuilder.Build`](../../src/SqlSource/Parsing/SqlTextBuilder.cs) writes a block's SQL from its lexemes, without comments or with them.  It is where a parse does most of its work, so it writes once into a buffer rented from `ArrayPool<T>`, copies text from the file in runs, and allocates nothing for a line or a character.  It trims lines and drops blank ones, but never inside a quoted region or a hint.  What reaches the generated SQL, as a user sees it, is in the manual, [what reaches the generated SQL](../manual/sql-files.md#what-reaches-the-generated-sql).
 
-The result is a `SqlBlockText`: the text, the runs it was copied from, and where each parameter landed.  `TokenScanner.Scan` then splits the text into literal segments and tokens, and `SqlTokenList` gives each token once, with the default its query gives.
+The result is a `SqlBlockText`: the text, the runs it was copied from, and where each parameter landed.  `TokenScanner.Scan` then splits the text into literal segments and tokens, and `SqlTokenList` gives each token once, with the default its query gives.  A `-- token:` marker's default is read the same way: `SqlMarkerScope` lexes it alone and, when it holds a comment, builds it with `SqlTextBuilder` without comments and trims it, so that it compares, and hashes, as the same default written in the SQL does.  The default as written is kept beside it, for the parameters inside it and their place in the file.
 
 ### Parameters
 

@@ -154,10 +154,10 @@ A `-- token:` marker inside a query gives the default of a token that the query 
 
 - A marker that is not exactly one token with a default is [SQLSRC111](diagnostics.md#sqlsrc111), and so is a default with a quote or a block comment that does not close inside it.  A name that is a keyword is [SQLSRC114](diagnostics.md#sqlsrc114).
 - A marker for a token the query does not write is ignored.
-- Two defaults for one token of a query must be the same, whether they are two in the SQL, two markers, or one of each.  Two that differ are [SQLSRC112](diagnostics.md#sqlsrc112).  Keep comments out of defaults, or two defaults that look the same can differ: see [known issues](#known-issues).
+- Two defaults for one token of a query must be the same, whether they are two in the SQL, two markers, or one of each.  Two that differ are [SQLSRC112](diagnostics.md#sqlsrc112).  Comments in a default are ignored when defaults are compared, wherever the default is written, so `{{f:a /* note */ b}}` in a marker and in the SQL is one default.
 - The marker goes inside a query, not in the file header.
 
-A change to a default, like a change to the SQL, makes the query's sidecar out of date.
+A change to a default, like a change to the SQL, makes the query's sidecar out of date.  A change to a comment inside a default does not.
 
 <a id="token-ignore"></a>
 
@@ -196,7 +196,6 @@ With validation off the method checks nothing.  An empty argument leaves nothing
 ## Known issues
 
 - **A `--` comment inside a token's default swallows its closing braces.**  A line comment runs to the end of its line and takes the `}}` with it, so the token ends at the next `}}` further down, or not at all.  In `{{filter:AND a = 1 -- note}}` followed by a line holding `{{orderBy:name}}`, the default of `filter` runs to the braces of `orderBy`, and the token `orderBy` is gone.  Nothing is reported; the method is missing an argument, which you notice when it does not compile.  Keep line comments out of defaults, and put the comment on a line of its own.
-- **A comment inside a default can make two equal defaults differ.**  A default in the SQL is read without its comments, and a `-- token:` marker's is read as written.  `{{f:a /* c */ b}}` in both places is [SQLSRC112](diagnostics.md#sqlsrc112), and editing a comment inside a marker's default makes the query's sidecar out of date.  Keep comments out of defaults.
 - **A reserved word in braces in a comment can be an error where no comment is kept.**  When the project or a file's item metadata asks for `keep-comments` and the attribute of the type that claims the file turns it off, a comment such as `-- {{class}}` is still [SQLSRC114](diagnostics.md#sqlsrc114).  Take the braces out of the comment, or add a `-- token-ignore:` marker.
 - **Under `mssql`, a parameter can be taken for a declared variable.**  After a `DECLARE` with no `;`, a statement that starts with a word SqlSource does not know to start a statement, such as `SEND` or a label, does not end the list.  A parameter after a comma in it, outside parentheses, is then taken for a variable and left out of the parameter list.  End the `DECLARE` with a `;`, or declare the parameter with its type: `-- param: @id int`.
 - **A user variable of MySQL or MariaDB, and a parameter of a procedure that the SQL creates, are listed as parameters.**  See [names that are read as parameters](#names-read-as-parameters).
