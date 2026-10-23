@@ -5,7 +5,10 @@ namespace SqlSource.Tool.Planning;
 /// </summary>
 internal enum PlannedFileState
 {
-    /// <summary>The file was parsed, and its dialect can be described or no query of it needs an entry.</summary>
+    /// <summary>
+    /// The file was parsed, and no query of it needs an entry or the file is saved as UTF-8 and its dialect can be
+    /// described.
+    /// </summary>
     Ready,
 
     /// <summary>The file has parse errors, which were reported, and so has no queries.</summary>

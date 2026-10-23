@@ -291,6 +291,38 @@ public sealed class RunPlannerErrorTests : IDisposable
     }
 
     [Fact]
+    public void Plan_FileNotUtf8WithTwoQueriesThatNeedAnEntry_IsSqlsrc271Once()
+    {
+        var project = Project();
+        var sql = project.AddSqlBytes(
+            "Q/Two.sql",
+            Encoding.Latin1.GetBytes("-- name: One\nSELECT 'café';\n\n-- name: Two\nSELECT 'thé';\n")
+        );
+
+        var result = Plans.Result(project);
+
+        result.Errors.ShouldBe([ToolDiagnostic.ForFile(ToolDiagnostics.FileNotUtf8, sql)]);
+        result.Plan.Files.ShouldHaveSingleItem().Queries.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Plan_FileNotUtf8WithATokenWithoutADefault_IsSqlsrc271ThenSqlsrc210()
+    {
+        var project = Project();
+        var sql = project.AddSqlBytes(
+            "Q/Find.sql",
+            Encoding.Latin1.GetBytes("-- name: Find\nSELECT 'café' FROM users {{where}};\n")
+        );
+
+        var result = Plans.Result(project);
+
+        result
+            .Errors.Select(error => (error.Descriptor.Id, error.Path, error.Position))
+            .ShouldBe([("SQLSRC271", sql, null), ("SQLSRC210", sql, new LinePosition(0, Name.Length))]);
+        result.Plan.Files.ShouldHaveSingleItem().State.ShouldBe(PlannedFileState.NotUtf8);
+    }
+
+    [Fact]
     public void Plan_TokensWithoutADefault_AreSqlsrc210ForEachAtTheNameOfTheirQuery()
     {
         var project = Project();
