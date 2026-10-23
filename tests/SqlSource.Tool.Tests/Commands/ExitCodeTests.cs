@@ -77,30 +77,52 @@ public sealed class ExitCodeTests : IDisposable
         result.Error.ShouldEndWith(DescribeScene.RunAgain);
     }
 
-    [Theory]
-    [InlineData("option", "SQLSRC999")]
-    [InlineData("variable", "SQLSRC999")]
-    [InlineData("a log that cannot be opened", "SQLSRC218")]
-    [InlineData("a log that is a file of the run", "SQLSRC218")]
-    public async Task Run_ErrorWithALogAskedFor_ExitsOneWithoutTheLine(string kind, string id)
+    private static void ShouldExitOneWithoutTheLine(CliResult result, string id)
     {
-        _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
-        if (kind == "variable")
-        {
-            _scene.Run.Environment["SQLSOURCE_LOG"] = "run.log";
-        }
-
-        var result = kind switch
-        {
-            "option" => await _scene.DescribeAsync("--log", "run.log"),
-            "variable" => await _scene.DescribeAsync(),
-            "a log that is a file of the run" => await _scene.DescribeAsync("--log", "Users.sql"),
-            _ => await _scene.DescribeAsync("--log", "tmp"),
-        };
-
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldContain($"error {id}: ");
         result.Error.ShouldNotContain("run again");
+    }
+
+    [Fact]
+    public async Task Run_ErrorWithTheLogOption_ExitsOneWithoutTheLine()
+    {
+        _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
+
+        var result = await _scene.DescribeAsync("--log", "run.log");
+
+        ShouldExitOneWithoutTheLine(result, "SQLSRC999");
+    }
+
+    [Fact]
+    public async Task Run_ErrorWithTheLogVariable_ExitsOneWithoutTheLine()
+    {
+        _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
+        _scene.Run.Environment["SQLSOURCE_LOG"] = "run.log";
+
+        var result = await _scene.DescribeAsync();
+
+        ShouldExitOneWithoutTheLine(result, "SQLSRC999");
+    }
+
+    [Fact]
+    public async Task Run_LogThatCannotBeOpened_ExitsOneWithoutTheLine()
+    {
+        _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
+
+        var result = await _scene.DescribeAsync("--log", "tmp");
+
+        ShouldExitOneWithoutTheLine(result, "SQLSRC218");
+    }
+
+    [Fact]
+    public async Task Run_LogThatIsAFileOfTheRun_ExitsOneWithoutTheLine()
+    {
+        _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
+
+        var result = await _scene.DescribeAsync("--log", "Users.sql");
+
+        ShouldExitOneWithoutTheLine(result, "SQLSRC218");
     }
 
     [Theory]
