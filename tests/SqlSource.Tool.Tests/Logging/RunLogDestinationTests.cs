@@ -105,19 +105,11 @@ public sealed class RunLogDestinationTests : IDisposable
     }
 
     // The log's name forgotten before a .sql filter: the file of the run must not be emptied, and nothing runs.
-    [Theory]
-    [InlineData("option")]
-    [InlineData("variable")]
-    public async Task Run_LogThatIsAFileOfTheRun_IsSqlsrc218AndTheFileIsAsItWas(string source)
+    private async Task ShouldLeaveTheFileAsItWasAsync(Func<Task<CliResult>> run)
     {
         var before = await File.ReadAllBytesAsync(_users, TestContext.Current.CancellationToken);
-        if (source == "variable")
-        {
-            _scene.Run.Environment["SQLSOURCE_LOG"] = "Users.sql";
-        }
 
-        var result =
-            source == "option" ? await _scene.DescribeAsync("--log", "Users.sql") : await _scene.DescribeAsync();
+        var result = await run();
 
         result.ExitCode.ShouldBe(1);
         result.Out.ShouldBeEmpty();
@@ -129,6 +121,18 @@ public sealed class RunLogDestinationTests : IDisposable
         _scene.Describer.Described.ShouldBeEmpty();
         _scene.Describer.Opened.ShouldBeEmpty();
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public Task Run_LogOptionThatIsAFileOfTheRun_IsSqlsrc218AndTheFileIsAsItWas() =>
+        ShouldLeaveTheFileAsItWasAsync(() => _scene.DescribeAsync("--log", "Users.sql"));
+
+    [Fact]
+    public Task Run_LogVariableThatIsAFileOfTheRun_IsSqlsrc218AndTheFileIsAsItWas()
+    {
+        _scene.Run.Environment["SQLSOURCE_LOG"] = "Users.sql";
+
+        return ShouldLeaveTheFileAsItWasAsync(() => _scene.DescribeAsync());
     }
 
     // A command line that was wrong is not logged at all: the run ended before the log was opened.
