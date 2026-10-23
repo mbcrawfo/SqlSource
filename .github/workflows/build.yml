@@ -128,34 +128,16 @@ jobs:
       - name: Restore packages
         run: dotnet restore "$SOLUTION"
 
-      # The default image of each engine is pulled in the background while the solution builds.  The pull writes its
-      # log, and when it ends its exit status, to RUNNER_TEMP; "Wait for test images" prints the log, with the seconds
-      # each pull took, and fails if the pull failed.  The status is moved into place so that it is never read half
-      # written.
-      - name: Start pulling test images
-        run: |
-          log="$RUNNER_TEMP/pull-test-images.log"
-          status="$RUNNER_TEMP/pull-test-images.status"
-          (
-              rc=0
-              tools/pull-test-images.sh || rc=$?
-              echo "$rc" >"$status.tmp"
-              mv "$status.tmp" "$status"
-          ) >"$log" 2>&1 &
-
       - name: Build
         id: build
         run: dotnet build "$SOLUTION" --configuration "$CONFIGURATION" --no-restore
 
-      - name: Wait for test images
+      # A pull is a step of its own, so that the time it takes shows apart from the time the tests take.  It pulls the
+      # default image of each engine.  It runs after the build, not beside it: a pull in the background during the build
+      # slowed the build by more than the pull took.
+      - name: Pull test images
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: |
-          status="$RUNNER_TEMP/pull-test-images.status"
-          until [[ -f "$status" ]]; do
-              sleep 1
-          done
-          cat "$RUNNER_TEMP/pull-test-images.log"
-          exit "$(cat "$status")"
+        run: tools/pull-test-images.sh
 
       - name: Test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
