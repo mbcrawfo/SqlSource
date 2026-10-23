@@ -85,6 +85,9 @@ internal static class ParameterCopies
 
     private const char Prefix = '@';
 
+    // Prefix as the text WithoutPrefix takes, from the one constant.
+    private static readonly string Prefixes = Prefix.ToString();
+
     /// <summary>The SQL with every use of each reused parameter renamed to a copy.</summary>
     /// <exception cref="InvalidOperationException">The SQL does not lex: a bug of the plan.</exception>
     public static CopiedSql Rename(string sql, EquatableArray<SqlQueryParameter> parameters)
@@ -177,7 +180,7 @@ internal static class ParameterCopies
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var name in reported)
         {
-            var bare = name.Length > 0 && name[0] == Prefix ? name[1..] : name;
+            var bare = SqlParameterName.WithoutPrefix(name, Prefixes);
             var parameter = parameterOfCopy.TryGetValue(bare, out var original) ? original : bare;
             if (seen.Add(parameter))
             {
@@ -298,7 +301,9 @@ internal static class ParameterCopies
     private static string CopyName(string name, string separator, int number) =>
         name + separator + number.ToString(CultureInfo.InvariantCulture);
 
-    // A parameter lexeme's name, without its "@".
-    private static string NameOf(string sql, SqlLexeme lexeme) =>
-        sql.Substring(lexeme.Span.Start + 1, lexeme.Span.Length - 1);
+    private static string NameOf(string sql, SqlLexeme lexeme)
+    {
+        var name = lexeme.ParameterName;
+        return sql.Substring(name.Start, name.Length);
+    }
 }

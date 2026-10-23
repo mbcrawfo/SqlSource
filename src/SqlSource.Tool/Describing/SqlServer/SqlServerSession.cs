@@ -225,7 +225,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
         var rowOf = new Dictionary<string, SqlServerParameterRow>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in rows)
         {
-            _ = rowOf.TryAdd(Bare(row.Name), row);
+            _ = rowOf.TryAdd(SqlParameterName.WithoutPrefix(row.Name, "@"), row);
         }
 
         // Each declared parameter's declaration, as DeclaredTypeText read it, by its name.
@@ -513,9 +513,6 @@ internal sealed partial class SqlServerSession : IDescribeSession
                     )
                 )
             );
-
-    // A name without its "@", as the server reports one.
-    private static string Bare(string name) => name.StartsWith('@') ? name[1..] : name;
 
     private static Outcome<QueryDescription, DescribeFailure> Failed(DescribeFailure failure) =>
         Outcome<QueryDescription, DescribeFailure>.Failed(failure);

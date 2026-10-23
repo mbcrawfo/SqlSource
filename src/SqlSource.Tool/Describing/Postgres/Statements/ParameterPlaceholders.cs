@@ -64,7 +64,8 @@ internal static class ParameterPlaceholders
             var text = sql.AsSpan(lexeme.Span.Start, lexeme.Span.Length);
             if (lexeme.Kind == SqlLexemeKind.Parameter && parameters is { } list)
             {
-                _ = rewritten.Append('$').Append(OrdinalOf(text[1..], list));
+                var name = lexeme.ParameterName;
+                _ = rewritten.Append('$').Append(OrdinalOf(sql.AsSpan(name.Start, name.Length), list));
                 continue;
             }
 

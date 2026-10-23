@@ -127,7 +127,7 @@ internal sealed class SqlDeclaredVariables
             }
             else if (lexeme.Kind == SqlLexemeKind.Parameter && list.ExpectsName)
             {
-                (names ??= []).Add(new TextSpan(lexeme.Span.Start + 1, lexeme.Span.Length - 1));
+                (names ??= []).Add(lexeme.ParameterName);
                 list.ExpectsName = false;
             }
             else if (lexeme.Kind is SqlLexemeKind.Quoted or SqlLexemeKind.Parameter)
