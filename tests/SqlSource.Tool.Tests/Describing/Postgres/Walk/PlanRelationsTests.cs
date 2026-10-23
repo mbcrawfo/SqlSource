@@ -70,7 +70,7 @@ public sealed class PlanRelationsTests
             .ShouldBeEmpty();
 
     [Fact]
-    public void Of_ComparesNamesByOrdinal() =>
+    public void Of_NamesOfDifferentCase_ComparesThemByOrdinal() =>
         PlanRelations
             .Of(Append(Member("a", "b"), Member("b", "B"), Member("c", "a")))
             .ShouldBe([Name("public", "B"), Name("public", "a"), Name("public", "b")]);

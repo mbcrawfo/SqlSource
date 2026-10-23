@@ -615,7 +615,7 @@ public sealed class SqlServerErrorsTests
     }
 
     [Fact]
-    public void NoColumnName_Is266()
+    public void NoColumnName_SecondColumn_Is266()
     {
         var failure = SqlServerErrors.NoColumnName(Of(SqlDialectRules.SqlServer, "SELECT id, 1 FROM dbo.users"), 2);
 

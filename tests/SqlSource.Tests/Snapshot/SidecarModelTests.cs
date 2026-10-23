@@ -92,7 +92,7 @@ public sealed class SidecarModelTests
         Postgres(kind: kind).TryGetKind(out _).ShouldBeFalse();
 
     [Fact]
-    public void SidecarFormat_IsVersionOneOfTheSchemaInTheRepository()
+    public void SidecarFormat_OfTheRepository_IsVersionOneOfItsSchema()
     {
         SidecarFormat.Version.ShouldBe(1);
         SidecarFormat.SchemaId.ShouldBe(

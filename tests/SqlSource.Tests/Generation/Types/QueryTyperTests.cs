@@ -131,7 +131,7 @@ public sealed class QueryTyperTests
     [InlineData("null", "parameter 'p0'", "null", "Run 'sqlsource describe'")]
     [InlineData("empty", "column 'c0'", "", "Run 'sqlsource describe'")]
     [InlineData("dbo.Money", "column 'c0'", "Money", "Map it with the type override, as dbo.\"Money\"=<a C# type>")]
-    public void Type_SqlServerHelps(string type, string subject, string typeName, string help)
+    public void Type_SqlServerTypeWithNoMapping_GivesTheHelp(string type, string subject, string typeName, string help)
     {
         SidecarType? sidecarType = type switch
         {

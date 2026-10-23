@@ -33,7 +33,7 @@ public sealed class UserDocsLinksTests
     [InlineData("A [linked](other.md#x) heading", "a-linked-heading")]
     [InlineData("Under_score and dash-ed", "under_score-and-dash-ed")]
     [InlineData("Cafe\u0301 au lait", "cafe\u0301-au-lait")]
-    public void Slug_FollowsGitHub(string heading, string slug) => UserDocs.Slug(heading).ShouldBe(slug);
+    public void Slug_Heading_FollowsGitHub(string heading, string slug) => UserDocs.Slug(heading).ShouldBe(slug);
 
     [Fact]
     public void Anchors_HeadingsOfAPage_AreTheirSlugs()
@@ -46,7 +46,7 @@ public sealed class UserDocsLinksTests
 
     // A parser that finds nothing would make every other test of this folder pass.
     [Fact]
-    public void UserDocs_HaveLinks()
+    public void Links_OfTheUserDocs_AreFound()
     {
         UserDocs.Files.ShouldNotBeEmpty();
         UserDocs.Links().ShouldNotBeEmpty();
@@ -56,19 +56,19 @@ public sealed class UserDocsLinksTests
 
     // The tests read inline links and "#" headings.  Another form is not read, and what it names would not be checked.
     [Fact]
-    public void UserDocs_UseInlineLinksAndAtxHeadingsOnly() =>
+    public void UnsupportedForms_OfTheUserDocs_AreNone() =>
         UserDocs.UnsupportedForms().Select(form => $"{form.File}:{form.Line}: {form.Message}").ShouldBeEmpty();
 
     [Fact]
-    public void RelativeLinks_ReachAFileAndAnchorThatExist() =>
+    public void RelativeLinks_OfTheUserDocs_ReachAFileAndAnchorThatExist() =>
         Problems((file, target) => UserDocs.IsRepositoryLink(target) ? null : Follow(file, target)).ShouldBeEmpty();
 
     [Fact]
-    public void RepositoryUrls_ReachAFileAndAnchorThatExist() =>
+    public void RepositoryUrls_OfTheUserDocs_ReachAFileAndAnchorThatExist() =>
         Problems((file, target) => UserDocs.IsRepositoryLink(target) ? Follow(file, target) : null).ShouldBeEmpty();
 
     [Fact]
-    public void PackedReadmes_HaveOnlyAbsoluteLinks() =>
+    public void Links_OfThePackedReadmes_AreOnlyAbsolute() =>
         UserDocs
             .Links()
             .Where(link => PackedReadmes.Contains(link.File))
@@ -77,7 +77,7 @@ public sealed class UserDocsLinksTests
             .ShouldBeEmpty();
 
     [Fact]
-    public void UserDocs_LinkToNoInternalDocument() =>
+    public void Links_OfTheUserDocs_ReachNoInternalDocument() =>
         UserDocs
             .Links()
             .Select(link => (link.File, link.Line, link.Target, Resolved: UserDocs.Resolve(link.File, link.Target)))
