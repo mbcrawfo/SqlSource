@@ -126,41 +126,33 @@ public sealed class NpgsqlProbeTests
         CurrentSidecar(Orders, "GetOrder"),
     ];
 
-    [Theory]
-    [InlineData("none")]
-    [InlineData("8")]
-    [InlineData("9")]
-    [InlineData("10")]
-    public void Read_EachDriver_GivesItsFlags(string driver)
-    {
-        var (reference, expected, column) = driver switch
-        {
-            "8" => (
-                NpgsqlReferences.Npgsql8,
-                new NpgsqlProbe(true, true, false, new Version(8, 0, 3, 0)),
-                NpgsqlColumn.Npgsql8
-            ),
-            "9" => (
-                NpgsqlReferences.Npgsql9,
-                new NpgsqlProbe(true, true, false, new Version(9, 0, 3, 0)),
-                NpgsqlColumn.Npgsql8
-            ),
-            "10" => (
-                NpgsqlReferences.Npgsql10,
-                new NpgsqlProbe(true, true, true, new Version(10, 0, 3, 0)),
-                NpgsqlColumn.Npgsql10
-            ),
-            "none" => (null, new NpgsqlProbe(false, false, false, null), NpgsqlColumn.None),
-            _ => throw new ArgumentOutOfRangeException(nameof(driver), driver, "No such driver."),
-        };
+    [Fact]
+    public void Read_NoDriver_GivesItsFlags() =>
+        ShouldReadTheFlags([], new NpgsqlProbe(false, false, false, null), NpgsqlColumn.None);
 
-        var run = Run(OutputKind.Models, reference is null ? [] : [reference], UsersWithSidecar);
+    [Fact]
+    public void Read_Npgsql8_GivesItsFlags() =>
+        ShouldReadTheFlags(
+            [NpgsqlReferences.Npgsql8],
+            new NpgsqlProbe(true, true, false, new Version(8, 0, 3, 0)),
+            NpgsqlColumn.Npgsql8
+        );
 
-        run.Diagnostics.ShouldBeEmpty();
-        var probe = StepOutputs.Single<NpgsqlProbe>(run, TrackingNames.NpgsqlProbe);
-        probe.ShouldBe(expected);
-        probe.Column.ShouldBe(column);
-    }
+    [Fact]
+    public void Read_Npgsql9_GivesItsFlags() =>
+        ShouldReadTheFlags(
+            [NpgsqlReferences.Npgsql9],
+            new NpgsqlProbe(true, true, false, new Version(9, 0, 3, 0)),
+            NpgsqlColumn.Npgsql8
+        );
+
+    [Fact]
+    public void Read_Npgsql10_GivesItsFlags() =>
+        ShouldReadTheFlags(
+            [NpgsqlReferences.Npgsql10],
+            new NpgsqlProbe(true, true, true, new Version(10, 0, 3, 0)),
+            NpgsqlColumn.Npgsql10
+        );
 
     [Fact]
     public void Findings_ProbeBelowTheFloor_IsSqlsrc247WithTheVersion() =>
@@ -368,6 +360,17 @@ public sealed class NpgsqlProbeTests
             .Single<FileTypes>(run, TrackingNames.FileTypes)
             .Queries.ShouldHaveSingleItem()
             .Columns.ShouldBe([new PropertyType(expected, isValueType, true, NoWarnings, internalName, null)]);
+    }
+
+    // Users with its sidecar at Models, with the driver's references, gives no diagnostic and the probe and column.
+    private static void ShouldReadTheFlags(MetadataReference[] references, NpgsqlProbe expected, NpgsqlColumn column)
+    {
+        var run = Run(OutputKind.Models, references, UsersWithSidecar);
+
+        run.Diagnostics.ShouldBeEmpty();
+        var probe = StepOutputs.Single<NpgsqlProbe>(run, TrackingNames.NpgsqlProbe);
+        probe.ShouldBe(expected);
+        probe.Column.ShouldBe(column);
     }
 
     // The project at the output, under postgres unless the dialect is given, with these references.

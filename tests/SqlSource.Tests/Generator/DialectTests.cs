@@ -59,9 +59,7 @@ public sealed class DialectTests
 
         var run = Run(OutputKind.Sql, property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
 
-        run.Diagnostics.ShouldBeEmpty();
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.ShouldBeClean();
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + expected + "\";");
     }
 
@@ -107,9 +105,7 @@ public sealed class DialectTests
 
         var run = Run(OutputKind.Sql, property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
 
-        run.Diagnostics.ShouldBeEmpty();
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.ShouldBeClean();
     }
 
     // The value that wins names no option, so the file is read without one: options are not merged.

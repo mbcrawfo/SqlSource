@@ -52,46 +52,41 @@ public sealed class SqlClientProbeTests
         CurrentSidecar(Orders, "GetOrder"),
     ];
 
-    [Theory]
-    [InlineData("none")]
-    [InlineData("System.Data.SqlClient")]
-    [InlineData("6.0")]
-    [InlineData("6.1")]
-    [InlineData("7")]
-    public void Read_EachDriver_GivesItsFlags(string driver)
-    {
-        var (reference, expected, column) = driver switch
-        {
-            "6.0" => (
-                SqlClientReferences.SqlClient60,
-                new SqlClientProbe(true, false, false, "6.0.5"),
-                SqlClientColumn.OlderThan61
-            ),
-            "6.1" => (
-                SqlClientReferences.SqlClient61,
-                new SqlClientProbe(true, true, false, "6.1.7"),
-                SqlClientColumn.SqlClient61
-            ),
-            "7" => (
-                SqlClientReferences.SqlClient7,
-                new SqlClientProbe(true, true, true, "7.1.1"),
-                SqlClientColumn.SqlClient7
-            ),
-            "System.Data.SqlClient" => (
-                SqlClientReferences.SystemDataSqlClient,
-                new SqlClientProbe(false, false, false, null),
-                SqlClientColumn.None
-            ),
-            "none" => (null, new SqlClientProbe(false, false, false, null), SqlClientColumn.None),
-            _ => throw new ArgumentOutOfRangeException(nameof(driver), driver, "No such driver."),
-        };
+    [Fact]
+    public void Read_NoDriver_GivesItsFlags() =>
+        ShouldReadTheFlags([], new SqlClientProbe(false, false, false, null), SqlClientColumn.None);
 
-        var run = Run(OutputKind.Models, reference is null ? [] : [reference], UsersWithSidecar);
+    [Fact]
+    public void Read_SystemDataSqlClient_GivesItsFlags() =>
+        ShouldReadTheFlags(
+            [SqlClientReferences.SystemDataSqlClient],
+            new SqlClientProbe(false, false, false, null),
+            SqlClientColumn.None
+        );
 
-        var probe = StepOutputs.Single<SqlClientProbe>(run, TrackingNames.SqlClientProbe);
-        probe.ShouldBe(expected);
-        probe.Column.ShouldBe(column);
-    }
+    [Fact]
+    public void Read_SqlClient60_GivesItsFlags() =>
+        ShouldReadTheFlags(
+            [SqlClientReferences.SqlClient60],
+            new SqlClientProbe(true, false, false, "6.0.5"),
+            SqlClientColumn.OlderThan61
+        );
+
+    [Fact]
+    public void Read_SqlClient61_GivesItsFlags() =>
+        ShouldReadTheFlags(
+            [SqlClientReferences.SqlClient61],
+            new SqlClientProbe(true, true, false, "6.1.7"),
+            SqlClientColumn.SqlClient61
+        );
+
+    [Fact]
+    public void Read_SqlClient7_GivesItsFlags() =>
+        ShouldReadTheFlags(
+            [SqlClientReferences.SqlClient7],
+            new SqlClientProbe(true, true, true, "7.1.1"),
+            SqlClientColumn.SqlClient7
+        );
 
     [Fact]
     public void Run_SqlClientBelowTheFloor_IsSqlsrc267Once()
@@ -134,9 +129,7 @@ public sealed class SqlClientProbeTests
         DriverDiagnostics(older).ShouldHaveSingleItem().ShouldStartWith("SQLSRC267 ");
         older.CompilationErrors.ShouldBeEmpty();
         older.GeneratedCodeWarnings.ShouldBeEmpty();
-        current.Diagnostics.ShouldBeEmpty();
-        current.CompilationErrors.ShouldBeEmpty();
-        current.GeneratedCodeWarnings.ShouldBeEmpty();
+        current.ShouldBeClean();
     }
 
     [Fact]
@@ -376,6 +369,20 @@ public sealed class SqlClientProbeTests
                 || diagnostic.StartsWith("SQLSRC268 ", StringComparison.Ordinal)
             ),
         ];
+
+    // Users with its sidecar at Models, with the driver's references, gives the probe and column.
+    private static void ShouldReadTheFlags(
+        MetadataReference[] references,
+        SqlClientProbe expected,
+        SqlClientColumn column
+    )
+    {
+        var run = Run(OutputKind.Models, references, UsersWithSidecar);
+
+        var probe = StepOutputs.Single<SqlClientProbe>(run, TrackingNames.SqlClientProbe);
+        probe.ShouldBe(expected);
+        probe.Column.ShouldBe(column);
+    }
 
     // The project at the output, under mssql unless the dialect is given, with these references.
     private static GeneratorRun Run(OutputKind output, MetadataReference[] references, params SqlFile[] files) =>

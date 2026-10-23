@@ -66,9 +66,7 @@ public sealed class GeneratorParameterLevelTests
             generatorParameters: property
         );
 
-        run.Diagnostics.ShouldBeEmpty();
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.ShouldBeClean();
         var generated = run.Sources["App.Sample.g.cs"];
         if (expected)
         {
