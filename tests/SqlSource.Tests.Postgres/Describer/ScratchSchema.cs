@@ -8,8 +8,9 @@ namespace SqlSource.Tests.Postgres.Describer;
 // here alone, made by SQL that can be run again, and is never dropped beyond what its own text replaces: the
 // container is thrown away, and the fixtures are recorded in one of their own.  So a class that runs it first makes
 // the same object as any other would.  An object that changes what another test sees while it exists,
-// public."numeric", the schema "user", the schema shadow of ShadowCount and ShadowOperators, describer_canary,
-// command_widgets, error_path_widgets and session_gone, is made by its test and dropped in a finally.
+// public."numeric", the schema "user", the schema shadow of ShadowCount and ShadowOperators, the aggregate
+// pg_catalog.count(text) of CatalogCount, describer_canary, command_widgets, error_path_widgets and session_gone, is
+// made by its test and dropped in a finally.
 internal static class ScratchSchema
 {
     /// <summary>
@@ -61,6 +62,28 @@ internal static class ScratchSchema
     /// <c>*</c>, the describer reads no <c>count(x)</c> and no range intersection of any other test.
     /// </summary>
     public const string DropShadow = "DROP SCHEMA IF EXISTS shadow CASCADE";
+
+    /// <summary>
+    /// An aggregate <c>pg_catalog.count(text)</c> that always returns <c>NULL</c>, added to <c>pg_catalog</c> itself as
+    /// a superuser or an extension installed there may.  Its function is PL/pgSQL, since the planner inlines a function
+    /// of SQL, and is in <c>pg_catalog</c> too.  The plan prints a call of it bare, as <c>count(...)</c>, whatever the
+    /// path's order.
+    /// </summary>
+    public const string CatalogCount = """
+        CREATE OR REPLACE FUNCTION pg_catalog.sqlsource_test_nulls(int8, text) RETURNS int8
+            LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END';
+        CREATE OR REPLACE AGGREGATE pg_catalog.count(text) (sfunc = pg_catalog.sqlsource_test_nulls, stype = int8);
+        """;
+
+    /// <summary>
+    /// Drops what <see cref="CatalogCount" /> made.  Every test that runs it runs this in a finally: while
+    /// <c>pg_catalog</c> holds a <c>count</c> that is not built in, the describer reads no <c>count(x)</c> of any
+    /// other test.
+    /// </summary>
+    public const string DropCatalogCount = """
+        DROP AGGREGATE IF EXISTS pg_catalog.count(text);
+        DROP FUNCTION IF EXISTS pg_catalog.sqlsource_test_nulls(int8, text);
+        """;
 
     /// <summary>
     /// The extension <c>postgres_fdw</c> and one loopback server, <c>scratch_loop</c>, to the container's own

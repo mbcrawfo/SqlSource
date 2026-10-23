@@ -83,6 +83,26 @@ public sealed class ExpressionTests(PostgresContainer postgres)
         }
     }
 
+    // An aggregate added to pg_catalog itself prints bare as the stock one does and is not built in, so "overloads"
+    // answers that count is held elsewhere: neither count(u.name::text), which it takes, nor count(u.id) is read.
+    [Fact]
+    public async Task DescribeAsync_CountWhenCatalogHoldsAnAddedOne_StaysUnknown()
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.CatalogCount);
+
+            (await AnswersAsync("SELECT count(u.name::text) AS n, count(u.id) AS m FROM users u")).ShouldBe([
+                UnknownNoOrigin,
+                UnknownNoOrigin,
+            ]);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropCatalogCount);
+        }
+    }
+
     // count, array_agg and jsonb_build_object are read by their name when no schema but pg_catalog holds one of it:
     // a count with a FILTER is never NULL, and an array_agg of a group that has a row is not, whatever its inputs.  A
     // FILTER may leave array_agg's group no row, and jsonb_build_object over a VARIADIC array is NULL for a NULL one.

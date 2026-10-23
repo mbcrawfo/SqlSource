@@ -38,8 +38,9 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// </param>
 /// <param name="CatalogAlone">
 /// The names of <see cref="CatalogOverloads" /> that no schema but <c>pg_catalog</c> holds a function or an operator
-/// of, or null for none.  A call of such a name is read by its name, and only when
-/// <paramref name="CatalogFunctions" /> holds too; a name it leaves out is read as no form of that table.
+/// of, and <c>pg_catalog</c> holds none of that is not built in, or null for none.  A call of such a name is read by
+/// its name, and only when <paramref name="CatalogFunctions" /> holds too; a name it leaves out is read as no form of
+/// that table.
 /// </param>
 /// <param name="ProvedOnFullJoinSide">
 /// Where the node that computes the entry is a <c>Full</c> join that no join above null-extends: for a reference to an

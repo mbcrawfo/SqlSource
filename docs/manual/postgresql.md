@@ -102,7 +102,7 @@ SqlSource can tell that a column is never null when it is:
 - **`merge_action()`** in the `RETURNING` list of a `MERGE`, on PostgreSQL 18.
 - **A column of a `UNION`, an `INTERSECT` or an `EXCEPT`** at the top of the query, when every value it can return there is never null by the rules above: every branch of a `UNION`, either side of an `INTERSECT`, the left side of an `EXCEPT`.
 
-`count(x)`, `array_agg`, the JSON builders and the range constructors and intersections count only when no schema of the database but `pg_catalog` holds a function or an operator of that name; a name that another schema holds as well is possibly null, as the lists below say.
+`count(x)`, `array_agg`, the JSON builders and the range constructors and intersections count only when no schema of the database but `pg_catalog` holds a function or an operator of that name, and none was added to `pg_catalog`; a name that another schema holds as well, or that was added to `pg_catalog`, is possibly null, as the lists below say.
 
 `count(*)` and the rankings, `count(x)`, `array_agg`, the JSON builders, the range constructors and intersections, constants, tests, the arithmetic, comparisons, functions, casts, aggregates and subqueries above, `merge_action()`, and `COALESCE`, `GREATEST`, `LEAST` and `CASE` each count only where an outer join cannot leave them null.
 
@@ -114,7 +114,7 @@ SqlSource treats a column as possibly null when:
 - **The column comes from a view or a materialized view.**  PostgreSQL does not record whether a view's column can be null.
 - **The column comes from a foreign table.**  PostgreSQL does not enforce `NOT NULL` on its remote rows.
 - **It is `NULL`**, or an expression that is not in the list above, such as `initcap(name)`, `array_agg(...)` without `GROUP BY` or with `FILTER`, `upper(during)` of a range, `price * quantity` where either column can hold null, `sum(total)` without `GROUP BY`, `EXISTS (...)` before PostgreSQL 18, or a call of another function.
-- **It is a function or an operator of a name that another schema of the database holds as well**, such as a `count` or a `*` that an extension installs, in a column the list above would have read.  The tool cannot tell which one the query calls.
+- **It is a function or an operator of a name that another schema of the database holds as well**, such as a `count` or a `*` that an extension installs, in its own schema or in `pg_catalog`, in a column the list above would have read.  The tool cannot tell which one the query calls.
 - **It is a column of a `UNION`, an `INTERSECT` or an `EXCEPT`** where a branch can give null, or where SqlSource cannot follow a branch.
 - **It is an expression that a subquery in `FROM` or a `WITH` query computes**, such as a `count(*)` that a `WITH` query returns, **or one computed over a `UNION`, an `INTERSECT` or an `EXCEPT`**, such as `count(*)` of a subquery that holds one.  Such a column can be treated as possibly null even when the list above says it is never null.
 - **The query has `ROLLUP`, `CUBE` or `GROUPING SETS`.**  Every column of such a query is possibly null.

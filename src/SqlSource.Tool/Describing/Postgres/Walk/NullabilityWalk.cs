@@ -59,7 +59,8 @@ internal sealed record WalkOutcome(
 /// </param>
 /// <param name="CatalogAlone">
 /// The names of <see cref="CatalogOverloads" /> that <c>overloads</c> answered no schema but <c>pg_catalog</c> holds,
-/// or null for none: a name it was not asked, and every name of a call that failed, is held elsewhere.
+/// and <c>pg_catalog</c> holds none of that is not built in, or null for none: a name it was not asked, and every
+/// name of a call that failed, is held elsewhere.
 /// </param>
 internal sealed record WalkScope(
     bool Gated,

@@ -8,7 +8,7 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 /// <summary>
 /// The names of functions and operators that only <c>pg_catalog</c> holds: no other schema holds a function or an
-/// operator of one, whatever the order of the search path.
+/// operator of one, whatever the order of the search path, and <c>pg_catalog</c> holds none that is not built in.
 /// </summary>
 /// <param name="Functions">The names of functions, as <c>pg_proc.proname</c> spells them.</param>
 /// <param name="Operators">The names of operators, as <c>pg_operator.oprname</c> spells them.</param>
@@ -29,9 +29,10 @@ internal sealed record CatalogNames(IReadOnlySet<string> Functions, IReadOnlySet
 /// it whatever the order of the path, so <see cref="TotalFunctions" />' rule of an exact signature cannot read it.  A
 /// name that no schema but <c>pg_catalog</c> holds is another thing: the call is one of <c>pg_catalog</c>'s overloads
 /// of the name, whichever the server chose.  So a name of this table is read only when the session finds
-/// <c>pg_catalog</c> first and no other schema holds a function or an operator of it
-/// (<see cref="ExpressionContext.CatalogAlone" />), and only when every overload <c>pg_catalog</c> holds of it is one
-/// the table lists: an overload the table does not list may be <c>NULL</c> where these are not.
+/// <c>pg_catalog</c> first and <c>overloads</c> answered that no schema other than <c>pg_catalog</c> holds a function
+/// or an operator of it, and <c>pg_catalog</c> holds none as an object that is not built in, which a superuser or an
+/// extension may add (<see cref="ExpressionContext.CatalogAlone" />), and only when every overload <c>pg_catalog</c>
+/// holds of it is one the table lists: an overload the table does not list may be <c>NULL</c> where these are not.
 /// </para>
 /// <para>
 /// What each name reads: <c>count(...)</c> with any argument, an optional <c>FILTER (...)</c> and an optional

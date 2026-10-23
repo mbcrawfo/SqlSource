@@ -72,10 +72,10 @@ These would make the work a failure even if every test passes:
 
 ### 1. The call `overloads`
 
-A new call, `overloads`, asks which of a list of names some schema other than `pg_catalog` holds a function of (`pg_proc.proname`, every `prokind`) or an operator of (`pg_operator.oprname`).
+A new call, `overloads`, asks which of a list of names some schema other than `pg_catalog` holds a function of (`pg_proc.proname`, every `prokind`) or an operator of (`pg_operator.oprname`), or `pg_catalog` holds as an object that is not built in: one whose OID is `16384` or more, `FirstNormalObjectId`, which every object `initdb` creates is below.  A superuser, or an extension made in `pg_catalog`, can add such an overload, and the table pins only the stock ones.
 
 - Request: `PostgresOverloadsRequest(IReadOnlyList<string> Functions, IReadOnlyList<string> Operators)`, each sorted and without duplicates.
-- Answer: `PostgresOverloadsAnswer(IReadOnlyList<string>? Functions, IReadOnlyList<string>? Operators, PostgresServerError? Error)`: the names of the request that another schema holds.  An empty list means `pg_catalog` alone holds every name of it.
+- Answer: `PostgresOverloadsAnswer(IReadOnlyList<string>? Functions, IReadOnlyList<string>? Operators, PostgresServerError? Error)`: the names of the request that another schema holds, or `pg_catalog` holds as an object that is not built in.  An empty list means `pg_catalog` alone holds every name of it, and only its built-in overloads.
 
 It is asked after `relations`, and only when all of these hold:
 - a column has no origin;

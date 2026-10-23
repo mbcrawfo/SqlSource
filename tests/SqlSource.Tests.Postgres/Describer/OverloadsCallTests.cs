@@ -6,7 +6,8 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;
 
-// "overloads" against a real server: which of the names asked for a schema other than pg_catalog holds.
+// "overloads" against a real server: which of the names asked for a schema other than pg_catalog holds, or
+// pg_catalog holds as an object that is not built in.
 [Collection(UsesPostgres.Name)]
 public sealed class OverloadsCallTests(PostgresContainer postgres)
 {
@@ -50,6 +51,31 @@ public sealed class OverloadsCallTests(PostgresContainer postgres)
         finally
         {
             await postgres.ExecuteAsync(ScratchSchema.DropShadow);
+        }
+    }
+
+    // A superuser, or an extension made in pg_catalog, adds an overload there: it is not the stock one the walk pins.
+    [Fact]
+    public async Task OverloadsAsync_NameAddedToTheCatalog_AnswersIt()
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.CatalogCount);
+            await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
+            var live = new PostgresLive(connection);
+
+            var answer = await live.OverloadsAsync(
+                new PostgresOverloadsRequest(["array_agg", "count", "max"], ["*", "+"]),
+                TestContext.Current.CancellationToken
+            );
+
+            answer.Error.ShouldBeNull(answer.Error?.Message);
+            answer.Functions.ShouldBe(["count"]);
+            answer.Operators.ShouldNotBeNull().ShouldBeEmpty();
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropCatalogCount);
         }
     }
 

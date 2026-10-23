@@ -316,14 +316,16 @@ internal sealed record PostgresRelationsRequest(IReadOnlyList<PostgresRelationNa
 internal sealed record PostgresOverloadsRequest(IReadOnlyList<string> Functions, IReadOnlyList<string> Operators);
 
 /// <summary>
-/// Which of the names asked for a schema other than <c>pg_catalog</c> holds, or why it could not be read.
+/// Which of the names asked for a schema other than <c>pg_catalog</c> holds, or <c>pg_catalog</c> holds as an object
+/// that is not built in, or why it could not be read.
 /// </summary>
 /// <param name="Functions">
-/// The names of the request's functions that some other schema holds, whatever the arguments, in ordinal order, or
-/// null with an error.
+/// The names of the request's functions that some other schema holds, or <c>pg_catalog</c> holds as an object that is
+/// not built in, whatever the arguments, in ordinal order, or null with an error.
 /// </param>
 /// <param name="Operators">
-/// The names of the request's operators that some other schema holds, or null with an error.
+/// The names of the request's operators that some other schema holds, or <c>pg_catalog</c> holds as an object that is
+/// not built in, or null with an error.
 /// </param>
 /// <param name="Error">What the server said, or null.  It is logged and never reported.</param>
 internal sealed record PostgresOverloadsAnswer(

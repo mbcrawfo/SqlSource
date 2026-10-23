@@ -267,8 +267,8 @@ internal static class PostgresEvents
 
     /// <summary>
     /// <c>postgres.overloads</c>: the names of functions and of operators that were asked for, and those of them that
-    /// a schema other than <c>pg_catalog</c> holds, or the error.  A name that is not among the answer's is held by
-    /// the catalog alone.
+    /// a schema other than <c>pg_catalog</c> holds, or <c>pg_catalog</c> holds as an object that is not built in, or
+    /// the error.  A name that is not among the answer's is held by the built-in catalog alone.
     /// </summary>
     public static void Overloads(
         IRunLog log,

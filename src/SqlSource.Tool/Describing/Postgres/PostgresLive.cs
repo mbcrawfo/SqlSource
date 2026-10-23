@@ -130,20 +130,27 @@ internal sealed class PostgresLive(PostgresConnection connection)
         ORDER BY 1, 2
         """;
 
+    // PostgreSQL's FirstNormalObjectId: every object that initdb creates has a lower OID, so an object of pg_catalog at
+    // or above it was added after, by a superuser or by an extension made in pg_catalog.
+    private const string FirstNormalObjectId = "16384";
+
     // The names of the functions and of the operators, among the ones asked for, that a schema other than pg_catalog
-    // holds: two queries, one for each, with the names as one positional text[].  Each name is of the collation "C",
-    // so that ORDER BY 1 gives ordinal order whatever the database's collation.
-    private const string OverloadedFunctionsSql = """
+    // holds, or that pg_catalog holds as an object that is not built in: two queries, one for each, with the names as
+    // one positional text[].  Each name is of the collation "C", so that ORDER BY 1 gives ordinal order whatever the
+    // database's collation.
+    private const string OverloadedFunctionsSql = $"""
         SELECT DISTINCT p.proname::text COLLATE "C"
         FROM pg_catalog.pg_proc AS p
-        WHERE p.proname = ANY ($1::text[]) AND p.pronamespace <> 'pg_catalog'::pg_catalog.regnamespace
+        WHERE p.proname = ANY ($1::text[])
+            AND (p.pronamespace <> 'pg_catalog'::pg_catalog.regnamespace OR p.oid >= {FirstNormalObjectId})
         ORDER BY 1
         """;
 
-    private const string OverloadedOperatorsSql = """
+    private const string OverloadedOperatorsSql = $"""
         SELECT DISTINCT o.oprname::text COLLATE "C"
         FROM pg_catalog.pg_operator AS o
-        WHERE o.oprname = ANY ($1::text[]) AND o.oprnamespace <> 'pg_catalog'::pg_catalog.regnamespace
+        WHERE o.oprname = ANY ($1::text[])
+            AND (o.oprnamespace <> 'pg_catalog'::pg_catalog.regnamespace OR o.oid >= {FirstNormalObjectId})
         ORDER BY 1
         """;
 
@@ -441,7 +448,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
 
     /// <summary>
     /// Asks <c>overloads</c>: which of the function names and of the operator names asked for a schema other than
-    /// <c>pg_catalog</c> holds, whatever its arguments and whether or not the session's search path names it.
+    /// <c>pg_catalog</c> holds, or <c>pg_catalog</c> holds as an object that is not built in, whatever its arguments
+    /// and whether or not the session's search path names it.
     /// </summary>
     public Task<PostgresOverloadsAnswer> OverloadsAsync(PostgresOverloadsRequest asked, CancellationToken token) =>
         AnswerAsync(

@@ -54,8 +54,8 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// read, since the child computed it under its own grouping.
 /// </para>
 /// <para>
-/// A name of <see cref="CatalogOverloads" /> that only <c>pg_catalog</c> holds
-/// (<see cref="ExpressionContext.CatalogAlone" />) is read by its name, since the call is then one of
+/// A name of <see cref="CatalogOverloads" /> that only <c>pg_catalog</c> holds, all of it built in
+/// (<see cref="ExpressionContext.CatalogAlone" />), is read by its name, since the call is then one of
 /// <c>pg_catalog</c>'s overloads of it, whichever the server chose: <c>count(...)</c> with any argument, a
 /// <c>bigint</c>; <c>array_agg(...)</c> of one argument where an aggregate of the table would be read, of no known
 /// type; <c>jsonb_build_object(...)</c> and <c>json_build_object(...)</c> with no argument written <c>VARIADIC</c>, a
