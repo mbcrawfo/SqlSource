@@ -41,7 +41,7 @@ internal static class ScratchSchema
         CREATE DOMAIN hiding_types.bpchar AS integer;
         CREATE DOMAIN hiding_types."char" AS integer;
         CREATE DOMAIN hiding_types."bit" AS integer;
-        CREATE DOMAIN hiding_types.oid AS integer;
+        CREATE DOMAIN hiding_types.oid AS pg_catalog.text;
         CREATE DOMAIN hiding_types.int4 AS pg_catalog.text;
         """;
 
