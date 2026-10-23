@@ -77,19 +77,7 @@ public sealed class TokenValidationTests
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            [
-                new SourceFile(
-                    GeneratorHarness.SourcePath,
-                    """
-                    using SqlSource;
-
-                    namespace App;
-
-                    [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
-                    public partial class Sample;
-                    """
-                ),
-            ],
+            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
             [
                 new SqlFile(
                     GeneratorHarness.UsersPath,

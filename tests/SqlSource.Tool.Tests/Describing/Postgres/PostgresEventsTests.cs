@@ -8,6 +8,7 @@ using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
 using Xunit;
+using static SqlSource.Tool.Testing.RecordingLog;
 using static SqlSource.Tool.Tests.PostgresEventCases;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;

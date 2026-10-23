@@ -60,11 +60,15 @@ public sealed class SettingLevelTests
     [InlineData("SqlSourceTypeOverrides", "timestamptz=System.DateTimeOffset  int4[]=int?[]", "codegen")]
     public void Run_ValidSettingAsPropertyAndAsMetadata_ChangesNoGeneratedCode(string name, string value, string output)
     {
-        var plain = GeneratorHarness.Run(null, Source(null), new SqlFile("/app/Repo/Q.sql", Sql));
+        var plain = GeneratorHarness.Run(
+            null,
+            GeneratorHarness.SampleSource(null),
+            new SqlFile("/app/Repo/Q.sql", Sql)
+        );
 
         var run = GeneratorHarness.Run(
             null,
-            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
+            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
             [new SqlFile("/app/Repo/Q.sql", Sql, Metadata: new Dictionary<string, string> { [name] = value })],
             properties: new Dictionary<string, string?> { [name] = value }
         );
@@ -89,7 +93,7 @@ public sealed class SettingLevelTests
     {
         var run = GeneratorHarness.Run(
             null,
-            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
+            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
             [new SqlFile("/app/Repo/Q.sql", Sql, Metadata: new Dictionary<string, string> { [name] = value })],
             properties: new Dictionary<string, string?> { [name] = value }
         );
@@ -112,7 +116,7 @@ public sealed class SettingLevelTests
 
         var run = GeneratorHarness.Run(
             null,
-            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
+            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
             [
                 new SqlFile(
                     "/app/Repo/Q.sql",
@@ -140,7 +144,7 @@ public sealed class SettingLevelTests
     {
         var run = GeneratorHarness.Run(
             null,
-            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
+            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
             [new SqlFile("/app/Repo/Q.sql", Sql)],
             properties: new Dictionary<string, string?>
             {
@@ -174,9 +178,17 @@ public sealed class SettingLevelTests
     [InlineData("InputModelSuffix = \"\", ModelNamespace = \"  \"", "codegen")]
     public void Run_ValidAttributeProperty_ChangesNoGeneratedCode(string argument, string? output)
     {
-        var plain = GeneratorHarness.Run(null, Source(null), new SqlFile("/app/Repo/Q.sql", Sql));
+        var plain = GeneratorHarness.Run(
+            null,
+            GeneratorHarness.SampleSource(null),
+            new SqlFile("/app/Repo/Q.sql", Sql)
+        );
 
-        var run = GeneratorHarness.Run(null, Source(argument), new SqlFile("/app/Repo/Q.sql", Sql));
+        var run = GeneratorHarness.Run(
+            null,
+            GeneratorHarness.SampleSource(argument),
+            new SqlFile("/app/Repo/Q.sql", Sql)
+        );
 
         // At sql the query needs nothing that the dialect cannot give.
         run.Diagnostics.ShouldBe(output is null ? [] : [NotDescribable(output, 1)]);
@@ -201,7 +213,11 @@ public sealed class SettingLevelTests
         string property
     )
     {
-        var run = GeneratorHarness.Run(null, Source(argument), new SqlFile("/app/Repo/Q.sql", Sql));
+        var run = GeneratorHarness.Run(
+            null,
+            GeneratorHarness.SampleSource(argument),
+            new SqlFile("/app/Repo/Q.sql", Sql)
+        );
 
         // The type's files are still checked, under the default output.
         run.Diagnostics.Count.ShouldBe(2);
@@ -225,9 +241,17 @@ public sealed class SettingLevelTests
         string[] markedDiagnostics
     )
     {
-        var plain = GeneratorHarness.Run(null, Source(null), new SqlFile("/app/Repo/Q.sql", plainSql));
+        var plain = GeneratorHarness.Run(
+            null,
+            GeneratorHarness.SampleSource(null),
+            new SqlFile("/app/Repo/Q.sql", plainSql)
+        );
 
-        var run = GeneratorHarness.Run(null, Source(null), new SqlFile("/app/Repo/Q.sql", markedSql));
+        var run = GeneratorHarness.Run(
+            null,
+            GeneratorHarness.SampleSource(null),
+            new SqlFile("/app/Repo/Q.sql", markedSql)
+        );
 
         plain.Diagnostics.ShouldBe(plainDiagnostics);
         run.Diagnostics.ShouldBe(markedDiagnostics);
@@ -241,7 +265,7 @@ public sealed class SettingLevelTests
     {
         var run = GeneratorHarness.Run(
             null,
-            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
+            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
             [new SqlFile("/app/Repo/Q.sql", "-- name: Q\n-- method-location: public\nSELECT 1; -- c\n")],
             properties: new Dictionary<string, string?> { ["SqlSourceMethodLocation"] = "nope" }
         );
@@ -261,9 +285,4 @@ public sealed class SettingLevelTests
     private static string NoDefault(string token) =>
         $"SQLSRC210 /app/Repo/Q.sql(1,10)-(1,11): The token '{token}' has no default, which a query whose output is "
         + "'codegen' needs.  Give it a default, or set the output to 'sql'.";
-
-    private static string Source(string? argument) =>
-        "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate(SqlLocation = SqlLocation.Direct"
-        + (argument is null ? string.Empty : ", " + argument)
-        + ")]\npublic partial class Sample;\n";
 }

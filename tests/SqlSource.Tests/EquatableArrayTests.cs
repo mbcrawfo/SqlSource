@@ -33,7 +33,7 @@ public sealed class EquatableArrayTests
         Of("a", "b").GetHashCode().ShouldBe(Of("a", "b").GetHashCode());
 
     [Fact]
-    public void Default_BehavesAsEmpty()
+    public void Default_OfTheArray_BehavesAsEmpty()
     {
         var array = default(EquatableArray<string>);
 
@@ -44,7 +44,7 @@ public sealed class EquatableArrayTests
     }
 
     [Fact]
-    public void Indexer_ReturnsItemsInOrder()
+    public void Indexer_ArrayOfTwoItems_ReturnsThemInOrder()
     {
         var array = Of("a", "b");
 

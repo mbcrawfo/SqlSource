@@ -6,7 +6,9 @@ using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Testing;
 using Xunit;
+using static SqlSource.Tool.Testing.RecordingLog;
 using static SqlSource.Tool.Tests.PostgresEventCases;
 using static SqlSource.Tool.Tests.PostgresPlans;
 

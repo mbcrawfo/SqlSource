@@ -10,6 +10,7 @@ using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
+using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
@@ -170,7 +171,7 @@ public sealed class QueryTyperTests
     [InlineData("null", "parameter 'p0'", "null", "Run 'sqlsource describe'")]
     [InlineData("empty", "column 'c0'", "", "Run 'sqlsource describe'")]
     [InlineData("dbo.Money", "column 'c0'", "Money", "Map it with the type override, as dbo.\"Money\"=<a C# type>")]
-    public void Type_SqlServerHelps(string type, string subject, string typeName, string help)
+    public void Type_SqlServerTypeWithNoMapping_GivesTheHelp(string type, string subject, string typeName, string help)
     {
         SidecarType? sidecarType = type switch
         {
@@ -308,7 +309,7 @@ public sealed class QueryTyperTests
     )
     {
         var file = SqlFileReader.Read(
-            new InMemoryAdditionalText(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"),
+            new InMemoryAdditionalText(GeneratorHarness.UsersPath, SqlTexts.GetUser),
             GeneratorHarness.UsersNormalizedPath,
             dialect,
             null,

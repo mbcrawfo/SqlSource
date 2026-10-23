@@ -251,7 +251,7 @@ Every other text is the tool's own: the read of `open`, the texts of `declared` 
 | `mssql.table` | When `table` is asked | `query`, the `schema` and the `table` it describes, the answer as `columns`', and `durationMs` |
 | `mssql.table-match` | For each statement with rows | `query`, `tableMatch`, and `table`, a map of `schema` and `table`, or null |
 
-`durationMs` is measured by the run's clock in `DescriberSession.AskAsync`.  A row is a map of every member of its record, an error row a map of `number`, `type` and `message`, and an `error` the list of every error, each a map of `number`, `class`, `state` and `message`.  `open` has no event of its own: the run's `database.open` records the server, the four settings included.  Every string goes through the session's redaction, as `RedactionTests` holds.  The remarks of `SqlServerEvents` give the same order.
+`durationMs` is measured by the run's clock in `DescriberSession.AskAsync`.  A row is a map of every member of its record, an error row a map of `number`, `type` and `message`, and an `error` the list of every error, each a map of `number`, `class`, `state` and `message`.  `open` has no event of its own: the run's `database.open` records the server, the four settings included.  Every string goes through the session's redaction, as `RunLogRedactionTests` holds.  The remarks of `SqlServerEvents` give the same order.
 
 ### Driver logging
 

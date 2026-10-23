@@ -200,13 +200,13 @@ public sealed class EndToEndTests
     [InlineData(typeof(DialectQueries))]
     [InlineData(typeof(ParameterQueries))]
     [InlineData(typeof(KeptQueries))]
-    public void Attribute_IsNotInTheMetadataOfTheTypesThatCarryIt(Type type) =>
+    public void Attribute_OnAGeneratedType_IsNotInItsMetadata(Type type) =>
         type.GetCustomAttributesData()
             .Select(attribute => attribute.AttributeType.FullName)
             .ShouldNotContain("SqlSource.SqlSourceGenerateAttribute");
 
     [Fact]
-    public void AttributeAndEnum_AreInternalTypesOfTheConsumingAssembly()
+    public void AttributeAndEnum_OfTheConsumingAssembly_AreInternalTypes()
     {
         var assembly = typeof(EndToEndTests).Assembly;
 

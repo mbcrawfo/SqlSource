@@ -73,5 +73,5 @@ public sealed class EventuallyTests
     }
 
     [Fact]
-    public void Patience_IsTwoMinutes() => Eventually.Patience.ShouldBe(TimeSpan.FromMinutes(2));
+    public void Patience_OfEveryWait_IsTwoMinutes() => Eventually.Patience.ShouldBe(TimeSpan.FromMinutes(2));
 }

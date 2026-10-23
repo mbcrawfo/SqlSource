@@ -9,6 +9,7 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Reporting;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Reporting;

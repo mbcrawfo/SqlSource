@@ -123,7 +123,8 @@ public sealed class TerminationTests : IDisposable
     private string ProjectThatWaits(string waiting)
     {
         var project = _fixtures.Copy("Single");
-        var wait = OperatingSystem.IsWindows() ? "ping -n 120 127.0.0.1 &gt; nul" : "sleep 120";
+        var (program, arguments) = Programs.Waiter(120);
+        var wait = string.Join(' ', [program, .. arguments]) + (OperatingSystem.IsWindows() ? " &gt; nul" : "");
         _ = _fixtures.WriteFile(
             "Single/Directory.Build.targets",
             $"""
