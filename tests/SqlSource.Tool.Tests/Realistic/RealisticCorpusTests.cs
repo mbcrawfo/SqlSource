@@ -14,14 +14,23 @@ public sealed class RealisticCorpusTests
     [Fact]
     public void Cases_OfEachCorpus_IsItsProjectsCasesFolder()
     {
-        RealisticCorpus.Postgres.Cases.ShouldBe(
-            Path.Combine(RepositoryRoot.Folder, "tests", "SqlSource.Tests.Postgres", "Realistic", "Cases")
-        );
-        RealisticCorpus.SqlServer.Cases.ShouldBe(
-            Path.Combine(RepositoryRoot.Folder, "tests", "SqlSource.Tests.SqlServer", "Realistic", "Cases")
-        );
+        RelativeToTheRepository(RealisticCorpus.Postgres.Cases)
+            .ShouldBe("tests/SqlSource.Tests.Postgres/Realistic/Cases");
+        RelativeToTheRepository(RealisticCorpus.SqlServer.Cases)
+            .ShouldBe("tests/SqlSource.Tests.SqlServer/Realistic/Cases");
         Directory.Exists(RealisticCorpus.Postgres.Cases).ShouldBeTrue();
         Directory.Exists(RealisticCorpus.SqlServer.Cases).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Files_OfEachCorpus_AreInTheRepository()
+    {
+        foreach (var corpus in new[] { RealisticCorpus.Postgres, RealisticCorpus.SqlServer })
+        {
+            File.Exists(corpus.Schema).ShouldBeTrue(corpus.Schema);
+            File.Exists(corpus.Seed).ShouldBeTrue(corpus.Seed);
+            File.Exists(corpus.Queries).ShouldBeTrue(corpus.Queries);
+        }
     }
 
     [Fact]
@@ -34,4 +43,8 @@ public sealed class RealisticCorpusTests
         RealisticCorpus.SqlServer.Engine.Product.ShouldBe(EngineImage.SqlServer.Product);
         RealisticCorpus.SqlServer.Engine.RecordedMajors.ShouldBe(EngineImage.SqlServer.RecordedMajors);
     }
+
+    // The path from the repository's root, with / between its folders on every system.
+    private static string RelativeToTheRepository(string path) =>
+        Path.GetRelativePath(RepositoryRoot.Folder, path).Replace(Path.DirectorySeparatorChar, '/');
 }

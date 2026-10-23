@@ -35,6 +35,20 @@ internal sealed class RealisticModels(Assembly assembly, string @namespace, Data
         }
     }
 
+    // Skips a case that the run through Dapper does not read, with the reason: it has no models, the server does not
+    // run it, or it has a parameter that Dapper cannot send.
+    public static void SkipUnlessReadThroughDapper(RealisticCase found, int major)
+    {
+        if (found.IsReadThroughDapperOn(major))
+        {
+            return;
+        }
+
+        SkipUnlessHasModels(found);
+        found.SkipUnlessRunsOn(major);
+        Assert.Skip($"{found} has a parameter that Dapper cannot send: {found.Dapper}.");
+    }
+
     // The one entry of the case's sidecar, which holds the case's one query.
     public static SidecarEntry EntryOf(RealisticCase found)
     {
@@ -66,6 +80,19 @@ internal sealed class RealisticModels(Assembly assembly, string @namespace, Data
     // The input model of the entry, which a query without parameters has not.
     public Type? InputModelOf(SidecarEntry entry) =>
         entry.Parameters.Count == 0 ? null : ModelNamed(entry.Name, InputSuffix);
+
+    // The SQL of the case's query, the constant of its claiming class named as the query, which SqlLocation.Direct
+    // writes on the class itself.  The class is the corpus's claim of the case, in the namespace of the models.
+    public string SqlOf(RealisticCorpus corpus, RealisticCase found, SidecarEntry entry)
+    {
+        var claim = RealisticClaims.Of(corpus, found);
+        var type =
+            assembly.GetType($"{@namespace}.{claim.TypeName}")
+            ?? throw new InvalidOperationException($"The class {claim.TypeName} of {found} is not compiled");
+        return type.GetField(entry.Name, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)
+                ?.GetValue(null) as string
+            ?? throw new InvalidOperationException($"The class {claim.TypeName} of {found} has no SQL {entry.Name}");
+    }
 
     // The case's output model is as nullable as its truth, or wider: a column the truth says can be NULL has a property
     // that can hold null.  Each column is paired with the property at its position, which must be named after it, so a

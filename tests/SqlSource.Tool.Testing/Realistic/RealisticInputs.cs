@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Dapper;
 using SqlSource.Generation.Models;
 using SqlSource.Snapshot;
 
@@ -9,7 +10,9 @@ namespace SqlSource.Tool.Testing.Realistic;
 
 // The input model of a case's sample in the run through Dapper, whatever the engine: built by its constructor from the
 // values the server reads the sample as, which fails when the driver gives a value of another type than the
-// property's.  Each engine's RealisticParameters reads the values on its own driver.
+// property's, and the arguments Dapper is given from it.  The query names its parameters in snake_case, which Dapper
+// does not bind to the model's PascalCase properties, so the model's values go to Dapper under the SQL's names
+// (D-0004).  Each engine's RealisticParameters reads the values on its own driver.
 internal static class RealisticInputs
 {
     // A value as a model holds it: a column's NULL, which the driver reads as DBNull, is null.
@@ -74,5 +77,24 @@ internal static class RealisticInputs
             })
             .ToArray();
         return constructor.Invoke(arguments);
+    }
+
+    // The model's values, each under its parameter's name in the SQL.
+    public static DynamicParameters ArgumentsOf(object model, IReadOnlyList<SidecarParameter> parameters)
+    {
+        var type = model.GetType();
+        var arguments = new DynamicParameters();
+        foreach (var parameter in parameters)
+        {
+            var name = PropertyNames.PascalCase(parameter.Name);
+            var property =
+                type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance)
+                ?? throw new InvalidOperationException(
+                    $"The input model {type.Name} has no property {name} for @{parameter.Name}."
+                );
+            arguments.Add(parameter.Name, property.GetValue(model));
+        }
+
+        return arguments;
     }
 }

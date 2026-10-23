@@ -2,11 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
-using Dapper;
 using Microsoft.Data.SqlClient;
-using SqlSource.Generation.Models;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
@@ -16,8 +13,8 @@ namespace SqlSource.Tests.SqlServer.Realistic.Generation;
 // The parameters of a case's query in the run through Dapper.  A sample is a T-SQL expression for each parameter, so
 // it becomes a C# value as the server reads it: cast to the parameter's type and read by GetValue.  The input model is
 // built from those values by RealisticInputs of tests/SqlSource.Tool.Testing, which fails when the driver gives a value
-// of another type than the property's.  The query names its parameters in snake_case, which Dapper does not bind to
-// the model's PascalCase properties, so the model's values go to Dapper under the SQL's names (D-0004).
+// of another type than the property's, and whose ArgumentsOf gives Dapper the model's values under the SQL's names
+// (D-0004).
 internal static class RealisticParameters
 {
     // A select of each of the sample's expressions cast to its parameter's type, in the parameters' order, the type as
@@ -71,24 +68,5 @@ internal static class RealisticParameters
         }
 
         return RealisticInputs.ModelOf(input, parameters, values);
-    }
-
-    // The model's values, each under its parameter's name in the SQL.
-    public static DynamicParameters ArgumentsOf(object model, IReadOnlyList<SidecarParameter> parameters)
-    {
-        var type = model.GetType();
-        var arguments = new DynamicParameters();
-        foreach (var parameter in parameters)
-        {
-            var name = PropertyNames.PascalCase(parameter.Name);
-            var property =
-                type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance)
-                ?? throw new InvalidOperationException(
-                    $"The input model {type.Name} has no property {name} for @{parameter.Name}."
-                );
-            arguments.Add(parameter.Name, property.GetValue(model));
-        }
-
-        return arguments;
     }
 }

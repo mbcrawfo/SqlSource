@@ -514,6 +514,7 @@
       "sqlsource.tool.testing": {
         "type": "Project",
         "dependencies": {
+          "Dapper": "[2.1.89, )",
           "Microsoft.CodeAnalysis.CSharp": "[5.9.0, )",
           "Shouldly": "[4.3.0, )",
           "SqlSource": "[0.1.0-dev, )",

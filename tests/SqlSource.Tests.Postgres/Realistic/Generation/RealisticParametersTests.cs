@@ -6,9 +6,8 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Generation;
 
-// The parameters of the run through Dapper: a sample's literals read as the server reads them, and the input model's
-// values passed under the names the SQL gives them.  It needs no server.  The building of the input model is tested in
-// tests/SqlSource.Tool.Tests/Realistic.
+// The parameters of the run through Dapper: a sample's literals read as the server reads them.  It needs no server.
+// The building of the input model and of Dapper's arguments from it is tested in tests/SqlSource.Tool.Tests/Realistic.
 public sealed class RealisticParametersTests
 {
     private static readonly SidecarParameter[] Parameters =
@@ -43,26 +42,6 @@ public sealed class RealisticParametersTests
         thrown.Message.ShouldContain("@id");
     }
 
-    [Fact]
-    public void ArgumentsOf_Model_NamesEachValueAsTheSql()
-    {
-        var arguments = RealisticParameters.ArgumentsOf(new R(10, null), Parameters);
-
-        arguments.ParameterNames.ShouldBe(["limit", "q"]);
-        arguments.Get<long>("limit").ShouldBe(10);
-        arguments.Get<object?>("q").ShouldBeNull();
-    }
-
-    [Fact]
-    public void ArgumentsOf_ModelWithoutAProperty_ThrowsNamingIt()
-    {
-        var thrown = Should.Throw<InvalidOperationException>(() =>
-            RealisticParameters.ArgumentsOf(new R(10, null), [new SidecarParameter("offset", 0, null, null, null)])
-        );
-
-        thrown.Message.ShouldContain("Offset");
-    }
-
     private static Dictionary<string, string> Sample(params (string Name, string Literal)[] values)
     {
         var sample = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -73,7 +52,4 @@ public sealed class RealisticParametersTests
 
         return sample;
     }
-
-    // An input model as the generator writes one, for the parameters limit and q.
-    private sealed record R(long Limit, string? Q);
 }

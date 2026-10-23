@@ -12,12 +12,8 @@ internal sealed class RealisticCorpus
 {
     private RealisticCorpus(string project, string engine, EngineImage image)
     {
+        Project = project;
         Engine = new RealisticEngine(engine, image.Product, image.RecordedMajors);
-        Folder = Path.Combine(RepositoryRoot.Folder, "tests", project, "Realistic");
-        Schema = Path.Combine(Folder, "schema.sql");
-        Seed = Path.Combine(Folder, "seed.sql");
-        Cases = Path.Combine(Folder, "Cases");
-        Queries = Path.Combine(Folder, "Generation", "RealisticQueries.cs");
     }
 
     public static RealisticCorpus Postgres { get; } =
@@ -26,19 +22,24 @@ internal sealed class RealisticCorpus
     public static RealisticCorpus SqlServer { get; } =
         new("SqlSource.Tests.SqlServer", SidecarValues.Engine.SqlServer, EngineImage.SqlServer);
 
-    // The engine, whose recorded majors a checkedFrom names one of.
+    // The engine, whose recorded majors a checkedFrom names one of.  It needs no repository, so that a test of a case
+    // that reads no file can build on it.
     public RealisticEngine Engine { get; }
 
-    public string Folder { get; }
+    // The folder of the engine's project under tests/, which holds the corpus in Realistic/.
+    public string Project { get; }
 
-    public string Schema { get; }
+    // The paths are found from the repository's root when they are read, never when the corpus is made.
+    public string Folder => Path.Combine(RepositoryRoot.Folder, "tests", Project, "Realistic");
 
-    public string Seed { get; }
+    public string Schema => Path.Combine(Folder, "schema.sql");
 
-    public string Cases { get; }
+    public string Seed => Path.Combine(Folder, "seed.sql");
+
+    public string Cases => Path.Combine(Folder, "Cases");
 
     // The classes that claim each case with models as a query of the project.
-    public string Queries { get; }
+    public string Queries => Path.Combine(Folder, "Generation", "RealisticQueries.cs");
 
     // The name of every folder of Cases, in order: each is a case, and a folder that is no case fails when it is
     // read.  Listing them reads no case.json, so that a broken one fails its own case and not every one.
