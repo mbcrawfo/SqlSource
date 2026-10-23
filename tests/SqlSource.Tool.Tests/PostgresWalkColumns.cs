@@ -136,18 +136,6 @@ internal static class PostgresWalkColumns
         );
     }
 
-    // A column of no origin for each type of the row description, over "a" and "o".
-    public static WalkOutcome RunTyped(PlanNode root, params long[] types)
-    {
-        var (columns, origins) = Built(false, [.. types.Select(static _ => Expression)]);
-        return NullabilityWalk.Run(
-            new PlanInstancesCache(root, null),
-            columns,
-            origins,
-            new WalkScope(false, false, true, PostgresTables.Of(TableA, OrdersO), types)
-        );
-    }
-
     public static readonly Asked OfB = new(TableB, 1);
 
     public static readonly Asked OfA = new(TableA, 1);

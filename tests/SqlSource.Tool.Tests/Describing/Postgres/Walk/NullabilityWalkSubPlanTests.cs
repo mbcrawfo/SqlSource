@@ -1,3 +1,4 @@
+using System.Linq;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
@@ -21,6 +22,18 @@ public sealed class NullabilityWalkSubPlanTests
         {
             Plans = subPlans,
         };
+
+    // A column of no origin for each type of the row description, over "a" and "o".
+    private static WalkOutcome RunTyped(PlanNode root, params long[] types)
+    {
+        var (columns, origins) = Built(false, [.. types.Select(static _ => Expression)]);
+        return NullabilityWalk.Run(
+            new PlanInstancesCache(root, null),
+            columns,
+            origins,
+            new WalkScope(false, false, true, PostgresTables.Of(TableA, OrdersO), types)
+        );
+    }
 
     [Theory]
     [InlineData(false)]

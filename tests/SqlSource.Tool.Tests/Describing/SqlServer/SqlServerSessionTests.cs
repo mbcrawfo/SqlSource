@@ -3,8 +3,8 @@ using Shouldly;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Testing;
+using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
-using static SqlSource.Tool.Tests.SqlServerSessionCases;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer;
 
@@ -12,6 +12,9 @@ namespace SqlSource.Tool.Tests.Describing.SqlServer;
 // settings, and of an error, at "open".  No driver runs: the connection is a word that SqlClient could not open.
 public sealed class SqlServerSessionTests
 {
+    private static Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(IDescribeExchange exchange) =>
+        new SqlServerDescriber().OpenAsync(SqlServerScript.Database, FixtureReplay.Connection, exchange);
+
     [Fact]
     public async Task OpenAsync_Server2017_OpensWithTheVersionTheDriverAndTheFourSettings()
     {

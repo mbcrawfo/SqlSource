@@ -17,6 +17,33 @@ namespace SqlSource.Tool.Tests.Describing.SqlServer;
 // that SqlClient could not open.
 public sealed class SqlServerSessionTableTests
 {
+    private static readonly SqlServerColumnRow NicknameColumn = NameColumn with
+    {
+        ColumnOrdinal = 3,
+        Name = "nickname",
+        IsNullable = true,
+        SystemTypeName = "nvarchar(50)",
+        MaxLength = 100,
+        SourceColumn = "nickname",
+    };
+
+    // The failure of a describe of the SQL, whose one column is dbo.users.id, when "table" answers as given.
+    private static async Task<DescribeFailure> TableAnsweringAsync(string sql, SqlServerColumnsAnswer answer)
+    {
+        var script = new SqlServerScript()
+            .Add("parameters", new SqlServerParametersRequest(sql, null), new SqlServerParametersAnswer([], null))
+            .Add(
+                "columns",
+                new SqlServerColumnsRequest(sql, null),
+                new SqlServerColumnsAnswer([IdColumn, Rowstat], null, null)
+            )
+            .Add("table", new SqlServerTableRequest("dbo", "users"), answer);
+
+        var (described, _) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, sql));
+
+        return described.Failure.ShouldNotBeNull();
+    }
+
     // A self-join: two columns of one table, whose list is the table's in part, ask "table" once.
     [Fact]
     public async Task DescribeAsync_OneTable_AsksTableOnce()

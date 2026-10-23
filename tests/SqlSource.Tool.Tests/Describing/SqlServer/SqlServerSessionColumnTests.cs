@@ -17,6 +17,18 @@ namespace SqlSource.Tool.Tests.Describing.SqlServer;
 // word that SqlClient could not open.
 public sealed class SqlServerSessionColumnTests
 {
+    // The failure of a describe of the SQL, which has no parameter, when "columns" answers as given.
+    private static async Task<DescribeFailure> ColumnsAnsweringAsync(string sql, SqlServerColumnsAnswer answer)
+    {
+        var script = new SqlServerScript()
+            .Add("parameters", new SqlServerParametersRequest(sql, null), new SqlServerParametersAnswer([], null))
+            .Add("columns", new SqlServerColumnsRequest(sql, null), answer);
+
+        var (described, _) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, sql));
+
+        return described.Failure.ShouldNotBeNull();
+    }
+
     // Each column as the server gave it, the hidden row dropped; the table asked for the one origin; and the match.
     [Fact]
     public async Task DescribeAsync_Rows_RecordsColumnsAndMatch()

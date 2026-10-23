@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
@@ -18,6 +19,8 @@ namespace SqlSource.Tool.Tests.Describing.SqlServer;
 // each names, how long each call took, and that nothing of the connection's secret is written.
 public sealed class SqlServerEventsSessionTests
 {
+    private static readonly TimeSpan CallTime = TimeSpan.FromMilliseconds(7);
+
     // A describe of a statement with rows, one of whose columns has no origin: parameters, columns, a column for each
     // and the match, with no table, each naming its query.
     [Fact]

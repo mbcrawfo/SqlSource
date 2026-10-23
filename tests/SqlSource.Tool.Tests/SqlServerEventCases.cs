@@ -1,16 +1,13 @@
-using System;
 using System.Linq;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Tests;
 
-// What the classes of the SQL Server events' tests share: the time of a call, the error a server refuses with, and the
-// maps in which an event writes an error, a parameter and a column row.
+// What the classes of the SQL Server events' tests share: the error a server refuses with, and the maps in which an
+// event writes an error, a parameter and a column row.
 internal static class SqlServerEventCases
 {
-    public static readonly TimeSpan CallTime = TimeSpan.FromMilliseconds(7);
-
     public static readonly SqlServerServerError Refused = new([
         new SqlServerErrorRow(11508, 16, 1, "The parameter '@p' is used twice."),
         new SqlServerErrorRow(8180, 16, 1, "Statement(s) could not be prepared."),
