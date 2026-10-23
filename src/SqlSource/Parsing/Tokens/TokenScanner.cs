@@ -101,7 +101,7 @@ internal static class TokenScanner
 
     // noCloseFrom is what the caller has learned from earlier calls on the same SQL: no "}}" starts at or after that
     // offset.  A search that finds none lowers it.
-    private static bool TryReadToken(
+    internal static bool TryReadToken(
         string sql,
         int start,
         ref int noCloseFrom,

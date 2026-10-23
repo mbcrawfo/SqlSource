@@ -415,7 +415,7 @@ internal static class SqlFileParser
                 );
             }
 
-            FindCommentsInHeads(query, start, end, ref errors);
+            FindCommentsInHeads(query, ignoredTokens, start, end, ref errors);
             FindOpenedDefaults(kept, start, end, ref errors);
             return (
                 scanned.Segments,
@@ -427,10 +427,12 @@ internal static class SqlFileParser
 
         // A comment in a token's head, from its braces to its colon or closing braces, is a blank where comments are
         // stripped, which a head may hold, and is text that ends the head where they are kept, so the token is gone
-        // there.  A stripped comment always makes the head longer in the file than in the SQL, so only such a head is
-        // looked at further.  An ignored token has no occurrence: it is text in both forms.
+        // there.  An ignored token is read to its closing braces as any other is, so the text it takes in differs
+        // too; it has no occurrence, so its heads are found by reading the SQL as the scanner does, and only for a
+        // query that ignores a name.
         private void FindCommentsInHeads(
             BuiltQuery query,
+            ISet<string> ignoredTokens,
             int start,
             int end,
             ref ImmutableArray<SqlParseError>.Builder? errors
@@ -440,25 +442,64 @@ internal static class SqlFileParser
             foreach (var occurrence in query.Occurrences)
             {
                 _ = TokenScanner.TryReadOpener(sql.Text, occurrence.Span.Start, out _, out var after);
-                var headStart = sql.ToSourceSpan(new TextSpan(occurrence.Span.Start, 1)).Start;
-                var headEnd = sql.ToSourceSpan(new TextSpan(after, 1)).Start;
-                if (headEnd - headStart == after - occurrence.Span.Start)
+                FindCommentsInHead(sql, occurrence.Span.Start, after, occurrence.Name, start, end, ref errors);
+            }
+
+            if (ignoredTokens.Count == 0)
+            {
+                return;
+            }
+
+            var noCloseFrom = int.MaxValue;
+            var index = sql.Text.IndexOf("{{", StringComparison.Ordinal);
+            while (index >= 0)
+            {
+                var next = index + 1;
+                if (TokenScanner.TryReadToken(sql.Text, index, ref noCloseFrom, out var name, out _, out var tokenEnd))
                 {
-                    continue;
+                    if (ignoredTokens.Contains(name))
+                    {
+                        _ = TokenScanner.TryReadOpener(sql.Text, index, out _, out var after);
+                        FindCommentsInHead(sql, index, after, name, start, end, ref errors);
+                    }
+
+                    next = tokenEnd;
                 }
 
-                for (var index = start; index < end && lexemes[index].Span.Start < headEnd; index++)
+                index = next < sql.Text.Length ? sql.Text.IndexOf("{{", next, StringComparison.Ordinal) : -1;
+            }
+        }
+
+        // The head runs from tokenStart up to after in the SQL.  A stripped comment always makes a head longer in the
+        // file than in the SQL, so only such a head has the block's lexemes searched for the comment.
+        private void FindCommentsInHead(
+            SqlBlockText sql,
+            int tokenStart,
+            int after,
+            string name,
+            int start,
+            int end,
+            ref ImmutableArray<SqlParseError>.Builder? errors
+        )
+        {
+            var headStart = sql.ToSourceSpan(new TextSpan(tokenStart, 1)).Start;
+            var headEnd = sql.ToSourceSpan(new TextSpan(after, 1)).Start;
+            if (headEnd - headStart == after - tokenStart)
+            {
+                return;
+            }
+
+            for (var index = start; index < end && lexemes[index].Span.Start < headEnd; index++)
+            {
+                var lexeme = lexemes[index];
+                if (
+                    lexeme.Kind is SqlLexemeKind.LineComment or SqlLexemeKind.BlockComment
+                    && lexeme.Span.Start >= headStart
+                )
                 {
-                    var lexeme = lexemes[index];
-                    if (
-                        lexeme.Kind is SqlLexemeKind.LineComment or SqlLexemeKind.BlockComment
-                        && lexeme.Span.Start >= headStart
-                    )
-                    {
-                        (errors ??= ImmutableArray.CreateBuilder<SqlParseError>()).Add(
-                            SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, lexeme.Span, occurrence.Name)
-                        );
-                    }
+                    (errors ??= ImmutableArray.CreateBuilder<SqlParseError>()).Add(
+                        SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, lexeme.Span, name)
+                    );
                 }
             }
         }

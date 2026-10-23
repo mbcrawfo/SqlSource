@@ -803,7 +803,7 @@ A comment stands inside a token's braces before its default: between `{{` and th
 SELECT id FROM {{table/* users or archive */}};
 ```
 
-The second and third are errors only for a type that keeps the query's comments, and that type gets no members from the file until it is fixed.  The first two hold for a name in a `-- token-ignore:` marker too, whose text runs to the same `}}`.  Keep a comment wholly inside the token's default, or outside the token: move it onto a line of its own, or after the token's `}}`.
+The second and third are errors only for a type that keeps the query's comments, and that type gets no members from the file until it is fixed.  All three hold for a name in a `-- token-ignore:` marker too, whose text runs to its closing `}}` as a token's does, so a comment there changes which tokens the rest of the query has.  Keep a comment wholly inside the token's default, or outside the token: move it onto a line of its own, or after the token's `}}`.
 
 See: [Defaults](parameters-and-tokens.md#token-defaults)
 

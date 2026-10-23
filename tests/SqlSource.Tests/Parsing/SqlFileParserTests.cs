@@ -570,11 +570,34 @@ public sealed class SqlFileParserTests
             ]);
     }
 
-    // A comment inside the default is in the default in both forms.  An ignored name is literal text in both.  A
-    // hint is kept in both.  A line comment ends at a line break, which no head may hold, so neither form has a token.
+    // An ignored token is read to its closing braces as any other is, so a comment in its head changes what the two
+    // forms read too: without comments the ignored f takes {{g}} into its text, with them f is no token and g is.
+    [Theory]
+    [InlineData("SELECT {{f/* c */:x {{g}} y}}", new string[0], new[] { "g" })]
+    [InlineData("SELECT {{f/* c */}}", new string[0], new string[0])]
+    [InlineData("SELECT {{f/* c */:x}}, {{h}}", new[] { "h" }, new[] { "h" })]
+    public void Parse_CommentInTheHeadOfAnIgnoredToken_IsAnErrorOfTheKeptForm(
+        string sql,
+        string[] stripped,
+        string[] kept
+    )
+    {
+        var text = "-- name: Q\n-- generator: keep-comments\n-- token-ignore: f\n" + sql + "\n";
+
+        var block = Blocks(text).ShouldHaveSingleItem();
+
+        TokenNames(block.Segments).ShouldBe(stripped);
+        TokenNames(block.KeptSegments.ShouldNotBeNull()).ShouldBe(kept);
+        block.KeptErrors.ShouldBe([
+            SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, SpanOf(text, "/* c */"), "f"),
+        ]);
+    }
+
+    // A comment inside the default is in the default in both forms.  A hint is kept in both.  A line comment ends at
+    // a line break, which no head may hold, so neither form has a token.
     [Theory]
     [InlineData("SELECT {{f:a/* c */}}")]
-    [InlineData("-- token-ignore: f\nSELECT {{f/* c */}}")]
+    [InlineData("-- token-ignore: f\nSELECT {{f:a/* c */}}")]
     [InlineData("SELECT {{f/*+ c */}}")]
     [InlineData("SELECT {{f -- c\n}}")]
     public void Parse_CommentOutsideATokensHead_IsNoErrorOfTheKeptForm(string sql) =>
