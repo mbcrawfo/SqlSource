@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Kind = SqlSource.Tool.Describing.Postgres.Walk.PlanTokens.Kind;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk;
@@ -132,24 +133,32 @@ internal static partial class PlanExpression
         }
 
         // The type of COALESCE(...), GREATEST(...) or LEAST(...), [from, to) its arguments, when it cannot be NULL:
-        // the parser casts every argument to their common type, and the plan prints the casts.
-        private long? VariadicType(int from, int to) =>
-            AnyArgumentIsNotNull(from, to) ? CommonType(ArgumentSpans(from, to)) : null;
+        // the parser casts every argument to their common type, and the plan prints the casts.  The references to the
+        // sides of a full join that prove it are of that type too.
+        private long? VariadicType(int from, int to)
+        {
+            var sides = FullJoinSides(from, to);
+            return sides is not null || AnyArgumentIsNotNull(from, to)
+                ? CommonType(ArgumentSpans(from, to), sides ?? [])
+                : null;
+        }
 
         // The type of a CASE whose every result cannot be NULL, which the parser casts to their common type too.
         private long? CaseType(int from, int to) =>
             CaseResults(from, to) is { } results && results.TrueForAll(result => IsNotNull(result.From, result.To))
-                ? CommonType(results)
+                ? CommonType(results, [])
                 : null;
 
-        // The one type of the spans proved of a known type, or null when none is or two differ.  A span proved of no
-        // known type, or not proved, says nothing of it.
-        private long? CommonType(List<(int From, int To)> spans)
+        // The one type of the spans proved of a known type and of the types given, or null when none is or two
+        // differ.  A span proved of no known type, or not proved, says nothing of it.
+        private long? CommonType(List<(int From, int To)> spans, List<long> known)
         {
             long? common = null;
-            foreach (var (start, end) in spans)
+            foreach (
+                var type in known.Concat(spans.Select(span => Proved(span.From, span.To) ?? TotalFunctions.UnknownType))
+            )
             {
-                if (Proved(start, end) is not { } type || type == TotalFunctions.UnknownType)
+                if (type == TotalFunctions.UnknownType)
                 {
                     continue;
                 }

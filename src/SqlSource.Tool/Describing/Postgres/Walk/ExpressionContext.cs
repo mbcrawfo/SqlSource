@@ -41,6 +41,12 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// of, or null for none.  A call of such a name is read by its name, and only when
 /// <paramref name="CatalogFunctions" /> holds too; a name it leaves out is read as no form of that table.
 /// </param>
+/// <param name="ProvedOnFullJoinSide">
+/// Where the node that computes the entry is a <c>Full</c> join that no join above null-extends: for a reference to an
+/// instance under one of its sides, under which no join null-extends, whether that side is the join's <c>Outer</c>
+/// child, and the declared type of the column, when the walk would prove the column but for that join's extension;
+/// or null.  It is null at any other node.
+/// </param>
 internal sealed record ExpressionContext(
     bool CatalogFunctions,
     Func<OutputReference, long?> ProvedTypeOf,
@@ -49,5 +55,6 @@ internal sealed record ExpressionContext(
     bool GroupsHaveRows = false,
     Func<string, long?>? ScalarSubPlanTypeOf = null,
     Func<string, int, long?>? SubPlanColumnTypeOf = null,
-    CatalogNames? CatalogAlone = null
+    CatalogNames? CatalogAlone = null,
+    Func<OutputReference, (bool OuterSide, long Type)?>? ProvedOnFullJoinSide = null
 );

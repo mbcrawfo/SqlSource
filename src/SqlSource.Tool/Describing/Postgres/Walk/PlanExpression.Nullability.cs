@@ -60,7 +60,9 @@ internal static partial class PlanExpression
 
             if (IsVariadicCall(from, to))
             {
-                return AnyArgumentIsNotNull(from + 2, to - 1) ? false : null;
+                return AnyArgumentIsNotNull(from + 2, to - 1) || FullJoinSides(from + 2, to - 1) is not null
+                    ? false
+                    : null;
             }
 
             if (IsCase(from, to) && CaseResultsAreNotNull(from, to))
@@ -83,6 +85,37 @@ internal static partial class PlanExpression
         // Whether an argument, between the commas of depth zero of [from, to), cannot be NULL.
         private bool AnyArgumentIsNotNull(int from, int to) =>
             ArgumentSpans(from, to).Any(argument => IsNotNull(argument.From, argument.To));
+
+        // The types of the plain references among the arguments of [from, to) that the walk proves on a side of the
+        // full join that computes the entry, when one is on each side; or null.  A row of a full join has a row of one
+        // side at least, so one of the two is not NULL, and COALESCE, GREATEST and LEAST are NULL only when every
+        // argument is.  Read only where the session finds pg_catalog first, as the forms read by their name are.
+        private List<long>? FullJoinSides(int from, int to)
+        {
+            if (!_context.CatalogFunctions || _context.ProvedOnFullJoinSide is not { } sideOf)
+            {
+                return null;
+            }
+
+            var types = new List<long>();
+            var outer = false;
+            var inner = false;
+            foreach (var (start, end) in ArgumentSpans(from, to))
+            {
+                if (
+                    end > start
+                    && OutputReference.Parse(Text(start, end)) is { } reference
+                    && sideOf(reference) is { } side
+                )
+                {
+                    outer |= side.OuterSide;
+                    inner |= !side.OuterSide;
+                    types.Add(side.Type);
+                }
+            }
+
+            return outer && inner ? types : null;
+        }
 
         // The arguments of [from, to), each between the commas of depth zero: one empty span for an empty span.
         private List<(int From, int To)> ArgumentSpans(int from, int to)

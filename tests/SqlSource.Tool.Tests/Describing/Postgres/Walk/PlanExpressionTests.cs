@@ -686,6 +686,49 @@ public sealed class PlanExpressionTests
     public void NullableOf_FormsOverNoCommonType_AreUnknown(string entry) =>
         PlanExpression.NullableOf(entry, CommonTypes(groupsHaveRows: true)).ShouldBeNull();
 
+    // The walk's answer at a full join of "a", its outer side, and "r", its inner one.
+    private static (bool OuterSide, long Type)? SideOf(OutputReference reference) =>
+        (reference.Alias, reference.Column) switch
+        {
+            ("a", "id") => (true, BuiltInTypes.Int4),
+            ("r", "account_id") => (false, BuiltInTypes.Int4),
+            ("r", "id") => (false, BuiltInTypes.Int8),
+            _ => null,
+        };
+
+    private static ExpressionContext AtAFullJoin(bool catalogFunctions = true) =>
+        new(catalogFunctions, static _ => null, ProvedOnFullJoinSide: SideOf);
+
+    // A row of a full join has a row of one side at least, and COALESCE, GREATEST and LEAST are NULL only when every
+    // argument is: over a plain reference to each side the walk proves but for the join, the form is not NULL, of
+    // their type when they share one.  Both of one side, a cast of a side's column, a reference in parentheses, a CASE
+    // and an operator prove nothing.
+    [Theory]
+    [InlineData("COALESCE(a.id, r.account_id)", false, BuiltInTypes.Int4)]
+    [InlineData("GREATEST(a.id, r.account_id)", false, BuiltInTypes.Int4)]
+    [InlineData("LEAST(r.account_id, a.id)", false, BuiltInTypes.Int4)]
+    [InlineData("COALESCE(a.id, r.account_id, NULL::integer)", false, BuiltInTypes.Int4)]
+    [InlineData("COALESCE(a.id, r.id)", false, null)]
+    [InlineData("COALESCE(a.id, a.id)", null, null)]
+    [InlineData("COALESCE(a.id, (r.account_id)::bigint)", null, null)]
+    [InlineData("COALESCE((a.id), r.account_id)", null, null)]
+    [InlineData("COALESCE(a.id, x.id)", null, null)]
+    [InlineData("CASE WHEN (a.id > 1) THEN a.id ELSE r.account_id END", null, null)]
+    [InlineData("(a.id + r.account_id)", null, null)]
+    public void NullableOf_CoalesceOverBothSidesOfAFullJoin_IsNotNull(string entry, bool? expected, long? type)
+    {
+        PlanExpression.NullableOf(entry, AtAFullJoin()).ShouldBe(expected);
+        PlanExpression.ProvedTypeOf(entry, AtAFullJoin()).ShouldBe(type);
+    }
+
+    // At a node that is no full join, and where the session does not find pg_catalog first, the form is not read.
+    [Fact]
+    public void NullableOf_CoalesceOverBothSidesWithoutTheFullJoin_IsUnknown()
+    {
+        PlanExpression.NullableOf("COALESCE(a.id, r.account_id)", new(true, static _ => null)).ShouldBeNull();
+        PlanExpression.NullableOf("COALESCE(a.id, r.account_id)", AtAFullJoin(catalogFunctions: false)).ShouldBeNull();
+    }
+
     [Theory]
     [InlineData("count(*)", new string[0], new string[0])]
     [InlineData("(count(o.id) + count(*))", new[] { "count" }, new string[0])]

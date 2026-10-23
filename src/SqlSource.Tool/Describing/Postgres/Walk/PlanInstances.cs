@@ -138,6 +138,7 @@ internal sealed class PlanInstances
     ];
 
     private readonly Dictionary<string, PlanInstance> _instances = [with(StringComparer.Ordinal)];
+    private readonly Dictionary<string, PlanNode> _nodesOfInstances = [with(StringComparer.Ordinal)];
     private readonly List<VisitedNode> _nodes = [];
     private readonly Dictionary<PlanNode, bool> _extended = [with(ReferenceEqualityComparer.Instance)];
     private readonly PlanNode _tree;
@@ -207,6 +208,17 @@ internal sealed class PlanInstances
     public bool TryFind(string alias, [NotNullWhen(true)] out PlanInstance? instance) =>
         _instances.TryGetValue(alias, out instance);
 
+    /// <summary>
+    /// Whether the node that names the instance of the alias is the node or is reached from it through <c>Outer</c>
+    /// and <c>Inner</c> children: which side of a join the instance is on.
+    /// </summary>
+    public bool IsUnder(string alias, PlanNode node) =>
+        _nodesOfInstances.TryGetValue(alias, out var named) && Reaches(node, named);
+
+    // Whether the node is the one sought, by reference, or one of its Outer and Inner children reaches it.
+    private static bool Reaches(PlanNode node, PlanNode sought) =>
+        ReferenceEquals(node, sought) || node.JoinChildren.Any(child => Reaches(child, sought));
+
     /// <summary>Whether a join on the path from the root null-extends a node that was visited.</summary>
     public bool IsExtended(PlanNode node) => _extended.TryGetValue(node, out var extended) && extended;
 
@@ -271,6 +283,7 @@ internal sealed class PlanInstances
         {
             Add(
                 partitioned.Alias,
+                node,
                 depth,
                 new PlanInstance(
                     InstanceKind.Partitioned,
@@ -291,13 +304,14 @@ internal sealed class PlanInstances
         {
             Add(
                 alias,
+                node,
                 depth,
                 new PlanInstance(InstanceKind.Relation, extended, node.Schema, node.RelationName, [], [], null)
             );
         }
         else if (node.Alias is { } scan && node.NodeType is PlanNodeTypes.SubqueryScan or PlanNodeTypes.CteScan)
         {
-            Add(scan, depth, new PlanInstance(InstanceKind.Plan, extended, null, null, [], [], ChildOf(node)));
+            Add(scan, node, depth, new PlanInstance(InstanceKind.Plan, extended, null, null, [], [], ChildOf(node)));
         }
 
         foreach (var child in node.JoinChildren)
@@ -329,7 +343,7 @@ internal sealed class PlanInstances
             : _tree.OnlyPlanNamed(PlanRelationships.InitPlan, CtePlanPrefix + node.CteName);
     }
 
-    private void Add(string alias, int depth, PlanInstance instance)
+    private void Add(string alias, PlanNode node, int depth, PlanInstance instance)
     {
         // The first scan of the target's alias under the ModifyTable is the target, which the root already named.
         if (depth > 0 && !_targetScanSeen && string.Equals(alias, _target, StringComparison.Ordinal))
@@ -341,6 +355,9 @@ internal sealed class PlanInstances
         if (!_instances.TryAdd(alias, instance))
         {
             Reason ??= WalkReasons.DoubledAlias;
+            return;
         }
+
+        _nodesOfInstances[alias] = node;
     }
 }
