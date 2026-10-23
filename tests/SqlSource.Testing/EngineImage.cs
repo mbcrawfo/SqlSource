@@ -14,9 +14,6 @@ namespace SqlSource.Testing;
 // the start of a container.  The default image of each is in DefaultImages.
 internal sealed class EngineImage
 {
-    private readonly bool _retriesCrashAtStart;
-
-    // retriesCrashAtStart is true for the engine whose container starts again after sqlservr's crash (TD-0072).
     private EngineImage(
         string product,
         string variable,
@@ -29,7 +26,7 @@ internal sealed class EngineImage
         Variable = variable;
         Default = defaultImage;
         RecordedMajors = recordedMajors;
-        _retriesCrashAtStart = retriesCrashAtStart;
+        RetriesCrashAtStart = retriesCrashAtStart;
     }
 
     public static EngineImage Postgres { get; } =
@@ -49,6 +46,9 @@ internal sealed class EngineImage
     // The majors that CI runs and that the tests pin answers for: a realistic case's committed entry, the noise budget
     // and, for PostgreSQL, the forms of a plan.
     public IReadOnlyList<int> RecordedMajors { get; }
+
+    // Whether a container of the engine is started again after sqlservr's crash at its start (TD-0072): SQL Server's.
+    public bool RetriesCrashAtStart { get; }
 
     // The image the tests run on, read each time since a test of the variable sets it.
     public string Image => Environment.GetEnvironmentVariable(Variable) is { Length: > 0 } image ? image : Default;
@@ -75,7 +75,7 @@ internal sealed class EngineImage
     public async Task<TContainer> StartAsync<TContainer>(Func<TContainer> build, CancellationToken token)
         where TContainer : IContainer
     {
-        if (_retriesCrashAtStart)
+        if (RetriesCrashAtStart)
         {
             return await SqlServerStart.StartAsync(build, token);
         }

@@ -56,6 +56,14 @@ public sealed class EngineImageTests
         EngineImage.SqlServer.Default.ShouldBe(DefaultImages.SqlServer);
     }
 
+    // SQL Server's containers start again after sqlservr's crash (TD-0072); PostgreSQL's start once.
+    [Fact]
+    public void RetriesCrashAtStart_OfEachEngine_IsSqlServersAlone()
+    {
+        EngineImage.SqlServer.RetriesCrashAtStart.ShouldBeTrue();
+        EngineImage.Postgres.RetriesCrashAtStart.ShouldBeFalse();
+    }
+
     [Fact]
     public async Task StartOnceAsync_StartThatThrows_DisposesTheContainerAndRethrows()
     {
