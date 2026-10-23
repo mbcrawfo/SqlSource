@@ -92,43 +92,6 @@ internal static class Redaction
     }
 
     /// <summary>
-    /// The texts each cleaned alone, and then cleaned again for what they hold together: each whole form anywhere in
-    /// the texts joined, and each part where it stands as a token in them joined, and again with a line break between
-    /// them for the forms and parts that hold one.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// A describer can write a value half in one string of an event and half in the next, where a search of each
-    /// alone finds neither.  A range that is found writes <see cref="Mark" /> over the slice of each text it
-    /// overlaps, so that the texts keep their order and their number; slices of one text that touch make one mark.
-    /// A separator is in no text.
-    /// </para>
-    /// <para>
-    /// The line break is searched because a value that holds one is cut where it stands: the texts are its lines, as
-    /// the server lines of a failure are (<see cref="OfLines" />).  A part with no line break cannot stand over a
-    /// separator, and a token ends at the end of a text either way, so only the forms and parts that hold a line break
-    /// are searched joined with one.
-    /// </para>
-    /// </remarks>
-    public static string[] OfJoined(IReadOnlyList<string> texts, ConnectionSecret secret)
-    {
-        const string Break = "\n";
-        string[] cleaned = [.. texts.Select(text => Of(text, secret))];
-        var cuts = new List<(int Start, int End)>?[cleaned.Length];
-        Cut(cleaned, string.Empty, secret.Wholes, secret.Parts, cuts);
-        Cut(cleaned, Break, WithBreaks(secret.Wholes, Break), WithBreaks(secret.Parts, Break), cuts);
-        for (var i = 0; i < cleaned.Length; i++)
-        {
-            if (cuts[i] is { } slices)
-            {
-                cleaned[i] = Marked(cleaned[i], slices);
-            }
-        }
-
-        return cleaned;
-    }
-
-    /// <summary>
     /// Whether the text holds the part as a token: where its first character, when that is a letter, a digit or
     /// <c>_</c>, follows none of those, and its last character, when that is one, is followed by none.
     /// </summary>
@@ -220,98 +183,6 @@ internal static class Redaction
             : new EquatableArray<string>([.. cleaned.Split(Break)]);
     }
 
-    // The forms or parts as they are searched joined with the break, those that hold one.
-    private static List<string> WithBreaks(IEnumerable<string> forms, string lineBreak) =>
-        [
-            .. forms
-                .Select(form => form.ReplaceLineEndings(lineBreak))
-                .Where(form => form.Contains(lineBreak, StringComparison.Ordinal)),
-        ];
-
-    // Adds to the cuts of each text the slices of it that the wholes and the parts cover in the texts joined.
-    private static void Cut(
-        string[] texts,
-        string separator,
-        IReadOnlyList<string> wholes,
-        IReadOnlyList<string> parts,
-        List<(int Start, int End)>?[] cuts
-    )
-    {
-        if (wholes.Count == 0 && parts.Count == 0)
-        {
-            return;
-        }
-
-        var joined = string.Join(separator, texts);
-        var starts = new int[texts.Length];
-        for (var i = 1; i < texts.Length; i++)
-        {
-            starts[i] = starts[i - 1] + texts[i - 1].Length + separator.Length;
-        }
-
-        foreach (var whole in wholes)
-        {
-            for (
-                var found = joined.IndexOf(whole, StringComparison.Ordinal);
-                found >= 0;
-                found = joined.IndexOf(whole, found + 1, StringComparison.Ordinal)
-            )
-            {
-                Cover(texts, starts, found, found + whole.Length, cuts);
-            }
-        }
-
-        foreach (var part in parts)
-        {
-            for (var found = NextToken(joined, part, 0); found >= 0; found = NextToken(joined, part, found + 1))
-            {
-                Cover(texts, starts, found, found + part.Length, cuts);
-            }
-        }
-    }
-
-    // Adds the slice of each text that the range of the joined text overlaps.
-    private static void Cover(string[] texts, int[] starts, int start, int end, List<(int Start, int End)>?[] cuts)
-    {
-        for (var i = 0; i < texts.Length && starts[i] < end; i++)
-        {
-            var from = Math.Max(start, starts[i]);
-            var to = Math.Min(end, starts[i] + texts[i].Length);
-            if (from < to)
-            {
-                (cuts[i] ??= []).Add((from - starts[i], to - starts[i]));
-            }
-        }
-    }
-
-    // The text with each run of slices that overlap or touch written as one mark.
-    private static string Marked(string text, List<(int Start, int End)> slices)
-    {
-        slices.Sort();
-        List<(int Start, int End)> runs = [];
-        foreach (var slice in slices)
-        {
-            if (runs.Count > 0 && slice.Start <= runs[^1].End)
-            {
-                runs[^1] = (runs[^1].Start, Math.Max(runs[^1].End, slice.End));
-            }
-            else
-            {
-                runs.Add(slice);
-            }
-        }
-
-        var marked = new StringBuilder(text.Length);
-        var from = 0;
-        foreach (var (start, end) in runs)
-        {
-            _ = marked.Append(text, from, start - from).Append(Mark);
-            from = end;
-        }
-
-        return marked.Append(text, from, text.Length - from).ToString();
-    }
-
     private static string OfToken(string text, string part)
     {
         var found = NextToken(text, part, 0);
@@ -332,8 +203,9 @@ internal static class Redaction
         return cleaned.Append(text, from, text.Length - from).ToString();
     }
 
-    // Where the part next stands as a token, at or after the start, or -1.  The one place of the rule of a token.
-    private static int NextToken(string text, string part, int start)
+    // Where the part next stands as a token, at or after the start, or -1.  The one place of the rule of a token, which
+    // JoinedRedaction uses too.
+    internal static int NextToken(string text, string part, int start)
     {
         if (part.Length == 0)
         {

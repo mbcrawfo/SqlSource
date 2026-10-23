@@ -132,6 +132,29 @@ public sealed class SessionRunLogTests
         _inner.Events[0].Members.ShouldBe([new("a", "latest_hunt"), new("b", "er22x")]);
     }
 
+    // The password that is a token in the second member is not cleaned before the whole value is found.
+    [Fact]
+    public void Write_WholeSplitOverTwoMembersWhoseSecondHoldsAPassword_IsTheMarkInBoth()
+    {
+        var log = new SessionRunLog(_inner, new ConnectionSecret("Host=db;Password=hunter22", ["hunter22"]));
+
+        log.Write("e", new("a", "Host=db;Pass"), new("b", "word=hunter22"));
+
+        _inner.Events[0].Members.ShouldBe([new("a", "***"), new("b", "***")]);
+    }
+
+    [Fact]
+    public void Write_WithAPrefixAndAValueSplitInTheName_PutsThePrefixBeforeTheMark()
+    {
+        var log = new SessionRunLog(_inner, new ConnectionSecret(Secrets.Connection), "postgres.");
+
+        log.Write("open " + FirstHalf, new LogMember(SecondHalf + " key", "plain"));
+
+        var (name, members) = _inner.Events.ShouldHaveSingleItem();
+        name.ShouldBe("postgres.open ***");
+        members.ShouldBe([new("*** key", "plain")]);
+    }
+
     [Fact]
     public void Write_ValuesThatAreNoStrings_AreAsTheyWere()
     {

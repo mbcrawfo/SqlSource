@@ -17,7 +17,7 @@ namespace SqlSource.Tool.Logging;
 /// The run writes its own events of a database through one too, without a prefix: they hold what a describer gave.
 /// </para>
 /// <para>
-/// Each string is searched alone, and then all of them joined (<see cref="Redaction.OfJoined" />), in the order they
+/// Each string is searched alone, and then all of them joined (<see cref="JoinedRedaction" />), in the order they
 /// were written: the name, then each member's name and the strings of its value, depth first; and then the texts of
 /// the values joined without the names between them.  A describer can write a value half in one member and half in
 /// the next, or a value that holds a line break over the items of a list.
@@ -44,15 +44,9 @@ internal sealed class SessionRunLog(IRunLog inner, ConnectionSecret secret, stri
             Flatten(member.Value, strings, values);
         }
 
-        var cleaned = Redaction.OfJoined(strings, secret);
         // The names stand between the values in the order of the event but are no part of what a describer wrote of a
         // value in two members, so the values are searched joined without them too.
-        var cleanedValues = Redaction.OfJoined([.. values.Select(index => cleaned[index])], secret);
-        for (var i = 0; i < values.Count; i++)
-        {
-            cleaned[values[i]] = cleanedValues[i];
-        }
-
+        var cleaned = JoinedRedaction.Of(strings, secret, values);
         var rest = new Queue<string>(cleaned);
         var cleanedName = prefix + rest.Dequeue();
         inner.Write(cleanedName, [.. members.Select(member => Rebuild(member, rest))]);
@@ -94,14 +88,13 @@ internal sealed class SessionRunLog(IRunLog inner, ConnectionSecret secret, stri
     private static LogMember Rebuild(LogMember member, Queue<string> cleaned) =>
         new(cleaned.Dequeue(), Rebuild(member.Value, cleaned));
 
+    // Flatten has decided the kinds, so a kind that holds no string is as it was.
     private static LogValue Rebuild(LogValue value, Queue<string> cleaned) =>
         value switch
         {
             LogValue.Text => cleaned.Dequeue(),
             LogValue.Items items => LogValue.ListOf(items.Values.Select(item => Rebuild(item, cleaned))),
             LogValue.Members map => LogValue.MapOf([.. map.Values.Select(member => Rebuild(member, cleaned))]),
-            // The kinds that hold no string.  The set is closed: a new kind is decided here, not let through.
-            LogValue.Nothing or LogValue.Flag or LogValue.Number => value,
-            _ => throw new InvalidOperationException($"Unknown kind of log value {value.GetType().Name}."),
+            _ => value,
         };
 }
