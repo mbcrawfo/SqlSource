@@ -111,8 +111,17 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
     // The parts of a connection that it says are secret, whatever the connection.
     public IReadOnlyList<string> Secrets { get; set; } = [];
 
+    // The parts of a connection that it says are secret, from the host's environment, in place of Secrets when set.
+    public Func<Func<string, string?>, IReadOnlyList<string>>? SecretsFrom { get; set; }
+
     // Thrown in place of the parts, for a describer that throws when it is asked for them.
     public Exception? SecretsException { get; set; }
+
+    // Thrown in place of the rewrite, for a describer that throws when it is asked for it.
+    public Exception? RewriteException { get; set; }
+
+    // What it says the driver writes of a connection, whatever the connection.
+    public string? Rewrite { get; set; }
 
     public DescribeFailure? OpenFailure { get; set; }
 
@@ -163,8 +172,17 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
     ) =>
         new(Rejected, new EquatableArray<string>([argument]), step, new EquatableArray<string>([.. serverLines]), help);
 
-    public IReadOnlyList<string> SecretsOf(string connection) =>
-        SecretsException is { } exception ? throw exception : Secrets;
+    public IReadOnlyList<string> SecretsOf(string connection, Func<string, string?> getEnvironmentVariable)
+    {
+        if (SecretsException is { } exception)
+        {
+            throw exception;
+        }
+
+        return SecretsFrom?.Invoke(getEnvironmentVariable) ?? Secrets;
+    }
+
+    public string? RewriteOf(string connection) => RewriteException is { } exception ? throw exception : Rewrite;
 
     public async Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,

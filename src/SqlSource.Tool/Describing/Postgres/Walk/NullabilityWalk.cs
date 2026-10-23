@@ -225,8 +225,9 @@ internal static partial class NullabilityWalk
             )
             : Kept(column, entry);
 
-    // Whether every reference the walk can map names the column the row description gives as its origin.  A plan of
-    // another statement, which a pooler can give for this one's name (TD-0049), names other columns.  A view's column
+    // Whether every reference the walk can map names the column the row description gives as its origin: a guard that
+    // the plan and the row description agree, written when a pooler could give the plan of another statement of the
+    // same name, which a describe in one transaction no longer meets.  A view's column
     // prints as the column of the table under it, under that column's name, so only a table's origin is compared, and
     // only by name: a partition prints under its own alias and a child under its parent's columns' names.  A scan of
     // another plan prints the subquery's names for its columns, which are no table's.

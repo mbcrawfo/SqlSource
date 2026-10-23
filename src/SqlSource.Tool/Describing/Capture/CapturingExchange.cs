@@ -11,7 +11,9 @@ namespace SqlSource.Tool.Describing.Capture;
 /// </summary>
 /// <remarks>
 /// A call that throws adds nothing: what a server can cause is an answer, and an exception is a bug of the
-/// describer or the end of the run.  It looks at a request and an answer only to write them.
+/// describer or the end of the run.  It looks at a request and an answer only to write them, and it does not look for
+/// the connection's secret in them: the writer of the capture does, and refuses a capture that holds it
+/// (<see cref="CaptureJson.Write(DescribeCapture, ConnectionSecret)" />).
 /// </remarks>
 /// <param name="inner">The exchange that answers.</param>
 /// <param name="capture">Where each call is added, in the order the calls are made.</param>

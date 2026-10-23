@@ -103,16 +103,33 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     // that type, with this one as its inner exception.
     private const string GssInitializer = "GssInitializer";
 
+    /// <summary>The savepoint that a describe's transaction takes at its start.</summary>
+    private const string DescribeSavepoint = "sqlsource_describe";
+
     private NpgsqlDataSource? _source;
     private NpgsqlConnection? _connection;
+    private NpgsqlTransaction? _describe;
     private ILoggerFactory? _driverLog;
 
     /// <summary>
-    /// The passwords of a connection string, <c>Password</c> and <c>SSL Password</c>, as the driver reads it, or
-    /// none when it cannot read it.  A password the driver takes from <c>PGPASSWORD</c> or a password file is not
-    /// in the string.
+    /// The passwords of a connection string as the driver reads it, <c>Password</c> and <c>SSL Password</c>, and the
+    /// one it would use when the string has no <c>Password</c>, or none when it cannot read the string.
     /// </summary>
-    public static IReadOnlyList<string> SecretsOf(string connection)
+    /// <remarks>
+    /// Npgsql 10.0.3 (<c>NpgsqlConnector.GetPassword</c>) takes the password of the data source, which is the
+    /// string's <c>Password</c> or that of a provider set with <c>NpgsqlDataSourceBuilder.UsePasswordProvider</c> or
+    /// <c>UsePeriodicPasswordProvider</c>; then the connection's <c>ProvidePasswordCallback</c>; then
+    /// <c>PGPASSWORD</c>; then the entry of a password file that matches the host, port, database and user.  The tool
+    /// sets no provider and no callback.
+    /// The file is the string's <c>Passfile</c>, else <c>PGPASSFILE</c>, else the default one, read only when it
+    /// exists.  So <c>PGPASSWORD</c> is given when the string has no <c>Password</c>, and when it has neither the
+    /// password of every entry of each file it could read is (<see cref="PasswordFile" />): which entry matches is
+    /// the driver's to say, and a password too many only removes a word that nothing else prints.  A file that cannot
+    /// be read for an I/O or access reason gives none, since the driver would fail to open the session in its own
+    /// place; anything else it throws is a bug, which the run's guard turns into <c>SQLSRC200</c>.  The environment is
+    /// the host's.
+    /// </remarks>
+    public static IReadOnlyList<string> SecretsOf(string connection, Func<string, string?> getEnvironmentVariable)
     {
         NpgsqlConnectionStringBuilder builder;
         try
@@ -125,7 +142,69 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
             return [];
         }
 
-        return [.. new[] { builder.Password, builder.SslPassword }.OfType<string>()];
+        var secrets = new List<string>(new[] { builder.Password, builder.SslPassword }.OfType<string>());
+        if (builder.Password is not null)
+        {
+            return secrets;
+        }
+
+        if (getEnvironmentVariable("PGPASSWORD") is { } fromEnvironment)
+        {
+            secrets.Add(fromEnvironment);
+            return secrets;
+        }
+
+        foreach (var path in PasswordFile.PathsOf(builder.Passfile, getEnvironmentVariable))
+        {
+            secrets.AddRange(PasswordsIn(path));
+        }
+
+        return secrets;
+    }
+
+    /// <summary>
+    /// The connection string as the driver writes it again, or null when it cannot read the string.  A text in an
+    /// error of the driver's may be this one and not the string that was given.
+    /// </summary>
+    public static string? RewriteOf(string connection)
+    {
+        try
+        {
+            return new NpgsqlConnectionStringBuilder(connection).ConnectionString;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    // The password file is read as the driver reads it, whole, and a file it cannot read gives none.  So is one that
+    // can be read only once, a named pipe or the pipe of a shell's process substitution, which is read ahead of the
+    // driver here and would leave it nothing: an empty length, which such a pipe has until a reader opens it, is not
+    // opened, and a stream that cannot seek is closed unread.
+    private static IReadOnlyList<string> PasswordsIn(string path)
+    {
+        try
+        {
+            if (new FileInfo(path) is not { Exists: true, Length: > 0 })
+            {
+                return [];
+            }
+
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            if (!stream.CanSeek)
+            {
+                return [];
+            }
+
+            using var reader = new StreamReader(stream);
+            return PasswordFile.Passwords(reader.ReadToEnd());
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return [];
+        }
     }
 
     /// <summary>The version of the driver, as <c>major.minor.patch</c>.</summary>
@@ -338,12 +417,105 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     public async Task<NpgsqlCommand> CommandAsync(string sql, CancellationToken cancellationToken) =>
         new(sql, await OpenAsync(cancellationToken));
 
+    /// <summary>Whether a describe's transaction is held: from <see cref="BeginDescribeAsync" /> to its end.</summary>
+    public bool InDescribe => _describe is not null;
+
     /// <summary>
-    /// A transaction on the session's connection.  Its caller rolls it back, and disposes it: disposing one that
-    /// was not ended rolls it back too.
+    /// Begins the transaction of a describe, which every call of the describe runs in, and takes the savepoint
+    /// <see cref="DescribeSavepoint" /> at its start.
     /// </summary>
-    public async Task<NpgsqlTransaction> BeginAsync(CancellationToken cancellationToken) =>
-        await (await OpenAsync(cancellationToken)).BeginTransactionAsync(cancellationToken);
+    /// <remarks>
+    /// <para>
+    /// A pooler in transaction mode keeps a transaction on one backend, so every call of the describe reaches the
+    /// statement it prepared.  A prepared statement is session state and survives a rollback, so <c>deallocate</c>
+    /// frees the statement inside the transaction, on its backend, before the end.
+    /// </para>
+    /// <para>
+    /// A rollback to a savepoint gives up the locks taken since it, so <see cref="KeepPreparedAsync" /> moves the
+    /// savepoint after the <c>PREPARE</c>: the transaction then keeps the locks that preparing took until it ends, and
+    /// another session's <c>DROP</c> or <c>ALTER</c> of a relation the query reads waits for the describe.  Npgsql
+    /// sends the <c>BEGIN</c> with the
+    /// <c>SAVEPOINT</c>, in one round trip, here and not with the <c>PREPARE</c>, so that a server that refuses a
+    /// transaction, as PgBouncer in statement mode does, refuses it at this call.  When either fails, the transaction
+    /// is disposed and none is held.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">A describe's transaction is already held.</exception>
+    /// <exception cref="NpgsqlException">The server refused the transaction, or the connection is lost.</exception>
+    public async Task BeginDescribeAsync(CancellationToken cancellationToken)
+    {
+        if (_describe is not null)
+        {
+            throw new InvalidOperationException("A describe's transaction is already held.");
+        }
+
+        var connection = await OpenAsync(cancellationToken);
+        var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            // A command of its own, and not NpgsqlTransaction.SaveAsync, which Npgsql only sends with the next
+            // command: a server that refuses the transaction refuses it here, before the PREPARE.
+            await using var save = new NpgsqlCommand($"SAVEPOINT {DescribeSavepoint}", connection);
+            _ = await save.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.DisposeAsync();
+            throw;
+        }
+
+        _describe = transaction;
+    }
+
+    /// <summary>
+    /// Moves the describe's savepoint after the <c>PREPARE</c>: <c>RELEASE SAVEPOINT</c>, which gives the locks taken
+    /// since it to the transaction, then <c>SAVEPOINT</c> again, in one round trip.  A later rollback to the savepoint
+    /// keeps the locks that preparing took.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No describe's transaction is held.</exception>
+    /// <exception cref="NpgsqlException">The connection is lost.</exception>
+    public async Task KeepPreparedAsync(CancellationToken cancellationToken)
+    {
+        if (_describe is null)
+        {
+            throw new InvalidOperationException("No describe's transaction is held to keep the PREPARE in.");
+        }
+
+        await using var move = await CommandAsync(
+            $"RELEASE SAVEPOINT {DescribeSavepoint}; SAVEPOINT {DescribeSavepoint}",
+            cancellationToken
+        );
+        _ = await move.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Rolls the describe's transaction back to its savepoint: a transaction that an error aborted takes commands
+    /// again, and every <c>SET LOCAL</c> since the savepoint ends.  The statement the describe prepared stays.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No describe's transaction is held.</exception>
+    /// <exception cref="NpgsqlException">The connection is lost.</exception>
+    public async Task RestoreDescribeAsync(CancellationToken cancellationToken)
+    {
+        var transaction =
+            _describe ?? throw new InvalidOperationException("No describe's transaction is held to restore.");
+
+        // Npgsql disposes the transaction of a connection that broke: the lost connection is the answer.
+        _ = await OpenAsync(cancellationToken);
+        await transaction.RollbackAsync(DescribeSavepoint, cancellationToken);
+    }
+
+    /// <summary>
+    /// Ends the describe's transaction, when one is held, by disposing it: Npgsql rolls it back, and on a connection
+    /// that was lost it sends nothing and throws nothing.  Afterwards none is held.
+    /// </summary>
+    public async ValueTask EndDescribeAsync()
+    {
+        if (_describe is { } transaction)
+        {
+            _describe = null;
+            await transaction.DisposeAsync();
+        }
+    }
 
     /// <summary>
     /// A batch of one command that holds a user's SQL.  Its caller adds parameters to the command, runs or describes

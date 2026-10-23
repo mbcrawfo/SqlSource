@@ -24,10 +24,12 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// it, checks it against every use of its parameter, and infers the rest.  The statement is then described through
 /// an <c>EXECUTE</c> that is never run, which gives its columns.  For a query that the outer-join gate lets in, or
 /// one with a column of no origin, an <c>EXPLAIN</c> of that <c>EXECUTE</c> under <c>force_generic_plan</c> gives
-/// the plan that <see cref="NullabilityWalk" /> walks.  A prepared statement is session state and
-/// survives a rollback, so it is freed in a <c>finally</c>, outside any transaction; one left behind would be a
-/// leak until the session ends.  Its name is a counter, since the name is part of a request and a capture must be
-/// the same each time it is recorded.
+/// the plan that <see cref="NullabilityWalk" /> walks.  Every call from <c>prepare</c> to <c>deallocate</c> runs
+/// in one transaction that <c>prepare</c> begins and <c>deallocate</c> rolls back, so that a pooler in transaction
+/// mode keeps the describe on one backend (<see cref="PostgresConnection.BeginDescribeAsync" />).  A prepared
+/// statement is session state and survives a rollback, so it is freed in a <c>finally</c>, inside the transaction;
+/// one left behind would be a leak until the session ends.  Its name is a counter, since the name is part of a
+/// request and a capture must be the same each time it is recorded.
 /// </remarks>
 internal sealed partial class PostgresSession : DescriberSession
 {
@@ -146,7 +148,8 @@ internal sealed partial class PostgresSession : DescriberSession
         }
         finally
         {
-            // With the describe's own token: a cancelled describe leaves the statement to die with its session,
+            // With the describe's own token: a cancelled describe leaves the statement and the transaction to die
+            // with its session,
             // because a cancelled run must not wait on a server, and the run closes the session next.  The error of
             // the call is never reported.
             _ = await DeallocateAsync(
@@ -174,9 +177,6 @@ internal sealed partial class PostgresSession : DescriberSession
     {
         var (parameterOids, arguments) = ParameterOids(request, prepared);
 
-        // Behind a pooler in transaction mode this call can reach another backend: one that lacks the statement
-        // answers no columns and no error, which "check" reports as SQLSRC231, and one that holds a statement of the
-        // same name from an earlier run answers that statement's columns (TD-0049).
         var answer = await ColumnsAsync(
             request.Name,
             new PostgresColumnsRequest(statement, request.Parameters.Count),
@@ -300,7 +300,8 @@ internal sealed partial class PostgresSession : DescriberSession
     // Asks for the generic plan of the statement, with a NULL for each of its arguments, and walks it.  A plan the
     // server will not give is no fault of the query: the error is logged and never reported, and the columns keep
     // the heuristic, as they do when the text is no plan.  The one error that is reported is 26000, a statement
-    // that is gone: the connection does not keep a session, and the describe is no longer of this query.
+    // that is gone although "prepare" made it in the same transaction: the connection does not keep a session, and
+    // the describe is no longer of this query.
     private async Task<Outcome<WalkOutcome, DescribeFailure>> WalkAsync(
         DescribeRequest request,
         WalkInput input,
