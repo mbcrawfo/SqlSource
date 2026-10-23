@@ -15,6 +15,8 @@
         -->
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
         <PackageReference Include="Shouldly" />
+        <!-- For SqlServerStart: it brings Testcontainers and no database driver. -->
+        <PackageReference Include="Testcontainers.MsSql" />
         <!-- TestContext, without what makes a project a test executable. -->
         <PackageReference Include="xunit.v3.extensibility.core" />
     </ItemGroup>

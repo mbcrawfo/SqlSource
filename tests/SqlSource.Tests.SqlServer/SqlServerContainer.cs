@@ -31,7 +31,8 @@ public sealed class SqlServerContainer : IAsyncLifetime
 
     public const string BillingDatabase = "billing";
 
-    private readonly MsSqlContainer _container = new MsSqlBuilder(Image).Build();
+    // Set by InitializeAsync, which starts it through SqlServerStart (TD-0072).
+    private MsSqlContainer? _container;
 
     // The server's major version, read once when the container has started: 14 for SQL Server 2017, 17 for 2025.
     public int Major { get; private set; }
@@ -66,7 +67,7 @@ public sealed class SqlServerContainer : IAsyncLifetime
 
     // Of the named database of the container.  The container's own string trusts the server's certificate.
     public string ConnectionStringOf(string database) =>
-        new SqlConnectionStringBuilder(_container.GetConnectionString()) { InitialCatalog = database }.ConnectionString;
+        new SqlConnectionStringBuilder(Container.GetConnectionString()) { InitialCatalog = database }.ConnectionString;
 
     // A source of the named database of the container, which the caller disposes.
     public DbDataSource SourceOf(string database) =>
@@ -112,7 +113,7 @@ public sealed class SqlServerContainer : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         var token = TestContext.Current.CancellationToken;
-        await _container.StartAsync(token);
+        _container = await SqlServerStart.StartAsync(new MsSqlBuilder(Image).Build, token);
         try
         {
             await using var server = SourceOf("master");
@@ -175,5 +176,8 @@ public sealed class SqlServerContainer : IAsyncLifetime
         return database == AppDatabase && major >= 17 ? [.. built, RepositoryPaths.NewTypesSchema] : built;
     }
 
-    public ValueTask DisposeAsync() => _container.DisposeAsync();
+    public ValueTask DisposeAsync() => _container?.DisposeAsync() ?? ValueTask.CompletedTask;
+
+    private MsSqlContainer Container =>
+        _container ?? throw new InvalidOperationException("The container has not started.");
 }
