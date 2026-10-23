@@ -207,6 +207,21 @@ public sealed class SqlServerTypeMapTests
         mapping.Detail.ShouldBe("6.1");
     }
 
+    // A type that SqlClient first has in a version is lacked by every column of an older one, and by no SqlClient.
+    [Theory]
+    [InlineData(nameof(SqlClientColumn.None), nameof(SqlClientColumn.SqlClient61), true)]
+    [InlineData(nameof(SqlClientColumn.OlderThan61), nameof(SqlClientColumn.SqlClient61), true)]
+    [InlineData(nameof(SqlClientColumn.SqlClient61), nameof(SqlClientColumn.SqlClient61), false)]
+    [InlineData(nameof(SqlClientColumn.SqlClient7), nameof(SqlClientColumn.SqlClient61), false)]
+    [InlineData(nameof(SqlClientColumn.None), nameof(SqlClientColumn.SqlClient7), true)]
+    [InlineData(nameof(SqlClientColumn.OlderThan61), nameof(SqlClientColumn.SqlClient7), true)]
+    [InlineData(nameof(SqlClientColumn.SqlClient61), nameof(SqlClientColumn.SqlClient7), true)]
+    [InlineData(nameof(SqlClientColumn.SqlClient7), nameof(SqlClientColumn.SqlClient7), false)]
+    public void Lacks_ColumnAndFirstColumnOfTheType_IsAnOlderColumn(string column, string since, bool expected) =>
+        SqlServerTypeMap
+            .Lacks(Enum.Parse<SqlClientColumn>(column), Enum.Parse<SqlClientColumn>(since))
+            .ShouldBe(expected);
+
     // An entry of the type override answers below 6.1 as it does under every column.
     [Fact]
     public void Map_VectorBelow61WithAnEntry_IsTheEntry()

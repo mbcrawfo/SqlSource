@@ -317,6 +317,8 @@ public sealed class SqlClientProbeTests
     [Theory]
     [InlineData(false, false, false, nameof(SqlClientColumn.None))]
     [InlineData(true, false, false, nameof(SqlClientColumn.OlderThan61))]
+    // SqlVector`1 found without SqlConnection chooses the column of 6.1, as SspiContextProvider without it chooses 7's.
+    [InlineData(false, true, false, nameof(SqlClientColumn.SqlClient61))]
     [InlineData(true, true, false, nameof(SqlClientColumn.SqlClient61))]
     [InlineData(true, true, true, nameof(SqlClientColumn.SqlClient7))]
     public void Column_Flags_IsTheNewestVersionTheProjectHas(
