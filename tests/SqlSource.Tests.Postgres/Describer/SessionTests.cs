@@ -205,49 +205,68 @@ public sealed class SessionTests(PostgresContainer postgres)
         CaptureJson.Write(capture).ShouldNotContain(new NpgsqlConnectionStringBuilder(postgres.ConnectionString).Host!);
     }
 
-    // Another session drops the table the query reads after "columns" named it: "tables" answers nothing for it.  That
-    // is SQLSRC225 at the catalog and not a throw, "types" and "check" are not asked, the statement is freed, and the
-    // session describes another query afterwards.
+    // The describe's transaction keeps the lock that preparing took on the table the query reads, so another session
+    // that drops the table between "columns" and "tables" waits for the describe, which gives its answer; the drop is
+    // made once the describe has ended.
     [Fact]
-    public async Task DescribeAsync_TableDroppedBetweenColumnsAndTables_IsSqlsrc225AtCatalogAndNoThrow()
+    public async Task DescribeAsync_TableDroppedDuringTheDescribe_WaitsForIt()
     {
         await postgres.ExecuteAsync("CREATE TABLE IF NOT EXISTS session_gone (id int)");
         try
         {
-            var dropped = false;
+            string? refused = null;
             var exchange = new HookedExchange(
                 after: async (method, _, _) =>
                 {
-                    if (method == "columns" && !dropped)
+                    if (method == "columns" && refused is null)
                     {
-                        dropped = true;
-                        await postgres.ExecuteAsync("DROP TABLE session_gone");
+                        refused = await DropSessionGoneWithinAsync("200ms");
                     }
                 }
             );
-            var (opened, capture) = await Sessions.OpenCapturedAsync(postgres.ConnectionString, exchange);
-            await using var session = opened;
-            var token = TestContext.Current.CancellationToken;
+            await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString, exchange);
 
-            var described = await session.DescribeAsync(DescribeRequests.Of("SELECT id FROM session_gone"), token);
-            var later = await session.DescribeAsync(DescribeRequests.Of("SELECT 1 AS one"), token);
+            var described = await session.DescribeAsync(
+                DescribeRequests.Of("SELECT id FROM session_gone"),
+                TestContext.Current.CancellationToken
+            );
 
-            var failure = ShouldBeRejected(described, DescribeStep.Catalog);
-            failure.Arguments.ShouldBe([DescribeRequests.Query, "the table of the column 'id' no longer exists"]);
-            failure.ServerLines.ShouldBeEmpty();
-            failure.Help.ShouldBe(PostgresErrors.SchemaChangedHelp);
-            capture
-                .Calls.Take(5)
-                .Select(call => call.Method)
-                .ShouldBe(["open", "prepare", "columns", "tables", "deallocate"]);
-            later.Failure.ShouldBeNull();
-            _ = later.Value.ShouldNotBeNull();
+            refused.ShouldBe("55P03", "the drop did not wait for the describe");
+            described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
             (await Sessions.PreparedStatementsAsync(session)).ShouldBe(0);
+            (await DropSessionGoneWithinAsync("10s")).ShouldBeNull();
         }
         finally
         {
-            // A run that fails before the hook drops the table leaves none for the next test.
+            // A run that fails before the drop leaves no table for the next test.
             await postgres.ExecuteAsync("DROP TABLE IF EXISTS session_gone");
+        }
+    }
+
+    // Drops session_gone from a connection of the test's own, waiting for its lock no longer than the timeout: the
+    // SQLSTATE of the server's refusal, or null when the table was dropped.
+    private async Task<string?> DropSessionGoneWithinAsync(string timeout)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = await own.OpenConnectionAsync(token);
+        await using (
+            var limit = new NpgsqlCommand("SELECT pg_catalog.set_config('lock_timeout', @timeout, false)", connection)
+        )
+        {
+            _ = limit.Parameters.AddWithValue("timeout", timeout);
+            _ = await limit.ExecuteScalarAsync(token);
+        }
+
+        try
+        {
+            await using var drop = new NpgsqlCommand("DROP TABLE session_gone", connection);
+            _ = await drop.ExecuteNonQueryAsync(token);
+            return null;
+        }
+        catch (PostgresException refused)
+        {
+            return refused.SqlState;
         }
     }
 

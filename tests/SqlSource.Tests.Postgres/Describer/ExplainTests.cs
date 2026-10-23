@@ -8,8 +8,8 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;
 
-// "explain" against a real server: the plan is a generic one that PlanNode reads, and the call leaves the session
-// as it found it.
+// "explain" against a real server: the plan is a generic one that PlanNode reads, and the call leaves the describe's
+// transaction as it found it.
 [Collection(UsesPostgres.Name)]
 public sealed class ExplainTests(PostgresContainer postgres)
 {
@@ -87,21 +87,24 @@ public sealed class ExplainTests(PostgresContainer postgres)
         (await ShowAsync(connection, "enable_nestloop")).ShouldBe("on");
     }
 
-    // The error is the answer, the transaction is rolled back, and the session goes on.
+    // The error is the answer, the describe's transaction is rolled back to its savepoint, which ends the settings,
+    // and the describe goes on.
     [Fact]
-    public async Task ExplainAsync_StatementThatWasNotPrepared_AnswersTheErrorAndLeavesNoTransaction()
+    public async Task ExplainAsync_StatementThatWasNotPrepared_AnswersTheErrorAndTheDescribeGoesOn()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
         var live = new PostgresLive(connection);
+        await PrepareAsync(live);
 
         var answer = await live.ExplainAsync(new PostgresExplainRequest("walk_nothing", 0, []), token);
 
         answer.Plan.ShouldBeNull();
         answer.Error.ShouldNotBeNull().SqlState.ShouldBe("26000");
 
-        // A SHOW in a transaction that an error had ended would be refused: the rollback was made.
+        // A SHOW in a transaction that an error had aborted would be refused: the rollback was made.
         (await ShowAsync(connection, "plan_cache_mode")).ShouldBe("auto");
+        connection.InDescribe.ShouldBeTrue();
     }
 
     // An UPDATE is planned and not executed: its row is unchanged.

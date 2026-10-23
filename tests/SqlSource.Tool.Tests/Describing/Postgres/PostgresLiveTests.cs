@@ -57,6 +57,38 @@ public sealed class PostgresLiveTests
             PostgresLive.SetTexts(new PostgresExplainRequest("sqlsource_1", 0, ["work_mem=1"]))
         );
 
+    // PgBouncer in statement mode refuses a BEGIN with 08P01: the answer of "prepare" keeps the SQLSTATE and the tool's
+    // own text in place of the pooler's.
+    [Fact]
+    public void RefusedTransaction_ProtocolViolation_IsTheAnswerOfARefusedTransaction() =>
+        PostgresLive
+            .RefusedTransaction(
+                new PostgresException(
+                    "transaction blocks not allowed in statement pooling mode",
+                    "ERROR",
+                    "ERROR",
+                    "08P01"
+                )
+            )
+            .ShouldBe(
+                new PostgresPrepareAnswer(
+                    null,
+                    new PostgresServerError("08P01", PostgresLive.TransactionRefused, null, null, null)
+                )
+            );
+
+    [Theory]
+    [InlineData("57P01")]
+    [InlineData("08006")]
+    public void RefusedTransaction_OtherServerError_IsNull(string state) =>
+        PostgresLive
+            .RefusedTransaction(new PostgresException("terminating connection", "FATAL", "FATAL", state))
+            .ShouldBeNull();
+
+    [Fact]
+    public void RefusedTransaction_LostConnection_IsNull() =>
+        PostgresLive.RefusedTransaction(new NpgsqlException(PostgresConnection.LostConnection)).ShouldBeNull();
+
     // An NpgsqlException the call throws, whatever its cause, is the answer's error, made by errorOf.  AnswerAsync has
     // no cancellation filter: it catches by the exception's type alone, and a cancellation that is no NpgsqlException
     // passes through, as the next test pins.

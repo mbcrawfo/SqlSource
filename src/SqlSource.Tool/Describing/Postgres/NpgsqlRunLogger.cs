@@ -14,8 +14,9 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// What is written is an allowlist of event ids, not a level: a message is forwarded only when its category lists its
 /// id, and every other message is dropped before it is formatted.  The list was read from the source of Npgsql 10.0.3,
 /// its <c>NpgsqlEventId.cs</c> and <c>LogMessages.cs</c>, and holds the ids whose message is the tool's own command
-/// text, a fixed text or a number, of the features the describer uses.  So a message that a later Npgsql adds is
-/// dropped until someone reads it, and a test fails on any other version of Npgsql until the list is read again.
+/// text, a fixed text, the name of the tool's own savepoint or a number, of the features the describer uses.  So a
+/// message that a later Npgsql adds is dropped until someone reads it, and a test fails on any other version of Npgsql
+/// until the list is read again.
 /// </para>
 /// <para>
 /// Left out: the messages of an opened or closed connection, which name <c>{Host}:{Port}/{Database}</c>; a notice of
@@ -39,7 +40,10 @@ internal sealed class NpgsqlRunLogger(IRunLog log) : ILoggerFactory
     public const string EventName = "driver";
 
     // The ids forwarded, by the category that writes them.  Each is the tool's command text, a fixed text or a number
-    // in Npgsql 10.0.3.  CancellingCommand is written on the connection's logger, not the command's.
+    // in Npgsql 10.0.3, and RolledBackToSavepoint a fixed text with the savepoint's name, which is the describer's
+    // own.  The describer takes its savepoint with a command of its own, which ExecutingCommand logs, and never
+    // releases it, so CreatingSavepoint and ReleasedSavepoint are left out.  CancellingCommand is written on the
+    // connection's logger, not the command's.
     private static readonly Dictionary<string, HashSet<int>> Forwarded = new(StringComparer.Ordinal)
     {
         ["Npgsql.Command"] =
@@ -54,6 +58,7 @@ internal sealed class NpgsqlRunLogger(IRunLog log) : ILoggerFactory
             NpgsqlEventId.StartedTransaction,
             NpgsqlEventId.CommittedTransaction,
             NpgsqlEventId.RolledBackTransaction,
+            NpgsqlEventId.RolledBackToSavepoint,
             NpgsqlEventId.ExceptionDuringTransactionDispose,
         ],
     };
