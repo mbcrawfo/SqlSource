@@ -27,9 +27,9 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </para>
 /// <para>
 /// An exception is written as its type alone: its message is the server's or the socket's text, which can name the
-/// endpoint, a role or a database.  The log the describer is given removes the connection's whole value from a
-/// message, and its passwords where they stand as tokens, and no other part of it, as <c>docs/tech-debt/TD-0034</c>
-/// says.
+/// endpoint, a role or a database.  The log the describer is given removes each whole form of the connection's value
+/// from a message, and its passwords where they stand as tokens, and no other part of it, as
+/// <c>docs/tech-debt/TD-0034</c> says.
 /// </para>
 /// </remarks>
 /// <param name="log">The describer's log.  It is the run's, and is not closed here.</param>
