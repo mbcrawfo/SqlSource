@@ -31,11 +31,15 @@ public sealed class SqlServerSessionProofTests
     };
 
     [Fact]
-    public async Task DescribeAsync_FormNeedsOperands_AsksOperandsBeforeTable()
+    public async Task DescribeAsync_FormNeedsOperands_AsksOperandsAndCorrectsTheColumn()
     {
         var operands = new SqlServerColumnsRequest(ShownOperands, null);
-        var script = Script(Shown, [IdColumn, Expression(2, "shown"), Rowstat with { ColumnOrdinal = 3 }])
-            .Add("operands", operands, new SqlServerColumnsAnswer([Operand(1, true), Operand(2, false)], null, null));
+        var script = Script(Shown, [IdColumn, ExpressionRow(2, "shown"), Rowstat with { ColumnOrdinal = 3 }])
+            .Add(
+                "operands",
+                operands,
+                new SqlServerColumnsAnswer([OperandRow(1, true), OperandRow(2, false)], null, null)
+            );
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Shown));
 
@@ -48,21 +52,20 @@ public sealed class SqlServerSessionProofTests
             .ShouldBe([(false, SidecarValues.NullableSource.Server), (false, SidecarValues.NullableSource.Expression)]);
     }
 
-    // Every column comes from dbo.users, so "table" is asked, after "operands".
+    // A column alone is what "columns" answered already, so a describe of nullable columns of dbo.users asks no
+    // "operands" and goes on to "table".
     [Fact]
-    public async Task DescribeAsync_OperandOfOneTable_AsksTableAfterOperands()
+    public async Task DescribeAsync_BareNullableColumn_AsksTableAndNoOperands()
     {
         const string Sql = "SELECT id, nickname FROM dbo.users";
-        var operands = new SqlServerColumnsRequest("SELECT nickname\nAS [1]\nFROM dbo.users", null);
         var table = new SqlServerTableRequest("dbo", "users");
         var script = Script(Sql, [IdColumn, NicknameColumn, Rowstat with { ColumnOrdinal = 3 }])
-            .Add("operands", operands, new SqlServerColumnsAnswer([Operand(1, true), Rowstat], null, null))
             .Add("table", table, new SqlServerColumnsAnswer([IdColumn, NicknameColumn, Rowstat], null, null));
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.Select(static call => call.Method).ShouldBe(["parameters", "columns", "operands", "table"]);
-        asked[2].ShouldBe(Call("operands", operands));
+        asked.Select(static call => call.Method).ShouldBe(["parameters", "columns", "table"]);
+        asked[2].ShouldBe(Call("table", table));
         Nullability(described)
             .ShouldBe([(false, SidecarValues.NullableSource.Server), (true, SidecarValues.NullableSource.Server)]);
         described.Value.ShouldNotBeNull().TableMatch.ShouldBe(SidecarValues.TableMatch.Matched);
@@ -85,9 +88,9 @@ public sealed class SqlServerSessionProofTests
                 [new SqlServerDescribeError(207, 2, "Invalid column name 'nickname'.")],
                 null
             ),
-            _ => new SqlServerColumnsAnswer([Operand(1, false)], null, null),
+            _ => new SqlServerColumnsAnswer([OperandRow(1, false)], null, null),
         };
-        var script = Script(Sql, [Expression(1, "n"), Expression(2, "shown")])
+        var script = Script(Sql, [ExpressionRow(1, "n"), ExpressionRow(2, "shown")])
             .Add("operands", new SqlServerColumnsRequest(ShownOperands, null), answer);
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
@@ -102,7 +105,7 @@ public sealed class SqlServerSessionProofTests
     public async Task DescribeAsync_NothingToAsk_NoOperandsCall()
     {
         const string Sql = "SELECT COUNT(*) AS n FROM dbo.users";
-        var script = Script(Sql, [Expression(1, "n")]);
+        var script = Script(Sql, [ExpressionRow(1, "n")]);
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
@@ -124,9 +127,13 @@ public sealed class SqlServerSessionProofTests
             .Add(
                 "columns",
                 new SqlServerColumnsRequest(Sql, "@x int"),
-                new SqlServerColumnsAnswer([Expression(1, "shown")], null, null)
+                new SqlServerColumnsAnswer([ExpressionRow(1, "shown")], null, null)
             )
-            .Add("operands", operands, new SqlServerColumnsAnswer([Operand(1, true), Operand(2, false)], null, null));
+            .Add(
+                "operands",
+                operands,
+                new SqlServerColumnsAnswer([OperandRow(1, true), OperandRow(2, false)], null, null)
+            );
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
@@ -139,29 +146,6 @@ public sealed class SqlServerSessionProofTests
         new SqlServerScript()
             .Add("parameters", new SqlServerParametersRequest(sql, null), new SqlServerParametersAnswer([], null))
             .Add("columns", new SqlServerColumnsRequest(sql, null), new SqlServerColumnsAnswer(rows, null, null));
-
-    // The row of a column of no origin that the server answers nullable.
-    private static SqlServerColumnRow Expression(int ordinal, string name) =>
-        IdColumn with
-        {
-            ColumnOrdinal = ordinal,
-            Name = name,
-            IsNullable = true,
-            SourceDatabase = null,
-            SourceSchema = null,
-            SourceTable = null,
-            SourceColumn = null,
-            SourceType = null,
-            IsIdentityColumn = null,
-            IsComputedColumn = null,
-        };
-
-    // The row of the operand numbered n, as the server answers "AS [n]".
-    private static SqlServerColumnRow Operand(int number, bool nullable) =>
-        Expression(number, number.ToString(System.Globalization.CultureInfo.InvariantCulture)) with
-        {
-            IsNullable = nullable,
-        };
 
     private static List<(bool? Nullable, string? Source)> Nullability(
         Outcome<QueryDescription, DescribeFailure> described

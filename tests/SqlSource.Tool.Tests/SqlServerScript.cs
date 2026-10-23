@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
@@ -83,6 +84,29 @@ internal sealed class SqlServerScript
         IsIdentityColumn = null,
         IsComputedColumn = null,
     };
+
+    // The row of a column of no origin that the server answers nullable.
+    public static SqlServerColumnRow ExpressionRow(int ordinal, string name) =>
+        IdColumn with
+        {
+            ColumnOrdinal = ordinal,
+            Name = name,
+            IsNullable = true,
+            SourceDatabase = null,
+            SourceSchema = null,
+            SourceTable = null,
+            SourceColumn = null,
+            SourceType = null,
+            IsIdentityColumn = null,
+            IsComputedColumn = null,
+        };
+
+    // The row of the operand numbered n, as the server answers "AS [n]" of "operands".
+    public static SqlServerColumnRow OperandRow(int number, bool? nullable) =>
+        ExpressionRow(number, number.ToString(CultureInfo.InvariantCulture)) with
+        {
+            IsNullable = nullable,
+        };
 
     public SqlServerScript()
     {

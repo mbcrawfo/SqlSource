@@ -101,10 +101,10 @@ public sealed class SqlServerEventsSessionTests
         Member(log.Events[4].Members, "tableMatch").ShouldBe((LogValue)"matched");
     }
 
-    // When every column comes from one table and a proof asks an operand: columns, operands, each column, table, then
-    // the match.
+    // A column alone asks no "operands": when every column comes from one table, columns, each column, table, then the
+    // match.
     [Fact]
-    public async Task DescribeAsync_OperandsOfOneTable_WritesOperandsBeforeTheColumnsAndTable()
+    public async Task DescribeAsync_BareNullableColumnOfOneTable_WritesNoOperands()
     {
         const string Sql = "SELECT id, nickname FROM dbo.users";
         var nickname = SqlServerSessionCases.NameColumn with
@@ -123,11 +123,6 @@ public sealed class SqlServerEventsSessionTests
                 new SqlServerColumnsAnswer([IdColumn, nickname, Rowstat with { ColumnOrdinal = 3 }], null, null)
             )
             .Add(
-                "operands",
-                new SqlServerColumnsRequest("SELECT nickname\nAS [1]\nFROM dbo.users", null),
-                new SqlServerColumnsAnswer([nickname with { ColumnOrdinal = 1, Name = "1" }, Rowstat], null, null)
-            )
-            .Add(
                 "table",
                 new SqlServerTableRequest("dbo", "users"),
                 new SqlServerColumnsAnswer([IdColumn, nickname, Rowstat with { ColumnOrdinal = 3 }], null, null)
@@ -137,9 +132,9 @@ public sealed class SqlServerEventsSessionTests
         _ = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql), log, new TestClock(), CallTime);
 
         log.Events.Select(written => written.Name)
-            .ShouldBe(["parameters", "columns", "operands", "column", "column", "table", "table-match"]);
-        Member(log.Events[4].Members, "nullableSource").ShouldBe((LogValue)"server");
-        Member(log.Events[6].Members, "tableMatch").ShouldBe((LogValue)"matched");
+            .ShouldBe(["parameters", "columns", "column", "column", "table", "table-match"]);
+        Member(log.Events[3].Members, "nullableSource").ShouldBe((LogValue)"server");
+        Member(log.Events[5].Members, "tableMatch").ShouldBe((LogValue)"matched");
     }
 
     // A describe of a declared parameter and a reused one: declared, then parameters, then the probes of each copy,

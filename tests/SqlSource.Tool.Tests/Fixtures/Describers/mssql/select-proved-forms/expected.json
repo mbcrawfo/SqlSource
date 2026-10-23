@@ -5,7 +5,7 @@
   "toolVersion": "fixture",
   "queries": {
     "OrderSummaries": {
-      "hash": "362f165014ef7ba6efc20202c214b91b3e434201e4a7d2eb194da4404d002f59",
+      "hash": "8934f45dc7c2ed39226277a02f1bb05de7da1b91ddd23e6f7292f63e7980cd69",
       "engine": "mssql",
       "database": "mssql",
       "serverVersion": "17.0.5015.4",
@@ -18,13 +18,13 @@
           "name": "minimum_total",
           "ordinal": 0,
           "type": {
-            "name": "decimal(38,19)",
-            "maxLength": 17,
-            "precision": 38,
-            "scale": 19
+            "name": "decimal(18,2)",
+            "maxLength": 9,
+            "precision": 18,
+            "scale": 2
           },
           "nullable": null,
-          "typeSource": "inferred"
+          "typeSource": "declared"
         }
       ],
       "columns": [

@@ -92,7 +92,12 @@ internal sealed class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBo
     public IReadOnlyList<TokenRange> Operands => _operands;
 
     /// <summary>The proof of an item's expression, in the select's context.</summary>
-    /// <remarks>Under <c>GROUP BY ALL</c>, which returns a group that no row holds, nothing is proved.</remarks>
+    /// <remarks>
+    /// Under <c>GROUP BY ALL</c>, which returns a group that no row holds, nothing is proved.  An item that is one leaf
+    /// alone, its outer parentheses aside, proves nothing and asks nothing: the server has already answered that very
+    /// expression over the same rows.  A lone leaf inside a form, as in <c>CAST(x AS int)</c>, is still asked, since
+    /// the form's answer can differ from its operand's.
+    /// </remarks>
     public Proof Of(TokenRange expression)
     {
         if (body.Grouping == SelectGrouping.All)
@@ -101,7 +106,10 @@ internal sealed class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBo
         }
 
         _leaves.Clear();
-        return Numbered(Expression(expression, rows: false));
+        var proof = Expression(expression, rows: false);
+        return proof is Proof.Operand leaf && IsTheWholeItem(_leaves[leaf.Index], expression)
+            ? Proof.No
+            : Numbered(proof);
     }
 
     private static Proof AnyOf(IEnumerable<Proof> parts)
@@ -294,6 +302,26 @@ internal sealed class ExpressionProofs(IReadOnlyList<TsqlToken> tokens, SelectBo
 
         // A call of a schema's name is a user's function or a CLR aggregate.
         return parts == 1 ? Call(piece, rows) : Proof.No;
+    }
+
+    // True when the leaf is the item's expression, or that expression with one or more outer parentheses removed.
+    private bool IsTheWholeItem(TokenRange leaf, TokenRange expression)
+    {
+        var range = expression;
+        while (true)
+        {
+            if (leaf == range)
+            {
+                return true;
+            }
+
+            if (range.Count < 2 || !tokens[range.Start].IsSymbol("(") || !IsOneGroup(range))
+            {
+                return false;
+            }
+
+            range = new TokenRange(range.Start + 1, range.End - 1);
+        }
     }
 
     // True when the piece is one "( ... )" or "CASE ... END": only its first token stands at its own level.

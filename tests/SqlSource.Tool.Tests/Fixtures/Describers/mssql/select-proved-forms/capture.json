@@ -32,24 +32,36 @@
       }
     },
     {
-      "method": "parameters",
+      "method": "declared",
       "request": {
-        "sql": "SELECT\n    o.user_id AS user_id,\n    COUNT(*) AS order_count,\n    SUM(o.total) AS total_spent,\n    MAX(o.total * u.credit) AS largest_weighted,\n    COALESCE(u.nickname, u.name) AS shown_name,\n    CAST(o.user_id AS bigint) AS user_key,\n    RANK() OVER (ORDER BY COUNT(*) DESC) AS order_rank\nFROM dbo.orders AS o\nJOIN dbo.users AS u ON u.id = o.user_id\nWHERE o.total >= @minimum_total\nGROUP BY o.user_id, u.nickname, u.name;",
-        "params": null
+        "sql": "SELECT @minimum_total AS [1]",
+        "params": "@minimum_total decimal(18,2)"
       },
       "answer": {
         "rows": [
           {
-            "name": "@minimum_total",
-            "suggestedSystemTypeName": "decimal(38,19)",
-            "suggestedMaxLength": 17,
-            "suggestedPrecision": 38,
-            "suggestedScale": 19,
-            "suggestedUserTypeSchema": null,
-            "suggestedUserTypeName": null,
-            "suggestedAssemblyQualifiedTypeName": null
+            "columnOrdinal": 1,
+            "systemTypeName": "decimal(18,2)",
+            "maxLength": 9,
+            "precision": 18,
+            "scale": 2,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null
           }
         ],
+        "errors": null,
+        "error": null
+      }
+    },
+    {
+      "method": "parameters",
+      "request": {
+        "sql": "SELECT\n    o.user_id AS user_id,\n    COUNT(*) AS order_count,\n    SUM(o.total) AS total_spent,\n    MAX(o.total * u.credit) AS largest_weighted,\n    COALESCE(u.nickname, u.name) AS shown_name,\n    CAST(o.user_id AS bigint) AS user_key,\n    RANK() OVER (ORDER BY COUNT(*) DESC) AS order_rank\nFROM dbo.orders AS o\nJOIN dbo.users AS u ON u.id = o.user_id\nWHERE o.total >= @minimum_total\nGROUP BY o.user_id, u.nickname, u.name;",
+        "params": "@minimum_total decimal(18,2)"
+      },
+      "answer": {
+        "rows": [],
         "error": null
       }
     },
@@ -57,7 +69,7 @@
       "method": "columns",
       "request": {
         "sql": "SELECT\n    o.user_id AS user_id,\n    COUNT(*) AS order_count,\n    SUM(o.total) AS total_spent,\n    MAX(o.total * u.credit) AS largest_weighted,\n    COALESCE(u.nickname, u.name) AS shown_name,\n    CAST(o.user_id AS bigint) AS user_key,\n    RANK() OVER (ORDER BY COUNT(*) DESC) AS order_rank\nFROM dbo.orders AS o\nJOIN dbo.users AS u ON u.id = o.user_id\nWHERE o.total >= @minimum_total\nGROUP BY o.user_id, u.nickname, u.name;",
-        "params": "@minimum_total decimal(38,19)"
+        "params": "@minimum_total decimal(18,2)"
       },
       "answer": {
         "rows": [
@@ -238,7 +250,7 @@
       "method": "operands",
       "request": {
         "sql": "SELECT o.total\nAS [1],\nu.credit\nAS [2],\nu.nickname\nAS [3],\nu.name\nAS [4],\no.user_id\nAS [5]\nFROM dbo.orders AS o\nJOIN dbo.users AS u ON u.id = o.user_id\nWHERE o.total >= @minimum_total",
-        "params": "@minimum_total decimal(38,19)"
+        "params": "@minimum_total decimal(18,2)"
       },
       "answer": {
         "rows": [

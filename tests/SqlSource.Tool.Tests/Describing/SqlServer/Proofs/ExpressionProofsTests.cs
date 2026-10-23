@@ -39,11 +39,12 @@ public sealed class ExpressionProofsTests
     [InlineData("(SELECT COUNT(*) OVER () FROM o)", "", false, false, "")]
     [InlineData("(SELECT COUNT(*) FROM o UNION ALL SELECT COUNT(*) FROM p)", "", false, false, "")]
     [InlineData("(SELECT COUNT(*) FROM o FOR XML PATH(''))", "", false, false, "")]
-    // A subquery of another form is a leaf, asked whole unless it holds an aggregate, OVER or a user's function.
-    [InlineData("(SELECT TOP (1) o.x FROM o)", "", true, false, "(SELECT TOP (1) o.x FROM o)")]
-    [InlineData("(SELECT MAX(o.x) FROM o)", "", false, false, "")]
+    // A subquery of another form is a leaf, asked whole unless it holds an aggregate, OVER or a user's function.  The
+    // leaves below each stand inside COALESCE(..., NULL), since an item that is a leaf alone asks nothing.
+    [InlineData("COALESCE((SELECT TOP (1) o.x FROM o), NULL)", "", true, false, "(SELECT TOP (1) o.x FROM o)")]
+    [InlineData("COALESCE((SELECT MAX(o.x) FROM o), NULL)", "", false, false, "")]
     [InlineData(
-        "CASE WHEN EXISTS (SELECT 1 FROM o WHERE o.c = t.id) THEN 1 ELSE 0 END",
+        "COALESCE(CASE WHEN EXISTS (SELECT 1 FROM o WHERE o.c = t.id) THEN 1 ELSE 0 END, NULL)",
         "",
         true,
         false,
@@ -166,8 +167,8 @@ public sealed class ExpressionProofsTests
     [InlineData("CONVERT(varchar(10), t.d, NULL)", "", false, false, "")]
     [InlineData("CONVERT(varchar(10), t.d, -1)", "", false, false, "")]
     [InlineData("CONVERT(varchar(10), t.d, (23))", "", false, false, "")]
-    // TRY_CAST is no form: it is asked whole, and the server answers it.
-    [InlineData("TRY_CAST(t.a AS int)", "", true, false, "TRY_CAST(t.a AS int)")]
+    // TRY_CAST is no form: it is asked whole inside a form, and the server answers it.
+    [InlineData("CAST(TRY_CAST(t.a AS int) AS bigint)", "", true, false, "TRY_CAST(t.a AS int)")]
     // JSON_OBJECT and JSON_ARRAY.
     [InlineData("JSON_OBJECT('a': t.a)", "", true, true, "")]
     [InlineData("JSON_ARRAY(t.a)", "", true, true, "")]
@@ -188,23 +189,33 @@ public sealed class ExpressionProofsTests
     [InlineData("SUM(t.a)", "GROUP BY t.b HAVING SUM(t.a) > 0", true, false, "t.a")]
     [InlineData("NTILE(4) OVER (ORDER BY t.b)", "GROUP BY ROLLUP (t.b)", true, true, "")]
     [InlineData("COUNT(*) WITHIN GROUP (ORDER BY t.a)", "", false, false, "")]
-    // Anything else at the top is asked whole.
-    [InlineData("t.a & t.b", "", true, false, "t.a & t.b")]
-    [InlineData("t.a COLLATE Latin1_General_BIN", "", true, false, "t.a COLLATE Latin1_General_BIN")]
-    [InlineData("t.a AT TIME ZONE 'UTC'", "", true, false, "t.a AT TIME ZONE 'UTC'")]
-    [InlineData("ISNULL(t.a, 0)", "", true, false, "ISNULL(t.a, 0)")]
-    [InlineData("NULLIF(t.a, 0)", "", true, false, "NULLIF(t.a, 0)")]
-    [InlineData("IIF(t.a > 0, 1, 0)", "", true, false, "IIF(t.a > 0, 1, 0)")]
-    [InlineData("TRY_CONVERT(int, t.a)", "", true, false, "TRY_CONVERT(int, t.a)")]
-    [InlineData("PARSE(t.s AS int USING 'en-US')", "", true, false, "PARSE(t.s AS int USING 'en-US')")]
+    // Anything else inside a form is asked whole.
+    [InlineData("COALESCE(t.a & t.b, NULL)", "", true, false, "t.a & t.b")]
+    [InlineData("COALESCE(t.a COLLATE Latin1_General_BIN, NULL)", "", true, false, "t.a COLLATE Latin1_General_BIN")]
+    [InlineData("COALESCE(t.a AT TIME ZONE 'UTC', NULL)", "", true, false, "t.a AT TIME ZONE 'UTC'")]
+    [InlineData("COALESCE(ISNULL(t.a, 0), NULL)", "", true, false, "ISNULL(t.a, 0)")]
+    [InlineData("COALESCE(NULLIF(t.a, 0), NULL)", "", true, false, "NULLIF(t.a, 0)")]
+    [InlineData("COALESCE(IIF(t.a > 0, 1, 0), NULL)", "", true, false, "IIF(t.a > 0, 1, 0)")]
+    [InlineData("COALESCE(TRY_CONVERT(int, t.a), NULL)", "", true, false, "TRY_CONVERT(int, t.a)")]
+    [InlineData("COALESCE(PARSE(t.s AS int USING 'en-US'), NULL)", "", true, false, "PARSE(t.s AS int USING 'en-US')")]
     // A ":" of JSON_OBJECT is no "::".
     [InlineData(
-        "ISNULL(JSON_OBJECT('a': UPPER(t.x)), '')",
+        "COALESCE(ISNULL(JSON_OBJECT('a': UPPER(t.x)), ''), NULL)",
         "",
         true,
         false,
         "ISNULL(JSON_OBJECT('a': UPPER(t.x)), '')"
     )]
+    // An item that is one leaf alone, its outer parentheses aside, is what the server answered already: it proves
+    // nothing and asks nothing.  An operator around the leaf makes a form, which asks it, as a sign does above.
+    [InlineData("t.a", "", false, false, "")]
+    [InlineData("((t.a))", "", false, false, "")]
+    [InlineData("(SELECT TOP (1) o.x FROM o)", "", false, false, "")]
+    [InlineData("CASE WHEN t.a > 0 THEN 1 ELSE 0 END", "", false, false, "")]
+    [InlineData("TRY_CAST(t.a AS int)", "", false, false, "")]
+    [InlineData("t.a AT TIME ZONE 'UTC'", "", false, false, "")]
+    [InlineData("ISNULL(t.a, 0)", "", false, false, "")]
+    [InlineData("t.a + 1", "", true, false, "t.a")]
     // A user's function, or anything that holds one, is never asked.
     [InlineData("dbo.COUNT(t.a)", "", false, false, "")]
     [InlineData("dbo.f(t.a) + 1", "", false, false, "")]
@@ -225,9 +236,9 @@ public sealed class ExpressionProofsTests
     [InlineData("LAG(t.a, 1, 0) OVER (ORDER BY t.id)", "", false, false, "")]
     // Columns, in the select's context.
     [InlineData("t.a", "GROUP BY ROLLUP (t.a)", false, false, "")]
-    [InlineData("t.a", "GROUP BY t.a", true, false, "t.a")]
-    [InlineData("[t].[a]", "", true, false, "[t].[a]")]
-    [InlineData("(t.a)", "", true, false, "t.a")]
+    [InlineData("COALESCE(t.a, NULL)", "GROUP BY t.a", true, false, "t.a")]
+    [InlineData("COALESCE([t].[a], NULL)", "", true, false, "[t].[a]")]
+    [InlineData("COALESCE((t.a), NULL)", "", true, false, "t.a")]
     // Literals, NULL and parameters.
     [InlineData("'x'", "", true, true, "")]
     [InlineData("N'x'", "", true, true, "")]

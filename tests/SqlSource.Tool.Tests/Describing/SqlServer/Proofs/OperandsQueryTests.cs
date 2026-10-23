@@ -58,7 +58,7 @@ public sealed class OperandsQueryTests
     public void NotNullOf_Rows_EachOperandsAnswer()
     {
         var answer = new SqlServerColumnsAnswer(
-            [Operand(1, nullable: false), Operand(2, nullable: true), Rowstat with { ColumnOrdinal = 3 }],
+            [OperandRow(1, nullable: false), OperandRow(2, nullable: true), Rowstat with { ColumnOrdinal = 3 }],
             null,
             null
         );
@@ -70,7 +70,7 @@ public sealed class OperandsQueryTests
     [Fact]
     public void NotNullOf_NullabilityUnknown_IsNotNotNull()
     {
-        var answer = new SqlServerColumnsAnswer([Operand(1, nullable: null)], null, null);
+        var answer = new SqlServerColumnsAnswer([OperandRow(1, nullable: null)], null, null);
 
         OperandsQuery.NotNullOf(answer, 1).ShouldBe([false]);
     }
@@ -84,22 +84,22 @@ public sealed class OperandsQueryTests
             new SqlServerColumnsAnswer(null, [new SqlServerDescribeError(207, 2, "Invalid column name 'x'.")], null)
         },
         { "neither rows nor an error", new SqlServerColumnsAnswer(null, null, null) },
-        { "one row for two operands", new SqlServerColumnsAnswer([Operand(1, false), Rowstat], null, null) },
+        { "one row for two operands", new SqlServerColumnsAnswer([OperandRow(1, false), Rowstat], null, null) },
         {
             "three rows for two operands",
-            new SqlServerColumnsAnswer([Operand(1, false), Operand(2, false), Operand(3, false)], null, null)
+            new SqlServerColumnsAnswer([OperandRow(1, false), OperandRow(2, false), OperandRow(3, false)], null, null)
         },
         {
             "rows named out of order",
             new SqlServerColumnsAnswer(
-                [Operand(1, false) with { Name = "2" }, Operand(2, false) with { Name = "1" }],
+                [OperandRow(1, false) with { Name = "2" }, OperandRow(2, false) with { Name = "1" }],
                 null,
                 null
             )
         },
         {
             "a row of another name",
-            new SqlServerColumnsAnswer([Operand(1, false), Operand(2, false) with { Name = "b" }], null, null)
+            new SqlServerColumnsAnswer([OperandRow(1, false), OperandRow(2, false) with { Name = "b" }], null, null)
         },
     };
 
@@ -112,22 +112,6 @@ public sealed class OperandsQueryTests
     [InlineData("rows named out of order")]
     [InlineData("a row of another name")]
     public void NotNullOf_Unusable_IsNull(string why) => OperandsQuery.NotNullOf(Unusable[why], 2).ShouldBeNull(why);
-
-    // The visible row of the operand numbered n, as the server answers "AS [n]".
-    private static SqlServerColumnRow Operand(int number, bool? nullable) =>
-        IdColumn with
-        {
-            ColumnOrdinal = number,
-            Name = number.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            IsNullable = nullable,
-            SourceDatabase = null,
-            SourceSchema = null,
-            SourceTable = null,
-            SourceColumn = null,
-            SourceType = null,
-            IsIdentityColumn = null,
-            IsComputedColumn = null,
-        };
 
     // The tokens and the statement of the SQL, and the operands its one item's proof asks.
     private static (

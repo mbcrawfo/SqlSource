@@ -16,7 +16,7 @@ public sealed class ColumnProofsTests
     [Fact]
     public void Read_NothingToAsk_OperandsSqlIsNull()
     {
-        var proofs = Read("SELECT COUNT(*) AS n FROM dbo.users", Expression(1, "n"));
+        var proofs = Read("SELECT COUNT(*) AS n FROM dbo.users", ExpressionRow(1, "n"));
 
         proofs.OperandsSql.ShouldBeNull();
         proofs.OperandCount.ShouldBe(0);
@@ -26,7 +26,7 @@ public sealed class ColumnProofsTests
     [Fact]
     public void Apply_OperandNotNull_ColumnProved()
     {
-        var proofs = Read("SELECT COALESCE(nickname, name) AS shown FROM dbo.users", Expression(1, "shown"));
+        var proofs = Read("SELECT COALESCE(nickname, name) AS shown FROM dbo.users", ExpressionRow(1, "shown"));
 
         proofs.OperandsSql.ShouldBe("SELECT nickname\nAS [1],\nname\nAS [2]\nFROM dbo.users");
         proofs.OperandCount.ShouldBe(2);
@@ -41,8 +41,8 @@ public sealed class ColumnProofsTests
     {
         var proofs = Read(
             "SELECT COALESCE(nickname, name) AS a, CAST(nickname AS nvarchar(60)) AS b FROM dbo.users",
-            Expression(1, "a"),
-            Expression(2, "b")
+            ExpressionRow(1, "a"),
+            ExpressionRow(2, "b")
         );
 
         proofs.OperandsSql.ShouldBe("SELECT nickname\nAS [1],\nname\nAS [2]\nFROM dbo.users");
@@ -55,11 +55,34 @@ public sealed class ColumnProofsTests
             ]);
     }
 
+    // A column alone is what "columns" answered already, over the same rows: it asks nothing and keeps the server's
+    // answer.
+    [Fact]
+    public void Read_BareNullableColumn_AsksNothing()
+    {
+        var proofs = Read(
+            "SELECT id, nickname FROM dbo.users",
+            IdColumn,
+            ExpressionRow(2, "nickname") with
+            {
+                SourceDatabase = Database,
+                SourceSchema = "dbo",
+                SourceTable = "users",
+                SourceColumn = "nickname",
+                SourceType = "U",
+            }
+        );
+
+        proofs.OperandsSql.ShouldBeNull();
+        Nullability(proofs.Apply(null))
+            .ShouldBe([(false, SidecarValues.NullableSource.Server), (true, SidecarValues.NullableSource.Server)]);
+    }
+
     // The reader has misread the select list: no column of it is proved.
     [Fact]
     public void Read_NameDiffers_ProvesNothing()
     {
-        var proofs = Read("SELECT COUNT(*) AS n FROM dbo.users", Expression(1, "other"));
+        var proofs = Read("SELECT COUNT(*) AS n FROM dbo.users", ExpressionRow(1, "other"));
 
         proofs.OperandsSql.ShouldBeNull();
         Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
@@ -68,7 +91,7 @@ public sealed class ColumnProofsTests
     [Fact]
     public void Read_CountDiffers_ProvesNothing()
     {
-        var proofs = Read("SELECT COUNT(*) AS n, COUNT(*) AS m FROM dbo.users", Expression(1, "n"));
+        var proofs = Read("SELECT COUNT(*) AS n, COUNT(*) AS m FROM dbo.users", ExpressionRow(1, "n"));
 
         proofs.OperandsSql.ShouldBeNull();
         Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
@@ -79,7 +102,7 @@ public sealed class ColumnProofsTests
     {
         var proofs = Read(
             "SELECT COUNT(*) AS n FROM dbo.users UNION ALL SELECT COUNT(*) AS n FROM dbo.orders",
-            Expression(1, "n")
+            ExpressionRow(1, "n")
         );
 
         proofs.OperandsSql.ShouldBeNull();
@@ -89,7 +112,7 @@ public sealed class ColumnProofsTests
     [Fact]
     public void Read_StarAmongTheItems_ProvesNothing()
     {
-        var proofs = Read("SELECT u.*, COUNT(*) OVER () AS n FROM dbo.users AS u", IdColumn, Expression(2, "n"));
+        var proofs = Read("SELECT u.*, COUNT(*) OVER () AS n FROM dbo.users AS u", IdColumn, ExpressionRow(2, "n"));
 
         proofs.OperandsSql.ShouldBeNull();
         Nullability(proofs.Apply(null))
@@ -102,7 +125,7 @@ public sealed class ColumnProofsTests
     {
         var proofs = Read(
             "SELECT COALESCE(nickname, name) AS shown FROM dbo.users",
-            Expression(1, "shown") with
+            ExpressionRow(1, "shown") with
             {
                 IsNullable = false,
             }
@@ -120,22 +143,6 @@ public sealed class ColumnProofsTests
         var built = SqlServerColumns.Build(rows, Database).Value.ShouldNotBeNull();
         return ColumnProofs.Read(sql, built, rows);
     }
-
-    // The row of a column of no origin that the server answers nullable.
-    private static SqlServerColumnRow Expression(int ordinal, string name) =>
-        IdColumn with
-        {
-            ColumnOrdinal = ordinal,
-            Name = name,
-            IsNullable = true,
-            SourceDatabase = null,
-            SourceSchema = null,
-            SourceTable = null,
-            SourceColumn = null,
-            SourceType = null,
-            IsIdentityColumn = null,
-            IsComputedColumn = null,
-        };
 
     private static List<(bool? Nullable, string? Source)> Nullability(IReadOnlyList<BuiltColumn> columns) =>
         [.. columns.Select(static column => (column.Column.Nullable, column.Column.NullableSource))];

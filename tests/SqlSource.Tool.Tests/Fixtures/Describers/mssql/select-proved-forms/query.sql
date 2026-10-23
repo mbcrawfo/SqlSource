@@ -1,4 +1,5 @@
 -- name: OrderSummaries
+-- param: @minimum_total decimal(18,2)
 SELECT
     o.user_id AS user_id,
     COUNT(*) AS order_count,
