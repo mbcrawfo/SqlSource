@@ -128,7 +128,7 @@ The queries are in `EndToEnd/Queries/`, each file claimed by a type under `EndTo
 | `NewTypes.sql` | `NewTypesQueries` | `json` and `vector`, described on SQL Server 2025 alone |
 | `Constants.sql` | `ConstantQueries` | The output `sql` by the file header, with no models and no sidecar |
 | `Billing/Invoices.sql` | `InvoiceQueries` | The database `billing` by `-- database:`, the model namespace by the file header, the table model `BillingInvoicesRow`, and the folder's metadata in the project |
-| `Notes.sql` | `NoteQueries` | The output `codegen` by the attribute, the type override of the alias type `dbo.Email` to a record struct and of `time` to `TimeOnly` by the file header, and of `sys.time` back to the map by a query's marker, a `LEFT JOIN`, `-- column:`, and the marks `!` and `?` in brackets and in double quotes |
+| `Notes.sql` | `NoteQueries` | The output `codegen` by the attribute, the type override of the alias type `dbo.Email` to a record struct and of `time` to `TimeOnly` by the file header, and of `sys.time` back to the map by a query's marker, a `LEFT JOIN`, a count that the tool shows is never null, `-- column:` on an `EOMONTH`, and the marks `!` and `?` in brackets and in double quotes |
 | `Shapes.sql` | `ShapeQueries` | The shapes, a suffix and the model namespace by the attribute and by markers, `sort-input` and `sort-output`, a model of another namespace, and the settings of query methods, which are accepted and change nothing |
 | `Writes.sql` | `WriteQueries` | An `INSERT`, an `UPDATE` and a `MERGE`, each described by the rows of its `OUTPUT` |
 

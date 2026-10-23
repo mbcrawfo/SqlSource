@@ -178,6 +178,53 @@
         }
       ]
     },
+    "ListAccountMonths": {
+      "hash": "4a4e0ba79f8c13bd7494dc59a9e7becbb5186ba49f57d46e07321a47aebe20d7",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "month_end",
+          "type": {
+            "name": "date",
+            "maxLength": 3,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": true
+        }
+      ]
+    },
     "ListMarkedNames": {
       "hash": "97fe6d113ddaf2ea8e2ec2d675f758b49a8af3d71329275c10ced7a07d30c6a6",
       "engine": "mssql",

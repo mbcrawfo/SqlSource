@@ -39,22 +39,4 @@ public sealed class ProofTests
         proof.Holds([true, true]).ShouldBeTrue();
         proof.Holds([false, true]).ShouldBeFalse();
     }
-
-    [Fact]
-    public void NeedsOperands_Operand_IsTrue() => new Proof.Operand(0).NeedsOperands.ShouldBeTrue();
-
-    [Fact]
-    public void NeedsOperands_YesAndNo_AreFalse()
-    {
-        Proof.Yes.NeedsOperands.ShouldBeFalse();
-        Proof.No.NeedsOperands.ShouldBeFalse();
-    }
-
-    // An operand whose answer cannot change the proof is not needed.
-    [Fact]
-    public void NeedsOperands_OperandBesideADecidedPart_IsFalse()
-    {
-        new Proof.AnyOf([new Proof.Operand(0), Proof.Yes]).NeedsOperands.ShouldBeFalse();
-        new Proof.AllOf([new Proof.Operand(0), Proof.No]).NeedsOperands.ShouldBeFalse();
-    }
 }

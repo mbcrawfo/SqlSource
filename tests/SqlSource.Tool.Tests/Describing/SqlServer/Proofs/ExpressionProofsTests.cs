@@ -290,20 +290,26 @@ public sealed class ExpressionProofsTests
     }
 
     [Fact]
-    public void NeedsOperands_FormOfOperands_IsTrue()
+    public void Of_FormOfOperands_AsksEachOperand()
     {
-        var (_, _, proofs, body) = Read("SELECT COALESCE(t.a, t.b) AS c FROM t AS t");
+        var (sql, tokens, proofs, body) = Read("SELECT COALESCE(t.a, t.b) AS c FROM t AS t");
 
-        proofs.Of(body.Items[0].Expression).NeedsOperands.ShouldBeTrue();
+        var proof = proofs.Of(body.Items[0].Expression);
+
+        Texts(sql, tokens, proofs.Operands).ShouldBe("t.a|t.b");
+        proof.Holds(null).ShouldBeFalse();
+        proof.Holds([false, true]).ShouldBeTrue();
     }
 
     [Fact]
-    public void NeedsOperands_ProvedFromTheTextAlone_IsFalse()
+    public void Of_ProvedFromTheTextAlone_AsksNothing()
     {
         var (_, _, proofs, body) = Read("SELECT COUNT(*) AS c FROM t AS t");
 
-        proofs.Of(body.Items[0].Expression).NeedsOperands.ShouldBeFalse();
+        var proof = proofs.Of(body.Items[0].Expression);
+
         proofs.Operands.ShouldBeEmpty();
+        proof.Holds(null).ShouldBeTrue();
     }
 
     private static (bool Proved, bool Unproved, string Operands) Prove(string item, string tail)

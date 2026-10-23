@@ -20,12 +20,6 @@ internal abstract record Proof
     /// <summary>Not proved, whatever the server answers.</summary>
     public static Proof No { get; } = new Never();
 
-    /// <summary>
-    /// True when the proof holds only through the server's answers: it does not hold without them, and it does when
-    /// every operand is answered not null.
-    /// </summary>
-    public bool NeedsOperands => !Evaluate(static _ => false) && Evaluate(static _ => true);
-
     /// <summary>True when the expression is proved not null.</summary>
     /// <param name="operandNotNull">
     /// The server's answer for each operand, by its index, true for not null; null when the server was not asked or

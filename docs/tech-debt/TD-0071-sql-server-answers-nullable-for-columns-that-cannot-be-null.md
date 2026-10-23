@@ -13,7 +13,7 @@ The describer keeps the server's nullability (`sys.dm_exec_describe_first_result
 - **A computed column that is not persisted**: `categories-right-join-products` `sale_price`, read from the preserved side of a `RIGHT JOIN`, which the server judges by its expression, `list_price * (1 - ISNULL(discount_pct, 0) / 100)`.
 - **A statement that is not one `SELECT`**: in an `UPDATE ... OUTPUT`, `update-orders-from-join-output` `shipped_at`, made not null by the `UPDATE`'s `WHERE`, and in `cte-feeding-update`, `note`, whose `SET` is a `CONCAT`, `due_at`, made not null by the CTE's `<`, and `outstanding`, money minus an `ISNULL` of a `SUM`, read through the CTE; and in a `UNION`, `contacts-union` `name`, whose second branch's `ship_name` is filtered by `LIKE`.
 
-The proofs' own limits, which no column of the corpus reaches yet, are as narrow: a `PERSISTED NOT NULL` computed column read through a join, a derived table, a CTE or a view, or in parentheses, keeps the server's answer, since through an outer join it is `NULL` while the server still names it as the source; a statement with `OUTPUT`, a set operator, `FOR XML` or `FOR JSON`, and a batch of several statements are not read at all; and a column alone is never asked about, since the server has answered it.
+The proofs' other limits are as narrow, and no column of the corpus reaches them: a `PERSISTED NOT NULL` computed column read through a join, a derived table, a CTE or a view, or in parentheses, keeps the server's answer, since through an outer join it is `NULL` while the server still names it as the source; and a query with `FOR XML` or `FOR JSON`, or a batch of several statements, is not read at all.
 
 ## Why it exists
 
@@ -21,7 +21,7 @@ The rule is to rely on the server where it is accurate and to correct it only wh
 
 ## Impact
 
-Low.  Nothing is wrong, and of the corpus's columns that cannot be `NULL`, 15 of the 193 of the cases that run on 2017 and 15 of the 209 of those that run on 2025, about one in thirteen, are answered nullable, where they were 39 and 44 before the proofs.  `COUNT`, `SUM` and the ranking functions, the commonest of the forms, are no longer among them.  Each that remains is a property with a `?` that a user meets as a `!` or a check added by hand, as TD-0051 is for PostgreSQL; the manual's [SQL Server known issues](../manual/sqlserver.md#known-issues) say what a user can do.  The count grows with every case of a kind above.
+Low.  Nothing is wrong, and of the corpus's columns that cannot be `NULL`, 15 of the 193 of the cases that run on 2017 and 15 of the 209 of those that run on 2025, about one in thirteen, are answered nullable.  Each that remains is a property with a `?` that a user meets as a `!` or a check added by hand, as TD-0051 is for PostgreSQL; the manual's [SQL Server known issues](../manual/sqlserver.md#known-issues) say what a user can do.  The count grows with every case of a kind above.
 
 ## Proposed fix
 
