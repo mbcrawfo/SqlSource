@@ -123,8 +123,9 @@ internal interface IStartingContainer : IAsyncDisposable
     Task<(string Stdout, string Stderr)> GetLogsAsync();
 }
 
-// IStartingContainer over a container of Testcontainers.
-file sealed class Testcontainer<TContainer>(TContainer container) : IStartingContainer
+// IStartingContainer over a container of Testcontainers.  A struct, since the container it holds is the caller's to
+// dispose and the adapter has nothing to dispose of its own, which CA2000 cannot know of a class.
+internal readonly struct Testcontainer<TContainer>(TContainer container) : IStartingContainer
     where TContainer : IContainer
 {
     public TContainer Container => container;

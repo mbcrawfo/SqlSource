@@ -27,7 +27,7 @@ public sealed partial class FixtureVersionTests
     public void Recorded_Case_IsOfTheVersionOfTheDefaultImage(string name)
     {
         var fixture = Found.Single(found => found.Name == name);
-        var version = PostgresContainer.TagOf(DefaultImages.Postgres);
+        var version = EngineImage.TagOf(DefaultImages.Postgres);
 
         VersionsIn(fixture.Capture).ShouldBe([version], "the capture.json");
         VersionsIn(fixture.Expected).ShouldBe([version], "the expected.json");

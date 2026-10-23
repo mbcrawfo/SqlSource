@@ -19,17 +19,17 @@ public sealed class RealisticCasesTests
 
     // The cases of the corpus, by the names of their folders alone, so that a case.json that is wrong fails the rows
     // of its own case.  Every theory over the corpus takes them.
-    public static TheoryData<string> Cases => [with(RealisticCases.Names)];
+    public static TheoryData<string> Cases => [with(RealisticCases.Corpus.Names)];
 
     [Fact]
-    public void All_Cases_HoldAKnownCase() => RealisticCases.All.ShouldContain(found => found.Name == KnownCase);
+    public void All_Cases_HoldAKnownCase() => RealisticCases.Corpus.All.ShouldContain(found => found.Name == KnownCase);
 
     // Each case is checked apart, so that a broken one fails its own row.
     [Theory]
     [MemberData(nameof(Cases))]
     public void Folder_Case_HoldsItsFilesAlone(string name)
     {
-        var found = RealisticCases.ReadNamed(name);
+        var found = RealisticCases.Corpus.ReadNamed(name);
 
         Directory
             .GetFiles(found.Folder)

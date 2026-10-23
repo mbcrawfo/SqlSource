@@ -17,6 +17,8 @@
         <PackageReference Include="Shouldly" />
         <!-- For SqlServerStart: it brings Testcontainers and no database driver. -->
         <PackageReference Include="Testcontainers.MsSql" />
+        <!-- Assert.SkipWhen and Assert.SkipUnless, for EngineImage. -->
+        <PackageReference Include="xunit.v3.assert" />
         <!-- TestContext, without what makes a project a test executable. -->
         <PackageReference Include="xunit.v3.extensibility.core" />
     </ItemGroup>

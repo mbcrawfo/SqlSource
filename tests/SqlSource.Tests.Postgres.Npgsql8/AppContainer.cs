@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Npgsql;
 using SqlSource.Testing;
@@ -6,27 +7,29 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.Npgsql8;
 
-// A PostgreSQL of DefaultImages.Postgres, the end-to-end project's default image, with the end-to-end database "app":
-// its schema and its seed.
+// A PostgreSQL of EngineImage.Postgres.Default, the end-to-end project's default image, with the end-to-end database
+// "app": its schema and its seed.
 public sealed class AppContainer : IAsyncLifetime
 {
     private const string Database = "app";
 
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder(DefaultImages.Postgres)
-        .WithDatabase("postgres")
-        .Build();
+    // Set by InitializeAsync, which starts it through EngineImage.
+    private PostgreSqlContainer? _container;
 
     // Of the database "app".
     public string ConnectionString =>
-        new NpgsqlConnectionStringBuilder(_container.GetConnectionString()) { Database = Database }.ConnectionString;
+        new NpgsqlConnectionStringBuilder(Container.GetConnectionString()) { Database = Database }.ConnectionString;
 
     public async ValueTask InitializeAsync()
     {
         var token = TestContext.Current.CancellationToken;
-        await _container.StartAsync(token);
+        _container = await EngineImage.Postgres.StartAsync(
+            new PostgreSqlBuilder(EngineImage.Postgres.Default).WithDatabase("postgres").Build,
+            token
+        );
         try
         {
-            await using var server = NpgsqlDataSource.Create(_container.GetConnectionString());
+            await using var server = NpgsqlDataSource.Create(Container.GetConnectionString());
             await EndToEndFiles.CreateAsync(
                 server,
                 EndToEndEngine.Postgres,
@@ -43,5 +46,8 @@ public sealed class AppContainer : IAsyncLifetime
         }
     }
 
-    public ValueTask DisposeAsync() => _container.DisposeAsync();
+    public ValueTask DisposeAsync() => _container?.DisposeAsync() ?? ValueTask.CompletedTask;
+
+    private PostgreSqlContainer Container =>
+        _container ?? throw new InvalidOperationException("The container has not started.");
 }

@@ -8,7 +8,6 @@ using Npgsql;
 using Shouldly;
 using SqlSource.Testing.Generator;
 using SqlSource.Tests.Postgres.Describer;
-using SqlSource.Tests.Postgres.Realistic.Describer;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
@@ -46,7 +45,7 @@ public sealed class RealisticModelRefusalTests(PostgresContainer postgres)
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
     public async Task Run_CaseWithRefusedModels_GivesItsOneModelError(string name)
     {
-        var found = RealisticCases.ReadNamed(name);
+        var found = RealisticCases.Corpus.ReadNamed(name);
         if (found.Models is null)
         {
             Assert.Skip($"{found} says the generator does not refuse its models.");
@@ -106,6 +105,6 @@ public sealed class RealisticModelRefusalTests(PostgresContainer postgres)
             Assert.Fail($"{found} was refused:\n{RealisticDescriptions.RenderFailure(described.Failure)}");
         }
 
-        return Sidecars.Of(query, RealisticDescribe.EntryOf(found, session.Server, described.Value));
+        return Sidecars.Of(query, RealisticCases.Describe.EntryOf(found, session.Server, described.Value));
     }
 }

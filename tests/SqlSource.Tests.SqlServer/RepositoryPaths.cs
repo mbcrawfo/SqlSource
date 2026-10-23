@@ -15,18 +15,6 @@ internal static class RepositoryPaths
 
     public static string SqlServerSchema { get; } = Path.Combine(DescriberFixtures, "mssql", "schema.sql");
 
-    // The database "realistic" of the corpus of realistic queries: its schema, its seed, and the folder of its cases.
-    public static string Realistic { get; } = Path.Combine(Root, "tests", "SqlSource.Tests.SqlServer", "Realistic");
-
-    public static string RealisticSchema { get; } = Path.Combine(Realistic, "schema.sql");
-
-    public static string RealisticSeed { get; } = Path.Combine(Realistic, "seed.sql");
-
-    public static string RealisticCases { get; } = Path.Combine(Realistic, "Cases");
-
-    // The file of the classes that claim the realistic cases as Models queries.
-    public static string RealisticQueries { get; } = Path.Combine(Realistic, "Generation", "RealisticQueries.cs");
-
     // The end-to-end project's folder EndToEnd/: the folders of the databases "app" and "billing", and Queries/, from
     // EndToEndEngine.
     public static string EndToEnd => EndToEndEngine.SqlServer.Folder;
