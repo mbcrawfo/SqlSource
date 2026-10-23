@@ -269,8 +269,8 @@ public static class Cli
             "run.start",
             new("toolVersion", PackageVersion.Prefix),
             new("formatVersion", SidecarFormat.Version),
-            new("runtime", RuntimeInformation.FrameworkDescription),
-            new("os", RuntimeInformation.OSDescription),
+            new("runtime", host.Runtime),
+            new("os", host.OperatingSystem),
             new("arguments", LoggedArguments.Of(commandLine.Usage, args))
         );
         return true;

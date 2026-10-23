@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -50,8 +49,8 @@ public sealed class RunLogTests : IDisposable
         start.GetProperty("time").GetString().ShouldBe(TestClock.StartIso);
         start.GetProperty("toolVersion").GetString().ShouldBe(PackageVersion.Prefix);
         start.GetProperty("formatVersion").GetInt32().ShouldBe(SidecarFormat.Version);
-        start.GetProperty("runtime").GetString().ShouldBe(RuntimeInformation.FrameworkDescription);
-        start.GetProperty("os").GetString().ShouldBe(RuntimeInformation.OSDescription);
+        start.GetProperty("runtime").GetString().ShouldBe(Hosts.Runtime);
+        start.GetProperty("os").GetString().ShouldBe(Hosts.OperatingSystem);
         Strings(start.GetProperty("arguments")).ShouldBe(["describe", "--log", "run.log"]);
         var end = events[^1];
         end.GetProperty("event").GetString().ShouldBe("run.end");
