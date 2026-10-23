@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Npgsql;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing.Describers;
@@ -21,18 +24,137 @@ public sealed class PostgresDescriberTests
     [Fact]
     public void SecretsOf_ConnectionWithBothPasswords_IsBoth() =>
         new PostgresDescriber()
-            .SecretsOf("Host=h;Password=pw;SSL Password=kp")
+            .SecretsOf("Host=h;Password=pw;SSL Password=kp", static _ => null)
             .ShouldBe(["pw", "kp"], ignoreOrder: true);
 
     // A string the driver cannot read has no parts it knows, and opening it fails in its own place.
     [Fact]
     public void SecretsOf_ConnectionTheDriverCannotRead_IsNone() =>
-        new PostgresDescriber().SecretsOf("Nonsense=1").ShouldBeEmpty();
+        new PostgresDescriber().SecretsOf("Nonsense=1", static _ => null).ShouldBeEmpty();
 
     // A keyword the builder knows with a value it cannot read: the builder throws, whatever else the string holds.
     [Fact]
     public void SecretsOf_ConnectionWithAValueTheDriverCannotRead_IsNone() =>
-        new PostgresDescriber().SecretsOf("Password=pw;Port=abc").ShouldBeEmpty();
+        new PostgresDescriber().SecretsOf("Password=pw;Port=abc", static _ => null).ShouldBeEmpty();
+
+    // Npgsql takes the password of the environment when the string has none.
+    [Fact]
+    public void SecretsOf_NoPasswordAndPgPasswordSet_IsPgPassword() =>
+        new PostgresDescriber().SecretsOf("Host=h", Environment(("PGPASSWORD", "envpass1"))).ShouldBe(["envpass1"]);
+
+    [Fact]
+    public void SecretsOf_PasswordInTheStringAndPgPasswordSet_IsTheStringsAlone() =>
+        new PostgresDescriber()
+            .SecretsOf("Host=h;Password=pw", Environment(("PGPASSWORD", "envpass1")))
+            .ShouldBe(["pw"]);
+
+    [Fact]
+    public void SecretsOf_NoPasswordAndAPasswordFile_IsItsPasswords()
+    {
+        using var folder = new TempFolder();
+        var file = folder.Write("pgpass", "# c\nh:5432:db:u:filepass1\n*:*:*:*:filepass2\n");
+
+        new PostgresDescriber()
+            .SecretsOf("Host=h", Environment(("PGPASSFILE", file)))
+            .ShouldBe(["filepass1", "filepass2"]);
+    }
+
+    // PGPASSWORD is before the file in Npgsql, so a file is not read when it is set.
+    [Fact]
+    public void SecretsOf_PgPasswordAndAPasswordFile_IsPgPassword()
+    {
+        using var folder = new TempFolder();
+        var file = folder.Write("pgpass", "h:5432:db:u:filepass1\n");
+
+        new PostgresDescriber()
+            .SecretsOf("Host=h", Environment(("PGPASSWORD", "envpass1"), ("PGPASSFILE", file)))
+            .ShouldBe(["envpass1"]);
+    }
+
+    [Fact]
+    public void SecretsOf_PasswordInTheStringAndAPasswordFile_IsTheStringsAlone()
+    {
+        using var folder = new TempFolder();
+        var file = folder.Write("pgpass", "h:5432:db:u:filepass1\n");
+
+        new PostgresDescriber().SecretsOf("Host=h;Password=pw", Environment(("PGPASSFILE", file))).ShouldBe(["pw"]);
+    }
+
+    [Fact]
+    public void SecretsOf_PassfileInTheString_WinsOverPgPassFile()
+    {
+        using var folder = new TempFolder();
+        var own = folder.Write("own", "h:5432:db:u:ownpass1\n");
+        var other = folder.Write("other", "h:5432:db:u:otherpass1\n");
+
+        new PostgresDescriber()
+            .SecretsOf($"Host=h;Passfile={own}", Environment(("PGPASSFILE", other)))
+            .ShouldBe(["ownpass1"]);
+    }
+
+    [Fact]
+    public void SecretsOf_DefaultPasswordFileOfHome_IsItsPasswords()
+    {
+        using var folder = new TempFolder();
+        _ = folder.Write(".pgpass", "h:5432:db:u:homepass1\n");
+
+        new PostgresDescriber().SecretsOf("Host=h", Environment(("HOME", folder.Path))).ShouldBe(["homepass1"]);
+    }
+
+    [Fact]
+    public void SecretsOf_PasswordFileMissingOrAFolder_IsNoneAndDoesNotThrow()
+    {
+        using var folder = new TempFolder();
+        var describer = new PostgresDescriber();
+
+        describer.SecretsOf("Host=h", Environment(("PGPASSFILE", Path.Combine(folder.Path, "none")))).ShouldBeEmpty();
+        describer.SecretsOf("Host=h", Environment(("PGPASSFILE", folder.Path))).ShouldBeEmpty();
+        describer.SecretsOf("Host=h", Environment(("PGPASSFILE", "bad\0name"))).ShouldBeEmpty();
+    }
+
+    // Npgsql reads a password file only for a string that has no Password, as it reads the environment's.
+    [Fact]
+    public void SecretsOf_SslPasswordOnlyAndPgPasswordSet_IsBoth() =>
+        new PostgresDescriber()
+            .SecretsOf("Host=h;SSL Password=kp", Environment(("PGPASSWORD", "envpass1")))
+            .ShouldBe(["kp", "envpass1"], ignoreOrder: true);
+
+    [Fact]
+    public void RewriteOf_ConnectionString_IsTheBuildersText() =>
+        new PostgresDescriber()
+            .RewriteOf("host=h;password=pw")
+            .ShouldBe(new NpgsqlConnectionStringBuilder("host=h;password=pw").ConnectionString);
+
+    [Theory]
+    [InlineData("Nonsense=1")]
+    [InlineData("Password=pw;Port=abc")]
+    public void RewriteOf_ConnectionTheDriverCannotRead_IsNull(string connection) =>
+        new PostgresDescriber().RewriteOf(connection).ShouldBeNull();
+
+    private static Func<string, string?> Environment(params (string Name, string Value)[] variables)
+    {
+        var map = new Dictionary<string, string>();
+        foreach (var (name, value) in variables)
+        {
+            map[name] = value;
+        }
+
+        return name => map.GetValueOrDefault(name);
+    }
+
+    private sealed class TempFolder : IDisposable
+    {
+        public string Path { get; } = Directory.CreateTempSubdirectory("sqlsource-pgpass").FullName;
+
+        public string Write(string name, string text)
+        {
+            var file = System.IO.Path.Combine(Path, name);
+            File.WriteAllText(file, text);
+            return file;
+        }
+
+        public void Dispose() => Directory.Delete(Path, recursive: true);
+    }
 
     // The list is closed: nothing else reaches a SET LOCAL, and a describer that would send it is never made.
     [Theory]

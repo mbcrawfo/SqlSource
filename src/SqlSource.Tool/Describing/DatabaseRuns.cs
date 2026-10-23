@@ -96,14 +96,20 @@ internal static class DatabaseRuns
         }
 
         // From here on the run holds the connection's value, and what a describer gives may hold it or a password
-        // of it.  The describer says which parts are secret, under a guard that knows only the whole value, and its
-        // list is copied there, since reading it is the describer's code too; then everything said of this database
-        // goes through a trace that removes both.
-        var parts = new Guard(new ConnectionSecret(value), host.GetEnvironmentVariable, cancellationToken).Call(() =>
-            (IReadOnlyList<string>)[.. describer.SecretsOf(value) ?? throw new InvalidOperationException(Guard.Nothing)]
+        // of it.  The describer says which parts are secret and how its driver writes the value again, under a guard
+        // that knows only the whole value, and its list is copied there, since reading it is the describer's code
+        // too; then everything said of this database goes through a trace that removes both.
+        var given = new Guard(new ConnectionSecret(value), host.GetEnvironmentVariable, cancellationToken).Call(() =>
+            new GivenSecrets(
+                [
+                    .. describer.SecretsOf(value, host.GetEnvironmentVariable)
+                        ?? throw new InvalidOperationException(Guard.Nothing),
+                ],
+                describer.RewriteOf(value)
+            )
         );
         var engine = SqlDialectName.Canonical(database.Dialect);
-        var secret = new ConnectionSecret(value, parts, [database.Name, engine]);
+        var secret = new ConnectionSecret(value, given.Parts, [database.Name, engine], [given.Rewrite]);
         var trace = reporter.Trace.Without(secret);
         var guard = new Guard(secret, host.GetEnvironmentVariable, cancellationToken);
         var request = new OpenRequest(database.Name, value, host.Exchange(database.Name), host.Time);
@@ -247,6 +253,15 @@ internal static class DatabaseRuns
         Reporter Reporter,
         RunTrace Trace
     );
+
+    // What a describer says of a connection's value before its session is opened.  The rewrite is none for a value
+    // that its driver cannot read.  It is a class and not a record, since a record prints its members.
+    private sealed class GivenSecrets(IReadOnlyList<string> parts, string? rewrite)
+    {
+        public IReadOnlyList<string> Parts => parts;
+
+        public string? Rewrite => rewrite;
+    }
 
     // Runs what a describer gives or does.  Whatever it throws is a bug of the describer and is thrown again as
     // the SQLSRC200 to report, without the connection's value and the parts it knows.

@@ -835,7 +835,9 @@ public sealed class DatabaseRunsTests : IDisposable
     {
         public SqlDialect Dialect => SqlDialect.PostgreSql;
 
-        public IReadOnlyList<string> SecretsOf(string connection) => [];
+        public IReadOnlyList<string> SecretsOf(string connection, Func<string, string?> getEnvironmentVariable) => [];
+
+        public string? RewriteOf(string connection) => null;
 
         public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
             OpenRequest request,

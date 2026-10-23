@@ -197,7 +197,10 @@ public sealed class FixtureReplayTests : IDisposable
     {
         public SqlDialect Dialect => inner.Dialect;
 
-        public IReadOnlyList<string> SecretsOf(string connection) => inner.SecretsOf(connection);
+        public IReadOnlyList<string> SecretsOf(string connection, Func<string, string?> getEnvironmentVariable) =>
+            inner.SecretsOf(connection, getEnvironmentVariable);
+
+        public string? RewriteOf(string connection) => inner.RewriteOf(connection);
 
         public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
             OpenRequest request,
