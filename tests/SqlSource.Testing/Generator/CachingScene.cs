@@ -50,7 +50,7 @@ internal sealed class CachingScene
         ),
     ];
 
-    public InMemoryAdditionalText Users { get; } = new("/app/Users/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+    public InMemoryAdditionalText Users { get; } = new("/app/Users/Users.sql", SqlTexts.GetUser);
 
     public InMemoryAdditionalText Orders { get; } = new("/app/Orders/Orders.sql", "-- name: GetOrder\nSELECT 2;\n");
 

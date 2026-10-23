@@ -10,6 +10,7 @@ using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
+using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
@@ -268,7 +269,7 @@ public sealed class QueryTyperTests
     )
     {
         var file = SqlFileReader.Read(
-            new InMemoryAdditionalText(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"),
+            new InMemoryAdditionalText(GeneratorHarness.UsersPath, SqlTexts.GetUser),
             GeneratorHarness.UsersNormalizedPath,
             dialect,
             null,

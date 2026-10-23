@@ -35,16 +35,14 @@ public sealed class SidecarTests
         public partial class Sample;
         """;
 
-    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
-
     [Fact]
     public void Run_MalformedSidecar_IsSqlsrc237AtTheError()
     {
         var run = Run(
             OutputKind.Models,
-            Users,
+            GeneratorHarness.UsersFile,
             Sidecars.Raw(
-                Users, /*lang=json,strict*/
+                GeneratorHarness.UsersFile, /*lang=json,strict*/
                 "{\n  \"formatVersion\": \"one\"\n}\n"
             )
         );
@@ -62,8 +60,13 @@ public sealed class SidecarTests
     {
         var run = Run(
             OutputKind.Models,
-            Users,
-            Sidecars.Of(Users, SidecarFormat.Version + 1, PackageVersion.Prefix, CurrentEntry(Users, "GetUser"))
+            GeneratorHarness.UsersFile,
+            Sidecars.Of(
+                GeneratorHarness.UsersFile,
+                SidecarFormat.Version + 1,
+                PackageVersion.Prefix,
+                CurrentEntry(GeneratorHarness.UsersFile, "GetUser")
+            )
         );
 
         run.Diagnostics.ShouldBe([
@@ -79,8 +82,13 @@ public sealed class SidecarTests
     {
         var run = Run(
             OutputKind.Models,
-            Users,
-            Sidecars.Of(Users, SidecarFormat.Version - 1, PackageVersion.Prefix, CurrentEntry(Users, "GetUser"))
+            GeneratorHarness.UsersFile,
+            Sidecars.Of(
+                GeneratorHarness.UsersFile,
+                SidecarFormat.Version - 1,
+                PackageVersion.Prefix,
+                CurrentEntry(GeneratorHarness.UsersFile, "GetUser")
+            )
         );
 
         run.Diagnostics.ShouldBe([
@@ -96,8 +104,13 @@ public sealed class SidecarTests
     {
         var run = Run(
             OutputKind.Models,
-            Users,
-            Sidecars.Of(Users, SidecarFormat.Version, "99.0.0-dev", CurrentEntry(Users, "GetUser"))
+            GeneratorHarness.UsersFile,
+            Sidecars.Of(
+                GeneratorHarness.UsersFile,
+                SidecarFormat.Version,
+                "99.0.0-dev",
+                CurrentEntry(GeneratorHarness.UsersFile, "GetUser")
+            )
         );
 
         run.Diagnostics.ShouldBe([
@@ -116,8 +129,8 @@ public sealed class SidecarTests
             $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
             + "'models' needs one.  Run 'sqlsource describe'.";
 
-        var withoutSidecar = Run(OutputKind.Models, Users);
-        var withoutEntry = Run(OutputKind.Models, Users, Sidecars.Of(Users));
+        var withoutSidecar = Run(OutputKind.Models, GeneratorHarness.UsersFile);
+        var withoutEntry = Run(OutputKind.Models, GeneratorHarness.UsersFile, Sidecars.Of(GeneratorHarness.UsersFile));
 
         withoutSidecar.Diagnostics.ShouldBe([Expected]);
         withoutSidecar.SeverityOf("SQLSRC241").ShouldBe(DiagnosticSeverity.Error);
@@ -133,9 +146,13 @@ public sealed class SidecarTests
     [InlineData("oracle")]
     public void Run_EntryOfAnotherEngine_IsSqlsrc242(string engine)
     {
-        var entry = Sidecars.Entry("GetUser", Sidecars.HashOf(Users, "GetUser", SqlDialect.PostgreSql), engine);
+        var entry = Sidecars.Entry(
+            "GetUser",
+            Sidecars.HashOf(GeneratorHarness.UsersFile, "GetUser", SqlDialect.PostgreSql),
+            engine
+        );
 
-        var run = Run(OutputKind.Models, Users, Sidecars.Of(Users, entry));
+        var run = Run(OutputKind.Models, GeneratorHarness.UsersFile, Sidecars.Of(GeneratorHarness.UsersFile, entry));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC242 {GetUserName}: The entry of the query 'GetUser' was described for '{engine}', and the dialect "
@@ -172,7 +189,7 @@ public sealed class SidecarTests
     [Fact]
     public void Run_MssqlFileWithoutASidecar_IsSqlsrc241AtEachQuery()
     {
-        var run = Run(OutputKind.Models, [Users], "mssql");
+        var run = Run(OutputKind.Models, [GeneratorHarness.UsersFile], "mssql");
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
@@ -184,16 +201,34 @@ public sealed class SidecarTests
     [Fact]
     public void Run_MssqlFileWithASidecar_IsCheckedForTheEngineAndForTheSidecarsOwnErrors()
     {
-        var current = Sidecars.Entry("GetUser", Sidecars.HashOf(Users, "GetUser", SqlDialect.SqlServer), "mssql");
-        var ofPostgres = Sidecars.Entry("GetUser", Sidecars.HashOf(Users, "GetUser", SqlDialect.PostgreSql));
+        var current = Sidecars.Entry(
+            "GetUser",
+            Sidecars.HashOf(GeneratorHarness.UsersFile, "GetUser", SqlDialect.SqlServer),
+            "mssql"
+        );
+        var ofPostgres = Sidecars.Entry(
+            "GetUser",
+            Sidecars.HashOf(GeneratorHarness.UsersFile, "GetUser", SqlDialect.PostgreSql)
+        );
 
         var withOrphan = Run(
             OutputKind.Models,
-            [Users, Sidecars.Of(Users, current, Sidecars.Entry("Gone", "h", "mssql"))],
+            [
+                GeneratorHarness.UsersFile,
+                Sidecars.Of(GeneratorHarness.UsersFile, current, Sidecars.Entry("Gone", "h", "mssql")),
+            ],
             "mssql"
         );
-        var malformed = Run(OutputKind.Models, [Users, Sidecars.Raw(Users, "")], "mssql");
-        var wrongEngine = Run(OutputKind.Models, [Users, Sidecars.Of(Users, ofPostgres)], "mssql");
+        var malformed = Run(
+            OutputKind.Models,
+            [GeneratorHarness.UsersFile, Sidecars.Raw(GeneratorHarness.UsersFile, "")],
+            "mssql"
+        );
+        var wrongEngine = Run(
+            OutputKind.Models,
+            [GeneratorHarness.UsersFile, Sidecars.Of(GeneratorHarness.UsersFile, ofPostgres)],
+            "mssql"
+        );
 
         withOrphan.Diagnostics.ShouldBe([
             $"SQLSRC245 {GeneratorHarness.UsersPath}.json(15,5)-(15,11): The entry 'Gone' names no query of the file "
@@ -219,7 +254,7 @@ public sealed class SidecarTests
     {
         foreach (var dialect in SqlDescribableDialects.All)
         {
-            var run = Run(OutputKind.Models, [Users], SqlDialectName.Canonical(dialect));
+            var run = Run(OutputKind.Models, [GeneratorHarness.UsersFile], SqlDialectName.Canonical(dialect));
 
             run.Diagnostics.ShouldBe([
                 $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
@@ -332,7 +367,11 @@ public sealed class SidecarTests
     [Fact]
     public void Run_StaleEntry_IsSqlsrc244()
     {
-        var run = Run(OutputKind.Models, Users, Sidecars.Of(Users, Sidecars.Entry("GetUser", "stale")));
+        var run = Run(
+            OutputKind.Models,
+            GeneratorHarness.UsersFile,
+            Sidecars.Of(GeneratorHarness.UsersFile, Sidecars.Entry("GetUser", "stale"))
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC244 {GetUserName}: The query 'GetUser' has changed since its entry was written.  Run 'sqlsource "
@@ -347,8 +386,12 @@ public sealed class SidecarTests
     {
         var run = Run(
             OutputKind.Models,
-            Users,
-            Sidecars.Of(Users, CurrentEntry(Users, "GetUser"), Sidecars.Entry("Gone", "h"))
+            GeneratorHarness.UsersFile,
+            Sidecars.Of(
+                GeneratorHarness.UsersFile,
+                CurrentEntry(GeneratorHarness.UsersFile, "GetUser"),
+                Sidecars.Entry("Gone", "h")
+            )
         );
 
         run.Diagnostics.ShouldBe([
@@ -400,7 +443,12 @@ public sealed class SidecarTests
         var run = GeneratorHarness.Run(
             OutputKind.Models,
             [new SourceFile(GeneratorHarness.SourcePath, source)],
-            [Users, Sidecars.Current(Users, SqlDialect.PostgreSql, "GetUser"), orders, Sidecars.Raw(orders, "{")],
+            [
+                GeneratorHarness.UsersFile,
+                Sidecars.Current(GeneratorHarness.UsersFile, SqlDialect.PostgreSql, "GetUser"),
+                orders,
+                Sidecars.Raw(orders, "{"),
+            ],
             dialect: "postgres"
         );
 
@@ -415,8 +463,8 @@ public sealed class SidecarTests
 
         var run = Run(
             OutputKind.Models,
-            Users,
-            Sidecars.Current(Users, SqlDialect.PostgreSql, "GetUser"),
+            GeneratorHarness.UsersFile,
+            Sidecars.Current(GeneratorHarness.UsersFile, SqlDialect.PostgreSql, "GetUser"),
             Sidecars.Raw(gone, "{")
         );
 
@@ -427,7 +475,7 @@ public sealed class SidecarTests
     [Fact]
     public void Run_FileAtSqlWithoutASidecar_GetsNothing()
     {
-        var run = Run(OutputKind.Sql, Users);
+        var run = Run(OutputKind.Sql, GeneratorHarness.UsersFile);
 
         run.Diagnostics.ShouldBeEmpty();
         StepOutputs
@@ -442,9 +490,9 @@ public sealed class SidecarTests
     {
         var run = Run(
             OutputKind.Sql,
-            Users,
+            GeneratorHarness.UsersFile,
             Sidecars.Raw(
-                Users, /*lang=json,strict*/
+                GeneratorHarness.UsersFile, /*lang=json,strict*/
                 "{\n  \"formatVersion\": \"one\"\n}\n"
             )
         );
@@ -458,7 +506,7 @@ public sealed class SidecarTests
     [Fact]
     public void Run_EmptySidecar_IsSqlsrc237AtTheStart()
     {
-        var run = Run(OutputKind.Models, Users, Sidecars.Raw(Users, ""));
+        var run = Run(OutputKind.Models, GeneratorHarness.UsersFile, Sidecars.Raw(GeneratorHarness.UsersFile, ""));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC237 {SidecarStart}: The sidecar cannot be read, because it is not one JSON object.  Run "
@@ -471,9 +519,12 @@ public sealed class SidecarTests
     [Fact]
     public void Run_EntryNamedByAnotherCase_IsMissingAndAnOrphan()
     {
-        var entry = Sidecars.Entry("getuser", Sidecars.HashOf(Users, "GetUser", SqlDialect.PostgreSql));
+        var entry = Sidecars.Entry(
+            "getuser",
+            Sidecars.HashOf(GeneratorHarness.UsersFile, "GetUser", SqlDialect.PostgreSql)
+        );
 
-        var run = Run(OutputKind.Models, Users, Sidecars.Of(Users, entry));
+        var run = Run(OutputKind.Models, GeneratorHarness.UsersFile, Sidecars.Of(GeneratorHarness.UsersFile, entry));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
@@ -540,7 +591,11 @@ public sealed class SidecarTests
     [Fact]
     public void Run_TwoTypesThatNeedOneEntry_ReportItOnceWithTheGreatestOutput()
     {
-        var run = RunTwoTypes("Output = GeneratorOutput.Models", "Output = GeneratorOutput.CodeGen", Users);
+        var run = RunTwoTypes(
+            "Output = GeneratorOutput.Models",
+            "Output = GeneratorOutput.CodeGen",
+            GeneratorHarness.UsersFile
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
@@ -561,13 +616,16 @@ public sealed class SidecarTests
         var withEntry = GeneratorHarness.Run(
             OutputKind.Models,
             [new SourceFile(GeneratorHarness.SourcePath, source)],
-            [Users, Sidecars.Current(Users, SqlDialect.PostgreSql, "GetUser")],
+            [
+                GeneratorHarness.UsersFile,
+                Sidecars.Current(GeneratorHarness.UsersFile, SqlDialect.PostgreSql, "GetUser"),
+            ],
             dialect: "postgres"
         );
         var withoutEntry = GeneratorHarness.Run(
             OutputKind.Models,
             [new SourceFile(GeneratorHarness.SourcePath, source)],
-            [Users, Sidecars.Of(Users)],
+            [GeneratorHarness.UsersFile, Sidecars.Of(GeneratorHarness.UsersFile)],
             dialect: "postgres"
         );
 
@@ -588,8 +646,13 @@ public sealed class SidecarTests
     {
         var run = Run(
             OutputKind.Models,
-            Users,
-            Sidecars.Of(Users, SidecarFormat.Version, PackageVersion.Prefix + "-dev", CurrentEntry(Users, "GetUser"))
+            GeneratorHarness.UsersFile,
+            Sidecars.Of(
+                GeneratorHarness.UsersFile,
+                SidecarFormat.Version,
+                PackageVersion.Prefix + "-dev",
+                CurrentEntry(GeneratorHarness.UsersFile, "GetUser")
+            )
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -600,9 +663,17 @@ public sealed class SidecarTests
     [Fact]
     public void Run_SidecarWithAByteOrderMark_IsRead()
     {
-        var sidecar = Sidecars.Of(Users, CurrentEntry(Users, "GetUser"), Sidecars.Entry("Gone", "h"));
+        var sidecar = Sidecars.Of(
+            GeneratorHarness.UsersFile,
+            CurrentEntry(GeneratorHarness.UsersFile, "GetUser"),
+            Sidecars.Entry("Gone", "h")
+        );
 
-        var run = Run(OutputKind.Models, Users, Sidecars.Raw(Users, "﻿" + sidecar.Text));
+        var run = Run(
+            OutputKind.Models,
+            GeneratorHarness.UsersFile,
+            Sidecars.Raw(GeneratorHarness.UsersFile, "﻿" + sidecar.Text)
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC245 {GeneratorHarness.UsersPath}.json(15,5)-(15,11): The entry 'Gone' names no query of the file "
@@ -616,11 +687,11 @@ public sealed class SidecarTests
     [Fact]
     public void Run_TwoSidecarsThatDifferOnlyByCase_ReadTheOneSpelledAsItsFile()
     {
-        var current = Sidecars.Current(Users, SqlDialect.PostgreSql, "GetUser");
+        var current = Sidecars.Current(GeneratorHarness.UsersFile, SqlDialect.PostgreSql, "GetUser");
         var other = new SqlFile("/app/Repo/users.sql.json", "{");
 
-        var run = Run(OutputKind.Models, Users, current, other);
-        var reversed = Run(OutputKind.Models, Users, other, current);
+        var run = Run(OutputKind.Models, GeneratorHarness.UsersFile, current, other);
+        var reversed = Run(OutputKind.Models, GeneratorHarness.UsersFile, other, current);
 
         run.Diagnostics.ShouldBeEmpty();
         UsableEntries(run).ShouldBe(["GetUser"]);
@@ -635,12 +706,12 @@ public sealed class SidecarTests
     {
         var current = new SqlFile(
             "/app/Repo/users.sql.json",
-            Sidecars.Current(Users, SqlDialect.PostgreSql, "GetUser").Text
+            Sidecars.Current(GeneratorHarness.UsersFile, SqlDialect.PostgreSql, "GetUser").Text
         );
         var other = new SqlFile("/app/Repo/USERS.sql.json", "{");
 
-        var run = Run(OutputKind.Models, Users, current, other);
-        var reversed = Run(OutputKind.Models, Users, other, current);
+        var run = Run(OutputKind.Models, GeneratorHarness.UsersFile, current, other);
+        var reversed = Run(OutputKind.Models, GeneratorHarness.UsersFile, other, current);
 
         run.Diagnostics.ShouldBeEmpty();
         UsableEntries(run).ShouldBe(["GetUser"]);

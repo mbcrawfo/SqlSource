@@ -14,23 +14,26 @@ namespace SqlSource.Tests.Generator;
 // of the models.
 public sealed class ModelRunsTests
 {
-    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
-
     [Fact]
     public void Entry_ParametersAndColumns_AreNumberedByTheirPlace()
     {
-        var entry = Entry(Users, "GetUser", [Parameter("a"), Parameter("b")], [Column("x"), Column("y")]);
+        var entry = Entry(
+            GeneratorHarness.UsersFile,
+            "GetUser",
+            [Parameter("a"), Parameter("b")],
+            [Column("x"), Column("y")]
+        );
 
         entry.Parameters.Select(parameter => parameter.Ordinal).ShouldBe([0, 1]);
         entry.Columns.ShouldNotBeNull().Select(column => column.Ordinal).ShouldBe([0, 1]);
         entry.ResultKind.ShouldBe(SidecarResultKind.Rows);
-        entry.Hash.ShouldBe(Sidecars.HashOf(Users, "GetUser", SqlDialect.PostgreSql));
+        entry.Hash.ShouldBe(Sidecars.HashOf(GeneratorHarness.UsersFile, "GetUser", SqlDialect.PostgreSql));
     }
 
     [Fact]
     public void Entry_NullColumns_HasNoRows()
     {
-        var entry = Entry(Users, "GetUser", [Parameter("a")], null);
+        var entry = Entry(GeneratorHarness.UsersFile, "GetUser", [Parameter("a")], null);
 
         entry.ResultKind.ShouldBe(SidecarResultKind.None);
         entry.Columns.ShouldBeNull();
@@ -39,7 +42,10 @@ public sealed class ModelRunsTests
     [Fact]
     public void ModelFiles_Run_AreTheModelsHintNames()
     {
-        var run = Run(Users, Entry(Users, "GetUser", [Parameter("id")], [Column("id")]));
+        var run = Run(
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [Parameter("id")], [Column("id")])
+        );
 
         ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs", "App.GetUserParams-Model.g.cs"]);
     }

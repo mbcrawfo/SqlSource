@@ -6,6 +6,7 @@ using SqlSource.Generation.Types;
 using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Settings.TypeOverrides;
+using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using Xunit;
 
@@ -19,7 +20,7 @@ public sealed class MappedTypeNamesTests
         var names = MappedTypeNames.Collect(
             new ProjectSettings(SettingsLevel.None, EquatableArray<InvalidSetting>.Empty),
             EquatableArray<FileSettings>.Empty,
-            TestModels.Array(Read("-- name: GetUser\nSELECT 1;\n"))
+            TestModels.Array(Read(SqlTexts.GetUser))
         );
 
         names.ShouldBeEmpty();

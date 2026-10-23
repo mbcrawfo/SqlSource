@@ -5,6 +5,7 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Snapshot;
+using SqlSource.Testing;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;

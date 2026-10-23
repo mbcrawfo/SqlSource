@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Generation.Models;
 using SqlSource.Snapshot;
+using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
@@ -756,7 +757,7 @@ public sealed class ModelTests
                 public partial class Second;
             }
             """;
-        var other = new SqlFile(OtherPath, "-- name: GetUser\nSELECT 1;\n");
+        var other = new SqlFile(OtherPath, SqlTexts.GetUser);
 
         var run = Run(
             source,
