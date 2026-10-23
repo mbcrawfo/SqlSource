@@ -10,9 +10,9 @@ namespace SqlSource.Tool.Planning;
 /// </summary>
 /// <remarks>
 /// The file is read once, the first time it is asked for, and every later question gets that read.  A file that
-/// cannot be read has no text, and the generator parses that as an empty file.  A file that the compiler reads in a
-/// fallback encoding is the planner's <c>SQLSRC271</c>: the tool reads its text with replacement characters, so its
-/// hash is not the compiler's.
+/// cannot be read has no text, and the generator parses that as an empty file.  A file that the compiler reads in its
+/// fallback encoding is the planner's <c>SQLSRC271</c>: on Windows the compiler reads it in the system's code page, so
+/// its hashes are not the tool's, and elsewhere both read its characters outside ASCII as replacement characters.
 /// </remarks>
 internal sealed class SqlFileText(string path) : AdditionalText
 {

@@ -1,6 +1,6 @@
 # `.sql` files
 
-A `.sql` file holds one or more queries.  Save it as UTF-8, which current editors write: the tool reports a file in another encoding ([SQLSRC271](diagnostics.md#sqlsrc271)).  Each query starts with a `-- name:` line, and the markers that describe it stand under that line:
+A `.sql` file holds one or more queries.  Save it as UTF-8, which current editors write: a file in another encoding reads differently on different systems, and the tool reports one whose queries it must describe ([SQLSRC271](diagnostics.md#sqlsrc271)).  Each query starts with a `-- name:` line, and the markers that describe it stand under that line:
 
 ```sql
 -- name: GetUser

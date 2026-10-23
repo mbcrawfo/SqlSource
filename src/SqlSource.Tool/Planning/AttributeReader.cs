@@ -22,8 +22,8 @@ namespace SqlSource.Tool.Planning;
 /// It matches the attribute by its name and reads <c>Path</c> and <c>Output</c> alone, each as it is written:
 /// nothing else on the attribute changes what is described.  What it cannot see is in <c>docs/tech-debt/TD-0031</c>:
 /// an alias, a type of the same name in another namespace, and an attribute inside <c>#if</c> under a configuration
-/// other than the manifest's.  A <c>Path</c> outside ASCII in a file that is not UTF-8 is not read: the compiler
-/// reads that file in another encoding, so the text here would not be the text it resolves.
+/// other than the manifest's.  A <c>Path</c> outside ASCII in a file that is not UTF-8 is not read: on Windows the
+/// compiler reads that file in the system's code page, so the text here would not be the text it resolves.
 /// </remarks>
 internal static class AttributeReader
 {

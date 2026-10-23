@@ -483,8 +483,8 @@ internal static class ToolDiagnostics
     public static readonly DiagnosticDescriptor FileNotUtf8 = new(
         id: "SQLSRC271",
         title: "File is not saved as UTF-8",
-        messageFormat: "'{0}' is not saved as UTF-8, so the tool and the build read different text from it.  "
-            + "Save it as UTF-8.",
+        messageFormat: "'{0}' is not saved as UTF-8, so its text depends on the system that reads it.  Save it as "
+            + "UTF-8.",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

@@ -161,8 +161,8 @@ internal static class RunPlanner
     }
 
     // Plans a claimed file once, under the first project that claims it.  A file with a parse error has no query.  When
-    // the compiler would read the file in another encoding the errors may be of the tool's reading, so SQLSRC271 is
-    // reported in their place.
+    // the compiler would read the file in its fallback encoding, another one on Windows, the errors may be of the
+    // tool's reading alone, so SQLSRC271 is reported in their place.
     private static PlannedFile PlanFile(
         FileWork work,
         ImmutableArray<ToolDiagnostic>.Builder errors,

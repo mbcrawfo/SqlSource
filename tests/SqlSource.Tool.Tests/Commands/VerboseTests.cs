@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
@@ -127,12 +128,17 @@ public sealed class VerboseTests : IDisposable
     {
         var broken = _scene.Project.AddSql("Broken.sql", "-- name: One\nSELECT 'open\n");
         var ansi = _scene.Project.AddSql("Ansi.sql", "-- name: Two\nSELECT 2;\n", ("SqlSourceDialect", "ansi"));
+        var latin1 = _scene.Project.AddSqlBytes(
+            "Latin1.sql",
+            Encoding.Latin1.GetBytes("-- name: Three\nSELECT 'café';\n")
+        );
         var queries = _scene.Project.PathOf("Queries.cs");
 
         var result = await _scene.DescribeAsync("App.csproj", "--verbose");
 
         result.Out.ShouldContain(Line($"file '{broken}': postgres, has parse errors, claimed by {queries}(1)"));
         result.Out.ShouldContain(Line($"file '{ansi}': ansi, cannot be described, claimed by {queries}(1)"));
+        result.Out.ShouldContain(Line($"file '{latin1}': postgres, is not saved as UTF-8, claimed by {queries}(1)"));
     }
 
     [Fact]

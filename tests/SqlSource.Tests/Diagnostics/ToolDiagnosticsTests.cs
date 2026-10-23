@@ -408,6 +408,6 @@ public sealed class ToolDiagnosticsTests
             )
             .ShouldBe(
                 "'/work/App/Queries/Users.sql' is not saved as UTF-8, "
-                    + "so the tool and the build read different text from it.  Save it as UTF-8."
+                    + "so its text depends on the system that reads it.  Save it as UTF-8."
             );
 }
