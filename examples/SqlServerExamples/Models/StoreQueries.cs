@@ -26,10 +26,14 @@ public sealed partial class StoreQueries(DbConnection connection)
             new { count, since = new TypedParameter(SqlDbType.DateTime2, since) }
         );
 
-    // Shipped is an int and not an int?, by the query's -- column: marker, which leaves the column's name alone for
-    // Dapper: a count is never null, though the server calls it nullable.
+    // Shipped is an int and not an int?: a count is never null, even of a column that may be, and the tool shows it.
     public Task<IEnumerable<CountShippedOrdersDto>> CountShippedOrdersAsync() =>
         connection.QueryAsync<CountShippedOrdersDto>(Sql.CountShippedOrders);
+
+    // MonthEnd is a DateOnly and not a DateOnly?, by the query's -- column: marker, which leaves the column's name
+    // alone for Dapper: EOMONTH of a time that is never null is not null, though the tool cannot show it.
+    public Task<IEnumerable<ListOrderMonthsDto>> ListOrderMonthsAsync() =>
+        connection.QueryAsync<ListOrderMonthsDto>(Sql.ListOrderMonths);
 
     // The OUTPUT clause gives the rows of the statement: the order as the database filled it in.
     public Task<AddOrderDto> AddOrderAsync(int userId) =>

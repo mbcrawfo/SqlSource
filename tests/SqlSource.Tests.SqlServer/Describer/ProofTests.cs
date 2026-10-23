@@ -71,9 +71,8 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
     // The queries that try to break a proof, with the major they need, each NULL in some row: the design's list, then
     // the same forms wrapped or written another way.  Under ROLLUP the grouping column is NULL in the total's row even
     // where the table holds none: the rows of a, which the table never makes NULL, show it, and those of g, NULL in
-    // the table too, do not.  The scalar
-    // subqueries of COUNT that a set operator, an OFFSET, a TOP or a grouping can leave with no row are inside
-    // arithmetic, so that the item is not one leaf alone, which would ask nothing.
+    // the table too, do not.  The scalar subqueries of COUNT that a set operator, an OFFSET, a TOP or a grouping can
+    // leave with no row are inside arithmetic, so that the item is not one leaf alone, which would ask nothing.
     public static TheoryData<int, string> BreakingAttempts =>
         new()
         {

@@ -248,6 +248,53 @@
         }
       ]
     },
+    "ListOrderMonths": {
+      "hash": "45fb903260d7e9758574d4fbaa3849e3e4c205481d681639b37d295981290bce",
+      "engine": "mssql",
+      "database": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "orders",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "month_end",
+          "type": {
+            "name": "date",
+            "maxLength": 3,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": true
+        }
+      ]
+    },
     "AddOrder": {
       "hash": "3232f291f739c3d7f466321c64a02631120ae090388b3bae52c8966499ad2663",
       "engine": "mssql",
