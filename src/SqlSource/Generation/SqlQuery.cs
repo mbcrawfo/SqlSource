@@ -45,6 +45,11 @@ namespace SqlSource.Generation;
 /// What the query's <c>-- column:</c> markers say of the nullability of its columns, in marker order, each column
 /// once.  Empty when it has none.
 /// </param>
+/// <param name="KeptErrors">
+/// The errors of the scan of <paramref name="KeptSegments" /> for tokens, of the comments alone.  They are errors only
+/// for a type that keeps the query's comments, which reports them and does not use the file.  Empty when there are
+/// none.
+/// </param>
 internal sealed record SqlQuery(
     string Name,
     LocationInfo NameLocation,
@@ -57,5 +62,6 @@ internal sealed record SqlQuery(
     SettingsLevel Markers,
     ModelMarker? InputModel,
     ModelMarker? OutputModel,
-    EquatableArray<ColumnMarker> ColumnMarkers
+    EquatableArray<ColumnMarker> ColumnMarkers,
+    EquatableArray<DiagnosticInfo> KeptErrors
 );

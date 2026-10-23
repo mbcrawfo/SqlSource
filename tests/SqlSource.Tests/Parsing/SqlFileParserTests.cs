@@ -31,6 +31,7 @@ public sealed class SqlFileParserTests
         block.Summary.ShouldBeNull();
         block.Markers.ShouldBeSameAs(SettingsLevel.None);
         block.KeptSegments.ShouldBeNull();
+        block.KeptErrors.ShouldBeEmpty();
         block.Segments.ShouldBe([new SqlSegment(SqlSegmentKind.Literal, "SELECT 1;")]);
     }
 
@@ -150,14 +151,30 @@ public sealed class SqlFileParserTests
         Tokens(block).ShouldBe(["t=users"]);
     }
 
-    [Theory]
-    [InlineData("SELECT {{class}} -- c\n", "{{class}}")]
-    [InlineData("SELECT 1 -- {{class}}\n", "{{class}}")]
-    public void Parse_ReservedTokenInEitherForm_IsReportedOnce(string sql, string at)
+    // The token is in both forms, and the kept form adds nothing for it: a file with an error has no blocks.
+    [Fact]
+    public void Parse_ReservedTokenInTheSqlUnderKeepComments_IsOneErrorOfTheFile()
     {
-        var text = "-- name: Q\n-- generator: keep-comments\n" + sql;
+        const string Text = "-- name: Q\n-- generator: keep-comments\nSELECT {{class}} -- c\n";
 
-        Errors(text).ShouldBe([SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(text, at), "class")]);
+        Errors(Text)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(Text, "{{class}}"), "class")]);
+    }
+
+    // The token is in the kept form alone, which a type that claims the file may not emit, so its error stays with
+    // the block.
+    [Fact]
+    public void Parse_ReservedTokenInAKeptCommentAlone_IsAnErrorOfTheKeptForm()
+    {
+        const string Text = "-- name: Q\n-- generator: keep-comments\nSELECT 1 -- {{class}}\n";
+
+        var block = Blocks(Text).ShouldHaveSingleItem();
+
+        Sql(block).ShouldBe("SELECT 1");
+        _ = block.KeptSegments.ShouldNotBeNull();
+        block.KeptErrors.ShouldBe([
+            SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(Text, "{{class}}"), "class"),
+        ]);
     }
 
     [Fact]
@@ -378,19 +395,6 @@ public sealed class SqlFileParserTests
 
         Errors(Text)
             .ShouldBe([SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(Text, Token), "class")]);
-    }
-
-    // The first token is in both forms of the SQL and the second in the kept form alone.
-    [Fact]
-    public void Parse_ReservedKeywordTokensUnderKeepComments_AreEachReportedOnce()
-    {
-        const string Text = "-- name: A\n-- generator: keep-comments\nSELECT {{class}} -- {{ class }}\n";
-
-        Errors(Text)
-            .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(Text, "{{class}}"), "class"),
-                SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(Text, "{{ class }}"), "class"),
-            ]);
     }
 
     [Fact]

@@ -40,6 +40,11 @@ namespace SqlSource.Parsing;
 /// What the query's <c>-- column:</c> markers say of the nullability of its columns, in marker order, each column
 /// once.  Empty when it has none.
 /// </param>
+/// <param name="KeptErrors">
+/// The errors of the scan of <paramref name="KeptSegments" /> for tokens, as offsets into the file's text.  They are
+/// errors only for a type that emits that form, which reports them.  An error of the form without comments is the
+/// file's, so these are of the comments alone.  Empty when there are none or the form was not built.
+/// </param>
 internal sealed record SqlBlock(
     string Name,
     TextSpan NameSpan,
@@ -52,5 +57,6 @@ internal sealed record SqlBlock(
     SettingsLevel Markers,
     SqlModelName? InputModel,
     SqlModelName? OutputModel,
-    EquatableArray<SqlColumnMarker> ColumnMarkers
+    EquatableArray<SqlColumnMarker> ColumnMarkers,
+    EquatableArray<SqlParseError> KeptErrors
 );

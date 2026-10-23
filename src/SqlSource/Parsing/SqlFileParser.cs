@@ -238,7 +238,7 @@ internal static class SqlFileParser
                 AddError(SqlParseErrorKind.InputModelWithoutParameters, inputModel.Marker.Span);
             }
 
-            var (markers, kept) = ResolveSettings(scope, preamble, query, start, end);
+            var (markers, kept, keptErrors) = ResolveSettings(scope, preamble, query, start, end);
             _blocks.Add(
                 new SqlBlock(
                     name,
@@ -252,7 +252,8 @@ internal static class SqlFileParser
                     markers,
                     ModelNameOf(scope?.InputModel),
                     ModelNameOf(scope?.OutputModel),
-                    ColumnMarkersOf(scope)
+                    ColumnMarkersOf(scope),
+                    keptErrors
                 )
             );
         }
@@ -313,7 +314,6 @@ internal static class SqlFileParser
         {
             var sql = SqlTextBuilder.Build(text, lexemes, start, end, keepComments: false);
             var scanned = TokenScanner.Scan(sql.Text, scope?.IgnoredTokens ?? SqlMarkerScope.NoNames);
-            var firstScanError = _errors.Count;
             foreach (var error in scanned.Errors)
             {
                 _errors.Add(error with { Span = sql.ToSourceSpan(error.Span) });
@@ -334,67 +334,63 @@ internal static class SqlFileParser
                 _errors
             );
 
-            return new BuiltQuery(sql, scanned.Segments, tokens, parameters, firstScanError);
+            return new BuiltQuery(sql, scanned.Segments, tokens, parameters);
         }
 
         // Step three: what the parser can resolve of the settings.  A query that has a list uses it whole, so it
         // alone says whether the comments can be wanted.  A query without one may get the parameter from a level the
         // parser does not see.
-        private (SettingsLevel Markers, EquatableArray<SqlSegment>? Kept) ResolveSettings(
-            SqlMarkerScope? scope,
-            SqlMarkerScope? preamble,
-            BuiltQuery query,
-            int start,
-            int end
-        )
+        private (
+            SettingsLevel Markers,
+            EquatableArray<SqlSegment>? Kept,
+            EquatableArray<SqlParseError> KeptErrors
+        ) ResolveSettings(SqlMarkerScope? scope, SqlMarkerScope? preamble, BuiltQuery query, int start, int end)
         {
             var markers = (scope?.Level ?? SettingsLevel.None).Over(preamble?.Level ?? SettingsLevel.None);
             var keepsComments = markers.Parameters is { } list
                 ? (list & GeneratorParameters.KeepComments) != 0
                 : commentsWanted;
 
-            return (
-                markers,
-                keepsComments
-                    ? BuildKept(
-                        start,
-                        end,
-                        query.Sql,
-                        scope?.IgnoredTokens ?? SqlMarkerScope.NoNames,
-                        query.FirstScanError
-                    )
-                    : null
-            );
+            if (!keepsComments)
+            {
+                return (markers, null, EquatableArray<SqlParseError>.Empty);
+            }
+
+            var (kept, keptErrors) = BuildKept(start, end, query.Sql, scope?.IgnoredTokens ?? SqlMarkerScope.NoNames);
+            return (markers, kept, keptErrors);
         }
 
         // The SQL with its comments, or null when it is the stripped SQL: one form then serves.  A token can stand
-        // in a comment, so this form is scanned too, and an error of its own is one the stripped form did not have
-        // at the same place.
-        private EquatableArray<SqlSegment>? BuildKept(
+        // in a comment, so this form is scanned too.  Its errors are not the file's: a type that claims the file may
+        // not keep the comments, so they go with the block, for the type that emits this form to report.  An error
+        // of the stripped form is the file's already, and a file with one has no blocks, so only the comments' own
+        // errors are seen.
+        private (EquatableArray<SqlSegment>? Segments, EquatableArray<SqlParseError> Errors) BuildKept(
             int start,
             int end,
             SqlBlockText stripped,
-            ISet<string> ignoredTokens,
-            int firstScanError
+            ISet<string> ignoredTokens
         )
         {
             var kept = SqlTextBuilder.Build(text, lexemes, start, end, keepComments: true);
             if (string.Equals(kept.Text, stripped.Text, StringComparison.Ordinal))
             {
-                return null;
+                return (null, EquatableArray<SqlParseError>.Empty);
             }
 
             var scanned = TokenScanner.Scan(kept.Text, ignoredTokens);
-            foreach (var error in scanned.Errors)
+            if (scanned.Errors.Count == 0)
             {
-                var located = error with { Span = kept.ToSourceSpan(error.Span) };
-                if (_errors.IndexOf(located, firstScanError) < 0)
-                {
-                    _errors.Add(located);
-                }
+                return (scanned.Segments, EquatableArray<SqlParseError>.Empty);
             }
 
-            return scanned.Segments;
+            var errors = ImmutableArray.CreateBuilder<SqlParseError>(scanned.Errors.Count);
+            foreach (var error in scanned.Errors)
+            {
+                errors.Add(error with { Span = kept.ToSourceSpan(error.Span) });
+            }
+
+            return (scanned.Segments, new EquatableArray<SqlParseError>(errors.MoveToImmutable()));
         }
 
         // The place is checked first: a marker in the wrong place is reported as that, whatever it names.
@@ -464,14 +460,12 @@ internal static class SqlFileParser
         private void AddError(SqlParseErrorKind kind, TextSpan span, params string[] arguments) =>
             _errors.Add(SqlParseError.Create(kind, span, arguments));
 
-        // What step two gives.  FirstScanError is where the errors of the SQL's scan start in _errors: the kept form
-        // is scanned too, and looks from there for an error it shares.
+        // What step two gives.
         private readonly record struct BuiltQuery(
             SqlBlockText Sql,
             EquatableArray<SqlSegment> Segments,
             EquatableArray<SqlToken> Tokens,
-            EquatableArray<SqlQueryParameter> Parameters,
-            int FirstScanError
+            EquatableArray<SqlQueryParameter> Parameters
         );
     }
 }

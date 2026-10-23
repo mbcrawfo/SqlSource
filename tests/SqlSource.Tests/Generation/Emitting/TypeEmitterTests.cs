@@ -457,7 +457,8 @@ public sealed class TypeEmitterTests
                 markers,
                 null,
                 null,
-                EquatableArray<ColumnMarker>.Empty
+                EquatableArray<ColumnMarker>.Empty,
+                EquatableArray<DiagnosticInfo>.Empty
             );
 
         var output = TypeEmitter.Emit(
@@ -555,7 +556,8 @@ public sealed class TypeEmitterTests
             new SettingsLevel { Parameters = GeneratorParameters.KeepComments },
             null,
             null,
-            EquatableArray<ColumnMarker>.Empty
+            EquatableArray<ColumnMarker>.Empty,
+            EquatableArray<DiagnosticInfo>.Empty
         );
 
         Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql", query))
@@ -578,12 +580,58 @@ public sealed class TypeEmitterTests
             new SettingsLevel { Parameters = GeneratorParameters.KeepComments },
             null,
             null,
-            EquatableArray<ColumnMarker>.Empty
+            EquatableArray<ColumnMarker>.Empty,
+            EquatableArray<DiagnosticInfo>.Empty
         );
 
         Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql", query))
             .Source.ShouldNotBeNull()
             .ShouldContain("\"SELECT 1;\"");
+    }
+
+    // The error of a kept form is the type's only when it emits that form: a type that does not keep the comments
+    // uses the file.  The query is in the second file, whose metadata alone decides, and the first file's metadata
+    // says the opposite, so the settings must be those of the query's own file.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Emit_QueryWithAnErrorInItsKeptForm_IsAnErrorAndItsFileGivesNoMembersOnlyWhereItKeepsComments(
+        bool keepComments
+    )
+    {
+        var keep = new SettingsLevel { Parameters = GeneratorParameters.KeepComments };
+        var none = new SettingsLevel { Parameters = GeneratorParameters.None };
+        var error = DiagnosticInfo.Create(SqlDiagnostics.ReservedTokenName, NameLocation("B.sql"), "class");
+        var output = Emit(
+            OutputKind.Sql,
+            TestModels.Type(),
+            SettingsLevel.None,
+            keepComments ? [none, keep] : [keep, none],
+            File("A.sql", Query("Kept", "SELECT 3;")),
+            File(
+                "B.sql",
+                Query("Other", "SELECT 1;", file: "B.sql"),
+                Query("GetUser", "SELECT 2;", file: "B.sql") with
+                {
+                    KeptErrors = TestModels.Array(error),
+                }
+            )
+        );
+
+        var source = output.Source.ShouldNotBeNull();
+        source.ShouldContain("public const string Kept = \"SELECT 3;\";");
+        if (keepComments)
+        {
+            output.Diagnostics.ShouldBe([error]);
+            source.ShouldNotContain("SELECT 1;");
+            source.ShouldNotContain("SELECT 2;");
+        }
+        else
+        {
+            output.Diagnostics.ShouldBeEmpty();
+            source.ShouldContain("public const string Other = \"SELECT 1;\";");
+            source.ShouldContain("public const string GetUser = \"SELECT 2;\";");
+        }
     }
 
     [Fact]
@@ -661,7 +709,8 @@ public sealed class TypeEmitterTests
             SettingsLevel.None,
             null,
             null,
-            EquatableArray<ColumnMarker>.Empty
+            EquatableArray<ColumnMarker>.Empty,
+            EquatableArray<DiagnosticInfo>.Empty
         );
 
     // "SELECT * FROM {{table}};", which is a method with one parameter.
@@ -687,7 +736,8 @@ public sealed class TypeEmitterTests
             },
             null,
             null,
-            EquatableArray<ColumnMarker>.Empty
+            EquatableArray<ColumnMarker>.Empty,
+            EquatableArray<DiagnosticInfo>.Empty
         );
 
     private static LocationInfo NameLocation(string file) =>

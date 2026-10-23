@@ -644,7 +644,7 @@ A token `{{name}}` becomes a parameter of a generated method, so its name must n
 SELECT * FROM {{class}};
 ```
 
-The same holds for the name in a `-- token:` marker.
+The same holds for the name in a `-- token:` marker, and for a token in a comment of a query that keeps its comments.  A token in a comment is an error only for a type that keeps the comments, and the file that holds it then produces no members for that type.
 
 Rename the token.  If the braces are literal text and not a token, add `-- token-ignore: class` to the query.
 

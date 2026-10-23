@@ -56,6 +56,7 @@ public sealed class QueryNamesTests
             SettingsLevel.None,
             null,
             null,
-            EquatableArray<ColumnMarker>.Empty
+            EquatableArray<ColumnMarker>.Empty,
+            EquatableArray<DiagnosticInfo>.Empty
         );
 }
