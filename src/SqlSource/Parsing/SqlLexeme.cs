@@ -10,6 +10,12 @@ namespace SqlSource.Parsing;
 internal readonly record struct SqlLexeme(SqlLexemeKind Kind, TextSpan Span)
 {
     /// <summary>
+    /// The span of this lexeme's name, without its prefix.  Meaningful for a <see cref="SqlLexemeKind.Parameter" />
+    /// lexeme alone.
+    /// </summary>
+    public TextSpan ParameterName => SqlParameterName.Of(Span);
+
+    /// <summary>
     /// Returns the part of this lexeme that counts as SQL content, or null when it has none.  Comments and whitespace
     /// are not content.
     /// </summary>

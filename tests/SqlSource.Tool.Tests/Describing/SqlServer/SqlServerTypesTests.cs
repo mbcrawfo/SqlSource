@@ -179,6 +179,19 @@ public sealed class SqlServerTypesTests
             .ShouldBe("hierarchyid");
     }
 
+    // In a case-sensitive database SYS is a schema of a user, apart from sys: the server reports its own as sys.
+    [Fact]
+    public void Declared_UserTypeOfASchemaSys_IsDeclaredByItsNames() =>
+        SqlServerTypes
+            .Declared(new SqlServerType("money", 8, 19, 4, new SqlServerUserType("SYS", "money2", null)))
+            .ShouldBe("[SYS].[money2]");
+
+    [Fact]
+    public void Spelled_UserTypeOfASchemaSys_NamesTheUserType() =>
+        SqlServerTypes
+            .Spelled(new SqlServerType("money", 8, 19, 4, new SqlServerUserType("SYS", "money2", null)))
+            .ShouldBe("SYS.money2");
+
     [Fact]
     public void Declared_SystemType_IsItsName() =>
         SqlServerTypes.Declared(new SqlServerType("decimal(18,4)", 9, 18, 4, null)).ShouldBe("decimal(18,4)");

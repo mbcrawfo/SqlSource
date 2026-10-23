@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using Kind = SqlSource.Tool.Describing.Postgres.Walk.PlanTokens.Kind;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk;
 
-// The reader's forms of pg_catalog, which a search path decides: an operator, a function, a cast, an aggregate and the
-// ANY over a subplan's column, with how a subplan's name and its column are printed.
+// The reader's forms of pg_catalog, which a search path decides and the proofs of types read
+// (PlanExpression.Proofs.cs): an operator, a function, a cast, an aggregate and the ANY over a subplan's column, with
+// how a subplan's name and its column are printed.
 internal static partial class PlanExpression
 {
     private sealed partial class Reader

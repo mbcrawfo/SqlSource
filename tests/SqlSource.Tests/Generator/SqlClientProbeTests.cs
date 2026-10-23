@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Shouldly;
+using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Types;
 using SqlSource.Parsing;
@@ -279,6 +280,42 @@ public sealed class SqlClientProbeTests
         bool atLeast7,
         bool expected
     ) => new SqlClientProbe(referenced, atLeast61, atLeast7, null).IsBelowTheFloor.ShouldBe(expected);
+
+    [Fact]
+    public void Findings_ProbeBelowTheFloor_IsSqlsrc267WithTheVersion() =>
+        new SqlClientProbe(true, false, false, "5.2.2").Findings.ShouldBe([
+            new DriverFinding(SqlDiagnostics.SqlClientTooOld, "5.2.2"),
+        ]);
+
+    [Fact]
+    public void Findings_ProbeNewerThanKnown_IsSqlsrc268WithTheVersion() =>
+        new SqlClientProbe(true, true, true, "8.0.1").Findings.ShouldBe([
+            new DriverFinding(SqlDiagnostics.SqlClientNewerThanKnown, "8.0.1"),
+        ]);
+
+    [Fact]
+    public void Findings_ProbeBelowTheFloorAndNewerThanKnown_IsTooOldThenNewer() =>
+        new SqlClientProbe(true, false, false, "8.0.0").Findings.ShouldBe([
+            new DriverFinding(SqlDiagnostics.SqlClientTooOld, "8.0.0"),
+            new DriverFinding(SqlDiagnostics.SqlClientNewerThanKnown, "8.0.0"),
+        ]);
+
+    [Fact]
+    public void Findings_ReferencedProbeWithoutAVersion_NamesTheVersionAsUnknown() =>
+        new SqlClientProbe(true, false, false, null).Findings.ShouldBe([
+            new DriverFinding(SqlDiagnostics.SqlClientTooOld, "of an unknown version"),
+        ]);
+
+    [Theory]
+    [InlineData(false, false, false, null)]
+    [InlineData(true, true, false, "6.1.0")]
+    [InlineData(true, true, true, "7.0.0")]
+    public void Findings_ProbeOfAKnownVersion_IsEmpty(
+        bool referenced,
+        bool atLeast61,
+        bool atLeast7,
+        string? version
+    ) => new SqlClientProbe(referenced, atLeast61, atLeast7, version).Findings.ShouldBeEmpty();
 
     // The diagnostics of the two drivers, which are the only ones these tests ask about.
     private static IReadOnlyList<string> DriverDiagnostics(GeneratorRun run) =>

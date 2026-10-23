@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Testing;
 using Xunit;
@@ -12,15 +13,6 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 // test wrote fails.
 public sealed class PostgresSessionTests
 {
-    [Theory]
-    [InlineData("18.4", 18)]
-    [InlineData("13.12", 13)]
-    [InlineData("9.6.24", 9)]
-    [InlineData("18beta1", 18)]
-    [InlineData("devel", null)]
-    public void MajorVersionOf_VersionAsRecorded_IsItsLeadingDigits(string version, int? expected) =>
-        PostgresSession.MajorVersionOf(version).ShouldBe(expected);
-
     // The script holds "open" alone: the server is refused before any query is described.
     [Theory]
     [InlineData("13.12")]
@@ -135,7 +127,7 @@ public sealed class PostgresSessionTests
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC228");
         failure.Arguments[1].ShouldBe("@id");
-        failure.Arguments[3].ShouldBe(PostgresErrors.NotATypeName);
+        failure.Arguments[3].ShouldBe(DescribeFailures.NotATypeName);
     }
 
     // The statements are counted before the types are read: the first thing wrong is the first reported.

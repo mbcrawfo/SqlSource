@@ -1,4 +1,5 @@
 using Shouldly;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
 using Xunit;
 
@@ -25,6 +26,11 @@ public sealed class DeclaredTypeTextTests
     [InlineData("[My Schema].[Odd; Name]")]
     [InlineData("#t")]
     [InlineData("_t$1")]
+    [InlineData("dbo.Größe")]
+    [InlineData("Größe")]
+    [InlineData("dbo.名前")]
+    [InlineData("dbo.x٣")]
+    [InlineData("dbo.Ａbc")]
     public void Read_TypeName_IsTheText(string text) => DeclaredTypeText.Read(text).Value.ShouldBe(text);
 
     // A delimited name holds anything but its own closing delimiter alone, so what looks like a second statement
@@ -79,6 +85,8 @@ public sealed class DeclaredTypeTextTests
     [InlineData("[]", DeclaredTypeText.Shape)]
     [InlineData("1int", DeclaredTypeText.Shape)]
     [InlineData("€type", DeclaredTypeText.Shape)]
+    [InlineData("٣x", DeclaredTypeText.Shape)]
+    [InlineData("x²", DeclaredTypeText.Shape)]
     [InlineData("a.b.c", DeclaredTypeText.Parts)]
     [InlineData("dbo .Email", DeclaredTypeText.Parts)]
     [InlineData("dbo. Email", DeclaredTypeText.Parts)]
@@ -95,7 +103,7 @@ public sealed class DeclaredTypeTextTests
     [InlineData("[a\u2028b]", DeclaredTypeText.OneLine)]
     [InlineData("\"a\u2029b\"", DeclaredTypeText.OneLine)]
     public void Read_AnythingElse_IsRefusedWithWhatWasFound(string text, string found) =>
-        DeclaredTypeText.Read(text).Failure.ShouldBe(DeclaredTypeText.NotATypeName + ": " + found, text);
+        DeclaredTypeText.Read(text).Failure.ShouldBe(DescribeFailures.NotATypeName + ": " + found, text);
 
     [Fact]
     public void Read_Semicolon_SaysItIsNotWrittenAsATypeName() =>

@@ -49,7 +49,8 @@ internal static class SqlParameterList
                 token++;
             }
 
-            if (variables?.Holds(sql.Text.AsSpan(span.Start + 1, span.Length - 1)) == true)
+            var name = SqlParameterName.Of(span);
+            if (variables?.Holds(sql.Text.AsSpan(name.Start, name.Length)) == true)
             {
                 continue;
             }
@@ -58,7 +59,7 @@ internal static class SqlParameterList
             {
                 (inDefaults ??= []).Add(new DefaultParameter(sql.Text, span, -1));
             }
-            else if (IndexOf(parameters, sql.Text.AsSpan(span.Start + 1, span.Length - 1)) < 0)
+            else if (IndexOf(parameters, sql.Text.AsSpan(name.Start, name.Length)) < 0)
             {
                 parameters.Add(new SqlQueryParameter(NameOf(sql.Text, span), null, null, false));
             }
@@ -149,7 +150,8 @@ internal static class SqlParameterList
     {
         foreach (var parameter in inDefaults)
         {
-            var name = parameter.Text.AsSpan(parameter.Span.Start + 1, parameter.Span.Length - 1);
+            var nameSpan = SqlParameterName.Of(parameter.Span);
+            var name = parameter.Text.AsSpan(nameSpan.Start, nameSpan.Length);
             if (IndexOf(parameters, name) >= 0 || variables?.Holds(name) == true)
             {
                 continue;
@@ -180,8 +182,11 @@ internal static class SqlParameterList
         return false;
     }
 
-    // The span holds the prefix, which is one character.
-    private static string NameOf(string text, TextSpan span) => text.Substring(span.Start + 1, span.Length - 1);
+    private static string NameOf(string text, TextSpan span)
+    {
+        var name = SqlParameterName.Of(span);
+        return text.Substring(name.Start, name.Length);
+    }
 
     private static int IndexOf(ImmutableArray<SqlQueryParameter>.Builder parameters, ReadOnlySpan<char> name)
     {

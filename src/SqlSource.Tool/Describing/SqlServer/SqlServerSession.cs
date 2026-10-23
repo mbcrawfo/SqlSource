@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,7 +34,7 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// <c>skipped</c>.
 /// </para>
 /// </remarks>
-internal sealed partial class SqlServerSession : IDescribeSession
+internal sealed partial class SqlServerSession : DescriberSession
 {
     public const string DriverName = "Microsoft.Data.SqlClient";
 
@@ -55,10 +54,8 @@ internal sealed partial class SqlServerSession : IDescribeSession
     // The session's database, DB_NAME(), whose columns alone have an origin; null in a capture recorded before "open"
     // asked it.
     private readonly string? _database;
-    private readonly IDescribeExchange _exchange;
     private readonly SqlServerLive _live;
     private readonly IRunLog _log;
-    private readonly TimeProvider _time;
 
     private SqlServerSession(
         OpenRequest request,
@@ -68,17 +65,13 @@ internal sealed partial class SqlServerSession : IDescribeSession
         ServerInfo server,
         string? database
     )
+        : base(request.Exchange, request.Time, server)
     {
         _database = database;
-        _exchange = request.Exchange;
-        _time = request.Time;
         _live = live;
         _log = log;
         Connection = connection;
-        Server = server;
     }
-
-    public ServerInfo Server { get; }
 
     /// <summary>The session's connection, for the container tests to ask on.</summary>
     internal SqlServerConnection Connection { get; }
@@ -91,7 +84,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
     /// (<see cref="SqlServerConnection" />).
     /// </param>
     /// <param name="cancellationToken">Ends the call.</param>
-    public static async Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
+    public static Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,
         IRunLog log,
         CancellationToken cancellationToken
@@ -99,34 +92,21 @@ internal sealed partial class SqlServerSession : IDescribeSession
     {
         var connection = new SqlServerConnection(request.Connection, log);
         var live = new SqlServerLive(connection);
-        var kept = false;
-        try
-        {
-            var answer = await AskOpenAsync(request.Exchange, live, cancellationToken);
-            if (answer.Error is { } error)
-            {
-                return Outcome<IDescribeSession, DescribeFailure>.Failed(SqlServerErrors.Open(error, request.Database));
-            }
-
-            var server = ServerOf(answer);
-            if (IsBelowTheFloor(server.Version, answer.EngineEdition))
-            {
-                return Outcome<IDescribeSession, DescribeFailure>.Failed(
-                    SqlServerErrors.VersionNotSupported(request.Database, server.Version)
-                );
-            }
-
-            var session = new SqlServerSession(request, log, connection, live, server, answer.Database);
-            kept = true;
-            return new Outcome<IDescribeSession, DescribeFailure>(session);
-        }
-        finally
-        {
-            if (!kept)
-            {
-                await connection.DisposeAsync();
-            }
-        }
+        return OpenAsync(
+            request,
+            connection,
+            new SessionOpening<SqlServerOpenRequest, SqlServerOpenAnswer>(
+                SqlServerCallNames.Open,
+                SqlServerOpenRequest.Instance,
+                (_, token) => live.OpenAsync(token),
+                answer => answer.Error is { } error ? SqlServerErrors.Open(error, request.Database) : null,
+                ServerOf,
+                static (answer, server) => IsBelowTheFloor(server.Version, answer.EngineEdition),
+                server => SqlServerErrors.VersionNotSupported(request.Database, server.Version),
+                (answer, server) => new SqlServerSession(request, log, connection, live, server, answer.Database)
+            ),
+            cancellationToken
+        );
     }
 
     /// <summary>
@@ -149,7 +129,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
     /// and <c>columns</c> may give its cause (<see cref="SqlServerErrors.AfterRefusal" />).
     /// </para>
     /// </remarks>
-    public async Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
+    public override async Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
         DescribeRequest request,
         CancellationToken cancellationToken
     )
@@ -163,24 +143,24 @@ internal sealed partial class SqlServerSession : IDescribeSession
             }
 
             var read = DeclaredTypeText.Read(text);
-            if (read.Failure is { } reason)
+            if (!read.Succeeded)
             {
-                return Failed(SqlServerErrors.TypeRefused(request, parameter, reason));
+                return Failed(SqlServerErrors.TypeRefused(request, parameter, read.Failure));
             }
 
-            declarations.Add((parameter, read.Value!));
+            declarations.Add((parameter, read.Value));
         }
 
         var declaredTypes = new Dictionary<string, SqlServerType>(StringComparer.OrdinalIgnoreCase);
         foreach (var (parameter, type) in declarations)
         {
             var resolved = await ResolveAsync(request, parameter, type, cancellationToken);
-            if (resolved.Failure is { } failure)
+            if (!resolved.Succeeded)
             {
-                return Failed(failure);
+                return Failed(resolved.Failure);
             }
 
-            declaredTypes[parameter.Name] = resolved.Value!;
+            declaredTypes[parameter.Name] = resolved.Value;
         }
 
         var copied = ParameterCopies.Rename(request.Sql, request.Parameters);
@@ -226,7 +206,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
         var rowOf = new Dictionary<string, SqlServerParameterRow>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in rows)
         {
-            _ = rowOf.TryAdd(Bare(row.Name), row);
+            _ = rowOf.TryAdd(SqlParameterName.WithoutPrefix(row.Name, "@"), row);
         }
 
         // Each declared parameter's declaration, as DeclaredTypeText read it, by its name.
@@ -240,12 +220,12 @@ internal sealed partial class SqlServerSession : IDescribeSession
         foreach (var reused in copied.Reused)
         {
             var unified = await UnifyAsync(request, reused, probes, rowOf, cancellationToken);
-            if (unified.Failure is { } failure)
+            if (!unified.Succeeded)
             {
-                return Failed(failure);
+                return Failed(unified.Failure);
             }
 
-            reusedTypes[reused.Name] = unified.Value!;
+            reusedTypes[reused.Name] = unified.Value;
         }
 
         var parameters = new EquatableArray<DescribedParameter>([
@@ -254,7 +234,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
         return await ResultAsync(request, parameters, ColumnsParams(parameters, declarationOf), cancellationToken);
     }
 
-    public ValueTask DisposeAsync() => Connection.DisposeAsync();
+    public override ValueTask DisposeAsync() => Connection.DisposeAsync();
 
     // The columns of the query's first result set, through "columns", and the match of its table, through "table",
     // with the parameters already described.
@@ -271,12 +251,12 @@ internal sealed partial class SqlServerSession : IDescribeSession
             cancellationToken
         );
         var rows = RowsOf(request, answer, DescribeStep.DescribeColumns, SqlServerCallNames.Columns);
-        if (rows.Failure is { } refused)
+        if (!rows.Succeeded)
         {
-            return Failed(refused);
+            return Failed(rows.Failure);
         }
 
-        var built = SqlServerColumns.Build(rows.Value!, _database);
+        var built = SqlServerColumns.Build(rows.Value, _database);
         if (!built.Succeeded)
         {
             return Failed(SqlServerErrors.NoColumnName(request, built.Failure));
@@ -296,9 +276,9 @@ internal sealed partial class SqlServerSession : IDescribeSession
 
         var columns = new EquatableArray<SidecarColumn>([.. built.Value.Select(static column => column.Column)]);
         var matched = await MatchAsync(request, columns, cancellationToken);
-        if (matched.Failure is { } failure)
+        if (!matched.Succeeded)
         {
-            return Failed(failure);
+            return Failed(matched.Failure);
         }
 
         var (table, tableMatch) = matched.Value;
@@ -328,9 +308,9 @@ internal sealed partial class SqlServerSession : IDescribeSession
         {
             var answer = await TableAsync(request.Name, new SqlServerTableRequest(schema, name), cancellationToken);
             var described = RowsOf(request, answer, DescribeStep.TableMatch, SqlServerCallNames.Table);
-            if (described.Failure is { } failure)
+            if (!described.Succeeded)
             {
-                return Outcome<(SidecarTable?, string), DescribeFailure>.Failed(failure);
+                return Outcome<(SidecarTable?, string), DescribeFailure>.Failed(described.Failure);
             }
 
             rows = described.Value;
@@ -339,34 +319,6 @@ internal sealed partial class SqlServerSession : IDescribeSession
         var (table, tableMatch) = SqlServerTableMatcher.Match(columns, rows);
         SqlServerEvents.TableMatch(_log, request.Name, table, tableMatch);
         return Outcome<(SidecarTable?, string), DescribeFailure>.Of((table, tableMatch));
-    }
-
-    // The rows of an answer of "columns" or "table", or what the query is reported as at the step of the call: the
-    // error of the call is SQLSRC225, and the error rows of the describe are classified by their type.
-    private static Outcome<IReadOnlyList<SqlServerColumnRow>, DescribeFailure> RowsOf(
-        DescribeRequest request,
-        SqlServerColumnsAnswer answer,
-        DescribeStep step,
-        string call
-    )
-    {
-        if (answer.Error is { } error)
-        {
-            return Outcome<IReadOnlyList<SqlServerColumnRow>, DescribeFailure>.Failed(
-                SqlServerErrors.Failed(request, error, step)
-            );
-        }
-
-        if (answer.Errors is { Count: > 0 } errors)
-        {
-            return Outcome<IReadOnlyList<SqlServerColumnRow>, DescribeFailure>.Failed(
-                SqlServerErrors.Columns(request, errors, step)
-            );
-        }
-
-        return Outcome<IReadOnlyList<SqlServerColumnRow>, DescribeFailure>.Of(
-            answer.Rows ?? throw new InvalidOperationException($"The answer to '{call}' holds no rows and no error.")
-        );
     }
 
     // The type the server reads a declared parameter's declaration as, through "declared".
@@ -450,147 +402,14 @@ internal sealed partial class SqlServerSession : IDescribeSession
         }
 
         var unified = ParameterCopies.Unify(findings);
-        return unified.Failure switch
-        {
-            null => Outcome<SqlServerType, DescribeFailure>.Of(unified.Value!),
-            { First: { } first, Second: { } second } => Outcome<SqlServerType, DescribeFailure>.Failed(
-                SqlServerErrors.CopiesDisagree(request, reused.Name, first, second)
-            ),
-            _ => Outcome<SqlServerType, DescribeFailure>.Failed(SqlServerErrors.NoType(request, reused.Name)),
-        };
-    }
-
-    // A parameter of the list with its type: declared, from "declared"; reused, from its copies; otherwise from its
-    // row, which the comparison of the lists has found.
-    private static DescribedParameter DescribedOf(
-        SqlQueryParameter parameter,
-        Dictionary<string, SqlServerType> declaredTypes,
-        Dictionary<string, SqlServerType> reusedTypes,
-        Dictionary<string, SqlServerParameterRow> rowOf
-    )
-    {
-        if (declaredTypes.TryGetValue(parameter.Name, out var declared))
-        {
-            return new DescribedParameter(parameter.Name, declared, SidecarValues.TypeSource.Declared);
-        }
-
-        if (reusedTypes.TryGetValue(parameter.Name, out var reused))
-        {
-            return new DescribedParameter(parameter.Name, reused, SidecarValues.TypeSource.InferredFromCopies);
-        }
-
-        return rowOf.TryGetValue(parameter.Name, out var row)
-            ? new DescribedParameter(
-                parameter.Name,
-                SqlServerTypes.FromParameter(row),
-                SidecarValues.TypeSource.Inferred
-            )
-            : throw new InvalidOperationException(
-                $"The server reported no type for the parameter '{parameter.Name}', and the lists agreed."
-            );
-    }
-
-    // The declarations of "columns": every parameter of the list in its order, a declared one at its declaration as
-    // DeclaredTypeText read it, and any other at the type it was described at, as SqlServerTypes.Declared writes it;
-    // or null for a query with no parameter.
-    private static string? ColumnsParams(
-        EquatableArray<DescribedParameter> parameters,
-        Dictionary<string, string> declarationOf
-    ) =>
-        parameters.Count == 0
-            ? null
-            : SqlServerLive.Declarations(
-                parameters.Select(parameter =>
-                    (
-                        parameter.Name,
-                        declarationOf.TryGetValue(parameter.Name, out var declaration)
-                            ? declaration
-                            : SqlServerTypes.Declared(
-                                parameter.Type as SqlServerType
-                                    ?? throw new InvalidOperationException(
-                                        $"The parameter '{parameter.Name}' was described with no type of SQL Server."
-                                    )
-                            )
-                    )
-                )
-            );
-
-    // A name without its "@", as the server reports one.
-    private static string Bare(string name) => name.StartsWith('@') ? name[1..] : name;
-
-    private static Outcome<QueryDescription, DescribeFailure> Failed(DescribeFailure failure) =>
-        Outcome<QueryDescription, DescribeFailure>.Failed(failure);
-
-    // Below the floor, unless the edition is Azure's: a version whose first part is no number is not refused, since
-    // the tool cannot tell what it is.
-    private static bool IsBelowTheFloor(string version, int? edition) =>
-        edition is not (AzureSqlDatabase or AzureSqlManagedInstance)
-        && int.TryParse(
-            version.AsSpan(
-                0,
-                version.IndexOf('.', StringComparison.Ordinal) is var dot and >= 0 ? dot : version.Length
-            ),
-            NumberStyles.None,
-            CultureInfo.InvariantCulture,
-            out var major
-        )
-        && major < MinimumMajorVersion;
-
-    private static ServerInfo ServerOf(SqlServerOpenAnswer answer) =>
-        new(
-            answer.ProductVersion
-                ?? throw new InvalidOperationException("The answer to 'open' holds no version and no error."),
-            DriverName,
-            answer.DriverVersion,
-            new EquatableArray<ServerSetting>([
-                .. (answer.Settings ?? []).Select(static setting => new ServerSetting(setting.Name, setting.Value)),
-            ])
-        );
-
-    /// <summary>
-    /// The requests of <c>probe</c> for one describe: the SQL that <c>parameters</c> was asked, and the declarations
-    /// of every parameter of the list in its order, each copy of a reused parameter in its place.
-    /// </summary>
-    /// <remarks>
-    /// The copy that is probed is declared at the type it is probed with; every other copy and undeclared parameter
-    /// at the system type that <c>parameters</c> gave it, and one it gave none is left out; a declared parameter as it
-    /// is declared.
-    /// </remarks>
-    private sealed class Probes(
-        DescribeRequest request,
-        CopiedSql copied,
-        Dictionary<string, string> declarationOf,
-        Dictionary<string, SqlServerParameterRow> rowOf
-    )
-    {
-        public SqlServerProbeRequest Request(string probed, string type)
-        {
-            var declared = new List<(string Name, string Type)>();
-            foreach (var parameter in request.Parameters)
+        return unified.Succeeded
+            ? Outcome<SqlServerType, DescribeFailure>.Of(unified.Value)
+            : unified.Failure switch
             {
-                if (parameter.Type is not null)
-                {
-                    declared.Add((parameter.Name, declarationOf[parameter.Name]));
-                    continue;
-                }
-
-                var copies = copied.Reused.FirstOrDefault(reused =>
-                    string.Equals(reused.Name, parameter.Name, StringComparison.OrdinalIgnoreCase)
-                );
-                foreach (var name in copies?.Copies ?? [parameter.Name])
-                {
-                    if (string.Equals(name, probed, StringComparison.OrdinalIgnoreCase))
-                    {
-                        declared.Add((name, type));
-                    }
-                    else if (rowOf.TryGetValue(name, out var row) && row.SuggestedSystemTypeName is { } suggested)
-                    {
-                        declared.Add((name, suggested));
-                    }
-                }
-            }
-
-            return new SqlServerProbeRequest(copied.Sql, SqlServerLive.Declarations(declared));
-        }
+                { First: { } first, Second: { } second } => Outcome<SqlServerType, DescribeFailure>.Failed(
+                    SqlServerErrors.CopiesDisagree(request, reused.Name, first, second)
+                ),
+                _ => Outcome<SqlServerType, DescribeFailure>.Failed(SqlServerErrors.NoType(request, reused.Name)),
+            };
     }
 }

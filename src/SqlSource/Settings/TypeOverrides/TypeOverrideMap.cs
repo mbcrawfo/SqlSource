@@ -6,9 +6,9 @@ namespace SqlSource.Settings.TypeOverrides;
 
 /// <summary>
 /// The rules of a map of type overrides: an array of entries sorted by key, with each key once.  Keys are compared by
-/// their parts, as <see cref="TypeKeys.TrySplit" /> gives them, and by the text of a part, so that <c>"a.b".c</c> and
-/// <c>a."b.c"</c> are two keys and <c>public."status"</c> and <c>public.status</c> are one.  The order is that of the
-/// keys ignoring case, then that of the keys exactly, so that keys that differ only by case are two keys and sit
+/// their parts, as <see cref="TypeKeyText.TrySplit" /> gives them, and by the text of a part, so that <c>"a.b".c</c>
+/// and <c>a."b.c"</c> are two keys and <c>public."status"</c> and <c>public.status</c> are one.  The order is that of
+/// the keys ignoring case, then that of the keys exactly, so that keys that differ only by case are two keys and sit
 /// together.
 /// </summary>
 /// <remarks>
@@ -122,7 +122,7 @@ internal static class TypeOverrideMap
         || (PartMatches(entry.Schema, key.Schema) && PartMatches(entry.Name, key.Name));
 
     private static bool PartMatches(ReadOnlySpan<char> entryPart, ReadOnlySpan<char> part) =>
-        !TypeKeys.IsQuoted(entryPart) || TypeKeys.TextOf(entryPart).SequenceEqual(TypeKeys.TextOf(part));
+        !TypeKeyText.IsQuoted(entryPart) || TypeKeyText.TextOf(entryPart).SequenceEqual(TypeKeyText.TextOf(part));
 
     // The order of the map: ignoring case, then exactly to break a tie.
     private static int Order(in KeyParts a, in KeyParts b)
@@ -155,7 +155,7 @@ internal static class TypeOverrideMap
     }
 
     private static int ComparePart(ReadOnlySpan<char> a, ReadOnlySpan<char> b, StringComparison comparison) =>
-        TypeKeys.TextOf(a).CompareTo(TypeKeys.TextOf(b), comparison);
+        TypeKeyText.TextOf(a).CompareTo(TypeKeyText.TextOf(b), comparison);
 
     // The index of the first entry that is not less than key, in the order of the map or, with ignoringCaseOnly, in
     // the order of the keys ignoring case.  Generic over the list, so that a map, which is a struct, is searched
@@ -209,14 +209,14 @@ internal static class TypeOverrideMap
             };
     }
 
-    // A key split once into its parts, as TypeKeys.TrySplit gives them, so that a search splits the key it looks for
+    // A key split once into its parts, as TypeKeyText.TrySplit gives them, so that a search splits the key it looks for
     // once and each entry once for each comparison.
     private readonly ref struct KeyParts
     {
         public KeyParts(string text)
         {
             Text = text;
-            IsWellFormed = TypeKeys.TrySplit(text.AsSpan(), out var schema, out var name, out var isArray);
+            IsWellFormed = TypeKeyText.TrySplit(text.AsSpan(), out var schema, out var name, out var isArray);
             Schema = schema;
             Name = name;
             IsArray = isArray;

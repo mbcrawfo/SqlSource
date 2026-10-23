@@ -39,6 +39,17 @@ internal abstract class QuoteReader
     internal static bool IsNameCharacterOfPostgreSql(char value) => IsIdentifierCharacter(value) || value > '\u007F';
 
     /// <summary>
+    /// True for a character that can be part of a name as SQL Server reads one: a letter or a digit of any script,
+    /// <c>_</c>, <c>@</c>, <c>#</c> or <c>$</c>.  SQL Server 2017 and 2025 take <c>Größe</c>, <c>名前</c>, <c>x٣</c> and
+    /// the full-width <c>Ａbc</c> in a name, and refuse a currency sign, a superscript digit, a circled digit and a
+    /// middle dot (<c>€</c>, <c>²</c>, <c>①</c>, <c>·</c>) with error 102.  It leaves out what the server also takes
+    /// after the first character, a combining mark, a letter number and a format character, and takes a letter newer
+    /// than the server's tables, which the server then refuses (TD-0076).
+    /// </summary>
+    internal static bool IsNameCharacterOfSqlServer(char value) =>
+        char.IsLetterOrDigit(value) || value is '_' or '@' or '#' or '$';
+
+    /// <summary>
     /// The end of a region that closes with the character it opens with, where that character doubled stands for
     /// itself.
     /// </summary>

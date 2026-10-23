@@ -562,56 +562,25 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // Not located, and once for the project, however many of its queries need the driver.
         context.RegisterSourceOutput(
             npgsqlProbe.Combine(usesPostgresEntries),
-            static (output, input) =>
-                ReportDriver(
-                    output,
-                    input.Right,
-                    input.Left.IsBelowTheFloor,
-                    input.Left.IsNewerThanKnown,
-                    input.Left.VersionText,
-                    SqlDiagnostics.NpgsqlTooOld,
-                    SqlDiagnostics.NpgsqlNewerThanKnown
-                )
+            static (output, input) => ReportDriver(output, input.Right, input.Left)
         );
         context.RegisterSourceOutput(
             sqlClientProbe.Combine(usesSqlServerEntries),
-            static (output, input) =>
-                ReportDriver(
-                    output,
-                    input.Right,
-                    input.Left.IsBelowTheFloor,
-                    input.Left.IsNewerThanKnown,
-                    input.Left.VersionText,
-                    SqlDiagnostics.SqlClientTooOld,
-                    SqlDiagnostics.SqlClientNewerThanKnown
-                )
+            static (output, input) => ReportDriver(output, input.Right, input.Left)
         );
     }
 
-    // The diagnostics of one driver, if a query needs an entry of its engine.
-    private static void ReportDriver(
-        SourceProductionContext output,
-        bool usesEntries,
-        bool isBelowTheFloor,
-        bool isNewerThanKnown,
-        string versionText,
-        DiagnosticDescriptor tooOld,
-        DiagnosticDescriptor newerThanKnown
-    )
+    // The diagnostics of one driver, if a query needs an entry of its engine: whatever its probe finds.
+    private static void ReportDriver(SourceProductionContext output, bool usesEntries, IDriverProbe probe)
     {
         if (!usesEntries)
         {
             return;
         }
 
-        if (isBelowTheFloor)
+        foreach (var finding in probe.Findings)
         {
-            output.ReportDiagnostic(Diagnostic.Create(tooOld, Location.None, versionText));
-        }
-
-        if (isNewerThanKnown)
-        {
-            output.ReportDiagnostic(Diagnostic.Create(newerThanKnown, Location.None, versionText));
+            output.ReportDiagnostic(Diagnostic.Create(finding.Descriptor, Location.None, finding.Argument));
         }
     }
 

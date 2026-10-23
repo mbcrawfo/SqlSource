@@ -35,7 +35,7 @@ internal static class UncastParameters
 
     // The names, ignoring case as the plan matches them, of the parameters with a use that is not "@x::t" or
     // "CAST(@x AS t)": white space and comments may stand between any two of the pieces, and a string, a quoted
-    // name or a comment holds no piece.  The name is the parameter's text after its one-character prefix.
+    // name or a comment holds no piece.  The name is the parameter piece's text.
     private static HashSet<string> Uncast(string sql, EquatableArray<SqlLexeme> lexemes)
     {
         var pieces = Pieces(sql, lexemes);
@@ -56,7 +56,7 @@ internal static class UncastParameters
                 );
             if (!cast)
             {
-                _ = uncast.Add(parameter.Text[1..]);
+                _ = uncast.Add(parameter.Text);
             }
         }
 
@@ -64,20 +64,24 @@ internal static class UncastParameters
     }
 
     // The SQL as a list of pieces, without white space or comments: a word, a "::", any other character, a string or
-    // a quoted name whole, and a parameter.
+    // a quoted name whole, and a parameter by its name.
     private static List<(string Text, bool Parameter)> Pieces(string sql, EquatableArray<SqlLexeme> lexemes)
     {
         var pieces = new List<(string Text, bool Parameter)>();
         foreach (var lexeme in lexemes)
         {
-            var text = sql.Substring(lexeme.Span.Start, lexeme.Span.Length);
             if (lexeme.Kind == SqlLexemeKind.Text)
             {
-                TextPieces(text, pieces);
+                TextPieces(sql.Substring(lexeme.Span.Start, lexeme.Span.Length), pieces);
             }
-            else if (lexeme.Kind is SqlLexemeKind.Parameter or SqlLexemeKind.Quoted)
+            else if (lexeme.Kind == SqlLexemeKind.Parameter)
             {
-                pieces.Add((text, lexeme.Kind == SqlLexemeKind.Parameter));
+                var name = lexeme.ParameterName;
+                pieces.Add((sql.Substring(name.Start, name.Length), true));
+            }
+            else if (lexeme.Kind == SqlLexemeKind.Quoted)
+            {
+                pieces.Add((sql.Substring(lexeme.Span.Start, lexeme.Span.Length), false));
             }
         }
 
