@@ -580,6 +580,20 @@ public sealed class PlanExpressionTests
             .NullableOf("(during * tstzrange($1, $2))", Alone(new CatalogNames(All.Functions, FrozenSet<string>.Empty)))
             .ShouldBeNull();
 
+    // With no name held by pg_catalog alone, or with the names but another schema's found first, a call of the name
+    // may be a user's function or aggregate.
+    [Theory]
+    [InlineData("jsonb_build_object('id', id, 'email', email)")]
+    [InlineData("json_build_object()")]
+    [InlineData("tstzrange($1, $2)")]
+    [InlineData("int4range(1, 2, '[]'::text)")]
+    [InlineData("array_agg(o.note)")]
+    public void NullableOf_NameThatMayBeAnotherSchemas_IsUnknown(string entry)
+    {
+        PlanExpression.NullableOf(entry, Alone(CatalogNames.None, groupsHaveRows: true)).ShouldBeNull();
+        PlanExpression.NullableOf(entry, Alone(All, catalogFunctions: false, groupsHaveRows: true)).ShouldBeNull();
+    }
+
     [Theory]
     [InlineData("count(o.id)", BuiltInTypes.Int8)]
     [InlineData("count(email) OVER w1", BuiltInTypes.Int8)]

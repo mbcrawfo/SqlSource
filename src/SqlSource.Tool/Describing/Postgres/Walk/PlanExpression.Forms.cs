@@ -17,6 +17,10 @@ internal static partial class PlanExpression
         private bool HeldAlone(string name) =>
             _context.CatalogFunctions && _context.CatalogAlone?.Functions.Contains(name) == true;
 
+        // Whether the session finds pg_catalog first and no other schema holds an operator of the name.
+        private bool OperatorHeldAlone(string name) =>
+            _context.CatalogFunctions && _context.CatalogAlone?.Operators.Contains(name) == true;
+
         // An operator in a group of its own, a cast or a function call, each the catalog's only when the session finds
         // pg_catalog first, and so is the name of the type a cast prints: the one place that reads any of them.
         private long? CatalogForm(int from, int to)
@@ -144,13 +148,7 @@ internal static partial class PlanExpression
         // (A * B) over two values of one built-in range type, where only pg_catalog holds an operator *: then it is
         // range_intersect, the one * that takes two ranges, which is of their type and never NULL for two that are not.
         private long? Intersection(string name, long left, long right) =>
-            name == "*"
-            && left == right
-            && CatalogOverloads.IsRange(left)
-            && _context.CatalogFunctions
-            && _context.CatalogAlone?.Operators.Contains(name) == true
-                ? left
-                : null;
+            name == "*" && left == right && CatalogOverloads.IsRange(left) && OperatorHeldAlone(name) ? left : null;
 
         // (E)::T, where E is proved of a type that carries to T within a family of SetOperationTypes: pg_cast holds
         // one row for a pair, the server ships one for every ordered pair of a family and pins it, and none returns

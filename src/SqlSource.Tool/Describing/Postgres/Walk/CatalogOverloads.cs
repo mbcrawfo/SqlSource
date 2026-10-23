@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk;
@@ -59,10 +60,21 @@ internal sealed record CatalogNames(IReadOnlySet<string> Functions, IReadOnlySet
 /// <c>*(anymultirange, anymultirange)</c> would need a cast from a range that <c>pg_cast</c> holds as explicit only.
 /// </para>
 /// <para>
+/// An aggregate runs other functions in a window and in a parallel plan, and they keep the property.  In a window whose
+/// frame moves, <c>count</c> runs as a moving aggregate, from the initial value <c>0</c>, with <c>int8inc</c> or
+/// <c>int8inc_any</c> as its transition and <c>int8dec</c> or <c>int8dec_any</c> as the inverse, all strict, so a
+/// <c>NULL</c> input is skipped either way, and with no final function: the state is a count, never <c>NULL</c>.  A
+/// <c>Finalize</c> node combines the partial counts with <c>int8pl</c>, each of them a count from <c>0</c>.  From
+/// PostgreSQL 16, <c>array_agg</c> has <c>array_agg_combine</c> and <c>array_agg_array_combine</c>, which are not
+/// strict and give a state that saw no row only when both of theirs saw none, with <c>array_agg_serialize</c>,
+/// <c>array_agg_deserialize</c> and the arrays' own, which pass a state across unchanged; before 16 it has none, and
+/// no plan computes it in parts.  So over a group that has a row, the state the final function reads saw one.
+/// </para>
+/// <para>
 /// A row goes in this table only with <c>Catalog_CatalogOverloads_ArePinned</c> in <c>PlanOutputTests</c>, which holds
 /// the overloads of each name to the catalog of 14 and 18, their implementations included, none strict, since a strict
-/// one is <c>NULL</c> for a <c>NULL</c> argument before its C function runs, and the intersection to each range
-/// type.
+/// one is <c>NULL</c> for a <c>NULL</c> argument before its C function runs, the functions of each aggregate's moving
+/// and partial modes, and the intersection to each range type.
 /// </para>
 /// </remarks>
 internal static class CatalogOverloads
@@ -99,6 +111,11 @@ internal static class CatalogOverloads
         ),
     ];
 
+    private static readonly ReadOnlyCollection<(string Name, string Arguments, string Implementation)> ReadOnlyRows =
+        Array.AsReadOnly(Rows);
+
+    private static readonly FrozenSet<long> RangeOids = Ranges.Select(static range => range.Type).ToFrozenSet();
+
     private static readonly FrozenDictionary<string, long> RangeTypes = Ranges.ToFrozenDictionary(
         static range => range.Name,
         static range => range.Type,
@@ -118,12 +135,12 @@ internal static class CatalogOverloads
     /// and <c>aggtransfn/aggfinalfn/agginitval</c> of an aggregate, <c>-</c> for no final function and nothing for no
     /// initial value.  <c>Catalog_CatalogOverloads_ArePinned</c> reads them from here.
     /// </summary>
-    public static IEnumerable<(string Name, string Arguments, string Implementation)> Overloads => Rows;
+    public static IEnumerable<(string Name, string Arguments, string Implementation)> Overloads => ReadOnlyRows;
 
     /// <summary>The OID of the range type a constructor of the table builds, or null for any other name.</summary>
     public static long? RangeTypeOf(string constructor) =>
         RangeTypes.TryGetValue(constructor, out var type) ? type : null;
 
     /// <summary>Whether the type is one of the built-in range types of the table.</summary>
-    public static bool IsRange(long type) => Ranges.Any(range => range.Type == type);
+    public static bool IsRange(long type) => RangeOids.Contains(type);
 }

@@ -559,7 +559,8 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
     // Every overload pg_catalog holds of each function name CatalogOverloads reads is a row of the table, with the
     // arguments and the implementation the row gives, and every row is one: an aggregate by its transition function,
     // its final one and its initial value.  None is strict, which would make it NULL for a NULL argument before its C
-    // function ran, and none returns a set.  The intersection of two of each range type is of that type, no implicit
+    // function ran, and none returns a set.  Each aggregate's functions of a moving window and of a plan in parts are
+    // the ones CatalogOverloads' remarks name.  The intersection of two of each range type is of that type, no implicit
     // or assignment cast leads from one, and the only operators * of pg_catalog over a range, a multirange or a
     // pseudo-type are range_intersect and the multirange's.  Every mismatch is listed.
     [Fact]
@@ -604,6 +605,53 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         var listed = CatalogOverloads.Overloads.ToHashSet();
         mismatches.AddRange(listed.Except(found).Select(static row => $"missing {Describe(row)}"));
         mismatches.AddRange(found.Except(listed).Select(static row => $"not listed {Describe(row)}"));
+
+        // The functions of the moving and the partial modes, aggcombinefn/aggserialfn/aggdeserialfn/aggmtransfn/
+        // aggminvtransfn/aggmfinalfn/aggminitval: array_agg is computed in parts from 16.
+        var parts = postgres.Major >= 16;
+        var support = new HashSet<(string Name, string Arguments, string Implementation)>
+        {
+            ("count", "", "int8pl/-/-/int8inc/int8dec/-/0"),
+            ("count", "\"any\"", "int8pl/-/-/int8inc_any/int8dec_any/-/0"),
+            (
+                "array_agg",
+                "anynonarray",
+                parts ? "array_agg_combine/array_agg_serialize/array_agg_deserialize/-/-/-/" : "-/-/-/-/-/-/"
+            ),
+            (
+                "array_agg",
+                "anyarray",
+                parts
+                    ? "array_agg_array_combine/array_agg_array_serialize/array_agg_array_deserialize/-/-/-/"
+                    : "-/-/-/-/-/-/"
+            ),
+        };
+        var foundSupport = new HashSet<(string Name, string Arguments, string Implementation)>();
+        await using (
+            var command = source.CreateCommand(
+                """
+                SELECT p.proname::text,
+                    pg_catalog.pg_get_function_identity_arguments(p.oid),
+                    a.aggcombinefn::text || '/' || a.aggserialfn::text || '/' || a.aggdeserialfn::text || '/'
+                        || a.aggmtransfn::text || '/' || a.aggminvtransfn::text || '/' || a.aggmfinalfn::text || '/'
+                        || coalesce(a.aggminitval, '')
+                FROM pg_catalog.pg_proc AS p
+                JOIN pg_catalog.pg_aggregate AS a ON a.aggfnoid = p.oid
+                WHERE p.pronamespace = 'pg_catalog'::regnamespace AND p.proname = ANY ($1)
+                """
+            )
+        )
+        {
+            _ = command.Parameters.Add(new NpgsqlParameter { Value = CatalogOverloads.FunctionNames.ToArray() });
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+            {
+                _ = foundSupport.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+            }
+        }
+
+        mismatches.AddRange(support.Except(foundSupport).Select(static row => $"missing modes {Describe(row)}"));
+        mismatches.AddRange(foundSupport.Except(support).Select(static row => $"other modes {Describe(row)}"));
 
         var ranges = CatalogOverloads
             .FunctionNames.Where(static name => CatalogOverloads.RangeTypeOf(name) is not null)
