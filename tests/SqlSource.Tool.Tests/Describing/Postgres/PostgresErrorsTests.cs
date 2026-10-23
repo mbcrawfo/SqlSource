@@ -101,7 +101,7 @@ public sealed class PostgresErrorsTests
     {
         var parameter = Declared("tenant", "int) AS SELECT 1");
 
-        var failure = PostgresErrors.TypeRefused(Query(parameter), parameter);
+        var failure = PostgresErrors.TypeRefused(Query(parameter), parameter, DescribeFailures.NotATypeName);
 
         failure.Descriptor.Id.ShouldBe("SQLSRC228");
         failure.Arguments.ShouldBe(["int) AS SELECT 1", "@tenant", "Q", "it is not written as a type name"]);

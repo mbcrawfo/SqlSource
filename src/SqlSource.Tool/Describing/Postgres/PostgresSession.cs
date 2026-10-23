@@ -122,7 +122,7 @@ internal sealed partial class PostgresSession : DescriberSession
         var types = ParameterPlaceholders.TypeList(request.Parameters);
         if (!types.Succeeded)
         {
-            return Failed(PostgresErrors.TypeRefused(request, types.Failure));
+            return Failed(PostgresErrors.TypeRefused(request, types.Failure.Parameter, types.Failure.Reason));
         }
 
         // The counter advances for a prepare that fails too: a name is used once.

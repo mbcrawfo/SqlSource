@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using SqlSource.Parsing;
+using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Describing.Postgres.Statements;
 
@@ -56,7 +57,7 @@ internal static class ParameterPlaceholders
     // The one statement of the SQL, with "$n" for each parameter when it is given the list.
     private static string? Statement(string sql, EquatableArray<SqlQueryParameter>? parameters)
     {
-        var lexemes = PostgresSql.Lex(sql);
+        var lexemes = DescriberSql.Lex(sql, SqlDialectRules.PostgreSql);
         var rewritten = new StringBuilder(sql.Length);
         for (var index = 0; index < lexemes.Count; index++)
         {
@@ -89,9 +90,9 @@ internal static class ParameterPlaceholders
     /// One item for each parameter of the list, in order: the declared type as the marker wrote it, or
     /// <see cref="Unknown" />.  A declared parameter that the SQL does not hold is in the list all the same: the
     /// server accepts a list longer than the placeholders used.  The failure is the first parameter whose type is
-    /// not written as a type name.
+    /// not written as a type name, with <see cref="DeclaredTypeText" />'s reason.
     /// </summary>
-    public static Outcome<IReadOnlyList<string>, SqlQueryParameter> TypeList(
+    public static Outcome<IReadOnlyList<string>, (SqlQueryParameter Parameter, string Reason)> TypeList(
         EquatableArray<SqlQueryParameter> parameters
     )
     {
@@ -103,17 +104,21 @@ internal static class ParameterPlaceholders
             {
                 types.Add(Unknown);
             }
-            else if (DeclaredTypeText.TryRead(parameter.Type, out var type))
-            {
-                types.Add(type);
-            }
             else
             {
-                return Outcome<IReadOnlyList<string>, SqlQueryParameter>.Failed(parameter);
+                var read = DeclaredTypeText.Read(parameter.Type);
+                if (!read.Succeeded)
+                {
+                    return Outcome<IReadOnlyList<string>, (SqlQueryParameter Parameter, string Reason)>.Failed(
+                        (parameter, read.Failure)
+                    );
+                }
+
+                types.Add(read.Value);
             }
         }
 
-        return Outcome<IReadOnlyList<string>, SqlQueryParameter>.Of(types);
+        return Outcome<IReadOnlyList<string>, (SqlQueryParameter Parameter, string Reason)>.Of(types);
     }
 
     /// <summary>

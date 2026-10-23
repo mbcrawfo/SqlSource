@@ -239,7 +239,7 @@ A view, a materialized view and a foreign table may match, as a table may.  The 
 
 ## Errors
 
-[`PostgresErrors`](../../src/SqlSource.Tool/Describing/Postgres/PostgresErrors.cs) makes each `DescribeFailure` of the describer, with one id for each cause a user mends differently.  What each id means to a user, with its help, is in [diagnostics](../manual/diagnostics.md); this section is how the code chooses it.  A failure's `server:` lines are the SQLSTATE and the message, the detail, the hint, and the character the error is at.  An error of `open`, of a session that the server ended, or of a connection that was lost or timed out has one line, the SQLSTATE where there is one and the fixed text of `ConnectionErrors`.  Npgsql's refusal of a text at `check`, `textRefused`, keeps Npgsql's message.
+[`PostgresErrors`](../../src/SqlSource.Tool/Describing/Postgres/PostgresErrors.cs) makes each `DescribeFailure` of the describer, with one id for each cause a user mends differently.  What each id means to a user, with its help, is in [diagnostics](../manual/diagnostics.md); this section is how the code chooses it.  A failure's `server:` lines are the SQLSTATE and the message, the detail, the hint, and the character the error is at.  An error of `open`, of a session that the server ended, or of a connection that was lost or timed out has one line, the SQLSTATE where there is one and the fixed text of `ConnectionErrors`.  Npgsql's refusal of a text at `check`, `textRefused`, keeps Npgsql's message.  `SQLSRC224`, `SQLSRC235` and `SQLSRC228` are built by [`DescribeFailures`](../../src/SqlSource.Tool/Describing/Describers/DescribeFailures.cs), which both engines share, each giving its own help.
 
 A server's error gets its id from the first of these that holds:
 

@@ -223,11 +223,14 @@ internal static class PostgresErrors
     /// <summary>
     /// <c>SQLSRC228</c> for a type that <see cref="DeclaredTypeText" /> refuses.  Nothing of the query is sent.
     /// </summary>
-    public static DescribeFailure TypeRefused(DescribeRequest query, SqlQueryParameter parameter) =>
+    /// <param name="query">The query.</param>
+    /// <param name="parameter">The declared parameter.</param>
+    /// <param name="reason">What <see cref="DeclaredTypeText.Read" /> gave.</param>
+    public static DescribeFailure TypeRefused(DescribeRequest query, SqlQueryParameter parameter, string reason) =>
         DeclaredType(
             query,
             parameter,
-            DescribeFailures.NotATypeName,
+            reason,
             DescribeStep.DescribeParameters,
             EquatableArray<string>.Empty,
             NotATypeNameHelp

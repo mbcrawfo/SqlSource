@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Describing.SqlServer;
 
@@ -92,7 +93,7 @@ internal static class ParameterCopies
     /// <exception cref="InvalidOperationException">The SQL does not lex: a bug of the plan.</exception>
     public static CopiedSql Rename(string sql, EquatableArray<SqlQueryParameter> parameters)
     {
-        var lexemes = SqlServerSql.Lex(sql);
+        var lexemes = DescriberSql.Lex(sql, SqlDialectRules.SqlServer);
         var uses = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var lexeme in lexemes)
