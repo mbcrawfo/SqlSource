@@ -27,10 +27,24 @@ internal sealed class PostgresLive(PostgresConnection connection)
 {
     /// <summary>
     /// What <c>prepare</c> answers when <c>pg_prepared_statements</c> does not list the statement that was just
-    /// prepared, by its name and its text: the read ran on another backend than the <c>PREPARE</c>, which a pooler in
-    /// transaction mode does.
+    /// prepared, by its name and its text: the read ran on another backend than the <c>PREPARE</c>, although the two
+    /// are in one transaction, which no pooler in session or transaction mode does.
     /// </summary>
     public const string StatementNotListed = "the server does not list the statement it prepared";
+
+    /// <summary>
+    /// What <c>prepare</c> answers, beside the SQLSTATE <c>08P01</c>, when a pooler in statement mode refuses the
+    /// describe's transaction: such a connection does not keep a session for the calls of a describe.  The text of
+    /// the refusal is not kept, since an error of class <c>08</c> holds the describer's own text
+    /// (<see cref="ConnectionErrors" />).
+    /// </summary>
+    public const string TransactionRefused = "the server refused the transaction of a describe";
+
+    // The SQLSTATE of a protocol violation, which PgBouncer gives every error of its own, and the message with which
+    // PgBouncer in statement mode refuses a transaction.  PgBouncer does not translate its messages, so the refusal is
+    // told from its other errors, a full pool's query_wait_timeout for one, by the message.
+    private const string ProtocolViolation = "08P01";
+    private const string StatementModeRefusal = "transaction blocks not allowed in statement pooling mode";
 
     // The settings of a session that change a description, in the order "open" answers them.
     private static readonly string[] SettingNames = ["search_path", "plan_cache_mode", "standard_conforming_strings"];
@@ -235,42 +249,93 @@ internal sealed class PostgresLive(PostgresConnection connection)
         return space < 0 ? serverVersion : serverVersion[..space];
     }
 
-    /// <summary>Asks <c>prepare</c>.</summary>
+    /// <summary>
+    /// Asks <c>prepare</c>, which begins the describe's transaction
+    /// (<see cref="PostgresConnection.BeginDescribeAsync" />) that every later call of the describe runs in and
+    /// <c>deallocate</c> ends.
+    /// </summary>
     /// <remarks>
     /// The one known cause of a read that fails is a connection that the server ended between the <c>PREPARE</c> and
     /// the read, and a lost connection has no position, so nothing is counted against the <c>PREPARE</c>'s text.  If
     /// a call is ever added between the two, this needs revisiting.  The read matches the statement's name and the
-    /// text of the <c>PREPARE</c>, which the server lists exactly as it was sent: behind a pooler the read can reach
-    /// another backend, which may hold a statement of the same name that an earlier run left there, whose
-    /// parameter types are not this query's.  A read that finds no row is <see cref="StatementNotListed" />, an
-    /// answer and not a fault: it is a backend that is not the one prepared on.
+    /// text of the <c>PREPARE</c>, which the server lists exactly as it was sent, so that a statement of the same name
+    /// that is not this one is never read for it.  A read that finds no row is <see cref="StatementNotListed" />, an
+    /// answer and not a fault: it is a backend that is not the one prepared on.  After an answer without an error the
+    /// savepoint is moved after the <c>PREPARE</c> (<see cref="PostgresConnection.KeepPreparedAsync" />), so that no
+    /// later rollback to it gives up the locks that preparing took.  An answer with an error ends the transaction,
+    /// since no <c>deallocate</c> follows it; a cancellation ends nothing, and the transaction dies with the session,
+    /// as the statement does.
     /// </remarks>
     public Task<PostgresPrepareAnswer> PrepareAsync(PostgresPrepareRequest asked, CancellationToken token) =>
         AnswerAsync(
             async () =>
             {
-                // One of the two texts that hold a user's SQL, with that of "check": the driver is given it as one
-                // statement and may not split it.  The read gives it again as a parameter's value, which is never
-                // parsed.
-                var text = ParameterPlaceholders.PrepareText(asked.Statement, asked.Types, asked.Sql);
-                await connection.ExecuteAsOneStatementAsync(text, token);
-
-                await using var read = await connection.CommandAsync(ParameterTypesSql, token);
-                _ = read.Parameters.Add(new NpgsqlParameter { Value = asked.Statement });
-                _ = read.Parameters.Add(new NpgsqlParameter { Value = text });
-                if (await read.ExecuteScalarAsync(token) is not uint[] types)
+                try
                 {
-                    return new PostgresPrepareAnswer(
-                        null,
-                        new PostgresServerError(null, StatementNotListed, null, null, null)
-                    );
+                    await connection.BeginDescribeAsync(token);
+                }
+                catch (NpgsqlException exception) when (RefusedTransaction(exception) is { } refused)
+                {
+                    return refused;
                 }
 
-                return new PostgresPrepareAnswer([.. types.Select(static oid => (long)oid)], null);
+                PostgresPrepareAnswer answer;
+                try
+                {
+                    answer = await PreparedAsync(asked, token);
+                    if (answer.Error is null)
+                    {
+                        await connection.KeepPreparedAsync(token);
+                    }
+                }
+                catch (NpgsqlException)
+                {
+                    await connection.EndDescribeAsync();
+                    throw;
+                }
+
+                if (answer.Error is not null)
+                {
+                    await connection.EndDescribeAsync();
+                }
+
+                return answer;
             },
             ConnectionErrors.Of,
             static error => new PostgresPrepareAnswer(null, error)
         );
+
+    /// <summary>
+    /// The answer of <c>prepare</c> when the exception that began the describe's transaction is a pooler's refusal of
+    /// it in statement mode, <c>08P01</c> with PgBouncer's message, or null for any other, which
+    /// <see cref="ConnectionErrors.Of" /> answers.  Internal for a test.
+    /// </summary>
+    internal static PostgresPrepareAnswer? RefusedTransaction(NpgsqlException exception) =>
+        exception is PostgresException { SqlState: ProtocolViolation, MessageText: StatementModeRefusal }
+            ? new PostgresPrepareAnswer(
+                null,
+                new PostgresServerError(ProtocolViolation, TransactionRefused, null, null, null)
+            )
+            : null;
+
+    // The PREPARE and the read of the statement's parameter types.
+    private async Task<PostgresPrepareAnswer> PreparedAsync(PostgresPrepareRequest asked, CancellationToken token)
+    {
+        // One of the two texts that hold a user's SQL, with that of "check": the driver is given it as one statement
+        // and may not split it.  The read gives it again as a parameter's value, which is never parsed.
+        var text = ParameterPlaceholders.PrepareText(asked.Statement, asked.Types, asked.Sql);
+        await connection.ExecuteAsOneStatementAsync(text, token);
+
+        await using var read = await connection.CommandAsync(ParameterTypesSql, token);
+        _ = read.Parameters.Add(new NpgsqlParameter { Value = asked.Statement });
+        _ = read.Parameters.Add(new NpgsqlParameter { Value = text });
+        if (await read.ExecuteScalarAsync(token) is not uint[] types)
+        {
+            return new PostgresPrepareAnswer(null, new PostgresServerError(null, StatementNotListed, null, null, null));
+        }
+
+        return new PostgresPrepareAnswer([.. types.Select(static oid => (long)oid)], null);
+    }
 
     /// <summary>
     /// Asks <c>columns</c>: describes the prepared statement through an <c>EXECUTE</c> that is parsed and never run.
@@ -281,7 +346,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
     /// server nothing more.  The text holds a name the tool made and nothing of a user's.
     /// </remarks>
     public Task<PostgresColumnsAnswer> ColumnsAsync(PostgresColumnsRequest asked, CancellationToken token) =>
-        AnswerAsync(
+        InDescribeAsync(
             async () =>
             {
                 await using var command = await connection.CommandAsync(ExecuteText(asked), token);
@@ -309,21 +374,21 @@ internal sealed class PostgresLive(PostgresConnection connection)
 
                 return new PostgresColumnsAnswer(columns, null);
             },
-            ConnectionErrors.Of,
-            static error => new PostgresColumnsAnswer(null, error)
+            static error => new PostgresColumnsAnswer(null, error),
+            token
         );
 
     /// <summary>Asks <c>tables</c>: one query of the catalog for every table the columns of a statement name.</summary>
     public Task<PostgresTablesAnswer> TablesAsync(PostgresTablesRequest asked, CancellationToken token) =>
-        AnswerAsync(
+        InDescribeAsync(
             async () =>
             {
                 await using var command = await connection.CommandAsync(TablesSql, token);
                 _ = command.Parameters.Add(OidArray(asked.Oids));
                 return new PostgresTablesAnswer(await TableRowsAsync(command, token), null);
             },
-            ConnectionErrors.Of,
-            static error => new PostgresTablesAnswer(null, error)
+            static error => new PostgresTablesAnswer(null, error),
+            token
         );
 
     /// <summary>
@@ -331,15 +396,15 @@ internal sealed class PostgresLive(PostgresConnection connection)
     /// as <c>tables</c> answers.  A relation that does not exist has no row.
     /// </summary>
     public Task<PostgresTablesAnswer> RelationsAsync(PostgresRelationsRequest asked, CancellationToken token) =>
-        AnswerAsync(
+        InDescribeAsync(
             async () =>
             {
                 await using var command = await connection.CommandAsync(RelationsSql, token);
                 AddRelations(command, asked.Relations);
                 return new PostgresTablesAnswer(await TableRowsAsync(command, token), null);
             },
-            ConnectionErrors.Of,
-            static error => new PostgresTablesAnswer(null, error)
+            static error => new PostgresTablesAnswer(null, error),
+            token
         );
 
     // The OIDs as one positional oid[].
@@ -413,7 +478,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
 
     /// <summary>Asks <c>partitions</c>: one query of the catalog for the ancestors of each relation.</summary>
     public Task<PostgresPartitionsAnswer> PartitionsAsync(PostgresPartitionsRequest asked, CancellationToken token) =>
-        AnswerAsync(
+        InDescribeAsync(
             async () =>
             {
                 await using var command = await connection.CommandAsync(PartitionsSql, token);
@@ -434,8 +499,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
 
                 return new PostgresPartitionsAnswer(rows, null);
             },
-            ConnectionErrors.Of,
-            static error => new PostgresPartitionsAnswer(null, error)
+            static error => new PostgresPartitionsAnswer(null, error),
+            token
         );
 
     /// <summary>
@@ -452,7 +517,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
 
     /// <summary>Asks <c>types</c>.</summary>
     public Task<PostgresTypesAnswer> TypesAsync(PostgresTypesRequest asked, CancellationToken token) =>
-        AnswerAsync(
+        InDescribeAsync(
             async () =>
             {
                 await using var command = await connection.CommandAsync(TypesSql, token);
@@ -487,13 +552,13 @@ internal sealed class PostgresLive(PostgresConnection connection)
 
                 return new PostgresTypesAnswer(rows, null);
             },
-            ConnectionErrors.Of,
-            static error => new PostgresTypesAnswer(null, error)
+            static error => new PostgresTypesAnswer(null, error),
+            token
         );
 
     /// <summary>Asks <c>spellings</c>: the server's own spelling of each type with each modifier.</summary>
     public Task<PostgresSpellingsAnswer> SpellingsAsync(PostgresSpellingsRequest asked, CancellationToken token) =>
-        AnswerAsync(
+        InDescribeAsync(
             async () =>
             {
                 await using var command = await connection.CommandAsync(SpellingsSql, token);
@@ -520,8 +585,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
 
                 return new PostgresSpellingsAnswer(rows, null);
             },
-            ConnectionErrors.Of,
-            static error => new PostgresSpellingsAnswer(null, error)
+            static error => new PostgresSpellingsAnswer(null, error),
+            token
         );
 
     /// <summary>
@@ -537,7 +602,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
     /// the answer holds the text Npgsql sent and the order of its parameters (<see cref="BatchRewrites" />).
     /// </remarks>
     public Task<PostgresCheckAnswer> CheckAsync(PostgresCheckRequest asked, CancellationToken token) =>
-        AnswerAsync(
+        InDescribeAsync(
             async () =>
             {
                 try
@@ -568,8 +633,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
                     return await RefusedAsync(asked, refused.Message, token);
                 }
             },
-            ConnectionErrors.Of,
-            CheckFailed
+            CheckFailed,
+            token
         );
 
     // The answer of a check that failed on the server: no columns, no bind error, and a text that was not refused.
@@ -582,7 +647,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         string message,
         CancellationToken token
     ) =>
-        AnswerAsync(
+        InDescribeAsync(
             async () =>
             {
                 foreach (var parameter in asked.Parameters)
@@ -601,8 +666,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
                     true
                 );
             },
-            ConnectionErrors.Of,
-            CheckFailed
+            CheckFailed,
+            token
         );
 
     // What Npgsql says of a parameter of this type and no other, or null when it binds it.
@@ -640,40 +705,55 @@ internal sealed class PostgresLive(PostgresConnection connection)
     private const string NoPartitionPruningSql = "SET LOCAL enable_partition_pruning = off";
 
     /// <summary>
-    /// Asks <c>explain</c>: the generic plan of the prepared statement, in a transaction that is rolled back.
+    /// Asks <c>explain</c>: the generic plan of the prepared statement, under the describe's savepoint, which it rolls
+    /// back to afterwards.
     /// </summary>
     /// <remarks>
     /// <c>EXPLAIN</c> without <c>ANALYZE</c> plans the statement and does not execute it.  Planning evaluates an
-    /// immutable function whose arguments are constants, inside the transaction that is rolled back: a function
-    /// wrongly marked immutable runs, and an effect outside the transaction, a sequence's for one, remains
+    /// immutable function whose arguments are constants, inside the describe's transaction, which is rolled back: a
+    /// function wrongly marked immutable runs, and an effect outside the transaction, a sequence's for one, remains
     /// (TD-0047).  Under <c>force_generic_plan</c> the <c>NULL</c> of a parameter is not folded into the plan, so
     /// <c>id = $1</c> stays a condition.  Partition pruning is off: the executor would prune every partition for the
     /// <c>NULL</c> of a parameter when it starts, and the plan would show an <c>Append</c> with no member, from
-    /// which the walk cannot tell a partitioned table from a set operation (TD-0052).  Disposing a transaction that
-    /// was not ended rolls it back, so a failure at any step leaves no setting behind.  The texts hold a name the tool
-    /// made, settings of a closed list and nothing of a user's.
+    /// which the walk cannot tell a partitioned table from a set operation (TD-0052).  Each setting is a
+    /// <c>SET LOCAL</c>, which the rollback to the savepoint ends, after the plan or, through
+    /// <see cref="InDescribeAsync{TAnswer}" />, after a failure at any step, so no setting reaches a later call.  The
+    /// texts hold a name the tool made, settings of a closed list and nothing of a user's.
     /// </remarks>
-    public Task<PostgresExplainAnswer> ExplainAsync(PostgresExplainRequest asked, CancellationToken token) =>
-        AnswerAsync(
+    /// <exception cref="InvalidOperationException">
+    /// No describe's transaction is held: outside one, a <c>SET LOCAL</c> would change nothing.
+    /// </exception>
+    public Task<PostgresExplainAnswer> ExplainAsync(PostgresExplainRequest asked, CancellationToken token)
+    {
+        if (!connection.InDescribe)
+        {
+            throw new InvalidOperationException("'explain' is asked within a describe's transaction only.");
+        }
+
+        return InDescribeAsync(
             async () =>
             {
-                await using var transaction = await connection.BeginAsync(token);
                 foreach (var text in SetTexts(asked))
                 {
                     await using var set = await connection.CommandAsync(text, token);
                     _ = await set.ExecuteNonQueryAsync(token);
                 }
 
-                await using var command = await connection.CommandAsync(ExplainText(asked), token);
-                var plan = await command.ExecuteScalarAsync(token) as string;
-                await transaction.RollbackAsync(token);
+                string? plan;
+                await using (var command = await connection.CommandAsync(ExplainText(asked), token))
+                {
+                    plan = await command.ExecuteScalarAsync(token) as string;
+                }
+
+                await connection.RestoreDescribeAsync(token);
 
                 // An answer that is no text is no plan, which the session reads as unreadable: never a failed describe.
                 return new PostgresExplainAnswer(plan, null);
             },
-            ConnectionErrors.Of,
-            static error => new PostgresExplainAnswer(null, error)
+            static error => new PostgresExplainAnswer(null, error),
+            token
         );
+    }
 
     /// <summary>The text <c>explain</c> sends for the plan.</summary>
     public static string ExplainText(PostgresExplainRequest asked) =>
@@ -687,18 +767,73 @@ internal sealed class PostgresLive(PostgresConnection connection)
     public static IReadOnlyList<string> SetTexts(PostgresExplainRequest asked) =>
         [ForceGenericPlanSql, NoPartitionPruningSql, .. asked.Settings.Select(PlannerSettings.SetText)];
 
-    /// <summary>Asks <c>deallocate</c>.</summary>
+    /// <summary>
+    /// Asks <c>deallocate</c>: frees the statement inside the describe's transaction, on the backend that prepared it,
+    /// then ends the transaction, whether the <c>DEALLOCATE</c> answered or failed.  A cancellation ends nothing: the
+    /// transaction dies with the session, which the run closes next.
+    /// </summary>
     public Task<PostgresDeallocateAnswer> DeallocateAsync(PostgresDeallocateRequest asked, CancellationToken token) =>
         AnswerAsync(
             async () =>
             {
-                await using var command = await connection.CommandAsync($"DEALLOCATE {asked.Statement}", token);
-                _ = await command.ExecuteNonQueryAsync(token);
+                try
+                {
+                    await using var command = await connection.CommandAsync($"DEALLOCATE {asked.Statement}", token);
+                    _ = await command.ExecuteNonQueryAsync(token);
+                }
+                catch (NpgsqlException)
+                {
+                    await connection.EndDescribeAsync();
+                    throw;
+                }
+
+                await connection.EndDescribeAsync();
                 return new PostgresDeallocateAnswer(null);
             },
             ConnectionErrors.Of,
             static error => new PostgresDeallocateAnswer(error)
         );
+
+    /// <summary>
+    /// Runs a call of a describe through <see cref="AnswerAsync{TAnswer}" />, with <see cref="ConnectionErrors.Of" />.
+    /// An error of the server aborts the describe's transaction, so the transaction is first rolled back to its
+    /// savepoint: every later call then runs as it would on its own, and <c>deallocate</c> can free the statement.
+    /// An error of that rollback is dropped, since the call's own error is the answer and a connection that was lost
+    /// answers the next call.  A call outside a describe's transaction, as a test makes one, restores nothing.
+    /// </summary>
+    private Task<TAnswer> InDescribeAsync<TAnswer>(
+        Func<Task<TAnswer>> call,
+        Func<PostgresServerError, TAnswer> failed,
+        CancellationToken token
+    ) =>
+        AnswerAsync(
+            async () =>
+            {
+                try
+                {
+                    return await call();
+                }
+                catch (NpgsqlException) when (connection.InDescribe)
+                {
+                    await RestoreAfterFailureAsync(token);
+                    throw;
+                }
+            },
+            ConnectionErrors.Of,
+            failed
+        );
+
+    private async Task RestoreAfterFailureAsync(CancellationToken token)
+    {
+        try
+        {
+            await connection.RestoreDescribeAsync(token);
+        }
+        catch (NpgsqlException)
+        {
+            // The call's own error is the answer; a connection that was lost answers the next call too.
+        }
+    }
 
     /// <summary>
     /// Runs a call and gives its answer, or the answer of the error the server, Npgsql or the connection gave.  A

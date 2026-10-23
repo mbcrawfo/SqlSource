@@ -84,8 +84,7 @@ public sealed class NullabilityWalkTests
         AnswersOf(outcome).ShouldBe([NotNullCatalog]);
     }
 
-    // A plan whose reference names another column than the one the row description gives may be no plan of this
-    // statement: a pooler can hand the explain another backend's statement of the same name (TD-0049).  Its
+    // A plan whose reference names another column than the one the row description gives does not agree with it.  Its
     // expressions are not read, and a gated query's columns with an origin are walked.
     [Theory]
     [InlineData("t.opt")]

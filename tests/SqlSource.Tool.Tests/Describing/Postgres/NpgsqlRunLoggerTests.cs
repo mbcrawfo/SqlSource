@@ -28,6 +28,7 @@ public sealed class NpgsqlRunLoggerTests
             { "Npgsql.Transaction", NpgsqlEventId.StartedTransaction, LogLevel.Debug },
             { "Npgsql.Transaction", NpgsqlEventId.CommittedTransaction, LogLevel.Debug },
             { "Npgsql.Transaction", NpgsqlEventId.RolledBackTransaction, LogLevel.Debug },
+            { "Npgsql.Transaction", NpgsqlEventId.RolledBackToSavepoint, LogLevel.Debug },
             { "Npgsql.Transaction", NpgsqlEventId.ExceptionDuringTransactionDispose, LogLevel.Error },
         };
 
@@ -45,6 +46,7 @@ public sealed class NpgsqlRunLoggerTests
             { "Npgsql.Command", 0 },
             { "Npgsql.Command", NpgsqlEventId.PreparingCommandExplicitly },
             { "Npgsql.Transaction", NpgsqlEventId.CreatingSavepoint },
+            { "Npgsql.Transaction", NpgsqlEventId.ReleasedSavepoint },
             { "Npgsql.Command", 2999 },
         };
 
