@@ -325,7 +325,8 @@ internal sealed partial class SqlServerSession : DescriberSession
 
     // The table whose column list the columns are, or the first check that failed.  "table" is asked only when every
     // column has an origin in one table, since the first two checks need none, and a call that fails for a table the
-    // match never reads would fail the query.
+    // match never reads would fail the query.  Its rows are corrected as the columns of SELECT * from the table alone
+    // are, so that a query the proofs corrected is compared with a table they corrected.
     private async Task<Outcome<(SidecarTable? Table, string TableMatch), DescribeFailure>> MatchAsync(
         DescribeRequest request,
         EquatableArray<SidecarColumn> columns,
@@ -342,7 +343,7 @@ internal sealed partial class SqlServerSession : DescriberSession
                 return Outcome<(SidecarTable?, string), DescribeFailure>.Failed(described.Failure);
             }
 
-            rows = described.Value;
+            rows = ColumnProofs.TableRows(described.Value);
         }
 
         var (table, tableMatch) = SqlServerTableMatcher.Match(columns, rows);

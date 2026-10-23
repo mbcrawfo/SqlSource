@@ -57,6 +57,14 @@ internal sealed record SelectItem(TokenRange Expression, string? Name, bool IsSt
         return new SelectItem(range, name, IsStar: false);
     }
 
+    /// <summary>
+    /// True when its expression is a column alone, <c>a</c>, <c>q.a</c> or <c>[s].[t].[a]</c>, with no parentheses
+    /// around it.
+    /// </summary>
+    /// <param name="tokens">The tokens it was read from.</param>
+    public bool IsColumn(IReadOnlyList<TsqlToken> tokens) =>
+        !IsStar && IsDottedName(tokens, Expression, beforeStar: false);
+
     private static bool IsAlias(TsqlToken token) =>
         token.Kind is TsqlTokenKind.Word or TsqlTokenKind.QuotedName or TsqlTokenKind.String;
 

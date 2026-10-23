@@ -1,0 +1,125 @@
+{
+  "captureVersion": 1,
+  "engine": "mssql",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "productVersion": "17.0.5015.4",
+        "engineEdition": 3,
+        "driverVersion": "7.1.1",
+        "settings": [
+          {
+            "name": "compatibility_level",
+            "value": "170"
+          },
+          {
+            "name": "ANSI_NULLS",
+            "value": "ON"
+          },
+          {
+            "name": "QUOTED_IDENTIFIER",
+            "value": "ON"
+          },
+          {
+            "name": "collation",
+            "value": "SQL_Latin1_General_CP1_CI_AS"
+          }
+        ],
+        "error": null,
+        "database": "fixtures"
+      }
+    },
+    {
+      "method": "parameters",
+      "request": {
+        "sql": "SELECT o.id, u.name_len_p FROM dbo.orders AS o LEFT JOIN dbo.users AS u ON u.id = o.user_id",
+        "params": null
+      },
+      "answer": {
+        "rows": [],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "sql": "SELECT o.id, u.name_len_p FROM dbo.orders AS o LEFT JOIN dbo.users AS u ON u.id = o.user_id",
+        "params": null
+      },
+      "answer": {
+        "rows": [
+          {
+            "isHidden": false,
+            "columnOrdinal": 1,
+            "name": "id",
+            "isNullable": false,
+            "systemTypeName": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": "fixtures",
+            "sourceSchema": "dbo",
+            "sourceTable": "orders",
+            "sourceColumn": "id",
+            "isIdentityColumn": true,
+            "isComputedColumn": false,
+            "sourceType": "U",
+            "persistedNotNull": false
+          },
+          {
+            "isHidden": false,
+            "columnOrdinal": 2,
+            "name": "name_len_p",
+            "isNullable": true,
+            "systemTypeName": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": "fixtures",
+            "sourceSchema": "dbo",
+            "sourceTable": "users",
+            "sourceColumn": "name_len_p",
+            "isIdentityColumn": false,
+            "isComputedColumn": true,
+            "sourceType": "U",
+            "persistedNotNull": true
+          },
+          {
+            "isHidden": true,
+            "columnOrdinal": 3,
+            "name": "ROWSTAT\u0000",
+            "isNullable": false,
+            "systemTypeName": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": null,
+            "sourceSchema": null,
+            "sourceTable": null,
+            "sourceColumn": null,
+            "isIdentityColumn": false,
+            "isComputedColumn": false,
+            "sourceType": null,
+            "persistedNotNull": false
+          }
+        ],
+        "errors": null,
+        "error": null
+      }
+    }
+  ]
+}

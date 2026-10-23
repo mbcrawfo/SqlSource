@@ -67,7 +67,8 @@ internal sealed class SqlServerScript
         SourceColumn: "id",
         IsIdentityColumn: true,
         IsComputedColumn: false,
-        SourceType: "U"
+        SourceType: "U",
+        PersistedNotNull: false
     );
 
     // The one hidden row that browse mode 2 adds.
@@ -99,6 +100,20 @@ internal sealed class SqlServerScript
             SourceType = null,
             IsIdentityColumn = null,
             IsComputedColumn = null,
+        };
+
+    // dbo.users.name_len_p, PERSISTED NOT NULL, in the place given: the server answers it nullable by its expression,
+    // and the tool's own column says what the catalog holds.
+    public static SqlServerColumnRow PersistedColumn(int ordinal) =>
+        IdColumn with
+        {
+            ColumnOrdinal = ordinal,
+            Name = "name_len_p",
+            IsNullable = true,
+            SourceColumn = "name_len_p",
+            IsIdentityColumn = false,
+            IsComputedColumn = true,
+            PersistedNotNull = true,
         };
 
     // The row of the operand numbered n, as the server answers "AS [n]" of "operands".

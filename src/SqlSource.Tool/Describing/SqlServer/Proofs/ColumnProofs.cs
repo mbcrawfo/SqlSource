@@ -10,10 +10,21 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// server in <c>operands</c>, and the columns as the answer corrects them.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The query is read only when it is one <c>SELECT</c> that <see cref="SelectStatement.Read" /> follows, whose items
 /// are the visible columns one for one: as many, none a <c>*</c>, and each item's name the server's, compared
-/// ordinally.  One item that does not agree proves nothing for the whole query, since the reader has misread its
-/// select list.  A column the server answers not null keeps its answer and asks nothing.
+/// ordinally; or whose one item is a <c>*</c> or a <c>q.*</c>, which every visible column is.  One item that does not
+/// agree proves nothing for the whole query, since the reader has misread its select list.  A column the server
+/// answers not null keeps its answer and asks nothing.
+/// </para>
+/// <para>
+/// A column whose row says <see cref="SqlServerColumnRow.PersistedNotNull" /> is proved by the catalog, with the
+/// <c>nullableSource</c> <c>catalog</c>, only when its item is a column alone or the one <c>*</c>, the <c>FROM</c> is
+/// one table alone (<see cref="SelectBody.IsOneTable" />) and the <c>GROUP BY</c> has no grouping set: then every row
+/// of the result is a row of that table, which the constraint keeps not null.  Through an outer join the column is
+/// <c>NULL</c> while the server still names it as the source, so nothing else proves it.  A <c>*</c> proves nothing
+/// else: no form is a column alone.
+/// </para>
 /// </remarks>
 internal sealed class ColumnProofs
 {
@@ -22,15 +33,20 @@ internal sealed class ColumnProofs
     // The proof of each column, by its place, or null for a column that has none.
     private readonly IReadOnlyList<Proof?> _proofs;
 
+    // Whether the catalog proves each column, by its place: a PERSISTED NOT NULL column read from its one table.
+    private readonly IReadOnlyList<bool> _catalog;
+
     private ColumnProofs(
         IReadOnlyList<BuiltColumn> columns,
         IReadOnlyList<Proof?> proofs,
+        IReadOnlyList<bool> catalog,
         string? operandsSql,
         int operandCount
     )
     {
         _columns = columns;
         _proofs = proofs;
+        _catalog = catalog;
         OperandsSql = operandsSql;
         OperandCount = operandCount;
     }
@@ -53,7 +69,7 @@ internal sealed class ColumnProofs
         IReadOnlyList<SqlServerColumnRow> rows
     )
     {
-        var none = new ColumnProofs(columns, [], null, 0);
+        var none = new ColumnProofs(columns, [], [], null, 0);
         var visible = rows.Where(static row => !row.IsHidden).ToList();
         if (visible.Count != columns.Count)
         {
@@ -61,18 +77,35 @@ internal sealed class ColumnProofs
         }
 
         var tokens = TsqlTokens.Read(sql);
-        if (SelectStatement.Read(tokens) is not { } statement || !AreTheColumns(statement.Body.Items, visible))
+        if (SelectStatement.Read(tokens) is not { } statement)
         {
             return none;
         }
 
-        var expressions = new ExpressionProofs(tokens, statement.Body);
+        var body = statement.Body;
+        if (body.Items is [{ IsStar: true }])
+        {
+            return new ColumnProofs(columns, [], [.. visible.Select(row => IsProvedByTheCatalog(body, row))], null, 0);
+        }
+
+        if (!AreTheColumns(body.Items, visible))
+        {
+            return none;
+        }
+
+        var expressions = new ExpressionProofs(tokens, body);
         var proofs = new Proof?[visible.Count];
+        var catalog = new bool[visible.Count];
         for (var index = 0; index < visible.Count; index++)
         {
-            if (visible[index].IsNullable != false)
+            var item = body.Items[index];
+            if (item.IsColumn(tokens) && IsProvedByTheCatalog(body, visible[index]))
             {
-                proofs[index] = expressions.Of(statement.Body.Items[index].Expression);
+                catalog[index] = true;
+            }
+            else if (visible[index].IsNullable != false)
+            {
+                proofs[index] = expressions.Of(item.Expression);
             }
         }
 
@@ -80,14 +113,16 @@ internal sealed class ColumnProofs
         return new ColumnProofs(
             columns,
             proofs,
+            catalog,
             operands.Count == 0 ? null : OperandsQuery.Text(sql, tokens, statement, operands),
             operands.Count
         );
     }
 
     /// <summary>
-    /// The columns, each whose proof holds <c>nullable</c> false with the <c>nullableSource</c> <c>expression</c>, and
-    /// every other as it came.
+    /// The columns, each the catalog proves <c>nullable</c> false with the <c>nullableSource</c> <c>catalog</c>, each
+    /// whose proof holds <c>nullable</c> false with the <c>nullableSource</c> <c>expression</c>, and every other as it
+    /// came.
     /// </summary>
     /// <param name="operandNotNull">
     /// The answer of <c>operands</c> as <see cref="OperandsQuery.NotNullOf" /> reads it, or null when it was not asked
@@ -96,19 +131,50 @@ internal sealed class ColumnProofs
     public IReadOnlyList<BuiltColumn> Apply(IReadOnlyList<bool>? operandNotNull) =>
         [
             .. _columns.Select(
-                (column, index) =>
-                    index < _proofs.Count && _proofs[index] is { } proof && proof.Holds(operandNotNull)
-                        ? column with
-                        {
-                            Column = column.Column with
-                            {
-                                Nullable = false,
-                                NullableSource = SidecarValues.NullableSource.Expression,
-                            },
-                        }
-                        : column
+                (column, index) => SourceOf(index, operandNotNull) is { } source ? NotNull(column, source) : column
             ),
         ];
+
+    /// <summary>
+    /// The rows of <c>table</c>, each the catalog proves not nullable, as for the columns of a query whose one item is
+    /// <c>*</c> of the table alone, which is what <c>table</c> describes; every other row as it came.  So the table
+    /// match compares a corrected query with a corrected table.
+    /// </summary>
+    /// <param name="rows">The rows of <c>table</c>, the hidden ones included.</param>
+    public static IReadOnlyList<SqlServerColumnRow> TableRows(IReadOnlyList<SqlServerColumnRow> rows) =>
+        [.. rows.Select(static row => IsPersistedNotNull(row) ? row with { IsNullable = false } : row)];
+
+    // True when the catalog proves the column of the row, whose item is a column alone or the one *, in the body: its
+    // row says PERSISTED NOT NULL, the FROM is its one table, and no grouping set gives a total row.
+    private static bool IsProvedByTheCatalog(SelectBody body, SqlServerColumnRow row) =>
+        row.IsNullable != false
+        && IsPersistedNotNull(row)
+        && body.IsOneTable
+        && body.Grouping is SelectGrouping.None or SelectGrouping.Plain;
+
+    // The row's source is a table of the session's database whose column is PERSISTED NOT NULL.  The SQL of "columns"
+    // already asks for a table, and SourceType says so again, for a capture made by hand.
+    private static bool IsPersistedNotNull(SqlServerColumnRow row) =>
+        row is { PersistedNotNull: true, SourceType: "U" };
+
+    // The nullableSource that proves the column in the place not null, or null when nothing does.
+    private string? SourceOf(int index, IReadOnlyList<bool>? operandNotNull)
+    {
+        if (index < _catalog.Count && _catalog[index])
+        {
+            return SidecarValues.NullableSource.Catalog;
+        }
+
+        return index < _proofs.Count && _proofs[index] is { } proof && proof.Holds(operandNotNull)
+            ? SidecarValues.NullableSource.Expression
+            : null;
+    }
+
+    private static BuiltColumn NotNull(BuiltColumn column, string source) =>
+        column with
+        {
+            Column = column.Column with { Nullable = false, NullableSource = source },
+        };
 
     // True when the items are the visible rows one for one, by place and by the server's name.
     private static bool AreTheColumns(IReadOnlyList<SelectItem> items, List<SqlServerColumnRow> visible) =>

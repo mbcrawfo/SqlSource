@@ -69,7 +69,8 @@
             "sourceColumn": "user_id",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -90,7 +91,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -111,7 +113,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           },
           {
             "isHidden": true,
@@ -132,7 +135,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           }
         ],
         "errors": null,
@@ -166,7 +170,8 @@
             "sourceColumn": "total",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": true,
@@ -187,7 +192,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           }
         ],
         "errors": null,

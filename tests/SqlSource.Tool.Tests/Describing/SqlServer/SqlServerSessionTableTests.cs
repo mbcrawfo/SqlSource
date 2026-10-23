@@ -74,6 +74,72 @@ public sealed class SqlServerSessionTableTests
         description.Plan.ShouldBe(SidecarValues.Plan.Skipped);
     }
 
+    // The rows of "table" are SELECT * from the table alone, so a PERSISTED NOT NULL column of them is corrected as the
+    // query's is, and the two match.
+    [Fact]
+    public async Task DescribeAsync_PersistedNotNull_TableRowsCorrected()
+    {
+        const string Sql = "SELECT id, name_len_p FROM dbo.users WHERE id = @id";
+        var script = new SqlServerScript()
+            .Add(
+                "parameters",
+                new SqlServerParametersRequest(Sql, null),
+                new SqlServerParametersAnswer([IntRow with { Name = "@id" }], null)
+            )
+            .Add(
+                "columns",
+                new SqlServerColumnsRequest(Sql, "@id int"),
+                new SqlServerColumnsAnswer(
+                    [IdColumn, PersistedColumn(2), Rowstat with { ColumnOrdinal = 3 }],
+                    null,
+                    null
+                )
+            )
+            .Add(
+                "table",
+                new SqlServerTableRequest("dbo", "users"),
+                new SqlServerColumnsAnswer(
+                    [IdColumn, PersistedColumn(2), Rowstat with { ColumnOrdinal = 3 }],
+                    null,
+                    null
+                )
+            );
+
+        var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
+
+        asked.Select(static call => call.Method).ShouldBe(["parameters", "columns", "table"]);
+        var description = described.Value.ShouldNotBeNull();
+        description
+            .Columns.ShouldNotBeNull()
+            .Select(static column => (column.Nullable, column.NullableSource))
+            .ShouldBe([(false, SidecarValues.NullableSource.Server), (false, SidecarValues.NullableSource.Catalog)]);
+        description.TableMatch.ShouldBe(SidecarValues.TableMatch.Matched);
+        description.MatchesTable.ShouldBe(new SidecarTable("dbo", "users"));
+    }
+
+    // Through a join the column cannot be proved and keeps the server's answer, while the table's row is corrected: the
+    // query no longer has the table's nullability.
+    [Fact]
+    public async Task DescribeAsync_PersistedNotNullThroughAJoin_NullabilityDiffers()
+    {
+        const string Sql = "SELECT u.id, u.name_len_p FROM dbo.users AS u JOIN dbo.orders AS o ON o.user_id = u.id";
+        var rows = new SqlServerColumnsAnswer(
+            [IdColumn, PersistedColumn(2), Rowstat with { ColumnOrdinal = 3 }],
+            null,
+            null
+        );
+        var script = new SqlServerScript()
+            .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([], null))
+            .Add("columns", new SqlServerColumnsRequest(Sql, null), rows)
+            .Add("table", new SqlServerTableRequest("dbo", "users"), rows);
+
+        var (described, _) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
+
+        var description = described.Value.ShouldNotBeNull();
+        description.Columns.ShouldNotBeNull()[1].Nullable.ShouldBe(true);
+        description.TableMatch.ShouldBe(SidecarValues.TableMatch.NullabilityDiffers);
+    }
+
     [Fact]
     public async Task DescribeAsync_TwoTables_AsksNoTable()
     {

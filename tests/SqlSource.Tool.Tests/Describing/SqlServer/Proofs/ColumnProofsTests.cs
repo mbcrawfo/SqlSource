@@ -135,6 +135,106 @@ public sealed class ColumnProofsTests
         Nullability(proofs.Apply(null)).ShouldBe([(false, SidecarValues.NullableSource.Server)]);
     }
 
+    // A PERSISTED NOT NULL column read from its one table alone: every row of the result is a row of the table, which
+    // the constraint keeps not null.  The catalog says so, and no operand is asked.
+    [Theory]
+    [InlineData("SELECT id, name_len_p FROM dbo.users WHERE id = @id")]
+    [InlineData("SELECT u.id, u.name_len_p AS name_len_p FROM dbo.users AS u WITH (NOLOCK) ORDER BY u.id")]
+    [InlineData("SELECT DISTINCT TOP (5) id, name_len_p FROM dbo.users GROUP BY id, name_len_p")]
+    [InlineData("WITH n AS (SELECT 1 AS one) SELECT id, name_len_p FROM [dbo].[users]")]
+    public void Apply_PersistedNotNullFromOneTable_Catalog(string sql)
+    {
+        var proofs = Read(sql, IdColumn, PersistedColumn(2));
+
+        proofs.OperandsSql.ShouldBeNull();
+        Nullability(proofs.Apply(null))
+            .ShouldBe([(false, SidecarValues.NullableSource.Server), (false, SidecarValues.NullableSource.Catalog)]);
+    }
+
+    // A * or a q.* that is the only item is every column of the one table, each corrected by its row.
+    [Theory]
+    [InlineData("SELECT * FROM dbo.users")]
+    [InlineData("SELECT u.* FROM dbo.users AS u WHERE u.id = @id")]
+    public void Apply_PersistedNotNullByStar_Catalog(string sql)
+    {
+        var proofs = Read(sql, IdColumn, ExpressionRow(2, "nickname"), PersistedColumn(3));
+
+        proofs.OperandsSql.ShouldBeNull();
+        Nullability(proofs.Apply(null))
+            .ShouldBe([
+                (false, SidecarValues.NullableSource.Server),
+                (true, SidecarValues.NullableSource.Server),
+                (false, SidecarValues.NullableSource.Catalog),
+            ]);
+    }
+
+    // The column through a join, a derived table or a CTE, under a grouping set, as an operand of an expression, or by
+    // a * that is not the one item of one table: the server's answer stands, since a row of the result may be no row
+    // of the table (an outer join gives NULL).
+    [Theory]
+    [InlineData("SELECT o.id, u.name_len_p FROM dbo.orders AS o LEFT JOIN dbo.users AS u ON u.id = o.user_id")]
+    [InlineData("SELECT o.id, u.name_len_p FROM dbo.orders AS o JOIN dbo.users AS u ON u.id = o.user_id")]
+    [InlineData("SELECT u.id, u.name_len_p FROM (SELECT * FROM dbo.users) AS u")]
+    [InlineData("WITH users AS (SELECT * FROM dbo.users) SELECT id, name_len_p FROM users")]
+    [InlineData("SELECT id, name_len_p FROM dbo.users GROUP BY ROLLUP (id, name_len_p)")]
+    [InlineData("SELECT id, name_len_p FROM dbo.users GROUP BY GROUPING SETS ((id, name_len_p), ())")]
+    [InlineData("SELECT id, name_len_p FROM dbo.users GROUP BY ALL id, name_len_p")]
+    [InlineData("SELECT id, CAST(name_len_p AS bigint) AS name_len_p FROM dbo.users")]
+    [InlineData("SELECT id, name_len_p FROM dbo.users UNION ALL SELECT id, name_len_p FROM dbo.users")]
+    [InlineData("SELECT *, 1 AS one FROM dbo.users")]
+    [InlineData("SELECT u.*, u.* FROM dbo.users AS u")]
+    [InlineData("SELECT u.* FROM dbo.orders AS o LEFT JOIN dbo.users AS u ON u.id = o.user_id")]
+    public void Apply_PersistedNotNull_StaysNullable(string sql)
+    {
+        var proofs = Read(sql, IdColumn, PersistedColumn(2));
+
+        Nullability(proofs.Apply(null))
+            .ShouldBe([(false, SidecarValues.NullableSource.Server), (true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // A column whose row does not say PERSISTED NOT NULL, or says nothing, as a capture before the member, keeps the
+    // server's answer even from one table.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(null)]
+    public void Apply_NotPersistedNotNull_StaysNullable(bool? persisted)
+    {
+        var proofs = Read(
+            "SELECT id, name_len_p FROM dbo.users",
+            IdColumn,
+            PersistedColumn(2) with
+            {
+                PersistedNotNull = persisted,
+            }
+        );
+
+        Nullability(proofs.Apply(null))
+            .ShouldBe([(false, SidecarValues.NullableSource.Server), (true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // The rows of "table", SELECT * from the table alone, are corrected as the columns of such a query are, so the
+    // match compares a corrected query with a corrected table; every other row comes as it came.
+    [Fact]
+    public void TableRows_PersistedNotNull_NotNullable()
+    {
+        IReadOnlyList<SqlServerColumnRow> rows =
+        [
+            IdColumn,
+            ExpressionRow(2, "nickname"),
+            PersistedColumn(3),
+            PersistedColumn(4) with
+            {
+                PersistedNotNull = false,
+            },
+            Rowstat with
+            {
+                ColumnOrdinal = 5,
+            },
+        ];
+
+        ColumnProofs.TableRows(rows).Select(static row => row.IsNullable).ShouldBe([false, true, false, true, false]);
+    }
+
     // The proofs of the SQL over the rows, built as the session builds them, the hidden row of browse mode 2 after
     // them.
     private static ColumnProofs Read(string sql, params SqlServerColumnRow[] visible)

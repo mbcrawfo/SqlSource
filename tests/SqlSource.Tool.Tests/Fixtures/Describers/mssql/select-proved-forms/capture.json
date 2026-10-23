@@ -92,7 +92,8 @@
             "sourceColumn": "user_id",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -113,7 +114,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -134,7 +136,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -155,7 +158,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -176,7 +180,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": true,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -197,7 +202,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": true,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -218,7 +224,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           },
           {
             "isHidden": true,
@@ -239,7 +246,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           }
         ],
         "errors": null,
@@ -273,7 +281,8 @@
             "sourceColumn": "total",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -294,7 +303,8 @@
             "sourceColumn": "credit",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -315,7 +325,8 @@
             "sourceColumn": "nickname",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -336,7 +347,8 @@
             "sourceColumn": "name",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -357,7 +369,8 @@
             "sourceColumn": "user_id",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": true,
@@ -378,7 +391,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           }
         ],
         "errors": null,
