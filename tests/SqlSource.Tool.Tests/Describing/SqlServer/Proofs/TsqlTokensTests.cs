@@ -110,6 +110,20 @@ public sealed class TsqlTokensTests
             .Select(static token => (token.Kind, token.Text))
             .ShouldBe([(TsqlTokenKind.Number, "1"), (TsqlTokenKind.Word, "x")]);
 
+    // The lexer ends a parameter at the first character that is not a letter, a digit or "_", and SQL Server's
+    // variable goes on through "#", "$" and "@".
+    [Theory]
+    [InlineData("@a#b")]
+    [InlineData("@a$b")]
+    [InlineData("@a#b@c")]
+    public void Read_VariableWithNameCharactersAfterItsLetters_IsOneParameter(string name) =>
+        TsqlTokens
+            .Read($"{name} x")
+            .ShouldBe([
+                new TsqlToken(TsqlTokenKind.Parameter, name, 0, name.Length),
+                new TsqlToken(TsqlTokenKind.Word, "x", name.Length + 1, name.Length + 2),
+            ]);
+
     [Fact]
     public void Read_NWithAGapBeforeAString_IsAWordThenAString() =>
         TsqlTokens

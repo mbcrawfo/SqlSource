@@ -153,6 +153,25 @@ public sealed class SelectStatementTests
             .ShouldBe("FROM t FOR SYSTEM_TIME ALL WHERE a = 1");
     }
 
+    [Fact]
+    public void Read_ForSystemTimeAsOf_IsPartOfTheFrom()
+    {
+        var (tokens, statement) = Read("SELECT a FROM t FOR SYSTEM_TIME AS OF @t ORDER BY a");
+
+        Text(tokens, statement.ShouldNotBeNull().Body.FromThroughWhere.ShouldNotBeNull())
+            .ShouldBe("FROM t FOR SYSTEM_TIME AS OF @t");
+    }
+
+    // A WHERE without a FROM is left out of the rows the operands are asked over, as the design says.
+    [Fact]
+    public void Read_WhereWithoutFrom_HasNoFrom()
+    {
+        var body = Read("SELECT 1 AS a WHERE @x = 1").Statement.ShouldNotBeNull().Body;
+
+        body.HasFrom.ShouldBeFalse();
+        body.FromThroughWhere.ShouldBeNull();
+    }
+
     [Theory]
     [InlineData("SELECT * FROM t")]
     [InlineData("SELECT t.* FROM t")]
@@ -198,6 +217,7 @@ public sealed class SelectStatementTests
     [InlineData("FROM @t")]
     [InlineData("FROM t (NOLOCK)")]
     [InlineData("FROM db..t")]
+    [InlineData("FROM t FOR SYSTEM_TIME AS OF @t")]
     public void Read_NotOneTable_IsNotOneTable(string from) =>
         Read($"WITH a AS (SELECT 1 AS x) SELECT x {from}").Statement.ShouldNotBeNull().Body.IsOneTable.ShouldBeFalse();
 
@@ -245,6 +265,8 @@ public sealed class SelectStatementTests
     [InlineData("SELECT NULL")]
     [InlineData("SELECT N'x'")]
     [InlineData("SELECT @p = a FROM t")]
+    [InlineData("SELECT @a#b")]
+    [InlineData("SELECT $IDENTITY FROM t")]
     public void Read_ItemName_WhereItCannotBeRead_IsNull(string sql) =>
         Read(sql).Statement.ShouldNotBeNull().Body.Items.ShouldHaveSingleItem().Name.ShouldBeNull();
 
@@ -258,6 +280,9 @@ public sealed class SelectStatementTests
     [InlineData("SELECT CASE WHEN a = 1 THEN 1 END k FROM t", "k")]
     [InlineData("SELECT name COLLATE Latin1_General_BIN x FROM t", "x")]
     [InlineData("SELECT 1x", "x")]
+    [InlineData("SELECT a [END] FROM t", "END")]
+    [InlineData("SELECT 1 AS [FROM]", "FROM")]
+    [InlineData("SELECT SUM(a) OVER (PARTITION BY b) s FROM t", "s")]
     public void Read_ItemName_IsReadWithoutQuotes(string sql, string name) =>
         Read(sql).Statement.ShouldNotBeNull().Body.Items.ShouldHaveSingleItem().Name.ShouldBe(name);
 
@@ -287,12 +312,13 @@ public sealed class SelectStatementTests
     }
 
     [Fact]
-    public void TokenRange_CountAndEmpty_AreItsLength()
-    {
-        new TokenRange(2, 5).Count.ShouldBe(3);
-        new TokenRange(2, 5).IsEmpty.ShouldBeFalse();
-        new TokenRange(4, 4).IsEmpty.ShouldBeTrue();
-    }
+    public void Count_OfARange_IsItsLength() => new TokenRange(2, 5).Count.ShouldBe(3);
+
+    [Fact]
+    public void IsEmpty_OfARangeOfTokens_IsFalse() => new TokenRange(2, 5).IsEmpty.ShouldBeFalse();
+
+    [Fact]
+    public void IsEmpty_OfARangeOfNoToken_IsTrue() => new TokenRange(4, 4).IsEmpty.ShouldBeTrue();
 
     private static (IReadOnlyList<TsqlToken> Tokens, SelectStatement? Statement) Read(string sql)
     {

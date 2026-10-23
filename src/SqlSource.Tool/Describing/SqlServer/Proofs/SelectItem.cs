@@ -83,7 +83,7 @@ internal sealed record SelectItem(TokenRange Expression, string? Name, bool IsSt
         {
             var isPart = (index - range.Start) % 2 == 0;
             var token = tokens[index];
-            if (isPart ? !IsPart(token) : !token.IsSymbol("."))
+            if (isPart ? !token.IsName || token.Is("NULL") : !token.IsSymbol("."))
             {
                 return false;
             }
@@ -92,8 +92,4 @@ internal sealed record SelectItem(TokenRange Expression, string? Name, bool IsSt
         var endsWithDot = range.Count % 2 == 0;
         return endsWithDot == beforeStar;
     }
-
-    private static bool IsPart(TsqlToken token) =>
-        token.Kind == TsqlTokenKind.QuotedName
-        || (token.Kind == TsqlTokenKind.Word && token.Text[0] != '@' && !token.Is("NULL"));
 }

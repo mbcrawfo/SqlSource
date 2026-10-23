@@ -69,6 +69,18 @@ internal static class TsqlTokens
 
     private static void ReadText(string sql, int at, int end, List<TsqlToken> tokens)
     {
+        // The lexer ends a parameter at the first character that is not a letter, a digit or "_", but a variable's
+        // name goes on through "#", "$" and "@", as every name of SQL Server does: "@a#b" is one variable.
+        if (tokens.Count > 0 && tokens[^1] is { Kind: TsqlTokenKind.Parameter } parameter && parameter.End == at)
+        {
+            while (at < end && QuoteReader.IsNameCharacterOfSqlServer(sql[at]))
+            {
+                at++;
+            }
+
+            tokens[^1] = parameter with { Text = sql[parameter.Start..at], End = at };
+        }
+
         while (at < end)
         {
             var character = sql[at];

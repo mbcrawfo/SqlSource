@@ -43,6 +43,12 @@ internal readonly record struct TsqlToken(TsqlTokenKind Kind, string Text, int S
     public bool IsSymbol(string symbol) => Kind == TsqlTokenKind.Symbol && Text == symbol;
 
     /// <summary>
+    /// True for a token that can be a part of an object's or a column's name: a quoted name, or a word that does not
+    /// start with <c>@</c>, which <c>@@ROWCOUNT</c> does.
+    /// </summary>
+    public bool IsName => Kind == TsqlTokenKind.QuotedName || (Kind == TsqlTokenKind.Word && Text[0] != '@');
+
+    /// <summary>
     /// The name this token writes, without its quotes, or null for a token that writes no name.  A word is itself,
     /// <c>[a]]b]</c> is <c>a]b</c>, <c>"a""b"</c> is <c>a"b</c>, and a string, the alias of <c>'a' = expr</c>, is
     /// read the same way, <c>N'a''b'</c> as <c>a'b</c>.

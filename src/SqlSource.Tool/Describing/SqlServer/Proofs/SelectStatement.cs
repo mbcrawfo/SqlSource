@@ -46,7 +46,7 @@ internal sealed record SelectStatement(TokenRange With, IReadOnlyList<string> Ct
         while (true)
         {
             // WITH XMLNAMESPACES declares namespaces, and no CTE.
-            if (at >= end || !IsName(tokens[at]) || tokens[at].Is("XMLNAMESPACES"))
+            if (at >= end || !tokens[at].IsName || tokens[at].Is("XMLNAMESPACES"))
             {
                 return -1;
             }
@@ -87,7 +87,7 @@ internal sealed record SelectStatement(TokenRange With, IReadOnlyList<string> Ct
     // The end of a CTE's list of columns, "a, b)", or -1.
     private static int ColumnsEnd(IReadOnlyList<TsqlToken> tokens, int at, int end)
     {
-        while (at + 1 < end && IsName(tokens[at]))
+        while (at + 1 < end && tokens[at].IsName)
         {
             if (tokens[at + 1].IsSymbol(")"))
             {
@@ -104,6 +104,4 @@ internal sealed record SelectStatement(TokenRange With, IReadOnlyList<string> Ct
 
         return -1;
     }
-
-    private static bool IsName(TsqlToken token) => token.Kind is TsqlTokenKind.Word or TsqlTokenKind.QuotedName;
 }

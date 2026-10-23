@@ -170,7 +170,7 @@ internal sealed record SelectBody(
     /// <summary>
     /// The change of depth a token makes: one for <c>(</c> and <c>CASE</c>, minus one for <c>)</c> and <c>END</c>.
     /// </summary>
-    private static int DepthChange(TsqlToken token)
+    internal static int DepthChange(TsqlToken token)
     {
         if (token.Is("CASE"))
         {
@@ -421,14 +421,14 @@ internal sealed record SelectBody(
     {
         var at = from.Start;
         var parts = 0;
-        while (at < from.End && IsName(tokens[at]))
+        while (at < from.End && tokens[at].IsName)
         {
             parts++;
             at++;
             if (at < from.End && tokens[at].IsSymbol("."))
             {
                 at++;
-                if (at >= from.End || !IsName(tokens[at]))
+                if (at >= from.End || !tokens[at].IsName)
                 {
                     return false;
                 }
@@ -451,13 +451,13 @@ internal sealed record SelectBody(
         if (at < from.End && tokens[at].Is("AS"))
         {
             at++;
-            if (at >= from.End || !IsName(tokens[at]))
+            if (at >= from.End || !tokens[at].IsName)
             {
                 return false;
             }
         }
 
-        if (at < from.End && IsName(tokens[at]) && !tokens[at].Is("WITH"))
+        if (at < from.End && tokens[at].IsName && !tokens[at].Is("WITH"))
         {
             at++;
         }
@@ -469,7 +469,4 @@ internal sealed record SelectBody(
 
         return at == from.End;
     }
-
-    private static bool IsName(TsqlToken token) =>
-        token.Kind == TsqlTokenKind.QuotedName || (token.Kind == TsqlTokenKind.Word && token.Text[0] != '@');
 }
