@@ -113,8 +113,10 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     /// </summary>
     /// <remarks>
     /// Npgsql 10.0.3 (<c>NpgsqlConnector.GetPassword</c>) takes the password of the data source, which is the
-    /// string's <c>Password</c>; then the data source's <c>ProvidePasswordCallback</c>, which the tool does not set;
-    /// then <c>PGPASSWORD</c>; then the entry of a password file that matches the host, port, database and user.
+    /// string's <c>Password</c> or that of a provider set with <c>NpgsqlDataSourceBuilder.UsePasswordProvider</c> or
+    /// <c>UsePeriodicPasswordProvider</c>; then the connection's <c>ProvidePasswordCallback</c>; then
+    /// <c>PGPASSWORD</c>; then the entry of a password file that matches the host, port, database and user.  The tool
+    /// sets no provider and no callback.
     /// The file is the string's <c>Passfile</c>, else <c>PGPASSFILE</c>, else the default one, read only when it
     /// exists.  So <c>PGPASSWORD</c> is given when the string has no <c>Password</c>, and when it has neither the
     /// password of every entry of each file it could read is (<see cref="PasswordFile" />): which entry matches is
