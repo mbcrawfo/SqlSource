@@ -1,4 +1,6 @@
 using System;
+using System.Threading.Tasks;
+using Npgsql;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
@@ -54,4 +56,50 @@ public sealed class PostgresLiveTests
         Should.Throw<ArgumentException>(() =>
             PostgresLive.SetTexts(new PostgresExplainRequest("sqlsource_1", 0, ["work_mem=1"]))
         );
+
+    // An NpgsqlException, whatever its cause, is the answer's error, made by errorOf: even one thrown after a
+    // cancellation, since a cancelled command is an error of the server's own.
+    [Fact]
+    public async Task AnswerAsync_CallThatThrowsAnNpgsqlException_IsTheFailedAnswer()
+    {
+        var thrown = new NpgsqlException("the connection failed");
+        NpgsqlException? seen = null;
+
+        var answer = await PostgresLive.AnswerAsync(
+            () => throw thrown,
+            exception =>
+            {
+                seen = exception;
+                return new PostgresServerError("08006", "made by errorOf", null, null, null);
+            },
+            error => new PostgresDeallocateAnswer(error)
+        );
+
+        seen.ShouldBeSameAs(thrown);
+        answer.ShouldBe(
+            new PostgresDeallocateAnswer(new PostgresServerError("08006", "made by errorOf", null, null, null))
+        );
+    }
+
+    [Fact]
+    public async Task AnswerAsync_CallThatIsCancelled_Throws() =>
+        await Should.ThrowAsync<OperationCanceledException>(() =>
+            PostgresLive.AnswerAsync<PostgresDeallocateAnswer>(
+                () => throw new OperationCanceledException(),
+                _ => throw new InvalidOperationException("errorOf must not run"),
+                _ => throw new InvalidOperationException("failed must not run")
+            )
+        );
+
+    [Fact]
+    public async Task AnswerAsync_CallThatAnswers_IsItsAnswer()
+    {
+        var answer = await PostgresLive.AnswerAsync(
+            () => Task.FromResult(new PostgresDeallocateAnswer(null)),
+            _ => throw new InvalidOperationException("errorOf must not run"),
+            _ => throw new InvalidOperationException("failed must not run")
+        );
+
+        answer.ShouldBe(new PostgresDeallocateAnswer(null));
+    }
 }
