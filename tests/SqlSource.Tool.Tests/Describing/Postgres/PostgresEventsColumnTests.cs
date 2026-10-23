@@ -169,9 +169,10 @@ public sealed class PostgresEventsColumnTests
         Member(check, "differs").ShouldBe(LogValue.Null);
 
         var match = log.Events[11].Members;
-        NamesOf(match).ShouldBe(["query", "result", "table"]);
+        NamesOf(match).ShouldBe(["query", "result", "tableMatch", "table"]);
         Member(match, "query").ShouldBe((LogValue)"ListUsers");
         Member(match, "result").ShouldBe((LogValue)"no-origin");
+        Member(match, "tableMatch").ShouldBe(Member(match, "result"));
         Member(match, "table").ShouldBe(LogValue.Null);
     }
 

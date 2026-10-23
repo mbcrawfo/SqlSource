@@ -57,8 +57,9 @@ public sealed class PostgresLiveTests
             PostgresLive.SetTexts(new PostgresExplainRequest("sqlsource_1", 0, ["work_mem=1"]))
         );
 
-    // An NpgsqlException, whatever its cause, is the answer's error, made by errorOf: even one thrown after a
-    // cancellation, since a cancelled command is an error of the server's own.
+    // An NpgsqlException the call throws, whatever its cause, is the answer's error, made by errorOf.  AnswerAsync has
+    // no cancellation filter: it catches by the exception's type alone, and a cancellation that is no NpgsqlException
+    // passes through, as the next test pins.
     [Fact]
     public async Task AnswerAsync_CallThatThrowsAnNpgsqlException_IsTheFailedAnswer()
     {
