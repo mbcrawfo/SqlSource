@@ -57,7 +57,7 @@ internal static class QueryTyper
         foreach (var entry in check.UsableEntries)
         {
             // The entries are in the order of their queries in the file, so each search starts after the last.
-            var at = IndexOf(file.Queries, entry.Name, next);
+            var at = QueryNames.IndexOf(file.Queries, entry.Name, next);
             if (at < 0)
             {
                 continue;
@@ -297,7 +297,7 @@ internal static class QueryTyper
     // schema already, which is found by splitting the key, as a dot inside quotes is no schema's.
     private static string AsAKey(string key, DatabaseEngine engine)
     {
-        if (!TypeKeys.TrySplit(key.AsSpan(), out var schema, out _, out _) || !schema.IsEmpty)
+        if (!TypeKeyText.TrySplit(key.AsSpan(), out var schema, out _, out _) || !schema.IsEmpty)
         {
             return key;
         }
@@ -354,19 +354,6 @@ internal static class QueryTyper
         var made = map.Count > 0 ? new OverrideLookup(map, input.MappedTypes, engine) : null;
         lookups.Add((markers, made));
         return made;
-    }
-
-    private static int IndexOf(EquatableArray<SqlQuery> queries, string name, int from)
-    {
-        for (var index = from; index < queries.Count; index++)
-        {
-            if (string.Equals(queries[index].Name, name, StringComparison.Ordinal))
-            {
-                return index;
-            }
-        }
-
-        return -1;
     }
 
     // What the typing of one query reads, and where its error goes.
@@ -461,14 +448,14 @@ internal static class QueryTyper
         private TypeOverride? EntryOf(PostgresType type, string suffix)
         {
             var key = PostgresTypeMap.KeyOf(type);
-            var bare = TypeKeys.WritePart(type.InternalName);
+            var bare = TypeKeyText.WritePart(type.InternalName);
             return TypeOverrideMap.Find(_map, key + suffix)
                 ?? (key.Length > bare.Length && IsExtension(type) ? TypeOverrideMap.Find(_map, bare + suffix) : null);
         }
 
         private static bool IsExtension(PostgresType type) =>
             type.Kind.Equals(SidecarValues.Kind.Base, StringComparison.Ordinal)
-            && TypeKeys.IsExtension(type.InternalName);
+            && TypeKeyNames.IsExtension(type.InternalName);
 
         private TypeMapping? MappingOf(TypeOverride entry)
         {

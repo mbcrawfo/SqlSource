@@ -48,7 +48,7 @@ internal static class PostgresTypeMap
             IsSystemType(type)
             || (
                 type.Kind.Equals(SidecarValues.Kind.Base, StringComparison.Ordinal)
-                && TypeKeys.IsExtension(type.InternalName)
+                && TypeKeyNames.IsExtension(type.InternalName)
             );
         if (isOfTheMap && IsBit(type.InternalName))
         {
@@ -97,13 +97,13 @@ internal static class PostgresTypeMap
     /// <summary>
     /// The key of <paramref name="type" />, written as the type override reads it: its <c>InternalName</c> for a type
     /// of <c>pg_catalog</c>, and <c>Schema.InternalName</c> for any other, each part in quotes when it needs them,
-    /// as <see cref="TypeKeys.WritePart" /> writes it: <c>public."Status"</c> and <c>"my schema"."order-status"</c>,
+    /// as <see cref="TypeKeyText.WritePart" /> writes it: <c>public."Status"</c> and <c>"my schema"."order-status"</c>,
     /// and in the escaped form for a name with a line break: <c>"my schema".U&amp;"Order\000AItem"</c>.
     /// </summary>
     public static string KeyOf(PostgresType type) =>
         IsSystemType(type)
-            ? TypeKeys.WritePart(type.InternalName)
-            : TypeKeys.WritePart(type.Schema) + "." + TypeKeys.WritePart(type.InternalName);
+            ? TypeKeyText.WritePart(type.InternalName)
+            : TypeKeyText.WritePart(type.Schema) + "." + TypeKeyText.WritePart(type.InternalName);
 
     /// <summary>A C# type as a user writes it in the type override, without <c>global::</c>.</summary>
     public static string AsWritten(string text) => text.Replace("global::", string.Empty);

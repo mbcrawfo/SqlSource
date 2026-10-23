@@ -272,7 +272,7 @@ public sealed class PostgresTypeMapTests
             kind = SidecarValues.Kind.Range;
         }
 
-        var schema = TypeKeys.IsExtension(internalName) ? "public" : "pg_catalog";
+        var schema = TypeKeyNames.IsExtension(internalName) ? "public" : "pg_catalog";
         var type = TestSidecars.Postgres(name: internalName, kind: kind, schema: schema, internalName: internalName);
 
         ShouldMapTo(PostgresTypeMap.Map(type, NpgsqlColumn.Npgsql8), under8, isValueType, internalName);
@@ -283,7 +283,7 @@ public sealed class PostgresTypeMapTests
     // The names a key may be written with are the map's own keys, so the map and the settings never drift apart.
     [Fact]
     public void Keys_OfTheMap_AreTheKnownPostgresNamesOfTheSettings() =>
-        PostgresTypeMap.Keys.ShouldBe(TypeKeys.KnownPostgresNames, ignoreOrder: true);
+        PostgresTypeMap.Keys.ShouldBe(TypeKeyNames.KnownPostgresNames, ignoreOrder: true);
 
     [Theory]
     [InlineData("citext", "public", "string")]

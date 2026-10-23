@@ -228,7 +228,7 @@ internal static class TypeOverrideGrammar
             else
             {
                 var start = index;
-                if (!TypeKeys.TryReadPart(entry, start, out index))
+                if (!TypeKeyText.TryReadPart(entry, start, out index))
                 {
                     return false;
                 }
@@ -298,7 +298,7 @@ internal static class TypeOverrideGrammar
         return false;
     }
 
-    private static bool IsPlain(string text) => text.All(TypeKeys.IsPlainCharacter);
+    private static bool IsPlain(string text) => text.All(TypeKeyText.IsPlainCharacter);
 
     // The first = outside double quotes, or -1.  A " toggles being inside quotes, so a doubled one inside a quoted part
     // closes and opens it again.
