@@ -29,7 +29,10 @@ internal sealed class PostgresDescriber(IReadOnlyList<string> explainSettings) :
 
     public SqlDialect Dialect => SqlDialect.PostgreSql;
 
-    public IReadOnlyList<string> SecretsOf(string connection) => PostgresConnection.SecretsOf(connection);
+    public IReadOnlyList<string> SecretsOf(string connection, Func<string, string?> getEnvironmentVariable) =>
+        PostgresConnection.SecretsOf(connection, getEnvironmentVariable);
+
+    public string? RewriteOf(string connection) => PostgresConnection.RewriteOf(connection);
 
     public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,

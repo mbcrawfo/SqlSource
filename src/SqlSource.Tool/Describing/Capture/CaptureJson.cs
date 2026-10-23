@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -14,7 +16,9 @@ namespace SqlSource.Tool.Describing.Capture;
 /// <remarks>
 /// The file is indented and its line ends are <c>\n</c> on every platform, so that a capture under version control
 /// differs line by line.  The encoder is the relaxed one, as the log's is: a capture holds SQL, and a reviewer reads
-/// its quotes and angle brackets as they are.
+/// its quotes and angle brackets as they are.  A capture is written with <see cref="Write(DescribeCapture)" /> only
+/// where it is known to hold no connection: the one that takes the connection's secret refuses a capture that holds
+/// it, and is how the fixtures are recorded.
 /// </remarks>
 internal static class CaptureJson
 {
@@ -95,7 +99,7 @@ internal static class CaptureJson
     /// </summary>
     public static string TextOf(JsonElement element) => JsonSerializer.Serialize(element, Options);
 
-    /// <summary>The file of a capture.</summary>
+    /// <summary>The file of a capture, whatever it holds.</summary>
     public static string Write(DescribeCapture capture)
     {
         using var stream = new MemoryStream();
@@ -123,6 +127,75 @@ internal static class CaptureJson
         // The writer indents with the platform's line end.  A line break inside a value is written as an escape,
         // so only the writer's own are replaced.
         return Encoding.UTF8.GetString(stream.ToArray()).Replace("\r\n", "\n", StringComparison.Ordinal) + "\n";
+    }
+
+    /// <summary>
+    /// The file of a capture, or the sentence that says it holds the connection's secret and so is not written.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A capture is a file that is committed or sent, and what a describer was answered goes into it as the server
+    /// said it, so a driver's message that quotes the connection string is in it.  The search is in the strings of
+    /// each request and each answer as they are, decoded, and not in the file's text: a quote, a backslash or a line
+    /// break is escaped in the file, and a password after an escaped line break (<c>\nhunter22</c>) has the letter
+    /// <c>n</c> before it there and is no token.  The strings of one request or answer are searched as the strings of
+    /// a log event are (<see cref="JoinedRedaction" />): each alone and joined, so that a value split over two of them
+    /// is found.
+    /// </para>
+    /// <para>
+    /// Only the values of strings are searched, and no name of a member: those are fixed by the records of the calls,
+    /// and a password that equals one, <c>answer</c> or <c>sql</c>, would refuse a capture that holds nothing.  The
+    /// answer is a refusal and not a removal: a capture is replayed, and one with a mark in place of a word would
+    /// answer a request that its describer never asked.  The failure does not name what was found.
+    /// </para>
+    /// </remarks>
+    public static Outcome<string, string> Write(DescribeCapture capture, ConnectionSecret secret) =>
+        capture.Calls.Any(call => HoldsSecret(call.Request, secret) || HoldsSecret(call.Answer, secret))
+            ? Outcome<string, string>.Failed("The capture holds the connection's value or a password of it.")
+            : Outcome<string, string>.Of(Write(capture));
+
+    private static bool HoldsSecret(JsonElement element, ConnectionSecret secret)
+    {
+        List<string> values = [];
+        StringsOf(element, values);
+        return JoinedRedaction.Of(values, secret).Where((cleaned, i) => cleaned != values[i]).Any();
+    }
+
+    // Every string value, depth first and in the order of the document; a name is not one.
+    private static void StringsOf(JsonElement element, List<string> values)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.String:
+                values.Add(element.GetString() ?? string.Empty);
+                break;
+            case JsonValueKind.Object:
+                foreach (var member in element.EnumerateObject())
+                {
+                    StringsOf(member.Value, values);
+                }
+
+                break;
+            case JsonValueKind.Array:
+                foreach (var item in element.EnumerateArray())
+                {
+                    StringsOf(item, values);
+                }
+
+                break;
+            case JsonValueKind.Undefined:
+                break;
+            case JsonValueKind.Number:
+                break;
+            case JsonValueKind.True:
+                break;
+            case JsonValueKind.False:
+                break;
+            case JsonValueKind.Null:
+                break;
+            default:
+                break;
+        }
     }
 
     /// <summary>

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
@@ -48,7 +49,13 @@ public sealed class FixtureReplayTests : IDisposable
             new CapturingExchange(LiveExchange.Instance, capture)
         );
 
-        await FixtureCaseFiles.WriteRecordingAsync(fixture, capture, expected, TestContext.Current.CancellationToken);
+        await FixtureCaseFiles.WriteRecordingAsync(
+            fixture,
+            capture,
+            expected,
+            new ConnectionSecret(Secrets.ConnectionWithMarker),
+            TestContext.Current.CancellationToken
+        );
         return describer;
     }
 
@@ -197,7 +204,10 @@ public sealed class FixtureReplayTests : IDisposable
     {
         public SqlDialect Dialect => inner.Dialect;
 
-        public IReadOnlyList<string> SecretsOf(string connection) => inner.SecretsOf(connection);
+        public IReadOnlyList<string> SecretsOf(string connection, Func<string, string?> getEnvironmentVariable) =>
+            inner.SecretsOf(connection, getEnvironmentVariable);
+
+        public string? RewriteOf(string connection) => inner.RewriteOf(connection);
 
         public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
             OpenRequest request,
