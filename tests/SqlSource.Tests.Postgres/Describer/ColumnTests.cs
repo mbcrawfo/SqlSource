@@ -165,72 +165,44 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // with its schema: pg_catalog.text, pg_catalog."char".  The name is the one it has in any other session, quotes
     // kept, and an array is its element's.  json is qualified so below 17 alone, which special-cases it.  The domains
     // named text, oid and int4 would take the casts of the describer's own SQL, and the column of a table makes it
-    // ask tables and spellings too.
+    // ask tables and spellings too; HiddenTypesCallTests asks every catalog call so.
     [Fact]
     public async Task DescribeAsync_BuiltInTypesHiddenOnTheSearchPath_AreNamedAsInAnySession()
     {
-        var token = TestContext.Current.CancellationToken;
-        await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using (
-            var create = own.CreateCommand(
+        await postgres.ExecuteAsync(ScratchSchema.HidingTypes);
+
+        var description = await Sessions.ShouldDescribeAsync(
+            $"{postgres.ConnectionString};{ScratchSchema.HidingTypesPath}",
+            DescribeRequests.Of(
                 """
-                CREATE SCHEMA td0050_shadow;
-                CREATE DOMAIN td0050_shadow.text AS integer;
-                CREATE DOMAIN td0050_shadow.jsonb AS integer;
-                CREATE DOMAIN td0050_shadow.json AS integer;
-                CREATE DOMAIN td0050_shadow.uuid AS integer;
-                CREATE DOMAIN td0050_shadow.bpchar AS integer;
-                CREATE DOMAIN td0050_shadow."char" AS integer;
-                CREATE DOMAIN td0050_shadow."bit" AS integer;
-                CREATE DOMAIN td0050_shadow.oid AS integer;
-                CREATE DOMAIN td0050_shadow.int4 AS text;
-                """
+                SELECT NULL::pg_catalog.text AS t, NULL::pg_catalog.jsonb AS j, NULL::pg_catalog.json AS js,
+                    NULL::pg_catalog.uuid AS u, NULL::pg_catalog.bpchar AS b, NULL::pg_catalog."char" AS c,
+                    NULL::pg_catalog."bit" AS bt, NULL::pg_catalog.text[] AS a, s.code, @p AS p
+                FROM public.samples AS s
+                """,
+                ("p", "pg_catalog.text")
             )
-        )
-        {
-            _ = await create.ExecuteNonQueryAsync(token);
-        }
+        );
 
-        try
-        {
-            var description = await Sessions.ShouldDescribeAsync(
-                $"{postgres.ConnectionString};Search Path=td0050_shadow,pg_catalog",
-                DescribeRequests.Of(
-                    """
-                    SELECT NULL::pg_catalog.text AS t, NULL::pg_catalog.jsonb AS j, NULL::pg_catalog.json AS js,
-                        NULL::pg_catalog.uuid AS u, NULL::pg_catalog.bpchar AS b, NULL::pg_catalog."char" AS c,
-                        NULL::pg_catalog."bit" AS bt, NULL::pg_catalog.text[] AS a, s.code, @p AS p
-                    FROM public.samples AS s
-                    """,
-                    ("p", "pg_catalog.text")
-                )
-            );
-
-            var columns = description.Columns.ShouldNotBeNull();
-            TypeNamesOf(columns)
-                .ShouldBe([
-                    "text",
-                    "jsonb",
-                    "json",
-                    "uuid",
-                    "bpchar",
-                    "\"char\"",
-                    "\"bit\"",
-                    "text[]",
-                    "character(2)",
-                    "text",
-                ]);
-            columns[7].Type.ShouldBeOfType<PostgresType>().Element.ShouldNotBeNull().Name.ShouldBe("text");
-            description
-                .Parameters.ShouldHaveSingleItem()
-                .Type.ShouldNotBeNull()
-                .ShouldSatisfyAllConditions(type => type.Name.ShouldBe("text"), type => type.BindName.ShouldBe("text"));
-        }
-        finally
-        {
-            await using var drop = own.CreateCommand("DROP SCHEMA IF EXISTS td0050_shadow CASCADE");
-            _ = await drop.ExecuteNonQueryAsync(token);
-        }
+        var columns = description.Columns.ShouldNotBeNull();
+        TypeNamesOf(columns)
+            .ShouldBe([
+                "text",
+                "jsonb",
+                "json",
+                "uuid",
+                "bpchar",
+                "\"char\"",
+                "\"bit\"",
+                "text[]",
+                "character(2)",
+                "text",
+            ]);
+        columns[7].Type.ShouldBeOfType<PostgresType>().Element.ShouldNotBeNull().Name.ShouldBe("text");
+        description
+            .Parameters.ShouldHaveSingleItem()
+            .Type.ShouldNotBeNull()
+            .ShouldSatisfyAllConditions(type => type.Name.ShouldBe("text"), type => type.BindName.ShouldBe("text"));
     }
 
     [Fact]
