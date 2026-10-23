@@ -15,7 +15,6 @@ internal delegate TypeMapping? SqlServerOverrideOf(string key);
 /// </summary>
 internal static class SqlServerTypeMap
 {
-    private const string SystemSchema = "sys";
     private const string StringKeyword = "string";
     private const string DateTime = "global::System.DateTime";
     private const string SqlServerTypesNamespace = "Microsoft.SqlServer.Types.";
@@ -71,7 +70,7 @@ internal static class SqlServerTypeMap
     /// <summary>
     /// The key of <paramref name="type" />, written as the type override reads it: the bare name of a user type of
     /// <c>sys</c>, <c>Schema.Name</c> for any other user type, and the base name of the type otherwise, each part in
-    /// quotes when it needs them, as <see cref="TypeKeys.WritePart" /> writes it: <c>dbo."Email"</c>.
+    /// quotes when it needs them, as <see cref="TypeKeyText.WritePart" /> writes it: <c>dbo."Email"</c>.
     /// </summary>
     public static string KeyOf(SqlServerType type)
     {
@@ -80,12 +79,12 @@ internal static class SqlServerTypeMap
             // A system type's name is case-insensitive: a row is keyed by its own name, so the key asked of the
             // override and the key of the mapping agree.
             var baseName = BaseName(type.Name);
-            return Rows.TryGetValue(baseName, out var row) ? row.Key : TypeKeys.WritePart(baseName);
+            return Rows.TryGetValue(baseName, out var row) ? row.Key : TypeKeyText.WritePart(baseName);
         }
 
         return IsSystemSchema(userType)
-            ? TypeKeys.WritePart(userType.Name!)
-            : TypeKeys.WritePart(userType.Schema ?? string.Empty) + "." + TypeKeys.WritePart(userType.Name!);
+            ? TypeKeyText.WritePart(userType.Name!)
+            : TypeKeyText.WritePart(userType.Schema ?? string.Empty) + "." + TypeKeyText.WritePart(userType.Name!);
     }
 
     /// <summary>
@@ -102,8 +101,7 @@ internal static class SqlServerTypeMap
     private static SqlServerUserType? UserTypeOf(SqlServerType type) =>
         string.IsNullOrEmpty(type.UserType?.Name) ? null : type.UserType;
 
-    private static bool IsSystemSchema(SqlServerUserType userType) =>
-        string.Equals(userType.Schema, SystemSchema, StringComparison.Ordinal);
+    private static bool IsSystemSchema(SqlServerUserType userType) => SystemSchemas.IsSqlServer(userType.Schema);
 
     private static Dictionary<string, Row> BuildRows()
     {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using Microsoft.Data.SqlClient;
+using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Describing.SqlServer;
 
@@ -109,7 +110,7 @@ internal static class ConnectionErrors
     /// <summary>What <c>open</c> answers for what SqlClient threw: each error's numbers, with a fixed text.</summary>
     public static SqlServerServerError AtOpen(SqlException exception)
     {
-        var timedOut = InChain<TimeoutException>(exception) is not null;
+        var timedOut = ExceptionChain.Find<TimeoutException>(exception) is not null;
         var other = OtherAtOpen(exception);
         return RowsOf(
             exception,
@@ -148,12 +149,12 @@ internal static class ConnectionErrors
     // holds no socket's error, so the order of the two is for clarity alone.
     private static string OtherAtOpen(SqlException exception)
     {
-        if (InChain<AuthenticationException>(exception) is not null)
+        if (ExceptionChain.Find<AuthenticationException>(exception) is not null)
         {
             return CertificateRefused;
         }
 
-        return InChain<SocketException>(exception) switch
+        return ExceptionChain.Find<SocketException>(exception) switch
         {
             null => SessionRefused,
             { SocketErrorCode: SocketError.Success } => UnreachablePrefix,
@@ -175,19 +176,5 @@ internal static class ConnectionErrors
         }
 
         return rows.Count == 0 ? Own(none) : new SqlServerServerError(rows);
-    }
-
-    private static T? InChain<T>(Exception exception)
-        where T : Exception
-    {
-        for (var current = exception; current is not null; current = current.InnerException)
-        {
-            if (current is T found)
-            {
-                return found;
-            }
-        }
-
-        return null;
     }
 }

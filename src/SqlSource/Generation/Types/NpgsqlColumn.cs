@@ -1,7 +1,7 @@
 namespace SqlSource.Generation.Types;
 
 /// <summary>The column of the PostgreSQL base map that a project's Npgsql chooses.</summary>
-internal enum DriverColumn
+internal enum NpgsqlColumn
 {
     /// <summary>Npgsql 8 or 9, which box the same type for every type, or an Npgsql older than 8.</summary>
     Npgsql8,

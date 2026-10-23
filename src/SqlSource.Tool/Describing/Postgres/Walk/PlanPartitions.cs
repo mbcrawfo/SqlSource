@@ -126,7 +126,7 @@ internal static class PlanPartitions
     /// </summary>
     public static string WithoutAlias(string entry, string alias)
     {
-        if (PlanExpression.Tokens.Read(entry) is not { } tokens)
+        if (PlanTokens.Read(entry) is not { } tokens)
         {
             return entry;
         }
@@ -137,11 +137,11 @@ internal static class PlanPartitions
         {
             var token = tokens[index];
             string? name = null;
-            if (token.Kind == PlanExpression.Kind.Word)
+            if (token.Kind == PlanTokens.Kind.Word)
             {
                 name = entry[token.Start..token.End];
             }
-            else if (token.Kind == PlanExpression.Kind.QuotedName)
+            else if (token.Kind == PlanTokens.Kind.QuotedName)
             {
                 name = PostgresIdentifiers.Unquote(entry.AsSpan(token.Start, token.End - token.Start));
             }
@@ -161,6 +161,6 @@ internal static class PlanPartitions
     }
 
     // Whether the token is a "." that stands at the index.
-    private static bool IsDotAt(PlanExpression.Token token, int at) =>
-        token.Kind == PlanExpression.Kind.Dot && token.Start == at;
+    private static bool IsDotAt(PlanTokens.Token token, int at) =>
+        token.Kind == PlanTokens.Kind.Dot && token.Start == at;
 }

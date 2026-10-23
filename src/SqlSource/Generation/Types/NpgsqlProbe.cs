@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
+using SqlSource.Diagnostics;
 
 namespace SqlSource.Generation.Types;
 
@@ -18,7 +20,7 @@ namespace SqlSource.Generation.Types;
 /// The version of the referenced assembly named <c>Npgsql</c>, or null when there is none.  For the diagnostics
 /// alone: the flags choose the column.
 /// </param>
-internal sealed record NpgsqlProbe(bool Referenced, bool AtLeast8, bool AtLeast10, Version? Version)
+internal sealed record NpgsqlProbe(bool Referenced, bool AtLeast8, bool AtLeast10, Version? Version) : IDriverProbe
 {
     private const string AssemblyName = "Npgsql";
 
@@ -26,12 +28,12 @@ internal sealed record NpgsqlProbe(bool Referenced, bool AtLeast8, bool AtLeast1
     private const int NewestKnownMajor = 10;
 
     /// <summary>The column of the base map that the driver chooses.</summary>
-    public DriverColumn Column =>
+    public NpgsqlColumn Column =>
         (AtLeast10, Referenced) switch
         {
-            (true, _) => DriverColumn.Npgsql10,
-            (_, true) => DriverColumn.Npgsql8,
-            _ => DriverColumn.None,
+            (true, _) => NpgsqlColumn.Npgsql10,
+            (_, true) => NpgsqlColumn.Npgsql8,
+            _ => NpgsqlColumn.None,
         };
 
     /// <summary>Whether the project references an Npgsql older than 8.0, which is <c>SQLSRC247</c>.</summary>
@@ -41,6 +43,23 @@ internal sealed record NpgsqlProbe(bool Referenced, bool AtLeast8, bool AtLeast1
     /// Whether the project references an Npgsql of a major newer than the map knows, which is <c>SQLSRC248</c>.
     /// </summary>
     public bool IsNewerThanKnown => Referenced && Version is { Major: > NewestKnownMajor };
+
+    /// <inheritdoc />
+    public IEnumerable<DriverFinding> Findings
+    {
+        get
+        {
+            if (IsBelowTheFloor)
+            {
+                yield return new DriverFinding(SqlDiagnostics.NpgsqlTooOld, VersionText);
+            }
+
+            if (IsNewerThanKnown)
+            {
+                yield return new DriverFinding(SqlDiagnostics.NpgsqlNewerThanKnown, VersionText);
+            }
+        }
+    }
 
     /// <summary>The version as a diagnostic names it: its first three parts, as a package's version has.</summary>
     public string VersionText =>
@@ -73,13 +92,10 @@ internal sealed record NpgsqlProbe(bool Referenced, bool AtLeast8, bool AtLeast1
         }
 
         return new NpgsqlProbe(
-            Has(compilation, "Npgsql.NpgsqlConnection"),
-            Has(compilation, "Npgsql.NpgsqlSlimDataSourceBuilder"),
-            Has(compilation, "NpgsqlTypes.NpgsqlCube"),
+            DriverProbes.Has(compilation, "Npgsql.NpgsqlConnection"),
+            DriverProbes.Has(compilation, "Npgsql.NpgsqlSlimDataSourceBuilder"),
+            DriverProbes.Has(compilation, "NpgsqlTypes.NpgsqlCube"),
             version
         );
     }
-
-    private static bool Has(Compilation compilation, string metadataName) =>
-        !compilation.GetTypesByMetadataName(metadataName).IsEmpty;
 }

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
+using SqlSource.Parsing.Quoting;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 
@@ -53,9 +54,6 @@ internal static class SqlServerErrors
     /// </summary>
     public const int RefusedBatch = 11501;
 
-    /// <summary>The reason of <c>SQLSRC228</c> for a type the database lacks: <c>2715</c> or <c>2724</c>.</summary>
-    public const string NoSuchType = "the database has no such type";
-
     public const string NoSuchTypeHelp =
         "write a type the database has, with its schema when it is not a built-in type: dbo.Email";
 
@@ -94,13 +92,7 @@ internal static class SqlServerErrors
     /// and a missing database are not the server rejecting a query.
     /// </summary>
     public static DescribeFailure Open(SqlServerServerError error, string database) =>
-        new(
-            ToolDiagnostics.DatabaseCannotBeOpened,
-            new EquatableArray<string>([database]),
-            null,
-            ServerLines(error),
-            OpenHelp
-        );
+        DescribeFailures.Open(database, ServerLines(error), OpenHelp);
 
     /// <summary>
     /// <c>SQLSRC235</c>: the server's major is below <see cref="SqlServerSession.MinimumMajorVersion" /> and it is
@@ -110,19 +102,11 @@ internal static class SqlServerErrors
     /// <param name="database">The database.</param>
     /// <param name="version">The server's <c>ProductVersion</c>, as it is recorded.</param>
     public static DescribeFailure VersionNotSupported(string database, string version) =>
-        new(
-            ToolDiagnostics.ServerVersionNotSupported,
-            new EquatableArray<string>([
-                database,
-                Engine,
-                version,
-                SqlServerSession.MinimumMajorVersion.ToString(CultureInfo.InvariantCulture)
-                    + " ("
-                    + MinimumRelease
-                    + ")",
-            ]),
-            null,
-            EquatableArray<string>.Empty,
+        DescribeFailures.VersionNotSupported(
+            database,
+            Engine,
+            version,
+            SqlServerSession.MinimumMajorVersion.ToString(CultureInfo.InvariantCulture) + " (" + MinimumRelease + ")",
             VersionNotSupportedHelp
         );
 
@@ -185,7 +169,7 @@ internal static class SqlServerErrors
         }
 
         return errors.Any(static row => row.Number is TypeNotFound or InvalidDataType)
-            ? DeclaredType(query, parameter, NoSuchType, lines, NoSuchTypeHelp)
+            ? DeclaredType(query, parameter, DescribeFailures.NoSuchType, lines, NoSuchTypeHelp)
             : DeclaredType(query, parameter, NotAType, lines, NotATypeHelp);
     }
 
@@ -412,9 +396,11 @@ internal static class SqlServerErrors
         EquatableArray<string> serverLines,
         string help
     ) =>
-        new(
-            ToolDiagnostics.DeclaredTypeNotValid,
-            new EquatableArray<string>([parameter.Type ?? string.Empty, Written(parameter.Name), query.Name, reason]),
+        DescribeFailures.DeclaredType(
+            query,
+            Written(parameter.Name),
+            parameter.Type,
+            reason,
             DescribeStep.ResolveType,
             serverLines,
             help
@@ -440,7 +426,7 @@ internal static class SqlServerErrors
             while (at >= 0)
             {
                 var end = at + 1;
-                while (end < message.Length && IsNamePart(message[end]))
+                while (end < message.Length && QuoteReader.IsNameCharacterOfSqlServer(message[end]))
                 {
                     end++;
                 }
@@ -453,8 +439,4 @@ internal static class SqlServerErrors
 
         return named;
     }
-
-    // A character that continues a T-SQL name after its "@": a letter, a digit, "_", "@", "#" or "$".
-    private static bool IsNamePart(char character) =>
-        char.IsLetterOrDigit(character) || character is '_' or '@' or '#' or '$';
 }

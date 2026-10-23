@@ -2,6 +2,7 @@ using System;
 using System.Collections.Frozen;
 using System.Globalization;
 using SqlSource.Parsing;
+using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Describing.Postgres.Statements;
 
@@ -110,7 +111,7 @@ internal static class StatementShape
         // The "(" before the first word: the statement's own depth.
         var leading = 0;
         string? previous = null;
-        foreach (var lexeme in PostgresSql.Lex(sql))
+        foreach (var lexeme in DescriberSql.Lex(sql, SqlDialectRules.PostgreSql))
         {
             if (lexeme.Kind is SqlLexemeKind.LineComment or SqlLexemeKind.BlockComment or SqlLexemeKind.Hint)
             {
@@ -206,7 +207,7 @@ internal static class StatementShape
     /// </exception>
     public static string? PositionalParameter(string sql)
     {
-        foreach (var lexeme in PostgresSql.Lex(sql))
+        foreach (var lexeme in DescriberSql.Lex(sql, SqlDialectRules.PostgreSql))
         {
             if (lexeme.Kind != SqlLexemeKind.Text)
             {

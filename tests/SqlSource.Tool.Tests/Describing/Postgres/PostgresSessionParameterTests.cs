@@ -44,7 +44,7 @@ public sealed class PostgresSessionParameterTests
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC228");
-        failure.Arguments.ShouldBe(["varchar(50)", "@name", "Q", PostgresErrors.NoSuchType]);
+        failure.Arguments.ShouldBe(["varchar(50)", "@name", "Q", DescribeFailures.NoSuchType]);
         exchange.Unused.ShouldBeEmpty();
     }
 

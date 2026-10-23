@@ -10,7 +10,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Postgres.Columns;
 
 // The six checks of the table match, in the format's order: the first that fails is the answer.
-public sealed class TableMatcherTests
+public sealed class PostgresTableMatcherTests
 {
     // Attribute 3 was dropped: the answer of "tables" leaves a dropped attribute out, so the numbers have a gap.
     private static readonly PostgresTableRow Items = PostgresTables.TableOf(
@@ -68,7 +68,7 @@ public sealed class TableMatcherTests
         [.. table.Columns.Select(attribute => From(table, attribute.Attnum))];
 
     private static (SidecarTable? Table, string Result) Match(params Cell[] cells) =>
-        TableMatcher.Match(
+        PostgresTableMatcher.Match(
             [.. cells.Select(static cell => cell.Column)],
             [.. cells.Select(static cell => cell.Origin)]
         );
@@ -268,11 +268,12 @@ public sealed class TableMatcherTests
 
     // A statement without rows has no match, and the session never asks for one.
     [Fact]
-    public void Match_NoColumn_Throws() => Should.Throw<InvalidOperationException>(() => TableMatcher.Match([], []));
+    public void Match_NoColumn_Throws() =>
+        Should.Throw<InvalidOperationException>(() => PostgresTableMatcher.Match([], []));
 
     [Fact]
     public void Match_OriginsOfAnotherCount_Throws() =>
-        Should.Throw<InvalidOperationException>(() => TableMatcher.Match([From(Items, 1).Column], []));
+        Should.Throw<InvalidOperationException>(() => PostgresTableMatcher.Match([From(Items, 1).Column], []));
 
     // A column and where it comes from, as the session holds the two side by side.
     private sealed record Cell(SidecarColumn Column, ColumnOrigin? Origin)

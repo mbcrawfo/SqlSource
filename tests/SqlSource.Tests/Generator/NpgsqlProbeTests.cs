@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using Shouldly;
+using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Types;
 using SqlSource.Parsing;
@@ -135,19 +136,19 @@ public sealed class NpgsqlProbeTests
             "8" => (
                 NpgsqlReferences.Npgsql8,
                 new NpgsqlProbe(true, true, false, new Version(8, 0, 3, 0)),
-                DriverColumn.Npgsql8
+                NpgsqlColumn.Npgsql8
             ),
             "9" => (
                 NpgsqlReferences.Npgsql9,
                 new NpgsqlProbe(true, true, false, new Version(9, 0, 3, 0)),
-                DriverColumn.Npgsql8
+                NpgsqlColumn.Npgsql8
             ),
             "10" => (
                 NpgsqlReferences.Npgsql10,
                 new NpgsqlProbe(true, true, true, new Version(10, 0, 3, 0)),
-                DriverColumn.Npgsql10
+                NpgsqlColumn.Npgsql10
             ),
-            "none" => (null, new NpgsqlProbe(false, false, false, null), DriverColumn.None),
+            "none" => (null, new NpgsqlProbe(false, false, false, null), NpgsqlColumn.None),
             _ => throw new ArgumentOutOfRangeException(nameof(driver), driver, "No such driver."),
         };
 
@@ -158,6 +159,48 @@ public sealed class NpgsqlProbeTests
         probe.ShouldBe(expected);
         probe.Column.ShouldBe(column);
     }
+
+    [Fact]
+    public void Findings_ProbeBelowTheFloor_IsSqlsrc247WithTheVersion() =>
+        new NpgsqlProbe(true, false, false, new Version(7, 0, 4, 0)).Findings.ShouldBe([
+            new DriverFinding(SqlDiagnostics.NpgsqlTooOld, "7.0.4"),
+        ]);
+
+    [Fact]
+    public void Findings_ProbeNewerThanKnown_IsSqlsrc248WithTheVersion() =>
+        new NpgsqlProbe(true, true, true, new Version(11, 0, 1, 0)).Findings.ShouldBe([
+            new DriverFinding(SqlDiagnostics.NpgsqlNewerThanKnown, "11.0.1"),
+        ]);
+
+    [Fact]
+    public void Findings_ProbeBelowTheFloorAndNewerThanKnown_IsTooOldThenNewer() =>
+        new NpgsqlProbe(true, false, false, new Version(11, 0, 0, 0)).Findings.ShouldBe([
+            new DriverFinding(SqlDiagnostics.NpgsqlTooOld, "11.0.0"),
+            new DriverFinding(SqlDiagnostics.NpgsqlNewerThanKnown, "11.0.0"),
+        ]);
+
+    [Fact]
+    public void Findings_ReferencedProbeWithoutAVersion_NamesTheVersionAsUnknown() =>
+        new NpgsqlProbe(true, false, false, null).Findings.ShouldBe([
+            new DriverFinding(SqlDiagnostics.NpgsqlTooOld, "of an unknown version"),
+        ]);
+
+    [Theory]
+    [InlineData(false, false, false, null)]
+    [InlineData(true, true, false, "8.0.3")]
+    [InlineData(true, true, true, "10.0.3")]
+    public void Findings_ProbeOfAKnownVersion_IsEmpty(
+        bool referenced,
+        bool atLeast8,
+        bool atLeast10,
+        string? version
+    ) =>
+        new NpgsqlProbe(
+            referenced,
+            atLeast8,
+            atLeast10,
+            version is null ? null : Version.Parse(version)
+        ).Findings.ShouldBeEmpty();
 
     [Fact]
     public void Run_NpgsqlBelowTheFloor_IsSqlsrc247Once()
@@ -172,7 +215,7 @@ public sealed class NpgsqlProbeTests
 
         oneFile.Diagnostics.ShouldBe([Expected]);
         oneFile.SeverityOf("SQLSRC247").ShouldBe(DiagnosticSeverity.Error);
-        StepOutputs.Single<NpgsqlProbe>(oneFile, TrackingNames.NpgsqlProbe).Column.ShouldBe(DriverColumn.Npgsql8);
+        StepOutputs.Single<NpgsqlProbe>(oneFile, TrackingNames.NpgsqlProbe).Column.ShouldBe(NpgsqlColumn.Npgsql8);
         twoFiles.Diagnostics.ShouldBe([Expected]);
     }
 
@@ -188,7 +231,7 @@ public sealed class NpgsqlProbeTests
                 + "SqlSource knows.  Its models use the types of Npgsql 10.",
         ]);
         run.SeverityOf("SQLSRC248").ShouldBe(DiagnosticSeverity.Info);
-        StepOutputs.Single<NpgsqlProbe>(run, TrackingNames.NpgsqlProbe).Column.ShouldBe(DriverColumn.Npgsql10);
+        StepOutputs.Single<NpgsqlProbe>(run, TrackingNames.NpgsqlProbe).Column.ShouldBe(NpgsqlColumn.Npgsql10);
     }
 
     // A query at Sql needs no entry, and one of a file under mssql needs one that is not of postgres: neither reads a

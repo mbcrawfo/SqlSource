@@ -17,8 +17,6 @@ namespace SqlSource.Generation.Emitting;
 /// </remarks>
 internal static class MethodWriter
 {
-    private const string Indent = "    ";
-
     private const string SpanName = "span";
 
     private const string StateName = "state";
@@ -42,9 +40,9 @@ internal static class MethodWriter
     )
     {
         var parameters = GetParameters(segments);
-        var bodyIndent = indent + Indent;
-        var argumentIndent = bodyIndent + Indent;
-        var stepIndent = argumentIndent + Indent;
+        var bodyIndent = indent + GeneratedText.Indent;
+        var argumentIndent = bodyIndent + GeneratedText.Indent;
+        var stepIndent = argumentIndent + GeneratedText.Indent;
         var span = GetUnusedName(SpanName, parameters);
         var state = GetUnusedName(StateName, parameters);
 

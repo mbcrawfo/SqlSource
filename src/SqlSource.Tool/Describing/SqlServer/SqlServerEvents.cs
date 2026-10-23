@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing.SqlServer;
@@ -130,11 +131,12 @@ internal static class SqlServerEvents
     ) =>
         log.Write(
             SqlServerCallNames.Table,
-            new("query", query),
-            new("schema", request.Schema),
-            new("table", request.Table),
-            DescribedOf(answer.Error, answer.Errors, answer.Rows, ColumnRowOf),
-            new(Duration, durationMs)
+            [
+                new("query", query),
+                .. DescriberEvents.TableMembers(request.Schema, request.Table),
+                DescribedOf(answer.Error, answer.Errors, answer.Rows, ColumnRowOf),
+                new(Duration, durationMs),
+            ]
         );
 
     /// <summary>
@@ -147,25 +149,14 @@ internal static class SqlServerEvents
     public static void Column(IRunLog log, string query, SidecarColumn column, string? noOriginReason) =>
         log.Write(
             "column",
-            new("query", query),
-            new("ordinal", column.Ordinal),
-            new("name", column.Name),
-            new("type", column.Type.Name),
-            new(
-                "origin",
-                column.Origin is { } origin
-                    ? LogValue.MapOf(
-                        new("schema", origin.Schema),
-                        new("table", origin.Table),
-                        new("column", origin.Column)
-                    )
-                    : LogValue.Null
-            ),
-            new("noOrigin", noOriginReason),
-            new("nullable", LogValue.Of(column.Nullable)),
-            new("nullableSource", column.NullableSource),
-            new("identity", LogValue.Of(column.Identity)),
-            new("computed", LogValue.Of(column.Computed))
+            [
+                .. DescriberEvents.ColumnHead(query, column),
+                new("noOrigin", noOriginReason),
+                new("nullable", LogValue.Of(column.Nullable)),
+                new("nullableSource", column.NullableSource),
+                new("identity", LogValue.Of(column.Identity)),
+                new("computed", LogValue.Of(column.Computed)),
+            ]
         );
 
     /// <summary>
@@ -174,15 +165,7 @@ internal static class SqlServerEvents
     /// <c>column</c> is.
     /// </summary>
     public static void TableMatch(IRunLog log, string query, SidecarTable? table, string tableMatch) =>
-        log.Write(
-            "table-match",
-            new("query", query),
-            new("tableMatch", tableMatch),
-            new(
-                "table",
-                table is null ? LogValue.Null : LogValue.MapOf(new("schema", table.Schema), new("table", table.Table))
-            )
-        );
+        log.Write("table-match", [new("query", query), .. DescriberEvents.TableMatchTail(table, tableMatch)]);
 
     // The answer of a call of sys.dm_exec_describe_first_result_set: the error of the call, the error rows of the
     // describe, or its rows, each a map.

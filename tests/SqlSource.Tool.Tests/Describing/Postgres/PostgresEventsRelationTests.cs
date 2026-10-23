@@ -225,8 +225,10 @@ public sealed class PostgresEventsRelationTests
         ids.Values[7].Name.ShouldBe("hasInsteadRule");
         ids.Values[7].Value.ShouldBe(LogValue.Null);
         var match = log.Events[6].Members;
+        NamesOf(match).ShouldBe(["query", "result", "tableMatch", "table"]);
         Member(match, "query").ShouldBe((LogValue)"ListIds");
         Member(match, "result").ShouldBe((LogValue)"matched");
+        Member(match, "tableMatch").ShouldBe(Member(match, "result"));
         Member(match, "table").ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "users")));
     }
 
