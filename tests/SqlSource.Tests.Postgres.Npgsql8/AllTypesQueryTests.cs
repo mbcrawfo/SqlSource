@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using Dapper;
 using Npgsql;
@@ -29,15 +28,13 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
     [Fact]
     public void Build_AllTypes_HasNpgsql8sTypes()
     {
-        var properties = typeof(AllTypesDto)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .ToDictionary(static property => property.Name, static property => property.PropertyType);
+        var properties = ModelReflection.TypedPropertiesOf(typeof(AllTypesDto));
 
-        properties["DateValue"].ShouldBe(typeof(DateTime?));
-        properties["TimeValue"].ShouldBe(typeof(TimeSpan?));
-        properties["CidrValue"].ShouldBe(typeof(NpgsqlCidr?));
-        properties["DaterangeValue"].ShouldBe(typeof(NpgsqlRange<DateTime>?));
-        properties["DatemultirangeValue"].ShouldBe(typeof(NpgsqlRange<DateTime>[]));
+        properties.ShouldContain(("DateValue", typeof(DateTime?), true));
+        properties.ShouldContain(("TimeValue", typeof(TimeSpan?), true));
+        properties.ShouldContain(("CidrValue", typeof(NpgsqlCidr?), true));
+        properties.ShouldContain(("DaterangeValue", typeof(NpgsqlRange<DateTime>?), true));
+        properties.ShouldContain(("DatemultirangeValue", typeof(NpgsqlRange<DateTime>[]), true));
     }
 
     [Fact]

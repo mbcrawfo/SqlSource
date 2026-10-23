@@ -496,6 +496,7 @@
           "Shouldly": "[4.3.0, )",
           "SqlSource": "[0.1.0-dev, )",
           "Testcontainers.MsSql": "[4.16.0, )",
+          "xunit.v3.assert": "[4.0.1, )",
           "xunit.v3.extensibility.core": "[4.0.1, )"
         }
       },
@@ -513,6 +514,7 @@
       "sqlsource.tool.testing": {
         "type": "Project",
         "dependencies": {
+          "Dapper": "[2.1.89, )",
           "Microsoft.CodeAnalysis.CSharp": "[5.9.0, )",
           "Shouldly": "[4.3.0, )",
           "SqlSource": "[0.1.0-dev, )",

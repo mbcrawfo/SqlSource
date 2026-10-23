@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Testing;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
@@ -19,7 +20,9 @@ public sealed class RealisticNullabilityNoiseTests(PostgresContainer postgres)
 
     [Fact]
     public void Budgets_RecordedMajors_EachHoldOneAndNoOtherDoes() =>
-        Budgets.Keys.Order().ShouldBe(PostgresContainer.RecordedMajors.Order(), "a recorded major and a budget differ");
+        Budgets
+            .Keys.Order()
+            .ShouldBe(EngineImage.Postgres.RecordedMajors.Order(), "a recorded major and a budget differ");
 
     [Fact]
     public async Task Noise_OverTheCorpus_IsTheBudget()
@@ -29,14 +32,14 @@ public sealed class RealisticNullabilityNoiseTests(PostgresContainer postgres)
         var held = Budgets[major];
 
         var count = 0;
-        foreach (var found in RealisticCases.All.Where(candidate => candidate.Refusal is null))
+        foreach (var found in RealisticCases.Corpus.All.Where(candidate => candidate.Refusal is null))
         {
             if (!found.RunsOn(major))
             {
                 continue;
             }
 
-            var described = await RealisticDescribe.DescribeOnceAsync(found, postgres.RealisticConnectionString);
+            var described = await RealisticCases.Describe.DescribeOnceAsync(found, postgres.RealisticConnectionString);
             count += RealisticNoise.CountOf(found, RealisticDescriptions.ColumnsOf(found, described));
         }
 

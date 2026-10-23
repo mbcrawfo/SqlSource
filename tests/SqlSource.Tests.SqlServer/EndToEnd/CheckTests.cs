@@ -19,7 +19,7 @@ public sealed class CheckTests(SqlServerContainer sqlServer)
 {
     // The sidecars under EndToEnd/ and Realistic/Cases/.
     private static IEnumerable<string> Sidecars() =>
-        new[] { RepositoryPaths.EndToEnd, RepositoryPaths.RealisticCases }.SelectMany(static folder =>
+        new[] { RepositoryPaths.EndToEnd, RealisticCases.Corpus.Cases }.SelectMany(static folder =>
             Directory.EnumerateFiles(folder, "*.sql.json", SearchOption.AllDirectories)
         );
 
@@ -40,7 +40,7 @@ public sealed class CheckTests(SqlServerContainer sqlServer)
             .. Connection(SqlServerContainer.RealisticDatabase),
         ];
 
-        var withModels = RealisticCases.All.Where(static found => found.HasModels).ToList();
+        var withModels = RealisticCases.Corpus.All.Where(static found => found.HasModels).ToList();
         var checkedHere = withModels.Where(found => found.IsCheckedOn(sqlServer.Major)).ToList();
         if (sqlServer.Major >= 17 && checkedHere.Count == withModels.Count)
         {

@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using Shouldly;
-using SqlSource.Generation.Models;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Generation;
@@ -13,44 +10,6 @@ public sealed class RealisticModelNullabilityTests
 {
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
-    public void Model_Case_IsAsNullableAsItsTruthOrWider(string name)
-    {
-        var found = RealisticCases.ReadNamed(name);
-        RealisticModels.SkipUnlessHasModels(found);
-
-        var model = RealisticModels.OutputModelOf(RealisticModels.EntryOf(found));
-        var properties = RealisticModels.PropertiesOf(model);
-
-        properties.Count.ShouldBe(
-            found.Columns.Count,
-            $"{found} has {found.Columns.Count} columns in its truth, and {model.Name} {properties.Count} properties"
-        );
-        var failures = new List<string>();
-        for (var index = 0; index < found.Columns.Count; index++)
-        {
-            var column = found.Columns[index];
-            var property = properties[index];
-            var expected = PropertyNames.PascalCase(column.Name);
-            if (property.Name != expected)
-            {
-                failures.Add(
-                    $"{found} column {index} {column.Name} is the property {model.Name}.{property.Name}, which "
-                        + $"should be named {expected}"
-                );
-            }
-
-            if (column.Nullable && !RealisticModels.IsNullable(property))
-            {
-                failures.Add(
-                    $"{found} column {index} {column.Name} can be NULL ({column.Why}), and the property "
-                        + $"{model.Name}.{property.Name} of {property.PropertyType.Name} is not nullable"
-                );
-            }
-        }
-
-        if (failures.Count > 0)
-        {
-            Assert.Fail(string.Join('\n', failures));
-        }
-    }
+    public void Model_Case_IsAsNullableAsItsTruthOrWider(string name) =>
+        RealisticCases.Models.ShouldBeAsNullableAsItsTruth(RealisticCases.Corpus.ReadNamed(name));
 }

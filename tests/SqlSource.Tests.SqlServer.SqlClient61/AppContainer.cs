@@ -8,13 +8,13 @@ using Xunit;
 
 namespace SqlSource.Tests.SqlServer.SqlClient61;
 
-// A SQL Server of DefaultImages.SqlServer, the end-to-end project's default image, with the end-to-end database "app":
-// its schema, its seed and the table of the types of SQL Server 2025.
+// A SQL Server of EngineImage.SqlServer.Default, the end-to-end project's default image, with the end-to-end database
+// "app": its schema, its seed and the table of the types of SQL Server 2025.
 public sealed class AppContainer : IAsyncLifetime
 {
     private const string Database = "app";
 
-    // Set by InitializeAsync, which starts it through SqlServerStart (TD-0072).
+    // Set by InitializeAsync, which starts it through EngineImage, and that through SqlServerStart (TD-0072).
     private MsSqlContainer? _container;
 
     // Of the database "app".  The container's own string trusts the server's certificate.
@@ -24,7 +24,10 @@ public sealed class AppContainer : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         var token = TestContext.Current.CancellationToken;
-        _container = await SqlServerStart.StartAsync(new MsSqlBuilder(DefaultImages.SqlServer).Build, token);
+        _container = await EngineImage.SqlServer.StartAsync(
+            new MsSqlBuilder(EngineImage.SqlServer.Default).Build,
+            token
+        );
         try
         {
             await using var server = SqlClientFactory.Instance.CreateDataSource(Container.GetConnectionString());

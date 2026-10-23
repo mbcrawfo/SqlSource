@@ -7,16 +7,15 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SqlSource.Generation;
-using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
-namespace SqlSource.Tests.SqlServer.Realistic.Generation;
+namespace SqlSource.Tool.Testing.Realistic;
 
-// A class of RealisticQueries.cs and the case whose query.sql its attribute claims.
+// A class of a corpus's RealisticQueries.cs and the case whose query.sql its attribute claims.
 internal sealed record RealisticClaim(string TypeName, string Case);
 
-// The claims of RealisticQueries.cs, read from its source with Roslyn and not by reflection, so that a test of them
-// names the case and the class and needs no generated type.
+// The claims of a corpus's RealisticQueries.cs, read from its source with Roslyn and not by reflection, so that a test
+// of them names the case and the class and needs no generated type.
 internal static partial class RealisticClaims
 {
     // The attribute as the generator names it, without its namespace and the suffix Attribute, as the file writes it.
@@ -24,8 +23,9 @@ internal static partial class RealisticClaims
         .AttributeMetadataName[(AttributeSource.AttributeMetadataName.LastIndexOf('.') + 1)..]
         .Replace("Attribute", "", StringComparison.Ordinal);
 
-    // Every claim of the file, in its order, read afresh each time.
-    public static IReadOnlyList<RealisticClaim> All => Parse(File.ReadAllText(RepositoryPaths.RealisticQueries));
+    // Every claim of the corpus's file, in its order, read afresh each time.
+    public static IReadOnlyList<RealisticClaim> AllOf(RealisticCorpus corpus) =>
+        Parse(File.ReadAllText(corpus.Queries));
 
     public static IReadOnlyList<RealisticClaim> Parse(string source) =>
         [
@@ -42,20 +42,20 @@ internal static partial class RealisticClaims
         ];
 
     // The one claim of the case, which a case with models has.
-    public static RealisticClaim Of(RealisticCase found)
+    public static RealisticClaim Of(RealisticCorpus corpus, RealisticCase found)
     {
-        var claims = All.Where(claim => claim.Case == found.Name).ToList();
+        var claims = AllOf(corpus).Where(claim => claim.Case == found.Name).ToList();
         if (claims.Count != 1)
         {
-            Assert.Fail(ClaimedBy(found, claims.Count));
+            Assert.Fail(ClaimedBy(corpus, found, claims.Count));
         }
 
         return claims[0];
     }
 
     // How a failure says that a case has a count of claims it should not.
-    public static string ClaimedBy(RealisticCase found, int count) =>
-        $"{found} is claimed by {count} classes of {RepositoryPaths.RealisticQueries}";
+    public static string ClaimedBy(RealisticCorpus corpus, RealisticCase found, int count) =>
+        $"{found} is claimed by {count} classes of {corpus.Queries}";
 
     // The attribute's name without what qualifies it: SqlSource.SqlSourceGenerate and global::SqlSourceGenerate claim
     // as SqlSourceGenerate does.

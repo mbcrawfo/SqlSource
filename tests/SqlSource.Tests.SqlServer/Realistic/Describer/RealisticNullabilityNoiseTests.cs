@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Testing;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
@@ -21,7 +22,7 @@ public sealed class RealisticNullabilityNoiseTests(SqlServerContainer sqlServer)
     public void Budgets_RecordedMajors_EachHoldOneAndNoOtherDoes() =>
         Budgets
             .Keys.Order()
-            .ShouldBe(SqlServerContainer.RecordedMajors.Order(), "a recorded major and a budget differ");
+            .ShouldBe(EngineImage.SqlServer.RecordedMajors.Order(), "a recorded major and a budget differ");
 
     // A count that differs from the budget lists the noisy columns, each as the safety tests name a column, to read
     // against the cases' truths; the cases that changed are in the diff of their sidecars too.
@@ -34,14 +35,14 @@ public sealed class RealisticNullabilityNoiseTests(SqlServerContainer sqlServer)
 
         var count = 0;
         var noisy = new List<string>();
-        foreach (var found in RealisticCases.All.Where(candidate => candidate.Refusal is null))
+        foreach (var found in RealisticCases.Corpus.All.Where(candidate => candidate.Refusal is null))
         {
             if (!found.RunsOn(major))
             {
                 continue;
             }
 
-            var described = await RealisticDescribe.DescribeOnceAsync(found, sqlServer.RealisticConnectionString);
+            var described = await RealisticCases.Describe.DescribeOnceAsync(found, sqlServer.RealisticConnectionString);
             var columns = RealisticDescriptions.ColumnsOf(found, described);
             var noisyOfCase = RealisticNoise.NoisyOf(found, columns);
             count += noisyOfCase.Count;

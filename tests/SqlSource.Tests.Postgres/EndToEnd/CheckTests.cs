@@ -22,7 +22,7 @@ public sealed class CheckTests(PostgresContainer postgres)
     // against.
     private static int ProjectEntries(string database) =>
         CommittedEntries.Count(
-            new[] { RepositoryPaths.EndToEnd, RepositoryPaths.RealisticCases }.SelectMany(static folder =>
+            new[] { RepositoryPaths.EndToEnd, RealisticCases.Corpus.Cases }.SelectMany(static folder =>
                 Directory.EnumerateFiles(folder, "*.sql.json", SearchOption.AllDirectories)
             ),
             database
@@ -41,7 +41,7 @@ public sealed class CheckTests(PostgresContainer postgres)
             $"app (postgres): {app} same, 0 differ, 0 failed\n"
             + $"billing (postgres): {billing} same, 0 differ, 0 failed\n";
 
-        var withModels = RealisticCases.All.Where(static found => found.HasModels).ToList();
+        var withModels = RealisticCases.Corpus.All.Where(static found => found.HasModels).ToList();
         var checkedHere = withModels.Where(found => found.IsCheckedOn(postgres.Major)).ToList();
         if (checkedHere.Count == withModels.Count)
         {

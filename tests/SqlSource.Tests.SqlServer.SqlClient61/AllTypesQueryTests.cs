@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -36,43 +35,14 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
     [Fact]
     public void Build_AllTypes_HasTheSameTypesAsSqlClient7()
     {
-        PropertiesOf(typeof(AllTypesDto))
+        ModelReflection.TypedPropertiesOf(typeof(AllTypesDto)).ShouldBe(SqlServerAllTypesRows.AllTypesProperties);
+        ModelReflection
+            .TypedPropertiesOf(typeof(NewTypesDto))
             .ShouldBe([
-                ("Id", typeof(int)),
-                ("BigintValue", typeof(long?)),
-                ("IntValue", typeof(int?)),
-                ("SmallintValue", typeof(short?)),
-                ("TinyintValue", typeof(byte?)),
-                ("BitValue", typeof(bool?)),
-                ("DecimalValue", typeof(decimal?)),
-                ("NumericValue", typeof(decimal?)),
-                ("MoneyValue", typeof(decimal?)),
-                ("SmallmoneyValue", typeof(decimal?)),
-                ("FloatValue", typeof(double?)),
-                ("RealValue", typeof(float?)),
-                ("DateValue", typeof(DateTime?)),
-                ("DatetimeValue", typeof(DateTime?)),
-                ("Datetime2Value", typeof(DateTime?)),
-                ("SmalldatetimeValue", typeof(DateTime?)),
-                ("TimeValue", typeof(TimeSpan?)),
-                ("DatetimeoffsetValue", typeof(DateTimeOffset?)),
-                ("CharValue", typeof(string)),
-                ("VarcharValue", typeof(string)),
-                ("TextValue", typeof(string)),
-                ("NcharValue", typeof(string)),
-                ("NvarcharValue", typeof(string)),
-                ("NtextValue", typeof(string)),
-                ("XmlValue", typeof(string)),
-                ("BinaryValue", typeof(byte[])),
-                ("VarbinaryValue", typeof(byte[])),
-                ("ImageValue", typeof(byte[])),
-                ("RowversionValue", typeof(byte[])),
-                ("UniqueidentifierValue", typeof(Guid?)),
-                ("SqlVariantValue", typeof(object)),
-                ("SysnameValue", typeof(string)),
+                ("Id", typeof(int), false),
+                ("JsonValue", typeof(string), true),
+                ("VectorValue", typeof(SqlVector<float>?), true),
             ]);
-        PropertiesOf(typeof(NewTypesDto))
-            .ShouldBe([("Id", typeof(int)), ("JsonValue", typeof(string)), ("VectorValue", typeof(SqlVector<float>?))]);
     }
 
     [Fact]
@@ -100,12 +70,4 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
         SqlServerAllTypesRows.ShouldBeTheFullNewTypesRow(rows[0]);
         SqlServerAllTypesRows.ShouldBeTheNullNewTypesRow(rows[1]);
     }
-
-    // The public properties in the order they are declared, each with its type.
-    private static (string Name, Type Type)[] PropertiesOf(Type model) =>
-        [
-            .. model
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Select(static property => (property.Name, property.PropertyType)),
-        ];
 }
