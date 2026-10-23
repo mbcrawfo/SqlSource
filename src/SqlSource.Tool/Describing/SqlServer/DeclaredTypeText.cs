@@ -1,4 +1,5 @@
 using System;
+using SqlSource.Parsing.Quoting;
 
 namespace SqlSource.Tool.Describing.SqlServer;
 
@@ -8,11 +9,14 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A type is a name of one or two parts joined by a dot with no space around it, each part a plain identifier, a
-/// bracketed one with <c>]]</c> for a bracket, or a double-quoted one with <c>""</c> for a quote; then, after any
-/// spaces, <c>(max)</c> in any case or one or two numbers in parentheses; and nothing else but spaces at either end.
-/// A comment, a <c>;</c>, a second <c>(</c>, a quote or a bracket left open and a line break are refused, each with
-/// what was found.
+/// A type is a name of one or two parts joined by a dot with no space around it, each part a plain identifier (a
+/// letter of any script, <c>_</c>, <c>@</c> or <c>#</c>, then those, digits of any script and <c>$</c>, as the server
+/// reads one), a bracketed one with <c>]]</c> for a bracket, or a double-quoted one with <c>""</c> for a quote;
+/// then, after any spaces, <c>(max)</c> in any case or one or two numbers in parentheses; and nothing else but
+/// spaces at either end.  A comment, a <c>;</c>, a second <c>(</c>, a quote or a bracket left open and a line break
+/// are refused, each with what was found.  A plain identifier that holds a combining mark, a letter number or a
+/// format character after its first character is refused, though the server takes it, and is written in brackets
+/// (TD-0076).
 /// </para>
 /// <para>
 /// It is the first refusal and not the guarantee: a declaration reaches the server only as the value of a parameter
@@ -226,10 +230,11 @@ internal static class DeclaredTypeText
         return position > start;
     }
 
-    // A plain identifier of T-SQL, kept to ASCII: a name with any other character is written in brackets.
-    private static bool IsFirst(char value) => char.IsAsciiLetter(value) || (value is '_' or '#' or '@');
+    // A plain identifier of T-SQL as the server reads one: a letter of any script, "_", "#" or "@" first, then those,
+    // a digit of any script or "$".  A name with any other character is written in brackets.
+    private static bool IsFirst(char value) => char.IsLetter(value) || (value is '_' or '#' or '@');
 
-    private static bool IsNext(char value) => char.IsAsciiLetterOrDigit(value) || (value is '_' or '#' or '@' or '$');
+    private static bool IsNext(char value) => QuoteReader.IsNameCharacterOfSqlServer(value);
 
     // A line break of any kind a reader may take for one: a type name stays on its line, quoted or not.
     private static bool IsLineBreak(char value) => value is '\r' or '\n' or '\u0085' or '\u2028' or '\u2029';

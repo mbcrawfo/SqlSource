@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
+using SqlSource.Parsing.Quoting;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 
@@ -440,7 +441,7 @@ internal static class SqlServerErrors
             while (at >= 0)
             {
                 var end = at + 1;
-                while (end < message.Length && IsNamePart(message[end]))
+                while (end < message.Length && QuoteReader.IsNameCharacterOfSqlServer(message[end]))
                 {
                     end++;
                 }
@@ -453,8 +454,4 @@ internal static class SqlServerErrors
 
         return named;
     }
-
-    // A character that continues a T-SQL name after its "@": a letter, a digit, "_", "@", "#" or "$".
-    private static bool IsNamePart(char character) =>
-        char.IsLetterOrDigit(character) || character is '_' or '@' or '#' or '$';
 }

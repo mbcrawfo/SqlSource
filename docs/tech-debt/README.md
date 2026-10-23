@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0076`
+Next id: `TD-0077`
 
 ## Active items
 
@@ -46,6 +46,7 @@ Next id: `TD-0076`
 | [TD-0073](TD-0073-duplicated-and-uneven-patterns-in-src.md) | Open | 2026-10-22 | Low | Duplicated and uneven patterns in `src/`, most between the two describers: the opening of a session, errors, events, the reading of a version, of a parameter's name and of a system schema, and names that differ by engine |
 | [TD-0074](TD-0074-duplicated-tests-across-the-engine-projects.md) | Open | 2026-10-22 | Low | Tests copied between the engine projects and helpers written per project: the realistic harness, reading a model by reflection, the driver tests' file and type, the containers' gates, and classes that cover several subjects |
 | [TD-0075](TD-0075-tests-that-depend-on-the-clock-or-the-runtime.md) | Open | 2026-10-22 | Low | A few tests depend on the real clock or on the order of `Type.GetProperties()`: one can pass without testing what it names, and others can fail on a slow runner |
+| [TD-0076](TD-0076-what-the-first-refusal-of-a-declared-type-says.md) | Open | 2026-10-23 | Low | PostgreSQL's first refusal of a `-- param:` type says only that it is not a type name, where SQL Server's says what was found, and SQL Server's refuses a name that holds a combining mark, a letter number or a format character after its first character, which the server takes |
 
 ## Columns
 
