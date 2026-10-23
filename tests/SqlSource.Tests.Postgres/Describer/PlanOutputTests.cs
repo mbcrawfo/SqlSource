@@ -782,6 +782,125 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         All(root).Count(static node => node.ParentRelationship == "SubPlan").ShouldBe(1);
     }
 
+    // A call whose argument types the server resolves from its arguments prints as the reader reads it, with the
+    // table's alias left out of a one-table query: the text is the same on 14 and on 18.  The recogniser reads these
+    // calls by the name and the printed arguments.
+    [Theory]
+    [InlineData("count(o.note)", "orders o", "count(note)")]
+    [InlineData("count(DISTINCT u.status)", "users u", "count(DISTINCT status)")]
+    [InlineData("count(u.email) FILTER (WHERE u.id > 1)", "users u", "count(email) FILTER (WHERE (id > 1))")]
+    [InlineData(
+        "jsonb_build_object('id', u.id, 'email', u.email)",
+        "users u",
+        "jsonb_build_object('id', id, 'email', email)"
+    )]
+    [InlineData("json_build_object()", "users u", "json_build_object()")]
+    [InlineData("b.during * tstzrange(now(), now())", "bookings b", "(during * tstzrange(now(), now()))")]
+    public async Task Explain_PolymorphicForm_PrintsWhatTheReaderReads(string selectList, string from, string expected)
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+
+        var root = await ExplainAsync($"SELECT {selectList} FROM {from}");
+
+        root.Output.ShouldBe([expected]);
+    }
+
+    // A window aggregate prints its window as ? on 14 and as the window's name on 18.  A call with a VARIADIC array
+    // prints the keyword and the parameter, and an ordered, distinct aggregate prints its order inside the call and is
+    // computed at the Aggregate that has the Group Key.
+    [Theory]
+    [InlineData(
+        "SELECT count(u.email) OVER (PARTITION BY u.status) FROM users u",
+        null,
+        "WindowAgg",
+        false,
+        "count(email) OVER (?)",
+        "count(email) OVER w1"
+    )]
+    [InlineData(
+        "SELECT jsonb_build_object(VARIADIC $1) FROM users u",
+        "text[]",
+        "Seq Scan",
+        false,
+        "jsonb_build_object(VARIADIC $1)",
+        "jsonb_build_object(VARIADIC $1)"
+    )]
+    [InlineData(
+        "SELECT array_agg(DISTINCT o.id ORDER BY o.id) FROM orders o GROUP BY o.user_id",
+        null,
+        "Aggregate",
+        true,
+        "array_agg(DISTINCT id ORDER BY id)",
+        "array_agg(DISTINCT id ORDER BY id)"
+    )]
+    public async Task Explain_PolymorphicFormsOfTheMajor_PrintAsEach(
+        string sql,
+        string? parameterType,
+        string nodeType,
+        bool hasGroupKey,
+        string printedOn14,
+        string printedOn18
+    )
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+        var printed = postgres.Major == 14 ? printedOn14 : printedOn18;
+
+        var root = parameterType is null
+            ? await ExplainAsync(sql)
+            : await ExplainExecuteAsync(sql, parameterType, pruning: true);
+
+        root.NodeType.ShouldBe(nodeType);
+        root.HasGroupKey.ShouldBe(hasGroupKey);
+        root.Output.ShouldNotBeNull()[0].ShouldBe(printed);
+    }
+
+    // The arguments of COALESCE, CASE and the like are cast to their common type, and print with the casts: a
+    // constant as a quoted literal of the type, and a column of another type in a cast.  The Aggregate prints each
+    // call bare.
+    [Theory]
+    [InlineData("sum(coalesce(o.total, 0))", "sum(COALESCE(total, '0'::numeric))")]
+    [InlineData("max(coalesce(o.id, o.user_id))", "max(COALESCE(id, (user_id)::bigint))")]
+    [InlineData(
+        "sum(CASE WHEN o.id > 1 THEN 1 ELSE 2.5 END)",
+        "sum(CASE WHEN (id > 1) THEN '1'::numeric ELSE 2.5 END)"
+    )]
+    public async Task Explain_CommonType_PrintsTheCastsOfTheArguments(string expression, string expected)
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+
+        var root = await ExplainAsync($"SELECT {expression} FROM orders o GROUP BY o.user_id");
+
+        root.NodeType.ShouldBe("Aggregate");
+        root.HasGroupKey.ShouldBeTrue();
+        root.Output.ShouldNotBeNull()[0].ShouldBe(expected);
+    }
+
+    // The COALESCE over the two sides of a full join is computed at the join, whichever join the planner picks: the
+    // node of Join Type Full prints it as itself, and no node under it does.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Explain_FullJoinCoalesce_IsComputedAtTheJoin(bool mergeJoin)
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+        var connection = mergeJoin
+            ? $"{postgres.ConnectionString};Options=-c enable_hashjoin=off -c enable_nestloop=off"
+            : null;
+
+        var root = await ExplainAsync(
+            "SELECT coalesce(u.id, o.user_id) AS k, o.total FROM users u FULL JOIN orders o ON o.user_id = u.id",
+            connection
+        );
+
+        var join = All(root).Single(static node => node.JoinType == "Full");
+        join.NodeType.ShouldBe(mergeJoin ? "Merge Join" : "Hash Join");
+        join.Output.ShouldNotBeNull().ShouldContain("COALESCE(u.id, o.user_id)");
+        All(join)
+            .Skip(1)
+            .SelectMany(static node => node.Output ?? [])
+            .ShouldNotContain(static entry => entry.Contains("COALESCE"));
+    }
+
     // A system column of a table prints as a column, qualified by the table's name on an INSERT's RETURNING.
     [Fact]
     public async Task Explain_SystemColumn_PrintsAsAColumn()
