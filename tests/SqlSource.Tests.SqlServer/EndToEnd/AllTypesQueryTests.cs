@@ -1,15 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using Shouldly;
 using SqlSource.Testing.EndToEnd;
 using Xunit;
+using static SqlSource.Testing.EndToEnd.ModelReflection;
 
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
@@ -161,20 +160,6 @@ public sealed class AllTypesQueryTests(SqlServerContainer sqlServer)
             .ToArray();
         return (InsertAllTypesArgs)constructor.Invoke(arguments);
     }
-
-    // The column of a property of AllTypesDto: SqlVariantValue is sql_variant_value.
-    private static string ColumnOf(string property) =>
-        string.Concat(
-            property.Select(
-                static (letter, i) =>
-                    i > 0 && char.IsUpper(letter)
-                        ? "_" + char.ToLowerInvariant(letter)
-                        : char.ToLowerInvariant(letter).ToString(CultureInfo.InvariantCulture)
-            )
-        );
-
-    private static string[] NamesOf(Type model) =>
-        [.. model.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(static property => property.Name)];
 
     // The parameters of one column, as the input model has them, and the id of the row.
     [SuppressMessage(

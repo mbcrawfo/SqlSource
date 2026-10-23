@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Generation.Models;
+using SqlSource.Testing.EndToEnd;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Generation;
@@ -19,7 +20,7 @@ public sealed class RealisticModelNullabilityTests
         RealisticModels.SkipUnlessHasModels(found);
 
         var model = RealisticModels.OutputModelOf(RealisticModels.EntryOf(found));
-        var properties = RealisticModels.PropertiesOf(model);
+        var properties = ModelReflection.PropertiesOf(model);
 
         properties.Count.ShouldBe(
             found.Columns.Count,
@@ -39,7 +40,7 @@ public sealed class RealisticModelNullabilityTests
                 );
             }
 
-            if (column.Nullable && !RealisticModels.IsNullable(property))
+            if (column.Nullable && !ModelReflection.IsNullable(property))
             {
                 failures.Add(
                     $"{found} column {index} {column.Name} can be NULL ({column.Why}), and the property "

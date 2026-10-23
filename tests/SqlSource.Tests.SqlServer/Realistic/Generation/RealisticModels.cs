@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using SqlSource.Generation.Models;
 using SqlSource.Settings;
@@ -68,20 +66,6 @@ internal static class RealisticModels
     // The input model of the entry, which a query without parameters has not.
     public static Type? InputModelOf(SidecarEntry entry) =>
         entry.Parameters.Count == 0 ? null : ModelNamed(entry.Name, InputSuffix);
-
-    // The model's public properties in the order they are declared, which is the order of its columns.
-    public static IReadOnlyList<PropertyInfo> PropertiesOf(Type model) =>
-        [
-            .. model
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .OrderBy(static property => property.MetadataToken),
-        ];
-
-    // Whether the property can hold null: a Nullable<T>, or a reference type annotated nullable.
-    public static bool IsNullable(PropertyInfo property) =>
-        property.PropertyType.IsValueType
-            ? Nullable.GetUnderlyingType(property.PropertyType) is not null
-            : new NullabilityInfoContext().Create(property).ReadState == NullabilityState.Nullable;
 
     private static Type ModelNamed(string name, string suffix)
     {
