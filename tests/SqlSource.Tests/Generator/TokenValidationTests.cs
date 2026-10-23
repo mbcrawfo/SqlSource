@@ -58,9 +58,7 @@ public sealed class TokenValidationTests
 
         var run = Run(OutputKind.Sql, property, new SqlFile(GeneratorHarness.UsersPath, sql));
 
-        run.Diagnostics.ShouldBeEmpty();
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.ShouldBeClean();
         var source = run.Sources["App.Sample.g.cs"];
         if (expected)
         {

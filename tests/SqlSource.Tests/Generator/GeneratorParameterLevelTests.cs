@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using Shouldly;
+using SqlSource.Generation;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using Xunit;
@@ -19,6 +20,12 @@ public sealed class GeneratorParameterLevelTests
     private const string Other = "sort-input";
 
     private const string Default = "default";
+
+    private const string ReservedTokenInAComment = "-- name: Q\nSELECT 1 -- {{class}}\n";
+
+    private const string DefaultOpenedInAComment = "-- name: Q\nSELECT * -- e.g. {{note: here\nFROM t WHERE {{w}}\n";
+
+    private const string CommentInATokensHead = "-- name: Q\nSELECT * FROM {{t/* c */}}\n";
 
     private const string Check = "global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);";
 
@@ -66,9 +73,7 @@ public sealed class GeneratorParameterLevelTests
             generatorParameters: property
         );
 
-        run.Diagnostics.ShouldBeEmpty();
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.ShouldBeClean();
         var generated = run.Sources["App.Sample.g.cs"];
         if (expected)
         {
@@ -115,6 +120,119 @@ public sealed class GeneratorParameterLevelTests
         run.CompilationErrors.ShouldBeEmpty();
         run.Sources["App.Plain.g.cs"].ShouldContain("public const string Q = \"SELECT 1   FROM t;\";");
         run.Sources["App.Kept.g.cs"].ShouldContain("public static string Q(string note)");
+    }
+
+    // The project, or the metadata of the file's item, keeps comments and one type turns them off.  The keyword
+    // stands only in a comment, so it is an error only for the type that keeps it, whose file then gives no members,
+    // and the other type uses the file.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Run_ReservedTokenInAComment_IsReportedOnlyForATypeThatKeepsComments(bool fromMetadata)
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App;
+
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct, Parameters = "default")]
+            public partial class Plain
+            {
+                public const string Sql = Q;
+            }
+
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            public partial class Kept { }
+            """;
+        var file = new SqlFile(
+            "/app/Repo/Q.sql",
+            ReservedTokenInAComment,
+            Metadata: fromMetadata
+                ? new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "keep-comments" }
+                : null
+        );
+
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [file],
+            generatorParameters: fromMetadata ? null : "keep-comments"
+        );
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC114 /app/Repo/Q.sql(2,13)-(2,22): The token name 'class' is a reserved C# keyword",
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources["App.Plain.g.cs"].ShouldContain("public const string Q = \"SELECT 1\";");
+        run.Sources["App.Kept.g.cs"].ShouldNotContain("string Q");
+    }
+
+    // The token and the comment overlap, so with the comments kept the query reads other tokens: the comment opens a
+    // default that the SQL closes, or stands in a token's head.  It is an error only for the type that keeps the
+    // comments, whose file then gives no members, and the other type emits the query with its token.
+    [Theory]
+    [InlineData(DefaultOpenedInAComment, "(2,10)-(2,30)", "note", "w")]
+    [InlineData(CommentInATokensHead, "(2,18)-(2,25)", "t", "t")]
+    public void Run_TokenThatCrossesAComment_IsReportedOnlyForATypeThatKeepsComments(
+        string sql,
+        string place,
+        string token,
+        string parameter
+    )
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App;
+
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct, Parameters = "default")]
+            public partial class Plain
+            {
+                public static string Sql() => Q("x");
+            }
+
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            public partial class Kept { }
+            """;
+
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [new SqlFile("/app/Repo/Q.sql", sql)],
+            generatorParameters: "keep-comments"
+        );
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC120 /app/Repo/Q.sql"
+                + place
+                + ": Token '"
+                + token
+                + "' and a comment overlap, so the token is read differently where comments are kept.  Keep a comment "
+                + "wholly inside the token's default, or outside the token.",
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources["App.Plain.g.cs"].ShouldContain("public static string Q(string " + parameter + ")");
+        run.Sources["App.Kept.g.cs"].ShouldNotContain("string Q");
+    }
+
+    // No level may keep comments, so the form with them is not built, and the keyword in the comment is never
+    // scanned.
+    [Fact]
+    public void Run_ReservedTokenInACommentWhereNoTypeKeepsComments_IsNoErrorAndBuildsNoKeptForm()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
+            [new SqlFile(GeneratorHarness.UsersPath, ReservedTokenInAComment)],
+            generatorParameters: null
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"SELECT 1\";");
+        var query = StepOutputs.Single<ParsedSqlFile>(run, TrackingNames.ParsedFile).Queries.ShouldHaveSingleItem();
+        query.KeptSegments.ShouldBeNull();
+        query.KeptErrors.ShouldBeEmpty();
     }
 
     [Fact]

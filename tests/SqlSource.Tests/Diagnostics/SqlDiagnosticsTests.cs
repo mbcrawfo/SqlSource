@@ -87,6 +87,18 @@ public sealed class SqlDiagnosticsTests
         SqlDiagnostics.ForParseError(SqlParseErrorKind.InputModelWithoutParameters).Id.ShouldBe("SQLSRC119");
 
     [Fact]
+    public void ForParseError_TokenCrossesComment_IsSqlsrc120() =>
+        SqlDiagnostics.ForParseError(SqlParseErrorKind.TokenCrossesComment).Id.ShouldBe("SQLSRC120");
+
+    [Fact]
+    public void TokenCrossesComment_Message_HoldsTheToken() =>
+        Format(SqlDiagnostics.TokenCrossesComment, "filter")
+            .ShouldBe(
+                "Token 'filter' and a comment overlap, so the token is read differently where comments are kept.  Keep "
+                    + "a comment wholly inside the token's default, or outside the token."
+            );
+
+    [Fact]
     public void InvalidDialect_Message_ListsTheNamesThatAreAccepted() =>
         SqlDiagnostics
             .InvalidDialect.MessageFormat.ToString(CultureInfo.InvariantCulture)

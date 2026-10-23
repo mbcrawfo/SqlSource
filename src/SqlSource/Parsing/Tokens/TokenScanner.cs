@@ -101,7 +101,7 @@ internal static class TokenScanner
 
     // noCloseFrom is what the caller has learned from earlier calls on the same SQL: no "}}" starts at or after that
     // offset.  A search that finds none lowers it.
-    private static bool TryReadToken(
+    internal static bool TryReadToken(
         string sql,
         int start,
         ref int noCloseFrom,
@@ -113,19 +113,11 @@ internal static class TokenScanner
         name = string.Empty;
         defaultSpan = null;
         end = 0;
-        if (SqlText.CharAt(sql, start) != '{' || SqlText.CharAt(sql, start + 1) != '{')
+        if (!TryReadOpener(sql, start, out var nameSpan, out var after))
         {
             return false;
         }
 
-        var nameStart = SkipBlanks(sql, start + 2);
-        var nameEnd = nameStart;
-        while (SyntaxFacts.IsIdentifierPartCharacter(SqlText.CharAt(sql, nameEnd)))
-        {
-            nameEnd++;
-        }
-
-        var after = SkipBlanks(sql, nameEnd);
         var hasDefault = SqlText.CharAt(sql, after) == ':';
         if (!hasDefault && (SqlText.CharAt(sql, after) != '}' || SqlText.CharAt(sql, after + 1) != '}'))
         {
@@ -133,7 +125,7 @@ internal static class TokenScanner
         }
 
         // The name is checked before the search for the closing braces, so that text such as "{{1a:" costs none.
-        name = sql.Substring(nameStart, nameEnd - nameStart);
+        name = sql.Substring(nameSpan.Start, nameSpan.Length);
         if (!SqlIdentifier.IsValid(name))
         {
             return false;
@@ -156,6 +148,35 @@ internal static class TokenScanner
         }
 
         end = close + 2;
+        return true;
+    }
+
+    /// <summary>
+    /// Reads what every token starts with: <c>{{</c>, blanks, the characters a name can hold, and blanks.
+    /// </summary>
+    /// <param name="sql">The SQL.</param>
+    /// <param name="start">Where to look for the opening braces.</param>
+    /// <param name="nameSpan">Where the name is, which may be empty or not a valid name.</param>
+    /// <param name="after">Where the token goes on, with a colon or <c>}}</c>.</param>
+    /// <returns>True when <paramref name="start" /> holds <c>{{</c>.</returns>
+    internal static bool TryReadOpener(string sql, int start, out TextSpan nameSpan, out int after)
+    {
+        nameSpan = default;
+        after = 0;
+        if (SqlText.CharAt(sql, start) != '{' || SqlText.CharAt(sql, start + 1) != '{')
+        {
+            return false;
+        }
+
+        var nameStart = SkipBlanks(sql, start + 2);
+        var nameEnd = nameStart;
+        while (SyntaxFacts.IsIdentifierPartCharacter(SqlText.CharAt(sql, nameEnd)))
+        {
+            nameEnd++;
+        }
+
+        nameSpan = TextSpan.FromBounds(nameStart, nameEnd);
+        after = SkipBlanks(sql, nameEnd);
         return true;
     }
 
