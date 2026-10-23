@@ -168,9 +168,10 @@ public sealed class ColumnProofsTests
             ]);
     }
 
-    // The column through a join, a derived table or a CTE, under a grouping set, as an operand of an expression, or by
-    // a * that is not the one item of one table: the server's answer stands, since a row of the result may be no row
-    // of the table (an outer join gives NULL).
+    // The column through a join, a derived table or a CTE, under a grouping set, as an operand of an expression or of
+    // a scalar subquery, in parentheses, which IsColumn does not take for a column alone, or by a * that is not the
+    // one item of one table: the server's answer stands, since a row of the result may be no row of the table (an
+    // outer join gives NULL).
     [Theory]
     [InlineData("SELECT o.id, u.name_len_p FROM dbo.orders AS o LEFT JOIN dbo.users AS u ON u.id = o.user_id")]
     [InlineData("SELECT o.id, u.name_len_p FROM dbo.orders AS o JOIN dbo.users AS u ON u.id = o.user_id")]
@@ -180,6 +181,8 @@ public sealed class ColumnProofsTests
     [InlineData("SELECT id, name_len_p FROM dbo.users GROUP BY GROUPING SETS ((id, name_len_p), ())")]
     [InlineData("SELECT id, name_len_p FROM dbo.users GROUP BY ALL id, name_len_p")]
     [InlineData("SELECT id, CAST(name_len_p AS bigint) AS name_len_p FROM dbo.users")]
+    [InlineData("SELECT id, (SELECT name_len_p FROM dbo.users WHERE id = 0) AS name_len_p FROM dbo.users")]
+    [InlineData("SELECT id, (name_len_p) AS name_len_p FROM dbo.users")]
     [InlineData("SELECT id, name_len_p FROM dbo.users UNION ALL SELECT id, name_len_p FROM dbo.users")]
     [InlineData("SELECT *, 1 AS one FROM dbo.users")]
     [InlineData("SELECT u.*, u.* FROM dbo.users AS u")]
@@ -192,12 +195,14 @@ public sealed class ColumnProofsTests
             .ShouldBe([(false, SidecarValues.NullableSource.Server), (true, SidecarValues.NullableSource.Server)]);
     }
 
-    // A column whose row does not say PERSISTED NOT NULL, or says nothing, as a capture before the member, keeps the
-    // server's answer even from one table.
+    // A column whose row does not say PERSISTED NOT NULL, or says nothing, as a capture before the member, or whose
+    // source is a view or of no type, keeps the server's answer even from one table.
     [Theory]
-    [InlineData(false)]
-    [InlineData(null)]
-    public void Apply_NotPersistedNotNull_StaysNullable(bool? persisted)
+    [InlineData(false, "U")]
+    [InlineData(null, "U")]
+    [InlineData(true, "V")]
+    [InlineData(true, null)]
+    public void Apply_NotPersistedNotNullOfATable_StaysNullable(bool? persisted, string? sourceType)
     {
         var proofs = Read(
             "SELECT id, name_len_p FROM dbo.users",
@@ -205,11 +210,29 @@ public sealed class ColumnProofsTests
             PersistedColumn(2) with
             {
                 PersistedNotNull = persisted,
+                SourceType = sourceType,
             }
         );
 
         Nullability(proofs.Apply(null))
             .ShouldBe([(false, SidecarValues.NullableSource.Server), (true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // A column the server answers not null keeps its answer, and its source, whatever the catalog says.
+    [Fact]
+    public void Apply_PersistedNotNullServerAlreadyNotNull_KeepsServer()
+    {
+        var proofs = Read(
+            "SELECT id, name_len_p FROM dbo.users",
+            IdColumn,
+            PersistedColumn(2) with
+            {
+                IsNullable = false,
+            }
+        );
+
+        Nullability(proofs.Apply(null))
+            .ShouldBe([(false, SidecarValues.NullableSource.Server), (false, SidecarValues.NullableSource.Server)]);
     }
 
     // The rows of "table", SELECT * from the table alone, are corrected as the columns of such a query are, so the
@@ -226,13 +249,24 @@ public sealed class ColumnProofsTests
             {
                 PersistedNotNull = false,
             },
+            PersistedColumn(5) with
+            {
+                SourceType = "V",
+            },
+            PersistedColumn(6) with
+            {
+                SourceType = null,
+            },
             Rowstat with
             {
-                ColumnOrdinal = 5,
+                ColumnOrdinal = 7,
             },
         ];
 
-        ColumnProofs.TableRows(rows).Select(static row => row.IsNullable).ShouldBe([false, true, false, true, false]);
+        ColumnProofs
+            .TableRows(rows)
+            .Select(static row => row.IsNullable)
+            .ShouldBe([false, true, false, true, true, true, false]);
     }
 
     // The proofs of the SQL over the rows, built as the session builds them, the hidden row of browse mode 2 after

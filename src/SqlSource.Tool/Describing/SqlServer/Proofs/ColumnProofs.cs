@@ -22,8 +22,8 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// <c>nullableSource</c> <c>catalog</c>, only when its item is a column alone or the one <c>*</c>, the <c>FROM</c> is
 /// one table alone (<see cref="SelectBody.IsOneTable" />) and the <c>GROUP BY</c> has no grouping set: then every row
 /// of the result is a row of that table, which the constraint keeps not null.  Through an outer join the column is
-/// <c>NULL</c> while the server still names it as the source, so nothing else proves it.  A <c>*</c> proves nothing
-/// else: no form is a column alone.
+/// <c>NULL</c> while the server still names it as the source, so nothing else proves it.  A <c>*</c> gets no proof of
+/// a form and asks no operand: this is the one proof it can have.
 /// </para>
 /// </remarks>
 internal sealed class ColumnProofs
