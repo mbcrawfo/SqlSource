@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0077`
+Next id: `TD-0078`
 
 ## Active items
 
@@ -33,7 +33,6 @@ Next id: `TD-0077`
 | [TD-0046](TD-0046-the-walk-leaves-some-columns-to-the-heuristic.md) | Open | 2026-10-13 | Low | The nullability walk leaves a column to the heuristic when an extension's `Custom Scan` scans it, or when it is a `RETURNING` column of another table than the target in a statement that names `OLD` or `NEW`, and asks for a plan that it has no use for when a word like `left(name, 3)` gates a query with no join |
 | [TD-0047](TD-0047-explain-evaluates-immutable-functions.md) | Open | 2026-10-14 | Low | The `EXPLAIN` that plans a query of the PostgreSQL describer, gated or with a column of no origin, runs a function the database wrongly marks `IMMUTABLE`, when it is called with constant arguments, and an effect of it outside the transaction, a sequence's for one, survives the rollback |
 | [TD-0049](TD-0049-describe-behind-a-pooler-can-reach-another-backend.md) | Open | 2026-10-14 | Low | Behind a pooler in transaction mode, the `columns` and `explain` calls of the PostgreSQL describer can reach a backend that lacks the prepared statement, which `check` then reports as `SQLSRC231` and not `SQLSRC236`, or one that holds a statement of the same name from an earlier run, whose columns or plan are read for the query, which a check of the plan's `Output` against the columns catches only in part |
-| [TD-0050](TD-0050-a-catalog-types-name-depends-on-the-search-path.md) | Open | 2026-10-14 | Low | The name of a type of `pg_catalog` that has no modifier is `format_type(oid, -1)`, which qualifies it when a user type of the same name stands before `pg_catalog` on the session's `search_path`, so such a name depends on the session |
 | [TD-0051](TD-0051-columns-that-cannot-be-null-are-answered-nullable.md) | Open | 2026-10-15 | Medium | The PostgreSQL describer answers nullable or unknown for about a fifth of the realistic corpus's columns that cannot be `NULL`, 42 on PostgreSQL 14 and 40 on 18: `count(x)` and polymorphic functions, functions outside its tables, `EXISTS` on 14, window aggregates, `VALUES`, an expression through a subquery the planner keeps apart, a `UNION` branch the planner keeps as a scan, recursive CTEs, grouping sets, views and `RETURNING` of a written value; `RealisticNullabilityNoiseTests` holds the count |
 | [TD-0052](TD-0052-explain-plans-every-partition.md) | Open | 2026-10-15 | Low | The PostgreSQL describer asks for a query's plan with partition pruning off, so that the members of a partitioned table's `Append` show for the `NULL`s of its parameters, and a query over a table of many partitions is planned, and logged, with every partition |
 | [TD-0063](TD-0063-lower-bound-of-the-type-override-map-is-a-search-of-its-own.md) | Open | 2026-10-19 | Low | The lower bound of the type override map is a search of its own: it runs over a `ref struct` key that `SortedSearch` cannot take on netstandard2.0 |
@@ -43,6 +42,7 @@ Next id: `TD-0077`
 | [TD-0072](TD-0072-sql-server-2025-container-crashes-at-start-in-ci.md) | Open | 2026-10-22 | Low | A SQL Server 2025 test container sometimes crashes as it starts in CI, for a reason not known; the tests start another, once, and report it in the job's summary, but two crashes in a row still fail every test of that project |
 | [TD-0075](TD-0075-tests-that-depend-on-the-real-clock.md) | Open | 2026-10-22 | Low | A few tests depend on the real clock: one can pass without testing what it names, and others can fail on a slow runner |
 | [TD-0076](TD-0076-what-the-first-refusal-of-a-declared-type-says.md) | Open | 2026-10-23 | Low | PostgreSQL's first refusal of a `-- param:` type says only that it is not a type name, where SQL Server's says what was found, and SQL Server's refuses a name that holds a combining mark, a letter number or a format character after its first character, which the server takes |
+| [TD-0077](TD-0077-describer-catalog-sql-takes-a-users-operators.md) | Open | 2026-10-23 | Low | The SQL of the PostgreSQL describer's catalog calls runs under the user's `search_path` and writes its operators without `pg_catalog`, so a user's operator on a system type before `pg_catalog` changes what the catalog answers |
 
 ## Columns
 
