@@ -25,6 +25,8 @@ public sealed class GeneratorParameterLevelTests
 
     private const string DefaultOpenedInAComment = "-- name: Q\nSELECT * -- e.g. {{note: here\nFROM t WHERE {{w}}\n";
 
+    private const string CommentInATokensHead = "-- name: Q\nSELECT * FROM {{t/* c */}}\n";
+
     private const string Check = "global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);";
 
     [Theory]
@@ -167,11 +169,18 @@ public sealed class GeneratorParameterLevelTests
         run.Sources["App.Kept.g.cs"].ShouldNotContain("string Q");
     }
 
-    // The comment opens a default that the SQL closes, so with the comments kept the query reads another token.  It
-    // is an error only for the type that keeps the comments, whose file then gives no members, and the other type
-    // emits the query with its token w.
-    [Fact]
-    public void Run_CommentThatOpensATokenDefault_IsReportedOnlyForATypeThatKeepsComments()
+    // The token and the comment overlap, so with the comments kept the query reads other tokens: the comment opens a
+    // default that the SQL closes, or stands in a token's head.  It is an error only for the type that keeps the
+    // comments, whose file then gives no members, and the other type emits the query with its token.
+    [Theory]
+    [InlineData(DefaultOpenedInAComment, "(2,10)-(2,30)", "note", "w")]
+    [InlineData(CommentInATokensHead, "(2,18)-(2,25)", "t", "t")]
+    public void Run_TokenThatCrossesAComment_IsReportedOnlyForATypeThatKeepsComments(
+        string sql,
+        string place,
+        string token,
+        string parameter
+    )
     {
         const string Source = """
             using SqlSource;
@@ -191,17 +200,20 @@ public sealed class GeneratorParameterLevelTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, Source)],
-            [new SqlFile("/app/Repo/Q.sql", DefaultOpenedInAComment)],
+            [new SqlFile("/app/Repo/Q.sql", sql)],
             generatorParameters: "keep-comments"
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC120 /app/Repo/Q.sql(2,10)-(2,30): The default of token 'note' starts and ends on different sides of "
-                + "a comment's edge, so it is read differently where comments are kept.  Keep the whole token inside "
-                + "the comment or outside it.",
+            "SQLSRC120 /app/Repo/Q.sql"
+                + place
+                + ": Token '"
+                + token
+                + "' and a comment overlap, so the token is read differently where comments are kept.  Keep a comment "
+                + "wholly inside the token's default, or outside the token.",
         ]);
         run.CompilationErrors.ShouldBeEmpty();
-        run.Sources["App.Plain.g.cs"].ShouldContain("public static string Q(string w)");
+        run.Sources["App.Plain.g.cs"].ShouldContain("public static string Q(string " + parameter + ")");
         run.Sources["App.Kept.g.cs"].ShouldNotContain("string Q");
     }
 

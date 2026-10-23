@@ -43,7 +43,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC117](#sqlsrc117) | Parameter has no type |
 | [SQLSRC118](#sqlsrc118) | Parameter is not declared |
 | [SQLSRC119](#sqlsrc119) | Query has no parameters |
-| [SQLSRC120](#sqlsrc120) | Token default crosses a comment |
+| [SQLSRC120](#sqlsrc120) | Token crosses a comment |
 
 **The tool**
 
@@ -774,9 +774,9 @@ See: [Name of one query's model](settings.md#setting-model-name)
 
 ## SQLSRC120
 
-**Token default crosses a comment**
+**Token crosses a comment**
 
-A token's default starts on one side of a comment's edge and ends on the other.  Comments are removed before tokens are found, and a query that keeps its comments (the `keep-comments` [generator parameter](settings.md#setting-generator-parameters)) has its tokens found in the SQL with them as well, so the two would read different tokens.  It happens two ways.
+A token and a comment overlap: the comment is not wholly inside the token's default, nor outside the token.  Comments are removed before tokens are found, and a query that keeps its comments (the `keep-comments` [generator parameter](settings.md#setting-generator-parameters)) has its tokens found in the SQL with them as well, so the two would read different tokens.  It happens three ways.
 
 A comment inside a default holds `}}`.  Without the comment those braces are gone, so the default runs on to the next `}}`, and a token written before that `}}` is lost.  A `--` comment runs to the end of its line, so the `}}` written after one on that line is part of the comment.  The comment is an error wherever the file is used.
 
@@ -786,7 +786,7 @@ SELECT id FROM users WHERE 1 = 1 {{filter:AND active -- only live rows}}
 ORDER BY {{orderBy:name}};
 ```
 
-A comment opens a default, `{{name:`, and the SQL after the comment closes it.  Without comments the query is as you wrote it, but where comments are kept the default runs from the comment to the next `}}`, and the token after it is lost.  This is an error only for a type that keeps the query's comments, and that type gets no members from the file until it is fixed.  A token written whole inside a comment, such as `-- see {{note:x}}`, is fine.
+A comment opens a default, `{{name:`, and the SQL after the comment closes it.  Without comments the query is as you wrote it, but where comments are kept the default runs from the comment to the next `}}`, and the token after it is lost.  A token written whole inside a comment, such as `-- see {{note:x}}`, is fine.
 
 ```sql error
 -- name: ListUsers
@@ -795,7 +795,15 @@ SELECT id -- e.g. {{note: here
 FROM users WHERE {{filter}};
 ```
 
-Both hold for a name in a `-- token-ignore:` marker too, whose text runs to the same `}}`.  Keep the whole token inside the comment or outside it: move the comment out of the default, onto a line of its own, or close the token inside the comment.
+A comment stands inside a token's braces before its default: between `{{` and the name, or between the name and the `:` or the closing `}}`.  Without comments the token is read, but where comments are kept the braces stay in the SQL as written, and the method has no argument for the token.
+
+```sql error
+-- name: ListFrom
+-- generator: keep-comments
+SELECT id FROM {{table/* users or archive */}};
+```
+
+The second and third are errors only for a type that keeps the query's comments, and that type gets no members from the file until it is fixed.  The first two hold for a name in a `-- token-ignore:` marker too, whose text runs to the same `}}`.  Keep a comment wholly inside the token's default, or outside the token: move it onto a line of its own, or after the token's `}}`.
 
 See: [Defaults](parameters-and-tokens.md#token-defaults)
 

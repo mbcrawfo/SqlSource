@@ -87,15 +87,15 @@ public sealed class SqlDiagnosticsTests
         SqlDiagnostics.ForParseError(SqlParseErrorKind.InputModelWithoutParameters).Id.ShouldBe("SQLSRC119");
 
     [Fact]
-    public void ForParseError_TokenDefaultCrossesComment_IsSqlsrc120() =>
-        SqlDiagnostics.ForParseError(SqlParseErrorKind.TokenDefaultCrossesComment).Id.ShouldBe("SQLSRC120");
+    public void ForParseError_TokenCrossesComment_IsSqlsrc120() =>
+        SqlDiagnostics.ForParseError(SqlParseErrorKind.TokenCrossesComment).Id.ShouldBe("SQLSRC120");
 
     [Fact]
-    public void TokenDefaultCrossesComment_Message_HoldsTheToken() =>
-        Format(SqlDiagnostics.TokenDefaultCrossesComment, "filter")
+    public void TokenCrossesComment_Message_HoldsTheToken() =>
+        Format(SqlDiagnostics.TokenCrossesComment, "filter")
             .ShouldBe(
-                "The default of token 'filter' starts and ends on different sides of a comment's edge, so it is read "
-                    + "differently where comments are kept.  Keep the whole token inside the comment or outside it."
+                "Token 'filter' and a comment overlap, so the token is read differently where comments are kept.  Keep "
+                    + "a comment wholly inside the token's default, or outside the token."
             );
 
     [Fact]

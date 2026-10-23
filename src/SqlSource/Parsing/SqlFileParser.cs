@@ -336,7 +336,7 @@ internal static class SqlFileParser
                 _errors
             );
 
-            return new BuiltQuery(sql, scanned.Segments, tokens, parameters);
+            return new BuiltQuery(sql, scanned.Segments, scanned.Occurrences, tokens, parameters);
         }
 
         // A comment is gone from the SQL that the tokens are found in, and so is any "}}" it holds: in a default, that
@@ -354,7 +354,7 @@ internal static class SqlFileParser
                     && (finder ??= new OpenDefaultFinder(sql.Text)).At(sql.ToOutput(lexeme.Span.Start)) is { } name
                 )
                 {
-                    AddError(SqlParseErrorKind.TokenDefaultCrossesComment, lexeme.Span, name);
+                    AddError(SqlParseErrorKind.TokenCrossesComment, lexeme.Span, name);
                 }
             }
         }
@@ -378,24 +378,25 @@ internal static class SqlFileParser
                 return (markers, null, EquatableArray<SqlParseError>.Empty);
             }
 
-            var (kept, keptErrors) = BuildKept(start, end, query.Sql, scope?.IgnoredTokens ?? SqlMarkerScope.NoNames);
+            var (kept, keptErrors) = BuildKept(start, end, query, scope?.IgnoredTokens ?? SqlMarkerScope.NoNames);
             return (markers, kept, keptErrors);
         }
 
         // The SQL with its comments, or null when it is the stripped SQL: one form then serves.  A token can stand
-        // in a comment, so this form is scanned too, and a comment can open a default that the SQL after it closes.
+        // in a comment, so this form is scanned too, and a comment can open a default that the SQL after it closes or
+        // stand in a token's head.
         // These errors are not the file's: a type that claims the file may not keep the comments, so they go with the
         // block, for the type that emits this form to report.  An error of the stripped form is the file's already,
         // and a file with one has no blocks, so only the comments' own errors are seen.
         private (EquatableArray<SqlSegment>? Segments, EquatableArray<SqlParseError> Errors) BuildKept(
             int start,
             int end,
-            SqlBlockText stripped,
+            BuiltQuery query,
             ISet<string> ignoredTokens
         )
         {
             var kept = SqlTextBuilder.Build(text, lexemes, start, end, keepComments: true);
-            if (string.Equals(kept.Text, stripped.Text, StringComparison.Ordinal))
+            if (string.Equals(kept.Text, query.Sql.Text, StringComparison.Ordinal))
             {
                 return (null, EquatableArray<SqlParseError>.Empty);
             }
@@ -414,6 +415,7 @@ internal static class SqlFileParser
                 );
             }
 
+            FindCommentsInHeads(query, start, end, ref errors);
             FindOpenedDefaults(kept, start, end, ref errors);
             return (
                 scanned.Segments,
@@ -421,6 +423,44 @@ internal static class SqlFileParser
                     ? EquatableArray<SqlParseError>.Empty
                     : new EquatableArray<SqlParseError>(errors.ToImmutable())
             );
+        }
+
+        // A comment in a token's head, from its braces to its colon or closing braces, is a blank where comments are
+        // stripped, which a head may hold, and is text that ends the head where they are kept, so the token is gone
+        // there.  A stripped comment always makes the head longer in the file than in the SQL, so only such a head is
+        // looked at further.  An ignored token has no occurrence: it is text in both forms.
+        private void FindCommentsInHeads(
+            BuiltQuery query,
+            int start,
+            int end,
+            ref ImmutableArray<SqlParseError>.Builder? errors
+        )
+        {
+            var sql = query.Sql;
+            foreach (var occurrence in query.Occurrences)
+            {
+                _ = TokenScanner.TryReadOpener(sql.Text, occurrence.Span.Start, out _, out var after);
+                var headStart = sql.ToSourceSpan(new TextSpan(occurrence.Span.Start, 1)).Start;
+                var headEnd = sql.ToSourceSpan(new TextSpan(after, 1)).Start;
+                if (headEnd - headStart == after - occurrence.Span.Start)
+                {
+                    continue;
+                }
+
+                for (var index = start; index < end && lexemes[index].Span.Start < headEnd; index++)
+                {
+                    var lexeme = lexemes[index];
+                    if (
+                        lexeme.Kind is SqlLexemeKind.LineComment or SqlLexemeKind.BlockComment
+                        && lexeme.Span.Start >= headStart
+                    )
+                    {
+                        (errors ??= ImmutableArray.CreateBuilder<SqlParseError>()).Add(
+                            SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, lexeme.Span, occurrence.Name)
+                        );
+                    }
+                }
+            }
         }
 
         // The mirror of FindHiddenTokenEnds: a comment that opens a default which the SQL after it closes is a token
@@ -454,7 +494,7 @@ internal static class SqlFileParser
                 )
                 {
                     (errors ??= ImmutableArray.CreateBuilder<SqlParseError>()).Add(
-                        SqlParseError.Create(SqlParseErrorKind.TokenDefaultCrossesComment, lexeme.Span, name)
+                        SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, lexeme.Span, name)
                     );
                 }
             }
@@ -531,6 +571,7 @@ internal static class SqlFileParser
         private readonly record struct BuiltQuery(
             SqlBlockText Sql,
             EquatableArray<SqlSegment> Segments,
+            EquatableArray<SqlTokenOccurrence> Occurrences,
             EquatableArray<SqlToken> Tokens,
             EquatableArray<SqlQueryParameter> Parameters
         );

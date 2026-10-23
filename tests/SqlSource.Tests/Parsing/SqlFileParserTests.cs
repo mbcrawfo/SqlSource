@@ -413,9 +413,7 @@ public sealed class SqlFileParserTests
         const string Text = "-- name: Q\nSELECT 1 {{f:AND a = 1 -- note}}\nORDER BY {{o:name}}\n";
 
         Errors(Text)
-            .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.TokenDefaultCrossesComment, SpanOf(Text, "-- note}}"), "f"),
-            ]);
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, SpanOf(Text, "-- note}}"), "f")]);
     }
 
     [Theory]
@@ -430,9 +428,7 @@ public sealed class SqlFileParserTests
         var text = "-- name: Q\n" + sql + "\n";
 
         Errors(text)
-            .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.TokenDefaultCrossesComment, SpanOf(text, comment), name),
-            ]);
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, SpanOf(text, comment), name)]);
     }
 
     // The scanner reads an ignored token to the next "}}" as it does any other, so a hidden "}}" takes g with it.
@@ -442,7 +438,7 @@ public sealed class SqlFileParserTests
         const string Text = "-- name: Q\n-- token-ignore: f\nSELECT {{f:a -- }}\nORDER BY {{g:b}}\n";
 
         Errors(Text)
-            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.TokenDefaultCrossesComment, SpanOf(Text, "-- }}"), "f")]);
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, SpanOf(Text, "-- }}"), "f")]);
     }
 
     // Under postgres a line comment may stand in the gap between the parts of a continued string.  The lexer gives
@@ -467,7 +463,7 @@ public sealed class SqlFileParserTests
                 "Text:}}\n",
             ]);
         Errors(Text, dialect: SqlDialect.PostgreSql)
-            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.TokenDefaultCrossesComment, SpanOf(Text, "-- }}"), "f")]);
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, SpanOf(Text, "-- }}"), "f")]);
     }
 
     // A marker is a line comment, and is gone from the SQL as one, so its braces do not end the default either.
@@ -478,11 +474,7 @@ public sealed class SqlFileParserTests
 
         Errors(Text)
             .ShouldBe([
-                SqlParseError.Create(
-                    SqlParseErrorKind.TokenDefaultCrossesComment,
-                    SpanOf(Text, "-- token: {{g:b}}"),
-                    "f"
-                ),
+                SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, SpanOf(Text, "-- token: {{g:b}}"), "f"),
             ]);
     }
 
@@ -494,9 +486,7 @@ public sealed class SqlFileParserTests
         const string Text = "-- name: Q\nSELECT {{f/* }} */:a}}\n";
 
         Errors(Text)
-            .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.TokenDefaultCrossesComment, SpanOf(Text, "/* }} */"), "f"),
-            ]);
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, SpanOf(Text, "/* }} */"), "f")]);
     }
 
     // The mirror: a comment opens a default that the SQL after it closes.  Without comments the query is as written;
@@ -529,7 +519,7 @@ public sealed class SqlFileParserTests
 
         Sql(block).ShouldBe(stripped);
         block.KeptErrors.ShouldBe([
-            SqlParseError.Create(SqlParseErrorKind.TokenDefaultCrossesComment, SpanOf(text, comment), name),
+            SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, SpanOf(text, comment), name),
         ]);
     }
 
@@ -547,6 +537,51 @@ public sealed class SqlFileParserTests
         block.KeptErrors.ShouldBeEmpty();
     }
 
+    // A comment in a token's head, before its default or its closing braces, is one space without comments, which a
+    // head may hold, and is text that ends the head where comments are kept: the token is gone there.
+    [Theory]
+    [InlineData("SELECT {{f/* c */}}", "/* c */")]
+    [InlineData("SELECT {{/* c */f}}", "/* c */")]
+    [InlineData("SELECT {{f/* c */:a}}", "/* c */")]
+    [InlineData("SELECT {{ f /* c\n d */ : a }}", "/* c\n d */")]
+    public void Parse_CommentInATokensHead_IsAnErrorOfTheKeptForm(string sql, string comment)
+    {
+        var text = "-- name: Q\n-- generator: keep-comments\n" + sql + "\n";
+
+        var block = Blocks(text).ShouldHaveSingleItem();
+
+        TokenNames(block.Segments).ShouldBe(["f"]);
+        TokenNames(block.KeptSegments.ShouldNotBeNull()).ShouldBeEmpty();
+        block.KeptErrors.ShouldBe([
+            SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, SpanOf(text, comment), "f"),
+        ]);
+    }
+
+    [Fact]
+    public void Parse_CommentsOnBothSidesOfATokensName_AreEachAnErrorOfTheKeptForm()
+    {
+        const string Text = "-- name: Q\n-- generator: keep-comments\nSELECT {{/* a */f/* b */}}, {{g}}\n";
+
+        Blocks(Text)
+            .ShouldHaveSingleItem()
+            .KeptErrors.ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, SpanOf(Text, "/* a */"), "f"),
+                SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, SpanOf(Text, "/* b */"), "f"),
+            ]);
+    }
+
+    // A comment inside the default is in the default in both forms.  An ignored name is literal text in both.  A
+    // hint is kept in both.  A line comment ends at a line break, which no head may hold, so neither form has a token.
+    [Theory]
+    [InlineData("SELECT {{f:a/* c */}}")]
+    [InlineData("-- token-ignore: f\nSELECT {{f/* c */}}")]
+    [InlineData("SELECT {{f/*+ c */}}")]
+    [InlineData("SELECT {{f -- c\n}}")]
+    public void Parse_CommentOutsideATokensHead_IsNoErrorOfTheKeptForm(string sql) =>
+        Blocks("-- name: Q\n-- generator: keep-comments\n" + sql + "\n")
+            .ShouldHaveSingleItem()
+            .KeptErrors.ShouldBeEmpty();
+
     // Where no level may keep comments the kept form is not built, so the mirror is not looked for.
     [Fact]
     public void Parse_CommentThatOpensADefaultWhereCommentsAreNotWanted_IsNoError()
@@ -563,7 +598,7 @@ public sealed class SqlFileParserTests
         const string Text = "-- name: Q\nSELECT {{f:a # }}\n";
 
         Errors(Text, dialect: SqlDialect.MySql)
-            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.TokenDefaultCrossesComment, SpanOf(Text, "# }}"), "f")]);
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.TokenCrossesComment, SpanOf(Text, "# }}"), "f")]);
     }
 
     [Theory]

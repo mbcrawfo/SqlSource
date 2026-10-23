@@ -377,11 +377,11 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor TokenDefaultCrossesComment = new(
+    public static readonly DiagnosticDescriptor TokenCrossesComment = new(
         id: "SQLSRC120",
-        title: "Token default crosses a comment",
-        messageFormat: "The default of token '{0}' starts and ends on different sides of a comment's edge, so it is "
-            + "read differently where comments are kept.  Keep the whole token inside the comment or outside it.",
+        title: "Token crosses a comment",
+        messageFormat: "Token '{0}' and a comment overlap, so the token is read differently where comments are kept.  "
+            + "Keep a comment wholly inside the token's default, or outside the token.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -806,7 +806,7 @@ internal static class SqlDiagnostics
             MissingParameterType,
             UndeclaredParameter,
             InputModelWithoutParameters,
-            TokenDefaultCrossesComment,
+            TokenCrossesComment,
             SidecarMalformed,
             SidecarFormatTooNew,
             SidecarFormatTooOld,
@@ -863,7 +863,7 @@ internal static class SqlDiagnostics
             SqlParseErrorKind.MissingParameterType => MissingParameterType,
             SqlParseErrorKind.UndeclaredParameter => UndeclaredParameter,
             SqlParseErrorKind.InputModelWithoutParameters => InputModelWithoutParameters,
-            SqlParseErrorKind.TokenDefaultCrossesComment => TokenDefaultCrossesComment,
+            SqlParseErrorKind.TokenCrossesComment => TokenCrossesComment,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "No descriptor is defined for this kind."),
         };
 }
