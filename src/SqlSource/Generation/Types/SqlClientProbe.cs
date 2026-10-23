@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
+using SqlSource.Diagnostics;
 
 namespace SqlSource.Generation.Types;
 
@@ -26,7 +28,7 @@ namespace SqlSource.Generation.Types;
 /// identity of a package's assembly keeps its major and no more.  Null when there is none.  For the diagnostics alone:
 /// the flags choose the column.
 /// </param>
-internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLeast7, string? Version)
+internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLeast7, string? Version) : IDriverProbe
 {
     private const string AssemblyName = "Microsoft.Data.SqlClient";
 
@@ -53,6 +55,23 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
     /// </summary>
     public bool IsNewerThanKnown => Referenced && Versions.LeadingMajor(Version) > NewestKnownMajor;
 
+    /// <inheritdoc />
+    public IEnumerable<DriverFinding> Findings
+    {
+        get
+        {
+            if (IsBelowTheFloor)
+            {
+                yield return new DriverFinding(SqlDiagnostics.SqlClientTooOld, VersionText);
+            }
+
+            if (IsNewerThanKnown)
+            {
+                yield return new DriverFinding(SqlDiagnostics.SqlClientNewerThanKnown, VersionText);
+            }
+        }
+    }
+
     /// <summary>The version as a diagnostic names it.</summary>
     public string VersionText => Version ?? "of an unknown version";
 
@@ -66,8 +85,8 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
         var connections = compilation.GetTypesByMetadataName("Microsoft.Data.SqlClient.SqlConnection");
         return new(
             !connections.IsEmpty,
-            Has(compilation, "Microsoft.Data.SqlTypes.SqlVector`1"),
-            Has(compilation, "Microsoft.Data.SqlClient.SspiContextProvider"),
+            DriverProbes.Has(compilation, "Microsoft.Data.SqlTypes.SqlVector`1"),
+            DriverProbes.Has(compilation, "Microsoft.Data.SqlClient.SspiContextProvider"),
             connections.IsEmpty ? null : ReadVersion(connections)
         );
     }
@@ -129,7 +148,4 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
                     ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true }
                 },
             };
-
-    private static bool Has(Compilation compilation, string metadataName) =>
-        !compilation.GetTypesByMetadataName(metadataName).IsEmpty;
 }

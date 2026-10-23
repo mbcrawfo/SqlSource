@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using Shouldly;
+using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Types;
 using SqlSource.Parsing;
@@ -158,6 +159,48 @@ public sealed class NpgsqlProbeTests
         probe.ShouldBe(expected);
         probe.Column.ShouldBe(column);
     }
+
+    [Fact]
+    public void Findings_ProbeBelowTheFloor_IsSqlsrc247WithTheVersion() =>
+        new NpgsqlProbe(true, false, false, new Version(7, 0, 4, 0)).Findings.ShouldBe([
+            new DriverFinding(SqlDiagnostics.NpgsqlTooOld, "7.0.4"),
+        ]);
+
+    [Fact]
+    public void Findings_ProbeNewerThanKnown_IsSqlsrc248WithTheVersion() =>
+        new NpgsqlProbe(true, true, true, new Version(11, 0, 1, 0)).Findings.ShouldBe([
+            new DriverFinding(SqlDiagnostics.NpgsqlNewerThanKnown, "11.0.1"),
+        ]);
+
+    [Fact]
+    public void Findings_ProbeBelowTheFloorAndNewerThanKnown_IsTooOldThenNewer() =>
+        new NpgsqlProbe(true, false, false, new Version(11, 0, 0, 0)).Findings.ShouldBe([
+            new DriverFinding(SqlDiagnostics.NpgsqlTooOld, "11.0.0"),
+            new DriverFinding(SqlDiagnostics.NpgsqlNewerThanKnown, "11.0.0"),
+        ]);
+
+    [Fact]
+    public void Findings_ReferencedProbeWithoutAVersion_NamesTheVersionAsUnknown() =>
+        new NpgsqlProbe(true, false, false, null).Findings.ShouldBe([
+            new DriverFinding(SqlDiagnostics.NpgsqlTooOld, "of an unknown version"),
+        ]);
+
+    [Theory]
+    [InlineData(false, false, false, null)]
+    [InlineData(true, true, false, "8.0.3")]
+    [InlineData(true, true, true, "10.0.3")]
+    public void Findings_ProbeOfAKnownVersion_IsEmpty(
+        bool referenced,
+        bool atLeast8,
+        bool atLeast10,
+        string? version
+    ) =>
+        new NpgsqlProbe(
+            referenced,
+            atLeast8,
+            atLeast10,
+            version is null ? null : Version.Parse(version)
+        ).Findings.ShouldBeEmpty();
 
     [Fact]
     public void Run_NpgsqlBelowTheFloor_IsSqlsrc247Once()

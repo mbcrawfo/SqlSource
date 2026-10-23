@@ -457,7 +457,7 @@ The compiler does not say where an MSBuild property or the metadata of an item w
 
 `SQLSRC247` and `SQLSRC248` are about the project's reference to Npgsql, so they have no position either.  The output step over `NpgsqlProbe` and `UsesPostgresEntries` reports each once for the project, with `Location.None`, and only when some file with needs is read as `postgres`.
 
-`SQLSRC267` and `SQLSRC268` are the same for the project's reference to Microsoft.Data.SqlClient: the output step over `SqlClientProbe` and `UsesSqlServerEntries` reports each once, with `Location.None`, and only when some file with needs is read as `mssql`.  The two drivers' reports share one method, `ReportDriver`, and nothing of one decides the other's.
+`SQLSRC267` and `SQLSRC268` are the same for the project's reference to Microsoft.Data.SqlClient: the output step over `SqlClientProbe` and `UsesSqlServerEntries` reports each once, with `Location.None`, and only when some file with needs is read as `mssql`.  The two drivers' reports share one method, `ReportDriver`, and nothing of one decides the other's.  `ReportDriver` takes the probe as an [`IDriverProbe`](../../src/SqlSource/Generation/Types/IDriverProbe.cs) and reports each of its `Findings`, a `DriverFinding` of a descriptor and the one argument of its message, in the order the probe gives them: too old, then newer than known.  `Findings` is computed from the probe's members and is no member of the record, so the probe's equality is unchanged, and a new thing a probe looks for is a new finding of the probe that `ReportDriver` reports without a change.
 
 ### The suppressor
 
