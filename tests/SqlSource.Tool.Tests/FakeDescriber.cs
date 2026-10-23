@@ -117,6 +117,9 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
     // Thrown in place of the parts, for a describer that throws when it is asked for them.
     public Exception? SecretsException { get; set; }
 
+    // Thrown in place of the rewrite, for a describer that throws when it is asked for it.
+    public Exception? RewriteException { get; set; }
+
     // What it says the driver writes of a connection, whatever the connection.
     public string? Rewrite { get; set; }
 
@@ -179,7 +182,7 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
         return SecretsFrom?.Invoke(getEnvironmentVariable) ?? Secrets;
     }
 
-    public string? RewriteOf(string connection) => Rewrite;
+    public string? RewriteOf(string connection) => RewriteException is { } exception ? throw exception : Rewrite;
 
     public async Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,

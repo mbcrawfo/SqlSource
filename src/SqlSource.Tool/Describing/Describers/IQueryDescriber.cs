@@ -36,7 +36,8 @@ internal interface IQueryDescriber
     /// </summary>
     /// <remarks>
     /// It is asked once for a database, before its session is opened.  It gives none for a value the driver cannot
-    /// read, and it never throws: an exception is <c>SQLSRC200</c>.  A password that the driver takes from
+    /// read, and for what a user can cause it throws nothing: a file that cannot be read for an I/O or access reason
+    /// gives none.  Any other exception is a bug, and <c>SQLSRC200</c>.  A password that the driver takes from
     /// elsewhere is not in the value, and is given all the same when the describer can know it: from the host's
     /// environment, through <paramref name="getEnvironmentVariable" /> and never the process's own, and from a file
     /// that the driver would read.  The run keeps no part shorter than
@@ -53,7 +54,7 @@ internal interface IQueryDescriber
     /// A driver quotes a connection in its errors from what it has read, which is not the text that was given: its
     /// keywords are in another order and its words in another spelling.  The run removes this text whole, as it
     /// removes the value, wherever it stands.  It is asked under the same guard as <see cref="SecretsOf" />, and it
-    /// never throws: an exception is <c>SQLSRC200</c>.
+    /// throws nothing for what a user can cause: an exception is a bug, and <c>SQLSRC200</c>.
     /// </remarks>
     /// <param name="connection">The connection's value.</param>
     string? RewriteOf(string connection);

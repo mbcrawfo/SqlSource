@@ -24,8 +24,8 @@ internal static class PasswordFile
 
     /// <summary>
     /// The password of each well-formed entry of a file's text.  A line that does not have five fields, or a port
-    /// that is neither <c>*</c> nor a number, is skipped as the driver's parser throws for it; a password that is
-    /// <c>*</c> or empty is none.
+    /// that is neither <c>*</c> nor a number, is skipped, since the driver could not use such a line; a password that
+    /// is <c>*</c> or empty is none.
     /// </summary>
     public static IReadOnlyList<string> Passwords(string text)
     {

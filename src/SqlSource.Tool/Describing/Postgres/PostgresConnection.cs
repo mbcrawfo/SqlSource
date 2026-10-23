@@ -119,8 +119,9 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     /// exists.  So <c>PGPASSWORD</c> is given when the string has no <c>Password</c>, and when it has neither the
     /// password of every entry of each file it could read is (<see cref="PasswordFile" />): which entry matches is
     /// the driver's to say, and a password too many only removes a word that nothing else prints.  A file that cannot
-    /// be read gives none, since the driver would fail to open the session in its own place.  The environment is the
-    /// host's.
+    /// be read for an I/O or access reason gives none, since the driver would fail to open the session in its own
+    /// place; anything else it throws is a bug, which the run's guard turns into <c>SQLSRC200</c>.  The environment is
+    /// the host's.
     /// </remarks>
     public static IReadOnlyList<string> SecretsOf(string connection, Func<string, string?> getEnvironmentVariable)
     {
