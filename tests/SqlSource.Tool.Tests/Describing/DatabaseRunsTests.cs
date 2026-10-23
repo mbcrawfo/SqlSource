@@ -405,6 +405,21 @@ public sealed class DatabaseRunsTests : IDisposable
         _describer.Opened.ShouldBeEmpty();
     }
 
+    // The driver's rewrite of the value is asked for under the same guard.
+    [Fact]
+    public async Task Run_DescriberThatThrowsWhenAskedForTheRewrite_IsOneFaultWithoutTheValue()
+    {
+        _describer.RewriteException = new InvalidOperationException($"cannot write {Secrets.ConnectionWithWord}");
+
+        var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
+
+        fault.InnerException.ShouldBeNull();
+        fault.Diagnostic.Descriptor.Id.ShouldBe("SQLSRC200");
+        fault.Diagnostic.Arguments.ToArray().ShouldBe(["System.InvalidOperationException", "cannot write ***"]);
+        _error.ToString().ShouldBeEmpty();
+        _describer.Opened.ShouldBeEmpty();
+    }
+
     // The list of the parts is the describer's too, and it is read under the same guard.
     [Fact]
     public async Task Run_DescriberWhoseSecretsThrowWhenTheyAreRead_IsOneFaultWithoutTheValue()
@@ -835,7 +850,9 @@ public sealed class DatabaseRunsTests : IDisposable
     {
         public SqlDialect Dialect => SqlDialect.PostgreSql;
 
-        public IReadOnlyList<string> SecretsOf(string connection) => [];
+        public IReadOnlyList<string> SecretsOf(string connection, Func<string, string?> getEnvironmentVariable) => [];
+
+        public string? RewriteOf(string connection) => null;
 
         public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
             OpenRequest request,

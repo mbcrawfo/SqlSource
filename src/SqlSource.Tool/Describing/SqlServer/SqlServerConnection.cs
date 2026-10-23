@@ -40,8 +40,18 @@ internal sealed class SqlServerConnection(string connectionString, IRunLog log) 
     /// <summary>
     /// The password of a connection string, as SqlClient reads it, or none when it gives none or cannot read it.
     /// </summary>
+    /// <remarks>
+    /// SqlClient 7.1.1 reads no password from the environment or from a file, so the host's environment is not asked
+    /// and the describer ignores it.
+    /// </remarks>
     public static IReadOnlyList<string> SecretsOf(string connection) =>
         Read(connection)?.Password is { Length: > 0 } password ? [password] : [];
+
+    /// <summary>
+    /// The connection string as SqlClient writes it again, or null when it cannot read it.  A text in an error of
+    /// the driver's may be this one and not the string that was given.
+    /// </summary>
+    public static string? RewriteOf(string connection) => Read(connection)?.ConnectionString;
 
     /// <summary>The version of the driver, its informational version without the commit after <c>+</c>.</summary>
     public static string? DriverVersion { get; } =
