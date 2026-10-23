@@ -45,7 +45,7 @@ These facts come from `EXPLAIN (VERBOSE, FORMAT JSON)` of `EXECUTE` under `force
   4. **A constructor of a built-in range type**, and **the intersection `*` of two values of one built-in range type** that are not `NULL`.
   5. **`COALESCE`, `GREATEST` or `LEAST` computed at a `FULL JOIN`** over a column on each of its sides that is not `NULL` but for that join.
 - **`COALESCE`, `GREATEST`, `LEAST` and `CASE` get a type** where they are not `NULL`, so arithmetic, a comparison, a cast, an aggregate and a scalar subquery's value over them are read: `sum(coalesce(x, 0))` under `GROUP BY`.
-- The noise budget lowered on both majors, by the corpus as it stands, from 42 to 33 on 14 and from 40 to 31 on 18 (below).
+- The noise budget lowered on both majors, by the corpus as it stands, from 42 to 32 on 14 and from 40 to 30 on 18 (below).
 - TD-0051 rewritten to describe only what remains.  `docs/architecture/postgres-nullability.md` and `postgres-describer.md` describe what was built, and the manual's nullability section says what a user now gets.
 
 ## Non-goals
@@ -134,10 +134,11 @@ Each row of a full join has a row of one side at least.  So a `COALESCE`, a `GRE
 | `json-build-and-agg` | `order_count`, `account` | 2 | 2 | 2 |
 | `array-and-string-agg` | `product_ids` | 1 | 1 | 2 |
 | `reservations-in-range` | `overlap` | 1 | 1 | 2 |
+| `recursive-category-tree` | `product_count` | 1 | 1 | 2 |
 | `full-join-accounts-reservations` | `account_id` | 1 | 1 | 4 |
-| | | 9 | 9 | |
+| | | 10 | 10 | |
 
-The budgets become 33 and 31.  Decision 3 lowers no column of the corpus: its one case, `sum(coalesce(...))` in `cte-chain` `lifetime`, is behind a `CTE Scan`.  It is taken because it is small and `sum(coalesce(x, 0))` is common.  The fixture cases `walk-using` and `walk-natural` change by decision 4: their merged columns become `Expression` in `WalkMatrixTests`, by hand.  If the build finds a column of the table unproved, the column stays, and the budget is set to what the corpus gives, with the reason in the plan.
+The budgets become 32 and 30.  The build found `recursive-category-tree` `product_count` as well: it is a `count(p.id)` at the outer grouped query, outside the CTE scan, so the walk reads it.  Decision 3 lowers no column of the corpus: its one case, `sum(coalesce(...))` in `cte-chain` `lifetime`, is behind a `CTE Scan`.  It is taken because it is small and `sum(coalesce(x, 0))` is common.  The fixture cases `walk-using` and `walk-natural` change by decision 4: their merged columns become `Expression` in `WalkMatrixTests`, by hand.  If the build finds a column of the table unproved, the column stays, and the budget is set to what the corpus gives, with the reason in the plan.
 
 ## What a user sees
 

@@ -260,16 +260,14 @@ The input model is the parameter object, and the output model is the type of a r
   </PropertyGroup>
   ```
 
-- **Set a column's nullability with a `-- column:` marker, not with `!` or `?` at the end of its alias.**  A mark stays in the name of the column, `note_count!`, and Dapper does not match it to the property `NoteCount`: it throws `InvalidOperationException` for a record that it cannot make without the column, and leaves the property of a class as it was made, with no error.  The marker leaves the name alone:
+- **Set a column's nullability with a `-- column:` marker, not with `!` or `?` at the end of its alias.**  A mark stays in the name of the column, `display_name!`, and Dapper does not match it to the property `DisplayName`: it throws `InvalidOperationException` for a record that it cannot make without the column, and leaves the property of a class as it was made, with no error.  The marker leaves the name alone:
 
   ```sql postgres
-  -- name: GetOrderNoteCount
-  -- column: note_count not null
-  SELECT o.id, count(l.note) AS note_count
-  FROM orders o
-  JOIN order_lines l ON l.order_id = o.id
-  WHERE o.id = @orderId
-  GROUP BY o.id;
+  -- name: GetCustomerLabel
+  -- column: display_name not null
+  SELECT c.id, initcap(c.name) AS display_name
+  FROM customers c
+  WHERE c.id = @customerId;
   ```
 
 Each database needs more, below: [PostgreSQL](#dapper-with-postgresql) and [SQL Server](#dapper-with-sql-server).
