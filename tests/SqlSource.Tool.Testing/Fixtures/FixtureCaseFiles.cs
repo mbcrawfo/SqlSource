@@ -1,6 +1,8 @@
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Capture;
 
 namespace SqlSource.Tool.Testing.Fixtures;
@@ -28,15 +30,30 @@ internal static class FixtureCaseFiles
             cancellationToken
         );
 
-    // The two files a recording writes: what was asked and answered, and the sidecar described from it.
+    // The two files a recording writes: what was asked and answered, and the sidecar described from it.  A capture
+    // that holds the connection's value or a password of it fails the test, and nothing is written: a recording is
+    // committed.
     public static async Task WriteRecordingAsync(
         FixtureCase fixture,
         DescribeCapture capture,
         string expected,
+        ConnectionSecret secret,
         CancellationToken cancellationToken
     )
     {
-        await WriteCaptureAsync(fixture, capture, cancellationToken);
+        var written = CaptureJson.Write(capture, secret);
+        if (!written.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"The capture of the case {fixture} is not written.  {written.Failure}"
+            );
+        }
+
+        await File.WriteAllTextAsync(
+            Path.Combine(fixture.Folder, FixtureCase.CaptureFile),
+            written.Value,
+            cancellationToken
+        );
         await File.WriteAllTextAsync(
             Path.Combine(fixture.Folder, FixtureCase.ExpectedFile),
             expected,

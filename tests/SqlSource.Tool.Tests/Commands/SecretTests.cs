@@ -446,6 +446,51 @@ public sealed class SecretTests : IDisposable
         );
     }
 
+    // A password that the driver takes from the environment is in no string of the value, so the describer gives it
+    // from the host's environment, and the run removes it.
+    [Fact]
+    public async Task Run_DescribersPasswordFromTheEnvironment_IsTheMarkInAFailure()
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = "Host=db";
+        _scene.Run.Environment["FAKE_PASSWORD"] = Secrets.Marker;
+        _scene.Describer.SecretsFrom = environment => environment("FAKE_PASSWORD") is { } password ? [password] : [];
+        _scene.Describer.Failures["Bad"] = FakeDescriber.Failure(
+            "Bad",
+            DescribeStep.Explain,
+            "check the SQL",
+            $"password {Secrets.Marker} failed"
+        );
+        _scene.Describer.Failures["Good"] = FakeDescriber.Failure("Good");
+
+        var result = await _scene.DescribeAsync();
+
+        result.Out.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldContain("    server: password *** failed\n");
+    }
+
+    // The driver writes the value again in its own order, and an error quotes that text whole.
+    [Fact]
+    public async Task Run_DescribersRewriteInAFailure_IsTheMark()
+    {
+        const string Rewrite = "Password=ab cd;Host=db";
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = "Host=db;Password=\"ab cd\"";
+        _scene.Describer.Rewrite = Rewrite;
+        _scene.Describer.Failures["Bad"] = FakeDescriber.Failure(
+            "Bad",
+            DescribeStep.Explain,
+            "check the SQL",
+            $"cannot use '{Rewrite}'"
+        );
+        _scene.Describer.Failures["Good"] = FakeDescriber.Failure("Good");
+
+        var result = await _scene.DescribeAsync();
+
+        result.Out.ShouldNotContain(Rewrite);
+        result.Error.ShouldNotContain(Rewrite);
+        result.Error.ShouldContain("    server: cannot use '***'\n");
+    }
+
     // The descriptor of a failure is a describer's text too, when the describer built it from what a server said.
     [Fact]
     public async Task Run_DescriberWhoseFailureHasADescriptorWithTheValue_PrintsTheMarkInEachPlace()

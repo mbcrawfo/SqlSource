@@ -108,11 +108,24 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     private ILoggerFactory? _driverLog;
 
     /// <summary>
-    /// The passwords of a connection string, <c>Password</c> and <c>SSL Password</c>, as the driver reads it, or
-    /// none when it cannot read it.  A password the driver takes from <c>PGPASSWORD</c> or a password file is not
-    /// in the string.
+    /// The passwords of a connection string as the driver reads it, <c>Password</c> and <c>SSL Password</c>, and the
+    /// one it would use when the string has no <c>Password</c>, or none when it cannot read the string.
     /// </summary>
-    public static IReadOnlyList<string> SecretsOf(string connection)
+    /// <remarks>
+    /// Npgsql 10.0.3 (<c>NpgsqlConnector.GetPassword</c>) takes the password of the data source, which is the
+    /// string's <c>Password</c> or that of a provider set with <c>NpgsqlDataSourceBuilder.UsePasswordProvider</c> or
+    /// <c>UsePeriodicPasswordProvider</c>; then the connection's <c>ProvidePasswordCallback</c>; then
+    /// <c>PGPASSWORD</c>; then the entry of a password file that matches the host, port, database and user.  The tool
+    /// sets no provider and no callback.
+    /// The file is the string's <c>Passfile</c>, else <c>PGPASSFILE</c>, else the default one, read only when it
+    /// exists.  So <c>PGPASSWORD</c> is given when the string has no <c>Password</c>, and when it has neither the
+    /// password of every entry of each file it could read is (<see cref="PasswordFile" />): which entry matches is
+    /// the driver's to say, and a password too many only removes a word that nothing else prints.  A file that cannot
+    /// be read for an I/O or access reason gives none, since the driver would fail to open the session in its own
+    /// place; anything else it throws is a bug, which the run's guard turns into <c>SQLSRC200</c>.  The environment is
+    /// the host's.
+    /// </remarks>
+    public static IReadOnlyList<string> SecretsOf(string connection, Func<string, string?> getEnvironmentVariable)
     {
         NpgsqlConnectionStringBuilder builder;
         try
@@ -125,7 +138,69 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
             return [];
         }
 
-        return [.. new[] { builder.Password, builder.SslPassword }.OfType<string>()];
+        var secrets = new List<string>(new[] { builder.Password, builder.SslPassword }.OfType<string>());
+        if (builder.Password is not null)
+        {
+            return secrets;
+        }
+
+        if (getEnvironmentVariable("PGPASSWORD") is { } fromEnvironment)
+        {
+            secrets.Add(fromEnvironment);
+            return secrets;
+        }
+
+        foreach (var path in PasswordFile.PathsOf(builder.Passfile, getEnvironmentVariable))
+        {
+            secrets.AddRange(PasswordsIn(path));
+        }
+
+        return secrets;
+    }
+
+    /// <summary>
+    /// The connection string as the driver writes it again, or null when it cannot read the string.  A text in an
+    /// error of the driver's may be this one and not the string that was given.
+    /// </summary>
+    public static string? RewriteOf(string connection)
+    {
+        try
+        {
+            return new NpgsqlConnectionStringBuilder(connection).ConnectionString;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    // The password file is read as the driver reads it, whole, and a file it cannot read gives none.  So is one that
+    // can be read only once, a named pipe or the pipe of a shell's process substitution, which is read ahead of the
+    // driver here and would leave it nothing: an empty length, which such a pipe has until a reader opens it, is not
+    // opened, and a stream that cannot seek is closed unread.
+    private static IReadOnlyList<string> PasswordsIn(string path)
+    {
+        try
+        {
+            if (new FileInfo(path) is not { Exists: true, Length: > 0 })
+            {
+                return [];
+            }
+
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            if (!stream.CanSeek)
+            {
+                return [];
+            }
+
+            using var reader = new StreamReader(stream);
+            return PasswordFile.Passwords(reader.ReadToEnd());
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return [];
+        }
     }
 
     /// <summary>The version of the driver, as <c>major.minor.patch</c>.</summary>

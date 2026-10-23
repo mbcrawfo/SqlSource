@@ -32,6 +32,33 @@ public sealed class ConnectionSecretTests
         ).Parts.ShouldBe(["Billing"]);
 
     [Fact]
+    public void Wholes_ValueWithSpaceAndAForm_AreAllThreeLongestFirst() =>
+        new ConnectionSecret(" Host=db;Password=pw ", forms: ["Host=db;Password=pw;Port=5432"]).Wholes.ShouldBe([
+            "Host=db;Password=pw;Port=5432",
+            " Host=db;Password=pw ",
+            "Host=db;Password=pw",
+        ]);
+
+    // Each whole form is removed whole, so a part that equals one adds nothing.
+    [Fact]
+    public void Parts_EqualToAFormOrToTheTrimmedValue_AreDropped() =>
+        new ConnectionSecret(
+            " Host=db;Password=hunter22 ",
+            ["Host=db;Password=hunter22;Port=5432", "Host=db;Password=hunter22", "hunter22"],
+            forms: ["Host=db;Password=hunter22;Port=5432"]
+        ).Parts.ShouldBe(["hunter22"]);
+
+    [Fact]
+    public void Wholes_FormEmptyOrEqualToTheValue_IsDropped() =>
+        new ConnectionSecret("v=1", forms: [null, "", " ", "v=1"]).Wholes.ShouldBe(["v=1"]);
+
+    [Fact]
+    public void IsIn_FormAnywhere_IsTrue() =>
+        new ConnectionSecret("Host=db", forms: ["Host=db;Password=pw;Port=5432"])
+            .IsIn("xHost=db;Password=pw;Port=5432x")
+            .ShouldBeTrue();
+
+    [Fact]
     public void IsIn_ValueInsideAWord_IsTrue() => new ConnectionSecret("test").IsIn("latest_orders").ShouldBeTrue();
 
     [Fact]

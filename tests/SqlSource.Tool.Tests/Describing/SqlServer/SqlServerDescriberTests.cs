@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing.Describers;
@@ -19,11 +20,13 @@ public sealed class SqlServerDescriberTests
 
     [Fact]
     public void SecretsOf_ValueWithAPassword_GivesThePassword() =>
-        new SqlServerDescriber().SecretsOf("Data Source=x;Password=Sesame123").ShouldBe(["Sesame123"]);
+        new SqlServerDescriber()
+            .SecretsOf("Data Source=x;Password=Sesame123", static _ => null)
+            .ShouldBe(["Sesame123"]);
 
     [Fact]
     public void SecretsOf_ValueWithoutAPassword_GivesNone() =>
-        new SqlServerDescriber().SecretsOf("Data Source=x;Integrated Security=true").ShouldBeEmpty();
+        new SqlServerDescriber().SecretsOf("Data Source=x;Integrated Security=true", static _ => null).ShouldBeEmpty();
 
     // A value SqlClient cannot read has no parts it knows, and opening it fails in its own place.  The builder throws
     // an ArgumentException for the first two, an OverflowException, an InvalidOperationException and a
@@ -35,7 +38,29 @@ public sealed class SqlServerDescriberTests
     [InlineData("Data Source=x;Password=Sesame123;Context Connection=true")]
     [InlineData("Data Source=x;Password=Sesame123;Network Library=dbmssocn")]
     public void SecretsOf_ValueSqlClientCannotRead_GivesNoneAndDoesNotThrow(string connection) =>
-        new SqlServerDescriber().SecretsOf(connection).ShouldBeEmpty();
+        new SqlServerDescriber().SecretsOf(connection, static _ => null).ShouldBeEmpty();
+
+    // SqlClient reads no password from the environment, so no variable is a secret of the value.
+    [Fact]
+    public void SecretsOf_PasswordVariablesSet_GivesOnlyTheStrings() =>
+        new SqlServerDescriber()
+            .SecretsOf("Data Source=x;Password=Sesame123", static _ => "envpass1")
+            .ShouldBe(["Sesame123"]);
+
+    [Fact]
+    public void RewriteOf_ValueWithAPassword_IsTheBuildersText() =>
+        new SqlServerDescriber()
+            .RewriteOf("Password=Sesame123;data source=x")
+            .ShouldBe(new SqlConnectionStringBuilder("Password=Sesame123;data source=x").ConnectionString);
+
+    [Theory]
+    [InlineData("Data Source=x;Nonsense=1")]
+    [InlineData("=;")]
+    [InlineData("Data Source=x;Password=Sesame123;Connect Timeout=99999999999")]
+    [InlineData("Data Source=x;Password=Sesame123;Context Connection=true")]
+    [InlineData("Data Source=x;Password=Sesame123;Network Library=dbmssocn")]
+    public void RewriteOf_ValueSqlClientCannotRead_IsNull(string connection) =>
+        new SqlServerDescriber().RewriteOf(connection).ShouldBeNull();
 
     // Each is refused before anything is opened, with the describer's own line and nothing of SqlClient's text.
     [Theory]
