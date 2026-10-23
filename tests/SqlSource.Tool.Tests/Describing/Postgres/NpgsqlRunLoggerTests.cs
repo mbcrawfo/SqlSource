@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using Shouldly;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Postgres;
@@ -10,88 +11,152 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
-// What of Npgsql's own log reaches the run's, at which levels, and without what.
+// What of Npgsql's own log reaches the run's: the ids listed for their category, and without the exception's message.
 public sealed class NpgsqlRunLoggerTests
 {
     private readonly RecordingLog _recording = new();
 
-    public static TheoryData<string, LogLevel> CommandOrTransactionAtDebugOrAbove =>
-        Cross(["Npgsql.Command", "Npgsql.Transaction"], AtOrAbove(LogLevel.Debug));
+    // Every id that is forwarded, at the level Npgsql 10.0.3 writes it.
+    public static TheoryData<string, int, LogLevel> Listed =>
+        new()
+        {
+            { "Npgsql.Command", NpgsqlEventId.ExecutingCommand, LogLevel.Debug },
+            { "Npgsql.Command", NpgsqlEventId.CommandExecutionCompleted, LogLevel.Information },
+            { "Npgsql.Command", NpgsqlEventId.ExecutingInternalCommand, LogLevel.Debug },
+            { "Npgsql.Connection", NpgsqlEventId.CancellingCommand, LogLevel.Debug },
+            { "Npgsql.Connection", NpgsqlEventId.ExceptionWhenClosingPhysicalConnection, LogLevel.Warning },
+            { "Npgsql.Transaction", NpgsqlEventId.StartedTransaction, LogLevel.Debug },
+            { "Npgsql.Transaction", NpgsqlEventId.CommittedTransaction, LogLevel.Debug },
+            { "Npgsql.Transaction", NpgsqlEventId.RolledBackTransaction, LogLevel.Debug },
+            { "Npgsql.Transaction", NpgsqlEventId.ExceptionDuringTransactionDispose, LogLevel.Error },
+        };
 
-    public static TheoryData<string, LogLevel> OtherBelowWarning =>
-        Cross(
-            ["Npgsql.Connection", "Npgsql.Copy", "Npgsql.Exception", "Npgsql.Replication"],
-            [LogLevel.Trace, LogLevel.Debug, LogLevel.Information]
-        );
+    // Ids that are not listed: the messages that name the endpoint or quote the server, id 0, ids of features the
+    // describer does not use, and an id that Npgsql 10.0.3 does not have.
+    public static TheoryData<string, int> NotListed =>
+        new()
+        {
+            { "Npgsql.Connection", NpgsqlEventId.OpenedConnection },
+            { "Npgsql.Connection", NpgsqlEventId.ClosedConnection },
+            { "Npgsql.Connection", NpgsqlEventId.OpenedPhysicalConnection },
+            { "Npgsql.Connection", NpgsqlEventId.ClosedPhysicalConnection },
+            { "Npgsql.Connection", NpgsqlEventId.ReceivedNotice },
+            { "Npgsql.Connection", 0 },
+            { "Npgsql.Command", 0 },
+            { "Npgsql.Command", NpgsqlEventId.PreparingCommandExplicitly },
+            { "Npgsql.Transaction", NpgsqlEventId.CreatingSavepoint },
+            { "Npgsql.Command", 2999 },
+        };
 
-    public static TheoryData<string, LogLevel> OtherAtWarningOrAbove =>
-        Cross(
-            ["Npgsql.Connection", "Npgsql.Copy", "Npgsql.Exception", "Npgsql.Replication"],
-            [LogLevel.Warning, LogLevel.Error, LogLevel.Critical]
-        );
+    // The levels that are ever forwarded.
+    private static readonly LogLevel[] Forwardable =
+    [
+        .. Enum.GetValues<LogLevel>().Where(static l => l is >= LogLevel.Debug and < LogLevel.None),
+    ];
 
     [Theory]
-    [MemberData(nameof(CommandOrTransactionAtDebugOrAbove))]
-    public void Log_CommandOrTransactionAtDebugOrAbove_IsWritten(string category, LogLevel level)
+    [MemberData(nameof(Listed))]
+    public void Log_ListedIdAtItsLevel_IsWritten(string category, int eventId, LogLevel level)
     {
-        Write(category, level, "Executing command: SELECT 1");
+        Write(category, level, "text", eventId: eventId);
 
         _recording.Events.ShouldHaveSingleItem().Name.ShouldBe(NpgsqlRunLogger.EventName);
     }
 
     [Theory]
-    [InlineData("Npgsql.Command")]
-    [InlineData("Npgsql.Transaction")]
-    public void Log_CommandOrTransactionAtTrace_IsDropped(string category)
+    [MemberData(nameof(NotListed))]
+    public void Log_IdNotListed_IsDropped(string category, int eventId)
+    {
+        foreach (var level in Forwardable)
+        {
+            Write(category, level, "Opened connection to db.example:5432/app", eventId: eventId);
+        }
+
+        _recording.Events.ShouldBeEmpty();
+    }
+
+    // A listed id is listed for the category that writes it, and a new version that moves it is read again.
+    [Theory]
+    [InlineData("Npgsql.Command", NpgsqlEventId.CancellingCommand)]
+    [InlineData("Npgsql.Connection", NpgsqlEventId.ExecutingCommand)]
+    [InlineData("Npgsql.Exception", NpgsqlEventId.ExecutingCommand)]
+    public void Log_ListedIdOfAnotherCategory_IsDropped(string category, int eventId)
+    {
+        Write(category, LogLevel.Warning, "text", eventId: eventId);
+
+        _recording.Events.ShouldBeEmpty();
+    }
+
+    // Npgsql.Exception writes only at id 0, the server's text among it, and a category the tool does not know has no
+    // listed id: neither is enabled, so Npgsql does not build their messages.
+    [Theory]
+    [InlineData("Npgsql.Exception")]
+    [InlineData("Npgsql.Copy")]
+    [InlineData("Npgsql.Replication")]
+    [InlineData("Npgsql.Pool")]
+    public void IsEnabled_CategoryWithNoListedId_IsFalseAtEveryLevel(string category)
     {
         var logger = Logger(category);
 
-        Write(category, LogLevel.Trace, "text");
+        Enum.GetValues<LogLevel>().ShouldAllBe(level => !logger.IsEnabled(level));
+    }
 
-        _recording.Events.ShouldBeEmpty();
+    [Theory]
+    [InlineData("Npgsql.Command")]
+    [InlineData("Npgsql.Connection")]
+    [InlineData("Npgsql.Transaction")]
+    public void IsEnabled_CategoryWithAListedId_IsTrueFromDebugAndNeverAtTraceOrNone(string category)
+    {
+        var logger = Logger(category);
+
+        Forwardable.ShouldAllBe(level => logger.IsEnabled(level));
         logger.IsEnabled(LogLevel.Trace).ShouldBeFalse();
+        logger.IsEnabled(LogLevel.None).ShouldBeFalse();
     }
 
     [Theory]
-    [MemberData(nameof(OtherBelowWarning))]
-    public void Log_OtherCategoryBelowWarning_IsDropped(string category, LogLevel level)
+    [InlineData(LogLevel.Trace)]
+    [InlineData(LogLevel.None)]
+    public void Log_ListedIdAtTraceOrNone_IsDropped(LogLevel level)
     {
-        Write(category, level, "text");
+        Write("Npgsql.Command", level, "text", eventId: NpgsqlEventId.ExecutingCommand);
 
         _recording.Events.ShouldBeEmpty();
     }
 
-    [Theory]
-    [MemberData(nameof(OtherAtWarningOrAbove))]
-    public void Log_OtherCategoryAtWarningOrAbove_IsWritten(string category, LogLevel level)
-    {
-        Write(category, level, "text");
-
-        _ = _recording.Events.ShouldHaveSingleItem();
-    }
-
+    // A message that is dropped is never built.
     [Fact]
-    public void Log_AnyCategoryAtNone_IsDropped()
+    public void Log_IdNotListed_DoesNotFormatTheMessage()
     {
-        var logger = Logger("Npgsql.Command");
+        Logger("Npgsql.Connection")
+            .Log(
+                LogLevel.Debug,
+                new EventId(NpgsqlEventId.OpenedConnection),
+                "state",
+                null,
+                (_, _) => throw new InvalidOperationException("formatted")
+            );
 
-        logger.IsEnabled(LogLevel.None).ShouldBeFalse();
-        Write("Npgsql.Command", LogLevel.None, "text");
         _recording.Events.ShouldBeEmpty();
     }
 
     [Fact]
     public void Log_Message_HasTheMembersInOrder()
     {
-        Write("Npgsql.Command", LogLevel.Debug, "Executing command: SELECT 1", eventId: 2001);
+        Write(
+            "Npgsql.Command",
+            LogLevel.Information,
+            "Command execution completed (duration=1ms): SELECT 1",
+            eventId: NpgsqlEventId.CommandExecutionCompleted
+        );
 
         _recording
             .Events.ShouldHaveSingleItem()
             .Members.ShouldBe([
                 new("category", "Npgsql.Command"),
-                new("level", "debug"),
+                new("level", "information"),
                 new("eventId", 2001L),
-                new("message", "Executing command: SELECT 1"),
+                new("message", "Command execution completed (duration=1ms): SELECT 1"),
                 new("exception", LogValue.Null),
             ]);
     }
@@ -104,34 +169,30 @@ public sealed class NpgsqlRunLoggerTests
     [InlineData(LogLevel.Critical, "critical")]
     public void Log_Level_IsWrittenInLowerCase(LogLevel level, string word)
     {
-        Write("Npgsql.Command", level, "text");
+        Write("Npgsql.Command", level, "text", eventId: NpgsqlEventId.ExecutingCommand);
 
         _recording.Events[0].Members[1].ShouldBe(new LogMember("level", word));
     }
 
-    [Fact]
-    public void Log_Exception_IsItsTypeAndMessage()
+    // The exception's message is the server's or the socket's text, which can name the endpoint, a role or a database.
+    [Theory]
+    [InlineData("Npgsql.Connection", NpgsqlEventId.ExceptionWhenClosingPhysicalConnection)]
+    [InlineData("Npgsql.Transaction", NpgsqlEventId.ExceptionDuringTransactionDispose)]
+    [InlineData("Npgsql.Command", NpgsqlEventId.ExecutingCommand)]
+    public void Log_Exception_IsItsTypeAlone(string category, int eventId)
     {
-        Write("Npgsql.Command", LogLevel.Error, "text", new InvalidOperationException("boom"));
+        Write(
+            category,
+            LogLevel.Error,
+            "text",
+            new InvalidOperationException("Failed to connect to db.example:5432"),
+            eventId
+        );
 
         _recording
             .Events.ShouldHaveSingleItem()
             .Members[4]
-            .ShouldBe(new LogMember("exception", "System.InvalidOperationException: boom"));
-    }
-
-    // A failed connect names the endpoint in its exception, which the log must not hold.
-    [Fact]
-    public void Log_ExceptionOfConnection_IsNotWritten()
-    {
-        Write(
-            "Npgsql.Connection",
-            LogLevel.Error,
-            "text",
-            new InvalidOperationException("Failed to connect to db.example:5432")
-        );
-
-        _recording.Events.ShouldHaveSingleItem().Members[4].ShouldBe(new LogMember("exception", LogValue.Null));
+            .ShouldBe(new LogMember("exception", "System.InvalidOperationException"));
     }
 
     [Fact]
@@ -142,7 +203,13 @@ public sealed class NpgsqlRunLoggerTests
 
         factory
             .CreateLogger("Npgsql.Command")
-            .Log(LogLevel.Debug, new EventId(2001), "state", null, (_, _) => "Opening " + Secrets.Connection);
+            .Log(
+                LogLevel.Debug,
+                new EventId(NpgsqlEventId.ExecutingCommand),
+                "state",
+                null,
+                (_, _) => "Executing command: " + Secrets.Connection
+            );
 
         var (name, members) = _recording.Events.ShouldHaveSingleItem();
         name.ShouldBe("postgres.driver");
@@ -150,6 +217,17 @@ public sealed class NpgsqlRunLoggerTests
         message.ShouldContain("***");
         message.ShouldNotContain(Secrets.Connection);
     }
+
+    // The list was read from this version's NpgsqlEventId.cs and LogMessages.cs.  An update of Npgsql reads the new
+    // version's, adds the ids that are safe and that the describer reaches, and moves this test to it.
+    [Fact]
+    public void Npgsql_IsTheVersionTheListWasReadFrom() =>
+        typeof(NpgsqlEventId)
+            .Assembly.GetName()
+            .Version.ShouldBe(
+                new Version(10, 0, 3, 0),
+                "Read the new Npgsql's NpgsqlEventId.cs and LogMessages.cs and update the list of NpgsqlRunLogger."
+            );
 
     [Fact]
     public void BeginScope_AnyState_IsANoOpThatCanBeDisposed()
@@ -174,25 +252,8 @@ public sealed class NpgsqlRunLoggerTests
     public void For_LogThatWrites_GivesAFactory() =>
         NpgsqlRunLogger.For(new RecordingLog()).ShouldBeOfType<NpgsqlRunLogger>();
 
-    private static LogLevel[] AtOrAbove(LogLevel level) =>
-        [.. Enum.GetValues<LogLevel>().Where(l => l >= level && l != LogLevel.None)];
-
-    private static TheoryData<string, LogLevel> Cross(string[] categories, LogLevel[] levels)
-    {
-        var data = new TheoryData<string, LogLevel>();
-        foreach (var category in categories)
-        {
-            foreach (var level in levels)
-            {
-                data.Add(category, level);
-            }
-        }
-
-        return data;
-    }
-
     private ILogger Logger(string category) => NpgsqlRunLogger.For(_recording).ShouldNotBeNull().CreateLogger(category);
 
-    private void Write(string category, LogLevel level, string message, Exception? exception = null, int eventId = 1) =>
+    private void Write(string category, LogLevel level, string message, Exception? exception = null, int eventId = 0) =>
         Logger(category).Log(level, new EventId(eventId), "state", exception, (_, _) => message);
 }
