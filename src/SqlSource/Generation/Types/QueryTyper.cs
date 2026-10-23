@@ -280,13 +280,14 @@ internal static class QueryTyper
                 failure.Detail ?? "",
                 failure.Text ?? ""
             ),
-            TypeMappingKind.Mapped or TypeMappingKind.Unreadable or _ => DiagnosticInfo.Create(
-                SqlDiagnostics.TypeHasNoCSharpType,
-                at,
-                subject,
-                typeName,
-                "Map it with the type override, as " + AsAKey(key, engine) + "=<a C# type>"
-            ),
+            TypeMappingKind.Mapped or TypeMappingKind.Unreadable or TypeMappingKind.NeedsNewerSqlClient or _ =>
+                DiagnosticInfo.Create(
+                    SqlDiagnostics.TypeHasNoCSharpType,
+                    at,
+                    subject,
+                    typeName,
+                    "Map it with the type override, as " + AsAKey(key, engine) + "=<a C# type>"
+                ),
         };
     }
 

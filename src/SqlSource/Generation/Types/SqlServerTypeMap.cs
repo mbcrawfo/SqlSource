@@ -141,7 +141,7 @@ internal static class SqlServerTypeMap
         Add(Row.Same("byte[]", false), "binary", "varbinary", "image", "timestamp");
         Add(Row.Same("global::System.Guid", true), "uniqueidentifier");
         Add(Row.Same("object", false), "sql_variant");
-        Add(Row.OfSqlClient("global::Microsoft.Data.SqlTypes.SqlVector<float>", true), "vector");
+        Add(Row.OfSqlClient("global::Microsoft.Data.SqlTypes.SqlVector<float>", true, "6.1"), "vector");
         Add(Row.NeedsTypes("SqlHierarchyId"), "hierarchyid");
         Add(Row.NeedsTypes("SqlGeography"), "geography");
         Add(Row.NeedsTypes("SqlGeometry"), "geometry");
@@ -152,20 +152,23 @@ internal static class SqlServerTypeMap
     /// <param name="Key">The row's name, set when it is added.</param>
     /// <param name="Text">The C# type, or null when SqlClient cannot read the type without a package.</param>
     /// <param name="IsValueType">Whether the C# type is a value type.</param>
-    /// <param name="IsOfSqlClient">Whether the C# type is SqlClient's own, so a project without it has none.</param>
+    /// <param name="SqlClientSince">
+    /// The version of SqlClient that first has the C# type, when it is SqlClient's own, or null.  A project without
+    /// SqlClient, or with an older one, has no such type.
+    /// </param>
     /// <param name="Package">The package's C# type for a type that SqlClient reads only with it, or null.</param>
-    private sealed record Row(string Key, string? Text, bool IsValueType, bool IsOfSqlClient, string? Package)
+    private sealed record Row(string Key, string? Text, bool IsValueType, string? SqlClientSince, string? Package)
     {
         // Whether SqlClient reads the type only with the package, which makes it a CLR type.
         public bool IsClr => Package is not null;
 
-        public static Row Same(string text, bool isValueType) => new(string.Empty, text, isValueType, false, null);
+        public static Row Same(string text, bool isValueType) => new(string.Empty, text, isValueType, null, null);
 
-        public static Row OfSqlClient(string text, bool isValueType) =>
-            new(string.Empty, text, isValueType, true, null);
+        public static Row OfSqlClient(string text, bool isValueType, string since) =>
+            new(string.Empty, text, isValueType, since, null);
 
         public static Row NeedsTypes(string package) =>
-            new(string.Empty, null, false, false, SqlServerTypesNamespace + package);
+            new(string.Empty, null, false, null, SqlServerTypesNamespace + package);
 
         public TypeMapping Under(SqlClientColumn column)
         {
@@ -174,9 +177,16 @@ internal static class SqlServerTypeMap
                 return TypeMapping.Failed(TypeMappingKind.NeedsSqlServerTypes, Key, Package);
             }
 
-            return column == SqlClientColumn.None && IsOfSqlClient
-                ? TypeMapping.Failed(TypeMappingKind.NeedsDriver, Key)
-                : TypeMapping.Mapped(Key, Text!, IsValueType);
+            return (SqlClientSince, column) switch
+            {
+                (not null, SqlClientColumn.None) => TypeMapping.Failed(TypeMappingKind.NeedsDriver, Key),
+                (not null, SqlClientColumn.OlderThan61) => TypeMapping.Failed(
+                    TypeMappingKind.NeedsNewerSqlClient,
+                    Key,
+                    SqlClientSince
+                ),
+                _ => TypeMapping.Mapped(Key, Text!, IsValueType),
+            };
         }
     }
 }

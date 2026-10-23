@@ -62,7 +62,7 @@ public sealed class SqlClientProbeTests
             "6.0" => (
                 SqlClientReferences.SqlClient60,
                 new SqlClientProbe(true, false, false, "6.0.5"),
-                SqlClientColumn.SqlClient61
+                SqlClientColumn.OlderThan61
             ),
             "6.1" => (
                 SqlClientReferences.SqlClient61,
@@ -280,6 +280,19 @@ public sealed class SqlClientProbeTests
         bool atLeast7,
         bool expected
     ) => new SqlClientProbe(referenced, atLeast61, atLeast7, null).IsBelowTheFloor.ShouldBe(expected);
+
+    // The column is the newest version the project's driver has, by its flags.
+    [Theory]
+    [InlineData(false, false, false, nameof(SqlClientColumn.None))]
+    [InlineData(true, false, false, nameof(SqlClientColumn.OlderThan61))]
+    [InlineData(true, true, false, nameof(SqlClientColumn.SqlClient61))]
+    [InlineData(true, true, true, nameof(SqlClientColumn.SqlClient7))]
+    public void Column_Flags_IsTheNewestVersionTheProjectHas(
+        bool referenced,
+        bool atLeast61,
+        bool atLeast7,
+        string expected
+    ) => new SqlClientProbe(referenced, atLeast61, atLeast7, null).Column.ToString().ShouldBe(expected);
 
     [Fact]
     public void Findings_ProbeBelowTheFloor_IsSqlsrc267WithTheVersion() =>
