@@ -9,8 +9,8 @@ namespace SqlSource.Settings.TypeOverrides;
 
 /// <summary>
 /// Reads the type override, in an MSBuild value and in a <c>-- type-override:</c> marker alike.  An entry is
-/// <c>key=type</c>, where the key is one that an engine reads, by <see cref="TypeKeys.TryNormalize" /> for PostgreSQL
-/// and <see cref="TypeKeys.TryNormalizeSqlServer" /> for SQL Server, and the type one that
+/// <c>key=type</c>, where the key is one that an engine reads, by <see cref="TypeKeys.TryNormalizePostgres" /> for
+/// PostgreSQL and <see cref="TypeKeys.TryNormalizeSqlServer" /> for SQL Server, and the type one that
 /// <see cref="ClrTypeName.TryParse" /> reads, or <c>default</c>, ignoring case, which takes the key out of the map.
 /// </summary>
 /// <remarks>
@@ -166,7 +166,7 @@ internal static class TypeOverrideGrammar
     private static bool TryNormalize(ReadOnlySpan<char> key, DatabaseEngine engine, out string normalized) =>
         engine == DatabaseEngine.SqlServer
             ? TypeKeys.TryNormalizeSqlServer(key, out normalized)
-            : TypeKeys.TryNormalize(key, out normalized);
+            : TypeKeys.TryNormalizePostgres(key, out normalized);
 
     // Puts an entry in its place in a list kept in the order of TypeOverrideMap, over an entry of its key.
     private static void Put(List<TypeOverride> entries, TypeOverride entry)

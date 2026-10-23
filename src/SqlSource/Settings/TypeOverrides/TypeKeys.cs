@@ -9,9 +9,9 @@ namespace SqlSource.Settings.TypeOverrides;
 /// <summary>
 /// The keys a type override may name: the names of the types that each engine's base map knows, each engine's with
 /// its one-word aliases, and a schema-qualified name of any type.  Each engine reads a key by its own rules,
-/// PostgreSQL's by <see cref="TryNormalize" /> and SQL Server's by <see cref="TryNormalizeSqlServer" />.  The
+/// PostgreSQL's by <see cref="TryNormalizePostgres" /> and SQL Server's by <see cref="TryNormalizeSqlServer" />.  The
 /// settings check a key here, and the map reads the names of the extensions' types here.  Each map keeps its own rows,
-/// and <c>PostgresTypeMapTests.Keys_OfTheMap_AreTheKnownNamesOfTheSettings</c> and
+/// and <c>PostgresTypeMapTests.Keys_OfTheMap_AreTheKnownPostgresNamesOfTheSettings</c> and
 /// <c>SqlServerTypeMapTests.Keys_OfTheMap_AreTheKnownSqlServerNamesOfTheSettings</c> hold them equal to the names here.
 /// A written key is read as an identifier is: the system schema, <c>pg_catalog</c> or <c>sys</c>, is bare in any case
 /// or quoted exactly.  A schema that a server reported is not a written key, and is compared with
@@ -32,7 +32,7 @@ internal static class TypeKeys
     );
 
     // Every key of the base map, its refused types and the built-in multiranges included, by itself.
-    private static readonly Dictionary<string, string> Names = NamesOf(
+    private static readonly Dictionary<string, string> PostgresNames = NamesOf(
         "bool",
         "int2",
         "int4",
@@ -161,7 +161,7 @@ internal static class TypeKeys
 
     // The one-word aliases of PostgreSQL's table of data types, by the name each stands for.  "char" is the key of
     // the one-byte type, not an alias of bpchar.
-    private static readonly Dictionary<string, string> Aliases = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, string> PostgresAliases = new(StringComparer.OrdinalIgnoreCase)
     {
         ["integer"] = "int4",
         ["int"] = "int4",
@@ -184,7 +184,7 @@ internal static class TypeKeys
     };
 
     /// <summary>The names of the PostgreSQL types the base map knows, in lower case.</summary>
-    public static IReadOnlyCollection<string> KnownNames => Names.Keys;
+    public static IReadOnlyCollection<string> KnownPostgresNames => PostgresNames.Keys;
 
     /// <summary>The names of the SQL Server types the base map knows, in lower case.</summary>
     public static IReadOnlyCollection<string> KnownSqlServerNames => SqlServerNames.Keys;
@@ -235,25 +235,25 @@ internal static class TypeKeys
     /// <c>public."status"</c> and <c>public.U&amp;"a\000ab"</c> gives <c>public.U&amp;"a\000Ab"</c>.
     /// </para>
     /// </summary>
-    public static bool TryNormalize(ReadOnlySpan<char> key, out string normalized)
+    public static bool TryNormalizePostgres(ReadOnlySpan<char> key, out string normalized)
     {
         normalized = string.Empty;
         return TrySplit(key, out var schema, out var name, out var isArray)
-            && TryNormalizeParts(key, schema, name, isArray, out normalized);
+            && TryNormalizePostgresParts(key, schema, name, isArray, out normalized);
     }
 
     /// <summary>
-    /// Reads a key by SQL Server's rules, by the grammar of <see cref="TryNormalize" />.  An array is not a key: SQL
-    /// Server has none.  An unqualified plain part must be a name SQL Server's map knows or one of its aliases,
-    /// <c>integer</c>, <c>character</c>, <c>dec</c> and <c>rowversion</c>, ignoring case, and is given as the name in
-    /// lower case: <c>rowversion</c> gives <c>timestamp</c>.  A quoted one must hold the name exactly, in lower case,
-    /// and has no alias.
+    /// Reads a key by SQL Server's rules, by the grammar of <see cref="TryNormalizePostgres" />.  An array is not a
+    /// key: SQL Server has none.  An unqualified plain part must be a name SQL Server's map knows or one of its
+    /// aliases, <c>integer</c>, <c>character</c>, <c>dec</c> and <c>rowversion</c>, ignoring case, and is given as the
+    /// name in lower case: <c>rowversion</c> gives <c>timestamp</c>.  A quoted one must hold the name exactly, in lower
+    /// case, and has no alias.
     /// <para>
     /// <c>sys.</c>, plain in any case or quoted in lower case, is SQL Server's system schema, and is taken off as
-    /// <see cref="TryNormalize" /> takes off <c>pg_catalog.</c>: what is left is not checked, a plain name the map
-    /// knows is given in lower case and any other as written, with no alias, and a quoted name that holds a name the
-    /// map knows is that name and any other is kept as written.  <c>pg_catalog.</c> is not a key, and any other
-    /// qualified key is what <see cref="TryNormalize" /> gives.  Returns false with an empty
+    /// <see cref="TryNormalizePostgres" /> takes off <c>pg_catalog.</c>: what is left is not checked, a plain name the
+    /// map knows is given in lower case and any other as written, with no alias, and a quoted name that holds a name
+    /// the map knows is that name and any other is kept as written.  <c>pg_catalog.</c> is not a key, and any other
+    /// qualified key is what <see cref="TryNormalizePostgres" /> gives.  Returns false with an empty
     /// <paramref name="normalized" /> for anything else.
     /// </para>
     /// </summary>
@@ -265,9 +265,10 @@ internal static class TypeKeys
     }
 
     /// <summary>
-    /// Reads a key by each engine's rules, as <see cref="TryNormalize" /> and <see cref="TryNormalizeSqlServer" />
-    /// do, with null for an engine that does not read it.  The key is split once, and a key of a user's schema, which
-    /// both engines read alike, is read once.  Returns whether either engine reads it.
+    /// Reads a key by each engine's rules, as <see cref="TryNormalizePostgres" /> and
+    /// <see cref="TryNormalizeSqlServer" /> do, with null for an engine that does not read it.  The key is split once,
+    /// and a key of a user's schema, which both engines read alike, is read once.  Returns whether either engine reads
+    /// it.
     /// </summary>
     public static bool TryNormalizeEach(ReadOnlySpan<char> key, out string? postgreSql, out string? sqlServer)
     {
@@ -285,7 +286,7 @@ internal static class TypeKeys
             return true;
         }
 
-        if (TryNormalizeParts(key, schema, name, isArray, out var postgreSqlKey))
+        if (TryNormalizePostgresParts(key, schema, name, isArray, out var postgreSqlKey))
         {
             postgreSql = postgreSqlKey;
         }
@@ -299,7 +300,7 @@ internal static class TypeKeys
     }
 
     // PostgreSQL's reading of a key that TrySplit split.
-    private static bool TryNormalizeParts(
+    private static bool TryNormalizePostgresParts(
         ReadOnlySpan<char> key,
         ReadOnlySpan<char> schema,
         ReadOnlySpan<char> name,
@@ -327,13 +328,13 @@ internal static class TypeKeys
         {
             // Every type of pg_catalog whose name starts with _ is an array, of the type named by the rest.
             var ofElement = name.Slice(1).ToString();
-            normalized = (Names.TryGetValue(ofElement, out var knownElement) ? knownElement : ofElement) + "[]";
+            normalized = (PostgresNames.TryGetValue(ofElement, out var knownElement) ? knownElement : ofElement) + "[]";
         }
         else
         {
             // A name the map knows is given in lower case, as it is without the schema; any other stays as written.
             var text = name.ToString();
-            if (Names.TryGetValue(text, out var known))
+            if (PostgresNames.TryGetValue(text, out var known))
             {
                 text = known;
             }
@@ -402,11 +403,11 @@ internal static class TypeKeys
     }
 
     /// <summary>
-    /// Splits a key as it is written, which is what <see cref="TryNormalize" /> gives and <see cref="WritePart" />
-    /// builds, into its parts, quotes included: <c>"a.b".c[]</c> gives <c>"a.b"</c>, <c>c</c> and true, and
-    /// <c>U&amp;"a.b".c</c> gives <c>U&amp;"a.b"</c>, whose escapes are checked here.  <paramref name="schema" /> is
-    /// empty for an unqualified key.  Returns false for text that is not <c>[part "."] part ["[]"]</c>, the grammar of
-    /// <see cref="TryNormalize" />.
+    /// Splits a key as it is written, which is what <see cref="TryNormalizePostgres" /> gives and
+    /// <see cref="WritePart" /> builds, into its parts, quotes included: <c>"a.b".c[]</c> gives <c>"a.b"</c>, <c>c</c>
+    /// and true, and <c>U&amp;"a.b".c</c> gives <c>U&amp;"a.b"</c>, whose escapes are checked here.
+    /// <paramref name="schema" /> is empty for an unqualified key.  Returns false for text that is not
+    /// <c>[part "."] part ["[]"]</c>, the grammar of <see cref="TryNormalizePostgres" />.
     /// </summary>
     public static bool TrySplit(
         ReadOnlySpan<char> key,
@@ -601,7 +602,7 @@ internal static class TypeKeys
     private static bool TryNormalizePlain(string text, bool isArray, out string normalized)
     {
         normalized = string.Empty;
-        if (Names.TryGetValue(text, out var known) || Aliases.TryGetValue(text, out known))
+        if (PostgresNames.TryGetValue(text, out var known) || PostgresAliases.TryGetValue(text, out known))
         {
             normalized = isArray ? known + "[]" : known;
             return true;
@@ -620,13 +621,13 @@ internal static class TypeKeys
     private static bool TryNormalizeQuoted(string text, bool isArray, out string normalized)
     {
         normalized = string.Empty;
-        if (TryGetExactName(Names, text, out var known))
+        if (TryGetExactName(PostgresNames, text, out var known))
         {
             normalized = isArray ? known + "[]" : known;
             return true;
         }
 
-        if (text.Length > 1 && text[0] == '_' && TryGetExactName(Names, text.Substring(1), out var element))
+        if (text.Length > 1 && text[0] == '_' && TryGetExactName(PostgresNames, text.Substring(1), out var element))
         {
             normalized = isArray ? "_" + element + "[]" : element + "[]";
             return true;
@@ -638,7 +639,7 @@ internal static class TypeKeys
     private static string NormalizeQuotedCatalogName(ReadOnlySpan<char> name, bool isArray)
     {
         var text = TextOf(name).ToString();
-        if (TryGetExactName(Names, text, out var known))
+        if (TryGetExactName(PostgresNames, text, out var known))
         {
             return isArray ? known + "[]" : known;
         }
@@ -646,7 +647,7 @@ internal static class TypeKeys
         if (text.Length > 1 && text[0] == '_')
         {
             var ofElement = text.Substring(1);
-            var isKnownElement = TryGetExactName(Names, ofElement, out var knownElement);
+            var isKnownElement = TryGetExactName(PostgresNames, ofElement, out var knownElement);
 
             // With [], the catalog's name is kept with its _, as a plain one is.
             if (isArray)
@@ -687,7 +688,7 @@ internal static class TypeKeys
     private static bool TryReadArrayName(string part, out string element)
     {
         element = string.Empty;
-        return part.Length > 1 && part[0] == '_' && Names.TryGetValue(part.Substring(1), out element);
+        return part.Length > 1 && part[0] == '_' && PostgresNames.TryGetValue(part.Substring(1), out element);
     }
 
     /// <summary>

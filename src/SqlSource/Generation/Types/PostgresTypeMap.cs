@@ -7,7 +7,7 @@ using SqlSource.Snapshot;
 namespace SqlSource.Generation.Types;
 
 /// <summary>The type override's answer for <paramref name="type" />, or null when it names none.</summary>
-internal delegate TypeMapping? OverrideOf(PostgresType type);
+internal delegate TypeMapping? PostgresOverrideOf(PostgresType type);
 
 /// <summary>
 /// The base map: the C# type Npgsql boxes for each PostgreSQL type it reads, under the column of a project's driver.
@@ -36,7 +36,7 @@ internal static class PostgresTypeMap
     /// its base's, and any other type the map's row or the rule of its kind.  An array's or a domain's failure is its
     /// element's or base's, with that key.  Never throws.
     /// </summary>
-    public static TypeMapping Map(PostgresType type, DriverColumn column, OverrideOf? overrideOf = null)
+    public static TypeMapping Map(PostgresType type, NpgsqlColumn column, PostgresOverrideOf? overrideOf = null)
     {
         if (overrideOf?.Invoke(type) is { } overridden)
         {
@@ -242,25 +242,25 @@ internal static class PostgresTypeMap
         // With no driver, a type whose two cells are both C# types differs between the drivers, which wins over
         // needing the driver: only the override can say which one the project runs on, and the failure's detail
         // gives the entry for each.
-        public TypeMapping Under(DriverColumn column, string key)
+        public TypeMapping Under(NpgsqlColumn column, string key)
         {
             if (Refusal is { } refusal)
             {
                 return refusal with { Key = key };
             }
 
-            if (column == DriverColumn.None && Npgsql8 is not null && Npgsql10 is not null)
+            if (column == NpgsqlColumn.None && Npgsql8 is not null && Npgsql10 is not null)
             {
                 return TypeMapping.Failed(TypeMappingKind.DiffersByDriver, key, EntriesFor(key, Npgsql8, Npgsql10));
             }
 
-            if (column == DriverColumn.None && IsOfNpgsql)
+            if (column == NpgsqlColumn.None && IsOfNpgsql)
             {
                 return TypeMapping.Failed(TypeMappingKind.NeedsDriver, key);
             }
 
             // A row that only Npgsql 10 reads has no C# type on 8 and 9.
-            var text = column == DriverColumn.Npgsql10 ? Npgsql10 ?? Npgsql8 : Npgsql8;
+            var text = column == NpgsqlColumn.Npgsql10 ? Npgsql10 ?? Npgsql8 : Npgsql8;
             return text is null
                 ? TypeMapping.Failed(TypeMappingKind.NeedsNpgsql10, key, TextType)
                 : TypeMapping.Mapped(key, text, IsValueType);

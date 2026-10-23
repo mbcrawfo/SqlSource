@@ -21,7 +21,7 @@ public sealed partial class TypeKeysTests
     [InlineData("character", "bpchar")]
     [InlineData("INTEGER", "int4")]
     [InlineData("integer[]", "int4[]")]
-    public void TryNormalize_Alias_IsItsName(string key, string expected) => ShouldNormalize(key, expected);
+    public void TryNormalizePostgres_Alias_IsItsName(string key, string expected) => ShouldNormalize(key, expected);
 
     [Theory]
     [InlineData("int4", "int4")]
@@ -31,7 +31,7 @@ public sealed partial class TypeKeysTests
     [InlineData("regclass", "regclass")]
     [InlineData("citext", "citext")]
     [InlineData("int4[]", "int4[]")]
-    public void TryNormalize_KnownName_IsValid(string key, string expected) => ShouldNormalize(key, expected);
+    public void TryNormalizePostgres_KnownName_IsValid(string key, string expected) => ShouldNormalize(key, expected);
 
     // The catalog names an array of a type with _ before the type's name, and that name is the array's key, so the
     // two spellings are one key: for a name the map knows without a schema, and for any name of pg_catalog, where
@@ -45,7 +45,7 @@ public sealed partial class TypeKeysTests
     [InlineData("pg_catalog._newtype", "newtype[]")]
     [InlineData("_int4[]", "_int4[]")]
     [InlineData("pg_catalog._int4[]", "_int4[]")]
-    public void TryNormalize_CatalogNameOfAnArray_IsItsElementsKeyWithBrackets(string key, string expected) =>
+    public void TryNormalizePostgres_CatalogNameOfAnArray_IsItsElementsKeyWithBrackets(string key, string expected) =>
         ShouldNormalize(key, expected);
 
     // What is left once the system schema is taken off is not checked, so a type the map does not know can be named.
@@ -58,7 +58,7 @@ public sealed partial class TypeKeysTests
     [InlineData("Billing.Invoice$State", "Billing.Invoice$State")]
     [InlineData("public.citext", "public.citext")]
     [InlineData("public._status", "public._status")]
-    public void TryNormalize_QualifiedKey_IsKeptUnchecked(string key, string expected) =>
+    public void TryNormalizePostgres_QualifiedKey_IsKeptUnchecked(string key, string expected) =>
         ShouldNormalize(key, expected);
 
     // A plain name of pg_catalog is read in lower case when the map knows it, as it is without the schema, so the two
@@ -69,7 +69,7 @@ public sealed partial class TypeKeysTests
     [InlineData("pg_catalog._INT4[]", "_int4[]")]
     [InlineData("pg_catalog.NewType", "NewType")]
     [InlineData("pg_catalog.Integer", "Integer")]
-    public void TryNormalize_KnownCatalogNameWithItsSchema_IsItsName(string key, string expected) =>
+    public void TryNormalizePostgres_KnownCatalogNameWithItsSchema_IsItsName(string key, string expected) =>
         ShouldNormalize(key, expected);
 
     [Theory]
@@ -98,8 +98,8 @@ public sealed partial class TypeKeysTests
     [InlineData("\"Int4\"")]
     [InlineData("\"integer\"")]
     [InlineData("\"int4\"[][]")]
-    public void TryNormalize_AnythingElse_IsNotAKey(string key) =>
-        TypeKeys.TryNormalize(key.AsSpan(), out _).ShouldBeFalse();
+    public void TryNormalizePostgres_AnythingElse_IsNotAKey(string key) =>
+        TypeKeys.TryNormalizePostgres(key.AsSpan(), out _).ShouldBeFalse();
 
     // A part may be quoted, to hold what a plain one cannot and to keep its case.  A key with a quoted part is kept as
     // written, and the system schema's own names are read as above, whatever way they are written.
@@ -113,7 +113,8 @@ public sealed partial class TypeKeysTests
     [InlineData("s.\"a=b\"", "s.\"a=b\"")]
     [InlineData("s.\"say \"\"hi\"\"\"", "s.\"say \"\"hi\"\"\"")]
     [InlineData("\"PG_CATALOG\".int4", "\"PG_CATALOG\".int4")]
-    public void TryNormalize_QuotedPart_IsKeptAsWritten(string key, string expected) => ShouldNormalize(key, expected);
+    public void TryNormalizePostgres_QuotedPart_IsKeptAsWritten(string key, string expected) =>
+        ShouldNormalize(key, expected);
 
     [Theory]
     [InlineData("\"char\"", "char")]
@@ -131,7 +132,8 @@ public sealed partial class TypeKeysTests
     [InlineData("pg_catalog.\"_int4\"[]", "_int4[]")]
     [InlineData("pg_catalog.\"_x\"[]", "\"_x\"[]")]
     [InlineData("pg_catalog.\"_a\tb\"", "U&\"a\\0009b\"[]")]
-    public void TryNormalize_QuotedCatalogName_IsItsKey(string key, string expected) => ShouldNormalize(key, expected);
+    public void TryNormalizePostgres_QuotedCatalogName_IsItsKey(string key, string expected) =>
+        ShouldNormalize(key, expected);
 
     // An escaped part is read to its text, and given in the quoted form of that text.
     [Theory]
@@ -149,7 +151,8 @@ public sealed partial class TypeKeysTests
     [InlineData("U&\"pg_catalog\".int4", "int4")]
     [InlineData("pg_catalog.U&\"_x\"[]", "\"_x\"[]")]
     [InlineData("pg_catalog.U&\"newtype\"[]", "\"newtype\"[]")]
-    public void TryNormalize_EscapedPart_IsItsQuotedForm(string key, string expected) => ShouldNormalize(key, expected);
+    public void TryNormalizePostgres_EscapedPart_IsItsQuotedForm(string key, string expected) =>
+        ShouldNormalize(key, expected);
 
     [Theory]
     [InlineData("U&\"Int4\"")]
@@ -170,8 +173,8 @@ public sealed partial class TypeKeysTests
     [InlineData("s.U& \"x\"")]
     [InlineData("s.U&\"x\" UESCAPE '!'")]
     [InlineData("s.U&\"unclosed")]
-    public void TryNormalize_EscapedPartThatIsNotValid_IsNotAKey(string key) =>
-        TypeKeys.TryNormalize(key.AsSpan(), out _).ShouldBeFalse();
+    public void TryNormalizePostgres_EscapedPartThatIsNotValid_IsNotAKey(string key) =>
+        TypeKeys.TryNormalizePostgres(key.AsSpan(), out _).ShouldBeFalse();
 
     [Theory]
     [InlineData("U&\"a\\000Ab\"", "a\nb")]
@@ -382,11 +385,11 @@ public sealed partial class TypeKeysTests
     [Theory]
     [InlineData("nvarchar")]
     [InlineData("rowversion")]
-    public void TryNormalize_NameOfSqlServerAlone_IsNotAKey(string key) =>
-        TypeKeys.TryNormalize(key.AsSpan(), out _).ShouldBeFalse();
+    public void TryNormalizePostgres_NameOfSqlServerAlone_IsNotAKey(string key) =>
+        TypeKeys.TryNormalizePostgres(key.AsSpan(), out _).ShouldBeFalse();
 
     [Fact]
-    public void TryNormalize_SysSchema_IsAUsersSchema() => ShouldNormalize("sys.int", "sys.int");
+    public void TryNormalizePostgres_SysSchema_IsAUsersSchema() => ShouldNormalize("sys.int", "sys.int");
 
     // TryNormalizeEach gives what each engine's own reading gives, null for an engine that does not read the key.
     [Theory]
@@ -406,7 +409,7 @@ public sealed partial class TypeKeysTests
 
         first.ShouldBe(postgreSql);
         second.ShouldBe(sqlServer);
-        (TypeKeys.TryNormalize(key.AsSpan(), out var alone) ? alone : null).ShouldBe(postgreSql);
+        (TypeKeys.TryNormalizePostgres(key.AsSpan(), out var alone) ? alone : null).ShouldBe(postgreSql);
         (TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out var sqlServerAlone) ? sqlServerAlone : null).ShouldBe(
             sqlServer
         );
@@ -433,7 +436,7 @@ public sealed partial class TypeKeysTests
 
     private static void ShouldNormalize(string key, string expected)
     {
-        TypeKeys.TryNormalize(key.AsSpan(), out var normalized).ShouldBeTrue();
+        TypeKeys.TryNormalizePostgres(key.AsSpan(), out var normalized).ShouldBeTrue();
 
         normalized.ShouldBe(expected);
     }

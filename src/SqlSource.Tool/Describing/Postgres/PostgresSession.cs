@@ -437,7 +437,7 @@ internal sealed partial class PostgresSession : IDescribeSession
             return null;
         }
 
-        var match = TableMatcher.Match(columns, origins);
+        var match = PostgresTableMatcher.Match(columns, origins);
         PostgresEvents.TableMatch(_log, request.Name, match.Table, match.Result);
         return match;
     }

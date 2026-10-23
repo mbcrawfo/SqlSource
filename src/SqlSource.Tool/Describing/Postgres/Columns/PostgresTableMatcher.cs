@@ -16,7 +16,7 @@ namespace SqlSource.Tool.Describing.Postgres.Columns;
 /// match is made after everything that sets one.  It asks the server nothing: an origin holds its relation with
 /// every attribute that is not dropped, as <c>tables</c> answered it.
 /// </remarks>
-internal static class TableMatcher
+internal static class PostgresTableMatcher
 {
     /// <summary>
     /// The relation whose column list the columns are, or null, and <c>matched</c> or the first check that failed.

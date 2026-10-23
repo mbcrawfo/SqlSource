@@ -66,7 +66,7 @@ internal static class QueryTyper
             next = at + 1;
             var query = file.Queries[at];
             var typing = new Typing(
-                input.Probe.Column,
+                input.NpgsqlProbe.Column,
                 input.SqlClientProbe.Column,
                 LookupOf(query.Markers, input, engine, lookups),
                 query.NameLocation,
@@ -178,7 +178,7 @@ internal static class QueryTyper
         string subject,
         string typeName,
         LocationInfo at,
-        DriverColumn column,
+        NpgsqlColumn column,
         DatabaseEngine engine
     )
     {
@@ -212,7 +212,7 @@ internal static class QueryTyper
                 at,
                 subject,
                 typeName,
-                (column == DriverColumn.None ? "Reference Npgsql, then map" : "Map")
+                (column == NpgsqlColumn.None ? "Reference Npgsql, then map" : "Map")
                     + " it with the type override, as "
                     + key
                     + "=NpgsqlTypes.NpgsqlRange<T> with the data source's EnableUnmappedTypes()"
@@ -313,7 +313,7 @@ internal static class QueryTyper
                 : SystemSchemas.SqlServer + "." + key;
         }
 
-        return TypeKeys.TryNormalize(key.AsSpan(), out _) ? key : SystemSchemas.Postgres + "." + key;
+        return TypeKeys.TryNormalizePostgres(key.AsSpan(), out _) ? key : SystemSchemas.Postgres + "." + key;
     }
 
     // A failure of a mapped type keeps the type the override names in its text, which the message gives as a user
@@ -371,7 +371,7 @@ internal static class QueryTyper
 
     // What the typing of one query reads, and where its error goes.
     private readonly record struct Typing(
-        DriverColumn Column,
+        NpgsqlColumn Column,
         SqlClientColumn SqlClientColumn,
         OverrideLookup? Lookup,
         LocationInfo Location,
@@ -420,7 +420,7 @@ internal static class QueryTyper
         }
 
         /// <summary>The lookup of a PostgreSQL file's types, or null in a SQL Server file.</summary>
-        public OverrideOf? OfPostgres { get; }
+        public PostgresOverrideOf? OfPostgres { get; }
 
         /// <summary>The lookup of a SQL Server file's types, or null in a PostgreSQL file.</summary>
         public SqlServerOverrideOf? OfSqlServer { get; }

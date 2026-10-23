@@ -136,19 +136,19 @@ public sealed class NpgsqlProbeTests
             "8" => (
                 NpgsqlReferences.Npgsql8,
                 new NpgsqlProbe(true, true, false, new Version(8, 0, 3, 0)),
-                DriverColumn.Npgsql8
+                NpgsqlColumn.Npgsql8
             ),
             "9" => (
                 NpgsqlReferences.Npgsql9,
                 new NpgsqlProbe(true, true, false, new Version(9, 0, 3, 0)),
-                DriverColumn.Npgsql8
+                NpgsqlColumn.Npgsql8
             ),
             "10" => (
                 NpgsqlReferences.Npgsql10,
                 new NpgsqlProbe(true, true, true, new Version(10, 0, 3, 0)),
-                DriverColumn.Npgsql10
+                NpgsqlColumn.Npgsql10
             ),
-            "none" => (null, new NpgsqlProbe(false, false, false, null), DriverColumn.None),
+            "none" => (null, new NpgsqlProbe(false, false, false, null), NpgsqlColumn.None),
             _ => throw new ArgumentOutOfRangeException(nameof(driver), driver, "No such driver."),
         };
 
@@ -215,7 +215,7 @@ public sealed class NpgsqlProbeTests
 
         oneFile.Diagnostics.ShouldBe([Expected]);
         oneFile.SeverityOf("SQLSRC247").ShouldBe(DiagnosticSeverity.Error);
-        StepOutputs.Single<NpgsqlProbe>(oneFile, TrackingNames.NpgsqlProbe).Column.ShouldBe(DriverColumn.Npgsql8);
+        StepOutputs.Single<NpgsqlProbe>(oneFile, TrackingNames.NpgsqlProbe).Column.ShouldBe(NpgsqlColumn.Npgsql8);
         twoFiles.Diagnostics.ShouldBe([Expected]);
     }
 
@@ -231,7 +231,7 @@ public sealed class NpgsqlProbeTests
                 + "SqlSource knows.  Its models use the types of Npgsql 10.",
         ]);
         run.SeverityOf("SQLSRC248").ShouldBe(DiagnosticSeverity.Info);
-        StepOutputs.Single<NpgsqlProbe>(run, TrackingNames.NpgsqlProbe).Column.ShouldBe(DriverColumn.Npgsql10);
+        StepOutputs.Single<NpgsqlProbe>(run, TrackingNames.NpgsqlProbe).Column.ShouldBe(NpgsqlColumn.Npgsql10);
     }
 
     // A query at Sql needs no entry, and one of a file under mssql needs one that is not of postgres: neither reads a

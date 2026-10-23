@@ -28,12 +28,12 @@ internal sealed record NpgsqlProbe(bool Referenced, bool AtLeast8, bool AtLeast1
     private const int NewestKnownMajor = 10;
 
     /// <summary>The column of the base map that the driver chooses.</summary>
-    public DriverColumn Column =>
+    public NpgsqlColumn Column =>
         (AtLeast10, Referenced) switch
         {
-            (true, _) => DriverColumn.Npgsql10,
-            (_, true) => DriverColumn.Npgsql8,
-            _ => DriverColumn.None,
+            (true, _) => NpgsqlColumn.Npgsql10,
+            (_, true) => NpgsqlColumn.Npgsql8,
+            _ => NpgsqlColumn.None,
         };
 
     /// <summary>Whether the project references an Npgsql older than 8.0, which is <c>SQLSRC247</c>.</summary>
