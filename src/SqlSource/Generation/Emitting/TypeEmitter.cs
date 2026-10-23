@@ -39,7 +39,7 @@ internal static class TypeEmitter
         }
 
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
-        var members = SelectMembers(type, input.Files, input.FileSettings, diagnostics);
+        var members = SelectMembers(type, input.Files, input.FileSettings, property, diagnostics);
         return new TypeOutput(
             input.HintName,
             Write(type, members, property),
@@ -49,16 +49,22 @@ internal static class TypeEmitter
 
     /// <summary>
     /// Which of the type's files it can use.  A file contributes all of its queries or none: one that has a query
-    /// with a name that cannot be used here (<c>SQLSRC008</c>, <c>SQLSRC009</c>) is left out, with a diagnostic for
-    /// each such query when <paramref name="diagnostics" /> is given.
+    /// with a name that cannot be used here (<c>SQLSRC008</c>, <c>SQLSRC009</c>), or a query that keeps its comments
+    /// here and has an error in the form with them (<see cref="SqlQuery.KeptErrors" />), is left out, with its
+    /// diagnostics when <paramref name="diagnostics" /> is given.
     /// </summary>
     /// <param name="type">The type.</param>
     /// <param name="files">The type's files, in member order.</param>
+    /// <param name="fileSettings">What the metadata of each file's item says, one for each of
+    /// <paramref name="files" />.</param>
+    /// <param name="property">What the project's properties say.</param>
     /// <param name="diagnostics">Where the diagnostics go, or null when the caller does not report them.</param>
     /// <returns>One element for each of <paramref name="files" />: whether the type can use it.</returns>
     public static bool[] FindUsableFiles(
         TargetType type,
         EquatableArray<ParsedSqlFile> files,
+        EquatableArray<SettingsLevel> fileSettings,
+        SettingsLevel property,
         ImmutableArray<DiagnosticInfo>.Builder? diagnostics
     )
     {
@@ -96,6 +102,16 @@ internal static class TypeEmitter
                     );
                     isUsable = false;
                 }
+
+                // The settings are resolved only for a query whose kept form has an error, which is rare.
+                if (
+                    query.KeptErrors.Count > 0
+                    && QuerySettings.Resolve(query.Markers, type.Settings, fileSettings[index], property).KeepComments
+                )
+                {
+                    diagnostics?.AddRange(query.KeptErrors);
+                    isUsable = false;
+                }
             }
 
             if (!isUsable)
@@ -118,10 +134,11 @@ internal static class TypeEmitter
         TargetType type,
         EquatableArray<ParsedSqlFile> files,
         EquatableArray<SettingsLevel> fileSettings,
+        SettingsLevel property,
         ImmutableArray<DiagnosticInfo>.Builder diagnostics
     )
     {
-        var usable = FindUsableFiles(type, files, diagnostics);
+        var usable = FindUsableFiles(type, files, fileSettings, property, diagnostics);
         var members = new List<(SqlQuery Query, string FileName, SettingsLevel Metadata)>();
         for (var index = 0; index < files.Count; index++)
         {

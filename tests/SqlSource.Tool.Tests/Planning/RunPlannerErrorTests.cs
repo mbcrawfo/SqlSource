@@ -46,6 +46,24 @@ public sealed class RunPlannerErrorTests : IDisposable
         file.Queries.Count.ShouldBe(0);
     }
 
+    // The tool describes the form without comments, so a keyword in braces in a kept comment, an error only for a
+    // type that emits the form with comments, is not one of the plan: the file is planned and its query described.
+    [Fact]
+    public void Plan_ReservedTokenInAKeptComment_IsNoErrorAndTheFileIsPlanned()
+    {
+        var project = Project();
+        _ = project.AddSql("Q/Kept.sql", "-- name: One\n-- generator: keep-comments\nSELECT 1; -- {{class}}\n");
+
+        var result = Plans.Result(project);
+
+        result.Errors.ShouldBeEmpty();
+        var file = result.Plan.Files.ShouldHaveSingleItem();
+        file.State.ShouldBe(PlannedFileState.Ready);
+        var query = file.Queries.ShouldHaveSingleItem();
+        query.Query.Name.ShouldBe("One");
+        query.NeedsEntry.ShouldBeTrue();
+    }
+
     // The generator parses a file it cannot read as empty.
     [Fact]
     public void Plan_ClaimedFileThatIsNotOnTheDisk_IsReportedAsAFileWithoutSql()

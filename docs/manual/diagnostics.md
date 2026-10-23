@@ -1,6 +1,6 @@
 # Diagnostics
 
-Every problem SqlSource finds is an error, and none can be turned off or made a warning, except two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 119, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: the query's constant or method is still generated.  An error in a sidecar is reported at its line and column in the sidecar.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
+Every problem SqlSource finds is an error, and none can be turned off or made a warning, except two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: the query's constant or method is still generated.  An error in a sidecar is reported at its line and column in the sidecar.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
 
 **Project and attribute**
 
@@ -43,6 +43,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC117](#sqlsrc117) | Parameter has no type |
 | [SQLSRC118](#sqlsrc118) | Parameter is not declared |
 | [SQLSRC119](#sqlsrc119) | Query has no parameters |
+| [SQLSRC120](#sqlsrc120) | Token crosses a comment |
 
 **The tool**
 
@@ -171,11 +172,11 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 |----|----|
 | [SQLSRC271](#sqlsrc271) | File is not saved as UTF-8 |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 120 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
-The ids from `SQLSRC237` to `SQLSRC245` are reported by the build, about the sidecar of a `.sql` file that a type uses.  A query whose output is `models` or `codegen` needs a current entry in its file's sidecar, which `dotnet sqlsource describe` writes; one whose output is `sql` needs none.  The default output is `codegen`, so under the `postgres` and `mssql` dialects every query needs an entry unless the project, the type or the file sets the output to `sql`.  A query that no entry can be written for gets [SQLSRC209](#sqlsrc209) or [SQLSRC210](#sqlsrc210) instead.  A sidecar that exists is checked even when no query of its file needs an entry.  While a `.sql` file has an error of its own, an id from 101 to 119, it has no queries to check, so the build checks only the sidecar itself, [SQLSRC237](#sqlsrc237) to [SQLSRC240](#sqlsrc240), and reports no entry of it as one that names no query.
+The ids from `SQLSRC237` to `SQLSRC245` are reported by the build, about the sidecar of a `.sql` file that a type uses.  A query whose output is `models` or `codegen` needs a current entry in its file's sidecar, which `dotnet sqlsource describe` writes; one whose output is `sql` needs none.  The default output is `codegen`, so under the `postgres` and `mssql` dialects every query needs an entry unless the project, the type or the file sets the output to `sql`.  A query that no entry can be written for gets [SQLSRC209](#sqlsrc209) or [SQLSRC210](#sqlsrc210) instead.  A sidecar that exists is checked even when no query of its file needs an entry.  While a `.sql` file has an error of its own, an id from 101 to 120, it has no queries to check, so the build checks only the sidecar itself, [SQLSRC237](#sqlsrc237) to [SQLSRC240](#sqlsrc240), and reports no entry of it as one that names no query.
 
 The ids `SQLSRC246` and `SQLSRC249` are reported by the build, about the C# types of a query whose output is `models` or `codegen` and whose entry in its sidecar is current: `SQLSRC246` under the `postgres` or the `mssql` dialect, and `SQLSRC249` under the `postgres` dialect.  Each column and parameter of the entry gets the C# type that the database's driver reads it as, Npgsql for `postgres` and Microsoft.Data.SqlClient for `mssql`, which can depend on the driver that the project references, or the type the type override maps its database type to.  Each is reported at the query's name, once for a query: for its first column or parameter that has no C# type, parameters before columns.
 
@@ -650,7 +651,7 @@ A token `{{name}}` becomes a parameter of a generated method, so its name must n
 SELECT * FROM {{class}};
 ```
 
-The same holds for the name in a `-- token:` marker.
+The same holds for the name in a `-- token:` marker, and for a token in a comment of a query that keeps its comments.  A token in a comment is an error only for a type that keeps the comments, and the file that holds it then produces no members for that type.
 
 Rename the token.  If the braces are literal text and not a token, add `-- token-ignore: class` to the query.
 
@@ -776,6 +777,41 @@ SELECT COUNT(*) FROM users;
 Remove the marker.
 
 See: [Name of one query's model](settings.md#setting-model-name)
+
+## SQLSRC120
+
+**Token crosses a comment**
+
+A token and a comment overlap: the comment is not wholly inside the token's default, nor outside the token.  Comments are removed before tokens are found, and a query that keeps its comments (the `keep-comments` [generator parameter](settings.md#setting-generator-parameters)) has its tokens found in the SQL with them as well, so the two would read different tokens.  It happens three ways.
+
+A comment inside a default holds `}}`.  Without the comment those braces are gone, so the default runs on to the next `}}`, and a token written before that `}}` is lost.  A `--` comment runs to the end of its line, so the `}}` written after one on that line is part of the comment.  The comment is an error wherever the file is used.
+
+```sql error
+-- name: ListUsers
+SELECT id FROM users WHERE 1 = 1 {{filter:AND active -- only live rows}}
+ORDER BY {{orderBy:name}};
+```
+
+A comment opens a default, `{{name:`, and the SQL after the comment closes it.  Without comments the query is as you wrote it, but where comments are kept the default runs from the comment to the next `}}`, and the token after it is lost.  A token written whole inside a comment, such as `-- see {{note:x}}`, is fine.
+
+```sql error
+-- name: ListUsers
+-- generator: keep-comments
+SELECT id -- e.g. {{note: here
+FROM users WHERE {{filter}};
+```
+
+A comment stands inside a token's braces before its default: between `{{` and the name, or between the name and the `:` or the closing `}}`.  Without comments the token is read, but where comments are kept the braces stay in the SQL as written, and the method has no argument for the token.
+
+```sql error
+-- name: ListFrom
+-- generator: keep-comments
+SELECT id FROM {{table/* users or archive */}};
+```
+
+The second and third are errors only for a type that keeps the query's comments, and that type gets no members from the file until it is fixed.  All three hold for a name in a `-- token-ignore:` marker too, whose text runs to its closing `}}` as a token's does, so a comment there changes which tokens the rest of the query has.  Keep a comment wholly inside the token's default, or outside the token: move it onto a line of its own, or after the token's `}}`.
+
+See: [Defaults](parameters-and-tokens.md#token-defaults)
 
 ## SQLSRC200
 

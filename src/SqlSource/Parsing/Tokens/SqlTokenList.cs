@@ -73,9 +73,9 @@ internal static class SqlTokenList
             var written = tokens[index].Default;
             if (written is null)
             {
-                tokens[index] = new SqlToken(marker.Name, marker.Text);
+                tokens[index] = new SqlToken(marker.Name, marker.Value);
             }
-            else if (!string.Equals(written, marker.Text, StringComparison.Ordinal))
+            else if (!string.Equals(written, marker.Value, StringComparison.Ordinal))
             {
                 var inline = FirstWithDefault(occurrences, marker.Name);
                 errors.Add(

@@ -405,6 +405,26 @@ public sealed class PlanInstancesTests
         PlanInstances.ExtendsUnder(Over("Sort", Join("Inner", Scan("a"), Scan("b")))).ShouldBeFalse();
     }
 
+    // An instance is under the child its scan is reached from through Outer and Inner children, the child itself
+    // included, and an alias of no instance is under none.
+    [Fact]
+    public void IsUnder_InstanceOfASide_IsUnderThatChild()
+    {
+        var initPlan = Scan("c") with { ParentRelationship = "InitPlan", SubplanName = "InitPlan 1" };
+        var outer = Over("Sort", Scan("a")) with { Plans = [Scan("a") with { ParentRelationship = Outer }, initPlan] };
+        var plan = Join("Full", outer, Over("Hash", Scan("r"), Inner));
+        var instances = Find(plan);
+
+        instances.IsUnder("a", plan.Plans[0]).ShouldBeTrue();
+        instances.IsUnder("a", plan.Plans[1]).ShouldBeFalse();
+        instances.IsUnder("r", plan.Plans[1]).ShouldBeTrue();
+        instances.IsUnder("r", plan.Plans[1].Plans[0]).ShouldBeTrue();
+        instances.IsUnder("r", plan.Plans[0]).ShouldBeFalse();
+        instances.IsUnder("a", plan).ShouldBeTrue();
+        instances.IsUnder("c", plan.Plans[0]).ShouldBeFalse();
+        instances.IsUnder("x", plan).ShouldBeFalse();
+    }
+
     // The Append of a partitioned table's partitions is one instance of the table under the alias the nodes above
     // print, with the tables every partition is a partition of, the relations its members scan, and no set operation.
     [Fact]

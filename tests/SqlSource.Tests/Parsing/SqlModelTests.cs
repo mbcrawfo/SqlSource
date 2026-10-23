@@ -40,7 +40,8 @@ public sealed class SqlModelTests
             ResultShape? shape = null,
             string? keptSql = null,
             SettingsLevel? markers = null,
-            bool? columnIsNullable = null
+            bool? columnIsNullable = null,
+            string? keptError = null
         )
         {
             EquatableArray<SqlSegment>? kept = keptSql is null
@@ -65,7 +66,12 @@ public sealed class SqlModelTests
                     ? new EquatableArray<SqlColumnMarker>([
                         new SqlColumnMarker("total", isNullable, new TextSpan(20, 21)),
                     ])
-                    : EquatableArray<SqlColumnMarker>.Empty
+                    : EquatableArray<SqlColumnMarker>.Empty,
+                keptError is null
+                    ? EquatableArray<SqlParseError>.Empty
+                    : new EquatableArray<SqlParseError>([
+                        SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, new TextSpan(30, 9), keptError),
+                    ])
             );
         }
 
@@ -87,5 +93,7 @@ public sealed class SqlModelTests
         Create("SELECT 1 FROM ", columnIsNullable: true).ShouldBe(Create("SELECT 1 FROM ", columnIsNullable: true));
         Create("SELECT 1 FROM ").ShouldNotBe(Create("SELECT 1 FROM ", columnIsNullable: true));
         Create("SELECT 1 FROM ", columnIsNullable: true).ShouldNotBe(Create("SELECT 1 FROM ", columnIsNullable: false));
+        Create("SELECT 1 FROM ", keptError: "class").ShouldBe(Create("SELECT 1 FROM ", keptError: "class"));
+        Create("SELECT 1 FROM ").ShouldNotBe(Create("SELECT 1 FROM ", keptError: "class"));
     }
 }

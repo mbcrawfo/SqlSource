@@ -45,18 +45,6 @@ internal static class SqlFileReader
         var fileName = SqlPath.GetFileName(file.Path);
         var result = SqlFileParser.Parse(text.ToString(), fileName, dialect, commentsWanted);
 
-        var errors = ImmutableArray.CreateBuilder<DiagnosticInfo>(result.Errors.Count);
-        foreach (var error in result.Errors)
-        {
-            errors.Add(
-                new DiagnosticInfo(
-                    SqlDiagnostics.ForParseError(error.Kind),
-                    LocationInfo.From(file.Path, text, error.Span),
-                    error.Arguments
-                )
-            );
-        }
-
         var queries = ImmutableArray.CreateBuilder<SqlQuery>(result.Blocks.Count);
         foreach (var block in result.Blocks)
         {
@@ -73,7 +61,8 @@ internal static class SqlFileReader
                     block.Markers,
                     ModelMarkerOf(file.Path, text, block.InputModel),
                     ModelMarkerOf(file.Path, text, block.OutputModel),
-                    ColumnMarkersOf(file.Path, text, block.ColumnMarkers)
+                    ColumnMarkersOf(file.Path, text, block.ColumnMarkers),
+                    DiagnosticsOf(file.Path, text, block.KeptErrors)
                 )
             );
         }
@@ -82,10 +71,37 @@ internal static class SqlFileReader
             normalizedPath,
             fileName,
             new EquatableArray<SqlQuery>(queries.ToImmutable()),
-            new EquatableArray<DiagnosticInfo>(errors.ToImmutable()),
+            DiagnosticsOf(file.Path, text, result.Errors),
             result.Dialect,
             invalidDialect
         );
+    }
+
+    // The array is made only for errors: a query's kept form has none but in a rare file.
+    private static EquatableArray<DiagnosticInfo> DiagnosticsOf(
+        string path,
+        SourceText text,
+        EquatableArray<SqlParseError> errors
+    )
+    {
+        if (errors.Count == 0)
+        {
+            return EquatableArray<DiagnosticInfo>.Empty;
+        }
+
+        var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>(errors.Count);
+        foreach (var error in errors)
+        {
+            diagnostics.Add(
+                new DiagnosticInfo(
+                    SqlDiagnostics.ForParseError(error.Kind),
+                    LocationInfo.From(path, text, error.Span),
+                    error.Arguments
+                )
+            );
+        }
+
+        return new EquatableArray<DiagnosticInfo>(diagnostics.MoveToImmutable());
     }
 
     private static EquatableArray<ColumnMarker> ColumnMarkersOf(

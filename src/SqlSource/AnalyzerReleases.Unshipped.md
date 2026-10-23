@@ -37,6 +37,7 @@ SQLSRC116 | SqlSource | Error | Marker is not allowed here
 SQLSRC117 | SqlSource | Error | Parameter has no type
 SQLSRC118 | SqlSource | Error | Parameter is not declared
 SQLSRC119 | SqlSource | Error | Query has no parameters
+SQLSRC120 | SqlSource | Error | Token crosses a comment
 SQLSRC200 | SqlSource | Error | The tool failed unexpectedly
 SQLSRC201 | SqlSource | Error | No project or solution found
 SQLSRC202 | SqlSource | Error | More than one project or solution found

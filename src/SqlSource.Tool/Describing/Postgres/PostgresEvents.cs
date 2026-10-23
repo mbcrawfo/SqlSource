@@ -19,8 +19,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// writes <c>prepare</c>, <c>columns</c>, <c>tables</c>, <c>types</c>, <c>spellings</c>, one <c>column</c> for each
 /// column, <c>check</c>, <c>table-match</c> and <c>deallocate</c>, in that order, each only when its call was made,
 /// and <c>table-match</c> only for a statement with rows whose check agreed.  A query with rows that is gated or has
-/// a column of no origin writes, between <c>check</c> and <c>table-match</c>, <c>explain</c>, <c>partitions</c> and
-/// <c>relations</c> when each is asked, one <c>walk.node</c> for each node the walk visited, one
+/// a column of no origin writes, between <c>check</c> and <c>table-match</c>, <c>explain</c>, <c>partitions</c>,
+/// <c>relations</c> and <c>overloads</c> when each is asked, one <c>walk.node</c> for each node the walk visited, one
 /// <c>walk.column</c> for each column, and <c>walk</c>.
 /// </remarks>
 internal static class PostgresEvents
@@ -262,6 +262,35 @@ internal static class PostgresEvents
             answer.Error is { } error
                 ? new LogMember(Error, ErrorOf(error))
                 : new LogMember("rows", LogValue.ListOf((answer.Tables ?? []).Select(TableOf))),
+            new(Duration, durationMs)
+        );
+
+    /// <summary>
+    /// <c>postgres.overloads</c>: the names of functions and of operators that were asked for, and those of them that
+    /// a schema other than <c>pg_catalog</c> holds, or <c>pg_catalog</c> holds as an object that is not built in, or
+    /// the error.  A name that is not among the answer's is held by the built-in catalog alone.
+    /// </summary>
+    public static void Overloads(
+        IRunLog log,
+        string query,
+        PostgresOverloadsRequest request,
+        PostgresOverloadsAnswer answer,
+        long durationMs
+    ) =>
+        log.Write(
+            PostgresCallNames.Overloads,
+            new("query", query),
+            new("functions", LogValue.ListOfTexts(request.Functions)),
+            new("operators", LogValue.ListOfTexts(request.Operators)),
+            answer.Error is { } error
+                ? new LogMember(Error, ErrorOf(error))
+                : new LogMember(
+                    "held",
+                    LogValue.MapOf(
+                        new("functions", LogValue.ListOfTexts(answer.Functions ?? [])),
+                        new("operators", LogValue.ListOfTexts(answer.Operators ?? []))
+                    )
+                ),
             new(Duration, durationMs)
         );
 
