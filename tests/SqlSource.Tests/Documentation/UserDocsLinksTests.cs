@@ -33,7 +33,7 @@ public sealed class UserDocsLinksTests
     [InlineData("A [linked](other.md#x) heading", "a-linked-heading")]
     [InlineData("Under_score and dash-ed", "under_score-and-dash-ed")]
     [InlineData("Cafe\u0301 au lait", "cafe\u0301-au-lait")]
-    public void Slug_Heading_FollowsGitHub(string heading, string slug) => UserDocs.Slug(heading).ShouldBe(slug);
+    public void Slug_AnyHeading_FollowsGitHub(string heading, string slug) => UserDocs.Slug(heading).ShouldBe(slug);
 
     [Fact]
     public void Anchors_HeadingsOfAPage_AreTheirSlugs()

@@ -35,7 +35,7 @@ public sealed class TestLayoutTests
     // A test project shares code through SqlSource.Testing or SqlSource.Tool.Testing, never by compiling another
     // project's file.  RoslynFloor's compile of the generator's tests is the one exception.
     [Fact]
-    public void TestProjects_Includes_CompileNoFileOfAnotherProject() =>
+    public void TestProjects_CompileIncludes_ReachNoFileOfAnotherProject() =>
         Directory
             .EnumerateDirectories(Tests)
             .SelectMany(folder => Directory.EnumerateFiles(folder, "*.csproj"))

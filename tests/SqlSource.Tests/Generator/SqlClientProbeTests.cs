@@ -119,11 +119,11 @@ public sealed class SqlClientProbeTests
             + "6.0.5.  Update the package.";
         var entry = TestSidecars.Entry(
             "GetUser",
-            Sidecars.HashOf(Users, "GetUser", SqlDialect.SqlServer),
+            Sidecars.HashOf(GeneratorHarness.UsersFile, "GetUser", SqlDialect.SqlServer),
             "mssql",
             columns: [TestSidecars.Column(0, "embedding", TestSidecars.SqlServer("vector(3)", 20, 0))]
         );
-        SqlFile[] files = [Users, Sidecars.Of(Users, entry)];
+        SqlFile[] files = [GeneratorHarness.UsersFile, Sidecars.Of(GeneratorHarness.UsersFile, entry)];
 
         var older = Run(OutputKind.Models, [SqlClientReferences.SqlClient60], files);
         var current = Run(OutputKind.Models, [SqlClientReferences.SqlClient61], files);
