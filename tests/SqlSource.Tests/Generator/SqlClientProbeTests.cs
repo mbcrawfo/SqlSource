@@ -30,17 +30,19 @@ public sealed class SqlClientProbeTests
         public partial class Sample;
         """;
 
-    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
-
     private static readonly SqlFile Orders = new("/app/Repo/Orders.sql", "-- name: GetOrder\nSELECT 2;\n");
 
-    private static readonly SqlFile[] UsersWithSidecar = [Users, CurrentSidecar(Users, "GetUser")];
+    private static readonly SqlFile[] UsersWithSidecar =
+    [
+        GeneratorHarness.UsersFile,
+        CurrentSidecar(GeneratorHarness.UsersFile, "GetUser"),
+    ];
 
     // Users as the postgres engine reads it, with the sidecar of its entry.
     private static readonly SqlFile[] PostgresUsers =
     [
-        Users,
-        Sidecars.Current(Users, SqlDialect.PostgreSql, "GetUser"),
+        GeneratorHarness.UsersFile,
+        Sidecars.Current(GeneratorHarness.UsersFile, SqlDialect.PostgreSql, "GetUser"),
     ];
 
     private static readonly SqlFile[] BothWithSidecars =
@@ -117,11 +119,11 @@ public sealed class SqlClientProbeTests
             + "6.0.5.  Update the package.";
         var entry = TestSidecars.Entry(
             "GetUser",
-            Sidecars.HashOf(Users, "GetUser", SqlDialect.SqlServer),
+            Sidecars.HashOf(GeneratorHarness.UsersFile, "GetUser", SqlDialect.SqlServer),
             "mssql",
             columns: [TestSidecars.Column(0, "embedding", TestSidecars.SqlServer("vector(3)", 20, 0))]
         );
-        SqlFile[] files = [Users, Sidecars.Of(Users, entry)];
+        SqlFile[] files = [GeneratorHarness.UsersFile, Sidecars.Of(GeneratorHarness.UsersFile, entry)];
 
         var older = Run(OutputKind.Models, [SqlClientReferences.SqlClient60], files);
         var current = Run(OutputKind.Models, [SqlClientReferences.SqlClient61], files);
@@ -163,7 +165,7 @@ public sealed class SqlClientProbeTests
         var older = SqlClientReferences.SqlClient60;
         var newer = SqlClientReferences.Synthetic("8.0.0.0", true, true, true, "8.0.1");
 
-        var sql = Run(OutputKind.Sql, [older], Users, Orders);
+        var sql = Run(OutputKind.Sql, [older], GeneratorHarness.UsersFile, Orders);
         var postgres = Run(OutputKind.Models, [older], "postgres", PostgresUsers);
         var postgresNewer = Run(OutputKind.Models, [newer], "postgres", PostgresUsers);
 

@@ -141,17 +141,12 @@ public sealed class ProgramsTests
         ShouldHaveExited(seen);
     }
 
-    // A program that outlives any patience of these tests.  Windows has no sleep, but ping waits as long.
+    // A program that outlives any patience of these tests.
     private static ProcessStartInfo Sleeper()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            Programs.SkipUnlessOnPath("ping");
-            return new ProcessStartInfo("ping", ["-n", "30", "127.0.0.1"]);
-        }
-
-        Programs.SkipUnlessOnPath("sleep");
-        return new ProcessStartInfo("sleep", ["30"]);
+        var (program, arguments) = Programs.Waiter(30);
+        Programs.SkipUnlessOnPath(program);
+        return new ProcessStartInfo(program, arguments);
     }
 
     // RunAsync does not give the program up before it is gone.  Its Process is disposed by then, so the test asks

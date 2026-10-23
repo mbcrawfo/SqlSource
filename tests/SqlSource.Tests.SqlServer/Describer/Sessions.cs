@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
@@ -89,15 +87,4 @@ internal static class Sessions
         described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
         return described.Value.ShouldNotBeNull();
     }
-
-    // Every text of a failure that a run prints or logs.
-    public static IReadOnlyList<string> TextsOf(DescribeFailure failure) =>
-        [
-            failure.Descriptor.Id,
-            failure.Descriptor.Title.ToString(CultureInfo.InvariantCulture),
-            failure.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
-            .. failure.Arguments,
-            .. failure.ServerLines,
-            failure.Help ?? string.Empty,
-        ];
 }

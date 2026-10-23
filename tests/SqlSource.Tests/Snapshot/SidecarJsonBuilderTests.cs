@@ -1,6 +1,7 @@
 using System.Globalization;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Testing;
 using Xunit;
 
 namespace SqlSource.Tests.Snapshot;
@@ -42,16 +43,8 @@ public sealed class SidecarJsonBuilderTests
     [Fact]
     public void Number_UnderAnotherCulture_IsWrittenTheSameWay()
     {
-        var culture = CultureInfo.CurrentCulture;
-        try
-        {
-            CultureInfo.CurrentCulture = new CultureInfo("sv-SE");
+        using var swedish = new CultureScope(new CultureInfo("sv-SE"));
 
-            SidecarJsonBuilder.Number(-1).ShouldBe("-1");
-        }
-        finally
-        {
-            CultureInfo.CurrentCulture = culture;
-        }
+        SidecarJsonBuilder.Number(-1).ShouldBe("-1");
     }
 }

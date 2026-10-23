@@ -20,7 +20,7 @@ public sealed partial class AttributeSourceTests
     [InlineData("GeneratorModelType", nameof(ModelKind))]
     [InlineData("GeneratorCollectionType", nameof(CollectionKind))]
     [InlineData("MethodLocation", nameof(MethodPlacement))]
-    public void EmittedEnum_HasTheMembersAndNumbersOfTheGeneratorsOwnForm(string emitted, string ownName)
+    public void EmittedEnum_ComparedWithTheGeneratorsOwnForm_HasTheSameMembersAndNumbers(string emitted, string ownName)
     {
         var own = new[]
         {
@@ -47,7 +47,7 @@ public sealed partial class AttributeSourceTests
     }
 
     [Fact]
-    public void GeneratedTypes_AreEveryTypeTheFileDeclares()
+    public void GeneratedTypes_ComparedWithTheFile_AreEveryTypeItDeclares()
     {
         var declared = Declaration()
             .Matches(AttributeSource.Text)

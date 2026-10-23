@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -30,6 +31,19 @@ internal static class Programs
     // A run of a program in the temporary directory, with the environment of the test process.
     public static ProcessRequest Request(string program, params string[] arguments) =>
         new(program, [.. arguments], Path.GetTempPath(), [], [], []);
+
+    // A program of the operating system that waits for the seconds given and ends, with its arguments.  Windows has no
+    // sleep, but ping waits as long.
+    public static (string Program, string[] Arguments) Waiter(int seconds)
+    {
+        var count = seconds.ToString(CultureInfo.InvariantCulture);
+        if (OperatingSystem.IsWindows())
+        {
+            return ("ping", ["-n", count, "127.0.0.1"]);
+        }
+
+        return ("sleep", [count]);
+    }
 
     // Skips the test when no folder of the path holds a program of the name.
     public static void SkipUnlessOnPath(string program) =>

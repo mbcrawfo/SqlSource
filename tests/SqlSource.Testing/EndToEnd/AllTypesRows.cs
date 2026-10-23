@@ -280,16 +280,8 @@ internal static class AllTypesRows
     // invariant one for the call, and is given back after it.
     private static string TextOf(object value)
     {
-        var culture = CultureInfo.CurrentCulture;
-        try
-        {
-            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
-            return Convert.ToString(value, CultureInfo.InvariantCulture).ShouldNotBeNull();
-        }
-        finally
-        {
-            CultureInfo.CurrentCulture = culture;
-        }
+        using var invariant = new CultureScope(CultureInfo.InvariantCulture);
+        return Convert.ToString(value, CultureInfo.InvariantCulture).ShouldNotBeNull();
     }
 
     // The expectation of a column whose C# type differs by driver, by the type that decides it.

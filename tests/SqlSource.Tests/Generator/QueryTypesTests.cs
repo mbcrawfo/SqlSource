@@ -8,6 +8,7 @@ using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Types;
 using SqlSource.Snapshot;
+using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
@@ -40,8 +41,6 @@ public sealed class QueryTypesTests
     // The warning ids of a C# type whose use gives none.
     private static readonly EquatableArray<string> NoWarnings = EquatableArray<string>.Empty;
 
-    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
-
     private static readonly PropertyType Int = new("int", true, true, NoWarnings, "int4", null);
 
     [Theory]
@@ -52,8 +51,13 @@ public sealed class QueryTypesTests
     {
         var run = Run(
             Driver(driver),
-            Users,
-            Entry(Users, "GetUser", [Parameter("id", Catalog("int4"))], [Column("id", Catalog("int4"))])
+            GeneratorHarness.UsersFile,
+            Entry(
+                GeneratorHarness.UsersFile,
+                "GetUser",
+                [Parameter("id", Catalog("int4"))],
+                [Column("id", Catalog("int4"))]
+            )
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -69,7 +73,11 @@ public sealed class QueryTypesTests
     [InlineData("10", "global::System.DateOnly")]
     public void Run_Date_IsTheTypeOfTheDriver(string driver, string expected)
     {
-        var run = Run(Driver(driver), Users, Entry(Users, "GetUser", [], [Column("born", Catalog("date"))]));
+        var run = Run(
+            Driver(driver),
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("born", Catalog("date"))])
+        );
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run).ShouldBe([new PropertyType(expected, true, true, NoWarnings, "date", null)]);
@@ -80,8 +88,8 @@ public sealed class QueryTypesTests
     {
         var run = Run(
             [NpgsqlReferences.Npgsql8],
-            Users,
-            Entry(Users, "GetUser", [], [Column("box", Extension("cube"))])
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("box", Extension("cube"))])
         );
 
         run.Diagnostics.ShouldBe([
@@ -97,8 +105,8 @@ public sealed class QueryTypesTests
     {
         var run = Run(
             [NpgsqlReferences.Npgsql10],
-            Users,
-            Entry(Users, "GetUser", [], [Column("box", Extension("cube"))])
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("box", Extension("cube"))])
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -111,8 +119,8 @@ public sealed class QueryTypesTests
     {
         var run = Run(
             [NpgsqlReferences.Npgsql10],
-            Users,
-            Entry(Users, "GetUser", [], [Column("relation", Catalog("regclass"))])
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("relation", Catalog("regclass"))])
         );
 
         run.Diagnostics.ShouldBe([
@@ -133,7 +141,11 @@ public sealed class QueryTypesTests
             element: Catalog("regclass")
         );
 
-        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("relations", array)]));
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("relations", array)])
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The column 'relations' has the type 'regclass[]', which SqlSource cannot give "
@@ -160,7 +172,11 @@ public sealed class QueryTypesTests
             )
             : Catalog(internalName);
 
-        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("value", type)]));
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("value", type)])
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The column 'value' has the type '{name}', which SqlSource cannot give a C# "
@@ -179,10 +195,14 @@ public sealed class QueryTypesTests
         );
         var mapped = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- type-override: pg_catalog.pg_class=MyApp.Tag\n-- name: GetUser\nSELECT 1;\n"
+            "-- type-override: pg_catalog.pg_class=MyApp.Tag\n" + SqlTexts.GetUser
         );
 
-        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("relation", pgClass)]));
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("relation", pgClass)])
+        );
         var mappedRun = Run(
             [NpgsqlReferences.Npgsql10],
             mapped,
@@ -217,7 +237,11 @@ public sealed class QueryTypesTests
     {
         var type = TestSidecars.Postgres(name: internalName, kind: kind, internalName: internalName);
 
-        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("row", type)]));
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("row", type)])
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The column 'row' has the type '{internalName}', which SqlSource cannot give a "
@@ -239,7 +263,11 @@ public sealed class QueryTypesTests
             subtype: Catalog("float8")
         );
 
-        var run = Run(Driver(driver), Users, Entry(Users, "GetUser", [], [Column("span", floatRange)]));
+        var run = Run(
+            Driver(driver),
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("span", floatRange)])
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The column 'span' has the type 'floatrange', which SqlSource cannot give a C# "
@@ -260,7 +288,11 @@ public sealed class QueryTypesTests
             subtype: Catalog("float8")
         );
 
-        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("span", floatRange)]));
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("span", floatRange)])
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The column 'span' has the type 'FloatRange', which SqlSource cannot give a C# "
@@ -282,7 +314,11 @@ public sealed class QueryTypesTests
             internalName: "Odd.Name"
         );
 
-        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("odd", odd)]));
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("odd", odd)])
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The column 'odd' has the type 'Odd.Name', which SqlSource cannot give a C# "
@@ -294,7 +330,11 @@ public sealed class QueryTypesTests
     [Fact]
     public void Run_ParameterWithoutAType_IsSqlsrc246()
     {
-        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [Parameter("id", null)], null));
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [Parameter("id", null)], null)
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The parameter 'id' has the type 'null', which SqlSource cannot give a C# "
@@ -313,7 +353,11 @@ public sealed class QueryTypesTests
             internalName: "address"
         );
 
-        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("home", address)]));
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("home", address)])
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The column 'home' has the type 'address', which SqlSource cannot give a C# "
@@ -332,7 +376,11 @@ public sealed class QueryTypesTests
             internalName: "Order Item"
         );
 
-        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("item", item)]));
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("item", item)])
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The column 'item' has the type 'Order Item', which SqlSource cannot give a C# "
@@ -351,7 +399,11 @@ public sealed class QueryTypesTests
             internalName: "Order\nItem"
         );
 
-        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("item", item)]));
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("item", item)])
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The column 'item' has the type 'Order\nItem', which SqlSource cannot give a C# "
@@ -370,7 +422,7 @@ public sealed class QueryTypesTests
         );
         var mapped = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- type-override: \"my schema\".U&\"Order\\000AItem\"=MyApp.Tag\n-- name: GetUser\nSELECT 1;\n"
+            "-- type-override: \"my schema\".U&\"Order\\000AItem\"=MyApp.Tag\n" + SqlTexts.GetUser
         );
 
         var run = Run([NpgsqlReferences.Npgsql10], mapped, Entry(mapped, "GetUser", [], [Column("item", item)]));
@@ -447,7 +499,7 @@ public sealed class QueryTypesTests
             columns: [Column("id", Catalog("int4"))]
         );
 
-        var run = Run([NpgsqlReferences.Npgsql10], Users, stale);
+        var run = Run([NpgsqlReferences.Npgsql10], GeneratorHarness.UsersFile, stale);
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC244 {GetUserName}: The query 'GetUser' has changed since its entry was written.  Run 'sqlsource "
@@ -531,7 +583,7 @@ public sealed class QueryTypesTests
                 element: tag
             )
         );
-        var file = new SqlFile(GeneratorHarness.UsersPath, marker + "-- name: GetUser\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, marker + SqlTexts.GetUser);
 
         var run = Run([NpgsqlReferences.Npgsql10], file, Entry(file, "GetUser", [], [Column("tags", tags)]));
 

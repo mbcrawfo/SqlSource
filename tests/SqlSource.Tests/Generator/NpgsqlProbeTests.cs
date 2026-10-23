@@ -50,8 +50,6 @@ public sealed class NpgsqlProbeTests
     // The warning ids of a C# type whose use gives none.
     private static readonly EquatableArray<string> NoWarnings = EquatableArray<string>.Empty;
 
-    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
-
     // Each type whose C# type differs between Npgsql 8 and 9 and Npgsql 10, or comes from one that does, by name.
     private static readonly Dictionary<string, PostgresType> Differing = new()
     {
@@ -115,7 +113,11 @@ public sealed class NpgsqlProbeTests
 
     private static readonly SqlFile Orders = new("/app/Repo/Orders.sql", "-- name: GetOrder\nSELECT 2;\n");
 
-    private static readonly SqlFile[] UsersWithSidecar = [Users, CurrentSidecar(Users, "GetUser")];
+    private static readonly SqlFile[] UsersWithSidecar =
+    [
+        GeneratorHarness.UsersFile,
+        CurrentSidecar(GeneratorHarness.UsersFile, "GetUser"),
+    ];
 
     private static readonly SqlFile[] BothWithSidecars =
     [
@@ -243,13 +245,13 @@ public sealed class NpgsqlProbeTests
     {
         var driver = NpgsqlReferences.Synthetic(version, slimBuilder, cube);
 
-        var sql = Run(OutputKind.Sql, [driver], Users, Orders);
+        var sql = Run(OutputKind.Sql, [driver], GeneratorHarness.UsersFile, Orders);
         var mssql = Run(
             OutputKind.Models,
             [driver],
             "mssql",
-            Users,
-            Sidecars.Current(Users, SqlDialect.SqlServer, "GetUser")
+            GeneratorHarness.UsersFile,
+            Sidecars.Current(GeneratorHarness.UsersFile, SqlDialect.SqlServer, "GetUser")
         );
 
         sql.Diagnostics.ShouldBeEmpty();
@@ -396,7 +398,7 @@ public sealed class NpgsqlProbeTests
     {
         var entry = TestSidecars.Entry(
             "GetUser",
-            Sidecars.HashOf(Users, "GetUser", SqlDialect.PostgreSql),
+            Sidecars.HashOf(GeneratorHarness.UsersFile, "GetUser", SqlDialect.PostgreSql),
             "postgres",
             "main",
             "18.0",
@@ -406,7 +408,7 @@ public sealed class NpgsqlProbeTests
         return GeneratorHarness.Run(
             OutputKind.Models,
             [new SourceFile(GeneratorHarness.SourcePath, SourceWithDateSpan)],
-            [Users, Sidecars.Of(Users, entry)],
+            [GeneratorHarness.UsersFile, Sidecars.Of(GeneratorHarness.UsersFile, entry)],
             dialect: "postgres",
             properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = overrides }
         );

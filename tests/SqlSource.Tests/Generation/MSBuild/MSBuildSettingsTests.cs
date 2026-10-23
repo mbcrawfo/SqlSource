@@ -13,7 +13,7 @@ public sealed class MSBuildSettingsTests
 {
     // The compiler's contract, spelled out: a change to a constant must fail here, not pass by agreeing with itself.
     [Fact]
-    public void Prefixes_AreWhereTheCompilerPutsAPropertyAndTheMetadataOfTheSettingsItem()
+    public void Prefixes_OfTheCompilersKeys_AreWhereItPutsAPropertyAndTheMetadataOfTheSettingsItem()
     {
         MSBuildSettings.PropertyPrefix.ShouldBe("build_property.");
         MSBuildSettings.MetadataPrefix.ShouldBe("build_metadata.SqlSourceSettingsFile.");
