@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing.Describers;
@@ -30,6 +31,8 @@ public sealed class ToolHostTests
         _ = host.Describers.Find(SqlDialect.SqlServer).ShouldBeOfType<SqlServerDescriber>();
         host.Exchange("billing").ShouldBeSameAs(LiveExchange.Instance);
         host.Time.ShouldBeSameAs(TimeProvider.System);
+        host.Runtime.ShouldBe(RuntimeInformation.FrameworkDescription);
+        host.OperatingSystem.ShouldBe(RuntimeInformation.OSDescription);
     }
 
     [Fact]
