@@ -69,7 +69,16 @@ internal sealed class SqlServerScript
     {
         var replay = new ReplayingExchange(_capture);
         var asked = new DescribeCapture(SidecarValues.Engine.SqlServer);
-        IDescribeExchange answering = clock is null ? replay : new ClockedExchange(replay, clock, perCall);
+        IDescribeExchange answering = clock is null
+            ? replay
+            : new HookedExchange(
+                before: (_, _, _) =>
+                {
+                    clock.Advance(perCall);
+                    return Task.CompletedTask;
+                },
+                inner: replay
+            );
         var opened = await new SqlServerDescriber().OpenAsync(
             Database,
             FixtureReplay.Connection,

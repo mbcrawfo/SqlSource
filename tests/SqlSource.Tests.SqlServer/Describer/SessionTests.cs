@@ -116,7 +116,8 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
     [Fact]
     public async Task OpenAsync_TokenCancelled_ThrowsOperationCanceled()
     {
-        var exchange = new TokenExchange();
+        List<CancellationToken> tokens = [];
+        var exchange = TokenExchange(tokens);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await cancel.CancelAsync();
 
@@ -124,14 +125,15 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
             Sessions.OpenAsync(sqlServer.ConnectionString, exchange, cancellationToken: cancel.Token)
         );
 
-        exchange.Tokens.ShouldBe([cancel.Token]);
+        tokens.ShouldBe([cancel.Token]);
     }
 
     // A describe that is cancelled ends as a cancellation, and its call is given the describe's own token.
     [Fact]
     public async Task DescribeAsync_TokenCancelled_ThrowsOperationCanceledWithTheTokenOfTheDescribe()
     {
-        var exchange = new TokenExchange();
+        List<CancellationToken> tokens = [];
+        var exchange = TokenExchange(tokens);
         await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString, exchange);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await cancel.CancelAsync();
@@ -143,7 +145,7 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
             )
         );
 
-        exchange.Tokens.ShouldBe([TestContext.Current.CancellationToken, cancel.Token]);
+        tokens.ShouldBe([TestContext.Current.CancellationToken, cancel.Token]);
     }
 
     // SqlClient reports a command that is cancelled while the server runs it as a SqlException: it is the cancellation
@@ -187,7 +189,7 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         ];
         foreach (var word in words.Where(static word => word.Length > 0))
         {
-            Sessions.TextsOf(failure).ShouldAllBe(text => !text.Contains(word, StringComparison.Ordinal));
+            Failures.TextsOf(failure).ShouldAllBe(text => !text.Contains(word, StringComparison.Ordinal));
             CaptureJson.Write(capture).ShouldNotContain(word);
         }
 
@@ -204,7 +206,7 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         failure.Descriptor.Id.ShouldBe("SQLSRC224");
         failure.Arguments.ShouldBe([SqlServerContainer.Database]);
         failure.Step.ShouldBeNull();
-        Sessions
+        Failures
             .TextsOf(failure)
             .ShouldAllBe(text =>
                 !text.Contains(connection, StringComparison.Ordinal)
@@ -214,19 +216,12 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
     }
 
     // Asks the server as the live exchange does, and keeps the token each call was given, in order.
-    private sealed class TokenExchange : IDescribeExchange
-    {
-        public List<CancellationToken> Tokens { get; } = [];
-
-        public Task<TAnswer> AskAsync<TRequest, TAnswer>(
-            string method,
-            TRequest request,
-            Func<TRequest, CancellationToken, Task<TAnswer>> live,
-            CancellationToken cancellationToken
-        )
-        {
-            Tokens.Add(cancellationToken);
-            return live(request, cancellationToken);
-        }
-    }
+    private static HookedExchange TokenExchange(List<CancellationToken> tokens) =>
+        new(
+            before: (_, _, token) =>
+            {
+                tokens.Add(token);
+                return Task.CompletedTask;
+            }
+        );
 }

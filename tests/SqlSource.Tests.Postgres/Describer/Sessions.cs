@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Globalization;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
@@ -100,17 +98,6 @@ internal static class Sessions
         );
         return (described, capture);
     }
-
-    // Every text of a failure that a run prints or logs.
-    public static IReadOnlyList<string> TextsOf(DescribeFailure failure) =>
-        [
-            failure.Descriptor.Id,
-            failure.Descriptor.Title.ToString(CultureInfo.InvariantCulture),
-            failure.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
-            .. failure.Arguments,
-            .. failure.ServerLines,
-            failure.Help ?? string.Empty,
-        ];
 
     // How many prepared statements the session holds.  The view shows those of its own session alone, so this asks
     // on the session's connection, whose search path a test may give a count of another schema.

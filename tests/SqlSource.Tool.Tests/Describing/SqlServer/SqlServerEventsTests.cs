@@ -10,6 +10,7 @@ using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
+using static SqlSource.Tool.Testing.RecordingLog;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer;
 
@@ -68,11 +69,6 @@ public sealed class SqlServerEventsTests
     };
 
     private static readonly SqlServerType Int = new("int", 4, 10, 0, null);
-
-    private static LogValue Member(LogMember[] members, string name) =>
-        members.Single(member => member.Name == name).Value;
-
-    private static string[] NamesOf(LogMember[] members) => [.. members.Select(member => member.Name)];
 
     private static LogValue ErrorsOf(params (long Number, long Class, long State, string Message)[] errors) =>
         LogValue.ListOf(

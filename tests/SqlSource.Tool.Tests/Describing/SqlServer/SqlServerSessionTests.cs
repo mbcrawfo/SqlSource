@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
@@ -122,11 +121,8 @@ public sealed class SqlServerSessionTests
         failure.Arguments.ShouldBe([SqlServerScript.Database, "SQL Server", "13.0.6300.2", "14 (SQL Server 2017)"]);
         failure.Step.ShouldBeNull();
         failure.ServerLines.ShouldBeEmpty();
-        string.Format(
-                CultureInfo.InvariantCulture,
-                failure.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
-                [.. failure.Arguments]
-            )
+        Failures
+            .MessageOf(failure)
             .ShouldBe(
                 "The database 'app' runs SQL Server 13.0.6300.2, and the tool supports 14 (SQL Server 2017) and later"
             );
