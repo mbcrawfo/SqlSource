@@ -266,7 +266,8 @@ public sealed class WalkTests(PostgresContainer postgres)
 
     // A COALESCE at a full join that is not over one column of each side, each extended by that join alone: both of
     // one side, a side with a LEFT JOIN under it, the full join on the side a LEFT JOIN extends, and a cast of a
-    // side's column.
+    // side's column.  The upper condition of the third is not strict in either side, so the planner keeps the full
+    // join, and each plan is asserted to hold one.
     [Theory]
     [InlineData("SELECT coalesce(o.user_id, o.user_id) AS k FROM users u FULL JOIN orders o ON o.user_id = u.id")]
     [InlineData(
@@ -275,9 +276,17 @@ public sealed class WalkTests(PostgresContainer postgres)
     )]
     [InlineData(
         "SELECT coalesce(u.id, o.user_id) AS k "
-            + "FROM bookings b LEFT JOIN (users u FULL JOIN orders o ON o.user_id = u.id) ON u.id = b.user_id"
+            + "FROM bookings b LEFT JOIN (users u FULL JOIN orders o ON o.user_id = u.id) "
+            + "ON b.user_id = coalesce(u.id, o.user_id)"
     )]
     [InlineData("SELECT coalesce(o.id, u.id) AS k FROM users u FULL JOIN orders o ON o.user_id = u.id")]
-    public async Task DescribeAsync_CoalesceAtAFullJoinNotOverEachSide_KeepsNoOrigin(string sql) =>
-        (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin]);
+    public async Task DescribeAsync_CoalesceAtAFullJoinNotOverEachSide_KeepsNoOrigin(string sql)
+    {
+        var (description, plan) = await DescribeWithSettingsAsync(sql);
+
+        var compact = plan.Replace("\\", "", StringComparison.Ordinal).Replace(" ", "", StringComparison.Ordinal);
+        compact.ShouldContain("\"JoinType\":\"Full\"", Case.Sensitive, "the plan holds no full join");
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([UnknownNoOrigin]);
+    }
 }

@@ -291,7 +291,7 @@ public sealed class PlanExpressionTests
         PlanExpression.ProvedTypeOf(entry, Context(catalogFunctions: true)).ShouldBe(expected);
 
     [Theory]
-    [InlineData("COALESCE(u.note, NULL::integer)")]
+    [InlineData("COALESCE(id, u.name)")]
     [InlineData("id")]
     [InlineData("count(id)")]
     [InlineData("(l.quantity * l.unit_price)")]

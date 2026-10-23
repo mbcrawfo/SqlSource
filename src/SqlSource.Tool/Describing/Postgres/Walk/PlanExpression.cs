@@ -24,8 +24,11 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// a quoted literal with its cast, a number, <c>true</c> or <c>false</c>, and <c>NULL::type</c>, which is the one
 /// that can be <c>NULL</c>; the tests <c>IS NULL</c>, <c>IS NOT NULL</c> and <c>IS DISTINCT FROM</c>, and the
 /// <c>NOT</c> of the last, which is how <c>IS NOT DISTINCT FROM</c> prints; <c>COALESCE</c>, <c>GREATEST</c> and
-/// <c>LEAST</c> with an argument that cannot be <c>NULL</c>; and a <c>CASE</c> with an <c>ELSE</c> whose every result
-/// cannot be.  A <c>CASE</c> written without an <c>ELSE</c> prints <c>ELSE NULL::type</c>.
+/// <c>LEAST</c> with an argument that cannot be <c>NULL</c>, or with a plain reference to each side of the full join
+/// that computes the entry (<see cref="ExpressionContext.ProvedOnFullJoinSide" />), since each row of such a join has
+/// a row of one side at least; and a <c>CASE</c> with an <c>ELSE</c> whose every result cannot be.  A <c>CASE</c>
+/// written without an <c>ELSE</c> prints <c>ELSE NULL::type</c>.  Each of the forms that is not <c>NULL</c> is typed
+/// from its arguments or results that are proved of a known type, as the next paragraph says.
 /// </para>
 /// <para>
 /// A value is also proved with its type (<see cref="ProvedTypeOf" />): a constant, a test, <c>count(*)</c> or a
