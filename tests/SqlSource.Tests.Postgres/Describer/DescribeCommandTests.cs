@@ -226,6 +226,27 @@ public sealed class DescribeCommandTests : IDisposable
         result.Error.ShouldNotContain(Secrets.Marker);
     }
 
+    // A connection string can turn Npgsql's parameter logging on, and the describer turns it off: the driver's events
+    // hold the text of each command and none of its parameters.
+    [Fact]
+    public async Task Describe_LogParametersWithLog_DriverEventsHoldNoParameter()
+    {
+        _ = AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
+        var connection = new NpgsqlConnectionStringBuilder(_postgres.ConnectionString) { LogParameters = true };
+        var log = _run.Folder.PathOf("run.log");
+
+        var result = await DescribeWithAsync(connection.ConnectionString, "--log", log);
+
+        result.ExitCode.ShouldBe(0, result.Error);
+        var messages = LogReader
+            .Read(log)
+            .Where(static logged => NameOf(logged) == DriverEvent)
+            .Select(static logged => logged.GetProperty("message").GetString() ?? string.Empty)
+            .ToList();
+        messages.ShouldContain(static message => message.StartsWith("Executing command: ", StringComparison.Ordinal));
+        messages.ShouldAllBe(static message => !message.Contains("Parameters:", StringComparison.Ordinal));
+    }
+
     // The port 1 of the container's host refuses at once.  The diagnostic holds the describer's own text, which says
     // what failed and names neither the host nor the user, and so does the rest of the log: the driver's own events
     // say nothing of it.
