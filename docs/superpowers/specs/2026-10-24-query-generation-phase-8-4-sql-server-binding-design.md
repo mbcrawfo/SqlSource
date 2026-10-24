@@ -91,7 +91,7 @@ The project's and the floor project's tests above.  Generator tests for the bind
 ## Documentation
 
 - `docs/manual/sqlserver.md`: its Query methods section, from what was built: how a parameter is bound, the transaction SqlClient requires, `rowcount`'s `-1`, a batch's first result set, and anything the end-to-end project found; the known issue of binding by value removed.
-- `docs/manual/generator.md`: the SQL Server known issue of 8.1 removed.
+- `docs/manual/generator.md`: the SQL Server known issue of 8.1 removed; and 8.3's known issue of a wrapping connection extended to SqlClient's `SqlParameter`, or written here if 8.4 merges first.
 - `docs/manual/README.md`: the row of generated query methods for SQL Server.
 - `docs/manual/recipes.md`: the Dapper recipe unchanged unless its test found otherwise.
 - `docs/architecture/generator.md`: the SQL Server binding step.

@@ -79,7 +79,7 @@ The project's and the floor project's tests above.  Generator tests for the bind
 ## Documentation
 
 - `docs/manual/postgresql.md`: its Query methods section, from what was built: how a parameter is bound, `MapEnum` and plugins on the data source for a mapped type with no converter, what Npgsql 8 and 10 read, and anything the end-to-end project found a user must know; the known issue of binding by value removed.
-- `docs/manual/generator.md`: the PostgreSQL known issue of 8.1 removed.
+- `docs/manual/generator.md`: the PostgreSQL known issue of 8.1 removed; and a known issue, with the README's line on the common path where it belongs, that a method needs the connection's own `NpgsqlParameter`, so a `DbConnection` that wraps Npgsql's and creates parameters of its own fails with an `InvalidCastException`, which the epic's Types in C# promised the user is told.
 - `docs/manual/README.md`: the row of generated query methods for PostgreSQL.
 - `docs/manual/recipes.md`: the Dapper recipe unchanged unless its test found otherwise.
 - `docs/architecture/generator.md`: the PostgreSQL binding step.
