@@ -283,6 +283,7 @@ internal static class RunEvents
             PlannedFileState.Ready => "ready",
             PlannedFileState.HasParseErrors => "has-parse-errors",
             PlannedFileState.NotDescribable => "not-describable",
+            PlannedFileState.NotUtf8 => "not-utf-8",
             _ => throw new InvalidOperationException($"Unknown state {state}."),
         };
 
@@ -292,6 +293,7 @@ internal static class RunEvents
             PlannedFileState.Ready => "ready",
             PlannedFileState.HasParseErrors => "has parse errors",
             PlannedFileState.NotDescribable => "cannot be described",
+            PlannedFileState.NotUtf8 => "is not saved as UTF-8",
             _ => throw new InvalidOperationException($"Unknown state {state}."),
         };
 

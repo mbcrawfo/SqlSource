@@ -105,11 +105,13 @@ internal static class RunPlanner
                 continue;
             }
 
+            var text = new SqlFileText(listed[path].Path);
             claimed.Add(
                 new ClaimedFile(
                     manifest.ProjectPath,
                     path,
-                    ReadMetadata(listed[path], invalid),
+                    text,
+                    ReadMetadata(text, listed[path], invalid),
                     dialect,
                     settings.Level,
                     fileClaims.Levels,
@@ -146,13 +148,9 @@ internal static class RunPlanner
     }
 
     // The metadata of a claimed file's item.  What is not valid in it is kept for the errors of the project.
-    private static FileMetadata ReadMetadata(ManifestFile file, InvalidValues invalid)
+    private static FileMetadata ReadMetadata(SqlFileText text, ManifestFile file, InvalidValues invalid)
     {
-        var metadata = FileMetadata.Read(
-            new SqlFileText(file.Path),
-            ManifestOptions.ForFile(file),
-            MSBuildSettings.ManifestMetadata
-        );
+        var metadata = FileMetadata.Read(text, ManifestOptions.ForFile(file), MSBuildSettings.ManifestMetadata);
         invalid.AddDialect(metadata.Dialect.InvalidValue);
         if (metadata.Settings is { } settings)
         {
@@ -162,7 +160,9 @@ internal static class RunPlanner
         return metadata;
     }
 
-    // Plans a claimed file once, under the first project that claims it.  A file with a parse error has no query.
+    // Plans a claimed file once, under the first project that claims it.  A file with a parse error has no query.  When
+    // the compiler would read the file in its fallback encoding, another one on Windows, the errors may be of the
+    // tool's reading alone, so SQLSRC271 is reported in their place.
     private static PlannedFile PlanFile(
         FileWork work,
         ImmutableArray<ToolDiagnostic>.Builder errors,
@@ -175,6 +175,12 @@ internal static class RunPlanner
         var parsed = Parse(work.Owner, cancellationToken);
         if (parsed.Errors.Count > 0)
         {
+            if (work.Owner.Text.CompilerFallsBack)
+            {
+                errors.Add(FileNotUtf8(work));
+                return FileOf(work, parsed.Dialect, PlannedFileState.NotUtf8, EquatableArray<PlannedQuery>.Empty);
+            }
+
             errors.AddRange(parsed.Errors.Select(ToolDiagnostic.From));
             return FileOf(work, parsed.Dialect, PlannedFileState.HasParseErrors, EquatableArray<PlannedQuery>.Empty);
         }
@@ -209,8 +215,8 @@ internal static class RunPlanner
         );
     }
 
-    // One query with its values, and its errors.  The first query of a file that needs an entry under a dialect
-    // that cannot be described changes the state of the file.
+    // One query with its values, and its errors.  The first query of a file that needs an entry changes the state of
+    // the file when the file is not saved as UTF-8, or else when its dialect cannot be described.
     private static PlannedQuery PlanQuery(
         SqlQuery query,
         FileWork work,
@@ -226,9 +232,15 @@ internal static class RunPlanner
             return new PlannedQuery(query, NeedsEntry: false, Database: null, Hash: null);
         }
 
-        // Once for the file, at its first query that needs an entry: one setting mends it.  The parser keeps no
-        // position for the marker that set the output.
-        if (state == PlannedFileState.Ready && !SqlDescribableDialects.Contains(dialect))
+        // Once for the file, at its first query that needs an entry.  A file that is not UTF-8 is that error alone,
+        // as saving it mends it.  The dialect is one setting, and the parser keeps no position for the marker that
+        // set the output.
+        if (state == PlannedFileState.Ready && work.Owner.Text.CompilerFallsBack)
+        {
+            state = PlannedFileState.NotUtf8;
+            errors.Add(FileNotUtf8(work));
+        }
+        else if (state == PlannedFileState.Ready && !SqlDescribableDialects.Contains(dialect))
         {
             state = PlannedFileState.NotDescribable;
             errors.Add(
@@ -269,6 +281,9 @@ internal static class RunPlanner
             problems
         );
     }
+
+    private static ToolDiagnostic FileNotUtf8(FileWork work) =>
+        ToolDiagnostic.ForFile(ToolDiagnostics.FileNotUtf8, work.Owner.Metadata.File.Path);
 
     // The planned file of a work, under its owner.
     private static PlannedFile FileOf(
@@ -325,9 +340,10 @@ internal static class RunPlanner
 
     // The databases of the run, in the order the plan first holds a query of each.  Names are compared ignoring
     // case, and every query gets the first spelling.  A database has the dialect of its first query in a ready
-    // file, and a file that is not ready neither decides it nor conflicts with it: SQLSRC209 or a parse error is
-    // that file's error.  A database that no ready file holds keeps the dialect of its first file.  A query of the
-    // database in a ready file of another dialect has a problem, and its file's first such query is SQLSRC211.
+    // file, and a file that is not ready neither decides it nor conflicts with it: SQLSRC209, SQLSRC271 or a parse
+    // error is that file's error.  A database that no ready file holds keeps the dialect of its first file.  A
+    // query of the database in a ready file of another dialect has a problem, and its file's first such query is
+    // SQLSRC211.
     private static EquatableArray<PlannedDatabase> AssignDatabases(
         List<PlannedFile> files,
         ImmutableArray<ToolDiagnostic>.Builder errors
@@ -502,6 +518,7 @@ internal static class RunPlanner
     private sealed record ClaimedFile(
         string ProjectPath,
         string NormalizedPath,
+        SqlFileText Text,
         FileMetadata Metadata,
         DialectSetting ProjectDialect,
         SettingsLevel Property,

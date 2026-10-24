@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -583,6 +584,20 @@ public sealed class RunLogTests : IDisposable
         Text(files.Single(line => Text(line, "path") == broken), "state").ShouldBe("has-parse-errors");
         Text(files.Single(line => Text(line, "path") == ansi), "state").ShouldBe("not-describable");
         Text(files.Single(line => Text(line, "path") == _users), "state").ShouldBe("ready");
+    }
+
+    [Fact]
+    public async Task Run_FileNotSavedAsUtf8_HasTheStateNotUtf8()
+    {
+        var latin1 = _scene.Project.AddSqlBytes(
+            "Latin1.sql",
+            Encoding.Latin1.GetBytes("-- name: Cafe\nSELECT 'café';\n")
+        );
+
+        _ = await _scene.DescribeAsync("--log", "run.log");
+
+        var files = LogReader.Read(Log).Where(line => Text(line, "event") == "file").ToArray();
+        Text(files.Single(line => Text(line, "path") == latin1), "state").ShouldBe("not-utf-8");
     }
 
     // Under --database a query of another database that has no entry is left out.

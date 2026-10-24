@@ -480,6 +480,18 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor FileNotUtf8 = new(
+        id: "SQLSRC271",
+        title: "File is not saved as UTF-8",
+        messageFormat: "'{0}' is not saved as UTF-8, so its text depends on the system that reads it.  Save it as "
+            + "UTF-8.",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc271",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -526,6 +538,7 @@ internal static class ToolDiagnostics
             ConflictingResults,
             DynamicSql,
             TemporaryTableInBatch,
-            ColumnHasNoName
+            ColumnHasNoName,
+            FileNotUtf8
         );
 }
