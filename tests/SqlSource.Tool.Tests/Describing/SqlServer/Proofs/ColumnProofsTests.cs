@@ -30,8 +30,8 @@ public sealed class ColumnProofsTests
 
         proofs.OperandsSql.ShouldBe("SELECT nickname\nAS [1],\nname\nAS [2]\nFROM dbo.users");
         proofs.OperandCount.ShouldBe(2);
-        Nullability(proofs.Apply([false, true])).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
-        Nullability(proofs.Apply([false, false])).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+        Nullability(proofs.Apply(Answers(false, true))).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
+        Nullability(proofs.Apply(Answers(false, false))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
         Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
     }
 
@@ -46,9 +46,9 @@ public sealed class ColumnProofsTests
         );
 
         proofs.OperandsSql.ShouldBe("SELECT nickname\nAS [1],\nname\nAS [2]\nFROM dbo.users");
-        Nullability(proofs.Apply([false, true]))
+        Nullability(proofs.Apply(Answers(false, true)))
             .ShouldBe([(false, SidecarValues.NullableSource.Expression), (true, SidecarValues.NullableSource.Server)]);
-        Nullability(proofs.Apply([true, false]))
+        Nullability(proofs.Apply(Answers(true, false)))
             .ShouldBe([
                 (false, SidecarValues.NullableSource.Expression),
                 (false, SidecarValues.NullableSource.Expression),
@@ -129,7 +129,7 @@ public sealed class ColumnProofsTests
         var proofs = Read(sql, ExpressionRow(1, "y"));
 
         proofs.OperandsSql.ShouldBeNull();
-        Nullability(proofs.Apply([true, true])).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+        Nullability(proofs.Apply(Answers(true, true))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
     }
 
     // "offset" is no reserved word either, and an alias so named stays in the FROM, whose rows the operand is asked
@@ -145,6 +145,44 @@ public sealed class ColumnProofsTests
         proofs.OperandsSql.ShouldBe(
             "SELECT x\nAS [1]\nFROM dbo.users offset RIGHT JOIN dbo.orders AS o ON o.user_id = id"
         );
+    }
+
+    // A column whose own row is of a CLR type gets no proof of its expression: a string converted to the type may be
+    // its Null, as N'NULL' to geometry is.
+    [Theory]
+    [InlineData("SELECT COALESCE(shape, N'NULL') AS g FROM dbo.shapes")]
+    [InlineData("SELECT COALESCE(shape, (SELECT COUNT(*) FROM dbo.shapes)) AS g FROM dbo.shapes")]
+    public void Read_ColumnOfAClrType_ProvesNothing(string sql)
+    {
+        var proofs = Read(
+            sql,
+            ExpressionRow(1, "g") with
+            {
+                SystemTypeName = "geometry",
+                MaxLength = -1,
+                Precision = 0,
+                UserTypeSchema = "sys",
+                UserTypeName = "geometry",
+                AssemblyQualifiedTypeName = "Microsoft.SqlServer.Types.SqlGeometry, Microsoft.SqlServer.Types",
+            }
+        );
+
+        proofs.OperandsSql.ShouldBeNull();
+        Nullability(proofs.Apply(Answers(true))).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // COALESCE converts each argument to the type of highest precedence, which a CLR type has: an operand answered of
+    // a CLR type proves nothing, however the column's row is typed, and one of no CLR type proves it with the literal.
+    [Fact]
+    public void Apply_OperandOfAClrType_StaysNullable()
+    {
+        var proofs = Read("SELECT COALESCE(nickname, N'NULL') AS shown FROM dbo.users", ExpressionRow(1, "shown"));
+
+        proofs.OperandsSql.ShouldBe("SELECT nickname\nAS [1]\nFROM dbo.users");
+        Nullability(proofs.Apply([new OperandFacts(NotNull: true, NotClr: false)]))
+            .ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+        Nullability(proofs.Apply(Answers(false))).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
+        Nullability(proofs.Apply(null)).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
     }
 
     // A column the server answers not null needs no proof, and asks nothing.

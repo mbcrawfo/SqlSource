@@ -66,6 +66,9 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
             { NewFunctions, "SELECT JSON_ARRAY(b) AS c FROM dbo.proof_rows" },
             { NewFunctions, "SELECT GREATEST(b, a) AS c FROM dbo.proof_rows" },
             { NewFunctions, "SELECT LEAST(g, b, a) AS c FROM dbo.proof_rows" },
+            // Conversions to built-in types that are no CLR type, sysname an alias of nvarchar(128) among them.
+            { 0, "SELECT CAST(a AS sysname) AS c FROM dbo.proof_rows" },
+            { 0, "SELECT COALESCE(CAST(b AS nvarchar(20)), N'none') AS c FROM dbo.proof_rows" },
         };
 
     // The queries that try to break a proof, with the major they need, each NULL in some row: the design's list, then
@@ -146,6 +149,14 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
                 "SELECT a + 1 AS c FROM dbo.proof_rows offset "
                     + "RIGHT JOIN dbo.proof_other AS o ON o.rows_id = a / 10"
             },
+            // A CLR type's Parse answers its Null for the string 'NULL', whatever its case, so a conversion to
+            // geometry or geography of a value that is not null, and a COALESCE over a geometry, whose literal is
+            // converted to it, can be NULL.
+            { 0, "SELECT CAST(wkt AS geometry) AS c FROM dbo.proof_shapes" },
+            { 0, "SELECT CONVERT(geography, wkt) AS c FROM dbo.proof_shapes" },
+            { 0, "SELECT CAST(N'NULL' AS geometry) AS c FROM dbo.proof_shapes" },
+            { 0, "SELECT COALESCE(shape, 'NULL') AS c FROM dbo.proof_shapes" },
+            { 0, "SELECT CAST(COALESCE(shape, 'NULL') AS varbinary(max)) AS c FROM dbo.proof_shapes" },
         };
 
     [Theory]
@@ -231,15 +242,20 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
         });
 
     // Design fact 1, the assumption of decision 5: with ANSI_WARNINGS and ARITHABORT off, a conversion overflow, a
-    // SUM of two ints over one group and an int's arithmetic that overflow are NULL; with ANSI_WARNINGS on, whatever
-    // ARITHABORT says, and as SqlClient connects, each is an error.  The settings are made on a connection of the
-    // test's own, outside the pool, so that no other test reads them.
+    // SUM of two ints over one group and an int's arithmetic that overflow are NULL, and so are COALESCE, GREATEST
+    // and LEAST whose one argument that is not NULL overflows the conversion to their type; with ANSI_WARNINGS on,
+    // whatever ARITHABORT says, and as SqlClient connects, each is an error.  The settings are made on a connection of
+    // the test's own, outside the pool, so that no other test reads them.
     [Theory]
-    [InlineData("SELECT CAST(300 AS tinyint)", 220)]
-    [InlineData("SELECT SUM(x) FROM (VALUES (1, 2147483647), (1, 2147483647)) AS v (g, x) GROUP BY g", 8115)]
-    [InlineData("SELECT x + 1 FROM (VALUES (2147483647)) AS v (x)", 8115)]
-    public async Task Set_AnsiWarningsOff_OverflowIsNull(string sql, int error)
+    [InlineData(0, "SELECT CAST(300 AS tinyint)", 220)]
+    [InlineData(0, "SELECT SUM(x) FROM (VALUES (1, 2147483647), (1, 2147483647)) AS v (g, x) GROUP BY g", 8115)]
+    [InlineData(0, "SELECT x + 1 FROM (VALUES (2147483647)) AS v (x)", 8115)]
+    [InlineData(0, "SELECT COALESCE(CAST(NULL AS datetime), 1e10)", 8115)]
+    [InlineData(NewFunctions, "SELECT GREATEST(CAST(NULL AS datetime), 1e10)", 8115)]
+    [InlineData(NewFunctions, "SELECT LEAST(CAST(NULL AS datetime), 1e10)", 8115)]
+    public async Task Set_AnsiWarningsOff_OverflowIsNull(int major, string sql, int error)
     {
+        sqlServer.SkipBelow(major, NewFunctionsReason);
         (await UnpooledScalarAsync($"SET ANSI_WARNINGS OFF; SET ARITHABORT OFF; {sql}")).ShouldBe(DBNull.Value);
 
         (
@@ -252,7 +268,8 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
 
     // The tables of the proofs and their rows, made for the body and dropped after it.  g and b are NULL in some rows
     // and a in none; proof_other and proof_computed find no row for the rows 3 to 5 of proof_rows.  dbo.COUNT is a
-    // user's function that is NULL for every row, which a bare COUNT never calls.
+    // user's function that is NULL for every row, which a bare COUNT never calls.  proof_shapes holds a point and
+    // two rows whose wkt, never NULL, is the text that geometry and geography parse as their Null.
     private async Task WithRowsAsync(Func<Task> body)
     {
         await DropAsync();
@@ -275,6 +292,15 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
             );
             await sqlServer.ExecuteAsync("INSERT INTO dbo.proof_computed (id) VALUES (1), (2)");
             await sqlServer.ExecuteAsync(
+                "CREATE TABLE dbo.proof_shapes "
+                    + "(id int NOT NULL PRIMARY KEY, wkt nvarchar(100) NOT NULL, shape geometry NULL)"
+            );
+            await sqlServer.ExecuteAsync(
+                "INSERT INTO dbo.proof_shapes (id, wkt, shape) "
+                    + "VALUES (1, N'POINT (1 2)', geometry::Parse('POINT (1 2)')), "
+                    + "(2, N'NULL', NULL), (3, N'Null', NULL)"
+            );
+            await sqlServer.ExecuteAsync(
                 "CREATE FUNCTION dbo.[COUNT] (@x int) RETURNS int AS BEGIN RETURN NULLIF(@x, @x) END"
             );
             await body();
@@ -288,7 +314,7 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
     private Task DropAsync() =>
         sqlServer.ExecuteAsync(
             "DROP FUNCTION IF EXISTS dbo.[COUNT]; "
-                + "DROP TABLE IF EXISTS dbo.proof_computed, dbo.proof_other, dbo.proof_rows"
+                + "DROP TABLE IF EXISTS dbo.proof_shapes, dbo.proof_computed, dbo.proof_other, dbo.proof_rows"
         );
 
     // The query's one column, described in a session of its own, must be as expected.

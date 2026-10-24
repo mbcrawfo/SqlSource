@@ -61,16 +61,18 @@ internal static class OperandsQuery
     }
 
     /// <summary>
-    /// Whether the server answered each operand not null, by its index; or null when the answer proves none.
+    /// What the server answered of each operand, by its index: whether it is not null, and whether its type is no CLR
+    /// type; or null when the answer proves none.
     /// </summary>
     /// <param name="answer">The answer of <c>operands</c>.</param>
     /// <param name="count">The number of operands the text asked.</param>
     /// <remarks>
     /// The answer proves none when it holds an error or error rows, or its visible rows are not
     /// <paramref name="count" /> rows named <c>1</c> to <paramref name="count" /> in order.  An operand is not null
-    /// only when its row says <c>is_nullable</c> false; a row that cannot say is nullable.
+    /// only when its row says <c>is_nullable</c> false; a row that cannot say is nullable.  Its type is no CLR type
+    /// only when <see cref="SqlServerTypes.MayBeClr" /> says so of its row.
     /// </remarks>
-    public static IReadOnlyList<bool>? NotNullOf(SqlServerColumnsAnswer answer, int count)
+    public static IReadOnlyList<OperandFacts>? AnswersOf(SqlServerColumnsAnswer answer, int count)
     {
         if (answer is not { Error: null, Errors: null or { Count: 0 }, Rows: { } rows })
         {
@@ -92,7 +94,10 @@ internal static class OperandsQuery
             }
         }
 
-        return [.. visible.Select(static row => row.IsNullable == false)];
+        return
+        [
+            .. visible.Select(static row => new OperandFacts(row.IsNullable == false, !SqlServerTypes.MayBeClr(row))),
+        ];
     }
 
     private static string Piece(string sql, IReadOnlyList<TsqlToken> tokens, TokenRange range) =>

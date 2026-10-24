@@ -15,7 +15,8 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// are the visible columns one for one: as many, none a <c>*</c>, and each item's name the server's, compared
 /// ordinally; or whose one item is a <c>*</c> or a <c>q.*</c>, which every visible column is.  One item that does not
 /// agree proves nothing for the whole query, since the reader has misread its select list.  A column the server
-/// answers not null keeps its answer and asks nothing.
+/// answers not null keeps its answer and asks nothing, and so does a column whose row may be of a CLR type
+/// (<see cref="SqlServerTypes.MayBeClr" />), whose expression may convert a string to that type's Null.
 /// </para>
 /// <para>
 /// A column whose row says <see cref="SqlServerColumnRow.PersistedNotNull" /> is proved by the catalog, with the
@@ -103,7 +104,7 @@ internal sealed class ColumnProofs
             {
                 catalog[index] = true;
             }
-            else if (visible[index].IsNullable != false)
+            else if (visible[index].IsNullable != false && !SqlServerTypes.MayBeClr(visible[index]))
             {
                 proofs[index] = expressions.Of(item.Expression);
             }
@@ -124,14 +125,14 @@ internal sealed class ColumnProofs
     /// whose proof holds <c>nullable</c> false with the <c>nullableSource</c> <c>expression</c>, and every other as it
     /// came.
     /// </summary>
-    /// <param name="operandNotNull">
-    /// The answer of <c>operands</c> as <see cref="OperandsQuery.NotNullOf" /> reads it, or null when it was not asked
+    /// <param name="answers">
+    /// The answer of <c>operands</c> as <see cref="OperandsQuery.AnswersOf" /> reads it, or null when it was not asked
     /// or proves nothing: the proofs of the text alone still hold.
     /// </param>
-    public IReadOnlyList<BuiltColumn> Apply(IReadOnlyList<bool>? operandNotNull) =>
+    public IReadOnlyList<BuiltColumn> Apply(IReadOnlyList<OperandFacts>? answers) =>
         [
             .. _columns.Select(
-                (column, index) => SourceOf(index, operandNotNull) is { } source ? NotNull(column, source) : column
+                (column, index) => SourceOf(index, answers) is { } source ? NotNull(column, source) : column
             ),
         ];
 
@@ -158,14 +159,14 @@ internal sealed class ColumnProofs
         row is { PersistedNotNull: true, SourceType: "U" };
 
     // The nullableSource that proves the column in the place not null, or null when nothing does.
-    private string? SourceOf(int index, IReadOnlyList<bool>? operandNotNull)
+    private string? SourceOf(int index, IReadOnlyList<OperandFacts>? answers)
     {
         if (index < _catalog.Count && _catalog[index])
         {
             return SidecarValues.NullableSource.Catalog;
         }
 
-        return index < _proofs.Count && _proofs[index] is { } proof && proof.Holds(operandNotNull)
+        return index < _proofs.Count && _proofs[index] is { } proof && proof.Holds(answers)
             ? SidecarValues.NullableSource.Expression
             : null;
     }

@@ -107,8 +107,8 @@ SQL Server says that a column is never null when no outer join of the query can 
 - **A count**: `COUNT` and `COUNT_BIG`, with or without `OVER (...)`, and a subquery that is a count alone and returns one row, `(SELECT COUNT(*) FROM dbo.orders AS o WHERE o.customer_id = c.id)`, with no `GROUP BY`, `HAVING`, `TOP` or `OFFSET`.  A count is `0` for no rows, never null.
 - **A rank**: `ROW_NUMBER()`, `RANK()` and `DENSE_RANK()`, and `NTILE` of a whole number, `NTILE(4)`, with `OVER (...)`.
 - **`SUM`, `MAX` and `MIN` of a value that is never null**, in a query with a `GROUP BY`, `ROLLUP`, `CUBE` and `GROUPING SETS` included, whose every group has a row; or with `OVER (...)` whose frame holds the current row, as the frame does when the window gives none.
-- **`COALESCE`, `GREATEST` and `LEAST`** with an argument that is never null.
-- **`CAST` and `CONVERT` of a value that is never null**, `CONVERT`'s style, when it has one, a whole number written in the query.  `TRY_CAST` and `TRY_CONVERT` are possibly null.
+- **`COALESCE`, `GREATEST` and `LEAST`** with an argument that is never null, and none of a spatial, `hierarchyid` or other .NET type.
+- **`CAST` and `CONVERT` of a value that is never null to a built-in type**, such as `int`, `decimal(10, 2)`, `nvarchar(max)` or `datetime2`, written as SQL Server names it, `CONVERT`'s style, when it has one, a whole number written in the query.  `TRY_CAST` and `TRY_CONVERT` are possibly null.
 - **Arithmetic of values that are never null**: `+`, `-`, `*`, `/` and `%`, as in `SUM(quantity * unit_price)`.
 - **`JSON_OBJECT` and `JSON_ARRAY`**, on SQL Server 2022 and later.
 - **A computed column declared `PERSISTED NOT NULL`**, read from its table alone: the query's `FROM` names that one table and nothing else, the column is an item of its own or the query is `SELECT *` from that table, and there is no `ROLLUP`, `CUBE` or `GROUPING SETS`.
@@ -125,6 +125,7 @@ SqlSource treats these as possibly null, though some of them never are:
 - **A `CASE` whose `ELSE` is the column it tests for null**, `CASE WHEN x IS NULL THEN 0 ELSE x END`.  Write `ISNULL(x, 0)`, which is never null.
 - **A column that a filter keeps from being null**, such as a column that can hold null under `WHERE x IS NOT NULL`, or the optional side of a `LEFT JOIN` that the `WHERE` makes inner.
 - **A column of a query that is not one `SELECT`**: the `OUTPUT` of an `INSERT`, `UPDATE`, `DELETE` or `MERGE`, a `UNION`, `INTERSECT` or `EXCEPT`, `FOR XML` or `FOR JSON`, and several statements in one query keep SQL Server's answer, so a count or a sum there is possibly null.
+- **A conversion to `geometry`, `geography`, `hierarchyid` or another .NET type, or `COALESCE`, `GREATEST` or `LEAST` over a value of one**, since SQL Server can convert the text `'NULL'` to such a type as null: `CAST(N'NULL' AS geometry)` and `COALESCE(shape, 'NULL')` are null.
 - **A column of a query that uses `window` as a name**, an alias or a column without brackets, as in `FROM dbo.panes window`, keeps SQL Server's answer.  Write `[window]`.
 
 A column that can be null gets a nullable property in the query's [output model](#models), `int?` or `string?`, and a column that is never null a property that cannot be null, `int` or `string`.  Where you know better, you decide instead: a `-- column:` marker says that a column is never null, or can be, and leaves its name alone, and so does an alias that ends in `!` or `?`.

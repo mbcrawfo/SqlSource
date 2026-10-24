@@ -3,6 +3,7 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Tool.Describing.SqlServer.Proofs;
 using Xunit;
+using static SqlSource.Tool.Tests.SqlServerScript;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer.Proofs;
 
@@ -43,6 +44,7 @@ public sealed class ExpressionProofsTests
     // leaves below each stand inside COALESCE(..., NULL), since an item that is a leaf alone asks nothing.
     [InlineData("COALESCE((SELECT TOP (1) o.x FROM o), NULL)", "", true, false, "(SELECT TOP (1) o.x FROM o)")]
     [InlineData("COALESCE((SELECT MAX(o.x) FROM o), NULL)", "", false, false, "")]
+    [InlineData("COALESCE((SELECT COUNT(*) FROM o WHERE o.c = t.id), 0)", "", true, true, "")]
     [InlineData(
         "COALESCE(CASE WHEN EXISTS (SELECT 1 FROM o WHERE o.c = t.id) THEN 1 ELSE 0 END, NULL)",
         "",
@@ -136,17 +138,28 @@ public sealed class ExpressionProofsTests
     [InlineData("SUM(SUM(t.a)) OVER ()", "GROUP BY t.b", true, false, "t.a")]
     [InlineData("SUM(SUM(t.a)) OVER ()", "GROUP BY ROLLUP (t.b)", true, false, "t.a")]
     [InlineData("SUM(COUNT(*)) OVER (PARTITION BY t.b)", "GROUP BY t.b", true, true, "")]
-    // COALESCE, GREATEST and LEAST: one argument proved.
+    // COALESCE, GREATEST and LEAST: one argument proved, and every argument of a type that is no CLR type, which is
+    // asked of each that is not a literal, in any context, a parameter's and a grouping set's included.
     [InlineData("COALESCE(t.a, t.b)", "", true, false, "t.a|t.b")]
-    [InlineData("COALESCE(t.a, 0)", "", true, true, "")]
-    [InlineData("COALESCE(t.a, NULL, @p)", "", true, false, "t.a")]
+    [InlineData("COALESCE(t.a, 0)", "", true, true, "t.a")]
+    [InlineData("COALESCE(t.a, NULL, @p)", "", true, false, "t.a|@p")]
     [InlineData("COALESCE(t.a, t.b)", "GROUP BY ROLLUP (t.a, t.b)", false, false, "")]
-    [InlineData("COALESCE(t.a, 0)", "GROUP BY ROLLUP (t.a)", true, true, "")]
-    [InlineData("COALESCE(MAX(t.a), 0)", "", true, true, "")]
+    [InlineData("COALESCE(t.a, 0)", "GROUP BY ROLLUP (t.a)", true, true, "t.a")]
+    [InlineData("COALESCE(MAX(t.a), 0)", "", true, true, "t.a")]
     [InlineData("COALESCE(NULL, @p)", "", false, false, "")]
     [InlineData("GREATEST(t.a, t.b)", "", true, false, "t.a|t.b")]
-    [InlineData("LEAST(t.a, 1)", "", true, true, "")]
+    [InlineData("LEAST(t.a, 1)", "", true, true, "t.a")]
+    [InlineData("GREATEST(t.a, @p)", "", true, false, "t.a|@p")]
     [InlineData("GREATEST(@p, NULL)", "", false, false, "")]
+    // An argument whose type is known from its form asks nothing; one whose type cannot be asked proves nothing.
+    [InlineData("COALESCE(CAST(t.a AS int), 0)", "", true, true, "")]
+    [InlineData("COALESCE(SUM(t.a), 0)", "GROUP BY t.b", true, true, "")]
+    [InlineData("COALESCE(JSON_OBJECT('a': t.a), N'')", "", true, true, "")]
+    [InlineData("COALESCE(t.a * 2, 0)", "", true, true, "t.a")]
+    [InlineData("COALESCE(dbo.f(t.a), 0)", "", false, false, "")]
+    [InlineData("COALESCE(MAX(dbo.f(t.a)), 0)", "GROUP BY t.b", false, false, "")]
+    [InlineData("COALESCE(LAG(t.a) OVER (ORDER BY t.id), 0)", "", false, false, "")]
+    [InlineData("COALESCE(CAST(t.a AS geometry), 0)", "", false, false, "")]
     // CAST and CONVERT: the operand proved, and CONVERT's style an integer literal.
     [InlineData(
         "CAST(CASE WHEN t.a > 1 THEN 1 ELSE 0 END AS bit)",
@@ -175,7 +188,7 @@ public sealed class ExpressionProofsTests
     // Arithmetic: every operand proved.
     [InlineData("t.a * t.b", "", true, false, "t.a|t.b")]
     [InlineData("(t.a + t.b) % 2", "", true, false, "t.a|t.b")]
-    [InlineData("COALESCE(p.name + N' > ', N'') + t.name", "", true, false, "t.name")]
+    [InlineData("COALESCE(p.name + N' > ', N'') + t.name", "", true, false, "p.name|t.name")]
     [InlineData("-t.a", "", true, false, "t.a")]
     [InlineData("~t.a - -1", "", true, false, "t.a")]
     [InlineData("t.a + NULL", "", false, false, "")]
@@ -185,7 +198,7 @@ public sealed class ExpressionProofsTests
     [InlineData("t.b + SUM(t.a)", "GROUP BY ROLLUP (t.b)", false, false, "")]
     [InlineData("(SELECT COUNT(*) FROM o) + t.a", "", true, false, "t.a")]
     // The forms nest, each operand in its own context.
-    [InlineData("COALESCE(CAST(SUM(t.a) AS int), t.b)", "GROUP BY ROLLUP (t.b)", true, false, "t.a")]
+    [InlineData("COALESCE(CAST(SUM(t.a) AS int), t.b)", "GROUP BY ROLLUP (t.b)", true, false, "t.a|t.b")]
     [InlineData("SUM(t.a)", "GROUP BY t.b HAVING SUM(t.a) > 0", true, false, "t.a")]
     [InlineData("NTILE(4) OVER (ORDER BY t.b)", "GROUP BY ROLLUP (t.b)", true, true, "")]
     [InlineData("COUNT(*) WITHIN GROUP (ORDER BY t.a)", "", false, false, "")]
@@ -262,6 +275,95 @@ public sealed class ExpressionProofsTests
         asked.ShouldBe(operands);
     }
 
+    // A string converted to a CLR type may be its Null: with every operand answered not null but of a CLR type, none
+    // of these is proved, and each is with every operand of no CLR type.
+    [Theory]
+    [InlineData("COALESCE(t.s, 'NULL')", "")]
+    [InlineData("COALESCE(t.a, t.b)", "")]
+    [InlineData("GREATEST(t.h, 'NULL')", "")]
+    [InlineData("LEAST(t.a, 1)", "")]
+    [InlineData("COALESCE(@p, 'NULL')", "")]
+    [InlineData("COALESCE(t.a, 0)", "GROUP BY ROLLUP (t.a)")]
+    [InlineData("COALESCE(MAX(t.a), 0)", "GROUP BY t.b")]
+    [InlineData("COALESCE(MIN(t.s) OVER (), 'NULL')", "")]
+    [InlineData("COALESCE((t.s), N'NULL')", "")]
+    [InlineData("COALESCE(-t.a, 0)", "")]
+    [InlineData("COALESCE(t.a + t.b, 0)", "")]
+    [InlineData("COALESCE(CASE WHEN t.a > 0 THEN t.s END, 'NULL')", "")]
+    [InlineData("COALESCE(ISNULL(t.s, 'x'), 'NULL')", "")]
+    [InlineData("COALESCE((SELECT TOP (1) o.s FROM o), 'NULL')", "")]
+    [InlineData("CAST(COALESCE(t.s, 'NULL') AS varbinary(max))", "")]
+    [InlineData("COALESCE(COALESCE(t.s, 'NULL'), 'x')", "")]
+    // A CLR type's conversion to a string is its ToString, which a user's type may answer null.
+    [InlineData("CAST(t.s AS nvarchar(100))", "")]
+    [InlineData("CONVERT(varbinary(max), t.s)", "")]
+    public void Of_OperandOfAClrType_IsNotProved(string item, string tail)
+    {
+        var (sql, tokens, proofs, body) = Read($"SELECT {item} AS c FROM t AS t {tail}");
+        var proof = proofs.Of(body.Items.ShouldHaveSingleItem().Expression);
+
+        var count = proofs.Operands.Count;
+        count.ShouldBeGreaterThan(0, Texts(sql, tokens, proofs.Operands));
+        proof.Holds([.. Enumerable.Repeat(new OperandFacts(NotNull: true, NotClr: true), count)]).ShouldBeTrue();
+        proof.Holds([.. Enumerable.Repeat(new OperandFacts(NotNull: true, NotClr: false), count)]).ShouldBeFalse();
+    }
+
+    // CAST and CONVERT prove only to a built-in type that is no CLR type, written as one word, with or without its
+    // facets: a CLR type's Parse may answer its Null for a string such as 'NULL'.
+    [Theory]
+    [InlineData("int", true)]
+    [InlineData("BIGINT", true)]
+    [InlineData("sysname", true)]
+    [InlineData("nvarchar(max)", true)]
+    [InlineData("nvarchar(40)", true)]
+    [InlineData("decimal(10, 2)", true)]
+    [InlineData("float(53)", true)]
+    [InlineData("datetime2(7)", true)]
+    [InlineData("date", true)]
+    [InlineData("varbinary(MAX)", true)]
+    [InlineData("uniqueidentifier", true)]
+    [InlineData("xml", true)]
+    [InlineData("sql_variant", true)]
+    [InlineData("geometry", false)]
+    [InlineData("geography", false)]
+    [InlineData("hierarchyid", false)]
+    [InlineData("dbo.Point", false)]
+    [InlineData("sys.geometry", false)]
+    [InlineData("[int]", false)]
+    [InlineData("Point", false)]
+    [InlineData("json", false)]
+    [InlineData("vector(3)", false)]
+    [InlineData("integer", false)]
+    [InlineData("double precision", false)]
+    [InlineData("varchar(10, 2, 3)", false)]
+    [InlineData("varchar(@n)", false)]
+    [InlineData("varchar(-1)", false)]
+    [InlineData("varchar(1.5)", false)]
+    [InlineData("varchar 10", false)]
+    [InlineData("xml(CONTENT dbo.s)", false)]
+    public void Of_CastTarget_ProvedOnlyForABuiltInType(string target, bool proved)
+    {
+        foreach (var item in (string[])[$"CAST(t.a AS {target})", $"CONVERT({target}, t.a)", $"CAST(1 AS {target})"])
+        {
+            var (_, _, proofs, body) = Read($"SELECT {item} AS c FROM t AS t");
+            var proof = proofs.Of(body.Items.ShouldHaveSingleItem().Expression);
+
+            proof.Holds(Answers([.. Enumerable.Repeat(true, proofs.Operands.Count)])).ShouldBe(proved, item);
+        }
+    }
+
+    [Theory]
+    [InlineData("CAST(N'NULL' AS geometry)")]
+    [InlineData("CONVERT(geography, N'POINT (1 2)')")]
+    [InlineData("CAST(0x00 AS dbo.Point)")]
+    public void Of_LiteralCastToAClrType_IsNotProved(string item)
+    {
+        var (_, _, proofs, body) = Read($"SELECT {item} AS c FROM t AS t");
+
+        proofs.Of(body.Items.ShouldHaveSingleItem().Expression).Holds(null).ShouldBeFalse();
+        proofs.Operands.ShouldBeEmpty();
+    }
+
     [Fact]
     public void Operands_SameRangeTwice_AskedOnce()
     {
@@ -270,8 +372,8 @@ public sealed class ExpressionProofsTests
         var proof = proofs.Of(body.Items[0].Expression);
 
         Texts(sql, tokens, proofs.Operands).ShouldBe("t.a");
-        proof.Holds([true]).ShouldBeTrue();
-        proof.Holds([false]).ShouldBeFalse();
+        proof.Holds(Answers(true)).ShouldBeTrue();
+        proof.Holds(Answers(false)).ShouldBeFalse();
     }
 
     // The operands of every item of a select are one list, in order of first use, and an item's proof indexes it.
@@ -284,9 +386,9 @@ public sealed class ExpressionProofsTests
         var second = proofs.Of(body.Items[1].Expression);
 
         Texts(sql, tokens, proofs.Operands).ShouldBe("t.b|t.a");
-        second.Holds([false, true]).ShouldBeTrue();
-        second.Holds([true, false]).ShouldBeFalse();
-        first.Holds([false, true]).ShouldBeTrue();
+        second.Holds(Answers(false, true)).ShouldBeTrue();
+        second.Holds(Answers(true, false)).ShouldBeFalse();
+        first.Holds(Answers(false, true)).ShouldBeTrue();
     }
 
     [Fact]
@@ -298,7 +400,7 @@ public sealed class ExpressionProofsTests
 
         Texts(sql, tokens, proofs.Operands).ShouldBe("t.a|t.b");
         proof.Holds(null).ShouldBeFalse();
-        proof.Holds([false, true]).ShouldBeTrue();
+        proof.Holds(Answers(false, true)).ShouldBeTrue();
     }
 
     [Fact]
@@ -321,8 +423,8 @@ public sealed class ExpressionProofsTests
 
         var count = proofs.Operands.Count;
         return (
-            proof.Holds([.. Enumerable.Repeat(true, count)]),
-            proof.Holds([.. Enumerable.Repeat(false, count)]),
+            proof.Holds(Answers([.. Enumerable.Repeat(true, count)])),
+            proof.Holds(Answers([.. Enumerable.Repeat(false, count)])),
             Texts(sql, tokens, proofs.Operands)
         );
     }

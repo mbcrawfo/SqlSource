@@ -55,7 +55,7 @@ public sealed class OperandsQueryTests
 
     // The hidden row of browse mode 2 is no operand's.
     [Fact]
-    public void NotNullOf_Rows_EachOperandsAnswer()
+    public void AnswersOf_Rows_EachOperandsAnswer()
     {
         var answer = new SqlServerColumnsAnswer(
             [OperandRow(1, nullable: false), OperandRow(2, nullable: true), Rowstat with { ColumnOrdinal = 3 }],
@@ -63,16 +63,53 @@ public sealed class OperandsQueryTests
             null
         );
 
-        OperandsQuery.NotNullOf(answer, 2).ShouldBe([true, false]);
+        OperandsQuery.AnswersOf(answer, 2).ShouldBe(Answers(true, false));
     }
 
     // The server could not say: the operand is not proved.
     [Fact]
-    public void NotNullOf_NullabilityUnknown_IsNotNotNull()
+    public void AnswersOf_NullabilityUnknown_IsNotNotNull()
     {
         var answer = new SqlServerColumnsAnswer([OperandRow(1, nullable: null)], null, null);
 
-        OperandsQuery.NotNullOf(answer, 1).ShouldBe([false]);
+        OperandsQuery.AnswersOf(answer, 1).ShouldBe(Answers(false));
+    }
+
+    // A CLR type, by its assembly or by the name of one of the system's, and a row of no type, may be a CLR type,
+    // whatever the operand's nullability; an alias type such as sysname is none.
+    [Theory]
+    [InlineData(
+        "geometry",
+        "sys",
+        "geometry",
+        "Microsoft.SqlServer.Types.SqlGeometry, Microsoft.SqlServer.Types",
+        false
+    )]
+    [InlineData("dbo.Point", "dbo", "Point", "Shapes.Point, Shapes", false)]
+    [InlineData("geography", null, null, null, false)]
+    [InlineData("HierarchyId", null, null, null, false)]
+    [InlineData(null, null, null, null, false)]
+    [InlineData("nvarchar(128)", "sys", "sysname", null, true)]
+    [InlineData("int", null, null, null, true)]
+    public void AnswersOf_Type_NotClrAsTheRowSays(
+        string? systemType,
+        string? userSchema,
+        string? userName,
+        string? assembly,
+        bool notClr
+    )
+    {
+        var row = OperandRow(1, nullable: false) with
+        {
+            SystemTypeName = systemType,
+            UserTypeSchema = userSchema,
+            UserTypeName = userName,
+            AssemblyQualifiedTypeName = assembly,
+        };
+
+        OperandsQuery
+            .AnswersOf(new SqlServerColumnsAnswer([row], null, null), 1)
+            .ShouldBe([new OperandFacts(NotNull: true, notClr)]);
     }
 
     // Each answer that proves no operand of two, by why.
@@ -111,7 +148,7 @@ public sealed class OperandsQueryTests
     [InlineData("three rows for two operands")]
     [InlineData("rows named out of order")]
     [InlineData("a row of another name")]
-    public void NotNullOf_Unusable_IsNull(string why) => OperandsQuery.NotNullOf(Unusable[why], 2).ShouldBeNull(why);
+    public void AnswersOf_Unusable_IsNull(string why) => OperandsQuery.AnswersOf(Unusable[why], 2).ShouldBeNull(why);
 
     // The tokens and the statement of the SQL, and the operands its one item's proof asks.
     private static (

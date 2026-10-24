@@ -8,6 +8,7 @@ using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Proofs;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
@@ -122,6 +123,11 @@ internal sealed class SqlServerScript
         {
             IsNullable = nullable,
         };
+
+    // The answers of "operands", one for each operand, each of a type that is no CLR type and not null where given
+    // true.
+    public static IReadOnlyList<OperandFacts> Answers(params bool[] notNull) =>
+        [.. notNull.Select(static value => new OperandFacts(value, NotClr: true))];
 
     public SqlServerScript()
     {

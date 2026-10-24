@@ -320,7 +320,7 @@ internal sealed partial class SqlServerSession : DescriberSession
             new SqlServerColumnsRequest(operandsSql, declarations),
             cancellationToken
         );
-        return proofs.Apply(OperandsQuery.NotNullOf(answer, proofs.OperandCount));
+        return proofs.Apply(OperandsQuery.AnswersOf(answer, proofs.OperandCount));
     }
 
     // The table whose column list the columns are, or the first check that failed.  "table" is asked only when every
