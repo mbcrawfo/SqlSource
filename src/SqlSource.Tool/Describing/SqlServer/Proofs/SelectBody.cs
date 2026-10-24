@@ -103,6 +103,13 @@ internal sealed record SelectBody(
     /// <c>INTERSECT</c>, a <c>;</c>, and a word that starts another statement give null.  A <c>FOR</c> that is none
     /// of those three, as <c>FOR SYSTEM_TIME</c>, is part of the clause it stands in.
     /// </para>
+    /// <para>
+    /// Every word that starts a clause is reserved but <c>WINDOW</c>, which may be an alias or a column: a clause read
+    /// from such a name would end the <c>FROM</c> or the <c>GROUP BY</c> before it.  So a <c>WINDOW</c> clause that is
+    /// not <c>WINDOW name AS ( ... ) [, name AS ( ... )]...</c> to its end gives null.  <c>OFFSET</c>, no reserved
+    /// word either, starts no clause: it is looked for only inside the <c>ORDER BY</c>, where a column so named makes
+    /// <see cref="HasOffset" /> true, which proves less.
+    /// </para>
     /// <para>The list is split into items at its commas, and an empty item gives null.</para>
     /// </remarks>
     public static SelectBody? Read(
@@ -140,6 +147,11 @@ internal sealed record SelectBody(
 
         var items = SplitItems(tokens, new TokenRange(at, clauses.Count > 0 ? clauses[0].Start : range.End));
         if (items is null)
+        {
+            return null;
+        }
+
+        if (RangeOf(clauses, Clause.Window) is { } window && !IsWindowClause(tokens, window))
         {
             return null;
         }
@@ -336,6 +348,38 @@ internal sealed record SelectBody(
             "OPTION" => Clause.Option,
             _ => null,
         };
+    }
+
+    // "WINDOW name AS ( ... ) [, name AS ( ... )]..." to the end of the clause.
+    private static bool IsWindowClause(IReadOnlyList<TsqlToken> tokens, TokenRange clause)
+    {
+        var at = clause.Start + 1;
+        while (true)
+        {
+            if (at + 2 >= clause.End || !tokens[at].IsName || !tokens[at + 1].Is("AS") || !tokens[at + 2].IsSymbol("("))
+            {
+                return false;
+            }
+
+            var close = ClosingParenthesis(tokens, at + 2, clause.End);
+            if (close < 0)
+            {
+                return false;
+            }
+
+            at = close + 1;
+            if (at == clause.End)
+            {
+                return true;
+            }
+
+            if (!tokens[at].IsSymbol(","))
+            {
+                return false;
+            }
+
+            at++;
+        }
     }
 
     private static TsqlToken? Next(IReadOnlyList<TsqlToken> tokens, int index, int end) =>

@@ -119,6 +119,34 @@ public sealed class ColumnProofsTests
             .ShouldBe([(false, SidecarValues.NullableSource.Server), (true, SidecarValues.NullableSource.Server)]);
     }
 
+    // "window" is no reserved word: an alias or a column so named is no WINDOW clause, and the query is not read,
+    // since a clause read from it would cut the FROM or the GROUP BY short and ask its operands over other rows.
+    [Theory]
+    [InlineData("SELECT x + 1 AS y FROM dbo.users window RIGHT JOIN dbo.orders AS o ON o.user_id = id")]
+    [InlineData("SELECT CAST(a AS bigint) AS y FROM dbo.w GROUP BY b, window, ROLLUP (a)")]
+    public void Read_WindowAsAName_ProvesNothing(string sql)
+    {
+        var proofs = Read(sql, ExpressionRow(1, "y"));
+
+        proofs.OperandsSql.ShouldBeNull();
+        Nullability(proofs.Apply([true, true])).ShouldBe([(true, SidecarValues.NullableSource.Server)]);
+    }
+
+    // "offset" is no reserved word either, and an alias so named stays in the FROM, whose rows the operand is asked
+    // over: the server answers it over the outer join.
+    [Fact]
+    public void Read_OffsetAsAnAlias_AsksOverTheWholeFrom()
+    {
+        var proofs = Read(
+            "SELECT x + 1 AS y FROM dbo.users offset RIGHT JOIN dbo.orders AS o ON o.user_id = id",
+            ExpressionRow(1, "y")
+        );
+
+        proofs.OperandsSql.ShouldBe(
+            "SELECT x\nAS [1]\nFROM dbo.users offset RIGHT JOIN dbo.orders AS o ON o.user_id = id"
+        );
+    }
+
     // A column the server answers not null needs no proof, and asks nothing.
     [Fact]
     public void Apply_ServerAlreadyNotNull_KeepsServer()
@@ -187,6 +215,9 @@ public sealed class ColumnProofsTests
     [InlineData("SELECT *, 1 AS one FROM dbo.users")]
     [InlineData("SELECT u.*, u.* FROM dbo.users AS u")]
     [InlineData("SELECT u.* FROM dbo.orders AS o LEFT JOIN dbo.users AS u ON u.id = o.user_id")]
+    // An alias named window or offset, neither a reserved word, before an outer join.
+    [InlineData("SELECT id, name_len_p FROM dbo.users window RIGHT JOIN dbo.orders AS o ON o.user_id = window.id")]
+    [InlineData("SELECT id, name_len_p FROM dbo.users offset RIGHT JOIN dbo.orders AS o ON o.user_id = offset.id")]
     public void Apply_PersistedNotNull_StaysNullable(string sql)
     {
         var proofs = Read(sql, IdColumn, PersistedColumn(2));

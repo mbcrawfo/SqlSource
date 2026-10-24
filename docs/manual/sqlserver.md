@@ -125,6 +125,7 @@ SqlSource treats these as possibly null, though some of them never are:
 - **A `CASE` whose `ELSE` is the column it tests for null**, `CASE WHEN x IS NULL THEN 0 ELSE x END`.  Write `ISNULL(x, 0)`, which is never null.
 - **A column that a filter keeps from being null**, such as a column that can hold null under `WHERE x IS NOT NULL`, or the optional side of a `LEFT JOIN` that the `WHERE` makes inner.
 - **A column of a query that is not one `SELECT`**: the `OUTPUT` of an `INSERT`, `UPDATE`, `DELETE` or `MERGE`, a `UNION`, `INTERSECT` or `EXCEPT`, `FOR XML` or `FOR JSON`, and several statements in one query keep SQL Server's answer, so a count or a sum there is possibly null.
+- **A column of a query that uses `window` as a name**, an alias or a column without brackets, as in `FROM dbo.panes window`, keeps SQL Server's answer.  Write `[window]`.
 
 A column that can be null gets a nullable property in the query's [output model](#models), `int?` or `string?`, and a column that is never null a property that cannot be null, `int` or `string`.  Where you know better, you decide instead: a `-- column:` marker says that a column is never null, or can be, and leaves its name alone, and so does an alias that ends in `!` or `?`.
 

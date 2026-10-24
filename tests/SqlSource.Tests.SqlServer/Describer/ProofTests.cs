@@ -129,6 +129,23 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
                 "SELECT SUM(a) OVER (w ROWS BETWEEN 1 FOLLOWING AND 2 FOLLOWING) AS c FROM dbo.proof_rows "
                     + "WINDOW w AS (ORDER BY id)"
             },
+            // WINDOW and OFFSET are no reserved words: an alias or a column so named before an outer join or a
+            // ROLLUP must not cut the FROM or the GROUP BY short.
+            {
+                0,
+                "SELECT a + 1 AS c FROM dbo.proof_rows window "
+                    + "RIGHT JOIN dbo.proof_other AS o ON o.rows_id = a / 10"
+            },
+            {
+                0,
+                "SELECT CAST(a AS bigint) AS c FROM (SELECT a, b, g AS window FROM dbo.proof_rows) AS r "
+                    + "GROUP BY b, window, ROLLUP (a)"
+            },
+            {
+                0,
+                "SELECT a + 1 AS c FROM dbo.proof_rows offset "
+                    + "RIGHT JOIN dbo.proof_other AS o ON o.rows_id = a / 10"
+            },
         };
 
     [Theory]
@@ -175,6 +192,16 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
             var rolledUp = "SELECT c FROM dbo.proof_computed GROUP BY ROLLUP (c)";
             await ShouldDescribeColumnAsync(rolledUp, true, SidecarValues.NullableSource.Server);
             (await NullRowsAsync(rolledUp)).ShouldBeGreaterThan(0);
+
+            // WINDOW and OFFSET are no reserved words, so an alias so named is no clause that ends the FROM.  The join
+            // names the alias no second time, which the reader would refuse as a clause that comes twice.
+            foreach (var alias in (string[])["window", "offset"])
+            {
+                var aliased =
+                    $"SELECT c FROM dbo.proof_computed {alias} RIGHT JOIN dbo.proof_rows AS r ON r.id = c / 2";
+                await ShouldDescribeColumnAsync(aliased, true, SidecarValues.NullableSource.Server);
+                (await NullRowsAsync(aliased)).ShouldBeGreaterThan(0);
+            }
         });
 
     // NTILE of a parameter proves nothing: run with @n NULL it raises error 4116 (design fact 7), so there is no NULL

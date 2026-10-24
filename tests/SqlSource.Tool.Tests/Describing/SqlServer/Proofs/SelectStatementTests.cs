@@ -249,6 +249,71 @@ public sealed class SelectStatementTests
     [InlineData("SELECT TOP a FROM t")]
     public void Read_Refused_IsNull(string sql) => Read(sql).Statement.ShouldBeNull();
 
+    // WINDOW is no reserved word, so "window" may be an alias or a column.  A WINDOW clause is only
+    // "WINDOW name AS ( ... ) [, name AS ( ... )]..."; any other "window" of the select's level gives null, since a
+    // clause read from it would cut the FROM or the GROUP BY short.
+    [Theory]
+    [InlineData("SELECT c2 FROM dbo.t window RIGHT JOIN dbo.u AS o ON o.uid = id")]
+    [InlineData("SELECT x + 1 AS y FROM dbo.t window RIGHT JOIN dbo.u AS o ON o.uid = id")]
+    [InlineData("SELECT CAST(a AS bigint) AS c FROM dbo.w GROUP BY b, window, ROLLUP (a)")]
+    [InlineData("SELECT a FROM t window")]
+    [InlineData("SELECT a FROM t WHERE a = window")]
+    [InlineData("SELECT a FROM t GROUP BY window HAVING COUNT(*) > 1")]
+    [InlineData("SELECT a FROM t ORDER BY window")]
+    [InlineData("SELECT window FROM t")]
+    [InlineData("SELECT a FROM t WINDOW w (ORDER BY a)")]
+    [InlineData("SELECT a FROM t WINDOW w AS ORDER BY a")]
+    [InlineData("SELECT a FROM t WINDOW w AS (ORDER BY a) x")]
+    [InlineData("SELECT a FROM t WINDOW w AS (ORDER BY a),")]
+    [InlineData("SELECT a FROM t WINDOW w AS (ORDER BY a) v AS (w)")]
+    [InlineData("SELECT a FROM t WINDOW @w AS (ORDER BY a)")]
+    [InlineData("SELECT a FROM t WINDOW")]
+    public void Read_WindowWordNotAWindowClause_IsNull(string sql) => Read(sql).Statement.ShouldBeNull();
+
+    [Theory]
+    [InlineData("SELECT a FROM t WINDOW w AS (ORDER BY a)")]
+    [InlineData("SELECT a FROM t window w AS (PARTITION BY a), [v] AS (w ORDER BY a) ORDER BY a")]
+    [InlineData("SELECT a FROM t WINDOW w AS ()")]
+    public void Read_WindowClause_IsRead(string sql) =>
+        Text(Read(sql).Tokens, Read(sql).Statement.ShouldNotBeNull().Body.FromThroughWhere.ShouldNotBeNull())
+            .ShouldBe("FROM t");
+
+    // A quoted [window] is a name, never the clause.
+    [Fact]
+    public void Read_QuotedWindowAlias_IsPartOfTheFrom()
+    {
+        var (tokens, statement) = Read("SELECT c2 FROM dbo.t [window] RIGHT JOIN dbo.u AS o ON o.uid = id");
+
+        var body = statement.ShouldNotBeNull().Body;
+        Text(tokens, body.FromThroughWhere.ShouldNotBeNull())
+            .ShouldBe("FROM dbo . t [window] RIGHT JOIN dbo . u AS o ON o . uid = id");
+        body.IsOneTable.ShouldBeFalse();
+    }
+
+    // OFFSET is no reserved word either, but it never starts a clause here: it is looked for only inside the ORDER BY,
+    // where a column named so makes HasOffset true, which proves less.  An "offset" anywhere else is a name.
+    [Fact]
+    public void Read_OffsetAlias_IsPartOfTheFrom()
+    {
+        var (tokens, statement) = Read("SELECT c2 FROM dbo.t offset RIGHT JOIN dbo.u AS o ON o.uid = id");
+
+        var body = statement.ShouldNotBeNull().Body;
+        Text(tokens, body.FromThroughWhere.ShouldNotBeNull())
+            .ShouldBe("FROM dbo . t offset RIGHT JOIN dbo . u AS o ON o . uid = id");
+        body.IsOneTable.ShouldBeFalse();
+        body.HasOffset.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Read_GroupByOffsetColumn_RollupSeen() =>
+        Read("SELECT a FROM t GROUP BY b, offset, ROLLUP (a)")
+            .Statement.ShouldNotBeNull()
+            .Body.Grouping.ShouldBe(SelectGrouping.Sets);
+
+    [Fact]
+    public void Read_OrderByOffsetColumn_HasOffset() =>
+        Read("SELECT a FROM t ORDER BY offset").Statement.ShouldNotBeNull().Body.HasOffset.ShouldBeTrue();
+
     [Fact]
     public void Read_TrailingSemicolon_IsOneStatement() =>
         Read("SELECT a FROM t;").Statement.ShouldNotBeNull().Body.Items.ShouldHaveSingleItem().Name.ShouldBe("a");
