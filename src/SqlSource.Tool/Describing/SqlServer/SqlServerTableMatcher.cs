@@ -20,9 +20,11 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// The table's column list and each column's nullability are the server's description of <c>SELECT *</c> from it,
 /// the answer of <c>table</c>, and not the catalog's.  So a period column declared <c>HIDDEN</c> is out of the list,
 /// as <c>SELECT *</c> leaves it out; a computed column is in it; and a column is the table's in nullability when it
-/// has what the server says of it read whole.  The server judges a computed column by its expression, so a
-/// <c>PERSISTED NOT NULL</c> one may be nullable in every query, and against the catalog's flag no table with one
-/// would ever match.
+/// has what the describer says of it read whole.  The server judges a computed column by its expression, so it
+/// answers a <c>PERSISTED NOT NULL</c> one nullable; the session gives this match the rows of <c>table</c> as
+/// <c>ColumnProofs.TableRows</c> corrects them, which is how a query of the table alone is corrected.  A query that
+/// reads such a column other than from the table alone, through a join, a derived table or a CTE, or as an item in
+/// parentheses, keeps the server's answer, and so no longer matches the table: it is <c>nullability-differs</c>.
 /// </para>
 /// </remarks>
 internal static class SqlServerTableMatcher

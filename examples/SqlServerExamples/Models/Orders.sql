@@ -19,12 +19,18 @@ ORDER BY placed_at DESC;
 
 -- name: CountShippedOrders
 -- summary: How many orders of each user have shipped.
--- column: shipped not null
 SELECT u.id, COUNT(o.shipped_on) AS shipped
 FROM users AS u
 LEFT JOIN orders AS o ON o.user_id = u.id
 GROUP BY u.id
 ORDER BY u.id;
+
+-- name: ListOrderMonths
+-- summary: Each order with the last day of the month it was placed in.
+-- column: month_end not null
+SELECT id, EOMONTH(placed_at) AS month_end
+FROM orders
+ORDER BY id;
 
 -- name: AddOrder
 -- summary: Places a new order for a user, and returns what the database filled in.

@@ -69,7 +69,8 @@
             "sourceColumn": "id",
             "isIdentityColumn": true,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -90,7 +91,8 @@
             "sourceColumn": "name",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -111,7 +113,8 @@
             "sourceColumn": "email",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -132,7 +135,8 @@
             "sourceColumn": "nickname",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -153,7 +157,8 @@
             "sourceColumn": "credit",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -174,7 +179,8 @@
             "sourceColumn": "created_at",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -195,7 +201,8 @@
             "sourceColumn": "deleted_at",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -216,7 +223,8 @@
             "sourceColumn": "name_len",
             "isIdentityColumn": false,
             "isComputedColumn": true,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -237,7 +245,8 @@
             "sourceColumn": "name_len_p",
             "isIdentityColumn": false,
             "isComputedColumn": true,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": true
           },
           {
             "isHidden": false,
@@ -258,7 +267,8 @@
             "sourceColumn": "rv",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": true,
@@ -279,7 +289,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           }
         ],
         "errors": null,
@@ -313,7 +324,8 @@
             "sourceColumn": "id",
             "isIdentityColumn": true,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -334,7 +346,8 @@
             "sourceColumn": "name",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -355,7 +368,8 @@
             "sourceColumn": "email",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -376,7 +390,8 @@
             "sourceColumn": "nickname",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -397,7 +412,8 @@
             "sourceColumn": "credit",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -418,7 +434,8 @@
             "sourceColumn": "created_at",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -439,7 +456,8 @@
             "sourceColumn": "deleted_at",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -460,7 +478,8 @@
             "sourceColumn": "name_len",
             "isIdentityColumn": false,
             "isComputedColumn": true,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -481,7 +500,8 @@
             "sourceColumn": "name_len_p",
             "isIdentityColumn": false,
             "isComputedColumn": true,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": true
           },
           {
             "isHidden": false,
@@ -502,7 +522,8 @@
             "sourceColumn": "rv",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": true,
@@ -523,7 +544,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           }
         ],
         "errors": null,

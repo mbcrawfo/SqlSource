@@ -230,13 +230,23 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Build_ColumnMarker_MakesTheCountNotNull() =>
+    public void Build_Count_IsNotNullWithoutAMarker() =>
         ShouldBeModel(
             typeof(CountAccountNotesDto),
             $"{Namespace}.CountAccountNotesDto",
             ModelShape.SealedRecord,
             ("Id", typeof(int), false),
             ("NoteCount", typeof(int), false)
+        );
+
+    [Fact]
+    public void Build_ColumnMarker_MakesTheMonthEndNotNull() =>
+        ShouldBeModel(
+            typeof(ListAccountMonthsDto),
+            $"{Namespace}.ListAccountMonthsDto",
+            ModelShape.SealedRecord,
+            ("Id", typeof(int), false),
+            ("MonthEnd", typeof(DateOnly), false)
         );
 
     [Fact]

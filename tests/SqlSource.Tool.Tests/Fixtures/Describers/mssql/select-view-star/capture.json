@@ -80,7 +80,8 @@
             "sourceColumn": "user_id",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "V"
+            "sourceType": "V",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -101,7 +102,8 @@
             "sourceColumn": "name",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "V"
+            "sourceType": "V",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -122,7 +124,8 @@
             "sourceColumn": "order_id",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "V"
+            "sourceType": "V",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -143,7 +146,8 @@
             "sourceColumn": "total",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "V"
+            "sourceType": "V",
+            "persistedNotNull": false
           },
           {
             "isHidden": true,
@@ -164,7 +168,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           }
         ],
         "errors": null,
@@ -198,7 +203,8 @@
             "sourceColumn": "user_id",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "V"
+            "sourceType": "V",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -219,7 +225,8 @@
             "sourceColumn": "name",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "V"
+            "sourceType": "V",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -240,7 +247,8 @@
             "sourceColumn": "order_id",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "V"
+            "sourceType": "V",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -261,7 +269,8 @@
             "sourceColumn": "total",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "V"
+            "sourceType": "V",
+            "persistedNotNull": false
           },
           {
             "isHidden": true,
@@ -282,7 +291,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           }
         ],
         "errors": null,

@@ -199,8 +199,8 @@ public sealed class SqlServerTableMatcherTests
             .ShouldBe((new SidecarTable("dbo", "user_orders"), SidecarValues.TableMatch.Matched));
     }
 
-    // The server judges a computed column by its expression: a PERSISTED NOT NULL one may be nullable in SELECT *
-    // and in the query alike, and the table is still matched.
+    // The server judges a computed column by its expression: one it answers nullable and nothing corrects, as one not
+    // persisted, is nullable in SELECT * and in the query alike, and the table is still matched.
     [Fact]
     public void Match_ComputedNullableInBoth_Matches() =>
         SqlServerTableMatcher

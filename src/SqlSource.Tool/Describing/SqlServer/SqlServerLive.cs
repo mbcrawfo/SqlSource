@@ -63,22 +63,38 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
     // database, the names compared by their code points as SqlServerColumns compares them: OBJECTPROPERTYEX reads the
     // current database whatever OBJECT_ID named, a name of two parts finds sys.databases of the system resource in it,
     // and a linked server's database of the session's name would find a local object of the source's name.
+    // persisted_not_null is the tool's own too: whether the source, under the same condition and a table of sys.tables,
+    // has its column computed PERSISTED NOT NULL in sys.computed_columns, the name compared under the database's
+    // collation, as the server resolves a name.  The server's is_nullable judges the column's expression instead.
     private const string ColumnsSql = """
-        SELECT is_hidden, column_ordinal, name, is_nullable, system_type_name, max_length, precision, scale,
-            user_type_schema, user_type_name, assembly_qualified_type_name, source_server, source_database,
-            source_schema, source_table, source_column, is_identity_column, is_computed_column, error_number,
-            error_type, error_message,
-            RTRIM(CAST(
+        SELECT d.is_hidden, d.column_ordinal, d.name, d.is_nullable, d.system_type_name, d.max_length, d.precision,
+            d.scale, d.user_type_schema, d.user_type_name, d.assembly_qualified_type_name, d.source_server,
+            d.source_database, d.source_schema, d.source_table, d.source_column, d.is_identity_column,
+            d.is_computed_column, d.error_number, d.error_type, d.error_message,
+            RTRIM(CAST(OBJECTPROPERTYEX(s.source_id, 'BaseType') AS nvarchar(2))) AS source_type,
+            CAST(
                 CASE
-                    WHEN source_server IS NULL AND source_database = DB_NAME() COLLATE Latin1_General_BIN2
-                    THEN OBJECTPROPERTYEX(
-                        OBJECT_ID(QUOTENAME(source_schema) + N'.' + QUOTENAME(source_table)),
-                        'BaseType'
+                    WHEN d.is_computed_column = 1 AND EXISTS (
+                        SELECT 1
+                        FROM sys.computed_columns AS c
+                        JOIN sys.tables AS t ON t.object_id = c.object_id
+                        WHERE c.object_id = s.source_id
+                            AND c.name = d.source_column COLLATE DATABASE_DEFAULT
+                            AND c.is_persisted = 1
+                            AND c.is_nullable = 0
                     )
-                END AS nvarchar(2)
-            )) AS source_type
-        FROM sys.dm_exec_describe_first_result_set(@tsql, @params, 2)
-        ORDER BY column_ordinal
+                    THEN 1
+                    ELSE 0
+                END AS bit
+            ) AS persisted_not_null
+        FROM sys.dm_exec_describe_first_result_set(@tsql, @params, 2) AS d
+        CROSS APPLY (
+            SELECT CASE
+                WHEN d.source_server IS NULL AND d.source_database = DB_NAME() COLLATE Latin1_General_BIN2
+                THEN OBJECT_ID(QUOTENAME(d.source_schema) + N'.' + QUOTENAME(d.source_table))
+            END AS source_id
+        ) AS s
+        ORDER BY d.column_ordinal
         """;
 
     public Task<SqlServerOpenAnswer> OpenAsync(CancellationToken token) =>
@@ -291,7 +307,8 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
                             StringOf(reader, "source_column"),
                             BoolOf(reader, "is_identity_column"),
                             BoolOf(reader, "is_computed_column"),
-                            StringOf(reader, "source_type")
+                            StringOf(reader, "source_type"),
+                            BoolOf(reader, "persisted_not_null")
                         )
                     );
                 }

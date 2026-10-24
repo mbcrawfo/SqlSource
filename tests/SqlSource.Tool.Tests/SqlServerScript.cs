@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
@@ -7,6 +8,7 @@ using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Proofs;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
@@ -66,7 +68,8 @@ internal sealed class SqlServerScript
         SourceColumn: "id",
         IsIdentityColumn: true,
         IsComputedColumn: false,
-        SourceType: "U"
+        SourceType: "U",
+        PersistedNotNull: false
     );
 
     // The one hidden row that browse mode 2 adds.
@@ -83,6 +86,48 @@ internal sealed class SqlServerScript
         IsIdentityColumn = null,
         IsComputedColumn = null,
     };
+
+    // The row of a column of no origin that the server answers nullable.
+    public static SqlServerColumnRow ExpressionRow(int ordinal, string name) =>
+        IdColumn with
+        {
+            ColumnOrdinal = ordinal,
+            Name = name,
+            IsNullable = true,
+            SourceDatabase = null,
+            SourceSchema = null,
+            SourceTable = null,
+            SourceColumn = null,
+            SourceType = null,
+            IsIdentityColumn = null,
+            IsComputedColumn = null,
+        };
+
+    // dbo.users.name_len_p, PERSISTED NOT NULL, in the place given: the server answers it nullable by its expression,
+    // and the tool's own column says what the catalog holds.
+    public static SqlServerColumnRow PersistedColumn(int ordinal) =>
+        IdColumn with
+        {
+            ColumnOrdinal = ordinal,
+            Name = "name_len_p",
+            IsNullable = true,
+            SourceColumn = "name_len_p",
+            IsIdentityColumn = false,
+            IsComputedColumn = true,
+            PersistedNotNull = true,
+        };
+
+    // The row of the operand numbered n, as the server answers "AS [n]" of "operands".
+    public static SqlServerColumnRow OperandRow(int number, bool? nullable) =>
+        ExpressionRow(number, number.ToString(CultureInfo.InvariantCulture)) with
+        {
+            IsNullable = nullable,
+        };
+
+    // The answers of "operands", one for each operand, each of a type that is no CLR type and not null where given
+    // true.
+    public static IReadOnlyList<OperandFacts> Answers(params bool[] notNull) =>
+        [.. notNull.Select(static value => new OperandFacts(value, NotClr: true))];
 
     public SqlServerScript()
     {

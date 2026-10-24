@@ -248,6 +248,12 @@ internal sealed record SqlServerColumnsAnswer(
 /// when the source is of a linked server or not in the session's database, or the row names none.  A capture recorded
 /// before it has no <c>columns</c> call at all.
 /// </param>
+/// <param name="PersistedNotNull">
+/// The tool's own column too: true when the source is a table of the session's database, <see cref="SourceType" />
+/// <c>U</c>, and its column is computed <c>PERSISTED NOT NULL</c> in <c>sys.computed_columns</c>, whose constraint
+/// the server's <c>is_nullable</c> does not show; false otherwise.  Null in a capture recorded before it.  Only
+/// <c>ColumnProofs</c> may act on it, since a row of the result read through an outer join is no row of the table.
+/// </param>
 internal sealed record SqlServerColumnRow(
     bool IsHidden,
     int ColumnOrdinal,
@@ -267,7 +273,8 @@ internal sealed record SqlServerColumnRow(
     string? SourceColumn,
     bool? IsIdentityColumn,
     bool? IsComputedColumn,
-    string? SourceType
+    string? SourceType,
+    bool? PersistedNotNull = null
 ) : ISqlServerTypeRow;
 
 /// <summary>

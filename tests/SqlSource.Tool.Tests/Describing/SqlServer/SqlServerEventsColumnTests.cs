@@ -55,7 +55,8 @@ public sealed class SqlServerEventsColumnTests
                         new("sourceColumn", "id"),
                         new("isIdentityColumn", true),
                         new("isComputedColumn", false),
-                        new("sourceType", "U")
+                        new("sourceType", "U"),
+                        new("persistedNotNull", false)
                     ),
                     ColumnRowMap(Rowstat),
                 ])

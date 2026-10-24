@@ -320,6 +320,46 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
     public async Task ColumnsAsync_SourceType_IsTheBaseTypeOfASourceOfTheSessionsDatabase(string sql, string? type) =>
         (await ColumnsAsync(sql)).Single(row => !row.IsHidden).SourceType.ShouldBe(type);
 
+    // The tool's persisted_not_null is the catalog's, of the source column: true for name_len_p, PERSISTED NOT NULL,
+    // and false for the computed name_len and the plain id.  It holds through a LEFT JOIN too, where the column is NULL
+    // for an order without its user: the flag says what the table holds, and only the proofs read the query.
+    [Theory]
+    [InlineData("SELECT name_len, name_len_p, id FROM dbo.users", new[] { false, true, false })]
+    [InlineData(
+        "SELECT o.id, u.name_len_p FROM dbo.orders AS o LEFT JOIN dbo.users AS u ON u.id = o.user_id",
+        new[] { false, true }
+    )]
+    [InlineData("SELECT 1 AS one", new[] { false })]
+    public async Task ColumnsAsync_PersistedNotNull_IsRead(string sql, bool[] expected) =>
+        (await ColumnsAsync(sql))
+            .Where(static row => !row.IsHidden)
+            .Select(static row => row.PersistedNotNull)
+            .ShouldBe([.. expected.Select(static flag => (bool?)flag)]);
+
+    // A view is its columns' source under mode 2, so its column of name_len_p, read through a LEFT JOIN that makes it
+    // NULL, is not the table's: persisted_not_null is false, as sys.tables holds no view.
+    [Fact]
+    public async Task ColumnsAsync_ViewOfAPersistedNotNullColumn_IsNotPersistedNotNull()
+    {
+        await sqlServer.ExecuteAsync("DROP VIEW IF EXISTS dbo.order_name_lengths");
+        await sqlServer.ExecuteAsync(
+            "CREATE VIEW dbo.order_name_lengths AS SELECT o.id, u.name_len_p "
+                + "FROM dbo.orders AS o LEFT JOIN dbo.users AS u ON u.id = o.user_id"
+        );
+        try
+        {
+            var row = (await ColumnsAsync("SELECT name_len_p FROM dbo.order_name_lengths")).Single(row =>
+                !row.IsHidden
+            );
+
+            (row.SourceTable, row.SourceType, row.PersistedNotNull).ShouldBe(("order_name_lengths", "V", false));
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync("DROP VIEW dbo.order_name_lengths");
+        }
+    }
+
     // The server names the synonym's table as the source, and not the synonym.
     [Fact]
     public async Task ColumnsAsync_Synonym_IsItsTable()

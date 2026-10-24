@@ -80,7 +80,8 @@
             "sourceColumn": "id",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "IF"
+            "sourceType": "IF",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -101,7 +102,8 @@
             "sourceColumn": "user_id",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "IF"
+            "sourceType": "IF",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -122,7 +124,8 @@
             "sourceColumn": "total",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "IF"
+            "sourceType": "IF",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -143,7 +146,8 @@
             "sourceColumn": "note",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "IF"
+            "sourceType": "IF",
+            "persistedNotNull": false
           },
           {
             "isHidden": true,
@@ -164,7 +168,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           }
         ],
         "errors": null,

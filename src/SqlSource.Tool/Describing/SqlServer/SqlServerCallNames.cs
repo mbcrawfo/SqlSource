@@ -12,5 +12,6 @@ internal static class SqlServerCallNames
     public const string Probe = "probe";
     public const string Declared = "declared";
     public const string Columns = "columns";
+    public const string Operands = "operands";
     public const string Table = "table";
 }

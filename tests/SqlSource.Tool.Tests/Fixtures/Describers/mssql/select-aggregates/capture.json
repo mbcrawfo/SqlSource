@@ -69,7 +69,8 @@
             "sourceColumn": "user_id",
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": "U"
+            "sourceType": "U",
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -90,7 +91,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           },
           {
             "isHidden": false,
@@ -111,7 +113,8 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
           },
           {
             "isHidden": true,
@@ -132,7 +135,65 @@
             "sourceColumn": null,
             "isIdentityColumn": false,
             "isComputedColumn": false,
-            "sourceType": null
+            "sourceType": null,
+            "persistedNotNull": false
+          }
+        ],
+        "errors": null,
+        "error": null
+      }
+    },
+    {
+      "method": "operands",
+      "request": {
+        "sql": "SELECT total\nAS [1]\nFROM dbo.orders",
+        "params": null
+      },
+      "answer": {
+        "rows": [
+          {
+            "isHidden": false,
+            "columnOrdinal": 1,
+            "name": "1",
+            "isNullable": false,
+            "systemTypeName": "decimal(18,2)",
+            "maxLength": 9,
+            "precision": 18,
+            "scale": 2,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": "fixtures",
+            "sourceSchema": "dbo",
+            "sourceTable": "orders",
+            "sourceColumn": "total",
+            "isIdentityColumn": false,
+            "isComputedColumn": false,
+            "sourceType": "U",
+            "persistedNotNull": false
+          },
+          {
+            "isHidden": true,
+            "columnOrdinal": 2,
+            "name": "ROWSTAT\u0000",
+            "isNullable": false,
+            "systemTypeName": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": null,
+            "sourceSchema": null,
+            "sourceTable": null,
+            "sourceColumn": null,
+            "isIdentityColumn": false,
+            "isComputedColumn": false,
+            "sourceType": null,
+            "persistedNotNull": false
           }
         ],
         "errors": null,

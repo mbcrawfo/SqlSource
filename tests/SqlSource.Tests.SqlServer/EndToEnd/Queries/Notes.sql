@@ -11,12 +11,20 @@ LEFT JOIN dbo.notes AS n ON n.account_id = a.id
 ORDER BY a.id, n.id;
 
 -- name: CountAccountNotes
--- summary: The number of notes of each account.
--- column: note_count not null
+-- summary: The number of notes of each account, which the tool shows is never null.
 SELECT a.id, COUNT(n.id) AS note_count
 FROM dbo.accounts AS a
 LEFT JOIN dbo.notes AS n ON n.account_id = a.id
 GROUP BY a.id
+ORDER BY a.id;
+
+-- name: ListAccountMonths
+-- summary: The last day of the month each account opened in.
+-- SQL Server treats EOMONTH as possibly null, and the tool cannot show otherwise, so the column would be nullable
+-- without its marker.
+-- column: month_end not null
+SELECT a.id, EOMONTH(a.opened_on) AS month_end
+FROM dbo.accounts AS a
 ORDER BY a.id;
 
 -- name: ListMarkedNames

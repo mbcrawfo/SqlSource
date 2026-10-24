@@ -46,6 +46,21 @@ public sealed class NoteQueryTests(SqlServerContainer sqlServer)
     }
 
     [Fact]
+    public async Task QueryAsync_ListAccountMonths_ReadsTheMarkedColumn()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+
+        var months = await connection.QueryAsync<ListAccountMonthsDto>(NoteQueries.ListAccountMonths);
+
+        months.ShouldBe([
+            new ListAccountMonthsDto(1, new DateOnly(2024, 1, 31)),
+            new ListAccountMonthsDto(2, new DateOnly(2024, 2, 29)),
+            new ListAccountMonthsDto(3, new DateOnly(2024, 3, 31)),
+        ]);
+    }
+
+    [Fact]
     public async Task QueryAsync_ListNoteKinds_ReadsTheAliasTypeThroughItsHandler()
     {
         await using var connection = EndToEndSources.App(sqlServer);

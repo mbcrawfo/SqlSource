@@ -60,6 +60,20 @@ internal sealed partial class SqlServerSession
             cancellationToken
         );
 
+    // The server's answer about the operands the proofs ask, through the text and the live function of "columns".
+    private Task<SqlServerColumnsAnswer> OperandsAsync(
+        string query,
+        SqlServerColumnsRequest request,
+        CancellationToken cancellationToken
+    ) =>
+        AskAsync(
+            SqlServerCallNames.Operands,
+            request,
+            _live.ColumnsAsync,
+            (asked, answer, durationMs) => SqlServerEvents.Operands(_log, query, asked, answer, durationMs),
+            cancellationToken
+        );
+
     private Task<SqlServerColumnsAnswer> TableAsync(
         string query,
         SqlServerTableRequest request,
