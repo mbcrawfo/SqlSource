@@ -1,9 +1,12 @@
 using System;
 using System.Linq;
 using System.Text;
+using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation.Emitting;
 using SqlSource.Parsing.Tokens;
+using SqlSource.Settings;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
@@ -275,6 +278,72 @@ public sealed class MethodWriterTests
                 + "/// <returns>The SQL with each token replaced by its argument.</returns>\n"
                 + "public static string Q(string table)\n"
         );
+    }
+
+    // The same names as Run_TokenWithAnAwkwardName_Compiles of GeneratedSourceMethodTests, at the newest C#.  This is
+    // not in Generator/: that folder also compiles on Roslyn 4.8.0, which knows C# 12 at most, and a consumer on
+    // .NET 10 compiles the generated code as C# 14, where field and extension are contextual keywords.  The original
+    // theory stays there as the Roslyn floor's check.
+    [Theory]
+    [InlineData("span")]
+    [InlineData("state")]
+    [InlineData("span1")]
+    [InlineData("Item1")]
+    [InlineData("Item2")]
+    [InlineData("Rest")]
+    [InlineData("System")]
+    [InlineData("String")]
+    [InlineData("ArgumentException")]
+    [InlineData("Sql")]
+    [InlineData("Sample")]
+    [InlineData("Probe")]
+    [InlineData("T")]
+    [InlineData("var")]
+    [InlineData("dynamic")]
+    [InlineData("await")]
+    [InlineData("nameof")]
+    [InlineData("global")]
+    [InlineData("value")]
+    [InlineData("scoped")]
+    [InlineData("field")]
+    [InlineData("_")]
+    [InlineData("from")]
+    [InlineData("extension")]
+    public void Run_TokenWithAnAwkwardName_CompilesOnTheNewestCSharp(string name)
+    {
+        var source = """
+            using SqlSource;
+
+            namespace App;
+
+            [SqlSourceGenerate]
+            public partial class Sample<T>
+            {
+                public static string One() => Sql.Probe("a");
+
+                public static string Two() => Sql.Pair("a", "b");
+            }
+            """;
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [new SourceFile(GeneratorHarness.SourcePath, source)],
+            [
+                new SqlFile(
+                    GeneratorHarness.UsersPath,
+                    "-- name: Probe\nSELECT {{"
+                        + name
+                        + "}}, {{"
+                        + name
+                        + "}};\n"
+                        + "-- name: Pair\nSELECT {{"
+                        + name
+                        + "}} FROM {{second}};\n"
+                ),
+            ],
+            languageVersion: LanguageVersion.Latest
+        );
+
+        run.ShouldBeClean();
     }
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);
