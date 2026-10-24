@@ -160,6 +160,7 @@ public sealed class ExpressionProofsTests
     [InlineData("COALESCE(MAX(dbo.f(t.a)), 0)", "GROUP BY t.b", false, false, "")]
     [InlineData("COALESCE(LAG(t.a) OVER (ORDER BY t.id), 0)", "", false, false, "")]
     [InlineData("COALESCE(CAST(t.a AS geometry), 0)", "", false, false, "")]
+    [InlineData("COALESCE(CONVERT(geometry, t.a), 0)", "", false, false, "")]
     // CAST and CONVERT: the operand proved, and CONVERT's style an integer literal.
     [InlineData(
         "CAST(CASE WHEN t.a > 1 THEN 1 ELSE 0 END AS bit)",

@@ -156,6 +156,7 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
             { 0, "SELECT CONVERT(geography, wkt) AS c FROM dbo.proof_shapes" },
             { 0, "SELECT CAST(N'NULL' AS geometry) AS c FROM dbo.proof_shapes" },
             { 0, "SELECT COALESCE(shape, 'NULL') AS c FROM dbo.proof_shapes" },
+            { 0, "SELECT COALESCE(CONVERT(geometry, wkt), 'NULL') AS c FROM dbo.proof_shapes" },
             { 0, "SELECT CAST(COALESCE(shape, 'NULL') AS varbinary(max)) AS c FROM dbo.proof_shapes" },
         };
 
