@@ -116,7 +116,7 @@ In order:
 2. The connection rule: `connection.State == ConnectionState.Closed` is noted; when it is, `await connection.OpenAsync(cancellationToken)`, and in a `finally`, `await connection.CloseAsync()` when the method opened it.  An open connection is never touched.
 3. The command: `await using var command = connection.CreateCommand()`; `CommandText`; `Transaction = transaction`; `CommandTimeout = commandTimeout.Value` when it has one.
 4. The parameters, by the binding step below, in the order of the query's parameter list.
-5. The execution, by the shape: `ExecuteNonQueryAsync` for `none` and `rowcount`; for the others `ExecuteReaderAsync`, `await using`, with the behaviour 8.0's spike settles, and `ReadAsync(cancellationToken)` for each row.
+5. The execution, by the shape: `ExecuteNonQueryAsync` for `none` and `rowcount`; for the others `ExecuteReaderAsync`, `await using`, with `CommandBehavior.Default`, and `ReadAsync(cancellationToken)` for each row.  Not `SingleRow`, under which both drivers' second `ReadAsync` returns `false`, so `one` could not see a second row; and not `SingleResult`, which the first result set does not need ([the spike](2026-10-24-query-generation-phase-8-spike.md#10-the-reader)).
 6. For `one`: no row is `UnexpectedRowCountException` with no rows; a row is read; a second row is `UnexpectedRowCountException` with more than one.  For `one-optional`: no row is `null`, and a second row throws as for `one`.  For `many`: every row, into the collection.
 
 Every `await` has `.ConfigureAwait(false)`.  `cancellationToken` reaches every asynchronous call that takes one.
@@ -126,9 +126,9 @@ Every `await` has `.ConfigureAwait(false)`.  `cancellationToken` reaches every a
 One reading step per query, from its own `QueryModels.Output`, which is in column order: column `i` is read at ordinal `i` into the property that column `i` gives.
 
 - A property the model calls not null: `reader.GetFieldValue<T>(i)`, with no `IsDBNull`.
-- A property the model calls nullable: `reader.IsDBNull(i) ? null : reader.GetFieldValue<T>(i)`, where `T` is the property's type without `?`; or `GetFieldValue<T?>` where 8.0's spike finds both drivers accept a nullable value type.
+- A property the model calls nullable: `reader.IsDBNull(i) ? null : reader.GetFieldValue<T>(i)`, where `T` is the property's type without `?`.  Never `GetFieldValue<T?>`: SqlClient throws on its `NULL`, and on a `DateOnly?`, `TimeOnly?` or enum's value ([the spike](2026-10-24-query-generation-phase-8-spike.md#2-getfieldvaluet-of-a-nullable-value-type)).
 - A record is built by its positional constructor, its arguments in the model's property order, which is the column order unless the model is sorted; a class by an object initializer.
-- The synchronous `GetFieldValue<T>` after `ReadAsync`, which reads from the buffered row, unless 8.0's spike finds a driver that does not buffer under the behaviour chosen.
+- The synchronous `GetFieldValue<T>` after `ReadAsync`, which reads from the row that `ReadAsync` buffered whole on both drivers under `CommandBehavior.Default`, a 32 MB row included ([the spike](2026-10-24-query-generation-phase-8-spike.md#10-the-reader)).
 
 ### Binding a parameter
 
@@ -141,7 +141,7 @@ p0.Value = parameters.UserId;
 command.Parameters.Add(p0);
 ```
 
-- `ParameterName` is the parameter's name as the SQL writes it, with or without the `@` as 8.0's spike settles for both drivers.
+- `ParameterName` is the parameter's name as the parameter list holds it, without the `@`.  Both drivers match it with or without the `@` and ignoring case, and one parameter binds every placeholder whose name differs from it only in case, as the lexer makes `@Id` and `@id` one parameter ([the spike](2026-10-24-query-generation-phase-8-spike.md#4-parameter-names)).
 - A nullable property sends `(object?)value ?? DBNull.Value`; a non-null reference property sends `DBNull.Value` when it is null all the same, since a caller can pass one.
 - Nothing else is set.  The step is one emitter per engine, chosen by the file's dialect, whose engine-neutral form is the above; 8.3 and 8.4 give each engine's form its typed members, and 8.2 the converter's call on the value, without changing the method around it.
 
@@ -187,7 +187,7 @@ The tests that compile generated code obey the Roslyn floor's rules in `tests/Sq
 
 ## Documentation
 
-- `docs/manual/generator.md`: the Query methods section, written from what was built: placement, signature, the connection rule, shapes, collection types, the exception, what replaces the constant; the known issue that a method's exception cannot be caught by its type from another assembly; the known issue for each engine of a parameter whose type the driver cannot infer from its value, until 8.3 and 8.4 remove it.
+- `docs/manual/generator.md`: the Query methods section, written from what was built: placement, signature, the connection rule, shapes, collection types, the exception, what replaces the constant; the known issue that a method's exception cannot be caught by its type from another assembly; the known issue for each engine of a parameter whose type the driver cannot infer from its value, until 8.3 and 8.4 remove it.  [The spike](2026-10-24-query-generation-phase-8-spike.md#7-binding-by-value-alone) lists them: on PostgreSQL, a `string` of a type that is not text (`json`, `jsonb`, `xml`, an enum, `ltree` and the like), `bit(1)`, `int2vector`, Npgsql 8's `daterange`, the unsigned types, `tid`, `pg_lsn`, `macaddr8`, a `DateTimeOffset` with an offset, and a `NULL` whose type the server must infer; on SQL Server, a `datetime2` sent as `datetime` and so rounded, a `NULL` into `binary`, `varbinary` or `image`, and a string, binary or `decimal` declared by its value's length or digits.  SqlClient also refuses a command on a connection with a transaction that the method was not given, which the manual says from 8.1.
 - `docs/manual/settings.md`: the statuses of Output's `codegen`, the collection type, `MethodLocation` and `async-method-suffix`, which move to the first table as working.
 - `docs/manual/sql-files.md`: result shapes, and the marker index's callouts.
 - `docs/manual/parameters-and-tokens.md`: the query's parameters and tokens as a method's arguments.
@@ -237,6 +237,7 @@ Not decided with the owner, and open to the review of this spec:
 - A non-null reference property that holds null at run time is sent as `DBNull.Value`, not refused with an exception.
 - The exception is internal, in the namespace `SqlSource`, emitted in every project with the attribute, and its two copies across projects that share internals are a known issue, not a design of their own.
 - `ConfigureAwait(false)` on every `await`.
+- By 8.0's spike, amended in 8.0's pull request: the reader under `CommandBehavior.Default`, a nullable column by `IsDBNull` and `GetFieldValue<T>`, and `ParameterName` without the `@`.
 - Until 8.3 and 8.4, the end-to-end projects' `NoteQueries` are `Models`.
 - The manual documents the methods from 8.1, with a known issue per engine for the types binding by value cannot send, which 8.3 and 8.4 remove.
 
