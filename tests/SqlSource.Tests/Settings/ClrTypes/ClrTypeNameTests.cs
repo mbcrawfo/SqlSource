@@ -64,4 +64,49 @@ public sealed class ClrTypeNameTests
         ClrTypeName.TryParse("System.Collections.Generic.List<>".AsSpan(), out _).ShouldBeFalse();
         ClrTypeName.TryParse("global::MyApp.Box<>".AsSpan(), out _).ShouldBeFalse();
     }
+
+    // A converter's types are written with a keyword's type as the keyword, so a property's type is compared in that
+    // form, wherever the name stands.
+    [Theory]
+    [InlineData("global::System.Int64", "long")]
+    [InlineData("global::System.String", "string")]
+    [InlineData("global::System.Object", "object")]
+    [InlineData("global::System.Boolean", "bool")]
+    [InlineData("global::System.Byte", "byte")]
+    [InlineData("global::System.SByte", "sbyte")]
+    [InlineData("global::System.Int16", "short")]
+    [InlineData("global::System.UInt16", "ushort")]
+    [InlineData("global::System.Int32", "int")]
+    [InlineData("global::System.UInt32", "uint")]
+    [InlineData("global::System.UInt64", "ulong")]
+    [InlineData("global::System.IntPtr", "nint")]
+    [InlineData("global::System.UIntPtr", "nuint")]
+    [InlineData("global::System.Char", "char")]
+    [InlineData("global::System.Single", "float")]
+    [InlineData("global::System.Double", "double")]
+    [InlineData("global::System.Decimal", "decimal")]
+    [InlineData("global::System.Byte[]", "byte[]")]
+    [InlineData("global::System.Int32?[]", "int?[]")]
+    [InlineData("global::App.Id<global::System.Int64>", "global::App.Id<long>")]
+    [InlineData(
+        "global::App.Pair<global::System.String?, global::App.Box<global::System.Decimal[]>>[]",
+        "global::App.Pair<string?, global::App.Box<decimal[]>>[]"
+    )]
+    [InlineData("global::System.Guid", "global::System.Guid")]
+    [InlineData("global::App.System.Int64", "global::App.System.Int64")]
+    [InlineData("global::System.Int64.Inner", "global::System.Int64.Inner")]
+    [InlineData(
+        "global::System.Collections.Generic.List<global::System.Int32>",
+        "global::System.Collections.Generic.List<int>"
+    )]
+    public void KeywordTextOf_TypeWithAFrameworkName_WritesTheKeyword(string text, string expected) =>
+        ClrTypeName.KeywordTextOf(text).ShouldBe(expected);
+
+    // A text without System., or one that is not a type, is given back as the same string.
+    [Theory]
+    [InlineData("long")]
+    [InlineData("global::App.Id<long>")]
+    [InlineData("not a type System.")]
+    public void KeywordTextOf_TextWithNothingToChange_IsTheSameString(string text) =>
+        ReferenceEquals(ClrTypeName.KeywordTextOf(text), text).ShouldBeTrue();
 }

@@ -88,6 +88,28 @@ public sealed class ConverterMethodTests
         }
         """;
 
+    // The generic Id<T>, whose converters are of Id<long>.
+    private const string GenericIdSource = """
+        using SqlSource;
+
+        namespace App
+        {
+            [SqlSourceGenerate]
+            public partial class Sample;
+
+            public readonly record struct Id<T>(T Value);
+
+            public static class Ids
+            {
+                [SqlSourceConverter]
+                public static Id<long> ToId(long value) => new(value);
+
+                [SqlSourceConverter]
+                public static long FromId(Id<long> id) => id.Value;
+            }
+        }
+        """;
+
     private const string Struct = "readonly record struct";
 
     private const string Class = "sealed record";
@@ -535,6 +557,115 @@ public sealed class ConverterMethodTests
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldContain("parameter.Value = global::App.Moments.Kind(parameters.At);\n");
         methods.ShouldContain("(global::App.Moments.Kind(reader.GetFieldValue<global::System.DateTime>(0)))");
+    }
+
+    // A keyword type is one type by either name: an override that writes it by its framework name, inside a type
+    // argument too, matches the converters that write it as the keyword, and the model keeps the name as written.
+    [Theory]
+    [InlineData("App.Id<long>", "global::App.Id<long>")]
+    [InlineData("App.Id<System.Int64>", "global::App.Id<global::System.Int64>")]
+    [InlineData("global::App.Id<global::System.Int64>", "global::App.Id<global::System.Int64>")]
+    public void Run_OverrideThatNamesAKeywordTypeByItsFrameworkName_ConvertsAsTheKeyword(
+        string written,
+        string property
+    )
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: int8=" + written + "\n-- name: FindId\nSELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [
+                Entry(
+                    file,
+                    "FindId",
+                    [Parameter("id", Catalog("int8"), nullable: false)],
+                    [Column("id", Catalog("int8"))]
+                ),
+            ],
+            GenericIdSource
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("parameter.Value = global::App.Ids.FromId(parameters.Id);\n");
+        methods.ShouldContain("(global::App.Ids.ToId(reader.GetFieldValue<long>(0)))");
+        run.Sources["App.FindIdDto-Model.g.cs"].ShouldContain(property + " Id");
+    }
+
+    // An array whose element is written by the framework name is converted element by element, and the method writes
+    // the element as the override does.
+    [Fact]
+    public void Run_ArrayOfAnElementNamedByItsFrameworkName_ConvertsEachElement()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: int8=App.Id<System.Int64>\n-- name: GetIds\nSELECT ids FROM teams;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "GetIds", [], [Column("ids", ArrayOf(Catalog("int8"), "_int8"))])],
+            GenericIdSource
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                "global::System.Array.ConvertAll<long?, global::App.Id<global::System.Int64>>("
+                    + "reader.GetFieldValue<long?[]>(0), static element => element is { } item ? "
+                    + "global::App.Ids.ToId(item) : "
+            );
+    }
+
+    // A converter of decimal to itself serves an override that names the type System.Decimal.
+    [Theory]
+    [InlineData("decimal")]
+    [InlineData("System.Decimal")]
+    public void Run_TopLevelOverrideByTheFrameworkName_ConvertsAsTheKeyword(string written)
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class Sample;
+
+                public static class Money
+                {
+                    [SqlSourceConverter]
+                    public static decimal Round(decimal value) => decimal.Round(value, 2);
+                }
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: numeric="
+                + written
+                + "\n-- name: FindPrice\n"
+                + "SELECT price FROM items WHERE price = @price;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [
+                Entry(
+                    file,
+                    "FindPrice",
+                    [Parameter("price", Catalog("numeric"), nullable: false)],
+                    [Column("price", Catalog("numeric"))]
+                ),
+            ],
+            Source
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("parameter.Value = global::App.Money.Round(parameters.Price);\n");
+        methods.ShouldContain("(global::App.Money.Round(reader.GetFieldValue<decimal>(0)))");
     }
 
     // SqlClient reads a NULL of vector as SqlVector<float>.Null, which the converter must never see: the value is read

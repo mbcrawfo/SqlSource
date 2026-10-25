@@ -14,7 +14,8 @@ namespace SqlSource.Generation.Converters;
 /// </summary>
 internal static class ConverterReader
 {
-    // A keyword bare and every other type from global::, with ? where it is annotated, as ClrTypeName.Text writes it.
+    // A keyword bare and every other type from global::, with ? where it is annotated, as ClrTypeName.KeywordTextOf
+    // writes a property's type.
     private static readonly SymbolDisplayFormat TypeFormat =
         SymbolDisplayFormat.FullyQualifiedFormat.AddMiscellaneousOptions(
             SymbolDisplayMiscellaneousOptions.UseSpecialTypes

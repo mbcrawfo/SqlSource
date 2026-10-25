@@ -7,6 +7,7 @@ using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Models;
 using SqlSource.Generation.Paths;
 using SqlSource.Settings;
+using SqlSource.Settings.ClrTypes;
 
 namespace SqlSource.Generation.Methods;
 
@@ -29,9 +30,10 @@ namespace SqlSource.Generation.Methods;
 /// <param name="Drivers">Which engines' methods the project's drivers allow.</param>
 /// <param name="Converters">
 /// The converters that touch the type of a property of the type's files' models that an override chose, or its
-/// element's for an array, without the <c>?</c> of an element written nullable
-/// (<see cref="ConversionPlanner.EdgeElementOf" />), each once, in the order of <see cref="ConverterSet.Comparer" />,
-/// and each without its location, so that an edit that only moves a converter plans no method again.
+/// element's for an array, each as <see cref="ClrTypeName.KeywordTextOf" /> writes it, without the <c>?</c> of an
+/// element written nullable (<see cref="ConversionPlanner.EdgeElementOf" />), each once, in the order of
+/// <see cref="ConverterSet.Comparer" />, and each without its location, so that an edit that only moves a converter
+/// plans no method again.
 /// </param>
 internal sealed record MethodsInput(
     TypeQueries Type,
@@ -120,7 +122,7 @@ internal sealed record MethodsInput(
         }
 
         var texts = each.Where(static property => property.Type.Place is not null)
-            .Select(static property => property.Type.Text);
+            .Select(static property => ClrTypeName.KeywordTextOf(property.Type.Text));
         foreach (var text in texts)
         {
             AddEach(converters.Touching(text), ref found);

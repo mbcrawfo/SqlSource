@@ -47,6 +47,7 @@ PostgreSQL gives each [query parameter](concepts.md#query-parameter) a type from
 
 - **A use that says nothing of the type** is [SQLSRC226](diagnostics.md#sqlsrc226): `SELECT @p IS NULL` holds for a value of any type.  Cast the parameter where it is used, `@p::int`, or declare its type.
 - **PostgreSQL takes the type from the first use.**  In the optional filter above, the first `@name` says nothing, so without the marker the query is [SQLSRC227](diagnostics.md#sqlsrc227).  Declare the type, as above, or turn the condition round: `(name = @name OR @name IS NULL)`.
+- **A parameter compared with a column of a domain takes the domain's base type**: in `WHERE email = @email`, where `email` is a domain over `text`, `@email` is a `text`, so a [type override](settings.md#setting-type-overrides) of the domain does not reach it.  Declare it as the domain, `-- param: @email public.email`, to give it the domain's C# type.
 - **The first use can also give a type you did not mean.**  In `placed_at > now() - @age`, `@age` becomes a `timestamp with time zone`, and the server then reports an operator that does not exist ([SQLSRC225](diagnostics.md#sqlsrc225)).  Write `@age::interval`, or declare it.
 - **A declared type the database does not have** is [SQLSRC228](diagnostics.md#sqlsrc228).  A type in a schema that is not on the connection's search path needs its schema: `public.user_status`.
 - **`@x` for the absolute value of `x`** is read as the parameter `x`.  Write `abs(x)`: see [names that are read as parameters](parameters-and-tokens.md#names-read-as-parameters).

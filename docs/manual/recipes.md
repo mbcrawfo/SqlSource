@@ -231,7 +231,14 @@ GetCustomerDto? customer = await connection.GetCustomer(new GetCustomerParams(cu
 // customer.Id and GetCustomerParams.Id are CustomerId
 ```
 
-The type override gives each `bigint` of the query the type `CustomerId`, so the method reads `id` as a `long` and passes it to `FromDatabase`, and sends the `long` that `ToDatabase` returns for `@id`.  On SQL Server the key is `bigint`: `-- type-override: bigint=MyApp.CustomerId`.  To give the type to one table's ids alone, make them a domain, `CREATE DOMAIN customer_id AS bigint`, and map it: `public.customer_id=MyApp.CustomerId`.
+The type override gives each `bigint` of the query the type `CustomerId`, so the method reads `id` as a `long` and passes it to `FromDatabase`, and sends the `long` that `ToDatabase` returns for `@id`.  On SQL Server the key is `bigint`: `-- type-override: bigint=MyApp.CustomerId`.  To give the type to one table's ids alone, make them a domain, `CREATE DOMAIN customer_id AS bigint`, map it, and declare each parameter compared with such an id as the domain, since PostgreSQL gives it the domain's base type, `bigint`, otherwise:
+
+```sql postgres
+-- name: GetCustomer -> one-optional
+-- type-override: public.customer_id=MyApp.CustomerId
+-- param: @id public.customer_id
+SELECT id, name FROM customers WHERE id = @id;
+```
 
 Rules: [converters](settings.md#converters), [type overrides](settings.md#setting-type-overrides).
 

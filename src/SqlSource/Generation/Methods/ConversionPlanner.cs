@@ -5,6 +5,7 @@ using SqlSource.Diagnostics;
 using SqlSource.Generation.Converters;
 using SqlSource.Generation.Types;
 using SqlSource.Settings;
+using SqlSource.Settings.ClrTypes;
 
 namespace SqlSource.Generation.Methods;
 
@@ -67,7 +68,9 @@ internal static class ConversionPlanner
         }
 
         var decision = new Decision(isRead, engine, converters, subject, at, problems);
-        var text = type.Text;
+        // Matched as a converter's types are written, a keyword's type by its keyword; the method writes the
+        // property's element as the property does.
+        var text = ClrTypeName.KeywordTextOf(type.Text);
         var element = EdgeElementOf(text);
         if (database.Text is not { } databaseText)
         {
@@ -122,7 +125,7 @@ internal static class ConversionPlanner
                     databaseText,
                     database.ElementIsValueType,
                     true,
-                    ElementOf(text),
+                    ElementOf(type.Text),
                     elementIsValueType,
                     byElement.WarningIds
                 );

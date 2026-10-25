@@ -55,6 +55,28 @@ internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> 
         "object",
     ];
 
+    // The name in System of each keyword's type, in the order of Keywords.
+    private static readonly string[] FrameworkNames =
+    [
+        "Boolean",
+        "Byte",
+        "SByte",
+        "Int16",
+        "UInt16",
+        "Int32",
+        "UInt32",
+        "Int64",
+        "UInt64",
+        "IntPtr",
+        "UIntPtr",
+        "Char",
+        "Single",
+        "Double",
+        "Decimal",
+        "String",
+        "Object",
+    ];
+
     /// <summary>
     /// The type as generated code writes it: <c>global::</c> before a name, a keyword bare, <c>, </c> between type
     /// arguments, each <c>?</c> and rank as written, and no other white space.  Two texts of one type give one text.
@@ -64,9 +86,28 @@ internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> 
         get
         {
             var builder = new StringBuilder();
-            Write(builder);
+            Write(builder, keywords: false);
             return builder.ToString();
         }
+    }
+
+    /// <summary>
+    /// The text that a converter's types are compared with: the <see cref="Text" /> of the type that
+    /// <paramref name="text" /> writes, with the name in <c>System</c> of each keyword's type written as the keyword,
+    /// <c>global::App.Id&lt;long&gt;</c> of <c>global::App.Id&lt;global::System.Int64&gt;</c>, as a converter's types
+    /// are written.  A text with no <c>System.</c> in it, or one that is not a type, is given back as it is.
+    /// </summary>
+    /// <param name="text">A type as <see cref="Text" /> writes it.</param>
+    public static string KeywordTextOf(string text)
+    {
+        if (text.IndexOf("System.", StringComparison.Ordinal) < 0 || !TryParse(text.AsSpan(), out var name))
+        {
+            return text;
+        }
+
+        var builder = new StringBuilder(text.Length);
+        name!.Write(builder, keywords: true);
+        return builder.ToString();
     }
 
     /// <summary>
@@ -86,11 +127,16 @@ internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> 
         return true;
     }
 
-    private void Write(StringBuilder builder)
+    // Writes the type; with keywords, a keyword's type named from System as the keyword.
+    private void Write(StringBuilder builder, bool keywords)
     {
         if (Keyword is not null)
         {
             _ = builder.Append(Keyword);
+        }
+        else if (keywords && KeywordOf(Parts) is { } keyword)
+        {
+            _ = builder.Append(keyword);
         }
         else
         {
@@ -102,7 +148,7 @@ internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> 
                     _ = builder.Append('.');
                 }
 
-                WritePart(builder, Parts[index]);
+                WritePart(builder, Parts[index], keywords);
             }
         }
 
@@ -112,7 +158,24 @@ internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> 
         }
     }
 
-    private static void WritePart(StringBuilder builder, ClrNamePart part)
+    // The keyword of System.Int64 and the others, or null.
+    private static string? KeywordOf(EquatableArray<ClrNamePart> parts)
+    {
+        if (
+            parts.Count != 2
+            || parts[0].Arguments.Count > 0
+            || parts[1].Arguments.Count > 0
+            || !parts[0].Identifier.Equals("System", StringComparison.Ordinal)
+        )
+        {
+            return null;
+        }
+
+        var index = Array.IndexOf(FrameworkNames, parts[1].Identifier);
+        return index < 0 ? null : Keywords[index];
+    }
+
+    private static void WritePart(StringBuilder builder, ClrNamePart part, bool keywords)
     {
         _ = builder.Append(part.Identifier);
         if (part.Arguments.Count == 0)
@@ -128,7 +191,7 @@ internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> 
                 _ = builder.Append(", ");
             }
 
-            part.Arguments[index].Type.Write(builder);
+            part.Arguments[index].Type.Write(builder, keywords);
             if (part.Arguments[index].Nullable)
             {
                 _ = builder.Append('?');
