@@ -29,8 +29,9 @@ namespace SqlSource.Generation.Methods;
 /// <param name="Drivers">Which engines' methods the project's drivers allow.</param>
 /// <param name="Converters">
 /// The converters that touch the type of a property of the type's files' models that an override chose, or its
-/// element's for an array, each once, in the order of <see cref="ConverterSet.Comparer" />, and each without its
-/// location, so that an edit that only moves a converter plans no method again.
+/// element's for an array, without the <c>?</c> of an element written nullable
+/// (<see cref="ConversionPlanner.EdgeElementOf" />), each once, in the order of <see cref="ConverterSet.Comparer" />,
+/// and each without its location, so that an edit that only moves a converter plans no method again.
 /// </param>
 internal sealed record MethodsInput(
     TypeQueries Type,
