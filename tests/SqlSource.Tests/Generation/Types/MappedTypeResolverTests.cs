@@ -705,6 +705,30 @@ public sealed class MappedTypeResolverTests
         resolved.Converters.ShouldBeEmpty();
     }
 
+    // The compiler reads the internal members of a reference only when it shows its internals to the project: one that
+    // shows them to another assembly alone, as to its tests, gives the project no internal converter, and one that
+    // shows them to the project gives it a converter the project can call.
+    [Fact]
+    public void Resolve_InternalConverterOfAReferenceWithInternalsVisibleToAnother_IsNotSeen()
+    {
+        var resolved = ResolveHidden("SomeOtherAssembly");
+
+        resolved.Types.ShouldHaveSingleItem().Status.ShouldBe(MappedTypeStatus.Found);
+        resolved.Converters.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Resolve_InternalConverterOfAReferenceWithInternalsVisibleToTheProject_IsAConverter()
+    {
+        var resolved = ResolveHidden("TestAssembly");
+
+        resolved.Types.ShouldHaveSingleItem().Status.ShouldBe(MappedTypeStatus.Found);
+        var converter = resolved.Converters.ShouldHaveSingleItem();
+        converter.Method.ShouldBe("global::TestedLib.Hidden.From");
+        converter.Fault.ShouldBeNull();
+        converter.Origin.ShouldBe(ConverterOrigin.MappedType);
+    }
+
     [Fact]
     public void Resolve_TypeOfTheProject_GivesNoConverters()
     {
@@ -815,6 +839,37 @@ public sealed class MappedTypeResolverTests
             null
         ),
     ];
+
+    // A library whose type Hidden has an internal converter, and which shows its internals to the assembly named, with
+    // a project of the default assembly name, TestAssembly, that references it.
+    private static ResolvedTypes ResolveHidden(string internalsVisibleTo)
+    {
+        var library = GeneratorHarness.CreateReference(
+            OutputKind.Sql,
+            "TestedLib",
+            $$"""
+            [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("{{internalsVisibleTo}}")]
+
+            namespace TestedLib
+            {
+                public sealed class Hidden
+                {
+                    [SqlSource.SqlSourceConverter]
+                    internal static Hidden From(string v) => new();
+                }
+            }
+            """
+        );
+        var project = GeneratorHarness.CreateCompilation(
+            [new SourceFile("/app/SqlSourceGenerateAttribute.g.cs", AttributeSource.Text)],
+            references: [library]
+        );
+        return MappedTypeResolver.Resolve(
+            project,
+            Names("global::TestedLib.Hidden"),
+            TestContext.Current.CancellationToken
+        );
+    }
 
     private static EquatableArray<string> Names(params string[] names) => new(ImmutableArray.Create(names));
 }
