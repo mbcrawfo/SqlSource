@@ -911,13 +911,15 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         subPlan.Output.ShouldBe(["count(*)"]);
     }
 
-    // A subquery in an expression is a SubPlan of every kind.  14 prints each as (SubPlan <n>), or (hashed SubPlan
-    // <n>) where the planner hashes it; 18 prints EXISTS, IN or ANY and ARRAY each its own way, and a scalar
-    // subquery as 14 does.  The uncorrelated IN is hashed on both by a rule of size and not of cost: the planner
-    // hashes an IN whose subplan takes no parameter of the query above when the subplan's estimated rows times their
-    // width fit in the memory a hash may take (subplan_is_hashable, under work_mem and hash_mem_multiplier).  A scan of
-    // one integer column of the small orders table fits by far under the server's default work_mem, which the test
-    // container keeps, so the row does not move with the costs or the statistics.
+    // A subquery in an expression is a SubPlan of every kind.  Before 17 each prints as (SubPlan <n>), or (hashed
+    // SubPlan <n>) where the planner hashes it; from 17 EXISTS, IN or ANY and ARRAY print each its own way, and a
+    // scalar subquery as before.  The describer tells the kinds apart only from 17, so unlike the other rows of this
+    // class the theory runs on every major, and pins where the forms change.  The uncorrelated IN is hashed on every
+    // major by a rule of size and not of cost: the planner hashes an IN whose subplan takes no parameter of the query
+    // above when the subplan's estimated rows times their width fit in the memory a hash may take
+    // (subplan_is_hashable, under work_mem and hash_mem_multiplier).  A scan of one integer column of the small orders
+    // table fits by far under the server's default work_mem, which the test container keeps, so the row does not move
+    // with the costs or the statistics.
     [Theory]
     [InlineData("EXISTS (SELECT 1 FROM orders o WHERE o.user_id > u.id)", "(SubPlan 1)", "EXISTS(SubPlan 1)")]
     [InlineData(
@@ -931,14 +933,13 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         "(ANY (u.id = (hashed SubPlan 1).col1))"
     )]
     [InlineData("ARRAY(SELECT o.id FROM orders o WHERE o.user_id = u.id)", "(SubPlan 1)", "ARRAY(SubPlan 1)")]
-    public async Task Explain_Sublinks_PrintEachKindOnEighteen(
+    public async Task Explain_Sublinks_PrintEachKindFromSeventeen(
         string expression,
-        string printedOn14,
-        string printedOn18
+        string printedBefore17,
+        string printedFrom17
     )
     {
-        postgres.SkipUnlessRecordedMajor("The printed forms");
-        var printed = postgres.Major == 14 ? printedOn14 : printedOn18;
+        var printed = postgres.Major >= 17 ? printedFrom17 : printedBefore17;
 
         var root = await ExplainAsync($"SELECT {expression} FROM users u");
 

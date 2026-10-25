@@ -92,8 +92,8 @@ internal static partial class NullabilityWalk
         // The type of a scalar subquery that is the whole column, when its plan always returns one row whose value is
         // proved of the column's type, and that type is in a family of SetOperationTypes.  A Plain Aggregate with no
         // Group Key, no Grouping Sets and no Filter returns one row whatever its input.  The type is what tells the
-        // subquery from the other subplans on PostgreSQL 14, which prints each as (SubPlan n): an EXISTS, an IN, an
-        // ANY, an ALL and a comparison of rows are boolean, and an ARRAY an array, none in a family.
+        // subquery from the other subplans before PostgreSQL 17, which prints each as (SubPlan n): an EXISTS, an IN,
+        // an ANY, an ALL and a comparison of rows are boolean, and an ARRAY an array, none in a family.
         private long? ScalarSubPlanTypeOf(string name, long columnType)
         {
             if (
