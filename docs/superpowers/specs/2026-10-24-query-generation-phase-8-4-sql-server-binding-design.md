@@ -26,7 +26,7 @@ The owner's measure for phase 8, for SQL Server, as 8.3 takes it for PostgreSQL.
 - The realistic corpus through the methods.  Sub-phase 8.5.
 - The example project.  Sub-phase 8.6.
 - `SqlDbTypeExtensions.Json` and `SqlJson`.  Phase 7; `json` binds as `nvarchar(max)`.  `SqlDbTypeExtensions.Json` exists on SqlClient 6.1 and 7 and declares `json` on 2025; on 2017 it is a protocol error ([the spike](2026-10-24-query-generation-phase-8-spike.md#9-sqlclients-facets)).
-- A CLR type, `hierarchyid`, `geography` and `geometry`, which have no C# type (`SQLSRC246`) and so no method; a table-valued parameter.  Out of the epic.
+- A table-valued parameter.  Out of the epic.  (A CLR type, `hierarchyid`, `geography` and `geometry` were listed here as having no method, but a type override gives them one; the owner decided on 2026-10-25, in this sub-phase's review, that they are bound as `SqlDbType.Udt` with `UdtTypeName`.)
 - A method for every result set of a batch.  `D-0006`.
 
 ## Anti-goals
