@@ -113,8 +113,8 @@ internal static class AttributeSource
                 Models = 1,
 
                 /// <summary>
-                /// The SQL, the types, and, in a later release, a method that runs the query.  Until then it generates
-                /// what <see cref="Models" /> does.
+                /// The types, and an asynchronous method that runs the query, which holds its SQL in place of the
+                /// constant or the method that <see cref="Sql" /> gives.
                 /// </summary>
                 CodeGen = 2,
             }
@@ -146,8 +146,7 @@ internal static class AttributeSource
             }
 
             /// <summary>
-            /// The type a generated method returns many rows in.  Every one is filled before the method returns.  It
-            /// has no effect until the methods that run the queries arrive in a later release.
+            /// The type a generated method returns many rows in.  Every one is filled before the method returns.
             /// </summary>
             internal enum GeneratorCollectionType
             {
@@ -203,13 +202,13 @@ internal static class AttributeSource
             }
 
             /// <summary>
-            /// Where the methods that run the queries of a type go.  It has no effect until those methods arrive in a
-            /// later release.
+            /// Where the methods that run the queries of a type go.
             /// </summary>
             internal enum MethodLocation
             {
                 /// <summary>
-                /// In a generated static class beside the type, as extension methods of <c>DbConnection</c>.
+                /// In a generated static class beside the type, named after it with <c>Extensions</c>, as extension
+                /// methods of <c>DbConnection</c>.
                 /// </summary>
                 ExtensionClass = 0,
 
@@ -323,15 +322,13 @@ internal static class AttributeSource
 
                 /// <summary>
                 /// Where the methods that run the queries go.  The default is
-                /// <see cref="global::SqlSource.MethodLocation.ExtensionClass" />.  It has no effect until those
-                /// methods arrive in a later release.
+                /// <see cref="global::SqlSource.MethodLocation.ExtensionClass" />.
                 /// </summary>
                 public MethodLocation MethodLocation { get; set; }
 
                 /// <summary>
                 /// The type a method returns many rows in.  The default is
-                /// <see cref="global::SqlSource.GeneratorCollectionType.Array" />.  It has no effect until the methods
-                /// that run the queries arrive in a later release.
+                /// <see cref="global::SqlSource.GeneratorCollectionType.Array" />.  A marker in a file comes first.
                 /// </summary>
                 public GeneratorCollectionType CollectionType { get; set; }
 

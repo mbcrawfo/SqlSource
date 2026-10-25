@@ -18,6 +18,8 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Use SQL Server, or another database | [SQL Server](sqlserver.md), [database support](dialects.md#database-support) |
 | See what the generator writes, and where it goes | [The generator](generator.md#locations) |
 | Know which models a query gets, what they are named, and what their properties are | [Models](generator.md#models) |
+| Run a query with its generated method, and know what it returns and throws | [Query methods](generator.md#query-methods) |
+| Run several queries in a transaction | [The recipe](recipes.md#queries-in-a-transaction) |
 | Use the queries with Dapper or ADO.NET | [The recipe](recipes.md#dapper-and-adonet) |
 | Read rows into the models with Dapper | [The recipe](recipes.md#models-through-dapper) |
 | Let a test project see the internals of another project | [Projects that share internals](generator.md#projects-that-share-internals) |
@@ -42,15 +44,15 @@ SqlSource is in early development.  This table is the one list of what works in 
 
 | Feature | Status | Where documented |
 |----|----|----|
-| Queries as string constants | Available | [Constants](generator.md#constants) |
+| Queries as string constants, for the output `sql` or `models` | Available | [Constants](generator.md#constants) |
 | Methods for queries with tokens | Available | [Token methods](generator.md#token-methods) |
 | Reading `.sql` files by the rules of your database's dialect | Available | [Dialects](dialects.md) |
 | Settings, and an error for a value that is wrong | Available | [Settings](settings.md#all-settings) |
-| The `Output` setting | Works today: it decides which queries the tool describes and the build checks against their sidecar, and `models` and `codegen` generate models; no effect yet for the method that `codegen` adds | [Output](settings.md#setting-output) |
+| The `Output` setting | Available | [Output](settings.md#setting-output) |
 | The settings for models: model suffixes, namespace, shape and name, and the generator parameters `sort-input`, `sort-output` and `no-table-models` | Available | [All settings](settings.md#all-settings) |
-| The settings for query methods: collection type, `MethodLocation`, and the generator parameter `async-method-suffix` | Accepted; no effect yet | [All settings](settings.md#all-settings) |
+| The settings for query methods: collection type, `MethodLocation`, and the generator parameter `async-method-suffix` | Available | [All settings](settings.md#all-settings) |
 | `null` or `not null` in a `-- param:` marker | Available: `null` makes the parameter's property in the input model nullable | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
-| Result shapes (`-- name: GetUser -> one`) | Accepted; no effect yet | [Result shapes](sql-files.md#result-shapes) |
+| Result shapes (`-- name: GetUser -> one`) | Available | [Result shapes](sql-files.md#result-shapes) |
 | Describing queries with the `sqlsource` tool, sidecar files, and `--check` | Available | [The tool](tool.md) |
 | An error in the build for a query whose sidecar entry is missing or out of date | Available | [Sidecar files](tool.md#sidecar-files), [SQLSRC241](diagnostics.md#sqlsrc241), [SQLSRC244](diagnostics.md#sqlsrc244) |
 | Describing PostgreSQL queries | Available | [PostgreSQL](postgresql.md) |
@@ -59,13 +61,13 @@ SqlSource is in early development.  This table is the one list of what works in 
 | The C# type of each column and parameter of a described SQL Server query, and an error in the build for one that has none | Available | [Types](sqlserver.md#types) |
 | Models for the parameters and rows of a query: their names, namespace, shape, properties and nullability, table models and shared models | Available | [Models](generator.md#models), [PostgreSQL](postgresql.md#models), [SQL Server](sqlserver.md#models) |
 | A column's nullability set by `!` or `?` at the end of its alias, or by a `-- column:` marker, which leaves the column's name alone for Dapper | Available | [Which properties can be null](generator.md#model-nullability), [the `-- column:` marker](generator.md#column-marker) |
-| Generated query methods | Coming | [Query methods](generator.md#query-methods) |
+| Generated query methods, which run a query on a connection and read its rows into its models, and `UnexpectedRowCountException` | Available: each parameter is sent by its value | [Query methods](generator.md#query-methods) |
+| Each parameter of a query method sent as the database type it was described with | Coming | Not documented until it is delivered; today see the [known issues](generator.md#known-issues) of sending a parameter by its value |
+| Converters: methods of your own that turn a type override's C# type into one the driver reads and sends | Coming | Not documented until it is delivered |
 | Library maps for the types of libraries such as NodaTime | Coming | Not documented until it is delivered |
 | Custom type mapping: the type override, `SqlSourceTypeOverrides` and `-- type-override:` | Available | [Type overrides](settings.md#setting-type-overrides); for a PostgreSQL type that cannot be sent as a parameter, see [SQLSRC232](diagnostics.md#sqlsrc232) |
 | Build integration: the tool running in your build | Coming | Not documented until it is delivered; today you run the tool yourself: [install the tool](tool.md#install-the-tool) |
 | Bug-report bundles | Coming | Not documented until it is delivered; today attach a [log](tool.md#logs) |
-
-"Accepted; no effect yet" means SqlSource checks the setting and reports an error for a value that is not valid, but the setting changes no generated code yet.
 
 ## The pages
 

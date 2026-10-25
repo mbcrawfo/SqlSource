@@ -7,6 +7,7 @@ Short answers to "how do I...", each a sample you can copy and a link to the pag
 - [Use several databases](#use-several-databases)
 - [Check the sidecars in CI](#check-sidecars-in-ci)
 - [Describe again after a schema change](#after-a-migration)
+- [Run queries in a transaction](#queries-in-a-transaction)
 - [Use the queries with Dapper or your own ADO.NET code](#dapper-and-adonet)
 - [Run the models through Dapper](#models-through-dapper)
 - [Choose a table name at run time](#table-name-at-run-time)
@@ -172,11 +173,38 @@ $ git commit -m "Describe the queries again after the migration"
 
 Rules: [after a schema change](tool.md#after-a-schema-change), [describing again](tool.md#describing-again).
 
+<a id="queries-in-a-transaction"></a>
+
+## Run queries in a transaction
+
+```sql postgres
+-- name: GetBalance -> one
+SELECT balance FROM accounts WHERE id = @accountId;
+
+-- name: SetBalance -> none
+UPDATE accounts SET balance = @balance WHERE id = @accountId;
+```
+
+```csharp
+await using var connection = dataSource.CreateConnection();
+await connection.OpenAsync();
+await using var transaction = await connection.BeginTransactionAsync();
+
+var account = await connection.GetBalance(new GetBalanceParams(accountId), transaction);
+await connection.SetBalance(new SetBalanceParams(account.Balance - amount, accountId), transaction);
+
+await transaction.CommitAsync();
+```
+
+Open the connection yourself: a query method leaves a connection that is open as it is, and opens and closes again only one that is closed.  Give every method the transaction.  Microsoft.Data.SqlClient refuses a command on a connection with a transaction that the command was not given, and Npgsql runs it in the transaction all the same.
+
+Rules: [the connection](generator.md#method-connection), [the signature](generator.md#method-signature), [result shapes](sql-files.md#result-shapes).
+
 <a id="dapper-and-adonet"></a>
 
 ## Use the queries with Dapper or your own ADO.NET code
 
-The members SqlSource generates are plain strings, so any library can run them.  Dapper is a separate package (`dotnet add package Dapper`); ADO.NET needs none:
+Under the output `models`, or `sql`, a query is a constant, a plain string, so any library can run it.  Under the default, `codegen`, it has a [method](generator.md#query-methods) in place of the constant, so a type whose queries you run yourself sets `Output`.  Dapper is a separate package (`dotnet add package Dapper`); ADO.NET needs none:
 
 ```csharp
 using System.Data;
@@ -184,7 +212,7 @@ using System.Data.Common;
 using Dapper;
 using SqlSource;
 
-[SqlSourceGenerate]
+[SqlSourceGenerate(Output = GeneratorOutput.Models)]
 public partial class UserRepository(DbConnection connection)
 {
     // Dapper
@@ -213,9 +241,9 @@ public partial class UserRepository(DbConnection connection)
 }
 ```
 
-Here `GetUser` is `SELECT id, name FROM users WHERE id = @id;`, and `GetUserDto` is its generated [model](generator.md#models).  SqlSource never opens a connection or binds a value: Dapper opens a closed connection for you, ADO.NET needs it open, and you give the database the value of each `@name` yourself.
+Here `GetUser` is `SELECT id, name FROM users WHERE id = @id;`, and `GetUserDto` is its generated [model](generator.md#models).  Under `models` SqlSource opens no connection and binds no value: Dapper opens a closed connection for you, ADO.NET needs it open, and you give the database the value of each `@name` yourself.
 
-Rules: [constants](generator.md#constants), [query parameters](parameters-and-tokens.md#query-parameters).
+Rules: [constants](generator.md#constants), [query parameters](parameters-and-tokens.md#query-parameters), [output](settings.md#setting-output).
 
 <a id="models-through-dapper"></a>
 
@@ -234,7 +262,7 @@ using System.Data.Common;
 using Dapper;
 using SqlSource;
 
-[SqlSourceGenerate]
+[SqlSourceGenerate(Output = GeneratorOutput.Models)]
 public partial class OrderRepository(DbConnection connection)
 {
     public Task<GetOrderDto?> Get(long orderId) =>
@@ -247,7 +275,7 @@ public partial class OrderRepository(DbConnection connection)
 DefaultTypeMap.MatchNamesWithUnderscores = true;
 ```
 
-The input model is the parameter object, and the output model is the type of a row.  What makes Dapper read them, with either database:
+The input model is the parameter object, and the output model is the type of a row.  The output `models` gives the queries their constants and models, and no [method](generator.md#query-methods), which the default, `codegen`, would give in place of the constant.  What makes Dapper read them, with either database:
 
 - **Columns in snake_case need `DefaultTypeMap.MatchNamesWithUnderscores`**, as above: Dapper matches `customer_name` to `CustomerName` only with it.
 - **Write the query's parameters in camelCase**, `@orderId` and not `@order_id`, since Dapper binds a property of the input model only to a parameter of its name, ignoring case.  A query that keeps `@order_id` gives Dapper its parameters by hand: `new { order_id = orderId }`.
@@ -458,20 +486,20 @@ connection.QueryAsync<ListCustomerOrdersSinceDto>(
 
 ## Choose a table name at run time
 
-```sql
--- name: CountRows
-SELECT COUNT(*) FROM {{table:orders}};
+```sql postgres
+-- name: CountRows -> one
+SELECT COUNT(*) AS total FROM {{table:orders}};
 ```
 
 ```csharp
 var table = kind == Kind.Archived ? "orders_archive" : "orders";
-var sql = Sql.CountRows(table);
-// SELECT COUNT(*) FROM orders_archive;
+var counted = await connection.CountRows(table);
+// runs SELECT COUNT(*) AS total FROM orders_archive; counted.Total is the count
 ```
 
-A query with a token is a method that returns the SQL with the token replaced.  The default after `:` is only a sample that the tool describes the query with, and the method still takes the table name; a query whose output is `sql` needs no default.  Pass only text that your own code chooses, as above, and never a value that a user typed: nothing is escaped.
+The query's method takes the text of the token, and runs the query with the token replaced.  Under the output `sql` or `models`, the query is instead a method that returns the SQL, `Sql.CountRows(table)`, for your own code to run.  The default after `:` is only a sample that the tool describes the query with, and the method still takes the table name; a query whose output is `sql` needs no default.  Pass only text that your own code chooses, as above, and never a value that a user typed: nothing is escaped.
 
-Rules: [tokens](parameters-and-tokens.md#tokens), [token methods](generator.md#token-methods), [defaults](parameters-and-tokens.md#token-defaults).
+Rules: [tokens](parameters-and-tokens.md#tokens), [the signature](generator.md#method-signature), [token methods](generator.md#token-methods), [defaults](parameters-and-tokens.md#token-defaults).
 
 <a id="test-project-sees-internals"></a>
 

@@ -272,7 +272,12 @@ A described PostgreSQL query gets the [models](generator.md#models) that every d
 
 ## Query methods
 
-> **Coming in a later release.**  The generator will write a method that runs each described PostgreSQL query through Npgsql and returns its rows.  See [what works today](README.md#what-works-today).
+Each described query whose output is `codegen` gets a method that runs it through Npgsql, on a `DbConnection` such as `NpgsqlConnection` or the one an `NpgsqlDataSource` gives: see [query methods](generator.md#query-methods).  The project references Npgsql 8.0 or later ([SQLSRC273](diagnostics.md#sqlsrc273), [SQLSRC247](diagnostics.md#sqlsrc247)).
+
+- **A column is read as its property's C# type**, the one [the types](#type-map) give it, so a type that Npgsql reads only once it is taught, an enum mapped to a C# enum or a plugin's type, needs the teaching on the data source, as `MapEnum<T>()`.  A column whose property cannot be null throws Npgsql's `InvalidCastException`, "Column 'name' is null.", when it holds a null.
+- **Each parameter is sent by its value**, so Npgsql chooses its type from the C# value, and a few types are sent as another or not at all: `json`, `jsonb`, an enum and the other types read as a `string`, the unsigned types, a `DateTimeOffset` with an offset, and a `DateTime` by its `Kind`.  The [generator's known issues](generator.md#known-issues) list them, with what to do.
+
+> **Coming in a later release.**  Each parameter will be sent as the PostgreSQL type it was described with, which ends the known issues of sending a parameter by its value.  See [what works today](README.md#what-works-today).
 
 <a id="known-issues"></a>
 

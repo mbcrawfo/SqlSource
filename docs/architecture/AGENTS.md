@@ -12,6 +12,7 @@ Each page is in this folder.
 | `src/SqlSource/Generation`, with `Models/`, `Paths/`, `Sidecars/` and `Types/` | `generator.md` | `## The pipeline` |
 | `src/SqlSource/Generation/MSBuild` | `generator.md` | `## Settings` |
 | `src/SqlSource/Generation/Emitting` | `generator.md` | `## Emitting` |
+| `src/SqlSource/Generation/Methods` | `generator.md` | `### Query methods`, under `## Emitting` |
 | `src/SqlSource/Settings`, with `ClrTypes/` and `TypeOverrides/` | `generator.md` | `## Settings` |
 | `src/SqlSource/Parsing`, with `Markers/`, `Quoting/` and `Tokens/` | `generator.md` | `## Parsing` |
 | `src/SqlSource/Diagnostics` | `generator.md` | `## Diagnostics` |
@@ -45,9 +46,9 @@ A new page gets its rows here and its line in the reading guide of `README.md`, 
 A part of query generation that is not built yet has a placeholder under `## Not built yet` of the page it will extend.  It is exactly this: a heading, one sentence on what will go there, and the phase with a link to the epic.  Nothing else.
 
 ```markdown
-### Execution methods
+### Library maps
 
-> **Not built yet.**  How the generator writes a method that runs a query and reads its rows into the output type.  Delivered by phase 8 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
+> **Not built yet.**  How the generator maps a described type to a type of a library such as NodaTime.  Delivered by phase 7 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
 ```
 
 - **The work that delivers a phase fills its placeholders**, in the same pull request: it replaces each one with a description of what was built, written from the code it wrote.

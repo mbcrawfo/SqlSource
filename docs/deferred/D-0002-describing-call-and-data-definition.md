@@ -6,7 +6,7 @@ The [epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.m
 
 ## Delivered instead
 
-[`SQLSRC233`](../manual/diagnostics.md#sqlsrc233), raised by [`StatementShape`](../../src/SqlSource.Tool/Describing/Postgres/Statements/StatementShape.cs) before anything is sent, and `-- output: sql` as the way to keep such a query: its SQL is still a string constant, or a method where the query has tokens, with no types, so the tool does not describe it.  The error still fails the query, so the file's sidecar is held back until the query is mended or given the marker.
+[`SQLSRC233`](../manual/diagnostics.md#sqlsrc233), raised by [`StatementShape`](../../src/SqlSource.Tool/Describing/Postgres/Statements/StatementShape.cs) before anything is sent, and `-- output: sql` as the way to keep such a query: its SQL is still a string constant, or a method where the query has tokens, with no types, so the tool does not describe it.  The error still fails the query, so the file's sidecar is held back until the query is mended or given the marker.  Since a query without an entry has no models, [sub-phase 8.1](../superpowers/specs/2026-10-24-query-generation-phase-8-1-methods-design.md) generates no method for such a query either, so no generated method calls a procedure: under `-- output: sql` the query keeps its constant, which the project runs itself, and the manual's [query methods](../manual/generator.md#which-methods) say so.
 
 ## Why deferred
 
@@ -26,4 +26,4 @@ Of data definition, only `CREATE TABLE AS` and `SELECT INTO` take a parameter; `
 
 ## Trigger
 
-Phase 8, or a user who asks for a method for a `CALL`.
+A user who asks for a method for a `CALL`, or a decision to support stored procedures.

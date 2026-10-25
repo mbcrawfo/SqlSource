@@ -75,10 +75,10 @@ Open [`Models/Orders.sql.json`](Models/Orders.sql.json).  It is the tool's recor
 dotnet build
 ```
 
-Your IDE shows the generated code among the project's dependencies, under its analyzers or source generators, and goes to it from a use such as `Sql.GetOrder` or `GetOrderDto`.  To write it to disk, build with `EmitCompilerGeneratedFiles`:
+Your IDE shows the generated code among the project's dependencies, under its analyzers or source generators, and goes to it from a use such as `Sql.GetOrder`, `GetOrderDto` or `ListOrderLines`.  To write it to disk, build with `EmitCompilerGeneratedFiles`:
 
 ```bash
 dotnet build -p:EmitCompilerGeneratedFiles=true
 ```
 
-The files are under `obj/Debug/net10.0/generated/`: one for each class, with the SQL of its queries, one for each model, and one with the attribute and its enums.  `GetOrderDto`, for instance, is a record with the properties `Id`, `Status`, `PlacedAt`, `ShippedOn` and `CustomerName`.  See [the generator](../../docs/manual/generator.md).
+The files are under `obj/Debug/net10.0/generated/`: one for each class, with the SQL of its queries whose output is `sql` or `models`, one with the methods of `OrderLineQueries`, in the class `OrderLineQueriesExtensions`, one for each model, and one with the attribute, its enums and the exception a method throws.  `GetOrderDto`, for instance, is a record with the properties `Id`, `Status`, `PlacedAt`, `ShippedOn` and `CustomerName`.  See [the generator](../../docs/manual/generator.md).

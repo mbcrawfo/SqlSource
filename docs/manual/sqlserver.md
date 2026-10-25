@@ -242,7 +242,15 @@ A described SQL Server query gets the [models](generator.md#models) that every d
 
 ## Query methods
 
-> **Coming in a later release.**  The generator will write a method that runs each described SQL Server query through Microsoft.Data.SqlClient and returns its rows.  See [what works today](README.md#what-works-today).
+Each described query whose output is `codegen` gets a method that runs it through Microsoft.Data.SqlClient, on a `DbConnection` such as `SqlConnection`: see [query methods](generator.md#query-methods).  The project references Microsoft.Data.SqlClient 6.1 or later ([SQLSRC273](diagnostics.md#sqlsrc273), [SQLSRC267](diagnostics.md#sqlsrc267)).
+
+- **Give each method the transaction** of a connection that has one: Microsoft.Data.SqlClient refuses a command that runs on such a connection without it, and throws `InvalidOperationException`.  See [the connection](generator.md#method-connection).
+- **A column whose property cannot be null** throws Microsoft.Data.SqlClient's `SqlNullValueException` when it holds a null, and a `vector` column the method's own `InvalidCastException`, "Column 'name' is null.".
+- **A query of several statements returns the rows of its first result set**, as its model has them, and its other statements still run.
+- **`rowcount` is `-1` after `SET NOCOUNT ON`**, which lasts for the connection's session: see [the generator's known issues](generator.md#known-issues).
+- **Each parameter is sent by its value**, so Microsoft.Data.SqlClient declares it from the value: a `DateTime` as `datetime`, which rounds a `datetime2` value, a `NULL` as `nvarchar(4000)`, which a binary column refuses, and a string by its length.  The [generator's known issues](generator.md#known-issues) list them, with what to do.
+
+> **Coming in a later release.**  Each parameter will be sent as the SQL Server type it was described with, with its length, precision and scale, which ends the known issues of sending a parameter by its value.  See [what works today](README.md#what-works-today).
 
 <a id="known-issues"></a>
 

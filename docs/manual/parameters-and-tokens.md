@@ -14,7 +14,7 @@ A value cannot stand for a table name, a list of columns or a whole clause, and 
 |----|----|----|
 | Written | `@since` | `{{table}}` |
 | Carries | A value | Text of the SQL |
-| Replaced | Never by SqlSource: it stays in the SQL, and you pass the value to the database | By the generated method, when your code asks for the SQL |
+| Replaced | Never by SqlSource: it stays in the SQL, and its value is sent to the database beside it | By the generated method, when your code asks for the SQL or runs the query |
 | Safe for text a user can influence | Yes | No |
 
 <a id="query-parameters"></a>
@@ -26,11 +26,9 @@ A value cannot stand for a table name, a list of columns or a whole clause, and 
 SELECT id, name FROM users WHERE id = @id;
 ```
 
-SqlSource finds the parameters of a query: `@` and a name of letters, digits and `_`, outside strings, quoted identifiers, comments and hints.  The list holds each parameter once, in the order it first appears.  The tool uses the list to ask a database what each parameter is, the query's input [model](generator.md#models) has a property for each parameter in its order, and a later release will use it to type the generated methods.
+SqlSource finds the parameters of a query: `@` and a name of letters, digits and `_`, outside strings, quoted identifiers, comments and hints.  The list holds each parameter once, in the order it first appears.  The tool uses the list to ask a database what each parameter is, and the query's input [model](generator.md#models) has a property for each parameter in its order.  The [method](generator.md#query-methods) of a query whose output is `codegen` takes the input model as its argument `parameters`, and sends each parameter of the list by its name, with the value of its property: see [how a parameter is sent](generator.md#method-parameters).
 
-> **Coming in a later release.**  The parameters of a query will become the typed arguments of its generated method.  Today they are found and listed, and give the input model its properties.  See [what works today](README.md#what-works-today).
-
-- **A parameter stays in the SQL exactly as written.**  The constant for `GetUser` holds `@id`.
+- **A parameter stays in the SQL exactly as written.**  The constant for `GetUser`, and the SQL its method sends, hold `@id`.
 - **Names are compared ignoring case.**  `@Id` and `@id` are one parameter.
 - **Only `@` starts a parameter.**  `:name`, `$1` and `?` are not found, and stay in the SQL as written.
 - **Some uses of `@` are not parameters.**  `@>`, `@@`, `@?` and `@@ROWCOUNT` are not, and neither is the `@` inside a word, such as `user@host`, or an `@` that no name follows, such as the one in `a <@ b`.  The `@` of `<@b` is a parameter, `b`.
@@ -105,14 +103,14 @@ SELECT id, name FROM {{table}} ORDER BY {{orderBy}};
 
 > **Tokens are for trusted text only.**  A token is replaced by string concatenation.  Nothing is escaped, quoted or checked for safety, so a value that a user can influence is a SQL injection.  Use a token for a fragment that your own code chooses, such as a table name from a fixed list, and a query parameter for every value.
 
-`{{name}}` in a query is replaced with text that the caller supplies.  A query with a token is a static method and not a constant.  The method has one `string` parameter for each token name, in the order the names first appear, and returns the SQL with every token replaced:
+`{{name}}` in a query is replaced with text that the caller supplies.  A query with a token whose output is `sql` or `models` is a static method and not a constant.  The method has one `string` parameter for each token name, in the order the names first appear, and returns the SQL with every token replaced:
 
 ```csharp
 var sql = Sql.ListFrom("users", "name DESC");
 // SELECT id, name FROM users ORDER BY name DESC;
 ```
 
-Where the method goes is described on [the generator page](generator.md).
+Where the method goes is described on [the generator page](generator.md).  Under the output `codegen`, the query's [method](generator.md#method-signature) takes the same `string` arguments, after its input model, fills in the tokens the same way and runs the query: `await connection.ListFrom("users", "name DESC")`.
 
 - **A token's name is a C# identifier that is not a reserved keyword.**  A keyword is [SQLSRC114](diagnostics.md#sqlsrc114).  Spaces and tabs inside the braces are ignored.
 - **Names are case-sensitive.**  `{{Table}}` and `{{table}}` are two tokens.
@@ -120,7 +118,7 @@ Where the method goes is described on [the generator page](generator.md).
 - **A token is replaced wherever it is written**, including inside a string or a quoted identifier.
 - **Braces around anything that is not a name, or a name and a default, are not a token.**  `{{table-name}}`, `{{1st}}`, `{{order by}}` and `{{name:` with no closing `}}` stay in the SQL as written, and nothing is reported.
 - **Comments are removed before tokens are found**, so a `{{x}}` in a comment is not a token.  A query that keeps its comments (the `keep-comments` [generator parameter](settings.md#setting-generator-parameters)) is the exception: a kept comment is part of the SQL, and a token in it is replaced like any other.
-- **A query that gains its first token changes from a constant to a method**, so the code that uses it stops compiling until it passes the arguments.
+- **A query that gains its first token changes from a constant to a method**, or its query method gains an argument, so the code that uses it stops compiling until it passes the arguments.
 
 <a id="token-defaults"></a>
 
@@ -185,7 +183,7 @@ SELECT 'Hello, {{name}}' AS greeting;
 SELECT id, name FROM users {{whereClause}};
 ```
 
-By default the method checks each argument with `ArgumentException.ThrowIfNullOrWhiteSpace`: null throws `ArgumentNullException`, and an empty or blank string throws `ArgumentException`.  The check is that a value is present, not that it is safe.
+By default the method, a token method or a query method, checks each argument with `ArgumentException.ThrowIfNullOrWhiteSpace`: null throws `ArgumentNullException`, and an empty or blank string throws `ArgumentException`.  The check is that a value is present, not that it is safe.
 
 An empty fragment can be what you want, for an optional clause for example, so the check can be turned off with the `no-token-validation` generator parameter.  Where a generator parameter can be written, and which place wins, is on [the settings page](settings.md#setting-generator-parameters).
 

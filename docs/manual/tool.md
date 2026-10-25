@@ -7,11 +7,9 @@ $ dotnet sqlsource describe --connection billing="Host=localhost;Database=billin
 billing (postgres): 4 described, 0 skipped, 0 failed
 ```
 
-The generator writes a constant or a token method for every query, with the tool or without it.  The tool is for the queries that must be described, those whose [output](settings.md#setting-output) is `models` or `codegen`, the default: the build checks each of them against its file's sidecar, and reports one that has no current entry there.  A project whose queries all have the output `sql` needs no tool.
+The generator writes a constant or a token method for every query whose output is `sql` or `models`, with the tool or without it.  The tool is for the queries that must be described, those whose [output](settings.md#setting-output) is `models` or `codegen`, the default: the build checks each of them against its file's sidecar, and reports one that has no current entry there.  A project whose queries all have the output `sql` needs no tool.
 
-The generator builds the [models](generator.md#models) of each described query from the sidecars that the tool writes.
-
-> **Coming in a later release.**  The generator will build query methods from the sidecars that the tool writes.  See [what works today](README.md#what-works-today).
+The generator builds the [models](generator.md#models) of each described query from the sidecars that the tool writes, and the [method](generator.md#query-methods) that runs a query whose output is `codegen`.
 
 This page has two parts: [the workflow](#install-the-tool), from installing the tool to checking the sidecars in CI, and [the command reference](#command-reference).
 
