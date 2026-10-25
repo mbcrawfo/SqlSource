@@ -107,6 +107,14 @@ internal static class TrackingNames
 
     public const string TypeMethods = nameof(TypeMethods);
 
+    public const string MethodSignatures = nameof(MethodSignatures);
+
+    public const string ExtensionClassNames = nameof(ExtensionClassNames);
+
+    public const string TakenExtensionClasses = nameof(TakenExtensionClasses);
+
+    public const string MethodConflicts = nameof(MethodConflicts);
+
     public const string MethodOutput = nameof(MethodOutput);
 
     public const string MethodDiagnostics = nameof(MethodDiagnostics);

@@ -180,6 +180,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC273](#sqlsrc273) | Driver is not referenced |
 | [SQLSRC274](#sqlsrc274) | Method name is taken |
 | [SQLSRC275](#sqlsrc275) | Token is named as an argument of the method |
+| [SQLSRC276](#sqlsrc276) | Extension class name is taken |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 120 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
@@ -201,7 +202,7 @@ The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type overri
 
 The ids from `SQLSRC253` to `SQLSRC260` are reported by the build, about the [models](generator.md#models) of a query whose entry in its sidecar is current and whose columns and parameters all have a C# type, except `SQLSRC259` and `SQLSRC260`, which a query with a current entry gets whatever its C# types.  Each property of a model is named by the PascalCase of its column or parameter: `created_at` gives `CreatedAt`.  `SQLSRC253` to `SQLSRC255`, `SQLSRC256` for a name that a record or `object` has, `SQLSRC259` and `SQLSRC260` are about the query's own columns, parameters and markers: each is reported once for the query, however many types claim its file, at the query's name, or at its marker for `SQLSRC259` and `SQLSRC260`, and the query gets no models until it is fixed.  `SQLSRC257` and `SQLSRC258`, `SQLSRC256` for a property named as its model, and `SQLSRC251` for each property whose type is not public in a public model, are about a model, whose name and accessibility come from the types that claim its queries: `SQLSRC257` is reported at the later of two queries whose models differ, at its marker when it has one, and the others at the name of each query of the model, which is not generated until it is fixed.  A query gets every error it has, and its constant or method is still generated.
 
-The ids from `SQLSRC272` to `SQLSRC275` are reported by the build, about the [method](generator.md#query-methods) of a query whose output is `codegen`.  `SQLSRC272`, `SQLSRC274` and `SQLSRC275` are reported at the query's name, once however many types claim its file, except a `SQLSRC274` whose cause is of one type, which each such type reports.  A query gets every one of them that it has, and no method until all are fixed; its models are still generated.  `SQLSRC273` has no file and line, and is reported once for the project and database.
+The ids from `SQLSRC272` to `SQLSRC276` are reported by the build, about the [method](generator.md#query-methods) of a query whose output is `codegen`.  `SQLSRC272`, `SQLSRC274` and `SQLSRC275` are reported at the query's name, once however many types claim its file, except a `SQLSRC274` whose cause is of one type, which each such type reports, and one for the methods of two types that clash, which each of the two queries gets.  A query gets every one of them that it has, and no method until all are fixed; its models are still generated.  `SQLSRC273` has no file and line, and is reported once for the project and database.  `SQLSRC276` is about the extension class that holds a type's methods, and is reported at the type's `[SqlSourceGenerate]`, once for each type whose methods would go into the class.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
@@ -2409,7 +2410,8 @@ The method of a query whose output is `codegen` would have the name of something
 
 - under the default `MethodLocation.ExtensionClass`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
 - under `MethodLocation.Public`, `Internal` or `Private`, the name of a member of the type, of the type itself or of one of its type parameters, of the constant or token method of another query of the type under `SqlLocation.Direct`, or of the class that holds the type's queries under `SqlLocation.Nested`;
-- the name of the method of another query of the same type, which is reported at both queries.
+- the name of the method of another query of the same type, which is reported at both queries;
+- under `MethodLocation.ExtensionClass`, the name of the method of a query of another type whose methods go into the same extension class, as two types of one name nested in two types do, or of a method of the same name and the same parameters in the extension class of another type of the same namespace, which a call on a connection could not tell apart from it.  Both queries get the error, and neither gets its method.  Two methods of one name in the classes of two types whose parameters differ, one with an input model and one without, say, are two overloads, and each is generated.
 
 The message names the query, the method's name and what takes it.
 
@@ -2417,7 +2419,7 @@ The message names the query, the method's name and what takes it.
 /work/App/Queries/Users.sql(1,10): error SQLSRC274: The method of the query 'Open' cannot be named 'Open', because DbConnection has a member of that name, which a call on a connection finds before the method.  Rename the query.
 ```
 
-Rename the query, with its `-- name:` marker, or rename the member that takes the name.  For two queries `Get` and `GetAsync` under `async-method-suffix`, rename one of them.  The error is reported at the query's name, and the query's models are still generated.
+Rename the query, with its `-- name:` marker, or rename the member that takes the name.  For two queries `Get` and `GetAsync` under `async-method-suffix`, rename one of them.  For the methods of two types, rename one of the queries, or set `MethodLocation` on one of the types to put its methods on the type itself.  The error is reported at the query's name, and the query's models are still generated.
 
 See: [Query methods](generator.md#query-methods)
 
@@ -2432,5 +2434,25 @@ A token of a query whose output is `codegen` has the name of one of the argument
 ```
 
 Rename the token, everywhere the query writes it and in its `-- token:` marker.  The error is reported at the query's name, once for each such token, and the query's models are still generated.
+
+See: [Query methods](generator.md#query-methods)
+
+## SQLSRC276
+
+**Extension class name is taken**
+
+Under the default `MethodLocation.ExtensionClass`, the methods of a type go into a `static partial class` named after the type with `Extensions` after it, `SampleExtensions` for `Sample`, in the type's namespace.  That class cannot be generated, so the type gets none of its methods, when:
+
+- the project already has a type of the class's full name, or a namespace of it, such as a class `App.SampleExtensions` that you wrote;
+- SqlSource writes a model of that full name, named by `-- output-model:` or `-- input-model:`, or by a query's name and a suffix, or a model in a namespace of that name;
+- two types whose methods go into the one class, as two types `Queries` nested in two types of one namespace do, are of two accessibilities: the class is `public` when the type and every type around it are public, and `internal` otherwise, and one class cannot be both.
+
+Two types of one accessibility that give one class share it, each writing a part of it.  The message names the type, the class and what stops it.
+
+```console
+/work/App/Sample.cs(5,6): error SQLSRC276: The query methods of 'App.Sample' cannot go into the extension class 'App.SampleExtensions', because the project has a type of that name.  Rename the type or what has the name, or set the attribute's MethodLocation to put the methods on the type.
+```
+
+Rename the type, or the type, namespace or model that has the class's name, or make the two types of one accessibility.  Or set `MethodLocation` on the attribute to `Public`, `Internal` or `Private`, which puts the methods on the type itself and needs no extension class.  The error is reported at the type's `[SqlSourceGenerate]`, once for each type whose methods would go into the class, and the type's models are still generated.
 
 See: [Query methods](generator.md#query-methods)

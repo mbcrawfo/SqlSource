@@ -114,3 +114,4 @@ SQLSRC272 | SqlSource | Error | Result shape needs rows
 SQLSRC273 | SqlSource | Error | Driver is not referenced
 SQLSRC274 | SqlSource | Error | Method name is taken
 SQLSRC275 | SqlSource | Error | Token is named as an argument of the method
+SQLSRC276 | SqlSource | Error | Extension class name is taken

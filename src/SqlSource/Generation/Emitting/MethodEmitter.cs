@@ -49,7 +49,7 @@ internal static class MethodEmitter
                 .Append("/// <summary>\n")
                 .Append(indent)
                 .Append("/// The query methods of <c>")
-                .Append(XmlDocWriter.Escape(DisplayNameOf(methods)))
+                .Append(XmlDocWriter.Escape(methods.DisplayName))
                 .Append("</c>, which extend the connection they run on.\n")
                 .Append(indent)
                 .Append("/// </summary>\n");
@@ -105,21 +105,4 @@ internal static class MethodEmitter
             MethodPlacement.Private => "private static",
             MethodPlacement.Public or MethodPlacement.ExtensionClass or _ => "public static",
         };
-
-    // The attributed type as its summary names it: the namespace and each type, with its type parameters.
-    private static string DisplayNameOf(TypeMethods methods)
-    {
-        var name = new StringBuilder(methods.Namespace);
-        foreach (var declaration in methods.Types)
-        {
-            if (name.Length > 0)
-            {
-                _ = name.Append('.');
-            }
-
-            _ = name.Append(declaration.ValueName).Append(declaration.TypeParameters);
-        }
-
-        return name.ToString();
-    }
 }

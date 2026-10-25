@@ -44,6 +44,17 @@ internal static class MethodRuns
             properties: properties
         );
 
+    // The source and these files, each sidecar among them, at CodeGen under postgres on Npgsql 10: the run of a test
+    // with more than one file.
+    public static GeneratorRun Run(string source, params SqlFile[] files) =>
+        GeneratorHarness.Run(
+            OutputKind.CodeGen,
+            [new SourceFile(GeneratorHarness.SourcePath, source)],
+            files,
+            references: [NpgsqlReferences.Npgsql10],
+            dialect: "postgres"
+        );
+
     // The same under mssql, on SqlClient 7 unless the references are given.
     public static GeneratorRun RunSqlServer(
         SqlFile file,

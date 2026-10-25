@@ -822,6 +822,20 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the attributed type in full, {1} the extension class's full name, and {2} what stops the class, as "the
+    // project has a type of that name".  Reported at the type's attribute.
+    public static readonly DiagnosticDescriptor ExtensionClassNameTaken = new(
+        id: "SQLSRC276",
+        title: "Extension class name is taken",
+        messageFormat: "The query methods of '{0}' cannot go into the extension class '{1}', because {2}.  Rename the "
+            + "type or what has the name, or set the attribute's MethodLocation to put the methods on the type.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc276",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -892,7 +906,8 @@ internal static class SqlDiagnostics
             QueryShapeNeedsRows,
             DriverNotReferenced,
             MethodNameTaken,
-            TokenNamedAsAnArgument
+            TokenNamedAsAnArgument,
+            ExtensionClassNameTaken
         );
 
     /// <summary>

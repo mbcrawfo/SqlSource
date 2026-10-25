@@ -1,3 +1,4 @@
+using System.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
 using SqlSource.Settings;
@@ -37,4 +38,28 @@ internal sealed record TypeMethods(
     EquatableArray<QueryMethod> Methods,
     EquatableArray<DiagnosticInfo> Diagnostics,
     CodeGenEngines CodeGenEngines
-);
+)
+{
+    /// <summary>
+    /// The type in full, as a summary or a diagnostic names it: the namespace and each type, with its type parameters,
+    /// as <c>App.Sample&lt;T&gt;</c>.
+    /// </summary>
+    public string DisplayName
+    {
+        get
+        {
+            var name = new StringBuilder(Namespace);
+            foreach (var declaration in Types)
+            {
+                if (name.Length > 0)
+                {
+                    _ = name.Append('.');
+                }
+
+                _ = name.Append(declaration.ValueName).Append(declaration.TypeParameters);
+            }
+
+            return name.ToString();
+        }
+    }
+}
