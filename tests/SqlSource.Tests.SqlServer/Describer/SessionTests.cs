@@ -31,8 +31,9 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         server.Version.ShouldBe(SqlServerContainer.ImageBuilds[EngineImage.SqlServer.Image]);
         server.Driver.ShouldBe("Microsoft.Data.SqlClient");
         server.DriverVersion.ShouldNotBeNull().ShouldStartWith("7.1.1");
+        // A new database takes the compatibility level of its server's major: 140 on 2017, 150 on 2019 and so on.
         server.Settings.ShouldBe([
-            new ServerSetting("compatibility_level", sqlServer.Major >= 17 ? "170" : "140"),
+            new ServerSetting("compatibility_level", (sqlServer.Major * 10).ToString(CultureInfo.InvariantCulture)),
             new ServerSetting("ANSI_NULLS", "ON"),
             new ServerSetting("QUOTED_IDENTIFIER", "ON"),
             new ServerSetting("collation", "SQL_Latin1_General_CP1_CI_AS"),

@@ -1,14 +1,18 @@
-# Builds and tests on Windows and macOS every night.  ci.yml covers Linux on every pull request, and this covers what
-# differs elsewhere: paths, quoting, exit codes, and how a process and what it started are killed.
-# No check that needs Docker, no test that needs a container, and no pack: the lint images and the PostgreSQL and
-# SQL Server images are Linux images, and build.yml has all three.
+# Builds and tests on Windows and macOS every night, and runs the container tests on Linux on every supported database
+# major that ci.yml does not.  ci.yml covers Linux on every pull request, and the test job here covers what differs
+# elsewhere: paths, quoting, exit codes, and how a process and what it started are killed.  That job runs no check that
+# needs Docker, no test that needs a container, and no pack: the lint images and the PostgreSQL and SQL Server images
+# are Linux images, which these runners cannot start, and build.yml has all three.
+# build.yml tests each engine's floor and default image, and test-postgres and test-sqlserver here every supported major
+# between them, so that the two cover every supported major: see the rule in .github/AGENTS.md.
 # It is no required check.  A pull request that changes this file runs it, so that a change to it is tried.
 name: Nightly
 
 on:
   schedule:
-    # 07:17 UTC.  Off the hour, when the scheduler is least loaded.
-    - cron: '17 7 * * *'
+    # 06:17 UTC: 01:17 EST, and 02:17 EDT, since a schedule has no time zone.  Off the hour, when the scheduler is least
+    # loaded.
+    - cron: '17 6 * * *'
   workflow_dispatch:
   pull_request:
     branches:
@@ -76,3 +80,95 @@ jobs:
                   --report-github || status=1
           done
           exit "$status"
+
+  # build.yml runs every test of tests/SqlSource.Tests.Postgres on PostgreSQL 14, the floor, and 18, the default.  This
+  # runs them on every supported major between the two, each image pinned as rule 5 of AGENTS.md says.  The steps are
+  # those of build.yml's test-postgres-floor.
+  test-postgres:
+    name: Test on PostgreSQL ${{ matrix.major }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      # One version's failure says nothing of another.
+      fail-fast: false
+      matrix:
+        include:
+          - major: 15
+            image: postgres:15.19
+          - major: 16
+            image: postgres:16.15
+          - major: 17
+            image: postgres:17.11
+    env:
+      PROJECT: tests/SqlSource.Tests.Postgres
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: tests/SqlSource.Tests.Postgres/packages.lock.json
+
+      - name: Build
+        run: dotnet build "$PROJECT" --configuration "$CONFIGURATION"
+
+      # A pull is a step of its own, so that the time it takes shows apart from the time the tests take.
+      - name: Pull test image
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: docker pull --quiet "$IMAGE"
+
+      - name: Test
+        env:
+          SQLSOURCE_TESTS_POSTGRES_IMAGE: ${{ matrix.image }}
+        run: dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build --report-github
+
+  # The same for tests/SqlSource.Tests.SqlServer, which build.yml runs on SQL Server 2017, the floor, and 2025, the
+  # default.  Each image here has its row of SqlServerContainer.ImageBuilds.  The steps are those of build.yml's
+  # test-sqlserver-floor.
+  test-sqlserver:
+    name: Test on SQL Server ${{ matrix.major }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      # One version's failure says nothing of another.
+      fail-fast: false
+      matrix:
+        include:
+          - major: 2019
+            image: mcr.microsoft.com/mssql/server:2019-CU32-GDR12-ubuntu-20.04
+          - major: 2022
+            image: mcr.microsoft.com/mssql/server:2022-CU27-GDR1-ubuntu-22.04
+    env:
+      PROJECT: tests/SqlSource.Tests.SqlServer
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: tests/SqlSource.Tests.SqlServer/packages.lock.json
+
+      - name: Build
+        run: dotnet build "$PROJECT" --configuration "$CONFIGURATION"
+
+      # A pull is a step of its own, so that the time it takes shows apart from the time the tests take.
+      - name: Pull test image
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: docker pull --quiet "$IMAGE"
+
+      - name: Test
+        env:
+          SQLSOURCE_TESTS_SQLSERVER_IMAGE: ${{ matrix.image }}
+        run: dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build --report-github
