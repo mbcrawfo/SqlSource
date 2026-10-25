@@ -182,6 +182,13 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC275](#sqlsrc275) | Token is named as an argument of the method |
 | [SQLSRC276](#sqlsrc276) | Extension class name is taken |
 
+**Converters**
+
+| Id | Title |
+|----|----|
+| [SQLSRC277](#sqlsrc277) | Method marked as a converter is not one |
+| [SQLSRC278](#sqlsrc278) | Two converters convert between the same types |
+
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 120 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
@@ -203,6 +210,8 @@ The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type overri
 The ids from `SQLSRC253` to `SQLSRC260` are reported by the build, about the [models](generator.md#models) of a query whose entry in its sidecar is current and whose columns and parameters all have a C# type, except `SQLSRC259` and `SQLSRC260`, which a query with a current entry gets whatever its C# types.  Each property of a model is named by the PascalCase of its column or parameter: `created_at` gives `CreatedAt`.  `SQLSRC253` to `SQLSRC255`, `SQLSRC256` for a name that a record or `object` has, `SQLSRC259` and `SQLSRC260` are about the query's own columns, parameters and markers: each is reported once for the query, however many types claim its file, at the query's name, or at its marker for `SQLSRC259` and `SQLSRC260`, and the query gets no models until it is fixed.  `SQLSRC257` and `SQLSRC258`, `SQLSRC256` for a property named as its model, and `SQLSRC251` for each property whose type is not public in a public model, are about a model, whose name and accessibility come from the types that claim its queries: `SQLSRC257` is reported at the later of two queries whose models differ, at its marker when it has one, and the others at the name of each query of the model, which is not generated until it is fixed.  A query gets every error it has; under the output `models` its constant or token method is still generated, and under `codegen` it gets no method until all are fixed.
 
 The ids from `SQLSRC272` to `SQLSRC276` are reported by the build, about the [method](generator.md#query-methods) of a query whose output is `codegen`.  `SQLSRC272`, `SQLSRC274` and `SQLSRC275` are reported at the query's name, once however many types claim its file, except a `SQLSRC274` whose cause is of one type, which each such type reports, and one for the methods of two types that clash, which each of the two queries gets.  A query of a file that two types of one namespace claim gives each type a method of one signature, so it gets one `SQLSRC274` for each type, each naming the other.  A query gets every one of them that it has, and no method until all are fixed; its models are still generated.  `SQLSRC273` has no file and line, and is reported once for the project and database.  `SQLSRC276` is about the extension class that holds a type's methods, and is reported at the type's `[SqlSourceGenerate]`, once for each type whose methods would go into the class.
+
+`SQLSRC277` and `SQLSRC278` are reported by the build, about the methods of the project's own code marked `[SqlSourceConverter]`: at the method's name, whatever the output of the project, its types and its files, and whether a query uses the method or not.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
@@ -2457,3 +2466,41 @@ Two types of one accessibility that give one class share it, each writing a part
 Rename the type, or the type, namespace or model that has the class's name, or make the two types of one accessibility.  Or set `MethodLocation` on the attribute to `Public`, `Internal` or `Private`, which puts the methods on the type itself and needs no extension class.  The error is reported at the type's `[SqlSourceGenerate]`, once for each type whose methods would go into the class, and the type's models are still generated.
 
 See: [Query methods](generator.md#query-methods)
+
+## SQLSRC277
+
+**Method marked as a converter is not one**
+
+A method marked `[SqlSourceConverter]` must be a converter: a `static` method of one argument that returns the argument converted to another type, as `public static Email FromDatabase(string value)` does.  The method is not one, and the message names it and the first of these that is wrong with it:
+
+- `it is not static`: the method is an instance method.
+- `it is generic`: the method has type parameters of its own.
+- `it is in a generic type`: the method is in a generic type, or in a type nested in one.
+- `it does not take exactly one argument`: the method has no argument, or more than one.
+- `its argument is ref, out, in, params or optional`: the argument has one of those modifiers, or a default value.
+- `it returns nothing`: the method returns `void`, `Task` or `ValueTask`, or `Task<T>` or `ValueTask<T>`.  A converter returns its result itself.
+- `its return type is annotated as nullable`: the method returns a type written with `?`, as `string?` or `int?`.  A converter's result is never null.
+- `this project cannot call it`: the method, or a type it is in, is `private` or `protected`, or the type is a `file` type, so code in another file of the project cannot call it.
+- `it is marked [Obsolete] as an error`: the method, or a type it is in, has `[Obsolete]` with `true` as its second argument, so that no call of it compiles.  A method marked `[Obsolete]` as a warning is a converter.
+
+```console
+/work/App/Email.cs(5,18): error SQLSRC277: The method 'App.Email.FromDatabase(string)' is marked [SqlSourceConverter], but it is not static.  A converter is a static method of one argument that returns the converted value.
+```
+
+Change the method so that it is a converter, or remove its `[SqlSourceConverter]` when it is not meant to be one.  The error is reported at the method's name.
+
+> **Coming in a later release.**  The generated query methods will call your converters to read and send a type that the type override names.  See [what works today](README.md#what-works-today).
+
+## SQLSRC278
+
+**Two converters convert between the same types**
+
+Two methods of the project marked `[SqlSourceConverter]` take the same type and return the same type, so either could convert between the two.  The message names both methods and the two types.
+
+```console
+/work/App/Conversions.cs(8,25): error SQLSRC278: The converters 'App.Conversions.ToEmail(string)' and 'App.Email.FromDatabase(string)' both convert 'string' to 'App.Email'.  Keep one.
+```
+
+Remove `[SqlSourceConverter]` from one of them, or remove the method.  The error is reported at the name of each of the methods.  Two converters of opposite directions, one from `string` to `Email` and one from `Email` to `string`, are a pair and not this error, and a converter of a type to itself, as `DateTime` to `DateTime`, is one converter.  A method that has [SQLSRC277](#sqlsrc277) is not counted until it is fixed.
+
+> **Coming in a later release.**  The generated query methods will call your converters to read and send a type that the type override names.  See [what works today](README.md#what-works-today).

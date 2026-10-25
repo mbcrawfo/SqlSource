@@ -4,9 +4,11 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Models;
@@ -64,6 +66,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             settings.ProjectSettings,
             settings.ProjectLevel
         );
+        _ = FindConverters(context, typing.MappedTypeConverters);
         var models = CollectModels(context, typing.Files, typeQueries, settings.ProjectLevel);
         ReportDrivers(context, typing.NpgsqlProbe, typing.SqlClientProbe, sidecars.Needs, parsedFiles.Sorted);
         ReportProblems(context, sidecars.Checks, typing.FileTypes, models.FileModels, models.Models);
@@ -499,7 +502,39 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             each.Select(static (file, _) => file.Types).WithTrackingName(TrackingNames.FileTypes)
         );
 
-        return new TypedFiles(npgsqlProbe, sqlClientProbe, typedFiles, fileTypes);
+        // The converters of the mapped types of referenced assemblies, none until they are read.
+        var mappedTypeConverters = mappedTypes.Select(static (_, _) => EquatableArray<Converter>.Empty);
+
+        return new TypedFiles(npgsqlProbe, sqlClientProbe, typedFiles, fileTypes, mappedTypeConverters);
+    }
+
+    // The project's converters, from the methods of its source that carry the converter attribute and from the mapped
+    // types, with the problems of its methods reported, whatever the output.
+    private static IncrementalValueProvider<ConverterSet> FindConverters(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValueProvider<EquatableArray<Converter>> mappedTypeConverters
+    )
+    {
+        // An edit to a method's declaration reads that method again, and goes no further unless the converter changes.
+        var projectConverters = context
+            .SyntaxProvider.ForAttributeWithMetadataName(
+                AttributeSource.ConverterAttributeMetadataName,
+                static (node, _) => node is MethodDeclarationSyntax,
+                ConverterReader.Read
+            )
+            .WithTrackingName(TrackingNames.ProjectConverters)
+            .Collect()
+            .Select(static (converters, _) => ConverterSet.Sort(converters));
+
+        var converters = projectConverters
+            .Combine(mappedTypeConverters)
+            .Select(static (input, _) => ConverterSet.Of(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.Converters);
+
+        // The problems alone, so that an edit that changes none of them reports nothing again.
+        context.RegisterSourceOutput(converters.Select(static (set, _) => set.Diagnostics), ReportAll);
+
+        return converters;
     }
 
     // Each file's models, and the models every type's requests come to, checked against each other and the project.
@@ -1063,12 +1098,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         FileNodes<SidecarCheckResult> Checks
     );
 
-    // The drivers the project references, each claimed file typed, and its types alone.
+    // The drivers the project references, each claimed file typed, its types alone, and the converters of the mapped
+    // types.
     private readonly record struct TypedFiles(
         IncrementalValueProvider<NpgsqlProbe> NpgsqlProbe,
         IncrementalValueProvider<SqlClientProbe> SqlClientProbe,
         FileNodes<TypedFile> Files,
-        FileNodes<FileTypes> FileTypes
+        FileNodes<FileTypes> FileTypes,
+        IncrementalValueProvider<EquatableArray<Converter>> MappedTypeConverters
     );
 
     // Each file's models, every file's together, the models' full names, and the models to emit with the problems of

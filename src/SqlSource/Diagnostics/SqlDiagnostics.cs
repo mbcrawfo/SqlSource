@@ -836,6 +836,34 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the method as "App.Email.FromDatabase(string)", {1} its first fault, as "it is not static".  Reported at
+    // the method's name for a method of the project's source.
+    public static readonly DiagnosticDescriptor NotAConverter = new(
+        id: "SQLSRC277",
+        title: "Method marked as a converter is not one",
+        messageFormat: "The method '{0}' is marked [SqlSourceConverter], but {1}.  A converter is a static method of "
+            + "one argument that returns the converted value.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc277",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} and {1} are the two methods as "App.Email.FromDatabase(string)", {2} the type of their argument and {3} their
+    // return type, as PostgresTypeMap.AsWritten writes them.  Reported at the name of each method of the project's
+    // source.
+    public static readonly DiagnosticDescriptor DuplicateConverter = new(
+        id: "SQLSRC278",
+        title: "Two converters convert between the same types",
+        messageFormat: "The converters '{0}' and '{1}' both convert '{2}' to '{3}'.  Keep one.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc278",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -907,7 +935,9 @@ internal static class SqlDiagnostics
             DriverNotReferenced,
             MethodNameTaken,
             TokenNamedAsAnArgument,
-            ExtensionClassNameTaken
+            ExtensionClassNameTaken,
+            NotAConverter,
+            DuplicateConverter
         );
 
     /// <summary>
