@@ -1,9 +1,11 @@
 using System;
 using System.Data;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
+using SqlSource.Testing.EndToEnd;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -22,6 +24,9 @@ public sealed class RunTimeTests(PostgresContainer postgres)
     // Enough rows to fill the server's send buffer many times over: it sends each buffer as it fills, so the client has
     // received every row but those of the last, unfilled buffer when the last row sleeps, on 14 as on 18.
     private const int RowsBeforeTheSleep = 10_000;
+
+    // The id of the copy of all_types' row of NULLs that a refused insert would have written.
+    private const int RefusedRowId = 5;
 
     // The write is seen by the transaction's own read, and the rollback puts back the version of the row it replaced.
     [Fact]
@@ -193,6 +198,28 @@ public sealed class RunTimeTests(PostgresContainer postgres)
         connection.State.ShouldBe(ConnectionState.Closed);
     }
 
+    // Npgsql writes a timestamptz from a DateTime whose Kind is Utc alone, and refuses another Kind before the command
+    // is sent, where it would otherwise convert the value in the session's time zone.
+    [Fact]
+    public Task InsertEveryType_UnspecifiedDateTimeForTimestamptz_ThrowsBeforeSending() =>
+        InsertEveryTypeShouldBeRefusedBeforeSendingAsync(static arguments =>
+            arguments with
+            {
+                TimestamptzValue = new DateTime(2024, 3, 15, 13, 45, 30, DateTimeKind.Unspecified),
+            }
+        );
+
+    // Npgsql writes a timestamp from a DateTime whose Kind is not Utc alone, and refuses a Utc one before the command
+    // is sent.
+    [Fact]
+    public Task InsertEveryType_UtcDateTimeForTimestamp_ThrowsBeforeSending() =>
+        InsertEveryTypeShouldBeRefusedBeforeSendingAsync(static arguments =>
+            arguments with
+            {
+                TimestampValue = new DateTime(2024, 3, 15, 13, 45, 30, DateTimeKind.Utc),
+            }
+        );
+
     // Cancels once ListThenSleep sleeps before its last row, or once the wait for it fails.
     private static async Task CancelOnceSleepingAsync(
         NpgsqlDataSource watch,
@@ -211,6 +238,33 @@ public sealed class RunTimeTests(PostgresContainer postgres)
         {
             await cancel.CancelAsync();
         }
+    }
+
+    // Inserts a copy of the row of NULLs with one value changed, which Npgsql refuses with ArgumentException.  Nothing
+    // reached the server: a statement it ran would have written the row, and one it refused would have aborted the
+    // transaction, which then refuses the read after it.
+    private async Task InsertEveryTypeShouldBeRefusedBeforeSendingAsync(
+        Func<InsertEveryTypeArgs, InsertEveryTypeArgs> change
+    )
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+        var nulls = (await connection.ListAllTypes(transaction, cancellationToken: token)).Single(static row =>
+            row.Id == AllTypesRows.NullRowId
+        );
+        var arguments = change(AllTypesRows.ArgsFrom<InsertEveryTypeArgs>(nulls, RefusedRowId));
+
+        var exception = await Should.ThrowAsync<ArgumentException>(() =>
+            connection.InsertEveryType(arguments, transaction, cancellationToken: token)
+        );
+        var rows = await connection.ListAllTypes(transaction, cancellationToken: token);
+        await transaction.RollbackAsync(token);
+
+        exception.GetType().ShouldBe(typeof(ArgumentException));
+        rows.Select(static row => row.Id).ShouldBe([AllTypesRows.FullRowId, AllTypesRows.NullRowId]);
+        connection.State.ShouldBe(ConnectionState.Open);
     }
 
     // The xmin of the account's row that the read sees: the id of the transaction that wrote that version of it.
