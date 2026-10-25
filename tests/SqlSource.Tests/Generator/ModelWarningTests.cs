@@ -222,7 +222,7 @@ public sealed class ModelWarningTests
 
         run.Diagnostics.ShouldHaveSingleItem()
             .ShouldStartWith(
-                $"SQLSRC252 {GeneratorHarness.UsersPath}(1,10)-(1,17): The type override maps 'text' to "
+                $"SQLSRC252 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'text' is mapped to "
                     + "'MyApp.GoneName' for column 'name', in the property SqlSourceTypeOverrides, and no property "
                     + "can have that type."
             );
@@ -254,7 +254,7 @@ public sealed class ModelWarningTests
 
         run.Diagnostics.ShouldHaveSingleItem()
             .ShouldStartWith(
-                $"SQLSRC252 {GeneratorHarness.UsersPath}(1,10)-(1,17): The type override maps 'text' to "
+                $"SQLSRC252 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'text' is mapped to "
                     + "'MyApp.ValueBox<string>' for column 'name', in the property SqlSourceTypeOverrides, and no "
                     + "property can have that type."
             );

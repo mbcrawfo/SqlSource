@@ -569,7 +569,7 @@ public sealed class SharedModelTests
 
         AssertUnusable(
             run,
-            $"SQLSRC251 {GetUserName}: The type override maps 'int4' to 'MyApp.Inner' for column 'id', in the property "
+            $"SQLSRC251 {GetUserName}: 'int4' is mapped to 'MyApp.Inner' for column 'id', in the property "
                 + "SqlSourceTypeOverrides, and that type is not public, and the model 'App.GetUserDto' is.  Make the "
                 + "type public, or make each type that claims the query's file internal."
         );
@@ -590,10 +590,10 @@ public sealed class SharedModelTests
         );
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC251 {GetUserName}: The type override maps 'int4' to 'MyApp.Inner' for column 'id', in the property "
+            $"SQLSRC251 {GetUserName}: 'int4' is mapped to 'MyApp.Inner' for column 'id', in the property "
                 + "SqlSourceTypeOverrides, and that type is not public, and the model 'App.GetUserDto' is.  Make the "
                 + "type public, or make each type that claims the query's file internal.",
-            $"SQLSRC251 {GetUserName}: The type override maps 'text' to 'MyApp.Secret' for column 'name', in the "
+            $"SQLSRC251 {GetUserName}: 'text' is mapped to 'MyApp.Secret' for column 'name', in the "
                 + "property SqlSourceTypeOverrides, and that type is not public, and the model 'App.GetUserDto' is.  "
                 + "Make the type public, or make each type that claims the query's file internal.",
         ]);
@@ -619,10 +619,10 @@ public sealed class SharedModelTests
         );
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC251 {GetAName}: The type override maps 'int4' to 'App.UserKey' for column 'id', in a "
+            $"SQLSRC251 {GetAName}: 'int4' is mapped to 'App.UserKey' for column 'id', in a "
                 + "-- type-override: marker of the query, and that type is not public, and the model 'App.UserRow' "
                 + "is.  Make the type public, or make each type that claims the query's file internal.",
-            $"SQLSRC251 {GetBName}: The type override maps 'text' to 'App.UserKey' for column 'Id', in the property "
+            $"SQLSRC251 {GetBName}: 'text' is mapped to 'App.UserKey' for column 'Id', in the property "
                 + "SqlSourceTypeOverrides, and that type is not public, and the model 'App.UserRow' is.  Make the type "
                 + "public, or make each type that claims the query's file internal.",
         ]);

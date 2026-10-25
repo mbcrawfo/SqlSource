@@ -82,6 +82,16 @@ public sealed class SqlQueryHashTests
     public void Compute_ParamMarkerWithAType_ChangesTheHash() =>
         Hash("-- name: Q\n-- param: @id int4\nSELECT @id;").ShouldNotBe(Hash("-- name: Q\nSELECT @id;"));
 
+    // A C# type describes nothing either: the database never sees it.
+    [Fact]
+    public void Compute_ParamMarkerOfACSharpTypeAlone_IsTheHashWithoutIt() =>
+        Hash("-- name: Q\n-- param: @id -> UserId\nSELECT @id;").ShouldBe(Hash("-- name: Q\nSELECT @id;"));
+
+    [Fact]
+    public void Compute_ParamMarker_AddingACSharpType_KeepsTheHash() =>
+        Hash("-- name: Q\n-- param: @id int4 -> UserId\nSELECT @id;")
+            .ShouldBe(Hash("-- name: Q\n-- param: @id int4\nSELECT @id;"));
+
     [Fact]
     public void Compute_AnyQuery_IsSixtyFourLowerCaseHexCharacters() => Hash(Simple).ShouldMatch("^[0-9a-f]{64}$");
 

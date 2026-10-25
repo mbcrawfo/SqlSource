@@ -105,7 +105,7 @@ internal static class SqlParameterList
         }
     }
 
-    // A declared parameter that the SQL holds takes its type; one that it does not hold is added after the others.
+    // A declared parameter that the SQL holds takes its types; one that it does not hold is added after the others.
     private static void Declare(
         ImmutableArray<SqlQueryParameter>.Builder parameters,
         SqlParameterDeclaration declaration,
@@ -121,6 +121,7 @@ internal static class SqlParameterList
                 Type = declaration.Type,
                 Nullable = declaration.Nullable,
                 IsDeclared = true,
+                ClrType = declaration.ClrType,
             };
             return;
         }
@@ -136,7 +137,9 @@ internal static class SqlParameterList
             );
         }
 
-        parameters.Add(new SqlQueryParameter(declaration.Name, declaration.Type, declaration.Nullable, true));
+        parameters.Add(
+            new SqlQueryParameter(declaration.Name, declaration.Type, declaration.Nullable, true, declaration.ClrType)
+        );
     }
 
     private static void ReportUndeclared(

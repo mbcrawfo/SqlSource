@@ -14,9 +14,9 @@ using SqlSource.Snapshot;
 namespace SqlSource.Generation.Types;
 
 /// <summary>
-/// Gives each parameter and column of a file's usable entries its C# type: the type override's, from the most specific
-/// level that names its key, or else the base map of its engine's, under the column of the project's driver of that
-/// engine.
+/// Gives each parameter and column of a file's usable entries its C# type: for a parameter, the one its
+/// <c>-- param:</c> marker gives after <c>-&gt;</c>; else the type override's, from the most specific level that names
+/// its key; or else the base map of its engine's, under the column of the project's driver of that engine.
 /// </summary>
 /// <remarks>
 /// A query's parameters are typed before its columns, each in order, and its first failure is its one error, at its
@@ -38,6 +38,9 @@ internal static class QueryTyper
         "Make it, and each type it is nested in, public, or internal when it is this project's own, or give this "
         + "project its assembly's internals with InternalsVisibleTo";
 
+    // The place of a parameter's C# type that its -- param: marker gives, as SQLSRC250 to SQLSRC252 name it.
+    private const string ParamMarker = "the -- param: marker of the parameter";
+
     /// <summary>The types of the file's queries whose entries are usable, and the errors of the others.</summary>
     public static FileTypes Type(FileTypesInput input)
     {
@@ -54,6 +57,7 @@ internal static class QueryTyper
         var queries = ImmutableArray.CreateBuilder<QueryTypes>(check.UsableEntries.Count);
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
         var engine = SqlDescribableDialects.EngineOf(file.Dialect);
+        var prefix = SqlDialectRules.For(new SqlDialectChoice(file.Dialect, SqlDialectOptions.None)).ParameterPrefix;
         var lookups = new List<(SettingsLevel Markers, OverrideLookup? Lookup)>();
         var next = 0;
         foreach (var entry in check.UsableEntries)
@@ -72,10 +76,11 @@ internal static class QueryTyper
                 input.SqlClientProbe.Column,
                 input.SqlClientProbe.VersionText,
                 LookupOf(query.Markers, input, engine, lookups),
+                input.MappedTypes,
                 query.NameLocation,
                 diagnostics
             );
-            if (TypeQuery(entry, typing) is { } types)
+            if (TypeQuery(entry, query.Parameters, prefix, typing) is { } types)
             {
                 queries.Add(types);
             }
@@ -88,13 +93,31 @@ internal static class QueryTyper
         );
     }
 
-    // The query's types, or null after its first failure is reported.
-    private static QueryTypes? TypeQuery(SidecarEntry entry, Typing typing)
+    // The query's types, or null after its first failure is reported.  A parameter whose marker gives a C# type, found
+    // by its name ignoring case, has that type, which the message of its failure names it by, with its prefix.
+    private static QueryTypes? TypeQuery(
+        SidecarEntry entry,
+        EquatableArray<SqlQueryParameter> declared,
+        char prefix,
+        Typing typing
+    )
     {
         var parameters = ImmutableArray.CreateBuilder<PropertyType>(entry.Parameters.Count);
         foreach (var parameter in entry.Parameters)
         {
-            if (TypeOf(parameter.Type, MessageSubject.Parameter, parameter.Name, typing) is not { } type)
+            var chosen =
+                parameter.Type is { } sidecarType && MarkedParameter(declared, parameter.Name) is { } marked
+                    ? Chosen(
+                        marked.ClrType!,
+                        ParamMarker,
+                        prefix + marked.Name,
+                        sidecarType,
+                        MessageSubject.Parameter,
+                        parameter.Name,
+                        typing
+                    )
+                    : TypeOf(parameter.Type, MessageSubject.Parameter, parameter.Name, typing);
+            if (chosen is not { } type)
             {
                 return null;
             }
@@ -124,6 +147,109 @@ internal static class QueryTyper
             new EquatableArray<PropertyType>(columns.MoveToImmutable())
         );
     }
+
+    // The query's parameter of the name, ignoring case, when its marker gives it a C# type, or null.
+    private static SqlQueryParameter? MarkedParameter(EquatableArray<SqlQueryParameter> declared, string name)
+    {
+        for (var index = 0; index < declared.Count; index++)
+        {
+            var parameter = declared[index];
+            if (
+                parameter.ClrType is not null
+                && string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                return parameter;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The property type of a parameter or column whose C# type a marker or a setting chose, over the type override
+    /// and the map, or null after its error is added.  The type keeps the base map's type of its database type beside
+    /// it, for its converters, as a type override's does.
+    /// </summary>
+    /// <param name="clrType">The C# type, as <c>ClrTypeName.Text</c> writes it.</param>
+    /// <param name="place">Where it was chosen, as <c>SQLSRC250</c> to <c>SQLSRC252</c> name it.</param>
+    /// <param name="key">What their messages name as mapped: <c>@author</c>, or the key of a column.</param>
+    /// <param name="type">The database type.</param>
+    /// <param name="owner"><see cref="MessageSubject.Parameter" /> or <see cref="MessageSubject.Column" />.</param>
+    /// <param name="name">The parameter's or the column's name.</param>
+    /// <param name="typing">What the typing of the query reads, and where its error goes.</param>
+    private static PropertyType? Chosen(
+        string clrType,
+        string place,
+        string key,
+        SidecarType type,
+        string owner,
+        string name,
+        Typing typing
+    )
+    {
+        // A type of an engine this version does not know has no base map: its error is the map's.
+        if (type is not (PostgresType or SqlServerType))
+        {
+            return TypeOf(type, owner, name, typing);
+        }
+
+        var mapping = MappingOf(typing.MappedTypes, clrType, key, place);
+        if (mapping is { Kind: TypeMappingKind.Mapped, Text: { } text })
+        {
+            return new PropertyType(
+                text,
+                mapping.IsValueType,
+                mapping.IsPublic,
+                mapping.WarningIds,
+                KeyOf(type),
+                place,
+                DatabaseTypeOf(type, typing)
+            );
+        }
+
+        var engine = type is SqlServerType ? DatabaseEngine.SqlServer : DatabaseEngine.PostgreSql;
+        typing.Diagnostics.Add(Diagnose(mapping, MessageSubject.Of(owner, name), type.Name, typing, engine));
+        return null;
+    }
+
+    // The key that an entry of the type override for the type would have, which a converter's message names as its
+    // database type: of an array of PostgreSQL its element's with [], as the type override finds one.
+    private static string KeyOf(SidecarType type) =>
+        type switch
+        {
+            SqlServerType sqlServer => SqlServerTypeMap.KeyOf(sqlServer),
+            PostgresType { Element: { } element } array
+                when array.Kind.Equals(SidecarValues.Kind.Array, StringComparison.Ordinal) => PostgresTypeMap.KeyOf(
+                element
+            ) + "[]",
+            PostgresType postgres => PostgresTypeMap.KeyOf(postgres),
+            _ => type.Name,
+        };
+
+    // The mapping of a C# type that a level chose for a key, by the compilation's answer for its name.  A found type is
+    // written as the resolver wrote it, its short names in full; a failure keeps the name for its message, and the
+    // place that chose it in its detail.
+    private static TypeMapping MappingOf(EquatableArray<MappedType> mappedTypes, string name, string key, string place)
+    {
+        var mapped = MappedTypeResolver.Find(mappedTypes, name);
+        var kind = (mapped?.Status ?? MappedTypeStatus.NotFound) switch
+        {
+            MappedTypeStatus.Found => TypeMappingKind.Mapped,
+            MappedTypeStatus.NotAccessible => TypeMappingKind.MappedTypeNotAccessible,
+            MappedTypeStatus.NotAPropertyType => TypeMappingKind.MappedTypeNotAPropertyType,
+            MappedTypeStatus.NotFound or MappedTypeStatus.Ambiguous or _ => TypeMappingKind.MappedTypeNotFound,
+        };
+        return kind == TypeMappingKind.Mapped
+            ? new TypeMapping(kind, key, mapped!.Text, mapped.IsValueType, mapped.IsPublic, mapped.WarningIds, place)
+            : new TypeMapping(kind, key, name, false, false, EquatableArray<string>.Empty, place);
+    }
+
+    // The types that a short name in the C# type could mean, or null when it has none.
+    private static EquatableArray<string>? CandidatesOf(EquatableArray<MappedType> mappedTypes, string? name) =>
+        name is not null && MappedTypeResolver.Find(mappedTypes, name) is { Candidates.Count: > 0 } mapped
+            ? mapped.Candidates
+            : null;
 
     // The property type of one parameter or column, by the map of its type's engine, or null after its error is
     // added.  A type of an engine this version does not know, or a parameter's that is null, is only in a sidecar
@@ -301,7 +427,7 @@ internal static class QueryTyper
                 failure,
                 subject,
                 at,
-                CandidatesText(typing.Lookup?.CandidatesOf(failure.Text))
+                CandidatesText(CandidatesOf(typing.MappedTypes, failure.Text))
             ),
             TypeMappingKind.MappedTypeNotAccessible => MappedTypeFailure(
                 SqlDiagnostics.MappedTypeNotAccessible,
@@ -394,8 +520,8 @@ internal static class QueryTyper
         return builder.ToString();
     }
 
-    // A failure of a mapped type keeps the type the override names in its text, which the message gives as a user
-    // writes it, and the place that wrote the entry in its detail.  SQLSRC250 adds its candidates after them, and
+    // A failure of a mapped type keeps the type that was chosen in its text, which the message gives as a user writes
+    // it, and the place that chose it in its detail.  SQLSRC250 adds its candidates after them, and
     // SQLSRC251 its case and help.
     private static DiagnosticInfo MappedTypeFailure(
         DiagnosticDescriptor descriptor,
@@ -436,12 +562,14 @@ internal static class QueryTyper
     }
 
     // What the typing of one query reads, and where its error goes.  SqlClientVersion is the probe's VersionText, for
-    // the message of a type that the project's SqlClient is too old for.
+    // the message of a type that the project's SqlClient is too old for, and MappedTypes the compilation's answers for
+    // every C# type that a level or a marker chose.
     private readonly record struct Typing(
         NpgsqlColumn Column,
         SqlClientColumn SqlClientColumn,
         string SqlClientVersion,
         OverrideLookup? Lookup,
+        EquatableArray<MappedType> MappedTypes,
         LocationInfo Location,
         ImmutableArray<DiagnosticInfo>.Builder Diagnostics
     );
@@ -497,7 +625,7 @@ internal static class QueryTyper
         {
             if (!type.Kind.Equals(SidecarValues.Kind.Array, StringComparison.Ordinal))
             {
-                return EntryOf(type, string.Empty) is { } entry ? MappingOf(entry) : null;
+                return EntryOf(type, string.Empty) is { } entry ? EntryMapping(entry) : null;
             }
 
             if (type.Element is not { } element)
@@ -518,17 +646,11 @@ internal static class QueryTyper
                 );
             }
 
-            return EntryOf(element, "[]") is { } ofElement ? MappingOf(ofElement) : null;
+            return EntryOf(element, "[]") is { } ofElement ? EntryMapping(ofElement) : null;
         }
 
         public TypeMapping? Find(string sqlServerKey) =>
-            TypeOverrideMap.Find(_map, sqlServerKey) is { } entry ? MappingOf(entry) : null;
-
-        /// <summary>The types that a short name in the C# type could mean, or null when it has none.</summary>
-        public EquatableArray<string>? CandidatesOf(string? name) =>
-            name is not null && MappedTypeResolver.Find(_mappedTypes, name) is { Candidates.Count: > 0 } mapped
-                ? mapped.Candidates
-                : null;
+            TypeOverrideMap.Find(_map, sqlServerKey) is { } entry ? EntryMapping(entry) : null;
 
         // The entry of the type's key with the suffix, or for a type of an extension, of its bare name with it:
         // citext[] as well as public.citext[].  A key longer than the name is qualified.
@@ -544,36 +666,8 @@ internal static class QueryTyper
             type.Kind.Equals(SidecarValues.Kind.Base, StringComparison.Ordinal)
             && TypeKeyNames.IsExtension(type.InternalName);
 
-        private TypeMapping? MappingOf(TypeOverride entry)
-        {
-            if (entry.Type is not { } name)
-            {
-                return null;
-            }
-
-            var mapped = MappedTypeResolver.Find(_mappedTypes, name);
-            var kind = (mapped?.Status ?? MappedTypeStatus.NotFound) switch
-            {
-                MappedTypeStatus.Found => TypeMappingKind.Mapped,
-                MappedTypeStatus.NotAccessible => TypeMappingKind.MappedTypeNotAccessible,
-                MappedTypeStatus.NotAPropertyType => TypeMappingKind.MappedTypeNotAPropertyType,
-                MappedTypeStatus.NotFound or MappedTypeStatus.Ambiguous or _ => TypeMappingKind.MappedTypeNotFound,
-            };
-            var place = PlaceOf(entry.Place);
-            // A found type is written as the resolver wrote it, its short names in full; a failure keeps the name for
-            // its message.
-            return kind == TypeMappingKind.Mapped
-                ? new TypeMapping(
-                    kind,
-                    entry.Key,
-                    mapped!.Text,
-                    mapped.IsValueType,
-                    mapped.IsPublic,
-                    mapped.WarningIds,
-                    place
-                )
-                : new TypeMapping(kind, entry.Key, name, false, false, EquatableArray<string>.Empty, place);
-        }
+        private TypeMapping? EntryMapping(TypeOverride entry) =>
+            entry.Type is { } name ? MappingOf(_mappedTypes, name, entry.Key, PlaceOf(entry.Place)) : null;
 
         // The place that wrote an entry, as SQLSRC250 to SQLSRC252 and SQLSRC261 name it.  The attribute has no level
         // for the type override.

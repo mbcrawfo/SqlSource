@@ -716,7 +716,7 @@ public sealed class TypeOverrideLevelTests
         string[] reported = ["GetFirst", "GetSecond"];
         run.Diagnostics.ShouldBe(
             reported.Select(name =>
-                $"SQLSRC250 {NameOf(text, name)}: The type override maps 'int4' to 'MyApp.Missing' for column "
+                $"SQLSRC250 {NameOf(text, name)}: 'int4' is mapped to 'MyApp.Missing' for column "
                 + $"'c0', in {place}, and no type of that name is found, or more than one that this project can see.  "
                 + "Correct the name, with its namespace and type arguments, or for a name that two references have, "
                 + "map to a type of this project."
@@ -745,7 +745,7 @@ public sealed class TypeOverrideLevelTests
         var run = Run("int4=" + type, (file, [Entry(file, "GetUser", Int4)]));
 
         run.Diagnostics.ShouldBe([
-            $"{id} {GeneratorHarness.UsersPath}(1,10)-(1,17): The type override maps 'int4' to '{type}' for column "
+            $"{id} {GeneratorHarness.UsersPath}(1,10)-(1,17): 'int4' is mapped to '{type}' for column "
                 + $"'c0', in the property SqlSourceTypeOverrides, {reason}",
         ]);
     }
@@ -769,7 +769,7 @@ public sealed class TypeOverrideLevelTests
 
         run.Diagnostics.ShouldHaveSingleItem()
             .ShouldStartWith(
-                $"SQLSRC250 {GeneratorHarness.UsersPath}(1,10)-(1,17): The type override maps 'int4' to "
+                $"SQLSRC250 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'int4' is mapped to "
                     + "'MyApp.Missing' for parameter 'id', in the property SqlSourceTypeOverrides,"
             );
     }

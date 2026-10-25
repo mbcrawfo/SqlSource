@@ -553,13 +553,14 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // {0} is the column or parameter, as "column 'id'", {1} the key, {2} the C# type, {3} the place that wrote the
-    // entry, as "the property SqlSourceTypeOverrides", and {4} the types a short name in it could mean, as ", and it
-    // could be App.UserId or Other.UserId", or empty.
+    // {0} is the column or parameter, as "column 'id'", {1} what is mapped, the type override's key or a parameter
+    // as "@author", {2} the C# type, {3} the place that chose it, as "the property SqlSourceTypeOverrides" or "the
+    // -- param: marker of the parameter", and {4} the types a short name in it could mean, as ", and it could be
+    // App.UserId or Other.UserId", or empty.
     public static readonly DiagnosticDescriptor MappedTypeNotFound = new(
         id: "SQLSRC250",
         title: "Mapped type is not found",
-        messageFormat: "The type override maps '{1}' to '{2}' for {0}, in {3}, and no type of that name is found, or "
+        messageFormat: "'{1}' is mapped to '{2}' for {0}, in {3}, and no type of that name is found, or "
             + "more than one that this project can see{4}.  Correct the name, with its namespace and type arguments, "
             + "or for a name that two references have, map to a type of this project.",
         category: Category,
@@ -574,7 +575,7 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor MappedTypeNotAccessible = new(
         id: "SQLSRC251",
         title: "Mapped type is not accessible",
-        messageFormat: "The type override maps '{1}' to '{2}' for {0}, in {3}, and {4}.  {5}.",
+        messageFormat: "'{1}' is mapped to '{2}' for {0}, in {3}, and {4}.  {5}.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -585,7 +586,7 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor MappedTypeNotAPropertyType = new(
         id: "SQLSRC252",
         title: "Mapped type cannot be a property's type",
-        messageFormat: "The type override maps '{1}' to '{2}' for {0}, in {3}, and no property can have that type.  "
+        messageFormat: "'{1}' is mapped to '{2}' for {0}, in {3}, and no property can have that type.  "
             + "Choose another type, and for System.Nullable<T> name T, since a column that can be null makes its "
             + "property nullable.",
         category: Category,

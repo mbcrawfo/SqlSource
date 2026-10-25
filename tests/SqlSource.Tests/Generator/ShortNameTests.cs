@@ -82,7 +82,7 @@ public sealed class ShortNameTests
         var run = RunOf(Source + AppUserId + OtherUserId, "int8=UserId", Int8);
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC250 {GeneratorHarness.UsersPath}(1,10)-(1,17): The type override maps 'int8' to 'UserId' for "
+            $"SQLSRC250 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'int8' is mapped to 'UserId' for "
                 + $"column 'id', in {Place}, and no type of that name is found, or more than one that this project "
                 + "can see, and it could be App.UserId or Other.UserId.  Correct the name, with its namespace and "
                 + "type arguments, or for a name that two references have, map to a type of this project.",
@@ -128,7 +128,7 @@ public sealed class ShortNameTests
         var run = RunOf(Source + AppUserId, "int8=global::UserId", Int8);
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC250 {GeneratorHarness.UsersPath}(1,10)-(1,17): The type override maps 'int8' to 'global::UserId' "
+            $"SQLSRC250 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'int8' is mapped to 'global::UserId' "
                 + $"for column 'id', in {Place}, and no type of that name is found, or more than one that this project "
                 + "can see.  Correct the name, with its namespace and type arguments, or for a name that two "
                 + "references have, map to a type of this project.",

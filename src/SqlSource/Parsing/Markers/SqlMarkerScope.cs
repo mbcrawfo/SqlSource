@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Settings.ClrTypes;
 using SqlSource.Settings.TypeOverrides;
 
 namespace SqlSource.Parsing.Markers;
@@ -26,6 +27,9 @@ internal sealed class SqlMarkerScope(
     private const string InsideAQuery = "inside a query";
 
     private const string BeforeTheFirstQuery = "before the file's first query";
+
+    // The word that takes a key out of the map of the levels below, ignoring case, as the type override reads it.
+    private const string Default = "default";
 
     /// <summary>The names of a scope that has none.  Shared by every parse, so it cannot be written to.</summary>
     public static readonly ISet<string> NoNames = ImmutableHashSet<string>.Empty;
@@ -417,7 +421,8 @@ internal sealed class SqlMarkerScope(
         _ = _ignoredTokens.Add(name);
     }
 
-    // "@name [type] [null | not null]".  The type is what stands between the name and those words, as written.
+    // "@name [type] [null | not null] [-> CSharpType]".  The type is what stands between the name and those words, as
+    // written.  The C# type is a ClrTypeName, and never default, since no level below a query maps a parameter.
     private void ReadParam(SqlMarker marker)
     {
         var start = marker.ValueSpan.Start;
@@ -440,14 +445,37 @@ internal sealed class SqlMarkerScope(
         }
 
         var name = text.Substring(start + 1, nameEnd - start - 1);
-        var rest = text.AsSpan(nameEnd, end - nameEnd).Trim();
+        var rest = text.AsSpan(nameEnd, end - nameEnd);
+        string? clrType = null;
+        if (TrySplitArrow(rest, out var before, out var after))
+        {
+            if (
+                after.Equals(Default.AsSpan(), StringComparison.OrdinalIgnoreCase)
+                || !ClrTypeName.TryParse(after, out var parsed)
+            )
+            {
+                AddInvalid(marker);
+                return;
+            }
+
+            clrType = parsed!.Text;
+            rest = before;
+        }
+
+        rest = rest.Trim();
         bool? nullable = null;
         if (TryTakeLastWord(ref rest, "null"))
         {
             nullable = !TryTakeLastWord(ref rest, "not");
         }
 
-        var declaration = new SqlParameterDeclaration(name, rest.IsEmpty ? null : rest.ToString(), nullable, marker);
+        var declaration = new SqlParameterDeclaration(
+            name,
+            rest.IsEmpty ? null : rest.ToString(),
+            nullable,
+            clrType,
+            marker
+        );
         _declarations ??= [];
         foreach (var existing in _declarations)
         {
@@ -459,6 +487,7 @@ internal sealed class SqlMarkerScope(
             if (
                 !string.Equals(existing.Type, declaration.Type, StringComparison.Ordinal)
                 || existing.Nullable != nullable
+                || !string.Equals(existing.ClrType, clrType, StringComparison.Ordinal)
             )
             {
                 AddConflict(marker);
@@ -556,6 +585,41 @@ internal sealed class SqlMarkerScope(
         }
 
         return quotes == 0 ? inner.ToString() : inner.ToString().Replace("\"\"", "\"");
+    }
+
+    // Splits a marker's value at its first "->" that starts it or stands after white space, outside double quotes, so
+    // that a quoted name may hold one: before is the text before it, as written, and after the text after it,
+    // trimmed.  False, with both empty, for a value without one.
+    private static bool TrySplitArrow(
+        ReadOnlySpan<char> value,
+        out ReadOnlySpan<char> before,
+        out ReadOnlySpan<char> after
+    )
+    {
+        var quoted = false;
+        for (var index = 0; index < value.Length - 1; index++)
+        {
+            var character = value[index];
+            if (character == '"')
+            {
+                quoted = !quoted;
+            }
+            else if (
+                !quoted
+                && character == '-'
+                && value[index + 1] == '>'
+                && (index == 0 || char.IsWhiteSpace(value[index - 1]))
+            )
+            {
+                before = value.Slice(0, index);
+                after = value.Slice(index + 2).Trim();
+                return true;
+            }
+        }
+
+        before = default;
+        after = default;
+        return false;
     }
 
     // Takes word off the end of rest when it stands there as a word: alone, or after white space.
