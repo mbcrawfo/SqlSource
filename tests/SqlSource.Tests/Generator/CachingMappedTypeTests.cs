@@ -65,6 +65,33 @@ public sealed class CachingMappedTypeTests
         OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
     }
 
+    // A short name is looked up again on the new compilation, through the index of each reference, which is the
+    // same, and gives an equal value.
+    [Fact]
+    public void Run_EditWithShortNames_ResolvedTypesUnchanged()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = _scene.FirstRun(
+            compilation,
+            _scene.Users,
+            new TestOptionsProvider(
+                OutputKind.Sql,
+                null,
+                properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "uuid=Guid" }
+            )
+        );
+        var before = Outputs(driver.GetRunResult(), TrackingNames.MappedTypes).ShouldHaveSingleItem().Value;
+        var type = ((EquatableArray<MappedType>)before).ShouldHaveSingleItem();
+        type.Name.ShouldBe("Guid");
+        type.Text.ShouldBe("global::System.Guid");
+
+        var result = Run(driver, WithMethodBodyEdited(compilation));
+
+        AllReasons(result, TrackingNames.ResolvedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        Outputs(result, TrackingNames.MappedTypes).ShouldHaveSingleItem().Value.ShouldBe(before);
+        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
     [Fact]
     public void Run_NoOverride_ResolvesNothing()
     {

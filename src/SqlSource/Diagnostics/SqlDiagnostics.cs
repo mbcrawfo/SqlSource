@@ -553,14 +553,15 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // {0} is the column or parameter, as "column 'id'", {1} the key, {2} the C# type and {3} the place that wrote the
-    // entry, as "the property SqlSourceTypeOverrides".
+    // {0} is the column or parameter, as "column 'id'", {1} the key, {2} the C# type, {3} the place that wrote the
+    // entry, as "the property SqlSourceTypeOverrides", and {4} the types a short name in it could mean, as ", and it
+    // could be App.UserId or Other.UserId", or empty.
     public static readonly DiagnosticDescriptor MappedTypeNotFound = new(
         id: "SQLSRC250",
         title: "Mapped type is not found",
         messageFormat: "The type override maps '{1}' to '{2}' for {0}, in {3}, and no type of that name is found, or "
-            + "more than one reference has one that this project can see.  Correct the name, with its namespace and "
-            + "type arguments, or for a name that two references have, map to a type of this project.",
+            + "more than one that this project can see{4}.  Correct the name, with its namespace and type arguments, "
+            + "or for a name that two references have, map to a type of this project.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

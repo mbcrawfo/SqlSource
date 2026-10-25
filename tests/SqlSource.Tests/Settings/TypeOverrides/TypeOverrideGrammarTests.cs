@@ -159,6 +159,8 @@ public sealed class TypeOverrideGrammarTests
     [InlineData("int4=int[]?")]
     [InlineData("int4=(int, string)")]
     [InlineData("int4=dynamic")]
+    [InlineData("int4=dynamic[]")]
+    [InlineData("int4=System.Collections.Generic.List<dynamic>")]
     [InlineData("int4=void")]
     [InlineData("int4=int*")]
     [InlineData("int4=System.Guid extra")]

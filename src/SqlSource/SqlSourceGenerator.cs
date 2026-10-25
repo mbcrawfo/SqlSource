@@ -463,7 +463,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         // Those types resolved against the compilation, with the converters declared on those of a referenced
         // assembly.  Like the probe, it runs on every run, since the driver gives a new compilation each time: a few
-        // lookups for each name, and none without an override.  Its value is equal until a type or a converter appears,
+        // lookups for each name, and none without an override.  A short name reads the index of each reference, which
+        // is built once while the reference is the same.  Its value is equal until a type or a converter appears,
         // goes or changes, so nothing after it runs again.
         var resolvedTypes = context
             .CompilationProvider.Combine(mappedTypeNames)

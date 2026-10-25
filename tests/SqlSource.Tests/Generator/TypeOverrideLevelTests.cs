@@ -717,9 +717,9 @@ public sealed class TypeOverrideLevelTests
         run.Diagnostics.ShouldBe(
             reported.Select(name =>
                 $"SQLSRC250 {NameOf(text, name)}: The type override maps 'int4' to 'MyApp.Missing' for column "
-                + $"'c0', in {place}, and no type of that name is found, or more than one reference has one that this "
-                + "project can see.  Correct the name, with its namespace and type arguments, or for a name that two "
-                + "references have, map to a type of this project."
+                + $"'c0', in {place}, and no type of that name is found, or more than one that this project can see.  "
+                + "Correct the name, with its namespace and type arguments, or for a name that two references have, "
+                + "map to a type of this project."
             )
         );
         TextsOf(run).Keys.ShouldBe(["GetText"]);

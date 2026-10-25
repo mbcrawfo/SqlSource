@@ -289,6 +289,8 @@ public sealed class MappedTypeResolverTests
 
     private static readonly EquatableArray<string> NoWarnings = EquatableArray<string>.Empty;
 
+    private static readonly EquatableArray<string> NoCandidates = EquatableArray<string>.Empty;
+
     // A project with the converter attribute and a converter of its own, and the library as a reference.
     private static readonly Lazy<CSharpCompilation> ConvertingProject = new(() =>
         GeneratorHarness.CreateCompilation(
@@ -442,7 +444,9 @@ public sealed class MappedTypeResolverTests
                     Enum.Parse<MappedTypeStatus>(status),
                     isValueType,
                     isPublic,
-                    warningIds.Length == 0 ? NoWarnings : Names(warningIds.Split(','))
+                    warningIds.Length == 0 ? NoWarnings : Names(warningIds.Split(',')),
+                    name,
+                    NoCandidates
                 )
             );
     }
@@ -584,9 +588,25 @@ public sealed class MappedTypeResolverTests
         var types = MappedTypeResolver.Resolve(Project.Value, names, TestContext.Current.CancellationToken).Types;
 
         types.ShouldBe([
-            new MappedType("global::MyApp.Missing", MappedTypeStatus.NotFound, false, false, NoWarnings),
-            new MappedType("global::MyApp.UserId", MappedTypeStatus.Found, true, true, NoWarnings),
-            new MappedType("int", MappedTypeStatus.Found, true, true, NoWarnings),
+            new MappedType(
+                "global::MyApp.Missing",
+                MappedTypeStatus.NotFound,
+                false,
+                false,
+                NoWarnings,
+                "global::MyApp.Missing",
+                NoCandidates
+            ),
+            new MappedType(
+                "global::MyApp.UserId",
+                MappedTypeStatus.Found,
+                true,
+                true,
+                NoWarnings,
+                "global::MyApp.UserId",
+                NoCandidates
+            ),
+            new MappedType("int", MappedTypeStatus.Found, true, true, NoWarnings, "int", NoCandidates),
         ]);
         MappedTypeResolver.Find(types, "global::MyApp.UserId").ShouldBe(types[1]);
         MappedTypeResolver.Find(types, "int").ShouldBe(types[2]);

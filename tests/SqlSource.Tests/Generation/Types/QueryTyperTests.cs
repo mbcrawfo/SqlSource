@@ -369,5 +369,13 @@ public sealed class QueryTyperTests
     }
 
     private static MappedType Found(string name, bool isValueType) =>
-        new(name, MappedTypeStatus.Found, isValueType, true, EquatableArray<string>.Empty);
+        new(
+            name,
+            MappedTypeStatus.Found,
+            isValueType,
+            true,
+            EquatableArray<string>.Empty,
+            name,
+            EquatableArray<string>.Empty
+        );
 }

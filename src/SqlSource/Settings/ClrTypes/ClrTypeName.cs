@@ -35,7 +35,7 @@ internal sealed record ClrTypeName(
     string? Keyword,
     EquatableArray<ClrNamePart> Parts,
     EquatableArray<ClrRank> Ranks,
-    bool IsShort = false
+    bool IsShort
 )
 {
     private const string GlobalPrefix = "global::";

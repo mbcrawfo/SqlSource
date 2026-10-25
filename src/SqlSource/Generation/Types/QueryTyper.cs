@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.MSBuild;
@@ -298,7 +300,8 @@ internal static class QueryTyper
                 SqlDiagnostics.MappedTypeNotFound,
                 failure,
                 subject,
-                at
+                at,
+                CandidatesText(typing.Lookup?.CandidatesOf(failure.Text))
             ),
             TypeMappingKind.MappedTypeNotAccessible => MappedTypeFailure(
                 SqlDiagnostics.MappedTypeNotAccessible,
@@ -358,8 +361,42 @@ internal static class QueryTyper
         return TypeKeys.TryNormalizePostgres(key.AsSpan(), out _) ? key : SystemSchemas.Postgres + "." + key;
     }
 
+    // SQLSRC250's last argument: the types a short name in the type could mean, after ", and it could be ", the first
+    // few by name and the rest by their count, or nothing.
+    private static string CandidatesText(EquatableArray<string>? candidates)
+    {
+        if (candidates is not { Count: > 0 } names)
+        {
+            return string.Empty;
+        }
+
+        const int Listed = 3;
+        var shown = Math.Min(names.Count, Listed);
+        var builder = new StringBuilder(", and it could be ");
+        for (var index = 0; index < shown; index++)
+        {
+            if (index > 0)
+            {
+                _ = builder.Append(index == shown - 1 && names.Count == shown ? " or " : ", ");
+            }
+
+            _ = builder.Append(names[index]);
+        }
+
+        if (names.Count > shown)
+        {
+            _ = builder
+                .Append(" or ")
+                .Append((names.Count - shown).ToString(CultureInfo.InvariantCulture))
+                .Append(" more");
+        }
+
+        return builder.ToString();
+    }
+
     // A failure of a mapped type keeps the type the override names in its text, which the message gives as a user
-    // writes it, and the place that wrote the entry in its detail.  SQLSRC251 adds its case and help after them.
+    // writes it, and the place that wrote the entry in its detail.  SQLSRC250 adds its candidates after them, and
+    // SQLSRC251 its case and help.
     private static DiagnosticInfo MappedTypeFailure(
         DiagnosticDescriptor descriptor,
         TypeMapping failure,
@@ -415,7 +452,7 @@ internal static class QueryTyper
     /// type of an extension outside <c>pg_catalog</c>, of its bare name.  For a type of SQL Server: the entry of the
     /// key the map asks, with no rule for an array or an extension, which SQL Server has none of.  A key whose
     /// winning entry is <c>default</c> has none, so the walk goes on as for a key without an entry.  An entry's type
-    /// is the one the compilation resolved, or the failure of its status.
+    /// is the one the compilation resolved, written with its short names in full, or the failure of its status.
     /// </summary>
     /// <remarks>
     /// An array is found by its element's key with <c>[]</c> alone, in every schema, and never by its own key, its
@@ -487,6 +524,12 @@ internal static class QueryTyper
         public TypeMapping? Find(string sqlServerKey) =>
             TypeOverrideMap.Find(_map, sqlServerKey) is { } entry ? MappingOf(entry) : null;
 
+        /// <summary>The types that a short name in the C# type could mean, or null when it has none.</summary>
+        public EquatableArray<string>? CandidatesOf(string? name) =>
+            name is not null && MappedTypeResolver.Find(_mappedTypes, name) is { Candidates.Count: > 0 } mapped
+                ? mapped.Candidates
+                : null;
+
         // The entry of the type's key with the suffix, or for a type of an extension, of its bare name with it:
         // citext[] as well as public.citext[].  A key longer than the name is qualified.
         private TypeOverride? EntryOf(PostgresType type, string suffix)
@@ -517,8 +560,18 @@ internal static class QueryTyper
                 MappedTypeStatus.NotFound or MappedTypeStatus.Ambiguous or _ => TypeMappingKind.MappedTypeNotFound,
             };
             var place = PlaceOf(entry.Place);
+            // A found type is written as the resolver wrote it, its short names in full; a failure keeps the name for
+            // its message.
             return kind == TypeMappingKind.Mapped
-                ? new TypeMapping(kind, entry.Key, name, mapped!.IsValueType, mapped.IsPublic, mapped.WarningIds, place)
+                ? new TypeMapping(
+                    kind,
+                    entry.Key,
+                    mapped!.Text,
+                    mapped.IsValueType,
+                    mapped.IsPublic,
+                    mapped.WarningIds,
+                    place
+                )
                 : new TypeMapping(kind, entry.Key, name, false, false, EquatableArray<string>.Empty, place);
         }
 

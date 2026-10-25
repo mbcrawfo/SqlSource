@@ -35,7 +35,23 @@ public sealed class ClrTypeNameTests
     {
         ClrTypeName.TryParse("string".AsSpan(), out var name).ShouldBeTrue();
 
-        name.ShouldBe(new ClrTypeName("string", EquatableArray<ClrNamePart>.Empty, EquatableArray<ClrRank>.Empty));
+        name.ShouldBe(
+            new ClrTypeName("string", EquatableArray<ClrNamePart>.Empty, EquatableArray<ClrRank>.Empty, IsShort: false)
+        );
+    }
+
+    // dynamic is no property's type, so no short name may make it one; global::dynamic is a type of that name in the
+    // global namespace, which the compilation then looks for.
+    [Fact]
+    public void TryParse_Dynamic_IsNotValid() => ClrTypeName.TryParse("dynamic".AsSpan(), out _).ShouldBeFalse();
+
+    [Fact]
+    public void TryParse_GlobalDynamic_IsAName()
+    {
+        ClrTypeName.TryParse("global::dynamic".AsSpan(), out var name).ShouldBeTrue();
+
+        name!.Text.ShouldBe("global::dynamic");
+        name.IsShort.ShouldBeFalse();
     }
 
     [Theory]
