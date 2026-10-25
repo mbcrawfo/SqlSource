@@ -37,7 +37,7 @@ INSERT INTO notes (account_id, kind, body, written_at) VALUES (@accountId, 'call
 SELECT id, name FROM accounts ORDER BY id;
 
 -- name: RenameInCte -> rowcount
--- summary: An update inside a WITH whose last statement is a SELECT, which counts as one.
+-- summary: An update inside a WITH whose last statement is a SELECT, which counts as -1, as a SELECT does.
 WITH u AS (UPDATE accounts SET name = name WHERE id = @accountId RETURNING id) SELECT id FROM u;
 
 -- name: Sleep -> none
