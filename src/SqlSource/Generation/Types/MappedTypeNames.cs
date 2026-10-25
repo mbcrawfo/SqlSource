@@ -8,14 +8,14 @@ using SqlSource.Settings.TypeOverrides;
 namespace SqlSource.Generation.Types;
 
 /// <summary>
-/// The C# types that the type override and the column types name, at any level, and that the <c>-- param:</c> markers
-/// give, which the compilation is asked for.
+/// The C# types that the type override and the column types name, at any level, and that the <c>-- param:</c> and
+/// <c>-- column:</c> markers of a query give, which the compilation is asked for.
 /// </summary>
 internal static class MappedTypeNames
 {
     /// <summary>
     /// The distinct types of every entry of the property, of each file's metadata and of the markers of every query,
-    /// and of each query's parameters, in ordinal order.  An entry of <c>default</c> names none.
+    /// and of each query's parameters and result's columns, in ordinal order.  An entry of <c>default</c> names none.
     /// </summary>
     /// <remarks>
     /// A query's markers are over its file header's, so the header's entries are read through its queries.  A list
@@ -42,6 +42,14 @@ internal static class MappedTypeNames
                 foreach (var parameter in query.Parameters)
                 {
                     if (parameter.ClrType is { } type)
+                    {
+                        _ = names.Add(type);
+                    }
+                }
+
+                foreach (var marker in query.ColumnMarkers)
+                {
+                    if (marker.ClrType is { } type)
                     {
                         _ = names.Add(type);
                     }

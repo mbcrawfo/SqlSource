@@ -63,6 +63,23 @@ public sealed class FileDiagnosticsTests
         run.CompilationErrors.ShouldBeEmpty();
     }
 
+    // A query's -- column: names a result's column; a column's source is the file header's.
+    [Fact]
+    public void Run_DottedColumnMarkerInAQuery_IsAnErrorThatPointsToTheHeader()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            Source,
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n-- column: posts.id -> PostId\nSELECT 1;\n")
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC111 {GeneratorHarness.UsersPath}(2,12)-(2,30): 'column: posts.id -> PostId' lacks a value it "
+                + "needs, has one it does not take, or has one that is not valid.  A column's source is mapped in the "
+                + "file header",
+        ]);
+    }
+
     [Fact]
     public void Run_DialectMarkerInsideAQuery_IsAnErrorAtTheMarker()
     {

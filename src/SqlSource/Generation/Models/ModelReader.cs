@@ -200,14 +200,15 @@ internal static class ModelReader
         }
     }
 
-    // SQLSRC260, at the marker, for each -- column: marker that names no column of the entry's, or one whose name ends
-    // in a mark, which sets its nullability already.
+    // SQLSRC260, at the marker, for each -- column: marker that names no column of the entry's, or that sets the
+    // nullability of one whose name ends in a mark, which sets it already.  A marker that gives a type alone may name
+    // a marked column.
     private static void AddUnusableColumnMarkers(SidecarEntry entry, SqlQuery query, Reading reading)
     {
         foreach (var marker in query.ColumnMarkers)
         {
             var column = entry.Columns is { } columns ? FindColumn(columns, marker.Name) : null;
-            if (column is null || HasMark(column.Name))
+            if (column is null || (HasMark(column.Name) && marker.IsNullable is not null))
             {
                 reading.Diagnostics.Add(
                     DiagnosticInfo.Create(
@@ -384,9 +385,9 @@ internal static class ModelReader
         return true;
     }
 
-    // A trailing ? makes a column nullable and a trailing ! not, and a -- column: marker that names the column sets it;
-    // otherwise only a column known not to be null is not.  A column with a mark and a marker is SQLSRC260 and has no
-    // model.
+    // A trailing ? makes a column nullable and a trailing ! not, and a -- column: marker that names the column and says
+    // null or not null sets it; otherwise only a column known not to be null is not.  A column with a mark and a marker
+    // that sets its nullability is SQLSRC260 and has no model.
     private static bool IsNullable(SidecarColumn column, EquatableArray<ColumnMarker> markers)
     {
         var name = column.Name;
@@ -398,12 +399,13 @@ internal static class ModelReader
 
         foreach (var marker in markers)
         {
-            if (!string.Equals(marker.Name, name, StringComparison.OrdinalIgnoreCase))
+            if (
+                marker.IsNullable is { } nullable
+                && string.Equals(marker.Name, name, StringComparison.OrdinalIgnoreCase)
+            )
             {
-                continue;
+                return nullable;
             }
-
-            return marker.IsNullable;
         }
 
         return column.Nullable != false;

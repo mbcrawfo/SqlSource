@@ -118,7 +118,15 @@ internal static class SqlFileReader
         var columns = ImmutableArray.CreateBuilder<ColumnMarker>(markers.Count);
         foreach (var marker in markers)
         {
-            columns.Add(new ColumnMarker(marker.Name, marker.IsNullable, LocationInfo.From(path, text, marker.Span)));
+            columns.Add(
+                new ColumnMarker(
+                    marker.Name,
+                    marker.IsNullable,
+                    marker.ClrType,
+                    marker.ResetsType,
+                    LocationInfo.From(path, text, marker.Span)
+                )
+            );
         }
 
         return new EquatableArray<ColumnMarker>(columns.MoveToImmutable());

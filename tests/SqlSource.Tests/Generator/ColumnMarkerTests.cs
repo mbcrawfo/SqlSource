@@ -202,6 +202,76 @@ public sealed class ColumnMarkerTests
         ModelsOf(run).Queries.ShouldHaveSingleItem().Name.ShouldBe("GetOther");
     }
 
+    // A marker that gives a type alone says nothing of the nullability, so it may name a column with a mark.
+    [Fact]
+    public void Run_TypeOnlyMarker_OnMarkedColumn_IsNoError()
+    {
+        var file = Query("-- column: display_name -> string\n", "SELECT name AS \"display_name!\" FROM users;");
+
+        var run = Run(file, Entry(file, "GetUser", [], [Column("display_name!", Text, nullable: true)]));
+
+        run.Diagnostics.ShouldBeEmpty();
+        Nullability(run).ShouldBe([("DisplayName", false)]);
+    }
+
+    [Fact]
+    public void Run_TypeOnlyMarker_KeepsTheEntrysNullability()
+    {
+        var file = Query(
+            "-- column: a -> string\n-- column: b -> default\n-- column: c -> string\n-- column: c not null\n",
+            "SELECT x AS a, y AS b, z AS c FROM t;"
+        );
+
+        var run = Run(
+            file,
+            Entry(
+                file,
+                "GetUser",
+                [],
+                [
+                    Column("a", Text, nullable: true),
+                    Column("b", Text, nullable: false),
+                    Column("c", Text, nullable: true),
+                ]
+            )
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        Nullability(run).ShouldBe([("A", true), ("B", false), ("C", false)]);
+    }
+
+    [Fact]
+    public void Run_TypeMarker_NamingNoColumn_IsSQLSRC260()
+    {
+        var file = Query("-- column: nope -> string\n", "SELECT 1 AS id;");
+
+        var run = Run(file, Entry(file, "GetUser", [], [Column("id")]));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC260 {GeneratorHarness.UsersPath}(2,1)-(2,26): The -- column: marker for 'nope' names no column of "
+                + "the query's result.  Name a column as the query returns it.",
+        ]);
+        ModelsOf(run).Queries.ShouldBeEmpty();
+    }
+
+    // Of a type marker and a nullability marker on a column with a mark, only the second says the nullability twice.
+    [Fact]
+    public void Run_TypeAndNullabilityMarkers_OnMarkedColumn_ReportTheNullabilityOne()
+    {
+        var file = Query(
+            "-- column: total -> long\n-- column: total not null\n",
+            "SELECT sum(amount) AS \"total!\" FROM payments;"
+        );
+
+        var run = Run(file, Entry(file, "GetUser", [], [Column("total!", nullable: true)]));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC260 {GeneratorHarness.UsersPath}(3,1)-(3,26): The -- column: marker for 'total' names a column "
+                + "whose alias already ends in ! or ?.  Remove the mark from the alias, or the marker.",
+        ]);
+        ModelsOf(run).Queries.ShouldBeEmpty();
+    }
+
     // A file of one query, GetUser, with these markers.
     private static SqlFile Query(string markers, string sql) =>
         new(GeneratorHarness.UsersPath, "-- name: GetUser\n" + markers + sql + "\n");

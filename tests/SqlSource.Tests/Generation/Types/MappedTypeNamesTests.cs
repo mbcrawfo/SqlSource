@@ -92,6 +92,27 @@ public sealed class MappedTypeNamesTests
         names.ShouldBe(["UserId", "global::MyApp.UserId", "long"]);
     }
 
+    // A file header's -- column: is a column type of its queries' markers, and a query's names its result's column.
+    [Fact]
+    public void Collect_ColumnMarkers_GiveTheirTypes()
+    {
+        var parsed = TestModels.Array(
+            Read(
+                "-- column: posts.id -> MyApp.PostId\n-- column: users.id -> default\n\n"
+                    + "-- name: GetUser\n-- column: total -> PostCount\n-- column: note null\n"
+                    + "-- column: id -> default\nSELECT 1;\n"
+            )
+        );
+
+        var names = MappedTypeNames.Collect(
+            new ProjectSettings(SettingsLevel.None, EquatableArray<InvalidSetting>.Empty),
+            EquatableArray<FileSettings>.Empty,
+            parsed
+        );
+
+        names.ShouldBe(["PostCount", "global::MyApp.PostId"]);
+    }
+
     private static SettingsLevel Level(params TypeOverride[] entries) =>
         new() { TypeOverrides = TestModels.Array(entries) };
 

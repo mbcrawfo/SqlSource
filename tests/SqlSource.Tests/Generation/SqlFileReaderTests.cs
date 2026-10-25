@@ -68,8 +68,8 @@ public sealed class SqlFileReaderTests
         Read("-- name: Q\n-- column: a not null\n-- column: b null\nSELECT 1 AS a, 2 AS b;\n")
             .Queries.ShouldHaveSingleItem()
             .ColumnMarkers.ShouldBe([
-                new ColumnMarker("a", false, Location(new TextSpan(11, 21), 1, 0, 1, 21)),
-                new ColumnMarker("b", true, Location(new TextSpan(33, 17), 2, 0, 2, 17)),
+                new ColumnMarker("a", false, null, false, Location(new TextSpan(11, 21), 1, 0, 1, 21)),
+                new ColumnMarker("b", true, null, false, Location(new TextSpan(33, 17), 2, 0, 2, 17)),
             ]);
 
     [Fact]
