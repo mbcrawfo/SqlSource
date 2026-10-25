@@ -11,6 +11,6 @@
     { "status": "'active'" }
   ],
   "dapper": {
-    "why": "@status is a string, sent as text: the server has no operator account_status = text; phase 8 binds by type"
+    "why": "@status is a string, sent as text: the server has no operator account_status = text"
   }
 }
