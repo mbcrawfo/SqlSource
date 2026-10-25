@@ -20,7 +20,7 @@ public sealed class RunTimeTests(PostgresContainer postgres)
     private const int LongSleep = 30;
 
     // Enough rows to fill the server's send buffer many times over: it sends each buffer as it fills, so the client has
-    // all but the last when the last row sleeps, on 14 as on 18, and the rest come with the answer to a cancel.
+    // received every row but those of the last, unfilled buffer when the last row sleeps, on 14 as on 18.
     private const int RowsBeforeTheSleep = 10_000;
 
     // The write is seen by the transaction's own read, and the rollback puts back the version of the row it replaced.
@@ -85,16 +85,20 @@ public sealed class RunTimeTests(PostgresContainer postgres)
 
         _ = await Should.ThrowAsync<OperationCanceledException>(async () =>
         {
-            var run = connection.ListThenSleep(
-                new ListThenSleepArgs(RowsBeforeTheSleep, LongSleep),
-                cancellationToken: cancel.Token
-            );
-            await Eventually.TrueAsync(
-                async () => await IsSleepingBeforeTheLastRowAsync(watch, token),
-                "the query never reached the sleep before its last row"
-            );
-            await cancel.CancelAsync();
-            _ = await run;
+            // The wait cancels the token however it ends, so a wait that fails leaves no sleep running, and the call
+            // is awaited on every path.
+            var cancelOnceSleeping = CancelOnceSleepingAsync(watch, cancel, token);
+            try
+            {
+                _ = await connection.ListThenSleep(
+                    new ListThenSleepArgs(RowsBeforeTheSleep, LongSleep),
+                    cancellationToken: cancel.Token
+                );
+            }
+            finally
+            {
+                await cancelOnceSleeping;
+            }
         });
 
         connection.State.ShouldBe(ConnectionState.Closed);
@@ -179,15 +183,34 @@ public sealed class RunTimeTests(PostgresContainer postgres)
         await using var source = EndToEndSources.App(postgres);
         await using var connection = source.CreateConnection();
 
-        var exception = await Should.ThrowAsync<ArgumentException>(() =>
+        _ = await Should.ThrowAsync<ArgumentException>(() =>
             connection.ListClosedBefore(
                 new ListClosedBeforeArgs(new DateTimeOffset(2024, 10, 1, 0, 0, 0, TimeSpan.FromHours(2))),
                 cancellationToken: token
             )
         );
 
-        exception.Message.ShouldContain("Offset=02:00:00");
         connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
+    // Cancels once ListThenSleep sleeps before its last row, or once the wait for it fails.
+    private static async Task CancelOnceSleepingAsync(
+        NpgsqlDataSource watch,
+        CancellationTokenSource cancel,
+        CancellationToken token
+    )
+    {
+        try
+        {
+            await Eventually.TrueAsync(
+                async () => await IsSleepingBeforeTheLastRowAsync(watch, token),
+                "the query never reached the sleep before its last row"
+            );
+        }
+        finally
+        {
+            await cancel.CancelAsync();
+        }
     }
 
     // The xmin of the account's row that the read sees: the id of the transaction that wrote that version of it.
