@@ -7,8 +7,8 @@ using SqlSource.Tool.Testing.Realistic;
 namespace SqlSource.Tests.Postgres.Realistic;
 
 // A case's sample values put in its SQL so that the server can run it over the seed, as the oracle's check does, once
-// RealisticSampleChecks of tests/SqlSource.Tool.Testing has checked them.  The run through Dapper sends them as
-// parameters instead.
+// RealisticSampleChecks of tests/SqlSource.Tool.Testing has checked them.  The runs through the method and through
+// Dapper send them as parameters instead.
 internal static class RealisticSamples
 {
     // The SQL with each parameter replaced by its sample literal, cast to the type described for it, so that the

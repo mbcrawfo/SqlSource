@@ -6,9 +6,8 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Realistic;
 
-// The input model of a case's sample in the run through Dapper, whatever the engine: a DBNull read as null, the input
-// model built from the values of exactly its properties' types, and its values passed under the names the SQL gives
-// them.
+// The input model of a case's sample, whatever the engine: a DBNull read as null, the input model built from the values
+// of exactly its properties' types, and its values passed under the names the SQL gives them.
 public sealed class RealisticInputsTests
 {
     private static readonly SidecarParameter[] Parameters =

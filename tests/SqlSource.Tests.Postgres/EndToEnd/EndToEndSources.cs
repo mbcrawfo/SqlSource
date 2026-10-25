@@ -29,8 +29,8 @@ internal static class EndToEndSources
     public static NpgsqlDataSource Billing(PostgresContainer postgres) =>
         NpgsqlDataSource.Create(postgres.ConnectionStringOf(PostgresContainer.BillingDatabase));
 
-    // The realistic corpus's database, which the run through Dapper reads with the same settings and no mapping: its
-    // models take the base type map, so an enum is a string.
+    // The realistic corpus's database, which the runs through the methods and through Dapper read with the same
+    // settings and no mapping: its models take the base type map, so an enum is a string.
     public static NpgsqlDataSource Realistic(PostgresContainer postgres) =>
         NpgsqlDataSource.Create(postgres.RealisticConnectionString);
 }

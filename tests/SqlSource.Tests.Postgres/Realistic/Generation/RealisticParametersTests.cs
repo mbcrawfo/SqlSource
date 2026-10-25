@@ -6,8 +6,9 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Generation;
 
-// The parameters of the run through Dapper: a sample's literals read as the server reads them.  It needs no server.
-// The building of the input model and of Dapper's arguments from it is tested in tests/SqlSource.Tool.Tests/Realistic.
+// The parameters of the runs through the method and through Dapper: a sample's literals read as the server reads them.
+// It needs no server.  The building of the input model and of Dapper's arguments from it is tested in
+// tests/SqlSource.Tool.Tests/Realistic.
 public sealed class RealisticParametersTests
 {
     private static readonly SidecarParameter[] Parameters =

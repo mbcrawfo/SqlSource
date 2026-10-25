@@ -10,11 +10,11 @@ using Xunit;
 
 namespace SqlSource.Tests.SqlServer.Realistic.Generation;
 
-// The parameters of a case's query in the run through Dapper.  A sample is a T-SQL expression for each parameter, so
-// it becomes a C# value as the server reads it: cast to the parameter's type and read by GetValue.  The input model is
-// built from those values by RealisticInputs of tests/SqlSource.Tool.Testing, which fails when the driver gives a value
-// of another type than the property's, and whose ArgumentsOf gives Dapper the model's values under the SQL's names
-// (D-0004).
+// The parameters of a case's query in the runs through its method and through Dapper.  A sample is a T-SQL expression
+// for each parameter, so it becomes a C# value as the server reads it: cast to the parameter's type and read by
+// GetValue.  The input model is built from those values by RealisticInputs of tests/SqlSource.Tool.Testing, which fails
+// when the driver gives a value of another type than the property's.  The method is given the model as it is, and
+// Dapper its values under the SQL's names by ArgumentsOf (D-0004).
 internal static class RealisticParameters
 {
     // A select of each of the sample's expressions cast to its parameter's type, in the parameters' order, the type as
