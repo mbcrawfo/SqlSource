@@ -169,9 +169,9 @@ internal static class TypeEmitter
         return members;
     }
 
-    // Under SqlLocation.Nested the nested class is not written when the type's queries are all CodeGen, so that a
-    // method may have its name, as the methods' planner expects.  A type with no query at all keeps it empty, so that a
-    // reference to it reports the missing member and not a missing type.
+    // Under SqlLocation.Nested the nested class is not written when the type's usable queries are all CodeGen, so
+    // that a method may have its name, as the methods' planner expects.  A type with no usable query at all keeps it
+    // empty, so that a reference to it reports the missing member and not a missing type.
     private static string Write(
         TargetType type,
         List<(SqlQuery Query, string FileName, QuerySettings Settings)> members,

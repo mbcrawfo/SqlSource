@@ -185,6 +185,30 @@ public sealed class MethodTests
         run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUserAsync(\n");
     }
 
+    // A query at sql in a file that SQLSRC008 leaves out fills no nested class, so the method still may have its name.
+    [Fact]
+    public void Run_MethodNamedLikeTheNestedClassBesideAFileLeftOut_Compiles()
+    {
+        var other = new SqlFile("/app/Repo/Zed.sql", "-- name: GetUser\n-- output: sql\nSELECT 2;\n");
+
+        var run = MethodRuns.Run(
+            MethodRuns.SampleSource(
+                "MethodLocation = MethodLocation.Public, NestedClass = \"GetUserAsync\", "
+                    + "Parameters = \"async-method-suffix\""
+            ),
+            Users,
+            Sidecars.Of(Users, UsersEntries),
+            other
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC008 /app/Repo/Zed.sql(");
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Sources["App.Sample.g.cs"].ShouldNotContain("class GetUserAsync");
+        run.Sources["App.Sample.g.cs"].ShouldNotContain("SELECT 2;");
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUserAsync(\n");
+    }
+
     // One file of a query at each output, by its marker, under SqlLocation.Direct and MethodLocation.Public.
     [Fact]
     public void Run_MixedType_HasConstantsMethodsAndModels()

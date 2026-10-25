@@ -21,6 +21,13 @@ public sealed class SettingLevelTests
 {
     private const string Sql = "-- name: Q\nSELECT 1;\n";
 
+    // Sql with the query at sql by its marker, so that the type's file has its constant, whose text shows the marker's
+    // line stripped, and the run reports nothing.
+    private const string SqlAtSql = "-- name: Q\n-- output: sql\nSELECT 1;\n";
+
+    // The constant of SqlAtSql, which a comparison of two type files checks is there.
+    private const string Constant = "public const string Q = \"SELECT 1;\";\n";
+
     // The query of the method runs, with its entry written for the file as each level's markers leave it.
     private static readonly SqlFile Users = new(
         GeneratorHarness.UsersPath,
@@ -34,17 +41,17 @@ public sealed class SettingLevelTests
         new()
         {
             {
-                "-- name: Q\nSELECT id FROM users WHERE id = @id;\n",
+                "-- name: Q\n-- output: sql\nSELECT id FROM users WHERE id = @id;\n",
                 "-- database: main\n-- output: models\n-- input-model-suffix: Args\n-- output-model-suffix: Row\n"
                     + "-- model-namespace: App.Models\n-- input-model-type: sealed record\n"
                     + "-- output-model-type: class\n-- collection-type: ImmutableArray\n"
                     + "-- type-override: numeric = System.Double\n\n"
-                    + "-- name: Q -> one\n-- param: @id int not null\n-- database: other\n-- output: codegen\n"
+                    + "-- name: Q -> one\n-- param: @id int not null\n-- database: other\n-- output: sql\n"
                     + "-- input-model: QueryArgs\n-- output-model: App.Models.QueryRow\n-- collection-type: List\n"
                     + "-- type-override: numeric = default\n-- type-override: int4 = long\n"
                     + "SELECT id FROM users WHERE id = @id;\n",
-                Default,
-                [NotDescribable("codegen", 11)]
+                [],
+                []
             },
             {
                 "-- output: models\n\n-- name: Q\nSELECT id FROM {{table}} WHERE {{filter}};\n",
@@ -56,19 +63,24 @@ public sealed class SettingLevelTests
             },
         };
 
-    // Each level, with an output that gives a constant and with the one that gives a method.
+    // Each level with each output.  The property is the least specific level, and codegen is both the default and the
+    // output MethodRuns gives the project, so a property of codegen would decide nothing: that row is left out.
     public static TheoryData<SettingLevel, string> OutputLevels =>
         new()
         {
             { SettingLevel.Property, "Sql" },
-            { SettingLevel.Property, "CodeGen" },
+            { SettingLevel.Property, "Models" },
             { SettingLevel.Metadata, "Sql" },
+            { SettingLevel.Metadata, "Models" },
             { SettingLevel.Metadata, "CodeGen" },
             { SettingLevel.Attribute, "Sql" },
+            { SettingLevel.Attribute, "Models" },
             { SettingLevel.Attribute, "CodeGen" },
             { SettingLevel.Header, "Sql" },
+            { SettingLevel.Header, "Models" },
             { SettingLevel.Header, "CodeGen" },
             { SettingLevel.Query, "Sql" },
+            { SettingLevel.Query, "Models" },
             { SettingLevel.Query, "CodeGen" },
         };
 
@@ -76,32 +88,44 @@ public sealed class SettingLevelTests
     public static TheoryData<SettingLevel> Levels =>
         [SettingLevel.Property, SettingLevel.Metadata, SettingLevel.Attribute, SettingLevel.Header, SettingLevel.Query];
 
+    // The output's row reads the default's query, whose diagnostic names the output read.  Every other row's query is
+    // at sql by its marker, so that the two runs' type files have a constant to compare.
     [Theory]
     [InlineData("SqlSourceOutput", " Code-Gen ", "codegen")]
-    [InlineData("SqlSourceDatabase", "not read by the generator, so never wrong", "codegen")]
-    [InlineData("SqlSourceInputModelSuffix", "Args", "codegen")]
-    [InlineData("SqlSourceOutputModelSuffix", "Row", "codegen")]
-    [InlineData("SqlSourceModelNamespace", "App.Models", "codegen")]
-    [InlineData("SqlSourceInputModelType", "sealed record", "codegen")]
-    [InlineData("SqlSourceOutputModelType", "Class", "codegen")]
-    [InlineData("SqlSourceTypeOverrides", "timestamptz=System.DateTimeOffset  int4[]=int?[]", "codegen")]
-    public void Run_ValidSettingAsPropertyAndAsMetadata_ChangesNoGeneratedCode(string name, string value, string output)
+    [InlineData("SqlSourceDatabase", "not read by the generator, so never wrong", null)]
+    [InlineData("SqlSourceInputModelSuffix", "Args", null)]
+    [InlineData("SqlSourceOutputModelSuffix", "Row", null)]
+    [InlineData("SqlSourceModelNamespace", "App.Models", null)]
+    [InlineData("SqlSourceInputModelType", "sealed record", null)]
+    [InlineData("SqlSourceOutputModelType", "Class", null)]
+    [InlineData("SqlSourceTypeOverrides", "timestamptz=System.DateTimeOffset  int4[]=int?[]", null)]
+    public void Run_ValidSettingAsPropertyAndAsMetadata_ChangesNoGeneratedCode(
+        string name,
+        string value,
+        string? output
+    )
     {
+        var text = output is null ? SqlAtSql : Sql;
         var plain = GeneratorHarness.Run(
             null,
             GeneratorHarness.SampleSource(null),
-            new SqlFile("/app/Repo/Q.sql", Sql)
+            new SqlFile("/app/Repo/Q.sql", text)
         );
 
         var run = GeneratorHarness.Run(
             null,
             [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
-            [new SqlFile("/app/Repo/Q.sql", Sql, Metadata: new Dictionary<string, string> { [name] = value })],
+            [new SqlFile("/app/Repo/Q.sql", text, Metadata: new Dictionary<string, string> { [name] = value })],
             properties: new Dictionary<string, string?> { [name] = value }
         );
 
-        plain.Diagnostics.ShouldBe(Default);
-        run.Diagnostics.ShouldBe([NotDescribable(output, 1)]);
+        plain.Diagnostics.ShouldBe(output is null ? [] : Default);
+        run.Diagnostics.ShouldBe(output is null ? [] : [NotDescribable(output, 1)]);
+        if (output is null)
+        {
+            plain.Sources["App.Sample.g.cs"].ShouldContain(Constant);
+        }
+
         run.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
     }
 
@@ -200,18 +224,19 @@ public sealed class SettingLevelTests
         var plain = GeneratorHarness.Run(
             null,
             GeneratorHarness.SampleSource(null),
-            new SqlFile("/app/Repo/Q.sql", Sql)
+            new SqlFile("/app/Repo/Q.sql", SqlAtSql)
         );
 
         var run = GeneratorHarness.Run(
             null,
             GeneratorHarness.SampleSource(argument),
-            new SqlFile("/app/Repo/Q.sql", Sql)
+            new SqlFile("/app/Repo/Q.sql", SqlAtSql)
         );
 
-        run.Diagnostics.ShouldBe(Default);
+        run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
+        plain.Sources["App.Sample.g.cs"].ShouldContain(Constant);
         run.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
     }
 
@@ -249,8 +274,8 @@ public sealed class SettingLevelTests
     }
 
     // The markers that change no type's file without a dialect, in a preamble and in a query: the type's file is the
-    // one of the same file without them.  A query's output marker over the header's, which gives the default, moves the
-    // diagnostic, and the tokens' defaults take SQLSRC210 away.
+    // one of the same file without them.  A query's output marker of sql over the header's of models leaves the file
+    // of the query at sql, and the tokens' defaults take SQLSRC210 away.
     [Theory]
     [MemberData(nameof(MarkersWithoutAnEffect))]
     public void Run_MarkersWithoutAnEffect_GiveTheFileOfTheSameQueryWithoutThem(
@@ -295,7 +320,8 @@ public sealed class SettingLevelTests
         run.Sources["App.Sample.g.cs"].ShouldContain("\"SELECT 1;\"");
     }
 
-    // Below the level the project's property says the other output, so that the level is what decides.
+    // Below the level the project's property says another output, sql for codegen and codegen otherwise, so that the
+    // level is what decides.
     [Theory]
     [MemberData(nameof(OutputLevels))]
     public void Run_OutputAtEachLevel_DecidesBetweenConstantAndMethod(SettingLevel level, string output)
@@ -303,7 +329,7 @@ public sealed class SettingLevelTests
         var settings = new LevelSettings();
         if (level != SettingLevel.Property)
         {
-            _ = settings.At(SettingLevel.Property, Setting.Output, output == "Sql" ? "CodeGen" : "Sql");
+            _ = settings.At(SettingLevel.Property, Setting.Output, output == "CodeGen" ? "Sql" : "CodeGen");
         }
 
         _ = settings.At(level, Setting.Output, output);
@@ -322,15 +348,19 @@ public sealed class SettingLevelTests
 
         run.ShouldBeClean();
         var type = run.Sources["App.Sample.g.cs"];
-        if (output == "Sql")
-        {
-            type.ShouldContain("public const string GetUser = \"SELECT id FROM users WHERE id = @id;\";\n");
-            run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
-        }
-        else
+        if (output == "CodeGen")
         {
             type.ShouldNotContain("GetUser");
             run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUser(\n");
+            ModelRuns.ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs", "App.GetUserParams-Model.g.cs"]);
+        }
+        else
+        {
+            type.ShouldContain("public const string GetUser = \"SELECT id FROM users WHERE id = @id;\";\n");
+            run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+            ModelRuns
+                .ModelFiles(run)
+                .ShouldBe(output == "Models" ? ["App.GetUserDto-Model.g.cs", "App.GetUserParams-Model.g.cs"] : []);
         }
     }
 

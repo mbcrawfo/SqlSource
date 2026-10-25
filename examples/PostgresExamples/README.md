@@ -13,7 +13,7 @@ A small project that uses SqlSource with PostgreSQL and Dapper: what you write, 
 | [`CodeGen/`](CodeGen) | The default output, `codegen`: `ListOrderLines` gets its models and a method that runs it, an extension method of the connection, which returns every row by the [result shape](../../docs/manual/sql-files.md#result-shapes) after the query's name, `many` |
 | [`DapperSetup.cs`](DapperSetup.cs), [`UtcDateTimeOffsetHandler.cs`](UtcDateTimeOffsetHandler.cs) | What Dapper needs once, before the first query: see [the recipe](../../docs/manual/recipes.md#dapper-with-postgresql) |
 
-Each folder's `.sql` files belong to the one class beside them, whose `[SqlSourceGenerate]` attribute sets the folder's output, and whose methods run the queries: in `Sql/` and `Models/` the generated SQL through Dapper, into the generated models, and in `CodeGen/` the generated method.  The queries write their parameters in camelCase, `@orderId`, which Dapper binds to the property `OrderId` of the input model.  Nothing here runs: the project compiles, so a model that changes shape breaks its build.
+Each folder's `.sql` files belong to the one class beside them, whose `[SqlSourceGenerate]` attribute sets the folder's output, and whose methods run the queries: in `Sql/` and `Models/` the generated SQL through Dapper, into the generated models, and in `CodeGen/` the generated method.  The queries write their parameters in camelCase, `@orderId`: in `Models/` Dapper binds it to the property `OrderId` of the input model, and in `CodeGen/` the generated method binds it from that property itself.  Nothing here runs: the project compiles, so a model that changes shape breaks its build.
 
 ## Your own project
 
