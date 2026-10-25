@@ -185,7 +185,7 @@ public sealed class MethodDiagnosticsTests
         Problems(run)
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,15): The method of the query 'Count' cannot be named 'Count', "
-                    + "because 'Sample' has a member of that name.  Rename the query.",
+                    + "because 'App.Sample' has a member of that name.  Rename the query.",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
@@ -204,7 +204,8 @@ public sealed class MethodDiagnosticsTests
         Problems(run)
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,16): The method of the query 'Sample' cannot be named "
-                    + "'Sample', because it is the name of the type 'Sample' that holds the method.  Rename the query.",
+                    + "'Sample', because it is the name of the type 'App.Sample' that holds the method.  Rename the "
+                    + "query.",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
@@ -228,7 +229,7 @@ public sealed class MethodDiagnosticsTests
         Problems(run)
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,14): The method of the query 'TRow' cannot be named 'TRow', "
-                    + "because 'Sample<TRow>' has a type parameter of that name.  Rename the query.",
+                    + "because 'App.Sample<TRow>' has a type parameter of that name.  Rename the query.",
             ]);
         run.Sources.Keys.ShouldNotContain("App.Sample-1-Methods.g.cs");
     }
@@ -253,7 +254,7 @@ public sealed class MethodDiagnosticsTests
         Problems(run)
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'GetAsync', "
-                    + "because the class of the queries of 'Sample' has that name.  Rename the query.",
+                    + "because the class of the queries of 'App.Sample' has that name.  Rename the query.",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
@@ -277,7 +278,7 @@ public sealed class MethodDiagnosticsTests
         Problems(run)
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'GetAsync', "
-                    + "because the query 'GetAsync' of 'Sample' has a constant or method of that name.  Rename the "
+                    + "because the query 'GetAsync' of 'App.Sample' has a constant or method of that name.  Rename the "
                     + "query.",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
@@ -306,6 +307,66 @@ public sealed class MethodDiagnosticsTests
                     + "'GetAsync', because the method of the query 'Get' has that name too.  Rename the query.",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
+    // A query that gets no method takes no name: GetAsync has a problem of its own, so Get under async-method-suffix
+    // keeps its method.
+    [Fact]
+    public void Run_QueryWithAProblemNamedAsAnotherMethod_LeavesTheOtherItsMethod()
+    {
+        var file = new SqlFile(
+            Path,
+            "-- name: GetAsync -> one\nUPDATE users SET name = 'x';\n"
+                + "-- name: Get\n-- generator: async-method-suffix\nSELECT id FROM users;\n"
+        );
+
+        var run = MethodRuns.Run(file, [Entry(file, "GetAsync", [], null), Entry(file, "Get", [], [Column("id")])]);
+
+        Problems(run)
+            .ShouldBe([
+                "SQLSRC272 /app/Repo/Users.sql(1,10)-(1,18): The query 'GetAsync' has the shape 'one', and its "
+                    + "statement returns no rows.  Remove the shape, or write 'rowcount' or 'none'.",
+            ]);
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetAsync(\n");
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("/// The <c>Get</c> query from <c>Users.sql</c>.\n");
+    }
+
+    // Two types of one name in two namespaces each report the member that takes their method's name.
+    [Fact]
+    public void Run_TwoTypesOfOneNameClaimingOneFile_EachReportSqlsrc274()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App.A
+            {
+                [SqlSourceGenerate(MethodLocation = MethodLocation.Public)]
+                public partial class Sample
+                {
+                    public static int Count => 0;
+                }
+            }
+
+            namespace App.B
+            {
+                [SqlSourceGenerate(MethodLocation = MethodLocation.Public)]
+                public partial class Sample
+                {
+                    public static int Count => 0;
+                }
+            }
+            """;
+        var file = new SqlFile(Path, "-- name: Count\nSELECT id FROM users;\n");
+
+        var run = MethodRuns.Run(file, [Entry(file, "Count", [], [Column("id")])], Source);
+
+        Problems(run)
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,15): The method of the query 'Count' cannot be named 'Count', "
+                    + "because 'App.A.Sample' has a member of that name.  Rename the query.",
+                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,15): The method of the query 'Count' cannot be named 'Count', "
+                    + "because 'App.B.Sample' has a member of that name.  Rename the query.",
+            ]);
     }
 
     // The diagnostics of a run whose generated code compiles with no error and no warning.

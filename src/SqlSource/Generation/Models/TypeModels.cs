@@ -180,7 +180,7 @@ internal static class TypeModels
     // The claiming type as a sort key and as a message names it.  The key is HintName.NameOf, the namespace and each
     // type's name, as values, with a generic type's arity after a hyphen, "App.Outer.Repository-1", so that Repository
     // and Repository<T> are told apart.  The name has the type parameters instead, "App.Outer.Repository<T>".
-    private static (string Key, string Name) ClaimingTypeOf(TargetType target)
+    internal static (string Key, string Name) ClaimingTypeOf(TargetType target)
     {
         var name = new StringBuilder(target.NamespaceValue);
         foreach (var declaration in target.Types)
