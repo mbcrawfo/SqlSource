@@ -24,27 +24,37 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 [Collection(MeasuresAllocations.Name)]
 public sealed class AllocationTests(PostgresContainer postgres)
 {
-    // The bytes for each call that the generated method may allocate beyond the hand-written one.  Two methods of the
-    // same calls differ by the size of their async state machines alone, a field or two, and the jitter of Npgsql's
-    // pooled buffers over 2,000 calls was below 25 bytes a call when this was set (the spike's section 8: an execution
-    // of one parameter costs 296 bytes, a boxed int 24).  An extra boxed value, array or closure on each call costs 24
-    // bytes or more, so a few of them exceed the margin and noise does not.  Never above 128.
+    // The bytes for each call that the generated method may allocate beyond the hand-written one.  A call of these
+    // queries allocated about 1.7 to 2.7 KB here when this was set, and the two methods of the same calls differed by
+    // the size of their async state machines alone, within about 25 bytes a call either way over a run; a boxed value
+    // is 24 bytes.  The binding's own cost, the driver's for each parameter and its DataTypeName, is in both sides
+    // alike.  So an extra boxed value, array or closure on each call shows, a few of them exceed the margin, and noise
+    // does not.  Never above 128.
     private const double MarginInBytesPerCall = 64;
 
     // The first calls pay for one-off work: JIT compilation, static initialisers, the pools of the driver and of the
     // runtime, and the statement's first parse.
     private const int WarmUpCalls = 200;
 
+    // Enough calls that the jitter of Npgsql's pooled buffers, which a call now and then grows or rents anew, averages
+    // to well below the margin: a few bytes a call over 2,000.
     private const int MeasuredCalls = 2_000;
 
-    // The measured calls of each method are made in blocks taken in turn, and which method goes first alternates from
-    // block to block, so that what the process does in the background over the run falls on both alike: the first of
-    // a pair was measured up to 40 bytes a call higher than the same method second.
+    // The measured calls of each method are made in blocks taken in turn, so that what the process does in the
+    // background over the run, a timer, the GC or the runner, falls on both methods alike, and which method goes first
+    // alternates from block to block: the first of a pair was measured up to 40 bytes a call higher than the same
+    // method second.
     private const int Blocks = 10;
 
     private const string GetAccountNameSql = "SELECT id, name\nFROM accounts\nWHERE id = @accountId;";
 
     private const string ListAccountsSql = "SELECT *\nFROM accounts\nORDER BY id;";
+
+    private const string ListClosedBeforeSql =
+        "SELECT id, name, closed_at\nFROM accounts\n"
+        + "WHERE @closedBefore IS NULL OR closed_at < @closedBefore\nORDER BY id;";
+
+    private static readonly DateTimeOffset BobClosedAt = new(2024, 9, 1, 17, 45, 0, TimeSpan.Zero);
 
     [Fact]
     public async Task GetAccountName_PerCall_AllocatesNoMoreThanHandWritten()
@@ -79,6 +89,28 @@ public sealed class AllocationTests(PostgresContainer postgres)
         var (generated, handWritten) = await MeasureAsync(
             () => connection.ListAccounts(cancellationToken: token),
             () => ListAccountsByHand(connection, cancellationToken: token)
+        );
+
+        generated.ShouldBeGreaterThan(0);
+        handWritten.ShouldBeGreaterThan(0);
+        generated.ShouldBeLessThanOrEqualTo(handWritten + MarginInBytesPerCall);
+    }
+
+    // A query with a parameter and a few rows: a null date reads every account, a NULL among them.
+    [Fact]
+    public async Task ListClosedBefore_PerCall_AllocatesNoMoreThanHandWritten()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        var parameters = new ListClosedBeforeArgs(null);
+        ListClosedBeforeDto[] expected = [new(1, "alice", null), new(2, "bob", BobClosedAt), new(3, "carol", null)];
+        (await connection.ListClosedBefore(parameters, cancellationToken: token)).ShouldBe(expected);
+        (await ListClosedBeforeByHand(connection, null, cancellationToken: token)).ShouldBe(expected);
+
+        var (generated, handWritten) = await MeasureAsync(
+            () => connection.ListClosedBefore(parameters, cancellationToken: token),
+            () => ListClosedBeforeByHand(connection, null, cancellationToken: token)
         );
 
         generated.ShouldBeGreaterThan(0);
@@ -248,6 +280,77 @@ public sealed class AllocationTests(PostgresContainer postgres)
                     }
 
                     AccountsDto[] array = [.. rows];
+                    return array;
+                }
+            }
+        }
+        finally
+        {
+            if (wasClosed)
+            {
+                await connection.CloseAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    // ListClosedBefore of Queries/Accounts.sql, by hand: a null date is the parameter's own null, and closed_at may be
+    // NULL.
+    [SuppressMessage(
+        "Performance",
+        "CA1849:Call async methods when in an async method",
+        Justification = "The row is in memory once ReadAsync returns, as the generated method reads it."
+    )]
+    private static async Task<IReadOnlyList<ListClosedBeforeDto>> ListClosedBeforeByHand(
+        DbConnection connection,
+        DateTimeOffset? closedBefore,
+        DbTransaction? transaction = null,
+        int? commandTimeout = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var wasClosed = connection.State == ConnectionState.Closed;
+        if (wasClosed)
+        {
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        try
+        {
+            var command = connection.CreateCommand();
+            await using (command.ConfigureAwait(false))
+            {
+                command.CommandText = ListClosedBeforeSql;
+                command.Transaction = transaction;
+                if (commandTimeout.HasValue)
+                {
+                    command.CommandTimeout = commandTimeout.Value;
+                }
+
+                _ = command.Parameters.Add(
+                    new NpgsqlParameter<DateTimeOffset?>
+                    {
+                        ParameterName = "closedBefore",
+                        DataTypeName = "timestamp with time zone",
+                        TypedValue = closedBefore,
+                    }
+                );
+
+                var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                await using (reader.ConfigureAwait(false))
+                {
+                    var rows = new List<ListClosedBeforeDto>();
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        rows.Add(
+                            new ListClosedBeforeDto(
+                                reader.GetFieldValue<int>(0),
+                                reader.GetFieldValue<string>(1),
+                                reader.IsDBNull(2) ? null : reader.GetFieldValue<DateTimeOffset>(2)
+                            )
+                        );
+                    }
+
+                    ListClosedBeforeDto[] array = [.. rows];
                     return array;
                 }
             }
