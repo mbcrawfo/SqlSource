@@ -2,9 +2,10 @@
 -- PostgresContainer and tools/describe-end-to-end.sh apply it, then seed.sql.  A change to it is followed by a run of
 -- tools/describe-end-to-end.sh, which writes the sidecars again.
 
--- The extensions whose types all_types reads.  cube is left out: Npgsql 8 cannot read it, and its row of the type map
--- is proved by PostgresTypeMapTests in tests/SqlSource.Tests.
+-- The extensions whose types all_types reads, and cube, which it leaves out: Npgsql 8 cannot read it, so the query
+-- EchoCube of Queries/Cube.sql writes and reads it alone, on Npgsql 10.
 CREATE EXTENSION citext;
+CREATE EXTENSION cube;
 CREATE EXTENSION hstore;
 CREATE EXTENSION ltree;
 
@@ -41,7 +42,8 @@ CREATE TABLE notes (
 );
 
 -- One nullable column for each type that the base map gives a C# type on both Npgsql 8 and Npgsql 10 and that
--- PostgreSQL 14 has, named for its type.  Every column is read through Dapper into a generated model.
+-- PostgreSQL 14 has, named for its type.  Every column is written and read through the generated methods, and read
+-- through Dapper into a generated model.
 --
 -- Left out: cube, as above.  The registered types that Npgsql reads only by a cast to oid (regclass and the others),
 -- pg_snapshot, txid_snapshot and pg_node_tree, which it reads only by a cast to text, and record, unknown and void,

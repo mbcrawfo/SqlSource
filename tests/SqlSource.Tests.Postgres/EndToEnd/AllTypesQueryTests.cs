@@ -14,10 +14,11 @@ using static SqlSource.Testing.EndToEnd.ModelReflection;
 
 namespace SqlSource.Tests.Postgres.EndToEnd;
 
-// The type map through the generated method and through Dapper.  The read side: both rows of all_types into
+// The type map through the generated methods and through Dapper.  The read side: both rows of all_types into
 // AllTypesDto, every column of each, by AllTypesQueries' method and by AllTypesSql's constant through Dapper.  The
-// write side, through Dapper: a row inserted with InsertAllTypesArgs, built from the values of row 1, and read back by
-// RETURNING, for every type that Dapper can send.  The insert runs in a transaction that is rolled back.
+// write side of InsertAllTypes: a row inserted with InsertAllTypesArgs, built from the values of row 1, and read back
+// by RETURNING, for every type that Dapper can send, by its method and by its constant through Dapper.  Each insert
+// runs in a transaction that is rolled back.  EveryTypeTests writes every column through InsertEveryType's method.
 [Collection(UsesPostgres.Name)]
 public sealed class AllTypesQueryTests(PostgresContainer postgres)
 {
@@ -96,6 +97,35 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
         rows.Count.ShouldBe(2);
         AllTypesRows.ShouldBeTheFullRow(rows[0]);
         AllTypesRows.ShouldBeTheNullRow(rows[1]);
+        (rows[0] with { Id = 9 }).Int4ArrayValue.ShouldBeSameAs(rows[0].Int4ArrayValue);
+        (rows[0] with { }).ShouldBe(rows[0]);
+    }
+
+    // The method of the query that Dapper's write runs, with the same values: it writes what Dapper can send, and the
+    // columns of WriteSideLeftOut are null.
+    [Fact]
+    public async Task InsertAllTypes_FullRow_ReturnsTheValuesWritten()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+
+        var full = (await connection.ListAllTypes(transaction, cancellationToken: token)).Single(static row =>
+            row.Id == AllTypesRows.FullRowId
+        );
+        var rows = await connection.InsertAllTypes(
+            ArgsFrom<InsertAllTypesArgs>(full, InsertedId),
+            transaction,
+            cancellationToken: token
+        );
+
+        AllTypesRows.ShouldBeTheFullRow(
+            rows.ShouldHaveSingleItem(),
+            InsertedId,
+            nullProperties: WriteSideLeftOut.Keys.ToHashSet()
+        );
+        await transaction.RollbackAsync(token);
     }
 
     [Fact]
@@ -131,7 +161,7 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
 
             var row = await connection.QuerySingleAsync<AllTypesDto>(
                 AllTypesSql.InsertAllTypes,
-                ArgsFrom(full),
+                ArgsFrom<InsertAllTypesArgs>(full, InsertedId),
                 transaction
             );
 
@@ -206,26 +236,23 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
             .ShouldBe(columns.Order(StringComparer.Ordinal));
     }
 
-    // The input model with the values of the full row, property by property by name, and the id of the new row.  A
-    // parameter of bit(1) has no length, so it is a BitArray where the column is a bool.
-    private static InsertAllTypesArgs ArgsFrom(AllTypesDto full)
+    // An input model of an insert into all_types with the values of a row, property by property by name, and the id
+    // of the new row.  A parameter of bit(1) has no length, so it is a BitArray where the column is a bool.
+    internal static TArgs ArgsFrom<TArgs>(AllTypesDto row, int id)
     {
-        var constructor = typeof(InsertAllTypesArgs).GetConstructors().ShouldHaveSingleItem();
+        var constructor = typeof(TArgs).GetConstructors().ShouldHaveSingleItem();
         var arguments = constructor
             .GetParameters()
             .Select(parameter =>
                 parameter.Name switch
                 {
-                    nameof(InsertAllTypesArgs.Id) => InsertedId,
-                    "Bit1Value" => new BitArray([full.Bit1Value.ShouldNotBeNull()]),
-                    _ => typeof(AllTypesDto)
-                        .GetProperty(parameter.Name!)
-                        .ShouldNotBeNull(parameter.Name)
-                        .GetValue(full),
+                    nameof(AllTypesDto.Id) => id,
+                    nameof(AllTypesDto.Bit1Value) => row.Bit1Value is { } bit ? new BitArray([bit]) : null,
+                    _ => typeof(AllTypesDto).GetProperty(parameter.Name!).ShouldNotBeNull(parameter.Name).GetValue(row),
                 }
             )
             .ToArray();
-        return (InsertAllTypesArgs)constructor.Invoke(arguments);
+        return (TArgs)constructor.Invoke(arguments);
     }
 
     // The parameters of one column, as the input model has them, and the id of the row.

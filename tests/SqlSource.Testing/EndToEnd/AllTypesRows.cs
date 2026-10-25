@@ -165,12 +165,12 @@ internal static class AllTypesRows
         }
     }
 
-    // Asserts that the row is row 2 of the seed, with null in every column but id.
-    public static void ShouldBeTheNullRow(object row)
+    // Asserts that the row is row 2 of the seed, with null in every column but id, which may be another.
+    public static void ShouldBeTheNullRow(object row, int id = NullRowId)
     {
         foreach (var property in PropertiesOf(row))
         {
-            ShouldBeValue(property.GetValue(row), property.Name == "Id" ? NullRowId : null, property.Name);
+            ShouldBeValue(property.GetValue(row), property.Name == "Id" ? id : null, property.Name);
         }
     }
 
