@@ -92,6 +92,21 @@ public sealed class ColumnTypeMapTests
         ColumnTypeMap.Find(map, "public", "Users", "Id")!.Type.ShouldBe("Upper");
     }
 
+    // Within one place, a schema weighs more than the spelling: the key with a schema wins though the other is spelled
+    // as the origin is and it is not.
+    [Fact]
+    public void Find_SchemaWins_OverExactSpelling_InOnePlace()
+    {
+        var map = ColumnTypeMap
+            .Over(
+                Map(Entry("Users.id", "A", SettingPlace.Property)),
+                Map(Entry("auth.users.id", "B", SettingPlace.Property))
+            )!
+            .Value;
+
+        ColumnTypeMap.Find(map, "auth", "Users", "id")!.Type.ShouldBe("B");
+    }
+
     [Fact]
     public void Find_TextWithAQuoteInAQuotedPart_IsFound()
     {

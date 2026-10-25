@@ -202,11 +202,14 @@ public sealed class ColumnMarkerTests
         ModelsOf(run).Queries.ShouldHaveSingleItem().Name.ShouldBe("GetOther");
     }
 
-    // A marker that gives a type alone says nothing of the nullability, so it may name a column with a mark.
-    [Fact]
-    public void Run_TypeOnlyMarker_OnMarkedColumn_IsNoError()
+    // A marker that gives a type alone, or takes it away, says nothing of the nullability, so it may name a column
+    // with a mark.
+    [Theory]
+    [InlineData("string")]
+    [InlineData("default")]
+    public void Run_TypeOnlyMarker_OnMarkedColumn_IsNoError(string type)
     {
-        var file = Query("-- column: display_name -> string\n", "SELECT name AS \"display_name!\" FROM users;");
+        var file = Query("-- column: display_name -> " + type + "\n", "SELECT name AS \"display_name!\" FROM users;");
 
         var run = Run(file, Entry(file, "GetUser", [], [Column("display_name!", Text, nullable: true)]));
 

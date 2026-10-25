@@ -86,12 +86,12 @@ internal static class TypeOverrideGrammar
 
             if (postgreSqlKey is not null)
             {
-                Put(postgreSql ??= [], new TypeOverride(postgreSqlKey, type, place));
+                TypeOverrideMap.Put(postgreSql ??= [], new TypeOverride(postgreSqlKey, type, place));
             }
 
             if (sqlServerKey is not null)
             {
-                Put(sqlServer ??= [], new TypeOverride(sqlServerKey, type, place));
+                TypeOverrideMap.Put(sqlServer ??= [], new TypeOverride(sqlServerKey, type, place));
             }
         }
 
@@ -170,20 +170,6 @@ internal static class TypeOverrideGrammar
         engine == DatabaseEngine.SqlServer
             ? TypeKeys.TryNormalizeSqlServer(key, out normalized)
             : TypeKeys.TryNormalizePostgres(key, out normalized);
-
-    // Puts an entry in its place in a list kept in the order of TypeOverrideMap, over an entry of its key.
-    private static void Put(List<TypeOverride> entries, TypeOverride entry)
-    {
-        var at = TypeOverrideMap.IndexOf(entries, entry.Key);
-        if (at >= 0)
-        {
-            entries[at] = entry;
-        }
-        else
-        {
-            entries.Insert(~at, entry);
-        }
-    }
 
     private static EquatableArray<TypeOverride> ToArray(List<TypeOverride>? entries) =>
         entries is null

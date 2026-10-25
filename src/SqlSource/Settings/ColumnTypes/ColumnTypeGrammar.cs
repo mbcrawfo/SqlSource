@@ -42,7 +42,7 @@ internal static class ColumnTypeGrammar
                 continue;
             }
 
-            Put(entries ??= [], new ColumnType(normalized, type, place));
+            ColumnTypeMap.Put(entries ??= [], new ColumnType(normalized, type, place));
         }
 
         return entries is null
@@ -84,20 +84,6 @@ internal static class ColumnTypeGrammar
 
         entry = new ColumnType(key, type, SettingPlace.FileHeader);
         return true;
-    }
-
-    // Puts an entry in its place in a list kept in the order of ColumnTypeMap, over an entry of its key.
-    private static void Put(List<ColumnType> entries, ColumnType entry)
-    {
-        var at = ColumnTypeMap.IndexOf(entries, entry.Key);
-        if (at >= 0)
-        {
-            entries[at] = entry;
-        }
-        else
-        {
-            entries.Insert(~at, entry);
-        }
     }
 
     // The first -> outside double quotes, or -1.  A " toggles being inside quotes, so a doubled one inside a quoted

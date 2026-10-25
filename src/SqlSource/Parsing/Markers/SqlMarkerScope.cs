@@ -108,7 +108,8 @@ internal sealed class SqlMarkerScope(
 
     /// <summary>
     /// What the scope's <c>-- column:</c> markers say of its query's result, in marker order.  A column has a second
-    /// marker only when that one says what the first does not, the type of a column whose nullability the first sets.
+    /// marker only when it says what the first does not: the type where the first sets the nullability, or the
+    /// nullability where the first sets the type.
     /// </summary>
     public IReadOnlyList<SqlColumnDeclaration> Columns => _columns ?? (IReadOnlyList<SqlColumnDeclaration>)[];
 
@@ -338,13 +339,10 @@ internal sealed class SqlMarkerScope(
             return;
         }
 
-        _typeOverrides ??= [];
-        var at = TypeOverrideMap.IndexOf(_typeOverrides, entry!.Key);
-        if (at < 0)
-        {
-            _typeOverrides.Insert(~at, entry);
-        }
-        else if (!string.Equals(_typeOverrides[at].Type, entry.Type, StringComparison.Ordinal))
+        if (
+            TypeOverrideMap.AddOrFind(_typeOverrides ??= [], entry!) is { } existing
+            && !string.Equals(existing.Type, entry!.Type, StringComparison.Ordinal)
+        )
         {
             AddConflict(marker);
         }
@@ -626,13 +624,10 @@ internal sealed class SqlMarkerScope(
             return;
         }
 
-        _columnTypes ??= [];
-        var at = ColumnTypeMap.IndexOf(_columnTypes, entry!.Key);
-        if (at < 0)
-        {
-            _columnTypes.Insert(~at, entry);
-        }
-        else if (!string.Equals(_columnTypes[at].Type, entry.Type, StringComparison.Ordinal))
+        if (
+            ColumnTypeMap.AddOrFind(_columnTypes ??= [], entry!) is { } existing
+            && !string.Equals(existing.Type, entry!.Type, StringComparison.Ordinal)
+        )
         {
             AddConflict(marker);
         }

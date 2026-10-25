@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using SqlSource.Settings.TypeOverrides;
 
 namespace SqlSource.Settings.ColumnTypes;
@@ -20,6 +19,11 @@ namespace SqlSource.Settings.ColumnTypes;
 /// </remarks>
 internal static class ColumnTypeMap
 {
+    // The order of the map and the key of an entry, for SortedKeyedList.  Static, so that no call allocates them.
+    private static readonly Comparison<string> KeyOrder = static (a, b) => Order(new KeyParts(a), new KeyParts(b));
+
+    private static readonly Func<ColumnType, string> KeyOf = static entry => entry.Key;
+
     /// <summary>
     /// <paramref name="higher" /> over <paramref name="lower" />: every key of either, with the entry of
     /// <paramref name="higher" /> for a key both have.  Null when both are, and either one itself when the other is.
@@ -27,40 +31,7 @@ internal static class ColumnTypeMap
     public static EquatableArray<ColumnType>? Over(
         EquatableArray<ColumnType>? higher,
         EquatableArray<ColumnType>? lower
-    )
-    {
-        if (higher is not { } over)
-        {
-            return lower;
-        }
-
-        if (lower is not { } under)
-        {
-            return over;
-        }
-
-        var merged = ImmutableArray.CreateBuilder<ColumnType>(over.Count + under.Count);
-        var (high, low) = (0, 0);
-        while (high < over.Count && low < under.Count)
-        {
-            var order = Order(new KeyParts(over[high].Key), new KeyParts(under[low].Key));
-            merged.Add(order <= 0 ? over[high] : under[low]);
-            high += order <= 0 ? 1 : 0;
-            low += order >= 0 ? 1 : 0;
-        }
-
-        for (; high < over.Count; high++)
-        {
-            merged.Add(over[high]);
-        }
-
-        for (; low < under.Count; low++)
-        {
-            merged.Add(under[low]);
-        }
-
-        return new EquatableArray<ColumnType>(merged.ToImmutable());
-    }
+    ) => SortedKeyedList.Over(higher, lower, KeyOrder, KeyOf);
 
     /// <summary>
     /// The entry for a column read from <paramref name="column" /> of <paramref name="table" /> in
@@ -96,25 +67,19 @@ internal static class ColumnTypeMap
     /// Where <paramref name="key" /> is in a list kept sorted by key, or the complement of where it would go, as
     /// <see cref="List{T}.BinarySearch(T)" /> gives it.
     /// </summary>
-    public static int IndexOf(List<ColumnType> entries, string key)
-    {
-        var parts = new KeyParts(key);
-        var (low, high) = (0, entries.Count);
-        while (low < high)
-        {
-            var middle = low + ((high - low) / 2);
-            if (Order(new KeyParts(entries[middle].Key), parts) < 0)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle;
-            }
-        }
+    public static int IndexOf(List<ColumnType> entries, string key) =>
+        SortedKeyedList.IndexOf(entries, key, KeyOrder, KeyOf);
 
-        return low < entries.Count && Order(new KeyParts(entries[low].Key), parts) == 0 ? low : ~low;
-    }
+    /// <summary>Puts an entry in its place in a list kept sorted by key, over the entry of its key.</summary>
+    public static void Put(List<ColumnType> entries, ColumnType entry) =>
+        SortedKeyedList.Put(entries, entry, KeyOrder, KeyOf);
+
+    /// <summary>
+    /// Adds an entry in its place in a list kept sorted by key and gives null, or gives the list's entry of its key
+    /// and leaves the list as it is.
+    /// </summary>
+    public static ColumnType? AddOrFind(List<ColumnType> entries, ColumnType entry) =>
+        SortedKeyedList.AddOrFind(entries, entry, KeyOrder, KeyOf);
 
     // The order of the map: ignoring case, then exactly to break a tie.
     private static int Order(in KeyParts a, in KeyParts b)
@@ -209,7 +174,7 @@ internal static class ColumnTypeMap
     {
         public ColumnType? Entry { get; } = entry;
 
-        public int Rank { get; } = RankOf(entry.Place);
+        public int Rank { get; } = SettingPlaces.Specificity(entry.Place);
 
         public bool HasSchema { get; } = hasSchema;
 
@@ -226,16 +191,6 @@ internal static class ColumnTypeMap
 
             return HasSchema != other.HasSchema ? HasSchema : IsExact && !other.IsExact;
         }
-
-        // How specific a place is, the most specific highest.  The attribute has no level for the column types.
-        private static int RankOf(SettingPlace place) =>
-            place switch
-            {
-                SettingPlace.Query => 3,
-                SettingPlace.FileHeader => 2,
-                SettingPlace.Metadata => 1,
-                SettingPlace.Property or SettingPlace.Attribute or _ => 0,
-            };
     }
 
     // A key split once into its parts, as ColumnTypeKey.TrySplit gives them.
