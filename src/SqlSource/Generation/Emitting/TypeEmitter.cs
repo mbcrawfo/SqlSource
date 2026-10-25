@@ -39,10 +39,10 @@ internal static class TypeEmitter
         }
 
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
-        var members = SelectMembers(type, input.Files, input.FileSettings, property, diagnostics);
+        var members = SelectMembers(type, input.Files, input.FileSettings, property, diagnostics, out var hasCodeGen);
         return new TypeOutput(
             input.HintName,
-            Write(type, members, property),
+            Write(type, members, hasCodeGen),
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable())
         );
     }
@@ -129,17 +129,21 @@ internal static class TypeEmitter
         return usable;
     }
 
-    // The queries of the files the type can use, each with what the metadata of its file's item says.
-    private static List<(SqlQuery Query, string FileName, SettingsLevel Metadata)> SelectMembers(
+    // The queries of the files the type can use that get a member here, each with its file's name and its settings.  A
+    // query whose output is CodeGen gets none, whether it gets a method or not: the method, in a file of its own, takes
+    // the place of its constant.  hasCodeGen says whether one was left out so.
+    private static List<(SqlQuery Query, string FileName, QuerySettings Settings)> SelectMembers(
         TargetType type,
         EquatableArray<ParsedSqlFile> files,
         EquatableArray<SettingsLevel> fileSettings,
         SettingsLevel property,
-        ImmutableArray<DiagnosticInfo>.Builder diagnostics
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics,
+        out bool hasCodeGen
     )
     {
         var usable = FindUsableFiles(type, files, fileSettings, property, diagnostics);
-        var members = new List<(SqlQuery Query, string FileName, SettingsLevel Metadata)>();
+        var members = new List<(SqlQuery Query, string FileName, QuerySettings Settings)>();
+        hasCodeGen = false;
         for (var index = 0; index < files.Count; index++)
         {
             if (!usable[index])
@@ -150,17 +154,28 @@ internal static class TypeEmitter
             var file = files[index];
             foreach (var query in file.Queries)
             {
-                members.Add((query, file.FileName, fileSettings[index]));
+                var settings = QuerySettings.Resolve(query.Markers, type.Settings, fileSettings[index], property);
+                if (settings.Output == OutputKind.CodeGen)
+                {
+                    hasCodeGen = true;
+                }
+                else
+                {
+                    members.Add((query, file.FileName, settings));
+                }
             }
         }
 
         return members;
     }
 
+    // Under SqlLocation.Nested the nested class is not written when the type's queries are all CodeGen, so that a
+    // method may have its name, as the methods' planner expects.  A type with no query at all keeps it empty, so that a
+    // reference to it reports the missing member and not a missing type.
     private static string Write(
         TargetType type,
-        List<(SqlQuery Query, string FileName, SettingsLevel Metadata)> members,
-        SettingsLevel property
+        List<(SqlQuery Query, string FileName, QuerySettings Settings)> members,
+        bool hasCodeGen
     )
     {
         var builder = new StringBuilder(Header);
@@ -179,7 +194,7 @@ internal static class TypeEmitter
             );
         }
 
-        if (type.Placement == MemberPlacement.Nested)
+        if (type.Placement == MemberPlacement.Nested && (members.Count > 0 || !hasCodeGen))
         {
             Open(builder, depth++, "private static class " + type.NestedClass);
         }
@@ -192,9 +207,8 @@ internal static class TypeEmitter
                 _ = builder.Append('\n');
             }
 
-            var (query, fileName, metadata) = members[index];
+            var (query, fileName, settings) = members[index];
             var summaryXml = GetSummaryXml(query, fileName);
-            var settings = QuerySettings.Resolve(query.Markers, type.Settings, metadata, property);
 
             // The member is built from the form that is emitted.  A form that was not built is the other one.
             var segments = settings.KeepComments ? query.KeptSegments ?? query.Segments : query.Segments;

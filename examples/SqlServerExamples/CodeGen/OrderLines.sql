@@ -1,6 +1,6 @@
--- The queries of the order lines, at the default output, codegen.  Until the methods that run the queries arrive in a
--- later release, codegen gives what models gives: the SQL and the models, which OrderLineQueries reads through Dapper.
--- The result shape after the name says what that method will return; it is checked and has no effect yet.
+-- The queries of the order lines, at the default output, codegen.  Each query gets its models and a method that runs
+-- it, which OrderLineQueries calls.  The result shape after the name says what the method returns: many, every row,
+-- as an array of the output model.
 
 -- name: ListOrderLines -> many
 -- summary: The lines of one order, in order.

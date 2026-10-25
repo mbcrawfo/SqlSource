@@ -19,9 +19,24 @@ public enum SettingLevel
 }
 
 // A setting by its name at each level: the MSBuild property, which is also the metadata's name, the argument of the
-// attribute, null for a setting the attribute has not, and the marker.
-internal sealed record Setting(string MSBuildName, string? AttributeArgument, string Marker)
+// attribute, null for a setting the attribute has not, and the marker.  The attribute takes the value of a setting with
+// an enum as that enum's member, so its value is the member's name, and as a string otherwise.
+internal sealed record Setting(
+    string MSBuildName,
+    string? AttributeArgument,
+    string Marker,
+    string? AttributeEnum = null
+)
 {
+    public static readonly Setting Output = new("SqlSourceOutput", "Output", "output", "GeneratorOutput");
+
+    public static readonly Setting CollectionType = new(
+        "SqlSourceCollectionType",
+        "CollectionType",
+        "collection-type",
+        "GeneratorCollectionType"
+    );
+
     public static readonly Setting InputModelSuffix = new(
         "SqlSourceInputModelSuffix",
         "InputModelSuffix",
@@ -67,8 +82,8 @@ internal sealed class LevelSettings
             .Select(property => property.Value)
             .LastOrDefault();
 
-    // The source with the attribute's arguments, Name = "value" joined by ", ", in place of [SqlSourceGenerate], or
-    // the source unchanged when no setting is at the attribute's level.
+    // The source with the attribute's arguments, Name = "value" or Name = Enum.Value joined by ", ", in place of
+    // [SqlSourceGenerate], or the source unchanged when no setting is at the attribute's level.
     public string Source(string source)
     {
         var arguments = AtLevel(SettingLevel.Attribute);
@@ -84,9 +99,11 @@ internal sealed class LevelSettings
                     $"The attribute has no argument for {argument.Setting.MSBuildName}."
                 )
             )
-            + " = \""
-            + argument.Value
-            + "\""
+            + (
+                argument.Setting.AttributeEnum is { } type
+                    ? " = " + type + "." + argument.Value
+                    : " = \"" + argument.Value + "\""
+            )
         );
         return source.Replace(
             "[SqlSourceGenerate]",

@@ -149,6 +149,91 @@ public sealed class MethodTests
         methods.ShouldNotContain("SampleExtensions");
     }
 
+    // The method takes the place of the query's constant, so the two never clash on the type.
+    [Fact]
+    public void Run_MethodOnTheTypeUnderDirect_TakesThePlaceOfTheConstant()
+    {
+        var run = MethodRuns.Run(
+            Users,
+            UsersEntries,
+            MethodRuns.SampleSource("SqlLocation = SqlLocation.Direct, MethodLocation = MethodLocation.Public")
+        );
+
+        run.ShouldBeClean();
+        run.Sources["App.Sample.g.cs"].ShouldNotContain("GetUser");
+        run.Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                "        public static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(\n"
+            );
+    }
+
+    // A nested class that only CodeGen queries would fill is not written, so a method may have its name.
+    [Fact]
+    public void Run_MethodNamedLikeTheNestedClassOfCodeGenQueriesAlone_Compiles()
+    {
+        var run = MethodRuns.Run(
+            Users,
+            UsersEntries,
+            MethodRuns.SampleSource(
+                "MethodLocation = MethodLocation.Public, NestedClass = \"GetUserAsync\", "
+                    + "Parameters = \"async-method-suffix\""
+            )
+        );
+
+        run.ShouldBeClean();
+        run.Sources["App.Sample.g.cs"].ShouldNotContain("class GetUserAsync");
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUserAsync(\n");
+    }
+
+    // One file of a query at each output, by its marker, under SqlLocation.Direct and MethodLocation.Public.
+    [Fact]
+    public void Run_MixedType_HasConstantsMethodsAndModels()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetName\n-- output: sql\nSELECT name FROM users WHERE id = @id;\n"
+                + "-- name: GetEmail\n-- output: models\nSELECT email FROM users WHERE id = @id;\n"
+                + "-- name: GetUser\n-- output: codegen\nSELECT id, name FROM users WHERE id = @id;\n"
+        );
+
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [
+                new SourceFile(
+                    GeneratorHarness.SourcePath,
+                    MethodRuns.SampleSource("SqlLocation = SqlLocation.Direct, MethodLocation = MethodLocation.Public")
+                ),
+            ],
+            [
+                file,
+                Sidecars.Of(
+                    file,
+                    Entry(file, "GetEmail", [Parameter("id")], [Column("email", Text, nullable: true)]),
+                    Entry(file, "GetUser", [Parameter("id")], [Column("id"), Column("name", Text, nullable: true)])
+                ),
+            ],
+            references: [NpgsqlReferences.Npgsql10],
+            dialect: "postgres"
+        );
+
+        run.ShouldBeClean();
+        var type = run.Sources["App.Sample.g.cs"];
+        type.ShouldContain("public const string GetName = \"SELECT name FROM users WHERE id = @id;\";\n");
+        type.ShouldContain("public const string GetEmail = \"SELECT email FROM users WHERE id = @id;\";\n");
+        type.ShouldNotContain("GetUser");
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(" GetUser(\n");
+        methods.ShouldNotContain("GetName");
+        methods.ShouldNotContain("GetEmail");
+        ModelFiles(run)
+            .ShouldBe([
+                "App.GetEmailDto-Model.g.cs",
+                "App.GetEmailParams-Model.g.cs",
+                "App.GetUserDto-Model.g.cs",
+                "App.GetUserParams-Model.g.cs",
+            ]);
+    }
+
     [Fact]
     public void Run_InternalType_GivesAnInternalExtensionClass()
     {

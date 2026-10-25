@@ -520,6 +520,132 @@ public sealed class TypeEmitterTests
         );
     }
 
+    // A CodeGen query's method takes the place of its constant, whether it gets one or not.
+    [Fact]
+    public void Emit_CodeGenQuery_WritesNoConstant()
+    {
+        var output = Emit(
+            OutputKind.CodeGen,
+            TestModels.Type(placement: MemberPlacement.Direct),
+            File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"))
+        );
+
+        output.Diagnostics.ShouldBeEmpty();
+        output.Source.ShouldBe(
+            $$"""
+            {{GeneratedFile.Header}}
+            namespace App
+            {
+                partial class UserRepository
+                {
+                }
+            }
+
+            """
+        );
+    }
+
+    [Fact]
+    public void Emit_CodeGenTokenQuery_WritesNoTokenMethod()
+    {
+        var output = Emit(
+            OutputKind.CodeGen,
+            TestModels.Type(placement: MemberPlacement.Direct),
+            File("Users.sql", TokenQuery("ListFrom"))
+        );
+
+        output.Diagnostics.ShouldBeEmpty();
+        output.Source.ShouldBe(
+            $$"""
+            {{GeneratedFile.Header}}
+            namespace App
+            {
+                partial class UserRepository
+                {
+                }
+            }
+
+            """
+        );
+    }
+
+    [Fact]
+    public void Emit_NestedTypeOfOnlyCodeGenQueries_WritesNoNestedClass()
+    {
+        var output = Emit(
+            OutputKind.CodeGen,
+            TestModels.Type(),
+            File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"), TokenQuery("ListFrom"))
+        );
+
+        output.Diagnostics.ShouldBeEmpty();
+        output.Source.ShouldBe(
+            $$"""
+            {{GeneratedFile.Header}}
+            namespace App
+            {
+                partial class UserRepository
+                {
+                }
+            }
+
+            """
+        );
+    }
+
+    // The project's output is CodeGen, and two queries' markers say Sql and Models.
+    [Fact]
+    public void Emit_MixedSqlModelsAndCodeGen_WritesTheSqlAndModelsConstantsAlone()
+    {
+        var output = Emit(
+            OutputKind.CodeGen,
+            TestModels.Type(),
+            File(
+                "Users.sql",
+                TestModels.Query("GetUser", "SELECT 1;"),
+                TestModels.Query("AsSql", "SELECT 2;", markers: new SettingsLevel { Output = OutputKind.Sql }),
+                TokenQuery("ListFrom"),
+                TestModels.Query("AsModels", "SELECT 3;", markers: new SettingsLevel { Output = OutputKind.Models })
+            )
+        );
+
+        output.Diagnostics.ShouldBeEmpty();
+        output.Source.ShouldBe(
+            $$"""
+            {{GeneratedFile.Header}}
+            namespace App
+            {
+                partial class UserRepository
+                {
+                    private static class Sql
+                    {
+                        /// <summary>
+                        /// The <c>AsSql</c> query from <c>Users.sql</c>.
+                        /// </summary>
+                        /// <remarks>
+                        /// <code>
+                        /// SELECT 2;
+                        /// </code>
+                        /// </remarks>
+                        public const string AsSql = "SELECT 2;";
+
+                        /// <summary>
+                        /// The <c>AsModels</c> query from <c>Users.sql</c>.
+                        /// </summary>
+                        /// <remarks>
+                        /// <code>
+                        /// SELECT 3;
+                        /// </code>
+                        /// </remarks>
+                        public const string AsModels = "SELECT 3;";
+                    }
+                }
+            }
+
+            """
+        );
+    }
+
     [Fact]
     public void Emit_QueryThatKeepsItsComments_EmitsTheKeptForm()
     {
