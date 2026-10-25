@@ -181,7 +181,7 @@ Add the generator parameter `async-method-suffix`: `<SqlSourceGeneratorParameter
 
 ### I got an `InvalidCastException`; what does it mean and how do I fix it?
 
-A query method asked the driver to read a column, or send a parameter, as a C# type the driver does not read.  Most often a [type override](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-type-overrides) names a type the driver was never taught: a C# enum for a PostgreSQL enum, or a type of your own, such as an id or an `Email`.  There are two fixes:
+A query method asked the driver to read a column, or send a parameter, as a C# type the driver does not read.  Most often a [type override](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-type-overrides), a [column type](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-column-types) or a `-- param:` line names a type the driver was never taught: a C# enum for a PostgreSQL enum, or a type of your own, such as an id or an `Email`.  There are two fixes:
 
 - **Teach the driver the type**, on the data source of your application: Npgsql's `MapEnum<T>()` for an enum, `MapComposite<T>()` for a composite type, or the plugin of a library such as NodaTime.
 - **Add converters**: two static methods marked `[SqlSourceConverter]`, one from the type the driver reads to your type and one back, which the generated method calls.  See [converters](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#converters) and [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#strongly-typed-id).
@@ -227,6 +227,20 @@ Each column and parameter of a PostgreSQL query whose output is `models` or `cod
 ```
 
 Each property of a model has the type its database type maps to, and a query method asks the driver for that type, so it must be one the driver reads, or one that your [converters](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#converters) convert to and from one it reads: see [the FAQ](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#i-got-an-invalidcastexception-what-does-it-mean-and-how-do-i-fix-it).  An entry that is not written correctly, or whose key has no schema and is not a type SqlSource knows, is a build error, and so is a C# type that the project cannot find or use, at each query that uses it.  See [type overrides](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-type-overrides).
+
+Where two columns of one database type need two C# types, `users.id` a `UserId` and `posts.id` a `PostId` though both are `bigint`, map the column a value is read from with `SqlSourceColumnTypes`, or with `-- column:` in a `.sql` file, and give a parameter its type on its `-- param:` line.  Either wins over the type override:
+
+```xml
+<PropertyGroup>
+    <SqlSourceColumnTypes>users.id=UserId posts.id=PostId</SqlSourceColumnTypes>
+</PropertyGroup>
+```
+
+```sql fragment
+-- param: @author -> UserId
+```
+
+A C# type may be written by its short name, `UserId`, wherever SqlSource takes one, when the project and its references have one type of that name that the project can see; the generated code writes its full name.  See [column types](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-column-types) and [giving a parameter a type](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/parameters-and-tokens.md#param-marker).
 
 ## Where to next
 

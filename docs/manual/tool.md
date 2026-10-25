@@ -109,7 +109,7 @@ To keep the sidecars current:
 
 | When | Run |
 |----|----|
-| You add, change, rename or remove a query, a `-- param:` marker or a token's default | `dotnet sqlsource describe` |
+| You add, change, rename or remove a query, the type or the nullability of a `-- param:` marker, or a token's default | `dotnet sqlsource describe` |
 | The schema of the database changes | `dotnet sqlsource describe --force`: see [after a schema change](#after-a-schema-change) |
 | You update the tool | `dotnet sqlsource describe`, which describes every query again |
 | On a build server, to catch a sidecar that someone forgot | `dotnet sqlsource describe --check`: see [check in CI](#check-in-ci) |
@@ -125,7 +125,7 @@ The format of a sidecar is described by its JSON Schema, [`sidecar-v1.schema.jso
 `describe` describes only what changed.  A query whose sidecar entry is current is skipped, and is not sent to the database.  An entry stops being current when any of these change:
 
 - The query's SQL.  A change to a comment alone does not count.
-- A `-- param:` marker of the query, or the default of one of its tokens.
+- The type or the nullability of a `-- param:` marker of the query, or the default of one of its tokens.
 - The query's dialect, or its [logical database](#connections).
 - The version of the tool: a sidecar written by another version is described again whole.  Until it is, the build warns of it ([SQLSRC240](diagnostics.md#sqlsrc240)).
 

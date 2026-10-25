@@ -247,8 +247,9 @@ internal static class TargetTypeReader
                 SettingId.InputModelType => AttributeSource.InputModelTypeProperty,
                 SettingId.OutputModelType => AttributeSource.OutputModelTypeProperty,
                 SettingId.CollectionType => AttributeSource.CollectionTypeProperty,
-                // The type override has no attribute level.
+                // The type override and the column types have no attribute level.
                 SettingId.TypeOverrides => null,
+                SettingId.ColumnTypes => null,
                 SettingId.NestedClass => AttributeSource.NestedClassProperty,
                 _ => null,
             };

@@ -86,12 +86,12 @@ internal static class TypeOverrideGrammar
 
             if (postgreSqlKey is not null)
             {
-                Put(postgreSql ??= [], new TypeOverride(postgreSqlKey, type, place));
+                TypeOverrideMap.Put(postgreSql ??= [], new TypeOverride(postgreSqlKey, type, place));
             }
 
             if (sqlServerKey is not null)
             {
-                Put(sqlServer ??= [], new TypeOverride(sqlServerKey, type, place));
+                TypeOverrideMap.Put(sqlServer ??= [], new TypeOverride(sqlServerKey, type, place));
             }
         }
 
@@ -124,9 +124,12 @@ internal static class TypeOverrideGrammar
             : NotInBrackets + plain;
     }
 
-    // The key and the C# type of an entry, null for default, or false for a text with no = or a type that is not
-    // valid.  The key is not read here.
-    private static bool TrySplitEntry(
+    /// <summary>
+    /// The key and the C# type of an entry, null for <c>default</c>, or false for a text with no <c>=</c> outside
+    /// double quotes or a type that is not valid.  The key is not read here.  The column types' grammar splits its
+    /// entries of MSBuild with it too.
+    /// </summary>
+    internal static bool TrySplitEntry(
         ReadOnlySpan<char> text,
         bool spacesAroundEquals,
         out ReadOnlySpan<char> key,
@@ -167,20 +170,6 @@ internal static class TypeOverrideGrammar
         engine == DatabaseEngine.SqlServer
             ? TypeKeys.TryNormalizeSqlServer(key, out normalized)
             : TypeKeys.TryNormalizePostgres(key, out normalized);
-
-    // Puts an entry in its place in a list kept in the order of TypeOverrideMap, over an entry of its key.
-    private static void Put(List<TypeOverride> entries, TypeOverride entry)
-    {
-        var at = TypeOverrideMap.IndexOf(entries, entry.Key);
-        if (at >= 0)
-        {
-            entries[at] = entry;
-        }
-        else
-        {
-            entries.Insert(~at, entry);
-        }
-    }
 
     private static EquatableArray<TypeOverride> ToArray(List<TypeOverride>? entries) =>
         entries is null
@@ -320,9 +309,12 @@ internal static class TypeOverrideGrammar
         return -1;
     }
 
-    // The next run of text outside white space, where white space inside <>, [] or double quotes belongs to the run,
-    // and a bracket inside double quotes is not counted.  Only the key opens a double quote.  Empty at the end.
-    private static ReadOnlySpan<char> NextEntry(ref ReadOnlySpan<char> rest)
+    /// <summary>
+    /// The next entry of an MSBuild value, a run of text outside white space, where white space inside <c>&lt;&gt;</c>,
+    /// <c>[]</c> or double quotes belongs to the run, and a bracket inside double quotes is not counted.  Only the key
+    /// opens a double quote.  Empty at the end.  The column types' grammar reads its entries of MSBuild with it too.
+    /// </summary>
+    internal static ReadOnlySpan<char> NextEntry(ref ReadOnlySpan<char> rest)
     {
         var start = 0;
         while (start < rest.Length && char.IsWhiteSpace(rest[start]))

@@ -24,6 +24,8 @@
         <SqlSourceDialect>mssql</SqlSourceDialect>
         <!-- Every date is a DateOnly, which Dapper reads through DateOnlyHandler. -->
         <SqlSourceTypeOverrides>date=System.DateOnly</SqlSourceTypeOverrides>
+        <!-- order_lines.order_id is an OrderId, by its short name, in every query that reads it. -->
+        <SqlSourceColumnTypes>order_lines.order_id=OrderId</SqlSourceColumnTypes>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="Dapper" />

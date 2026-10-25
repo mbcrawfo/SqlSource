@@ -1,3 +1,4 @@
+using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.TypeOverrides;
 
 namespace SqlSource.Settings;
@@ -60,6 +61,13 @@ internal sealed record SettingsLevel
     public EquatableArray<TypeOverride>? SqlServerTypeOverrides { get; init; }
 
     /// <summary>
+    /// The column types: the C# types of columns by their source, sorted by key as <see cref="ColumnTypeMap" /> keeps
+    /// them, entries of <c>default</c> included.  One list for both engines, whose keys are read alike.  Merged per
+    /// key, not taken whole.
+    /// </summary>
+    public EquatableArray<ColumnType>? ColumnTypes { get; init; }
+
+    /// <summary>
     /// The name of the class that holds a type's members in <see cref="MemberPlacement.Nested" /> placement.  Only the
     /// attribute and the property give it, since a type's queries can come from several files.
     /// </summary>
@@ -70,8 +78,8 @@ internal sealed record SettingsLevel
 
     /// <summary>
     /// This level over <paramref name="other" />: each member from this level when it has one, and from
-    /// <paramref name="other" /> when it has not.  The type override of each engine is merged per key, this level's
-    /// entry winning.
+    /// <paramref name="other" /> when it has not.  The type override of each engine and the column types are merged per
+    /// key, this level's entry winning.
     /// </summary>
     public SettingsLevel Over(SettingsLevel other)
     {
@@ -98,6 +106,7 @@ internal sealed record SettingsLevel
             CollectionType = CollectionType ?? other.CollectionType,
             TypeOverrides = TypeOverrideMap.Over(TypeOverrides, other.TypeOverrides),
             SqlServerTypeOverrides = TypeOverrideMap.Over(SqlServerTypeOverrides, other.SqlServerTypeOverrides),
+            ColumnTypes = ColumnTypeMap.Over(ColumnTypes, other.ColumnTypes),
             NestedClass = NestedClass ?? other.NestedClass,
         };
     }

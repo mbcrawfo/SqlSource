@@ -115,7 +115,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC248](#sqlsrc248) | Npgsql is newer than SqlSource knows |
 | [SQLSRC249](#sqlsrc249) | Type needs Npgsql |
 
-**The type override**
+**A C# type of your choice**
 
 | Id | Title |
 |----|----|
@@ -197,7 +197,7 @@ The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the
 
 The ids from `SQLSRC237` to `SQLSRC245` are reported by the build, about the sidecar of a `.sql` file that a type uses.  A query whose output is `models` or `codegen` needs a current entry in its file's sidecar, which `dotnet sqlsource describe` writes; one whose output is `sql` needs none.  The default output is `codegen`, so under the `postgres` and `mssql` dialects every query needs an entry unless the project, the type or the file sets the output to `sql`.  A query that no entry can be written for gets [SQLSRC209](#sqlsrc209) or [SQLSRC210](#sqlsrc210) instead.  A sidecar that exists is checked even when no query of its file needs an entry.  While a `.sql` file has an error of its own, an id from 101 to 120, it has no queries to check, so the build checks only the sidecar itself, [SQLSRC237](#sqlsrc237) to [SQLSRC240](#sqlsrc240), and reports no entry of it as one that names no query.
 
-The ids `SQLSRC246` and `SQLSRC249` are reported by the build, about the C# types of a query whose output is `models` or `codegen` and whose entry in its sidecar is current: `SQLSRC246` under the `postgres` or the `mssql` dialect, and `SQLSRC249` under the `postgres` dialect.  Each column and parameter of the entry gets the C# type that the database's driver reads it as, Npgsql for `postgres` and Microsoft.Data.SqlClient for `mssql`, which can depend on the driver that the project references, or the type the type override maps its database type to.  Each is reported at the query's name, once for a query: for its first column or parameter that has no C# type, parameters before columns.
+The ids `SQLSRC246` and `SQLSRC249` are reported by the build, about the C# types of a query whose output is `models` or `codegen` and whose entry in its sidecar is current: `SQLSRC246` under the `postgres` or the `mssql` dialect, and `SQLSRC249` under the `postgres` dialect.  Each column and parameter of the entry gets the C# type that the database's driver reads it as, Npgsql for `postgres` and Microsoft.Data.SqlClient for `mssql`, which can depend on the driver that the project references, or the type you chose for it, by the type override, the column types or a marker.  Each is reported at the query's name, once for a query: for its first column or parameter that has no C# type, parameters before columns.
 
 The ids `SQLSRC247` and `SQLSRC248` are reported by the build, about the version of the `Npgsql` package that the project references, directly or through another package.  The C# types of a PostgreSQL query depend on it.  Each is reported once for the project, with no file and line, and only when a query needs an entry in its sidecar under the `postgres` dialect.
 
@@ -205,7 +205,7 @@ The ids `SQLSRC267` and `SQLSRC268` are reported by the build, about the version
 
 `SQLSRC269` and `SQLSRC270` are reported by the build at a query of the `mssql` dialect whose output is `models` or `codegen` and whose entry in its sidecar is current, as `SQLSRC249` is under the `postgres` dialect: at the query's name, once for the query, for its first column or parameter that has no C# type, parameters before columns.
 
-The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type override names.  Each is reported at a query that has a column or a parameter of the database type the entry maps, and names the column or parameter, the entry and the place that wrote it.  An entry that no query uses is never an error, so a project can set its mappings before it has the queries.
+The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that you chose: one that the type override gives a database type, that the column types give a column, or that a `-- param:` or `-- column:` marker gives after `->`.  Each is reported at a query that has a column or a parameter the type is chosen for, and names the column or parameter, what is mapped, the C# type and the place that chose it.  An entry that no query uses is never an error, so a project can set its mappings before it has the queries.
 
 `SQLSRC261` is reported at a query that has a column or a parameter of an array of a type outside `pg_catalog`, or of a domain over such an array, when the type override has an entry for the array's name in the database.  It names the column or parameter, the entry, the place that wrote it and the key to write.  It is reported once for the query, for its first column or parameter that has no C# type, as `SQLSRC246` and `SQLSRC249` to `SQLSRC252` are, so the query has no models until it is fixed.
 
@@ -213,7 +213,7 @@ The ids from `SQLSRC253` to `SQLSRC260` are reported by the build, about the [mo
 
 The ids from `SQLSRC272` to `SQLSRC276` are reported by the build, about the [method](generator.md#query-methods) of a query whose output is `codegen`.  `SQLSRC272`, `SQLSRC274` and `SQLSRC275` are reported at the query's name, once however many types claim its file, except a `SQLSRC274` whose cause is of one type, which each such type reports, and one for the methods of two types that clash, which each of the two queries gets.  A query of a file that two types of one namespace claim gives each type a method of one signature, so it gets one `SQLSRC274` for each type, each naming the other.  A query gets every one of them that it has, and no method until all are fixed; its models are still generated.  `SQLSRC273` has no file and line, and is reported once for the project and database.  `SQLSRC276` is about the extension class that holds a type's methods, and is reported at the type's `[SqlSourceGenerate]`, once for each type whose methods would go into the class.
 
-The ids from `SQLSRC277` to `SQLSRC280` are reported by the build, about converters, the methods marked `[SqlSourceConverter]`.  `SQLSRC277` and `SQLSRC278` are about the methods of the project's own code: at the method's name, whatever the output of the project, its types and its files, and whether a query uses the method or not.  A converter of a type that the type override names, declared in a referenced assembly, has no place in the project, so `SQLSRC277` and `SQLSRC278` are reported for it at the name of each query whose output is `codegen` and whose method would use it.  `SQLSRC279` and `SQLSRC280` are about a column or a parameter of a query whose output is `codegen`, whose C# type a type override chose, and whose type has converters that do not serve it.  Each of these at a query is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.  A project whose output is `models` uses no converter, and gets none of them at a query, and neither does a query whose database's driver the project does not reference, which [SQLSRC273](#sqlsrc273) is about.
+The ids from `SQLSRC277` to `SQLSRC280` are reported by the build, about converters, the methods marked `[SqlSourceConverter]`.  `SQLSRC277` and `SQLSRC278` are about the methods of the project's own code: at the method's name, whatever the output of the project, its types and its files, and whether a query uses the method or not.  A converter of a type that a type override, a column type or a marker names, declared in a referenced assembly, has no place in the project, so `SQLSRC277` and `SQLSRC278` are reported for it at the name of each query whose output is `codegen` and whose method would use it.  `SQLSRC279` and `SQLSRC280` are about a column or a parameter of a query whose output is `codegen`, whose C# type a type override, a column type or a marker chose, and whose type has converters that do not serve it.  Each of these at a query is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.  A project whose output is `models` uses no converter, and gets none of them at a query, and neither does a query whose database's driver the project does not reference, which [SQLSRC273](#sqlsrc273) is about.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
@@ -432,9 +432,11 @@ Correct the value, or remove it to keep the default.  While it is wrong the sett
 - **No space around `=`.**  A space separates entries, so `numeric = double` is three entries, and `timestamp with time zone=...` is four.
 - **The key is a type's one-word name**, `timestamptz` and not `timestamp with time zone`, `float8` and not `double precision`; every built-in type has one.  A type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`: a name without one must be a type SqlSource knows, so `user_status` and the misspelling `timestampz` are reported.  A value serves PostgreSQL and SQL Server alike, so a name of either one's types, `int4` or `nvarchar`, is not reported.  A schema or a name may be in double quotes, `"my schema"."order-status"`, which must close: `"my schema.status=MyApp.Status` is reported with the rest of the value.  A part may also be in `U&"..."` with escapes, its `&` written `&amp;` in a project file, and an escape that is not valid makes the entry not valid.
 - **A key is not written in brackets.**  `[dbo].[Email]=MyApp.Email` is reported, and the message shows the forms that are read: `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
-- **The C# type is a keyword or a full name from its namespace**, `System.DateTimeOffset` and not `DateTimeOffset`, with no `?` at the end: `int4=int` and not `int4=int?`.  Write a generic's `<` and `>` as `&lt;` and `&gt;` in the project file.
+- **The C# type is a keyword, a full name or a short name**, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end: `int4=int` and not `int4=int?`.  Write a generic's `<` and `>` as `&lt;` and `&gt;` in the project file.
 
 The rules are in [type overrides](settings.md#setting-type-overrides).
+
+`SqlSourceColumnTypes` takes entries `key=type` by the same rules of spaces, `<>`, `[]` and quotes, and each entry that is not valid is reported on its own, while the others still apply.  Its key is the column a value is read from, `table.column` or `schema.table.column`, each part plain or in double quotes, so `id=MyApp.UserId`, of one part, is reported, and so are a key of four parts, a key in brackets and a key with `[]`.  Its C# type is read as a type override's is, or is `default`.  The rules are in [column types](settings.md#setting-column-types).
 
 The compiler hands a generator only the part of a value before the first `;` or `#`.
 
@@ -608,7 +610,7 @@ A generator parameter has a value it does not take; what follows a name in a `--
 - `-- input-model-type:` and `-- output-model-type:` take `record`, `sealed record`, `class` or `sealed class`.  `-- collection-type:` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`.
 - `-- input-model-suffix:` and `-- output-model-suffix:` take characters that can be part of an identifier, and `-- model-namespace:` takes a namespace such as `App.Models`.
 - `-- input-model:` and `-- output-model:` take the name of a type, or its full name with its namespace: `UserRow` or `App.Models.UserRow`.  Neither is a reserved keyword, and no generic type is named.
-- `-- type-override:` takes one entry, `key = type` or `key = default`.  The key is a type's one-word name, `timestamptz` and not `timestamp with time zone`, and a type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`.  A schema or a name may be in double quotes, with a quote inside it doubled: `public."Status"`, `"my schema"."order-status"`; or in `U&"..."` with escapes, `public.U&"Order\000AItem"`, where an escape that is not `\\`, `\` and four hex digits, or `\+` and six, for a code from 1 to 10FFFF (a character beyond FFFF is one `\+` escape or the escapes of its two surrogates), is not valid.  The type is a keyword or a full name from its namespace, `System.DateTimeOffset`, with no `?` at the end.  See [type overrides](settings.md#setting-type-overrides).
+- `-- type-override:` takes one entry, `key = type` or `key = default`.  The key is a type's one-word name, `timestamptz` and not `timestamp with time zone`, and a type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`.  A schema or a name may be in double quotes, with a quote inside it doubled: `public."Status"`, `"my schema"."order-status"`; or in `U&"..."` with escapes, `public.U&"Order\000AItem"`, where an escape that is not `\\`, `\` and four hex digits, or `\+` and six, for a code from 1 to 10FFFF (a character beyond FFFF is one `\+` escape or the escapes of its two surrogates), is not valid.  The type is a keyword, a full name or a short name, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end.  See [type overrides](settings.md#setting-type-overrides).
 - The key of a `-- type-override:` marker is read by its file's dialect.  In an `mssql` file it is a SQL Server type's name, such as `int`, `nvarchar` or `sys.int`, and a name SQL Server does not have, such as `int4` or `pg_catalog.text`, is this error.  In a file of any other dialect a name that SQL Server alone has, such as `nvarchar` or `rowversion`, is this error.  A type of a schema of your own, `dbo.Email`, is read in either.
 - A key is not written in brackets: `-- type-override: [dbo].[Email] = MyApp.Email` is this error, and the message shows the forms that are read, `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
 
@@ -616,9 +618,21 @@ A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
 
 A `-- token:` marker holds exactly one token with a default, `{{name:default}}`, and nothing else; and a quote or a block comment inside the default must close there.
 
-A `-- param:` marker starts with the parameter as the SQL writes it, `@name`, alone or followed by a space.
+A `-- param:` marker starts with the parameter as the SQL writes it, `@name`, alone or followed by a space or `->`.  What follows its `->` is a C# type, written as a type override's is, and never `default`, since nothing below a query maps a parameter: `-- param: @author -> default` is this error.
 
-A `-- column:` marker holds a column's name, then `null` or `not null`, as in `-- column: total not null`.  A name with white space, or one that is the word `null` or `not`, is written in double quotes, with a quote inside it doubled: `-- column: "total due" not null`.
+Inside a query, a `-- column:` marker holds a column's name, then `null` or `not null`, `->` and a C# type or `default`, or both in that order, as in `-- column: total not null` or `-- column: note null -> NoteText`.  A name with white space or a `.`, or one that is the word `null` or `not`, is written in double quotes, with a quote inside it doubled: `-- column: "total due" not null`.  A name with a `.` outside quotes, `-- column: users.id -> UserId`, is this error, whose message says that a column's source is mapped in the file header.
+
+In the file header, a `-- column:` marker holds a column's source, `table.column` or `schema.table.column`, then `->` and a C# type or `default`, as in `-- column: users.id -> UserId`.  A marker without `->`, one that says `null` or `not null`, and one whose key has one part are this error.
+
+```sql error
+-- column: users.id not null
+-- column: id -> UserId
+
+-- name: ListUsers
+-- column: users.id -> UserId
+-- param: @team -> default
+SELECT id FROM users WHERE team_id = @team;
+```
 
 Add the missing value, correct the one that is wrong, or remove the one that does not belong.
 
@@ -633,11 +647,12 @@ Two settings contradict each other.  The error is at the second.
 - `default` beside another generator parameter in the file header, or inside one query: `default` is the empty list, and a list that holds something is not empty.
 - Two `-- dialect:` markers name different dialects, or one dialect with different options.  A file has one dialect.
 - Two defaults for one token of a query that differ: two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
-- Two `-- column:` markers for one column, its name compared ignoring case, of which one says `null` and the other `not null`.
-- Two `-- param:` markers for one parameter that give different types or different nullability.  `not null` counts as different from saying nothing: `-- param: @a int` and `-- param: @a int not null` conflict.  Write both the same.
+- Two `-- column:` markers inside one query for one column, its name compared ignoring case, of which one says `null` and the other `not null`, or which give it two C# types, `default` among them.  One may give the nullability and the other the type.
+- Two `-- column:` markers in the file header that give one key two C# types.  The key is compared as [column types](settings.md#setting-column-types) compares it, so `users.id` and `"users".id` are one key, and `users.id` and `public.users.id` two.
+- Two `-- param:` markers for one parameter that give different types, different nullability or different C# types after `->`.  `not null` counts as different from saying nothing: `-- param: @a int` and `-- param: @a int not null` conflict.  Write both the same.
 - Two `-- output:` markers that give different values, or two `-- database:` markers that name different databases (`billing` and `Billing` are different), in the file header or inside one query.
 - Two markers of any other setting of the models and the collection type that give different values in the file header or inside one query: two `-- input-model:` markers that name different types, two `-- model-namespace:` markers, and so on.
-- Two `-- type-override:` markers that give one database type different C# types, in the file header or inside one query.  The key is compared as [type overrides](settings.md#setting-type-overrides) compares it, so `integer` and `int4` are one type, `public.status` and `public."status"` are one type, and `public.Status` and `public.status` are two; and the C# types are compared by how they are named, so `int` and `System.Int32` are two.
+- Two `-- type-override:` markers that give one database type different C# types, in the file header or inside one query.  The key is compared as [type overrides](settings.md#setting-type-overrides) compares it, so `integer` and `int4` are one type, `public.status` and `public."status"` are one type, and `public.Status` and `public.status` are two; and the C# types are compared by how they are named, so `int` and `System.Int32` are two, and so are `UserId` and `MyApp.UserId`.  The same holds for the C# types of `-- column:` and `-- param:` markers.
 
 ```sql error
 -- name: ListUsers
@@ -646,7 +661,7 @@ Two settings contradict each other.  The error is at the second.
 SELECT id, name FROM users;
 ```
 
-Remove one of the two.  A query's `-- generator:` list replaces the file header's list, and a query's `-- type-override:` for a type replaces the file header's for that type: neither is a conflict.  The same dialect given twice with the same options is not a conflict either.
+Remove one of the two.  A query's `-- generator:` list replaces the file header's list, and a query's `-- type-override:` for a type replaces the file header's for that type: neither is a conflict, and nor is a query's `-- column:` for a column whose source the file header maps.  The same dialect given twice with the same options is not a conflict either.
 
 See: [A value that is wrong](settings.md#a-value-that-is-wrong)
 
@@ -740,7 +755,7 @@ Move the marker to where the message says.  A file with no `-- name:` line is on
 | `-- input-model:`, `-- output-model:` | no | yes |
 | `-- collection-type:` | yes | yes |
 | `-- type-override:` | yes | yes |
-| `-- column:` | no | yes |
+| `-- column:` | yes | yes |
 
 The table is this error's, with two exceptions.  A `-- summary:` in the file header is [SQLSRC107](#sqlsrc107), and a `-- dialect:` inside a query or after SQL is [SQLSRC115](#sqlsrc115).
 
@@ -767,7 +782,9 @@ DECLARE @n int = 1;
 SELECT * FROM events WHERE id > @n;
 ```
 
-Give the type, in the database's own words: `-- param: @page int`.  Under `mssql`, remove the marker when the name is a variable that the query declares, and give the type when it is a parameter that SqlSource took for a variable: see [variables declared with `DECLARE`](parameters-and-tokens.md#declared-variables).  Correct a misspelt name.
+A marker that gives only a C# type, `-- param: @page -> PageNumber`, has no type either: the C# type is not the database's.
+
+Give the type, in the database's own words: `-- param: @page int`, or `-- param: @page int -> PageNumber`.  Under `mssql`, remove the marker when the name is a variable that the query declares, and give the type when it is a parameter that SqlSource took for a variable: see [variables declared with `DECLARE`](parameters-and-tokens.md#declared-variables).  Correct a misspelt name.
 
 See: [Giving a parameter a type: `-- param:`](parameters-and-tokens.md#param-marker)
 
@@ -1148,7 +1165,7 @@ See: [Logs](tool.md#logs)
 | `the sidecar does not exist` | A query of the file needs an entry, and the file has no sidecar |
 | `the sidecar cannot be read`, or `the sidecar has format 2, and this tool writes 1` | The sidecar is no sidecar of this version of the tool.  A merge conflict in it is the usual cause of the first |
 | `the sidecar has no entry` | The query was added, or renamed, since the sidecar was written |
-| `the query has changed since it was described` | The SQL, a `-- param:` marker or the default of a token changed |
+| `the query has changed since it was described` | The SQL, the type or the nullability of a `-- param:` marker, or the default of a token changed |
 | `columns[2].nullable is true, and the database says false` | The database describes the query another way than the sidecar holds.  A change to the schema is the usual cause |
 | `database is "billing", and the project says "reports"` | The query belongs to another database, or another kind of database, than the one it was described against |
 | `the query is not in the file`, or `the query needs no entry` | The sidecar holds an entry for a query that was removed, or whose output is now `sql` |
@@ -1169,7 +1186,7 @@ See: [Logs](tool.md#logs)
 
 - **Columns and parameters are counted from 0**: `columns[2]` is the third column.
 - **Only the first difference of a query is named.**
-- **What is compared is what changes generated code**: the query as written (its SQL, its `-- param:` markers and its tokens' defaults), its database and the kind of that database, whether it returns rows and which table's rows they match, if any, and the name, position, type and nullability of each parameter and column.  The versions of the tool and of the server are not compared.
+- **What is compared is what changes generated code**: the query as written (its SQL, the types and nullability of its `-- param:` markers, and its tokens' defaults), its database and the kind of that database, whether it returns rows and which table's rows they match, if any, and the name, position, type and nullability of each parameter and column.  The versions of the tool and of the server are not compared.
 - **With `--database`**, an entry for a query that is no longer in the file, or that needs none, is reported, whatever its database, when `describe` with the same filters would rewrite the sidecar, which drops it.  A sidecar that such a `describe` leaves as it is, because another query of the file, of a database that `--database` does not name, has changed or was never described, keeps the entry, and the check does not report it.
 
 The tool exits with the code 2 when it reported this error and no other, so that a build can tell a sidecar that is out of date from a check that could not be made.  A query that could not be described has an error of its own, and the exit code is then 1.
@@ -1766,7 +1783,7 @@ See: [Dialects](dialects.md)
 
 **Entry is stale**
 
-The query has changed since its entry in the sidecar was written: its SQL, a `-- param:` marker or the default of one of its tokens.  A change to a comment alone does not count.  An entry that describes another version of the query could give it the wrong types, so it is not used.
+The query has changed since its entry in the sidecar was written: its SQL, the type or the nullability of a `-- param:` marker, or the default of one of its tokens.  A change to a comment alone does not count, and neither does a C# type after `->`.  An entry that describes another version of the query could give it the wrong types, so it is not used.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC244: The query 'GetUser' has changed since its entry was written.  Run 'sqlsource describe'.
@@ -1873,24 +1890,25 @@ See: [Which version of Npgsql](postgresql.md#which-npgsql)
 
 **Mapped type is not found**
 
-The type override maps a database type to a C# type that the project cannot find: no type of that name and number of type arguments is in the project or its references, or more than one reference has one that the project can see and the project has none.  A type of a reference that the project cannot see does not count, so a name that one reference has as `public` and another as `internal` is the public one.  The message names the column or parameter, the database type, the C# type and the place that wrote the entry: the property `SqlSourceTypeOverrides`, the metadata of the file, a `-- type-override:` marker in the file header or one of the query.
+A C# type that you chose cannot be found.  It is a type that the [type override](settings.md#setting-type-overrides) gives a database type, that the [column types](settings.md#setting-column-types) give a column, or that a `-- param:` or `-- column:` marker gives after `->`, and either no type of that name and number of type arguments is in the project or its references; or the name is a short name, of one part, and more than one type of it, in different namespaces, is one that the project can see; or more than one reference has a type of the full name that the project can see and the project has none.  A type of a reference that the project cannot see does not count, so a name that one reference has as `public` and another as `internal` is the public one.  The message names the column or parameter; what is mapped: the type override's key, the column types' key, the name of a `-- column:` marker of the query, or the parameter of a `-- param:` marker; the C# type; and the place that chose it: the property `SqlSourceTypeOverrides` or `SqlSourceColumnTypes`, the metadata of the file, a `-- type-override:` or `-- column:` marker in the file header or one of the query, or the `-- param:` marker of the parameter.  For a short name that several types have, it names their full names, the first three and a count of the rest.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC250: The type override maps 'uuid' to 'MyApp.UserKey' for column 'id', in the property SqlSourceTypeOverrides, and no type of that name is found, or more than one reference has one that this project can see.  Correct the name, with its namespace and type arguments, or for a name that two references have, map to a type of this project.
+/work/App/Queries/Users.sql(1,10): error SQLSRC250: 'uuid' is mapped to 'MyApp.UserKey' for column 'id', in the property SqlSourceTypeOverrides, and no type of that name is found, or more than one that this project can see.  Correct the name, with its namespace and type arguments, or for a name that two references have, map to a type of this project.
+/work/App/Queries/Posts.sql(1,10): error SQLSRC250: 'users.id' is mapped to 'UserId' for column 'author_id', in the property SqlSourceColumnTypes, and no type of that name is found, or more than one that this project can see, and it could be MyApp.UserId or Legacy.UserId.  Correct the name, with its namespace and type arguments, or for a name that two references have, map to a type of this project.
 ```
 
-Write the type's full name, from its namespace, with its type arguments: `MyApp.Ids.UserKey`, or `System.Collections.Generic.List<int>`.  A nested type is written with a `.` before its name, as in C#: `MyApp.Outer.Inner`.  When two references have a type of the name that the project can see, map the database type to a type of the project's own, which is always chosen first.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
+Write the name of a type that the project has, with its type arguments: `UserKey`, `MyApp.Ids.UserKey`, or `System.Collections.Generic.List<int>`.  For a short name that several types have, write the full name, from its namespace, of the one you mean: `MyApp.UserId`.  A nested type is written with its full name, with a `.` before its name, as in C#: `MyApp.Outer.Inner`.  When two references have a type of the full name that the project can see, map to a type of the project's own, which is always chosen first.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
 
-See: [Type overrides](settings.md#setting-type-overrides)
+See: [Type overrides](settings.md#setting-type-overrides), [column types](settings.md#setting-column-types)
 
 ## SQLSRC251
 
 **Mapped type is not accessible**
 
-The type override maps a database type to a C# type that the project cannot use: the type, or one of its type arguments, is `internal` in another assembly, or is a `private` or `protected` type nested in another, in the project itself or another assembly.  The message names the column or parameter, the database type, the C# type and the place that wrote the entry.
+A C# type that you chose, by the type override, the column types or a marker, cannot be used by the project: the type, or one of its type arguments, is `internal` in another assembly, or is a `private` or `protected` type nested in another, in the project itself or another assembly.  The message names the column or parameter, what is mapped, the C# type and the place that chose it, as [SQLSRC250](#sqlsrc250)'s does.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC251: The type override maps 'uuid' to 'Shared.UserKey' for column 'id', in a -- type-override: marker of the query, and this project cannot see that type.  Make it, and each type it is nested in, public, or internal when it is this project's own, or give this project its assembly's internals with InternalsVisibleTo.
+/work/App/Queries/Users.sql(1,10): error SQLSRC251: 'uuid' is mapped to 'Shared.UserKey' for column 'id', in a -- type-override: marker of the query, and this project cannot see that type.  Make it, and each type it is nested in, public, or internal when it is this project's own, or give this project its assembly's internals with InternalsVisibleTo.
 ```
 
 Make the type, and each type it is nested in, `public`.  A type of the project itself can be `internal` instead.  For a type of another assembly, you can also add `[assembly: InternalsVisibleTo("YourProject")]` to the assembly that declares it, which lets the project see its `internal` types.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
@@ -1898,26 +1916,26 @@ Make the type, and each type it is nested in, `public`.  A type of the project i
 The same error is reported when the type is not `public` and the model that would have the column or parameter as a property is: a model is `public` when a `public` type claims its query, as [accessibility](generator.md#model-accessibility) says, and a `public` type cannot have a property of a type that is not.  Each such property is an error of its own, and the message then also names the model.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC251: The type override maps 'uuid' to 'App.UserKey' for column 'id', in the property SqlSourceTypeOverrides, and that type is not public, and the model 'App.Queries.GetUserDto' is.  Make the type public, or make each type that claims the query's file internal.
+/work/App/Queries/Users.sql(1,10): error SQLSRC251: 'uuid' is mapped to 'App.UserKey' for column 'id', in the property SqlSourceTypeOverrides, and that type is not public, and the model 'App.Queries.GetUserDto' is.  Make the type public, or make each type that claims the query's file internal.
 ```
 
 Make the type `public`, or make each type that claims the query's file `internal`, which makes its models `internal`.  The model is not generated until then.  Under the output `models` the query's constant or token method still is; under `codegen` the query gets no method.
 
-See: [Type overrides](settings.md#setting-type-overrides)
+See: [Type overrides](settings.md#setting-type-overrides), [column types](settings.md#setting-column-types)
 
 ## SQLSRC252
 
 **Mapped type cannot be a property's type**
 
-The type override maps a database type to a C# type that no property of a model can have: a `static` class, a `ref struct` such as `System.Span<T>`, `System.Void`, or `System.Nullable<T>` as the whole type.  A type argument or an array's element that is a `static` class, a `ref struct` or `System.Void` is refused too, as is a type argument that is an interface with a `static abstract` member, such as `System.Numerics.INumber<int>`, and so is `System.Nullable<T>` with a `?` after it, as a type argument or an array's element: `System.Nullable<int>?[]`.  So is a type when it, a type it is nested in or one of its type arguments is marked `[Obsolete]` as an error, as `[Obsolete("Use UserKey.", true)]`, since no code can use it without an error; and so is one marked `[Obsolete]` or `[Experimental]` under a diagnostic id that is not an identifier, such as `MY-001` or `1234`, since a model could not turn off the warning, or the error of `[Experimental]`, that its use gives.  `[Experimental]` on the assembly or module that declares the type counts as on the type.  So is a generic type with a type argument that breaks a constraint of its type parameter, as `System.Collections.Generic.List<System.Nullable<string>>`, whose `System.Nullable<T>` takes only a value type, or `MyApp.Box<string>` where `Box<T>` requires `where T : struct`.  A type argument written with a `?` breaks a constraint that forbids null: `notnull`, `class` without a `?`, or a base type or interface written without a `?`, as `System.Collections.Generic.Dictionary<string?, int>` does, whose key is `notnull`.  A type marked `[Obsolete]` or `[Experimental]` otherwise is accepted, and its model compiles without a warning.  The message names the column or parameter, the database type, the C# type and the place that wrote the entry.
+A C# type that you chose, by the type override, the column types or a marker, is one that no property of a model can have: a `static` class, a `ref struct` such as `System.Span<T>`, `System.Void`, or `System.Nullable<T>` as the whole type.  A type argument or an array's element that is a `static` class, a `ref struct` or `System.Void` is refused too, as is a type argument that is an interface with a `static abstract` member, such as `System.Numerics.INumber<int>`, and so is `System.Nullable<T>` with a `?` after it, as a type argument or an array's element: `System.Nullable<int>?[]`.  So is a type when it, a type it is nested in or one of its type arguments is marked `[Obsolete]` as an error, as `[Obsolete("Use UserKey.", true)]`, since no code can use it without an error; and so is one marked `[Obsolete]` or `[Experimental]` under a diagnostic id that is not an identifier, such as `MY-001` or `1234`, since a model could not turn off the warning, or the error of `[Experimental]`, that its use gives.  `[Experimental]` on the assembly or module that declares the type counts as on the type.  So is a generic type with a type argument that breaks a constraint of its type parameter, as `System.Collections.Generic.List<System.Nullable<string>>`, whose `System.Nullable<T>` takes only a value type, or `MyApp.Box<string>` where `Box<T>` requires `where T : struct`.  A type argument written with a `?` breaks a constraint that forbids null: `notnull`, `class` without a `?`, or a base type or interface written without a `?`, as `System.Collections.Generic.Dictionary<string?, int>` does, whose key is `notnull`.  A type marked `[Obsolete]` or `[Experimental]` otherwise is accepted, and its model compiles without a warning.  The message names the column or parameter, what is mapped, the C# type and the place that chose it, as [SQLSRC250](#sqlsrc250)'s does.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC252: The type override maps 'int4' to 'System.Nullable<int>' for column 'id', in the metadata SqlSourceTypeOverrides of the file, and no property can have that type.  Choose another type, and for System.Nullable<T> name T, since a column that can be null makes its property nullable.
+/work/App/Queries/Users.sql(1,10): error SQLSRC252: 'int4' is mapped to 'System.Nullable<int>' for column 'id', in the metadata SqlSourceTypeOverrides of the file, and no property can have that type.  Choose another type, and for System.Nullable<T> name T, since a column that can be null makes its property nullable.
 ```
 
-Map the database type to another C# type.  For `System.Nullable<T>`, map it to `T`: a column that can be null already gets a nullable property, and one that cannot gets `T`.  For a type marked `[Obsolete]` as an error, map it to the type that replaces it.  For a generic type, give it type arguments that meet the constraints of its declaration.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
+Choose another C# type.  For `System.Nullable<T>`, choose `T`: a column that can be null already gets a nullable property, and one that cannot gets `T`.  For a type marked `[Obsolete]` as an error, map it to the type that replaces it.  For a generic type, give it type arguments that meet the constraints of its declaration.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
 
-See: [Type overrides](settings.md#setting-type-overrides)
+See: [Type overrides](settings.md#setting-type-overrides), [column types](settings.md#setting-column-types)
 
 ## SQLSRC253
 
@@ -2119,7 +2137,7 @@ See: [Which queries get models](generator.md#which-models)
 
 **Column marker names no usable column**
 
-A `-- column:` marker, which sets the nullability of one column of its query's result, cannot be used.  Either it names no column of the result, its name compared ignoring case, or the query returns no rows; or it names a column whose alias already ends in `!` or `?`, which says the column's nullability too.  The error is at the marker, and the message says which it is.
+A `-- column:` marker, which sets the nullability or the C# type of one column of its query's result, cannot be used.  Either it names no column of the result, its name compared ignoring case, or the query returns no rows; or it says `null` or `not null` of a column whose alias already ends in `!` or `?`, which says the column's nullability too.  A marker that gives only a C# type may name such a column.  The error is at the marker, and the message says which it is.
 
 ```console
 /work/App/Queries/Payments.sql(2,1): error SQLSRC260: The -- column: marker for 'totl' names no column of the query's result.  Name a column as the query returns it.
@@ -2133,7 +2151,7 @@ A `-- column:` marker, which sets the nullability of one column of its query's r
 SELECT sum(amount) AS total, max(note) AS "note?" FROM payments;
 ```
 
-Name the column as the query returns it: its alias, or its own name when it has none.  For a column whose alias ends in a mark, keep one of the two: remove the marker, or remove the mark from the alias, which changes the query, and run `dotnet sqlsource describe`.  Where the rows are read by the names of their columns, as Dapper reads them, keep the marker:
+Name the column as the query returns it: its alias, or its own name when it has none.  For a column whose alias ends in a mark, keep one of the two: remove the marker's `null` or `not null`, or remove the mark from the alias, which changes the query, and run `dotnet sqlsource describe`.  Where the rows are read by the names of their columns, as Dapper reads them, keep the marker:
 
 ```sql postgres
 -- name: GetTotals
@@ -2144,7 +2162,7 @@ SELECT sum(amount) AS total, max(note) AS note FROM payments;
 
 Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
 
-See: [Setting a column's nullability with a marker](generator.md#column-marker)
+See: [Setting a column's nullability or type with a marker](generator.md#column-marker)
 
 ## SQLSRC261
 
@@ -2495,7 +2513,7 @@ A method marked `[SqlSourceConverter]` must be a converter: a `static` method of
 
 Change the method so that it is a converter, or remove its `[SqlSourceConverter]` when it is not meant to be one.  The error is reported at the method's name, at an operator's symbol, or at the type that a conversion converts to.
 
-A converter declared in a referenced assembly, on a type that the type override names, is reported at the name of each query whose output is `codegen` and whose method would convert through it, since the project cannot change the method.  That query gets no method until the library is fixed, or until the project declares a converter of its own between the same two types, which is used instead of the library's.  The library's own build reports the error at the method, since the method is in the library's code.  A library's converter is used only when the project can call it: when it is `public`, or `internal` in a library that gives the project its internals with `InternalsVisibleTo`.
+A converter declared in a referenced assembly, on a type that a type override, a column type or a marker names, is reported at the name of each query whose output is `codegen` and whose method would convert through it, since the project cannot change the method.  That query gets no method until the library is fixed, or until the project declares a converter of its own between the same two types, which is used instead of the library's.  The library's own build reports the error at the method, since the method is in the library's code.  A library's converter is used only when the project can call it: when it is `public`, or `internal` in a library that gives the project its internals with `InternalsVisibleTo`.
 
 See: [Converters](settings.md#converters)
 
@@ -2511,7 +2529,7 @@ Two methods of the project marked `[SqlSourceConverter]` take the same type and 
 
 Remove `[SqlSourceConverter]` from one of them, or remove the method.  The error is reported at the name of each of the methods.  Two converters of opposite directions, one from `string` to `Email` and one from `Email` to `string`, are a pair and not this error, and a converter of a type to itself, as `DateTime` to `DateTime`, is one converter.  A method that has [SQLSRC277](#sqlsrc277) is not counted until it is fixed.  An argument written with `?` takes the type without it, since a converter is never given null, so `ToDatabase(Email? email)` and `ToDatabase(Email email)` both convert `Email` to `string`, and are this error together.
 
-Two such converters declared in referenced assemblies, on the types that the type override names, are reported at the name of each query whose output is `codegen` and whose method would convert through one of them, and that query gets no method.  Declare a converter of your own between the same two types, which is used instead of both.
+Two such converters declared in referenced assemblies, on the types that a type override, a column type or a marker names, are reported at the name of each query whose output is `codegen` and whose method would convert through one of them, and that query gets no method.  Declare a converter of your own between the same two types, which is used instead of both.
 
 See: [Converters](settings.md#converters)
 
@@ -2519,7 +2537,7 @@ See: [Converters](settings.md#converters)
 
 **Converters do not convert from the database type**
 
-A type override gives a column or a parameter of a query whose output is `codegen` a C# type that the database's driver never reads, such as your own `Email` or `UserId`, and the project has converters of that type, but none between it and the C# type that the driver reads the column's database type as.  So no converter can read the column or send the parameter.  A converter of an `int` never reads a `bigint` column, which the driver reads as a `long`: SqlSource never narrows a value.  The message names the column or parameter, its type, the types its converters convert from and to, the type the driver reads, and the database type.
+A type override, a column type or a marker gives a column or a parameter of a query whose output is `codegen` a C# type that the database's driver never reads, such as your own `Email` or `UserId`, and the project has converters of that type, but none between it and the C# type that the driver reads the column's database type as.  So no converter can read the column or send the parameter.  A converter of an `int` never reads a `bigint` column, which the driver reads as a `long`: SqlSource never narrows a value.  The message names the column or parameter, its type, the types its converters convert from and to, the type the driver reads, and the database type.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC279: The column 'id' has type 'App.UserId', whose converters convert from and to 'int', and not from and to 'long', the type the database type 'int8' is read as.  Add a converter between 'App.UserId' and 'long'.
@@ -2530,10 +2548,10 @@ Add a converter between the column's or parameter's type and the type the messag
 The error has a second form, when the column's or parameter's database type has no C# type that the driver reads it as, such as a composite type, `regclass` or a range of a subtype SqlSource does not know: such a type has nothing to convert from.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC279: The column 'address' has type 'App.Address', which has converters, but the database type 'public.address' has no C# type to convert from.  Remove the type override, or the converters of 'App.Address'.
+/work/App/Queries/Users.sql(1,10): error SQLSRC279: The column 'address' has type 'App.Address', which has converters, but the database type 'public.address' has no C# type to convert from.  Choose a C# type without converters for it, or remove the converters of 'App.Address'.
 ```
 
-For an array whose element type the type override chose, such as `email[]` under `public.email=App.Email`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
+For an array whose element type a type override, a column type or a marker chose, such as `email[]` under `public.email=App.Email` or `posts.tag_ids=TagId[]`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
 
 See: [Converters](settings.md#converters)
 
@@ -2541,7 +2559,7 @@ See: [Converters](settings.md#converters)
 
 **Converter is missing for one direction**
 
-A type override gives a column or a parameter of a query whose output is `codegen` a C# type, and the project has a converter between that type and the C# type that the driver reads the column's database type as, but only in the other direction.  A column needs a converter from the type the driver reads, and a parameter one to it.  The message names the column or parameter, its type, the converter it has, and the method it needs.
+A type override, a column type or a marker gives a column or a parameter of a query whose output is `codegen` a C# type, and the project has a converter between that type and the C# type that the driver reads the column's database type as, but only in the other direction.  A column needs a converter from the type the driver reads, and a parameter one to it.  The message names the column or parameter, its type, the converter it has, and the method it needs.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC280: The column 'email' has type 'App.Email', which has a converter to 'string' but none from it, which a column needs.  Add a static method marked [SqlSourceConverter] that takes 'string' and returns 'App.Email'.

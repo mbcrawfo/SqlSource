@@ -5,7 +5,7 @@
   "toolVersion": "0.1.0",
   "queries": {
     "ListAccountNotes": {
-      "hash": "0423ff4e369ad39d86b4cf24ada9d0c184dccae57fb73916f24e0b1f88151d5e",
+      "hash": "d471771e53eacae3637abcacc6a3d16db0474766faffa50d0c9b5d3c97f605ae",
       "engine": "mssql",
       "database": "app",
       "serverVersion": "17.0.5015.4",
@@ -74,6 +74,25 @@
         },
         {
           "ordinal": 3,
+          "name": "account_id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "account_id"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 4,
           "name": "kind",
           "type": {
             "name": "varchar(10)",
@@ -92,7 +111,7 @@
           "computed": false
         },
         {
-          "ordinal": 4,
+          "ordinal": 5,
           "name": "body",
           "type": {
             "name": "nvarchar(max)",
@@ -111,7 +130,7 @@
           "computed": false
         },
         {
-          "ordinal": 5,
+          "ordinal": 6,
           "name": "remind_at",
           "type": {
             "name": "time(0)",
@@ -141,6 +160,66 @@
       "plan": "skipped",
       "tableMatch": "no-origin",
       "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "note_count",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "GetAccountNoteCount": {
+      "hash": "c56205bff153dd8319d7345b98cc692b80709faed712147ccf46aadf0de2ab58",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
       "columns": [
         {
           "ordinal": 0,

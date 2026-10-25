@@ -13,4 +13,14 @@ namespace SqlSource.Parsing;
 /// no marker.  Null and false both mean the parameter is not nullable.
 /// </param>
 /// <param name="IsDeclared">Whether a <c>-- param:</c> marker names the parameter.</param>
-internal sealed record SqlQueryParameter(string Name, string? Type, bool? Nullable, bool IsDeclared);
+/// <param name="ClrType">
+/// The C# type that a <c>-- param:</c> marker gives after <c>-&gt;</c>, as <c>ClrTypeName.Text</c> writes it, or null.
+/// It describes nothing to the database, so the hash leaves it out.
+/// </param>
+internal sealed record SqlQueryParameter(
+    string Name,
+    string? Type,
+    bool? Nullable,
+    bool IsDeclared,
+    string? ClrType = null
+);

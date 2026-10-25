@@ -463,7 +463,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         // Those types resolved against the compilation, with the converters declared on those of a referenced
         // assembly.  Like the probe, it runs on every run, since the driver gives a new compilation each time: a few
-        // lookups for each name, and none without an override.  Its value is equal until a type or a converter appears,
+        // lookups for each name, and none without an override.  A short name reads the index of each reference, which
+        // is built once while the reference is the same.  Its value is equal until a type or a converter appears,
         // goes or changes, so nothing after it runs again.
         var resolvedTypes = context
             .CompilationProvider.Combine(mappedTypeNames)
@@ -478,15 +479,16 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (resolved, _) => resolved.Types)
             .WithTrackingName(TrackingNames.MappedTypes);
 
-        // The property's type override alone, so that a change to another property types no file again.
-        var projectTypeOverrides = projectLevel.Select(static (level, _) => FileTypesInput.TypeOverridesOf(level));
+        // The properties' type override and column types alone, so that a change to another property types no file
+        // again.
+        var projectTypeSettings = projectLevel.Select(static (level, _) => FileTypesInput.TypeSettingsOf(level));
 
         // The C# types of each claimed file's usable entries, a node for each file after its check, so that an edit to
         // one file or one sidecar types that file alone.  A file with no usable entry carries nothing to type.  Each
         // file keeps its input beside its types, so that the models read its entries without typing it again.
         var typedFiles = sidecarChecks.Then(each =>
             each.Combine(parsedFiles.Combine(filesSettings))
-                .Combine(projectTypeOverrides.Combine(npgsqlProbe.Combine(sqlClientProbe.Combine(mappedTypes))))
+                .Combine(projectTypeSettings.Combine(npgsqlProbe.Combine(sqlClientProbe.Combine(mappedTypes))))
                 .Select(
                     static (input, _) =>
                         FileTypesInput.Gather(
@@ -770,7 +772,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         // Each type's own slice of what its methods need, which is equal until something of the type changes: its
         // queries, its files' models, the models its queries got, its names, the drivers or the converters of the
-        // types its overrides chose.
+        // types that its type overrides, column types and markers chose.
         var typeMethods = typeQueries
             .Combine(projectLevel)
             .Combine(allFileModels.Combine(assignments))

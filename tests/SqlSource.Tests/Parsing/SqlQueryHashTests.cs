@@ -6,7 +6,7 @@ namespace SqlSource.Tests.Parsing;
 
 // The hash ties a query to its entry in a sidecar.  Its input is fixed: the engine's name, a line feed, the SQL
 // without comments and with each token as {{name:default}}, {{name:}} or {{name}}, a line feed, and a line for each
-// parameter that a marker declares.
+// parameter that a marker declares with a type or a nullability.
 public sealed class SqlQueryHashTests
 {
     private const string Simple = "-- name: Q\nSELECT 1;\n";
@@ -22,7 +22,7 @@ public sealed class SqlQueryHashTests
         Hash(Simple, SqlDialect.SqlServer).ShouldBe("5b37670f9fd87ce771169402163baa1ec54b97293d4fa4454897400defac7cf9");
 
     // printf 'postgres\nSELECT id FROM users WHERE id = @id {{filter:AND x = 1}} ORDER BY {{orderBy}}{{tail:}}\n
-    // id\nsince timestamptz not null\npage int\nq text null\n' | shasum -a 256, on one line.
+    // since timestamptz not null\npage int\nq text null\n' | shasum -a 256, on one line.  The bare @id adds no line.
     [Fact]
     public void Compute_QueryWithTokensAndDeclarations_RendersEachAsTheDefinitionSays()
     {
@@ -31,7 +31,7 @@ public sealed class SqlQueryHashTests
             + "-- param: @id\n-- token: {{filter:AND x = 1}}\n"
             + "SELECT id FROM users WHERE id = @id {{filter}} ORDER BY {{orderBy}}{{tail:}}\n";
 
-        Hash(Text).ShouldBe("71e8d6c8d93f1de8eefcc9a1e00c48c4455a0d416c23002d24ead2c0c09399f9");
+        Hash(Text).ShouldBe("7ce509523c09f8150953aa1222e35feff3e8f1e7c7e82611241aed9b6c4a34c8");
     }
 
     [Theory]
@@ -52,8 +52,7 @@ public sealed class SqlQueryHashTests
     // A parameter's name, and its case.
     [InlineData("SELECT @a", "SELECT @b")]
     [InlineData("SELECT @a", "SELECT @A")]
-    // A declaration, its type and its nullability.
-    [InlineData("SELECT @a", "-- param: @a\nSELECT @a")]
+    // A declaration's type and its nullability.
     [InlineData("-- param: @a\nSELECT @a", "-- param: @a int\nSELECT @a")]
     [InlineData("-- param: @a int\nSELECT @a", "-- param: @a bigint\nSELECT @a")]
     [InlineData("-- param: @a int\nSELECT @a", "-- param: @a int null\nSELECT @a")]
@@ -73,6 +72,25 @@ public sealed class SqlQueryHashTests
     public void Compute_MarkerDefaultsThatDifferOnlyInAComment_AreEqual() =>
         Hash("-- name: Q\n-- token: {{f:a /* x */ b}}\nSELECT {{f}}\n")
             .ShouldBe(Hash("-- name: Q\n-- token: {{f:a /* y */ b}}\nSELECT {{f}}\n"));
+
+    // A marker that gives no type and no nullability describes nothing.
+    [Fact]
+    public void Compute_BareParamMarker_IsTheHashWithoutIt() =>
+        Hash("-- name: Q\n-- param: @id\nSELECT @id;").ShouldBe(Hash("-- name: Q\nSELECT @id;"));
+
+    [Fact]
+    public void Compute_ParamMarkerWithAType_ChangesTheHash() =>
+        Hash("-- name: Q\n-- param: @id int4\nSELECT @id;").ShouldNotBe(Hash("-- name: Q\nSELECT @id;"));
+
+    // A C# type describes nothing either: the database never sees it.
+    [Fact]
+    public void Compute_ParamMarkerOfACSharpTypeAlone_IsTheHashWithoutIt() =>
+        Hash("-- name: Q\n-- param: @id -> UserId\nSELECT @id;").ShouldBe(Hash("-- name: Q\nSELECT @id;"));
+
+    [Fact]
+    public void Compute_ParamMarker_AddingACSharpType_KeepsTheHash() =>
+        Hash("-- name: Q\n-- param: @id int4 -> UserId\nSELECT @id;")
+            .ShouldBe(Hash("-- name: Q\n-- param: @id int4\nSELECT @id;"));
 
     [Fact]
     public void Compute_AnyQuery_IsSixtyFourLowerCaseHexCharacters() => Hash(Simple).ShouldMatch("^[0-9a-f]{64}$");

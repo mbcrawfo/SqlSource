@@ -609,7 +609,15 @@ internal static class SqlFileParser
             var markers = ImmutableArray.CreateBuilder<SqlColumnMarker>(scope.Columns.Count);
             foreach (var column in scope.Columns)
             {
-                markers.Add(new SqlColumnMarker(column.Name, column.IsNullable, column.Marker.Span));
+                markers.Add(
+                    new SqlColumnMarker(
+                        column.Name,
+                        column.IsNullable,
+                        column.ClrType,
+                        column.ResetsType,
+                        column.Marker.Span
+                    )
+                );
             }
 
             return new EquatableArray<SqlColumnMarker>(markers.MoveToImmutable());

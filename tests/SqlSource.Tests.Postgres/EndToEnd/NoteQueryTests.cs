@@ -1,4 +1,5 @@
 using System.Data;
+using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tests.Postgres.EndToEnd.Types;
@@ -7,9 +8,10 @@ using Xunit;
 namespace SqlSource.Tests.Postgres.EndToEnd;
 
 // The queries of Queries/Notes.sql, run on the seed of "app" through the methods that NoteQueries gets: the enum
-// note_kind is read as the C# enum NoteKind, which the data source maps, and the domains email and note_ref as the
-// record structs Email and NoteRef, through their converters, as columns and as parameters.  Half the tests give the
-// method an open connection and half a closed one, which the method opens.
+// note_kind is read as the C# enum NoteKind, which the data source maps, the domains email and note_ref as the record
+// structs Email and NoteRef, and the ids of the accounts and a count, by the file's column types and the queries'
+// markers, as the record structs AccountId and NoteCount, through their converters, as columns and as parameters.  Half
+// the tests give the method an open connection and half a closed one, which the method opens.
 [Collection(UsesPostgres.Name)]
 public sealed class NoteQueryTests(PostgresContainer postgres)
 {
@@ -23,15 +25,53 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
         var notes = await connection.ListAccountNotes(cancellationToken: token);
 
         notes.ShouldBe([
-            new ListAccountNotesDto(1, "alice", 1, NoteKind.Call, "Asked for a larger plan."),
-            new ListAccountNotesDto(1, "alice", 2, NoteKind.Email, "Sent the quote."),
-            new ListAccountNotesDto(2, "bob", 3, NoteKind.Visit, "Closed the account on site."),
-            new ListAccountNotesDto(3, "carol", null, null, null),
+            new ListAccountNotesDto(
+                new AccountId(1),
+                "alice",
+                1,
+                new AccountId(1),
+                NoteKind.Call,
+                "Asked for a larger plan."
+            ),
+            new ListAccountNotesDto(new AccountId(1), "alice", 2, new AccountId(1), NoteKind.Email, "Sent the quote."),
+            new ListAccountNotesDto(
+                new AccountId(2),
+                "bob",
+                3,
+                new AccountId(2),
+                NoteKind.Visit,
+                "Closed the account on site."
+            ),
+            new ListAccountNotesDto(new AccountId(3), "carol", null, null, null, null),
         ]);
     }
 
+    // accounts.id is an AccountId by the file's column types in the project, and notes.account_id one by the header's
+    // -- column: marker, nullable on the optional side of the join: each is read from the int that Npgsql gives,
+    // through FromDatabase, and carol's NULL is read as null, never given to it.
     [Fact]
-    public async Task CountAccountNotes_EveryAccount_ReadsTheCounts()
+    public async Task ListAccountNotes_EveryRow_ReadsTheIdsAsAccountIds()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = source.CreateConnection();
+
+        var notes = await connection.ListAccountNotes(cancellationToken: token);
+
+        notes
+            .Select(static note => (note.Id, note.AccountId))
+            .ShouldBe([
+                (new AccountId(1), new AccountId(1)),
+                (new AccountId(1), new AccountId(1)),
+                (new AccountId(2), new AccountId(2)),
+                (new AccountId(3), null),
+            ]);
+    }
+
+    // The count, a bigint, is read from the long that Npgsql gives, through NoteCount's FromDatabase, by the query's
+    // -- column: marker.
+    [Fact]
+    public async Task CountAccountNotes_EveryAccount_ReadsTheCountsAsNoteCounts()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -40,10 +80,27 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
         var counts = await connection.CountAccountNotes(cancellationToken: token);
 
         counts.ShouldBe([
-            new CountAccountNotesDto(1, 2),
-            new CountAccountNotesDto(2, 1),
-            new CountAccountNotesDto(3, 0),
+            new CountAccountNotesDto(new AccountId(1), new NoteCount(2)),
+            new CountAccountNotesDto(new AccountId(2), new NoteCount(1)),
+            new CountAccountNotesDto(new AccountId(3), new NoteCount(0)),
         ]);
+    }
+
+    // The parameter, which the -- param: marker gives the type AccountId and the database infers as an integer, is sent
+    // as the int that ToDatabase returns.
+    [Fact]
+    public async Task GetAccountNoteCount_AnAccountId_ReadsItsNoteCount()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+
+        var count = await connection.GetAccountNoteCount(
+            new GetAccountNoteCountArgs(new AccountId(1)),
+            cancellationToken: token
+        );
+
+        count.ShouldBe(new GetAccountNoteCountDto(new AccountId(1), new NoteCount(2)));
     }
 
     [Fact]
@@ -56,9 +113,9 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
         var names = await connection.ListDisplayNames(cancellationToken: token);
 
         names.ShouldBe([
-            new ListDisplayNamesDto(1, "Alice"),
-            new ListDisplayNamesDto(2, "Bob"),
-            new ListDisplayNamesDto(3, "Carol"),
+            new ListDisplayNamesDto(new AccountId(1), "Alice"),
+            new ListDisplayNamesDto(new AccountId(2), "Bob"),
+            new ListDisplayNamesDto(new AccountId(3), "Carol"),
         ]);
     }
 
@@ -74,9 +131,9 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
         var names = await connection.ListMarkedNames(cancellationToken: token);
 
         names.ShouldBe([
-            new ListMarkedNamesDto(1, "Alice"),
-            new ListMarkedNamesDto(2, "Bob"),
-            new ListMarkedNamesDto(3, "Carol"),
+            new ListMarkedNamesDto(new AccountId(1), "Alice"),
+            new ListMarkedNamesDto(new AccountId(2), "Bob"),
+            new ListMarkedNamesDto(new AccountId(3), "Carol"),
         ]);
     }
 

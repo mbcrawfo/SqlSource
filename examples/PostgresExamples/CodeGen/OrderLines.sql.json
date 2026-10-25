@@ -5,14 +5,14 @@
   "toolVersion": "0.1.0",
   "queries": {
     "ListOrderLines": {
-      "hash": "7beddfaa3df127a41d4d4205a81a416055ac1f9fd13293fe569d2bd209cf1856",
+      "hash": "a6917672b65f7ed76d793f38675552dd465f83fdea0b95b0d532c89d53f7d406",
       "engine": "postgres",
       "database": "postgres",
       "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,
       "plan": "not-needed",
-      "tableMatch": "columns-differ",
+      "tableMatch": "order-differs",
       "parameters": [
         {
           "name": "orderId",
@@ -106,6 +106,72 @@
           },
           "identity": false,
           "computed": false
+        },
+        {
+          "ordinal": 4,
+          "name": "order_id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "order_lines",
+            "column": "order_id"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "ListLatestOrderPerProduct": {
+      "hash": "108cc31788a84c4105d9447cd306e4d55a5f8bdd22e4bd73da1db9370d8cfeab",
+      "engine": "postgres",
+      "database": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "walked",
+      "tableMatch": "no-origin",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "product",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "order_lines",
+            "column": "product"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "latest_order_id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": null,
+          "computed": null
         }
       ]
     }

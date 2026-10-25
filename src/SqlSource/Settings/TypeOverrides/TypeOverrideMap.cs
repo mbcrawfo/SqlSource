@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 
 namespace SqlSource.Settings.TypeOverrides;
 
@@ -18,6 +17,11 @@ namespace SqlSource.Settings.TypeOverrides;
 /// </remarks>
 internal static class TypeOverrideMap
 {
+    // The order of the map and the key of an entry, for SortedKeyedList.  Static, so that no call allocates them.
+    private static readonly Comparison<string> KeyOrder = static (a, b) => Order(new KeyParts(a), new KeyParts(b));
+
+    private static readonly Func<TypeOverride, string> KeyOf = static entry => entry.Key;
+
     /// <summary>
     /// <paramref name="higher" /> over <paramref name="lower" />: every key of either, with the entry of
     /// <paramref name="higher" /> for a key both have.  Null when both are, and either one itself when the other is.
@@ -25,40 +29,7 @@ internal static class TypeOverrideMap
     public static EquatableArray<TypeOverride>? Over(
         EquatableArray<TypeOverride>? higher,
         EquatableArray<TypeOverride>? lower
-    )
-    {
-        if (higher is not { } over)
-        {
-            return lower;
-        }
-
-        if (lower is not { } under)
-        {
-            return over;
-        }
-
-        var merged = ImmutableArray.CreateBuilder<TypeOverride>(over.Count + under.Count);
-        var (high, low) = (0, 0);
-        while (high < over.Count && low < under.Count)
-        {
-            var order = Order(new KeyParts(over[high].Key), new KeyParts(under[low].Key));
-            merged.Add(order <= 0 ? over[high] : under[low]);
-            high += order <= 0 ? 1 : 0;
-            low += order >= 0 ? 1 : 0;
-        }
-
-        for (; high < over.Count; high++)
-        {
-            merged.Add(over[high]);
-        }
-
-        for (; low < under.Count; low++)
-        {
-            merged.Add(under[low]);
-        }
-
-        return new EquatableArray<TypeOverride>(merged.ToImmutable());
-    }
+    ) => SortedKeyedList.Over(higher, lower, KeyOrder, KeyOf);
 
     /// <summary>
     /// The entry for <paramref name="key" />, a type's key as it is written, or null when no entry matches it or the
@@ -83,12 +54,19 @@ internal static class TypeOverrideMap
     /// Where <paramref name="key" /> is in a list kept sorted by key, or the complement of where it would go, as
     /// <see cref="List{T}.BinarySearch(T)" /> gives it.
     /// </summary>
-    public static int IndexOf(List<TypeOverride> entries, string key)
-    {
-        var parts = new KeyParts(key);
-        var at = LowerBound(entries, parts, ignoringCaseOnly: false);
-        return at < entries.Count && Order(new KeyParts(entries[at].Key), parts) == 0 ? at : ~at;
-    }
+    public static int IndexOf(List<TypeOverride> entries, string key) =>
+        SortedKeyedList.IndexOf(entries, key, KeyOrder, KeyOf);
+
+    /// <summary>Puts an entry in its place in a list kept sorted by key, over the entry of its key.</summary>
+    public static void Put(List<TypeOverride> entries, TypeOverride entry) =>
+        SortedKeyedList.Put(entries, entry, KeyOrder, KeyOf);
+
+    /// <summary>
+    /// Adds an entry in its place in a list kept sorted by key and gives null, or gives the list's entry of its key
+    /// and leaves the list as it is.
+    /// </summary>
+    public static TypeOverride? AddOrFind(List<TypeOverride> entries, TypeOverride entry) =>
+        SortedKeyedList.AddOrFind(entries, entry, KeyOrder, KeyOf);
 
     // The best of the entries that match key: equal to it ignoring case, from the first such entry on, with its
     // quoted parts equal to key's, or none.  A key's entries sit together in the order of the map, so the walk stops
@@ -96,7 +74,7 @@ internal static class TypeOverrideMap
     private static Match BestOf(EquatableArray<TypeOverride> map, in KeyParts key)
     {
         Match best = default;
-        for (var at = LowerBound(map, key, ignoringCaseOnly: true); at < map.Count; at++)
+        for (var at = LowerBound(map, key); at < map.Count; at++)
         {
             var entry = new KeyParts(map[at].Key);
             if (Compare(entry, key, StringComparison.OrdinalIgnoreCase) != 0)
@@ -157,20 +135,17 @@ internal static class TypeOverrideMap
     private static int ComparePart(ReadOnlySpan<char> a, ReadOnlySpan<char> b, StringComparison comparison) =>
         TypeKeyText.TextOf(a).CompareTo(TypeKeyText.TextOf(b), comparison);
 
-    // The index of the first entry that is not less than key, in the order of the map or, with ignoringCaseOnly, in
-    // the order of the keys ignoring case.  Generic over the list, so that a map, which is a struct, is searched
-    // without being boxed.  It is a search of its own because it is a lower bound over a ref struct key, which
-    // SortedSearch cannot take (TD-0063).
-    private static int LowerBound<TList>(TList entries, in KeyParts key, bool ignoringCaseOnly)
+    // The index of the first entry that is not less than key ignoring case.  Generic over the list, so that a map,
+    // which is a struct, is searched without being boxed.  It is a search of its own because it is a lower bound over
+    // a ref struct key, which SortedSearch cannot take (TD-0063).
+    private static int LowerBound<TList>(TList entries, in KeyParts key)
         where TList : IReadOnlyList<TypeOverride>
     {
         var (low, high) = (0, entries.Count);
         while (low < high)
         {
             var middle = low + ((high - low) / 2);
-            var entry = new KeyParts(entries[middle].Key);
-            var order = ignoringCaseOnly ? Compare(entry, key, StringComparison.OrdinalIgnoreCase) : Order(entry, key);
-            if (order < 0)
+            if (Compare(new KeyParts(entries[middle].Key), key, StringComparison.OrdinalIgnoreCase) < 0)
             {
                 low = middle + 1;
             }
@@ -189,7 +164,7 @@ internal static class TypeOverrideMap
     {
         public TypeOverride? Entry { get; } = entry;
 
-        public int Rank { get; } = RankOf(entry.Place);
+        public int Rank { get; } = SettingPlaces.Specificity(entry.Place);
 
         public bool IsExact { get; } = isExact;
 
@@ -197,16 +172,6 @@ internal static class TypeOverrideMap
         // stays, so the first in the order of the map wins.
         public bool IsBetterThan(Match other) =>
             other.Entry is null || Rank > other.Rank || (Rank == other.Rank && IsExact && !other.IsExact);
-
-        // How specific a place is, the most specific highest.  The attribute has no level for the type override.
-        private static int RankOf(SettingPlace place) =>
-            place switch
-            {
-                SettingPlace.Query => 3,
-                SettingPlace.FileHeader => 2,
-                SettingPlace.Metadata => 1,
-                SettingPlace.Property or SettingPlace.Attribute or _ => 0,
-            };
     }
 
     // A key split once into its parts, as TypeKeyText.TrySplit gives them, so that a search splits the key it looks for

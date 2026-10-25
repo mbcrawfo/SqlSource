@@ -64,7 +64,7 @@ public sealed class SqlModelTests
                 null,
                 columnIsNullable is { } isNullable
                     ? new EquatableArray<SqlColumnMarker>([
-                        new SqlColumnMarker("total", isNullable, new TextSpan(20, 21)),
+                        new SqlColumnMarker("total", isNullable, null, false, new TextSpan(20, 21)),
                     ])
                     : EquatableArray<SqlColumnMarker>.Empty,
                 keptError is null

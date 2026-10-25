@@ -219,23 +219,45 @@ public sealed class ModelShapeTests
             typeof(ListAccountNotesDto),
             $"{Namespace}.ListAccountNotesDto",
             ModelShape.SealedRecord,
-            ("Id", typeof(int), false),
+            ("Id", typeof(AccountId), false),
             ("Name", typeof(string), false),
             ("NoteId", typeof(int?), true),
+            ("AccountId", typeof(AccountId?), true),
             ("Kind", typeof(string), true),
             ("Body", typeof(string), true),
             ("RemindAt", typeof(TimeOnly?), true)
         );
 
     [Fact]
-    public void Build_Count_IsNotNullWithoutAMarker() =>
+    public void Build_Count_IsNotNullWithoutANullabilityMarker() =>
         ShouldBeModel(
             typeof(CountAccountNotesDto),
             $"{Namespace}.CountAccountNotesDto",
             ModelShape.SealedRecord,
-            ("Id", typeof(int), false),
-            ("NoteCount", typeof(int), false)
+            ("Id", typeof(AccountId), false),
+            ("NoteCount", typeof(NoteCount), false)
         );
+
+    // dbo.accounts.id is an AccountId by the file's column types in the project, dbo.notes.account_id by the header's
+    // -- column: marker (pinned by Build_LeftJoin_MakesTheOptionalSideNullable), the count by the query's, and the
+    // parameter by its -- param: marker, which names no database type.
+    [Fact]
+    public void Build_ColumnTypesAndParamMarker_MapTheIdsAndTheCountToTypesOfTheProject()
+    {
+        ShouldBeModel(
+            typeof(GetAccountNoteCountArgs),
+            $"{Namespace}.GetAccountNoteCountArgs",
+            ModelShape.Record,
+            ("Id", typeof(AccountId), false)
+        );
+        ShouldBeModel(
+            typeof(GetAccountNoteCountDto),
+            $"{Namespace}.GetAccountNoteCountDto",
+            ModelShape.SealedRecord,
+            ("Id", typeof(AccountId), false),
+            ("NoteCount", typeof(NoteCount), false)
+        );
+    }
 
     [Fact]
     public void Build_ColumnMarker_MakesTheMonthEndNotNull() =>
@@ -243,7 +265,7 @@ public sealed class ModelShapeTests
             typeof(ListAccountMonthsDto),
             $"{Namespace}.ListAccountMonthsDto",
             ModelShape.SealedRecord,
-            ("Id", typeof(int), false),
+            ("Id", typeof(AccountId), false),
             ("MonthEnd", typeof(DateOnly), false)
         );
 
@@ -253,7 +275,7 @@ public sealed class ModelShapeTests
             typeof(ListMarkedNamesDto),
             $"{Namespace}.ListMarkedNamesDto",
             ModelShape.SealedRecord,
-            ("Id", typeof(int?), true),
+            ("Id", typeof(AccountId?), true),
             ("UpperName", typeof(string), false)
         );
 

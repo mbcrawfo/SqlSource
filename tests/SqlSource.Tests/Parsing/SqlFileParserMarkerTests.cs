@@ -5,6 +5,7 @@ using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.TypeOverrides;
 using Xunit;
 using static SqlSource.Tests.Parsing.ParseOf;
@@ -364,7 +365,6 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("-- token: {{a:x}}", "token", "SELECT {{a}}")]
     [InlineData("-- param: @a int", "param", "SELECT @a")]
     [InlineData("-- token-ignore: a", "token-ignore", "SELECT {{a}}")]
-    [InlineData("-- column: total null", "column")]
     public void Parse_MarkerOutsideAQuery_IsNotAllowedThere(string marker, string word, string sql = "SELECT 1")
     {
         var text = marker + "\n-- name: Q\n" + sql + "\n";
@@ -479,7 +479,7 @@ public sealed class SqlFileParserMarkerTests
         Blocks(Text)
             .ShouldHaveSingleItem()
             .ColumnMarkers.ShouldBe([
-                new SqlColumnMarker("total", false, TextSpans.Of(Text, "-- column: total not null")),
+                new SqlColumnMarker("total", false, null, false, TextSpans.Of(Text, "-- column: total not null")),
             ]);
     }
 
@@ -527,6 +527,13 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("\"total\"x null")]
     [InlineData("total\"\" null")]
     [InlineData("total amount null")]
+    // A type that is not valid, or an arrow without a name.
+    [InlineData("total -> not a type")]
+    [InlineData("total ->")]
+    [InlineData("total -> int?")]
+    [InlineData("-> PostCount")]
+    [InlineData("null -> PostCount")]
+    [InlineData("total->PostCount")]
     public void Parse_ColumnMarkerWithoutANameAndANullability_IsInvalid(string value)
     {
         var text = "-- name: Q\n-- column: " + value + "\nSELECT 1\n";
@@ -551,6 +558,216 @@ public sealed class SqlFileParserMarkerTests
     public void Parse_QueryWithoutAColumnMarker_HasNoColumnMarkers() =>
         Blocks("-- name: Q\n-- param: @a int\nSELECT @a\n").ShouldHaveSingleItem().ColumnMarkers.ShouldBeEmpty();
 
+    [Theory]
+    [InlineData("-- column: total -> PostCount", null, "PostCount", false)]
+    [InlineData("-- column: note null -> NoteText", true, "NoteText", false)]
+    [InlineData("-- column: id -> default", null, null, true)]
+    [InlineData("-- column: id not null -> DEFAULT", false, null, true)]
+    [InlineData("-- column: total\t->\tMyApp.PostCount", null, "global::MyApp.PostCount", false)]
+    [InlineData("-- column: \"a -> b\" -> PostCount", null, "PostCount", false)]
+    [InlineData("-- column: \"posts.id\" -> PostId", null, "PostId", false)]
+    public void Parse_ColumnMarker_InAQuery_WithAType(string marker, bool? isNullable, string? clrType, bool resetsType)
+    {
+        var column = Blocks("-- name: Q\n" + marker + "\nSELECT 1\n")
+            .ShouldHaveSingleItem()
+            .ColumnMarkers.ShouldHaveSingleItem();
+
+        column.IsNullable.ShouldBe(isNullable);
+        column.ClrType.ShouldBe(clrType);
+        column.ResetsType.ShouldBe(resetsType);
+    }
+
+    [Fact]
+    public void Parse_ColumnMarker_InAQuery_KeepsTheNameWithoutQuotes() =>
+        Blocks("-- name: Q\n-- column: \"a -> b\" -> PostCount\nSELECT 1\n")
+            .ShouldHaveSingleItem()
+            .ColumnMarkers.ShouldHaveSingleItem()
+            .Name.ShouldBe("a -> b");
+
+    // A type is not a setting of the query's level: the result's column carries it.
+    [Fact]
+    public void Parse_ColumnMarker_InAQuery_IsNoColumnTypeOfTheLevel() =>
+        Blocks("-- name: Q\n-- column: total -> PostCount\nSELECT 1\n")
+            .ShouldHaveSingleItem()
+            .Markers.ShouldBeSameAs(SettingsLevel.None);
+
+    [Fact]
+    public void Parse_ColumnMarker_InTheHeader_IsAColumnType()
+    {
+        var blocks = Blocks(
+            "-- column: posts.id -> PostId\n-- column: auth.\"Users\".id -> default\n"
+                + "-- name: A\nSELECT 1\n-- name: B\nSELECT 2\n"
+        );
+
+        foreach (var block in blocks)
+        {
+            block
+                .Markers.ColumnTypes.ShouldNotBeNull()
+                .ShouldBe([
+                    new ColumnType("posts.id", "PostId", SettingPlace.FileHeader),
+                    new ColumnType("auth.\"Users\".id", null, SettingPlace.FileHeader),
+                ]);
+            block.ColumnMarkers.ShouldBeEmpty();
+        }
+    }
+
+    // The header's entries reach each query's level, under a type override of the query's own.
+    [Fact]
+    public void Parse_ColumnMarker_InTheHeader_ReachesAQueryWithMarkersOfItsOwn() =>
+        Blocks("-- column: posts.id -> PostId\n-- name: A\n-- output: sql\nSELECT 1\n")
+            .ShouldHaveSingleItem()
+            .Markers.ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([new ColumnType("posts.id", "PostId", SettingPlace.FileHeader)]);
+
+    [Theory]
+    [InlineData("posts.id not null -> PostId")]
+    [InlineData("posts.id null -> PostId")]
+    [InlineData("posts.id null")]
+    [InlineData("posts.id")]
+    [InlineData("id -> PostId")]
+    [InlineData("total null")]
+    [InlineData("posts.id -> int?")]
+    [InlineData("a.b.c.d -> PostId")]
+    public void Parse_ColumnMarker_InTheHeader_WithNullability_IsSQLSRC111(string value)
+    {
+        var text = "-- column: " + value + "\n-- name: Q\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    TextSpans.Of(text, value),
+                    "column: " + value,
+                    ""
+                ),
+            ]);
+    }
+
+    [Theory]
+    [InlineData("posts.id -> PostId")]
+    [InlineData("posts.id null")]
+    [InlineData("public.posts.id not null -> PostId")]
+    [InlineData("posts.id")]
+    public void Parse_ColumnMarker_InAQuery_DottedName_IsSQLSRC111(string value)
+    {
+        var text = "-- name: Q\n-- column: " + value + "\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    TextSpans.Of(text, value),
+                    "column: " + value,
+                    ".  A column's source is mapped in the file header"
+                ),
+            ]);
+    }
+
+    // A file without a name marker takes both kinds: a key of two or three parts is the header's, one part the
+    // query's.
+    [Fact]
+    public void Parse_ColumnMarker_InAWholeFile_DottedIsTheHeaders()
+    {
+        var block = Blocks("-- column: posts.id -> PostId\n-- column: total -> PostCount\nSELECT 1\n")
+            .ShouldHaveSingleItem();
+
+        block
+            .Markers.ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([new ColumnType("posts.id", "PostId", SettingPlace.FileHeader)]);
+        var column = block.ColumnMarkers.ShouldHaveSingleItem();
+        column.Name.ShouldBe("total");
+        column.ClrType.ShouldBe("PostCount");
+    }
+
+    [Fact]
+    public void Parse_ColumnMarker_InAWholeFile_DottedWithNullability_IsSQLSRC111()
+    {
+        const string Value = "posts.id not null -> PostId";
+        const string Text = "-- column: " + Value + "\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    TextSpans.Of(Text, Value),
+                    "column: " + Value,
+                    ""
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_ColumnMarkers_TypeAndNullabilityApart_AreNoConflict()
+    {
+        var markers = Blocks(
+                "-- name: Q\n-- column: note null\n-- column: NOTE -> NoteText\n-- column: note null -> NoteText\n"
+                    + "SELECT 1\n"
+            )
+            .ShouldHaveSingleItem()
+            .ColumnMarkers;
+
+        markers
+            .Select(static marker => (marker.Name, marker.IsNullable, marker.ClrType))
+            .ShouldBe([("note", true, null), ("NOTE", null, "NoteText")]);
+    }
+
+    [Theory]
+    [InlineData("-- column: total -> PostCount", "total -> Count")]
+    [InlineData("-- column: total -> PostCount", "TOTAL -> default")]
+    [InlineData("-- column: total -> default", "total null -> PostCount")]
+    [InlineData("-- column: total null -> PostCount", "total not null")]
+    public void Parse_ColumnMarkers_TwoTypes_IsSQLSRC112(string first, string second)
+    {
+        var text = "-- name: Q\n" + first + "\n-- column: " + second + "\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ConflictingSettings,
+                    new TextSpan(text.IndexOf("-- column: " + second, StringComparison.Ordinal) + 11, second.Length),
+                    "column: " + second
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_HeaderColumnMarkers_TwoTypesForOneKey_IsSQLSRC112()
+    {
+        const string Second = "\"posts\".id -> Id";
+        const string Text = "-- column: posts.id -> PostId\n-- column: " + Second + "\n-- name: Q\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ConflictingSettings,
+                    TextSpans.Of(Text, Second),
+                    "column: " + Second
+                ),
+            ]);
+    }
+
+    // A quoted part and a plain part of one text are one key; keys that differ only by case are two.
+    [Fact]
+    public void Parse_HeaderColumnMarkers_OneTypeTwice_IsNoConflict() =>
+        Blocks(
+                "-- column: posts.id -> PostId\n-- column: \"posts\".id -> PostId\n-- column: POSTS.ID -> Other\n"
+                    + "-- name: Q\nSELECT 1\n"
+            )
+            .ShouldHaveSingleItem()
+            .Markers.ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([
+                new ColumnType("POSTS.ID", "Other", SettingPlace.FileHeader),
+                new ColumnType("posts.id", "PostId", SettingPlace.FileHeader),
+            ]);
+
     private static string[] Columns(SqlBlock block) =>
-        [.. block.ColumnMarkers.Select(static column => column.Name + ":" + (column.IsNullable ? "null" : "not null"))];
+        [.. block.ColumnMarkers.Select(static column => column.Name + ":" + Nullability(column.IsNullable))];
+
+    private static string Nullability(bool? isNullable) =>
+        isNullable switch
+        {
+            true => "null",
+            false => "not null",
+            null => "",
+        };
 }

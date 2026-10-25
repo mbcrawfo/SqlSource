@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Settings;
+using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.TypeOverrides;
 using Xunit;
 
@@ -69,6 +70,7 @@ public sealed class SettingsLevelReaderTests
     [InlineData("ModelNamespace")]
     [InlineData("Parameters")]
     [InlineData("TypeOverrides")]
+    [InlineData("ColumnTypes")]
     [InlineData("NestedClass")]
     public void Read_TextThatIsWhiteSpace_IsNotSetAndNotRecorded(string setting)
     {
@@ -114,14 +116,14 @@ public sealed class SettingsLevelReaderTests
     public void Read_TypeOverrideThatIsNotValid_IsRecordedAndTheOthersApply()
     {
         var source = new FakeSource(
-            new Dictionary<SettingId, string> { [SettingId.TypeOverrides] = "int4=long timestampz=int int8=Guid" }
+            new Dictionary<SettingId, string> { [SettingId.TypeOverrides] = "int4=long timestampz=int int8=int?" }
         );
 
         SettingsLevelReader
             .Read(ref source)
             .TypeOverrides.ShouldNotBeNull()
             .ShouldBe([new TypeOverride("int4", "long", SettingPlace.Property)]);
-        source.Invalids.ShouldBe([(SettingId.TypeOverrides, "timestampz=int"), (SettingId.TypeOverrides, "int8=Guid")]);
+        source.Invalids.ShouldBe([(SettingId.TypeOverrides, "timestampz=int"), (SettingId.TypeOverrides, "int8=int?")]);
     }
 
     // An MSBuild value serves both engines: each entry is in the list of each engine that reads its key.
@@ -162,6 +164,48 @@ public sealed class SettingsLevelReaderTests
 
         SettingsLevelReader.Read(ref source).ShouldBeSameAs(SettingsLevel.None);
         source.Invalids.ShouldBe([(SettingId.TypeOverrides, "timestampz=int")]);
+    }
+
+    [Fact]
+    public void Read_ColumnTypes_AreReadSortedAtThePlaceOfTheSource()
+    {
+        var source = new FakeSource(
+            new Dictionary<SettingId, string> { [SettingId.ColumnTypes] = " users.id=UserId\n posts.id=default " },
+            SettingPlace.Metadata
+        );
+
+        SettingsLevelReader
+            .Read(ref source)
+            .ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([
+                new ColumnType("posts.id", null, SettingPlace.Metadata),
+                new ColumnType("users.id", "UserId", SettingPlace.Metadata),
+            ]);
+        source.Invalids.ShouldBeEmpty();
+    }
+
+    // Each entry that is not valid is SQLSRC014's value, as written, and the others apply.
+    [Fact]
+    public void Read_ColumnTypeThatIsNotValid_IsRecordedAndTheOthersApply()
+    {
+        var source = new FakeSource(
+            new Dictionary<SettingId, string> { [SettingId.ColumnTypes] = "users.id=UserId id=UserId posts.id=int?" }
+        );
+
+        SettingsLevelReader
+            .Read(ref source)
+            .ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([new ColumnType("users.id", "UserId", SettingPlace.Property)]);
+        source.Invalids.ShouldBe([(SettingId.ColumnTypes, "id=UserId"), (SettingId.ColumnTypes, "posts.id=int?")]);
+    }
+
+    [Fact]
+    public void Read_ColumnTypesThatAreNoneValid_AreNotSet()
+    {
+        var source = new FakeSource(new Dictionary<SettingId, string> { [SettingId.ColumnTypes] = "id=UserId" });
+
+        SettingsLevelReader.Read(ref source).ShouldBeSameAs(SettingsLevel.None);
+        source.Invalids.ShouldBe([(SettingId.ColumnTypes, "id=UserId")]);
     }
 
     [Fact]

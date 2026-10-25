@@ -4,6 +4,8 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Settings.ClrTypes;
+using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.TypeOverrides;
 
 namespace SqlSource.Parsing.Markers;
@@ -26,6 +28,12 @@ internal sealed class SqlMarkerScope(
     private const string InsideAQuery = "inside a query";
 
     private const string BeforeTheFirstQuery = "before the file's first query";
+
+    // The word that takes a key out of the map of the levels below, ignoring case, as the type override reads it.
+    private const string Default = "default";
+
+    // The help of a query's -- column: whose name is a column's source.
+    private const string SourceInTheHeader = ".  A column's source is mapped in the file header";
 
     /// <summary>The names of a scope that has none.  Shared by every parse, so it cannot be written to.</summary>
     public static readonly ISet<string> NoNames = ImmutableHashSet<string>.Empty;
@@ -62,6 +70,9 @@ internal sealed class SqlMarkerScope(
     // once.
     private List<TypeOverride>? _typeOverrides;
 
+    // The column types of the file's header: sorted by key as ColumnTypeMap keeps a map, each key once.
+    private List<ColumnType>? _columnTypes;
+
     /// <summary>The scope's generator parameters.</summary>
     public SqlGeneratorParameterScope Generator { get; } = new();
 
@@ -95,7 +106,11 @@ internal sealed class SqlMarkerScope(
     public IReadOnlyList<SqlParameterDeclaration> Declarations =>
         _declarations ?? (IReadOnlyList<SqlParameterDeclaration>)[];
 
-    /// <summary>What the scope's <c>-- column:</c> markers say, in marker order, each column once.</summary>
+    /// <summary>
+    /// What the scope's <c>-- column:</c> markers say of its query's result, in marker order.  A column has a second
+    /// marker only when it says what the first does not: the type where the first sets the nullability, or the
+    /// nullability where the first sets the type.
+    /// </summary>
     public IReadOnlyList<SqlColumnDeclaration> Columns => _columns ?? (IReadOnlyList<SqlColumnDeclaration>)[];
 
     /// <summary>
@@ -223,7 +238,8 @@ internal sealed class SqlMarkerScope(
                 or SqlMarkerKind.InputModelType
                 or SqlMarkerKind.OutputModelType
                 or SqlMarkerKind.CollectionType
-                or SqlMarkerKind.TypeOverride;
+                or SqlMarkerKind.TypeOverride
+                or SqlMarkerKind.Column;
 
     private SettingsLevel BuildLevel()
     {
@@ -238,6 +254,7 @@ internal sealed class SqlMarkerScope(
             && _outputModelType is null
             && _collectionType is null
             && _typeOverrides is null
+            && _columnTypes is null
         )
         {
             return SettingsLevel.None;
@@ -259,6 +276,7 @@ internal sealed class SqlMarkerScope(
             CollectionType = _collectionType,
             TypeOverrides = isSqlServer ? null : typeOverrides,
             SqlServerTypeOverrides = isSqlServer ? typeOverrides : null,
+            ColumnTypes = _columnTypes is null ? null : new EquatableArray<ColumnType>(_columnTypes.ToImmutableArray()),
         };
     }
 
@@ -321,13 +339,10 @@ internal sealed class SqlMarkerScope(
             return;
         }
 
-        _typeOverrides ??= [];
-        var at = TypeOverrideMap.IndexOf(_typeOverrides, entry!.Key);
-        if (at < 0)
-        {
-            _typeOverrides.Insert(~at, entry);
-        }
-        else if (!string.Equals(_typeOverrides[at].Type, entry.Type, StringComparison.Ordinal))
+        if (
+            TypeOverrideMap.AddOrFind(_typeOverrides ??= [], entry!) is { } existing
+            && !string.Equals(existing.Type, entry!.Type, StringComparison.Ordinal)
+        )
         {
             AddConflict(marker);
         }
@@ -417,7 +432,9 @@ internal sealed class SqlMarkerScope(
         _ = _ignoredTokens.Add(name);
     }
 
-    // "@name [type] [null | not null]".  The type is what stands between the name and those words, as written.
+    // "@name [type] [null | not null] [-> CSharpType]", the name ended by white space or by the arrow.  The type is
+    // what stands between the name and those words, as written.  The C# type is a ClrTypeName, and never default,
+    // since no level below a query maps a parameter.
     private void ReadParam(SqlMarker marker)
     {
         var start = marker.ValueSpan.Start;
@@ -432,7 +449,11 @@ internal sealed class SqlMarkerScope(
             start == end
             || text[start] != rules.ParameterPrefix
             || nameEnd == start + 1
-            || (nameEnd < end && !char.IsWhiteSpace(text[nameEnd]))
+            || (
+                nameEnd < end
+                && !char.IsWhiteSpace(text[nameEnd])
+                && !text.AsSpan(nameEnd, end - nameEnd).StartsWith("->".AsSpan(), StringComparison.Ordinal)
+            )
         )
         {
             AddInvalid(marker);
@@ -440,14 +461,37 @@ internal sealed class SqlMarkerScope(
         }
 
         var name = text.Substring(start + 1, nameEnd - start - 1);
-        var rest = text.AsSpan(nameEnd, end - nameEnd).Trim();
+        var rest = text.AsSpan(nameEnd, end - nameEnd);
+        string? clrType = null;
+        if (TrySplitArrow(rest, out var before, out var after))
+        {
+            if (
+                after.Equals(Default.AsSpan(), StringComparison.OrdinalIgnoreCase)
+                || !ClrTypeName.TryParse(after, out var parsed)
+            )
+            {
+                AddInvalid(marker);
+                return;
+            }
+
+            clrType = parsed!.Text;
+            rest = before;
+        }
+
+        rest = rest.Trim();
         bool? nullable = null;
         if (TryTakeLastWord(ref rest, "null"))
         {
             nullable = !TryTakeLastWord(ref rest, "not");
         }
 
-        var declaration = new SqlParameterDeclaration(name, rest.IsEmpty ? null : rest.ToString(), nullable, marker);
+        var declaration = new SqlParameterDeclaration(
+            name,
+            rest.IsEmpty ? null : rest.ToString(),
+            nullable,
+            clrType,
+            marker
+        );
         _declarations ??= [];
         foreach (var existing in _declarations)
         {
@@ -459,6 +503,7 @@ internal sealed class SqlMarkerScope(
             if (
                 !string.Equals(existing.Type, declaration.Type, StringComparison.Ordinal)
                 || existing.Nullable != nullable
+                || !string.Equals(existing.ClrType, clrType, StringComparison.Ordinal)
             )
             {
                 AddConflict(marker);
@@ -470,42 +515,141 @@ internal sealed class SqlMarkerScope(
         _declarations.Add(declaration);
     }
 
-    // "name null" or "name not null".  The name is one word, or a double-quoted name, in which "" is one quote, for a
-    // name with white space or one that is a word of nullability.  The same column twice, ignoring case, with the same
-    // nullability is fine; with another it is a conflict, the first standing.
+    // In a file's header, a column's source and its C# type, "table.column -> Type" or "-> default", which the file's
+    // column types hold; in a file of one query, a name of two or three parts is the header's.  In a query, a result's
+    // column, by its name as the database returns it, then "null" or "not null", "-> Type" or "-> default", or both in
+    // that order.  The name is one word, or a double-quoted name, in which "" is one quote, for a name with white
+    // space, an arrow or a dot, or one that is a word of nullability.
     private void ReadColumn(SqlMarker marker)
     {
-        var rest = text.AsSpan(marker.ValueSpan.Start, marker.ValueSpan.Length);
-        if (!TryTakeLastWord(ref rest, "null"))
+        var value = Value(marker);
+        var hasArrow = TrySplitArrow(value, out var before, out var after);
+        var rest = (hasArrow ? before : value).Trim();
+        bool? nullable = null;
+        if (TryTakeLastWord(ref rest, "null"))
+        {
+            nullable = !TryTakeLastWord(ref rest, "not");
+        }
+
+        var isSource = HasDotOutsideQuotes(rest);
+        if (scopeKind == SqlScopeKind.Preamble || (scopeKind == SqlScopeKind.WholeFile && isSource))
+        {
+            ReadColumnType(marker);
+            return;
+        }
+
+        if (isSource)
+        {
+            AddInvalid(marker, SourceInTheHeader);
+            return;
+        }
+
+        string? clrType = null;
+        var resetsType = false;
+        if (hasArrow)
+        {
+            if (after.Equals(Default.AsSpan(), StringComparison.OrdinalIgnoreCase))
+            {
+                resetsType = true;
+            }
+            else if (ClrTypeName.TryParse(after, out var parsed))
+            {
+                clrType = parsed!.Text;
+            }
+            else
+            {
+                AddInvalid(marker);
+                return;
+            }
+        }
+
+        if ((nullable is null && !hasArrow) || ReadColumnName(rest) is not { } name)
         {
             AddInvalid(marker);
             return;
         }
 
-        var nullable = !TryTakeLastWord(ref rest, "not");
-        if (ReadColumnName(rest) is not { } name)
-        {
-            AddInvalid(marker);
-            return;
-        }
+        AddColumn(new SqlColumnDeclaration(name, nullable, clrType, resetsType, marker));
+    }
 
+    // Two markers of one column, ignoring case, conflict when both set the nullability and differ, or both set a type,
+    // -> default among them, and differ; the first stands.  A marker that sets nothing an earlier one does not is
+    // dropped, so that a column's markers say each thing once.
+    private void AddColumn(SqlColumnDeclaration column)
+    {
         _columns ??= [];
+        var addsNullability = column.IsNullable is not null;
+        var addsType = column.ClrType is not null || column.ResetsType;
         foreach (var existing in _columns)
         {
-            if (!string.Equals(existing.Name, name, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(existing.Name, column.Name, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            if (existing.IsNullable != nullable)
+            var setsType = existing.ClrType is not null || existing.ResetsType;
+            if (
+                (existing.IsNullable is not null && addsNullability && existing.IsNullable != column.IsNullable)
+                || (
+                    setsType
+                    && addsType
+                    && (
+                        existing.ResetsType != column.ResetsType
+                        || !string.Equals(existing.ClrType, column.ClrType, StringComparison.Ordinal)
+                    )
+                )
+            )
             {
-                AddConflict(marker);
+                AddConflict(column.Marker);
+                return;
             }
 
+            addsNullability &= existing.IsNullable is null;
+            addsType &= !setsType;
+        }
+
+        if (addsNullability || addsType)
+        {
+            _columns.Add(column);
+        }
+    }
+
+    // A header's entry.  The entries of a scope add up, one for each key; the same type twice is fine, and another
+    // type for a key is a conflict, the first standing.  The types are compared as their text.
+    private void ReadColumnType(SqlMarker marker)
+    {
+        if (!ColumnTypeGrammar.TryReadHeaderEntry(Value(marker), out var entry))
+        {
+            AddInvalid(marker);
             return;
         }
 
-        _columns.Add(new SqlColumnDeclaration(name, nullable, marker));
+        if (
+            ColumnTypeMap.AddOrFind(_columnTypes ??= [], entry!) is { } existing
+            && !string.Equals(existing.Type, entry!.Type, StringComparison.Ordinal)
+        )
+        {
+            AddConflict(marker);
+        }
+    }
+
+    // Whether a name as written holds a "." outside double quotes, as a column's source does.
+    private static bool HasDotOutsideQuotes(ReadOnlySpan<char> written)
+    {
+        var quoted = false;
+        foreach (var character in written)
+        {
+            if (character == '"')
+            {
+                quoted = !quoted;
+            }
+            else if (character == '.' && !quoted)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // The name a -- column: marker writes, without its quotes, or null when it is empty, has white space or a quote
@@ -556,6 +700,41 @@ internal sealed class SqlMarkerScope(
         }
 
         return quotes == 0 ? inner.ToString() : inner.ToString().Replace("\"\"", "\"");
+    }
+
+    // Splits a marker's value at its first "->" that starts it or stands after white space, outside double quotes, so
+    // that a quoted name may hold one: before is the text before it, as written, and after the text after it,
+    // trimmed.  False, with both empty, for a value without one.
+    private static bool TrySplitArrow(
+        ReadOnlySpan<char> value,
+        out ReadOnlySpan<char> before,
+        out ReadOnlySpan<char> after
+    )
+    {
+        var quoted = false;
+        for (var index = 0; index < value.Length - 1; index++)
+        {
+            var character = value[index];
+            if (character == '"')
+            {
+                quoted = !quoted;
+            }
+            else if (
+                !quoted
+                && character == '-'
+                && value[index + 1] == '>'
+                && (index == 0 || char.IsWhiteSpace(value[index - 1]))
+            )
+            {
+                before = value.Slice(0, index);
+                after = value.Slice(index + 2).Trim();
+                return true;
+            }
+        }
+
+        before = default;
+        after = default;
+        return false;
     }
 
     // Takes word off the end of rest when it stands there as a word: alone, or after white space.

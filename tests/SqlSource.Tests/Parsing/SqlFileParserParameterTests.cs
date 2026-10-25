@@ -221,6 +221,95 @@ public sealed class SqlFileParserParameterTests
     }
 
     [Theory]
+    [InlineData("-- param: @a -> UserId", null, null, "UserId")]
+    [InlineData("-- param: @a null -> UserId", null, true, "UserId")]
+    [InlineData("-- param: @a int4 not null -> App.UserId", "int4", false, "global::App.UserId")]
+    [InlineData(
+        "-- param: @a double precision -> System.Collections.Generic.List<UserId>",
+        "double precision",
+        null,
+        "global::System.Collections.Generic.List<UserId>"
+    )]
+    // As people type it.
+    [InlineData("-- param: @a\t->\tUserId  ", null, null, "UserId")]
+    [InlineData("-- param: @a int4 ->UserId", "int4", null, "UserId")]
+    [InlineData("-- param: @a->UserId", null, null, "UserId")]
+    [InlineData("-- param: @a NOT NULL -> global::UserId", null, false, "global::UserId")]
+    // A -> inside quotes, or that does not stand after white space, is part of the type.
+    [InlineData("-- param: @a \"odd -> name\" -> UserId", "\"odd -> name\"", null, "UserId")]
+    [InlineData("-- param: @a my->type", "my->type", null, null)]
+    public void Parse_ParamMarkerWithACSharpType_GivesItsParameterThatType(
+        string marker,
+        string? type,
+        bool? nullable,
+        string? clrType
+    )
+    {
+        var parameter = Blocks("-- name: Q\n" + marker + "\nSELECT @a\n")
+            .ShouldHaveSingleItem()
+            .Parameters.ShouldHaveSingleItem();
+
+        parameter.ShouldBe(new SqlQueryParameter("a", type, nullable, true, clrType));
+    }
+
+    // A parameter that only the marker declares keeps its C# type too.
+    [Fact]
+    public void Parse_DeclaredOnlyParameterWithACSharpType_KeepsIt() =>
+        Blocks("-- name: Q\n-- param: @page int4 -> PageNumber\nSELECT 1 {{tail:LIMIT @page}}\n")
+            .ShouldHaveSingleItem()
+            .Parameters.ShouldBe([new SqlQueryParameter("page", "int4", null, true, "PageNumber")]);
+
+    [Theory]
+    [InlineData("-- param: @a -> default")]
+    [InlineData("-- param: @a -> Default")]
+    [InlineData("-- param: @a -> int?")]
+    [InlineData("-- param: @a ->")]
+    [InlineData("-- param: @a int4 -> UserId more")]
+    [InlineData("-- param: @a -> -> UserId")]
+    public void Parse_ParamMarker_BadCSharpType_IsSQLSRC111(string marker)
+    {
+        var text = "-- name: Q\n" + marker + "\nSELECT @a\n";
+        var value = marker["-- param: ".Length..];
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    TextSpans.Of(text, value),
+                    "param: " + value,
+                    ""
+                ),
+            ]);
+    }
+
+    [Theory]
+    [InlineData("@a -> OtherId")]
+    [InlineData("@a -> App.UserId")]
+    [InlineData("@a")]
+    public void Parse_TwoParamMarkers_DifferentCSharpTypes_IsSQLSRC112(string second)
+    {
+        var text = "-- name: Q\n-- param: @a -> UserId\n-- param: " + second + "\nSELECT @a\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ConflictingSettings,
+                    new TextSpan(
+                        text.IndexOf("-- param: " + second + "\n", StringComparison.Ordinal) + 10,
+                        second.Length
+                    ),
+                    "param: " + second
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TwoParamMarkers_TheSameCSharpType_IsNotAConflict() =>
+        Blocks("-- name: Q\n-- param: @a -> UserId\n-- param: @A  ->  UserId\nSELECT @a\n")
+            .ShouldHaveSingleItem()
+            .Parameters.ShouldBe([new SqlQueryParameter("a", null, null, true, "UserId")]);
+
+    [Theory]
     [InlineData("a int")]
     [InlineData("@")]
     [InlineData("@ a")]
@@ -246,6 +335,7 @@ public sealed class SqlFileParserParameterTests
     [InlineData("@page")]
     [InlineData("@page null")]
     [InlineData("@page not null")]
+    [InlineData("@page -> PageNumber")]
     public void Parse_DeclaredOnlyParameterWithoutAType_IsAnError(string value)
     {
         var text = "-- name: Q\n-- param: " + value + "\nSELECT 1 {{tail:LIMIT @page}}\n";

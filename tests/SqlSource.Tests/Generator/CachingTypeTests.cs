@@ -6,11 +6,16 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
+using SqlSource.Generation.Sidecars;
 using SqlSource.Generation.Types;
+using SqlSource.Parsing;
+using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 using static SqlSource.Testing.Generator.CachingScene;
 using static SqlSource.Testing.Generator.StepReasons;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -238,6 +243,158 @@ public sealed class CachingTypeTests
             .Text.ShouldBe("global::MyApp.Missing");
     }
 
+    // The C# type of a -- param: marker is no part of the hash, so an edit of it checks the sidecar again to an equal
+    // value, and types Users again with the new type.  Orders' check and types are taken from the previous run.
+    [Fact]
+    public void Run_ParamMarkersCSharpTypeEdited_ChecksTheSameEntryAndTypesTheFileAgain()
+    {
+        var compilation = GeneratorHarness
+            .CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10])
+            .AddSyntaxTrees(
+                CSharpSyntaxTree.ParseText(
+                    "namespace MyApp;\n\npublic readonly record struct UserId(int Value);\n\n"
+                        + "public readonly record struct OtherId(int Value);\n",
+                    GeneratorHarness.ParseOptions,
+                    "/app/MyApp/Ids.cs",
+                    cancellationToken: TestContext.Current.CancellationToken
+                )
+            );
+        var users = UsersWithMarker("UserId");
+        var parameter = TestSidecars.Parameter(0, "id", TestSidecars.Postgres("int4", internalName: "int4"), false);
+        var driver = GeneratorHarness
+            .CreateDriver(
+                [
+                    users,
+                    _scene.Orders,
+                    TypedSidecar(users, "GetUser", "int4", [parameter]),
+                    TypedSidecar(_scene.Orders, "GetOrder", "int4"),
+                ],
+                OptionsWithTypeOverrides(null)
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+
+        var result = Run(driver.ReplaceAdditionalText(users, UsersWithMarker("OtherId")), compilation);
+
+        Reasons<SidecarCheckResult>(result, TrackingNames.SidecarCheck, check => check.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Unchanged,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        result.Diagnostics.ShouldBeEmpty();
+        TypesOf(result, "app/Users/Users.sql")
+            .Queries.ShouldHaveSingleItem()
+            .Parameters.ShouldHaveSingleItem()
+            .Text.ShouldBe("global::MyApp.OtherId");
+    }
+
+    // The column types of Users' metadata change the type of its column read from users.id.  The edit swaps the two
+    // types it names, so the mapped types are equal, and Orders, without metadata, gathers an equal input and is not
+    // typed again.
+    [Fact]
+    public void Run_ColumnTypeEdited_RetypesOnlyThatFile()
+    {
+        var compilation = WithIds(GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]));
+        var driver = GeneratorHarness
+            .CreateDriver(
+                [
+                    _scene.Users,
+                    _scene.Orders,
+                    OriginSidecar(_scene.Users, "GetUser"),
+                    OriginSidecar(_scene.Orders, "GetOrder"),
+                ],
+                OptionsWithColumnTypes("users.id=MyApp.UserId posts.id=MyApp.OtherId")
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(
+                OptionsWithColumnTypes("users.id=MyApp.OtherId posts.id=MyApp.UserId")
+            ),
+            compilation
+        );
+
+        Reasons<FileTypesInput>(result, TrackingNames.FileTypesInput, input => input.Check.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        result.Diagnostics.ShouldBeEmpty();
+        ColumnTextOf(result, "app/Users/Users.sql").ShouldBe("global::MyApp.OtherId");
+        ColumnTextOf(result, "app/Orders/Orders.sql").ShouldBe("long");
+    }
+
+    // The C# type of a -- column: marker is no part of the hash, so an edit of it checks the sidecar again to an equal
+    // value, and types Users again with the new type.  Orders' check is taken from the previous run.
+    [Fact]
+    public void Run_ArrowEdited_SidecarCheckUnchanged()
+    {
+        var compilation = WithIds(GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]));
+        var users = UsersWithColumnMarker("UserId");
+        var driver = GeneratorHarness
+            .CreateDriver(
+                [
+                    users,
+                    _scene.Orders,
+                    TypedSidecar(users, "GetUser", "int4"),
+                    TypedSidecar(_scene.Orders, "GetOrder", "int4"),
+                ],
+                OptionsWithTypeOverrides(null)
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+
+        var result = Run(driver.ReplaceAdditionalText(users, UsersWithColumnMarker("OtherId")), compilation);
+
+        Reasons<SidecarCheckResult>(result, TrackingNames.SidecarCheck, check => check.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Unchanged,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        result.Diagnostics.ShouldBeEmpty();
+        ColumnTextOf(result, "app/Users/Users.sql").ShouldBe("global::MyApp.OtherId");
+    }
+
     // Without Npgsql, date has no C# type, SQLSRC249.  The reference changes the probe, and every file is typed
     // again, with the type of Npgsql 10.
     [Fact]
@@ -268,4 +425,66 @@ public sealed class CachingTypeTests
             .ShouldHaveSingleItem()
             .Text.ShouldBe("global::System.DateOnly");
     }
+
+    // Users, whose one parameter a -- param: marker gives the C# type of MyApp.
+    private InMemoryAdditionalText UsersWithMarker(string type) =>
+        new(_scene.Users.Path, "-- name: GetUser\n-- param: @id -> MyApp." + type + "\nSELECT 1 WHERE @id = 1;\n");
+
+    // Users, whose column value a -- column: marker gives the C# type of MyApp.
+    private InMemoryAdditionalText UsersWithColumnMarker(string type) =>
+        new(_scene.Users.Path, "-- name: GetUser\n-- column: value -> MyApp." + type + "\nSELECT 1 AS value;\n");
+
+    // The compilation with MyApp.UserId and MyApp.OtherId.
+    private static Compilation WithIds(Compilation compilation) =>
+        compilation.AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText(
+                "namespace MyApp;\n\npublic readonly record struct UserId(long Value);\n\n"
+                    + "public readonly record struct OtherId(long Value);\n",
+                GeneratorHarness.ParseOptions,
+                "/app/MyApp/Ids.cs",
+                cancellationToken: TestContext.Current.CancellationToken
+            )
+        );
+
+    // The options at Models under postgres, with these column types in the metadata of Users.
+    private TestOptionsProvider OptionsWithColumnTypes(string columnTypes) =>
+        new(
+            OutputKind.Models,
+            null,
+            "postgres",
+            fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                [_scene.Users.Path] = new Dictionary<string, string> { ["SqlSourceColumnTypes"] = columnTypes },
+            }
+        );
+
+    // A current sidecar whose entry has one column, value, an int8 read from public.users.id.
+    private static InMemoryAdditionalText OriginSidecar(InMemoryAdditionalText sqlFile, string queryName)
+    {
+        var file = ToSqlFile(sqlFile);
+        var sidecar = Sidecars.Of(
+            file,
+            TestSidecars.Entry(
+                queryName,
+                Sidecars.HashOf(file, queryName, SqlDialect.PostgreSql),
+                "postgres",
+                "main",
+                "18.0",
+                columns:
+                [
+                    TestSidecars.Column(
+                        0,
+                        "value",
+                        TestSidecars.Postgres("int8", internalName: "int8"),
+                        origin: new SidecarOrigin("public", "users", "id")
+                    ),
+                ]
+            )
+        );
+        return new InMemoryAdditionalText(sidecar.Path, sidecar.Text);
+    }
+
+    // The C# type of the one column of the one query of the file.
+    private static string ColumnTextOf(GeneratorDriverRunResult result, string path) =>
+        TypesOf(result, path).Queries.ShouldHaveSingleItem().Columns.ShouldNotBeNull().ShouldHaveSingleItem().Text;
 }

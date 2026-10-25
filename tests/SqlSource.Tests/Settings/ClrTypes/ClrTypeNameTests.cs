@@ -35,7 +35,58 @@ public sealed class ClrTypeNameTests
     {
         ClrTypeName.TryParse("string".AsSpan(), out var name).ShouldBeTrue();
 
-        name.ShouldBe(new ClrTypeName("string", EquatableArray<ClrNamePart>.Empty, EquatableArray<ClrRank>.Empty));
+        name.ShouldBe(
+            new ClrTypeName("string", EquatableArray<ClrNamePart>.Empty, EquatableArray<ClrRank>.Empty, IsShort: false)
+        );
+    }
+
+    // dynamic is no property's type, so no short name may make it one; global::dynamic is a type of that name in the
+    // global namespace, which the compilation then looks for.
+    [Fact]
+    public void TryParse_Dynamic_IsNotValid() => ClrTypeName.TryParse("dynamic".AsSpan(), out _).ShouldBeFalse();
+
+    [Fact]
+    public void TryParse_GlobalDynamic_IsAName()
+    {
+        ClrTypeName.TryParse("global::dynamic".AsSpan(), out var name).ShouldBeTrue();
+
+        name!.Text.ShouldBe("global::dynamic");
+        name.IsShort.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("UserId", "UserId")]
+    [InlineData("List<UserId>", "List<UserId>")]
+    [InlineData("System.Collections.Generic.List<UserId>", "global::System.Collections.Generic.List<UserId>")]
+    [InlineData("UserId[]", "UserId[]")]
+    [InlineData("global::UserId", "global::UserId")]
+    public void TryParse_ShortName_IsValid(string written, string text)
+    {
+        ClrTypeName.TryParse(written.AsSpan(), out var name).ShouldBeTrue();
+
+        name!.Text.ShouldBe(text);
+    }
+
+    [Fact]
+    public void TryParse_ShortAndGlobal_AreTwoNames()
+    {
+        ClrTypeName.TryParse("UserId".AsSpan(), out var bare).ShouldBeTrue();
+        ClrTypeName.TryParse("global::UserId".AsSpan(), out var global).ShouldBeTrue();
+
+        bare!.IsShort.ShouldBeTrue();
+        global!.IsShort.ShouldBeFalse();
+        bare.Text.ShouldNotBe(global.Text);
+        bare.ShouldNotBe(global);
+    }
+
+    [Fact]
+    public void TryParse_KeywordAndSeveralParts_AreNotShort()
+    {
+        ClrTypeName.TryParse("int".AsSpan(), out var keyword).ShouldBeTrue();
+        ClrTypeName.TryParse("App.UserId".AsSpan(), out var several).ShouldBeTrue();
+
+        keyword!.IsShort.ShouldBeFalse();
+        several!.IsShort.ShouldBeFalse();
     }
 
     [Fact]

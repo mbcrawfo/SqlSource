@@ -26,6 +26,14 @@ namespace SqlSource.Generation.Types;
 /// same way, and of two failures in a name, the first in the order of <see cref="MappedTypeStatus" /> is the name's.
 /// </para>
 /// <para>
+/// A short name, of one part without <c>global::</c>, is looked up by <see cref="ShortNameIndex" />, for the
+/// top-level types of its name and arity in any namespace that the project can see.  One is the type, its metadata
+/// name then looked up as a full name's, so that the project's own wins over a reference's of the same full name;
+/// several are ambiguous, and their full names are the record's <see cref="MappedType.Candidates" />; none is not
+/// found.  The record's <see cref="MappedType.Text" /> writes each short name found as its type's full name, from
+/// <c>global::</c>, so that generated code needs no <c>using</c> and a short name and its full name are one text.
+/// </para>
+/// <para>
 /// A name is accessible when each of its types is.  A part with arguments is constructed with them, and each argument
 /// checked against its type parameter as the compiler checks it where a model writes the type: the <c>class</c>,
 /// <c>struct</c>, <c>unmanaged</c>, <c>notnull</c> and <c>new()</c> constraints, and each constraint type, with the
@@ -84,14 +92,17 @@ internal static class MappedTypeResolver
             var found = ClrTypeName.TryParse(name.AsSpan(), out var parsed)
                 ? ResolveType(compilation, parsed!, Use.Whole, builder, warningIds)
                 : Resolution.Failed(MappedTypeStatus.NotFound);
+            var isFound = found.Status == MappedTypeStatus.Found;
             types.Add(
                 new MappedType(
                     name,
                     found.Status,
                     found.IsValueType,
                     found.IsPublic,
-                    found.Status == MappedTypeStatus.Found
-                        ? MappedTypeWarnings.Distinct(warningIds)
+                    isFound ? MappedTypeWarnings.Distinct(warningIds) : EquatableArray<string>.Empty,
+                    isFound && found.Written is { } written ? written.Text : name,
+                    found.Status == MappedTypeStatus.Ambiguous && !found.Candidates.IsDefaultOrEmpty
+                        ? new EquatableArray<string>(found.Candidates)
                         : EquatableArray<string>.Empty
                 )
             );
@@ -150,7 +161,7 @@ internal static class MappedTypeResolver
             );
 
     // The resolution of the name, after the ids of the warnings a use of each of its types gives are added to
-    // warningIds.
+    // warningIds.  Its Written is the name with each short name in it written in full, or null when it has none.
     private static Resolution ResolveType(
         Compilation compilation,
         ClrTypeName name,
@@ -171,17 +182,46 @@ internal static class MappedTypeResolver
             );
         }
 
-        if (FindNamed(compilation, name.Parts, builder, out var status) is not { } type)
+        INamedTypeSymbol? type;
+        MappedTypeStatus status;
+        if (!name.IsShort)
+        {
+            type = FindNamed(compilation, name.Parts, builder, out status);
+        }
+        else
+        {
+            var part = name.Parts[0];
+            var candidates = ShortNameIndex.MetadataNamesOf(compilation, part.Identifier, part.Arguments.Count);
+            switch (candidates.Length)
+            {
+                case 0:
+                    return Resolution.Failed(MappedTypeStatus.NotFound);
+                case 1:
+                    type = Find(compilation, compilation.GetTypesByMetadataName(candidates[0]), out status);
+                    break;
+                default:
+                    return Resolution.Failed(MappedTypeStatus.Ambiguous, FullNames(candidates, part.Identifier));
+            }
+        }
+
+        // A failure of the name's own lookup, an ambiguity across references among them, returns here before its
+        // arguments are read, so the candidates gathered below are always those of an argument of a type found.
+        if (type is null)
         {
             return Resolution.Failed(status);
         }
 
         var isPublic = true;
         List<ITypeSymbol>? arguments = null;
-        foreach (var part in name.Parts)
+        ImmutableArray<string> ambiguous = default;
+        ImmutableArray<ClrNamePart>.Builder? writtenParts = null;
+        for (var index = 0; index < name.Parts.Count; index++)
         {
-            foreach (var argument in part.Arguments)
+            var part = name.Parts[index];
+            ImmutableArray<ClrTypeArgument>.Builder? writtenArguments = null;
+            for (var at = 0; at < part.Arguments.Count; at++)
             {
+                var argument = part.Arguments[at];
                 var resolved = ResolveType(
                     compilation,
                     argument.Type,
@@ -191,11 +231,46 @@ internal static class MappedTypeResolver
                 );
                 status = First(status, resolved.Status);
                 isPublic &= resolved.IsPublic;
+                if (ambiguous.IsDefault && !resolved.Candidates.IsDefault)
+                {
+                    ambiguous = resolved.Candidates;
+                }
+
                 if (resolved.Symbol is { } argumentType)
                 {
                     (arguments ??= []).Add(argumentType);
                 }
+
+                // The arguments before the first written in full are copied as they are.
+                if (resolved.Written is not null && writtenArguments is null)
+                {
+                    writtenArguments = ImmutableArray.CreateBuilder<ClrTypeArgument>(part.Arguments.Count);
+                    for (var before = 0; before < at; before++)
+                    {
+                        writtenArguments.Add(part.Arguments[before]);
+                    }
+                }
+
+                writtenArguments?.Add(resolved.Written is { } inFull ? argument with { Type = inFull } : argument);
             }
+
+            if (writtenArguments is not null && writtenParts is null)
+            {
+                writtenParts = ImmutableArray.CreateBuilder<ClrNamePart>(name.Parts.Count);
+                for (var before = 0; before < index; before++)
+                {
+                    writtenParts.Add(name.Parts[before]);
+                }
+            }
+
+            writtenParts?.Add(
+                writtenArguments is null
+                    ? part
+                    : part with
+                    {
+                        Arguments = new EquatableArray<ClrTypeArgument>(writtenArguments.MoveToImmutable()),
+                    }
+            );
         }
 
         // An argument that failed is the name's failure, which comes before a broken constraint, so the type is
@@ -236,16 +311,65 @@ internal static class MappedTypeResolver
 
         if (status != MappedTypeStatus.Found)
         {
-            return Resolution.Failed(status);
+            return Resolution.Failed(status, ambiguous);
         }
 
+        var full = name.IsShort ? InFull(type, name, writtenParts) : WrittenWith(name, writtenParts);
         if (use == Use.Whole)
         {
-            return new Resolution(status, name.Ranks.Count == 0 && type.IsValueType, isPublic, null, constructed);
+            return new Resolution(status, name.Ranks.Count == 0 && type.IsValueType, isPublic, null, constructed, full);
         }
 
         var symbol = AsWritten(compilation, constructed, name, use);
-        return new Resolution(status, name.Ranks.Count == 0 && type.IsValueType, isPublic, symbol, null);
+        return new Resolution(status, name.Ranks.Count == 0 && type.IsValueType, isPublic, symbol, null, full);
+    }
+
+    // The short name as the type's full name: its namespaces, then its one part, with its arguments as written in
+    // full.
+    private static ClrTypeName InFull(
+        INamedTypeSymbol type,
+        ClrTypeName name,
+        ImmutableArray<ClrNamePart>.Builder? writtenParts
+    )
+    {
+        var parts = ImmutableArray.CreateBuilder<ClrNamePart>();
+        for (
+            var space = type.ContainingNamespace;
+            space is { IsGlobalNamespace: false };
+            space = space.ContainingNamespace
+        )
+        {
+            parts.Add(new ClrNamePart(space.Name, EquatableArray<ClrTypeArgument>.Empty));
+        }
+
+        parts.Reverse();
+        parts.Add(writtenParts is null ? name.Parts[0] : writtenParts[0]);
+        return new ClrTypeName(null, new EquatableArray<ClrNamePart>(parts.ToImmutable()), name.Ranks, IsShort: false);
+    }
+
+    // The name with its parts as written in full, or null when no argument had a short name.
+    private static ClrTypeName? WrittenWith(ClrTypeName name, ImmutableArray<ClrNamePart>.Builder? writtenParts) =>
+        writtenParts is null
+            ? null
+            : name with
+            {
+                Parts = new EquatableArray<ClrNamePart>(writtenParts.MoveToImmutable()),
+            };
+
+    // The full names of a short name's types as a user writes them, from their metadata names, in ordinal order: the
+    // namespace and the name, without the arity, and global:: before a type of the global namespace.
+    private static ImmutableArray<string> FullNames(ImmutableArray<string> metadataNames, string identifier)
+    {
+        var names = new string[metadataNames.Length];
+        for (var index = 0; index < metadataNames.Length; index++)
+        {
+            var metadataName = metadataNames[index];
+            var dot = metadataName.LastIndexOf('.');
+            names[index] = dot < 0 ? "global::" + identifier : metadataName.Substring(0, dot + 1) + identifier;
+        }
+
+        Array.Sort(names, StringComparer.Ordinal);
+        return ImmutableArray.Create(names);
     }
 
     // The type of a keyword.
@@ -637,17 +761,31 @@ internal static class MappedTypeResolver
                 continue;
             }
 
-            if (candidates.Length == 1)
-            {
-                status = MappedTypeStatus.Found;
-                return candidates[0];
-            }
-
-            return Choose(compilation, candidates, out status);
+            return Find(compilation, candidates, out status);
         }
 
         status = MappedTypeStatus.NotFound;
         return null;
+    }
+
+    // Of the types of one metadata name, the one, or the one Choose picks of several.  None is not found.
+    private static INamedTypeSymbol? Find(
+        Compilation compilation,
+        ImmutableArray<INamedTypeSymbol> candidates,
+        out MappedTypeStatus status
+    )
+    {
+        switch (candidates.Length)
+        {
+            case 0:
+                status = MappedTypeStatus.NotFound;
+                return null;
+            case 1:
+                status = MappedTypeStatus.Found;
+                return candidates[0];
+            default:
+                return Choose(compilation, candidates, out status);
+        }
     }
 
     // Of several types of one metadata name, the project's own, or else the one the project can see.  Of none it can
@@ -726,15 +864,20 @@ internal static class MappedTypeResolver
 
     // Symbol is the type as a model writes it, for the name that has it as an argument, and null for the whole name or
     // a failure.  Named is the named type the whole name found, without its ranks, whose converters the resolver reads,
-    // and null for an argument, a keyword or a failure.
+    // and null for an argument, a keyword or a failure.  Written is the name with each short name in it written in
+    // full, and null when it has none or for a failure.  Candidates are the full names of the first short name in it
+    // that several types answer, and default when there is none.
     private readonly record struct Resolution(
         MappedTypeStatus Status,
         bool IsValueType,
         bool IsPublic,
         ITypeSymbol? Symbol,
-        INamedTypeSymbol? Named
+        INamedTypeSymbol? Named,
+        ClrTypeName? Written = null,
+        ImmutableArray<string> Candidates = default
     )
     {
-        public static Resolution Failed(MappedTypeStatus status) => new(status, false, false, null, null);
+        public static Resolution Failed(MappedTypeStatus status, ImmutableArray<string> candidates = default) =>
+            new(status, false, false, null, null, null, candidates);
     }
 }

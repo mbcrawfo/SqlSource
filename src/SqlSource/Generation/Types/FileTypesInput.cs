@@ -7,8 +7,8 @@ namespace SqlSource.Generation.Types;
 
 /// <summary>
 /// One claimed file with everything its types read.  It compares equal until one of them changes, so an edit to
-/// another file, to another sidecar or to a setting other than the type override types this one again only when its
-/// own value changed.
+/// another file, to another sidecar or to a setting other than the type override and the column types types this one
+/// again only when its own value changed.
 /// </summary>
 /// <param name="Check">What the checks of the file's sidecar gave, its usable entries among them.</param>
 /// <param name="File">
@@ -16,14 +16,19 @@ namespace SqlSource.Generation.Types;
 /// has nothing to type.
 /// </param>
 /// <param name="Metadata">
-/// The type override of the metadata of the file's item, as a level that says nothing else.
+/// The type override and the column types of the metadata of the file's item, as a level that says nothing else.
 /// </param>
-/// <param name="Property">The type override of the project's property, as a level that says nothing else.</param>
+/// <param name="Property">
+/// The type override and the column types of the project's properties, as a level that says nothing else.
+/// </param>
 /// <param name="NpgsqlProbe">The Npgsql the project references, which chooses the column of PostgreSQL's map.</param>
 /// <param name="SqlClientProbe">
 /// The Microsoft.Data.SqlClient the project references, which chooses the column of SQL Server's map.
 /// </param>
-/// <param name="MappedTypes">The C# types that the type override names at any level, resolved.</param>
+/// <param name="MappedTypes">
+/// The C# types that the type override and the column types name at any level, and that the <c>-- param:</c> and
+/// <c>-- column:</c> markers give, resolved.
+/// </param>
 internal sealed record FileTypesInput(
     SidecarCheckResult Check,
     ParsedSqlFile? File,
@@ -36,8 +41,8 @@ internal sealed record FileTypesInput(
 {
     /// <summary>
     /// Finds the parsed file and the metadata of <paramref name="check" />'s file.  Both lists are sorted by
-    /// <see cref="SqlPath.Comparer" />.  <paramref name="property" /> is the property's type override alone, as
-    /// <see cref="TypeOverridesOf" /> gives it.
+    /// <see cref="SqlPath.Comparer" />.  <paramref name="property" /> is the properties' type override and column types
+    /// alone, as <see cref="TypeSettingsOf" /> gives them.
     /// </summary>
     public static FileTypesInput Gather(
         SidecarCheckResult check,
@@ -70,7 +75,7 @@ internal sealed record FileTypesInput(
         return new FileTypesInput(
             check,
             files[fileIndex],
-            settingsIndex < 0 ? SettingsLevel.None : TypeOverridesOf(filesSettings[settingsIndex].Level),
+            settingsIndex < 0 ? SettingsLevel.None : TypeSettingsOf(filesSettings[settingsIndex].Level),
             property,
             npgsqlProbe,
             sqlClientProbe,
@@ -79,15 +84,17 @@ internal sealed record FileTypesInput(
     }
 
     /// <summary>
-    /// The type override of <paramref name="level" />, each engine's entries, as a level that says nothing else, so
-    /// that a change to another setting gives an equal level.  <see cref="SettingsLevel.None" /> when it has none.
+    /// The type override of <paramref name="level" />, each engine's entries, and its column types, as a level that
+    /// says nothing else, so that a change to another setting gives an equal level.  <see cref="SettingsLevel.None" />
+    /// when it has none of them.
     /// </summary>
-    public static SettingsLevel TypeOverridesOf(SettingsLevel level) =>
-        level.TypeOverrides is null && level.SqlServerTypeOverrides is null
+    public static SettingsLevel TypeSettingsOf(SettingsLevel level) =>
+        level.TypeOverrides is null && level.SqlServerTypeOverrides is null && level.ColumnTypes is null
             ? SettingsLevel.None
             : new SettingsLevel
             {
                 TypeOverrides = level.TypeOverrides,
                 SqlServerTypeOverrides = level.SqlServerTypeOverrides,
+                ColumnTypes = level.ColumnTypes,
             };
 }

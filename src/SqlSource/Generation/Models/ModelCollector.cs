@@ -345,7 +345,7 @@ internal static class ModelCollector
                 SqlDiagnostics.MappedTypeNotAccessible,
                 at,
                 property.Subject,
-                property.Type.Key,
+                property.Type.Mapped ?? property.Type.Key,
                 PostgresTypeMap.AsWritten(property.Type.Text),
                 property.Type.Place ?? "",
                 NotPublicBefore + fullName + NotPublicAfter,

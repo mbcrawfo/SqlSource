@@ -14,7 +14,7 @@ internal enum MappedTypeStatus
 
     /// <summary>
     /// Several types of the name and arity that the project can see are found across references, and none in the
-    /// project.
+    /// project; or a short name has several types, in the project or its references, of the name and arity.
     /// </summary>
     Ambiguous,
 

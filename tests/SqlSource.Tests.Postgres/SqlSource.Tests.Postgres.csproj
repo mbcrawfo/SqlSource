@@ -37,6 +37,8 @@
             SqlSourceTypeOverrides="timestamptz=System.DateTime"
             SqlSourceCollectionType="IList"
         />
+        <!-- The queries of the notes: accounts.id as the project's AccountId, by its short name. -->
+        <AdditionalFiles Update="EndToEnd/Queries/Notes.sql" SqlSourceColumnTypes="accounts.id=AccountId" />
         <!-- The realistic corpus: the database realistic, and the type map's own C# type for timestamptz. -->
         <AdditionalFiles
             Update="Realistic/Cases/**/*.sql"
