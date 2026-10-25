@@ -106,6 +106,64 @@ internal sealed class CachingScene
         return driver;
     }
 
+    // The source of UserQueries for the tests of the methods, with these arguments on its attribute when they are given
+    // and these members.  It is in the namespace App, as OrderQueries of MethodsCompilation is, so that a method of
+    // each can clash.  It reads no constant, since a query at CodeGen has none.
+    public static string UserQueriesSource(string? arguments = null, string members = "") =>
+        "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate"
+        + (arguments is null ? string.Empty : "(" + arguments + ")")
+        + "]\npublic partial class UserQueries\n{\n"
+        + members
+        + "}\n";
+
+    // The two types of the tests of the methods, both in the namespace App, with this source of UserQueries.
+    public static CSharpCompilation MethodsCompilation(string usersSource) =>
+        GeneratorHarness.CreateCompilation(
+            [
+                new(UsersSourcePath, usersSource),
+                new(
+                    "/app/Orders/OrderQueries.cs",
+                    "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate]\npublic partial class OrderQueries;\n"
+                ),
+            ],
+            references: [NpgsqlReferences.Npgsql10]
+        );
+
+    // Both types at CodeGen under postgres, with Users and Orders, each with a current sidecar whose entry has one
+    // column, of int4, so that each type has one method, in its extension class.  A sidecar given is used in place of
+    // the one of its file.
+    public GeneratorDriver FirstRunOfMethods(Compilation compilation, params InMemoryAdditionalText[] given)
+    {
+        var sidecars = new List<InMemoryAdditionalText>
+        {
+            TypedSidecar(Users, "GetUser", "int4"),
+            TypedSidecar(Orders, "GetOrder", "int4"),
+        };
+        foreach (var sidecar in given)
+        {
+            _ = sidecars.RemoveAll(other => other.Path == sidecar.Path);
+            sidecars.Add(sidecar);
+        }
+
+        var driver = GeneratorHarness
+            .CreateDriver([Users, Orders, .. sidecars], new TestOptionsProvider(OutputKind.CodeGen, null, "postgres"))
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        return driver;
+    }
+
+    // The compilation with this source of UserQueries in place of the one it has.
+    public static Compilation WithUserQueries(Compilation compilation, string source) =>
+        compilation.ReplaceSyntaxTree(
+            compilation.SyntaxTrees.Single(tree => tree.FilePath == UsersSourcePath),
+            CSharpSyntaxTree.ParseText(
+                source,
+                GeneratorHarness.ParseOptions,
+                UsersSourcePath,
+                cancellationToken: TestContext.Current.CancellationToken
+            )
+        );
+
     public GeneratorDriver FirstRun(OutputKind? output, Compilation compilation) =>
         FirstRun(compilation, Users, new TestOptionsProvider(output, null));
 
