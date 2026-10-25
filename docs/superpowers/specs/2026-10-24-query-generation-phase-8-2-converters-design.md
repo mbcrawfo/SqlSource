@@ -121,7 +121,7 @@ The binding of a converted parameter is the base map's for its database type, wh
 
 ### Null
 
-The converter never sees null.  A nullable column is `reader.IsDBNull(i) ? null : Convert(reader.GetFieldValue<B>(i))`; a column the model calls not null is `Convert(reader.GetFieldValue<B>(i))`, and the driver's throw on a `NULL` stays the oracle.  A nullable parameter is `value is { } v ? Convert(v) : DBNull.Value`, and so is a not-null parameter of a reference type, which a caller can still pass as null, by 8.1's rule.  So one pair of converters serves a nullable and a not-null property alike.
+The converter never sees null.  A nullable column is `reader.IsDBNull(i) ? null : Convert(reader.GetFieldValue<B>(i))`; a column the model calls not null is `Convert(reader.GetFieldValue<B>(i))`, and the driver's throw on a `NULL` stays the oracle.  When `B` is `SqlVector<float>`, which SqlClient reads as `SqlVector<float>.Null` on a `NULL` with no throw, the method checks the value it read by `IsNull` and throws `InvalidCastException` naming the column before `Convert`, as 8.1 does for a column read as `SqlVector<float>` with no converter ([8.0's spike](2026-10-24-query-generation-phase-8-spike.md#1-getfieldvaluet-on-a-null-with-no-isdbnull)).  A nullable parameter is `value is { } v ? Convert(v) : DBNull.Value`, and so is a not-null parameter of a reference type, which a caller can still pass as null, by 8.1's rule.  So one pair of converters serves a nullable and a not-null property alike.
 
 ### Arrays
 
@@ -142,7 +142,7 @@ The ids follow 8.1's; if 8.1 merged with more or fewer, this sub-phase takes the
 
 | Where | Cases |
 |----|----|
-| Generator tests | A converter in the project and one on the mapped type, in source and in a referenced assembly; each fault of `SQLSRC277`; `SQLSRC278`; `SQLSRC279` with a `long` column and an `int` converter; `SQLSRC280` for a column and for a parameter; the text of the read and the write, nullable and not null, of a value type and a reference type, an array and an array override; a converter of one type to itself; an `[Obsolete]` converter; a `Models` project with converters and none of the query diagnostics; no change to a project with no converter; the generated code compiled against both drivers' metadata with no warning |
+| Generator tests | A converter in the project and one on the mapped type, in source and in a referenced assembly; each fault of `SQLSRC277`; `SQLSRC278`; `SQLSRC279` with a `long` column and an `int` converter; `SQLSRC280` for a column and for a parameter; the text of the read and the write, nullable and not null, of a value type and a reference type, an array and an array override; a not-null `vector` column with a converter, its `IsNull` check before `Convert`; a converter of one type to itself; an `[Obsolete]` converter; a `Models` project with converters and none of the query diagnostics; no change to a project with no converter; the generated code compiled against both drivers' metadata with no warning |
 | Caching tests | An edit to a converter re-runs the methods and not the models; an edit to a type with no converter re-runs nothing of the methods |
 | `AttributeConflictTests` | `SqlSourceConverterAttribute` among the suppressed types |
 
