@@ -12,6 +12,13 @@ namespace SqlSource.Generation.Emitting;
 /// </summary>
 internal static class MethodEmitter
 {
+    // A method calls a converter, and names a property type, that can be marked [Obsolete] or [Experimental], which is
+    // what was asked for; the compiler's warning, or the error of [Experimental], would be in code the consumer cannot
+    // change.
+    private const string PragmaStart = "#pragma warning disable ";
+
+    private const string PragmaEnd = " // A converter or a mapped type is obsolete or experimental.\n";
+
     /// <summary>
     /// Writes the file of <paramref name="methods" />, or no source when no method is left.
     /// </summary>
@@ -34,7 +41,13 @@ internal static class MethodEmitter
             return (methods.HintName, null);
         }
 
-        var builder = new StringBuilder(isExtension ? GeneratedText.Header + "\n" : TypeEmitter.Header);
+        var builder = new StringBuilder(isExtension ? GeneratedText.Header : TypeEmitter.HeaderLines);
+        if (methods.WarningIds.Count > 0)
+        {
+            _ = builder.Append(PragmaStart).Append(string.Join(", ", methods.WarningIds)).Append(PragmaEnd);
+        }
+
+        _ = builder.Append('\n');
         var depth = 0;
         if (methods.NamespaceText.Length > 0)
         {

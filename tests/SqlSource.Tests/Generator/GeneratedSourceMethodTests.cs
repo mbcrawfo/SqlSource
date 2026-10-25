@@ -233,7 +233,8 @@ public sealed class GeneratedSourceMethodTests
     }
 
     // The same names as the token of a query's method, beside its parameters, its connection and its locals, under
-    // CodeGen: one method reads many rows, the other one.
+    // CodeGen: one method reads many rows, the other one, and each binds a parameter and reads a column through a
+    // converter, so that value names the pattern variable of the binding too.
     [Theory]
     [InlineData("span")]
     [InlineData("state")]
@@ -274,7 +275,10 @@ public sealed class GeneratedSourceMethodTests
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.CSharp12);
 
         run.ShouldBeClean();
-        run.Sources[MethodRuns.MethodsFile].ShouldContain(" ProbeOne(\n");
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(" ProbeOne(\n");
+        methods.ShouldContain("(object)global::App.UserId.ToDatabase(");
+        methods.ShouldContain("global::App.UserId.FromDatabase(");
     }
 
     [Fact]

@@ -56,6 +56,50 @@ public sealed class ConverterMethodTests
     private const string ToDatabase =
         "[SqlSourceConverter] public static string ToDatabase(Email email) => email.Value;";
 
+    // The types of App that the converted reads and writes use: UserId, a value type over long, whose converters are
+    // on Conversions, and Email, a value type or a reference type as KIND says, whose converters are its own.
+    private const string AppSource = """
+        using SqlSource;
+
+        namespace App
+        {
+            [SqlSourceGenerate]
+            public partial class Sample;
+
+            public readonly record struct UserId(long Value);
+
+            public static class Conversions
+            {
+                [SqlSourceConverter]
+                public static UserId ToUserId(long value) => new(value);
+
+                [SqlSourceConverter]
+                public static long FromUserId(UserId id) => id.Value;
+            }
+
+            public KIND Email(string Value)
+            {
+                [SqlSourceConverter]
+                public static Email FromDatabase(string value) => new(value);
+
+                [SqlSourceConverter]
+                public static string ToDatabase(Email email) => email.Value;
+            }
+        }
+        """;
+
+    private const string Struct = "readonly record struct";
+
+    private const string Class = "sealed record";
+
+    private const string NullableEmailRead =
+        "reader.IsDBNull(0) ? default(global::App.Email?) : "
+        + "global::App.Email.FromDatabase(reader.GetFieldValue<string>(0))";
+
+    private const string EmailWrite =
+        "parameter.Value = parameters.Email is { } value ? (object)global::App.Email.ToDatabase(value) : "
+        + "global::System.DBNull.Value;\n";
+
     private const string EmailMarker = "-- type-override: public.email=MyApp.Email\n";
 
     // The domain email over text.
@@ -370,6 +414,252 @@ public sealed class ConverterMethodTests
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
         ModelFiles(run).ShouldContain("App.GetEmailDto-Model.g.cs");
     }
+
+    [Fact]
+    public void Run_NotNullColumnOfAValueType_ReadsTheBaseTypeAndConverts()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: int8=App.UserId\n-- name: GetId\nSELECT id FROM users;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "GetId", [], [Column("id", Catalog("int8"))])],
+            AppSourceOf(Struct)
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile]
+            .ShouldContain("(global::App.Conversions.ToUserId(reader.GetFieldValue<long>(0)))");
+    }
+
+    [Fact]
+    public void Run_NullableColumnOfAValueType_ChecksForNullFirst()
+    {
+        var run = RunEmailColumn(Struct);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(NullableEmailRead);
+    }
+
+    [Fact]
+    public void Run_NullableColumnOfAReferenceType_ChecksForNullFirst()
+    {
+        var run = RunEmailColumn(Class);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(NullableEmailRead);
+    }
+
+    [Fact]
+    public void Run_NotNullParameterOfAValueType_ConvertsTheValue()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: int8=App.UserId\n-- name: DeleteUser\nDELETE FROM users WHERE id = @id;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "DeleteUser", [Parameter("id", Catalog("int8"), nullable: false)], null)],
+            AppSourceOf(Struct)
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile]
+            .ShouldContain("parameter.Value = global::App.Conversions.FromUserId(parameters.Id);\n");
+    }
+
+    [Fact]
+    public void Run_NullableParameter_SendsDBNullForNull()
+    {
+        var run = RunEmailParameter(Struct, nullable: true);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(EmailWrite);
+    }
+
+    // A caller can pass null for a property of a reference type that cannot be null, so it is checked as well.
+    [Fact]
+    public void Run_NotNullParameterOfAReferenceType_SendsDBNullForNull()
+    {
+        var run = RunEmailParameter(Class, nullable: false);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(EmailWrite);
+    }
+
+    // One converter from DateTime to DateTime is the edge of both directions.
+    [Fact]
+    public void Run_OneTypeToItself_ConvertsBothWays()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class Sample;
+
+                public static class Moments
+                {
+                    [SqlSourceConverter]
+                    public static System.DateTime Kind(System.DateTime value) =>
+                        System.DateTime.SpecifyKind(value, System.DateTimeKind.Utc);
+                }
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: timestamp=System.DateTime\n-- name: FindAt\nSELECT at FROM events WHERE at = @at;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [
+                Entry(
+                    file,
+                    "FindAt",
+                    [Parameter("at", Catalog("timestamp"), nullable: false)],
+                    [Column("at", Catalog("timestamp"))]
+                ),
+            ],
+            Source
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("parameter.Value = global::App.Moments.Kind(parameters.At);\n");
+        methods.ShouldContain("(global::App.Moments.Kind(reader.GetFieldValue<global::System.DateTime>(0)))");
+    }
+
+    // SqlClient reads a NULL of vector as SqlVector<float>.Null, which the converter must never see: the value is read
+    // into a local, refused when it IsNull, and converted in the row.
+    [Fact]
+    public void RunSqlServer_NotNullVectorColumnWithAConverter_ChecksIsNullBeforeConverting()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class Sample;
+
+                public sealed record Embedding(float[] Values)
+                {
+                    [SqlSourceConverter]
+                    public static Embedding FromDatabase(Microsoft.Data.SqlTypes.SqlVector<float> value) =>
+                        new(value.Memory.ToArray());
+
+                    [SqlSourceConverter]
+                    public static Microsoft.Data.SqlTypes.SqlVector<float> ToDatabase(Embedding embedding) =>
+                        new(embedding.Values);
+                }
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: vector=App.Embedding\n-- name: GetEmbedding\nSELECT embedding FROM documents;\n"
+        );
+
+        var run = MethodRuns.RunSqlServer(
+            file,
+            [
+                MethodRuns.SqlServerEntry(
+                    file,
+                    "GetEmbedding",
+                    [],
+                    [TestSidecars.Column(0, "embedding", TestSidecars.SqlServer("vector(3)", 20, 0))]
+                ),
+            ],
+            Source
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(
+            "var value0 = reader.GetFieldValue<global::Microsoft.Data.SqlTypes.SqlVector<float>>(0);\n"
+        );
+        methods.ShouldContain("if (value0.IsNull)\n");
+        methods.ShouldContain("(global::App.Embedding.FromDatabase(value0))");
+    }
+
+    [Fact]
+    public void Run_ObsoleteConverter_DisablesItsWarning()
+    {
+        var source = AppSourceOf(Struct)
+            .Replace(
+                "        public static Email FromDatabase",
+                "        [System.Obsolete(\"Read emails another way.\")]\n        public static Email FromDatabase",
+                StringComparison.Ordinal
+            );
+
+        var run = RunEmailColumn(Struct, source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("#nullable enable\n#pragma warning disable CS0612, CS0618 ");
+        methods.ShouldContain(NullableEmailRead);
+    }
+
+    // 8.1's methods name a mapped type in GetFieldValue<T>, and an obsolete one warns there as it would in a model.
+    [Fact]
+    public void Run_ObsoleteMappedTypeUnderCodeGen_DisablesItsWarning()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class Sample;
+
+                [System.Obsolete("Use another type.")]
+                public readonly record struct Email(string Value);
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: public.email=App.Email\n-- name: GetEmail\nSELECT email FROM users;\n"
+        );
+
+        var run = MethodRuns.Run(file, [Entry(file, "GetEmail", [], [Column("email", Email, nullable: true)])], Source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("#nullable enable\n#pragma warning disable CS0612, CS0618 ");
+        methods.ShouldContain("reader.GetFieldValue<global::App.Email>(0)");
+    }
+
+    private static GeneratorRun RunEmailColumn(string kind, string? source = null)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: public.email=App.Email\n-- name: GetEmail\nSELECT email FROM users;\n"
+        );
+        return MethodRuns.Run(
+            file,
+            [Entry(file, "GetEmail", [], [Column("email", Email, nullable: true)])],
+            source ?? AppSourceOf(kind)
+        );
+    }
+
+    private static GeneratorRun RunEmailParameter(string kind, bool nullable)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: public.email=App.Email\n-- name: DeleteUser\nDELETE FROM users WHERE email = @email;\n"
+        );
+        return MethodRuns.Run(
+            file,
+            [Entry(file, "DeleteUser", [Parameter("email", Email, nullable)], null)],
+            AppSourceOf(kind)
+        );
+    }
+
+    private static string AppSourceOf(string kind) => AppSource.Replace("KIND", kind, StringComparison.Ordinal);
 
     private static string SourceWith(params string[] converters) =>
         EmailSource.Replace("CONVERTERS", string.Join("\n\n        ", converters), StringComparison.Ordinal);

@@ -46,9 +46,10 @@ internal static class MethodPlanner
         var methods = ImmutableArray.CreateBuilder<QueryMethod>();
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
         var engines = CodeGenEngines.None;
+        var warningIds = new SortedSet<string>(StringComparer.Ordinal);
         if (typeQueries.Type.Diagnostics.Count == 0 && typeQueries.Files.Count > 0)
         {
-            engines = Collect(input, key, methods, diagnostics);
+            engines = Collect(input, key, methods, diagnostics, warningIds);
         }
 
         return new TypeMethods(
@@ -63,7 +64,8 @@ internal static class MethodPlanner
             type.AttributeLocation,
             new EquatableArray<QueryMethod>(methods.ToImmutable()),
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable()),
-            engines
+            engines,
+            new EquatableArray<string>(warningIds.ToImmutableArray())
         );
     }
 
@@ -87,7 +89,8 @@ internal static class MethodPlanner
         MethodsInput input,
         string key,
         ImmutableArray<QueryMethod>.Builder methods,
-        ImmutableArray<DiagnosticInfo>.Builder diagnostics
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics,
+        SortedSet<string> warningIds
     )
     {
         var typeQueries = input.Type;
@@ -120,7 +123,7 @@ internal static class MethodPlanner
             }
         }
 
-        AddPlanned(planned, methods, diagnostics);
+        AddPlanned(planned, methods, diagnostics, warningIds);
         return engines;
     }
 
@@ -222,7 +225,7 @@ internal static class MethodPlanner
 
         // A query that gets no method takes no name, so it is compared with the other methods' only once it has one.
         // Its models are read whatever its other problems, so that it gets every problem of its converters too.
-        var planned = new Planned(problems, name, query.Name, query.NameLocation, null, false);
+        var planned = new Planned(problems, name, query.Name, query.NameLocation, null, false, []);
         // A query whose driver is missing gets no method, which SQLSRC273 says, so its converters are not decided.
         var databaseEngine = SqlDescribableDialects.EngineOf(file.Dialect);
         var isUsable =
@@ -249,7 +252,40 @@ internal static class MethodPlanner
             methodOutput,
             query.NameLocation
         );
-        return planned with { Method = method, IsDriverUsable = isUsable };
+        return planned with
+        {
+            Method = method,
+            IsDriverUsable = isUsable,
+            WarningIds = WarningIdsOf(models, methodInput, methodOutput),
+        };
+    }
+
+    // The ids of the warnings that a method gives: of each property type it reads or binds, which it names as its
+    // model does, and of each converter it calls.
+    private static List<string> WarningIdsOf(QueryModels models, MethodInput? input, MethodOutput? output)
+    {
+        var ids = new List<string>();
+        AddTypes(models.Input);
+        AddTypes(models.Output);
+        foreach (var parameter in input?.Parameters ?? EquatableArray<MethodParameter>.Empty)
+        {
+            ids.AddRange(parameter.Write?.WarningIds ?? EquatableArray<string>.Empty);
+        }
+
+        foreach (var column in output?.Columns ?? EquatableArray<MethodColumn>.Empty)
+        {
+            ids.AddRange(column.Read?.WarningIds ?? EquatableArray<string>.Empty);
+        }
+
+        return ids;
+
+        void AddTypes(EquatableArray<ModelProperty>? properties)
+        {
+            foreach (var property in properties ?? EquatableArray<ModelProperty>.Empty)
+            {
+                ids.AddRange(property.Type.WarningIds);
+            }
+        }
     }
 
     // The query's models, matched by index and name as TypeModels matches them.  The models of a file are in the order
@@ -500,11 +536,12 @@ internal static class MethodPlanner
             .Any(parameter => string.Equals(parameter.Trim().TrimStart('@'), name, StringComparison.Ordinal));
 
     // The planned queries in order: the problems of each, then SQLSRC274 at each of two or more methods of one name,
-    // and the rest of the methods when their driver allows them.
+    // and the rest of the methods when their driver allows them, with the ids of their warnings.
     private static void AddPlanned(
         List<Planned> planned,
         ImmutableArray<QueryMethod>.Builder methods,
-        ImmutableArray<DiagnosticInfo>.Builder diagnostics
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics,
+        SortedSet<string> warningIds
     )
     {
         var byName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
@@ -538,6 +575,7 @@ internal static class MethodPlanner
             else if (plan is { Method: { } method, IsDriverUsable: true })
             {
                 methods.Add(method);
+                warningIds.UnionWith(plan.WarningIds);
             }
         }
     }
@@ -601,14 +639,15 @@ internal static class MethodPlanner
         }
     }
 
-    // One query's problems, the name its method would have, and its method, with whether its driver allows it, when it
-    // has no problem and its models were read.
+    // One query's problems, the name its method would have, and its method, with whether its driver allows it and the
+    // ids of the warnings it gives, when it has no problem and its models were read.
     private sealed record Planned(
         List<DiagnosticInfo> Problems,
         string Name,
         string QueryName,
         LocationInfo NameLocation,
         QueryMethod? Method,
-        bool IsDriverUsable
+        bool IsDriverUsable,
+        List<string> WarningIds
     );
 }

@@ -24,11 +24,16 @@ namespace SqlSource.Generation.Methods;
 /// <param name="ElementIsValueType">
 /// Whether <paramref name="ElementText" /> is a value type, for a conversion by element; false otherwise.
 /// </param>
+/// <param name="WarningIds">
+/// The ids of the compiler's warnings that a call of the converter gives, which the file of its method disables, in
+/// ordinal order: the converter's <see cref="Converters.Converter.WarningIds" />.
+/// </param>
 internal sealed record Conversion(
     string Method,
     string DatabaseText,
     bool DatabaseIsValueType,
     bool IsByElement,
     string? ElementText,
-    bool ElementIsValueType
+    bool ElementIsValueType,
+    EquatableArray<string> WarningIds = default
 );

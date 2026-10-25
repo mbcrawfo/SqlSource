@@ -93,7 +93,15 @@ internal static class ConversionPlanner
         {
             return whole is null
                 ? null
-                : new Conversion(whole.Method, databaseText, database.IsValueType, false, null, false);
+                : new Conversion(
+                    whole.Method,
+                    databaseText,
+                    database.IsValueType,
+                    false,
+                    null,
+                    false,
+                    whole.WarningIds
+                );
         }
 
         // An array that no converter touches is converted by its element's, whichever level chose the element.
@@ -115,7 +123,8 @@ internal static class ConversionPlanner
                     database.ElementIsValueType,
                     true,
                     element,
-                    elementIsValueType
+                    elementIsValueType,
+                    byElement.WarningIds
                 );
             }
 

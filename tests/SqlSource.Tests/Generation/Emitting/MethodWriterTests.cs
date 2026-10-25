@@ -409,7 +409,10 @@ public sealed class MethodWriterTests
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.Latest);
 
         run.ShouldBeClean();
-        run.Sources[MethodRuns.MethodsFile].ShouldContain(" ProbeOne(\n");
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(" ProbeOne(\n");
+        methods.ShouldContain("(object)global::App.UserId.ToDatabase(");
+        methods.ShouldContain("global::App.UserId.FromDatabase(");
     }
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);
