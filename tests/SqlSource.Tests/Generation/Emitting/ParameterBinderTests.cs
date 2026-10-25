@@ -31,7 +31,7 @@ public sealed class ParameterBinderTests
     [InlineData(false, true)]
     public void Append_NullableOrReferenceProperty_SendsDbNullForNull(bool isValueType, bool isNullable)
     {
-        Write(new MethodParameter("name", "Name", "string", isValueType, isNullable))
+        Write(new MethodParameter("name", "Name", isValueType ? "int" : "string", isValueType, isNullable))
             .ShouldContain("    p0.Value = (object?)parameters.Name ?? global::System.DBNull.Value;\n");
     }
 

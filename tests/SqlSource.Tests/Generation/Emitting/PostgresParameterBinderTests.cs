@@ -83,6 +83,7 @@ public sealed class PostgresParameterBinderTests
     [InlineData(false, true, "long", true, "long?")]
     [InlineData(true, true, "string", false, "string")]
     [InlineData(false, false, "string", false, "string")]
+    [InlineData(false, true, "string", false, "string")]
     public void Append_NullableOrReferencePropertyWithAConverter_BindsNullForNull(
         bool isValueType,
         bool isNullable,

@@ -26,10 +26,10 @@ public sealed class QueryMethodWriterTests
     // Ends a line of an expected text that goes on in the next, written so to keep within the width of a line.
     private const string Continued = "\u21a9";
 
-    // GetUser -> one-optional of the spec: one parameter, one token, a record of two columns.
     // The type integer, as the entry of a parameter describes it.
     private static readonly PostgresType Integer = TestSidecars.Postgres(bindName: "integer");
 
+    // GetUser -> one-optional of the spec: one parameter, one token, a record of two columns.
     private static readonly QueryMethod GetUser = new(
         "GetUser",
         "GetUser",

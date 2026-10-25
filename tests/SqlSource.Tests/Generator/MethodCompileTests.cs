@@ -103,8 +103,8 @@ public sealed class MethodCompileTests
         methods.ShouldContain(" ListFrom(\n");
     }
 
-    // A parameter of each kind PostgreSQL binds, each a parameter of Npgsql by its bindName, compiles alike on every
-    // Npgsql, the setter of DataTypeName and TypedValue included.
+    // A parameter of each kind PostgreSQL binds, each a parameter of Npgsql by its bindName, and an integer that can be
+    // null, a parameter of int?, compile alike on every Npgsql, the setter of DataTypeName and TypedValue included.
     [Theory]
     [InlineData(8)]
     [InlineData(9)]
@@ -123,12 +123,17 @@ public sealed class MethodCompileTests
             MethodRuns.KindsOverride
                 + "-- name: TouchEach\nUPDATE things SET n = 1 WHERE "
                 + string.Join(" AND ", kinds.Select(row => row.Kind + " = @" + row.Kind))
-                + ";\n"
+                + " AND maybe = @maybe;\n"
         );
+        SidecarParameter[] parameters =
+        [
+            .. kinds.Select(row => Parameter(row.Kind, row.Type, nullable: false)),
+            Parameter("maybe", Int4 with { BindName = "integer" }, nullable: true),
+        ];
 
         var run = MethodRuns.Run(
             file,
-            [Entry(file, "TouchEach", [.. kinds.Select(row => Parameter(row.Kind, row.Type, nullable: false))], null)],
+            [Entry(file, "TouchEach", parameters, null)],
             MethodRuns.KindsSource,
             references: [reference]
         );
@@ -140,6 +145,9 @@ public sealed class MethodCompileTests
         {
             methods.ShouldContain(" parameter.DataTypeName = \"" + type.BindName + "\";\n", customMessage: kind);
         }
+
+        methods.ShouldContain(" var parameter = new global::Npgsql.NpgsqlParameter<int?>();\n");
+        methods.ShouldContain(" parameter.TypedValue = parameters.Maybe;\n");
     }
 
     // SqlClient reads a NULL of vector as SqlVector<float>.Null, so the method checks a not-null one with IsNull.  The
