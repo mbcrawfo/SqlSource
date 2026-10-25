@@ -691,7 +691,7 @@ public sealed class SharedModelTests
         foreach (var file in files)
         {
             var query = file.Queries.ShouldHaveSingleItem();
-            query.ColumnNames.ShouldBe(["id", "name"]);
+            query.ColumnNames.ShouldBe(columns.Select(column => column.Name));
             var assignment = assignments
                 .Where(item => item.NormalizedPath == file.NormalizedPath)
                 .ShouldHaveSingleItem();
@@ -701,6 +701,15 @@ public sealed class SharedModelTests
             assignment.TypeText.ShouldBe("global::App.UsersDto");
             assignment.Kind.ShouldBe(ModelKind.SealedRecord);
         }
+    }
+
+    [Fact]
+    public void Run_QueryWithoutRows_HasNoColumnNames()
+    {
+        var run = Run(Users, Entry(Users, "GetUser", [Parameter("id")], null));
+
+        run.ShouldBeClean();
+        ModelsOf(run).Queries.ShouldHaveSingleItem().ColumnNames.ShouldBeNull();
     }
 
     // GetA in A and GetB in B, each with the -- output-model: marker of the name, then the markers given.

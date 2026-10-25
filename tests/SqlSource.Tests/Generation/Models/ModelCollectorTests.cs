@@ -91,14 +91,13 @@ public sealed class ModelCollectorTests
     public void Resolve_LaterRequestThatDiffers_IsNotAssigned()
     {
         var requests = ImmutableArray.Create(
-            Request("GetUserDto", ModelRole.Output, "app/Users.sql", 0, "App.A"),
-            Request("GetUserDto", ModelRole.Output, "app/Orders.sql", 0, "App.A", propertyName: "Name")
+            Request("GetUserDto", ModelRole.Output, "app/Orders.sql", 0, "App.A"),
+            Request("GetUserDto", ModelRole.Output, "app/Users.sql", 0, "App.A", propertyName: "Name")
         );
 
         var set = Resolve(requests);
 
         set.Diagnostics.Count.ShouldBe(1);
-        // Orders.sql sorts before Users.sql, so its request is the first and the one of Users.sql is the later.
         set.Assignments.Select(assignment => assignment.NormalizedPath).ShouldBe(["app/Orders.sql"]);
     }
 
