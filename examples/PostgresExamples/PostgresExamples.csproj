@@ -24,6 +24,8 @@
         <SqlSourceDialect>postgres</SqlSourceDialect>
         <!-- Every timestamptz is a DateTimeOffset, which Dapper reads through UtcDateTimeOffsetHandler. -->
         <SqlSourceTypeOverrides>timestamptz=System.DateTimeOffset</SqlSourceTypeOverrides>
+        <!-- order_lines.order_id is an OrderId, by its short name, in every query that reads it. -->
+        <SqlSourceColumnTypes>order_lines.order_id=OrderId</SqlSourceColumnTypes>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="Dapper" />
