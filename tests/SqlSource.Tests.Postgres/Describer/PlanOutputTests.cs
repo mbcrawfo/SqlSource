@@ -913,13 +913,13 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
 
     // A subquery in an expression is a SubPlan of every kind.  Before 17 each prints as (SubPlan <n>), or (hashed
     // SubPlan <n>) where the planner hashes it; from 17 EXISTS, IN or ANY and ARRAY print each its own way, and a
-    // scalar subquery as before.  The describer tells the kinds apart only from 17, so unlike the other rows of this
-    // class the theory runs on every major, and pins where the forms change.  The uncorrelated IN is hashed on every
-    // major by a rule of size and not of cost: the planner hashes an IN whose subplan takes no parameter of the query
-    // above when the subplan's estimated rows times their width fit in the memory a hash may take
-    // (subplan_is_hashable, under work_mem and hash_mem_multiplier).  A scan of one integer column of the small orders
-    // table fits by far under the server's default work_mem, which the test container keeps, so the row does not move
-    // with the costs or the statistics.
+    // scalar subquery as before.  The describer tells the kinds apart only from 17, so unlike the other tests of
+    // printed forms here, which run on the recorded majors alone, the theory runs on every major, and pins where the
+    // forms change.  The uncorrelated IN is hashed on every major by a rule of size and not of cost: the planner hashes
+    // an IN whose subplan takes no parameter of the query above when the subplan's estimated rows times their width fit
+    // in the memory a hash may take (subplan_is_hashable, under work_mem and hash_mem_multiplier).  A scan of one
+    // integer column of the small orders table fits by far under the server's default work_mem, which the test
+    // container keeps, so the row does not move with the costs or the statistics.
     [Theory]
     [InlineData("EXISTS (SELECT 1 FROM orders o WHERE o.user_id > u.id)", "(SubPlan 1)", "EXISTS(SubPlan 1)")]
     [InlineData(
