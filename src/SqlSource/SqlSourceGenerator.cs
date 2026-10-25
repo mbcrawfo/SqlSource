@@ -4,7 +4,6 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
@@ -519,7 +518,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var projectConverters = context
             .SyntaxProvider.ForAttributeWithMetadataName(
                 AttributeSource.ConverterAttributeMetadataName,
-                static (node, _) => node is MethodDeclarationSyntax,
+                static (node, _) => ConverterReader.IsCandidate(node),
                 ConverterReader.Read
             )
             .WithTrackingName(TrackingNames.ProjectConverters)

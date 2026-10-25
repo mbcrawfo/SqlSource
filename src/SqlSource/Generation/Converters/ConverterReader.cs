@@ -39,18 +39,37 @@ internal static class ConverterReader
             | SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers
     );
 
+    // A local function by its name and parameters, after the members it is in.
+    private static readonly SymbolDisplayFormat LocalFunctionFormat = DisplayFormat.WithMemberOptions(
+        SymbolDisplayMemberOptions.IncludeParameters
+    );
+
+    // A member that a local function is in, App.Conversions.Outer, without its parameters.
+    private static readonly SymbolDisplayFormat OuterFormat = DisplayFormat.WithMemberOptions(
+        SymbolDisplayMemberOptions.IncludeContainingType
+    );
+
     /// <summary>
-    /// Reads a method of the project's source, the target of the attribute's step, located at its name.
+    /// Whether a node that carries the attribute is read: a method, or a local function, which is reported.  A lambda
+    /// is not.
+    /// </summary>
+    public static bool IsCandidate(SyntaxNode node) => node is MethodDeclarationSyntax or LocalFunctionStatementSyntax;
+
+    /// <summary>
+    /// Reads a method or local function of the project's source, the target of the attribute's step, located at its
+    /// name.
     /// </summary>
     public static Converter Read(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var declaration = (MethodDeclarationSyntax)context.TargetNode;
+        var identifier = context.TargetNode is LocalFunctionStatementSyntax local
+            ? local.Identifier
+            : ((MethodDeclarationSyntax)context.TargetNode).Identifier;
         return Read(
             (IMethodSymbol)context.TargetSymbol,
             context.SemanticModel.Compilation,
             ConverterOrigin.Project,
-            declaration.Identifier.GetLocation()
+            identifier.GetLocation()
         );
     }
 
@@ -70,7 +89,7 @@ internal static class ConverterReader
         var fault = FindFault(method, compilation, warningIds);
         return new Converter(
             method.ContainingType.ToDisplayString(TypeFormat) + "." + method.ToDisplayString(NameFormat),
-            method.ToDisplayString(DisplayFormat),
+            DisplayNameOf(method),
             argument?.Type.ToDisplayString(TypeFormat) ?? string.Empty,
             argument?.Type.IsValueType ?? false,
             method.ReturnType.ToDisplayString(TypeFormat),
@@ -81,6 +100,17 @@ internal static class ConverterReader
             location is null ? null : LocationInfo.From(location)
         );
     }
+
+    // App.Conversions.Outer.Local(string) for a local function, which its own display would name as Local(string).
+    private static string DisplayNameOf(IMethodSymbol method) =>
+        method.MethodKind == MethodKind.LocalFunction && method.ContainingSymbol is IMethodSymbol outer
+            ? OuterNameOf(outer) + "." + method.ToDisplayString(LocalFunctionFormat)
+            : method.ToDisplayString(DisplayFormat);
+
+    private static string OuterNameOf(IMethodSymbol method) =>
+        method.MethodKind == MethodKind.LocalFunction && method.ContainingSymbol is IMethodSymbol outer
+            ? OuterNameOf(outer) + "." + method.ToDisplayString(NameFormat)
+            : method.ToDisplayString(OuterFormat);
 
     // The first fault, in the order the manual lists them.  The warnings of the method and of its containing types are
     // added whatever the fault, since each is read once.
@@ -96,9 +126,20 @@ internal static class ConverterReader
             inFileLocalType |= type.IsFileLocal;
         }
 
+        if (method.MethodKind == MethodKind.LocalFunction)
+        {
+            return "it is a local function";
+        }
+
         if (!method.IsStatic)
         {
             return "it is not static";
+        }
+
+        // A static abstract or virtual member of an interface cannot be called through the interface (CS8926).
+        if (method.IsAbstract || method.IsVirtual)
+        {
+            return "it is abstract or virtual";
         }
 
         if (method.IsGenericMethod)

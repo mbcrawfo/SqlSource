@@ -16,7 +16,7 @@ namespace SqlSource.Tests.Generator;
 public sealed class ConverterDiagnosticsTests
 {
     // The line of the marked method in FaultySource.
-    private const int FaultyMethodLine = 13;
+    private const int FaultyMethodLine = 12;
 
     [Fact]
     public void Run_ValidConverters_ReportNothing()
@@ -110,133 +110,163 @@ public sealed class ConverterDiagnosticsTests
     [Theory]
     [InlineData(
         "public class Conversions",
-        "public Email ToEmail(string value) => new(value);",
+        "[SqlSourceConverter] public Email ToEmail(string value) => new(value);",
         "App.Conversions.ToEmail(string)",
         "it is not static"
     )]
     [InlineData(
         "public class Conversions",
-        "public void Log(string value) { }",
+        "[SqlSourceConverter] public void Log(string value) { }",
         "App.Conversions.Log(string)",
         "it is not static"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static Email ToEmail<T>(string value) => new(value);",
+        "public static void Outer() { [SqlSourceConverter] static Email ToEmail(string value) => new(value); }",
+        "App.Conversions.Outer.ToEmail(string)",
+        "it is a local function"
+    )]
+    [InlineData(
+        "public interface IConversions",
+        "[SqlSourceConverter] static abstract Email ToEmail(string value);",
+        "App.IConversions.ToEmail(string)",
+        "it is abstract or virtual"
+    )]
+    [InlineData(
+        "public interface IConversions",
+        "[SqlSourceConverter] static virtual Email ToEmail(string value) => new(value);",
+        "App.IConversions.ToEmail(string)",
+        "it is abstract or virtual"
+    )]
+    [InlineData(
+        "public static class Conversions",
+        "[SqlSourceConverter] public static Email ToEmail<T>(string value) => new(value);",
         "App.Conversions.ToEmail<T>(string)",
         "it is generic"
     )]
     [InlineData(
         "public static class Conversions<T>",
-        "public static Email ToEmail(string value) => new(value);",
+        "[SqlSourceConverter] public static Email ToEmail(string value) => new(value);",
         "App.Conversions<T>.ToEmail(string)",
         "it is in a generic type"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static Email Empty() => new(string.Empty);",
+        "[SqlSourceConverter] public static Email Empty() => new(string.Empty);",
         "App.Conversions.Empty()",
         "it does not take exactly one argument"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static Email ToEmail(string value, int length) => new(value);",
+        "[SqlSourceConverter] public static Email ToEmail(string value, int length) => new(value);",
         "App.Conversions.ToEmail(string, int)",
         "it does not take exactly one argument"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static Email ToEmail(ref string value) => new(value);",
+        "[SqlSourceConverter] public static Email ToEmail(ref string value) => new(value);",
         "App.Conversions.ToEmail(ref string)",
         "its argument is ref, out, in, params or optional"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static Email ToEmail(out string value) { value = string.Empty; return new(value); }",
+        "[SqlSourceConverter] public static Email ToEmail(out string value) { value = \"\"; return new(value); }",
         "App.Conversions.ToEmail(out string)",
         "its argument is ref, out, in, params or optional"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static Email ToEmail(in string value) => new(value);",
+        "[SqlSourceConverter] public static Email ToEmail(in string value) => new(value);",
         "App.Conversions.ToEmail(in string)",
         "its argument is ref, out, in, params or optional"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static Email ToEmail(params string[] values) => new(values[0]);",
+        "[SqlSourceConverter] public static Email ToEmail(params string[] values) => new(values[0]);",
         "App.Conversions.ToEmail(params string[])",
         "its argument is ref, out, in, params or optional"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static Email ToEmail(string value = \"\") => new(value);",
+        "[SqlSourceConverter] public static Email ToEmail(string value = \"\") => new(value);",
         "App.Conversions.ToEmail(string)",
         "its argument is ref, out, in, params or optional"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static void ToEmail(string value) { }",
+        "[SqlSourceConverter] public static void ToEmail(string value) { }",
         "App.Conversions.ToEmail(string)",
         "it returns nothing"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static Task ToEmail(string value) => Task.CompletedTask;",
+        "[SqlSourceConverter] public static Task ToEmail(string value) => Task.CompletedTask;",
         "App.Conversions.ToEmail(string)",
         "it returns nothing"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static Task<Email> ToEmail(string value) => Task.FromResult(new Email(value));",
+        "[SqlSourceConverter] public static Task<Email> ToEmail(string value) => Task.FromResult(new Email(value));",
         "App.Conversions.ToEmail(string)",
         "it returns nothing"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static ValueTask ToEmail(string value) => default;",
+        "[SqlSourceConverter] public static ValueTask ToEmail(string value) => default;",
         "App.Conversions.ToEmail(string)",
         "it returns nothing"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static ValueTask<Email> ToEmail(string value) => new(new Email(value));",
+        "[SqlSourceConverter] public static ValueTask<Email> ToEmail(string value) => new(new Email(value));",
         "App.Conversions.ToEmail(string)",
         "it returns nothing"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static Email? ToEmail(string value) => new(value);",
+        "[SqlSourceConverter] public static Email? ToEmail(string value) => new(value);",
         "App.Conversions.ToEmail(string)",
         "its return type is annotated as nullable"
     )]
     [InlineData(
         "public static class Conversions",
-        "public static string? FromEmail(Email email) => email.Value;",
+        "[SqlSourceConverter] public static string? FromEmail(Email email) => email.Value;",
         "App.Conversions.FromEmail(App.Email)",
         "its return type is annotated as nullable"
     )]
     [InlineData(
         "public static class Conversions",
-        "private static Email ToEmail(string value) => new(value);",
+        "[SqlSourceConverter] private static Email ToEmail(string value) => new(value);",
+        "App.Conversions.ToEmail(string)",
+        "this project cannot call it"
+    )]
+    [InlineData(
+        "public class Conversions",
+        "[SqlSourceConverter] protected static Email ToEmail(string value) => new(value);",
+        "App.Conversions.ToEmail(string)",
+        "this project cannot call it"
+    )]
+    [InlineData(
+        "public class Conversions",
+        "[SqlSourceConverter] private protected static Email ToEmail(string value) => new(value);",
         "App.Conversions.ToEmail(string)",
         "this project cannot call it"
     )]
     [InlineData(
         "file static class Conversions",
-        "public static Email ToEmail(string value) => new(value);",
+        "[SqlSourceConverter] public static Email ToEmail(string value) => new(value);",
         "App.Conversions.ToEmail(string)",
         "this project cannot call it"
     )]
     [InlineData(
         "public static class Conversions",
-        "[Obsolete(\"Use another.\", true)] public static Email ToEmail(string value) => new(value);",
+        "[SqlSourceConverter, Obsolete(\"Old.\", true)] public static Email ToEmail(string value) => new(value);",
         "App.Conversions.ToEmail(string)",
         "it is marked [Obsolete] as an error"
     )]
     [InlineData(
         "[Obsolete(\"Use another.\", true)] public static class Conversions",
-        "public static Email ToEmail(string value) => new(value);",
+        "[SqlSourceConverter] public static Email ToEmail(string value) => new(value);",
         "App.Conversions.ToEmail(string)",
         "it is marked [Obsolete] as an error"
     )]
@@ -257,6 +287,65 @@ public sealed class ConverterDiagnosticsTests
         );
     }
 
+    // Two overloads of one name and types are two methods: the faulty one is reported, and the converter is kept.
+    [Theory]
+    [InlineData(
+        "ref string value",
+        "App.Conversions.From(ref string)",
+        "its argument is ref, out, in, params or optional",
+        true
+    )]
+    [InlineData(
+        "ref string value",
+        "App.Conversions.From(ref string)",
+        "its argument is ref, out, in, params or optional",
+        false
+    )]
+    [InlineData(
+        "in string value",
+        "App.Conversions.From(in string)",
+        "its argument is ref, out, in, params or optional",
+        true
+    )]
+    [InlineData(
+        "in string value",
+        "App.Conversions.From(in string)",
+        "its argument is ref, out, in, params or optional",
+        false
+    )]
+    [InlineData("string value", "App.Conversions.From<T>(string)", "it is generic", true)]
+    [InlineData("string value", "App.Conversions.From<T>(string)", "it is generic", false)]
+    public void Run_OverloadWithAFaultBesideAConverter_ReportsSQLSRC277AtTheOverload(
+        string parameter,
+        string displayName,
+        string fault,
+        bool faultyFirst
+    )
+    {
+        var faulty =
+            "    [SqlSourceConverter] public static Email From"
+            + (fault == "it is generic" ? "<T>" : string.Empty)
+            + "("
+            + parameter
+            + ") => new(string.Empty);\n";
+        const string Valid = "    [SqlSourceConverter] public static Email From(string value) => new(value);\n";
+        var source =
+            "using SqlSource;\n\nnamespace App;\n\npublic readonly record struct Email(string Value);\n\n"
+            + "public static class Conversions\n{\n"
+            + (faultyFirst ? faulty + Valid : Valid + faulty)
+            + "}\n";
+
+        var run = GeneratorHarness.Run(OutputKind.Models, source);
+
+        var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.ShouldStartWith($"SQLSRC277 /app/Repo/Sample.cs({(faultyFirst ? 9 : 10)},");
+        diagnostic.ShouldContain($"The method '{displayName}' is marked [SqlSourceConverter], but {fault}.");
+        StepOutputs
+            .Single<ConverterSet>(run, TrackingNames.Converters)
+            .Converters.Select(converter => (converter.DisplayName, converter.Fault))
+            .ShouldBe([("App.Conversions.From(string)", null), (displayName, fault)], ignoreOrder: true);
+    }
+
     [Fact]
     public void Run_ObsoleteAsAWarning_ReportsNothing()
     {
@@ -264,7 +353,7 @@ public sealed class ConverterDiagnosticsTests
             OutputKind.Models,
             FaultySource(
                 "[Obsolete(\"Use another.\")] public static class Conversions",
-                "[Obsolete] public static Email ToEmail(string value) => new(value);"
+                "[SqlSourceConverter, Obsolete] public static Email ToEmail(string value) => new(value);"
             )
         );
 
@@ -341,17 +430,20 @@ public sealed class ConverterDiagnosticsTests
     {
         var run = GeneratorHarness.Run(
             OutputKind.CodeGen,
-            FaultySource("public static class Conversions", "public static void ToEmail(string value) { }")
+            FaultySource(
+                "public static class Conversions",
+                "[SqlSourceConverter] public static void ToEmail(string value) { }"
+            )
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC277 /app/Repo/Sample.cs(13,24)-(13,31): The method 'App.Conversions.ToEmail(string)' is marked "
+            "SQLSRC277 /app/Repo/Sample.cs(12,45)-(12,52): The method 'App.Conversions.ToEmail(string)' is marked "
                 + "[SqlSourceConverter], but it returns nothing.  A converter is a static method of one argument that "
                 + "returns the converted value.",
         ]);
     }
 
-    // A type that holds one marked method, at FaultyMethodLine.
+    // A type that holds one member, at FaultyMethodLine, which marks the method it holds as a converter.
     private static string FaultySource(string type, string method) =>
         "#nullable enable\n"
         + "using System;\n"
@@ -365,7 +457,6 @@ public sealed class ConverterDiagnosticsTests
         + type
         + "\n"
         + "{\n"
-        + "    [SqlSourceConverter]\n"
         + "    "
         + method
         + "\n"

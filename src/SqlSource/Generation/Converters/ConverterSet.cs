@@ -149,8 +149,10 @@ internal sealed record ConverterSet(EquatableArray<Converter> Converters, Equata
             : new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable());
     }
 
+    // The display name tells overloads apart, by their type parameters and the modifiers of their argument.
     private static bool IsSameMethod(Converter left, Converter right) =>
         IsText(left.Method, right.Method)
+        && IsText(left.DisplayName, right.DisplayName)
         && IsText(left.ArgumentText, right.ArgumentText)
         && IsText(left.ReturnText, right.ReturnText);
 
@@ -184,8 +186,8 @@ internal sealed record ConverterSet(EquatableArray<Converter> Converters, Equata
         return low;
     }
 
-    // Ordinal by argument, return type and method, then the project's before the mapped types', then by position, so
-    // that two declarations of one method keep the first.
+    // Ordinal by argument, return type, method and display name, then the project's before the mapped types', then by
+    // position, so that two declarations of one method keep the first.
     private sealed class ConverterComparer : IComparer<Converter>
     {
         public int Compare(Converter? x, Converter? y)
@@ -209,6 +211,11 @@ internal sealed record ConverterSet(EquatableArray<Converter> Converters, Equata
             if (order == 0)
             {
                 order = string.CompareOrdinal(x.Method, y.Method);
+            }
+
+            if (order == 0)
+            {
+                order = string.CompareOrdinal(x.DisplayName, y.DisplayName);
             }
 
             if (order == 0)

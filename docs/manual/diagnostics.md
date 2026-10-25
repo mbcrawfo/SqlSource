@@ -2471,16 +2471,18 @@ See: [Query methods](generator.md#query-methods)
 
 **Method marked as a converter is not one**
 
-A method marked `[SqlSourceConverter]` must be a converter: a `static` method of one argument that returns the argument converted to another type, as `public static Email FromDatabase(string value)` does.  The method is not one, and the message names it and the first of these that is wrong with it:
+A method marked `[SqlSourceConverter]` must be a converter: a `static` method of one argument, declared in a type, that returns the argument converted to another type, as `public static Email FromDatabase(string value)` does.  The method is not one, and the message names it and the first of these that is wrong with it:
 
+- `it is a local function`: the method is declared inside another method.  Only a method declared in a type is a converter, and the attribute on a lambda is ignored.
 - `it is not static`: the method is an instance method.
+- `it is abstract or virtual`: the method is a `static abstract` or `static virtual` member of an interface, which a call through the interface cannot reach.
 - `it is generic`: the method has type parameters of its own.
 - `it is in a generic type`: the method is in a generic type, or in a type nested in one.
 - `it does not take exactly one argument`: the method has no argument, or more than one.
 - `its argument is ref, out, in, params or optional`: the argument has one of those modifiers, or a default value.
 - `it returns nothing`: the method returns `void`, `Task` or `ValueTask`, or `Task<T>` or `ValueTask<T>`.  A converter returns its result itself.
 - `its return type is annotated as nullable`: the method returns a type written with `?`, as `string?` or `int?`.  A converter's result is never null.
-- `this project cannot call it`: the method, or a type it is in, is `private` or `protected`, or the type is a `file` type, so code in another file of the project cannot call it.
+- `this project cannot call it`: the method is `private`, `protected` or `private protected` (a `protected internal` method can be called), it is in a type that the project cannot reach, or it is in a `file` type, which code in another file of the project cannot name.
 - `it is marked [Obsolete] as an error`: the method, or a type it is in, has `[Obsolete]` with `true` as its second argument, so that no call of it compiles.  A method marked `[Obsolete]` as a warning is a converter.
 
 ```console
