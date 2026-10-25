@@ -451,7 +451,7 @@ The parser cannot see the attribute, the metadata or the property, and two types
 
 ### The hash
 
-[`SqlQueryHash.Compute`](../../src/SqlSource/Parsing/SqlQueryHash.cs) is the one definition of a query's hash, and its remarks give the input.  It is computed from the dialect's canonical name, the form without comments with its tokens, and the declared parameters, and every file that stores a hash depends on that input.  Nothing computes it during a parse: the tool computes it when it plans a run, and the generator when it [checks a sidecar](#sidecars), each for a query that needs an entry alone, so a query that needs no description never pays for it.
+[`SqlQueryHash.Compute`](../../src/SqlSource/Parsing/SqlQueryHash.cs) is the one definition of a query's hash, and its remarks give the input.  It is computed from the dialect's canonical name, the form without comments with its tokens, and the parameters whose `-- param:` marker gives a type or a nullability, and every file that stores a hash depends on that input.  Nothing computes it during a parse: the tool computes it when it plans a run, and the generator when it [checks a sidecar](#sidecars), each for a query that needs an entry alone, so a query that needs no description never pays for it.
 
 ## Emitting
 

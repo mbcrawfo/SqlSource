@@ -10,11 +10,12 @@ namespace SqlSource.Parsing;
 /// <remarks>
 /// SHA-256, in lower-case hex, of the UTF-8 bytes of: the engine's canonical name; a line feed; the query's SQL
 /// without comments, with each token as <c>{{name:default}}</c>, <c>{{name:}}</c> for an empty default and
-/// <c>{{name}}</c> for none; a line feed; and for each parameter that a <c>-- param:</c> marker declares, in the
-/// order of the query's list, its name, a space and its type when it has one, <c> null</c> or <c> not null</c> when
-/// the marker says so, and a line feed.  A comment changes no type and is not part of it; a parameter's name, a
-/// default and a declaration are.  The definition is a contract with the files that hold a hash: changing it makes
-/// every one of them stale.
+/// <c>{{name}}</c> for none; a line feed; and for each parameter that a <c>-- param:</c> marker declares with a
+/// type, a nullability or both, in the order of the query's list, its name, a space and its type when it has one,
+/// <c> null</c> or <c> not null</c> when the marker says so, and a line feed.  A comment changes no type and is not
+/// part of it, nor is a marker that gives neither, which describes nothing; a parameter's name, a default and a
+/// declared type or nullability are.  The definition is a contract with the files that hold a hash: changing it
+/// makes every one of them stale.
 /// </remarks>
 internal static class SqlQueryHash
 {
@@ -53,7 +54,7 @@ internal static class SqlQueryHash
         _ = input.Append('\n');
         foreach (var parameter in parameters)
         {
-            if (!parameter.IsDeclared)
+            if (!parameter.IsDeclared || (parameter.Type is null && parameter.Nullable is null))
             {
                 continue;
             }
