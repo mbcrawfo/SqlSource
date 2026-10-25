@@ -359,7 +359,8 @@ internal static class QueryTyper
 
         if (mapping is { Kind: TypeMappingKind.Mapped, Text: { } text })
         {
-            // A type of the map has no place; one that an override chose has the base map's type beside it.
+            // A type of the map has no place; one that a type override, a column type or a marker chose has the base
+            // map's type beside it.
             return new PropertyType(
                 text,
                 mapping.IsValueType,

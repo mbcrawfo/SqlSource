@@ -10,9 +10,9 @@ using SqlSource.Settings.ClrTypes;
 namespace SqlSource.Generation.Methods;
 
 /// <summary>
-/// Decides the converter that a column is read through, or a parameter bound through, where a type override chose its
-/// type, with <c>SQLSRC279</c> and <c>SQLSRC280</c> for a type whose converters do not serve it, and <c>SQLSRC277</c>
-/// and <c>SQLSRC278</c> for a converter of a referenced assembly that it would use.
+/// Decides the converter that a column is read through, or a parameter bound through, where a type override, a column
+/// type or a marker chose its type, with <c>SQLSRC279</c> and <c>SQLSRC280</c> for a type whose converters do not serve
+/// it, and <c>SQLSRC277</c> and <c>SQLSRC278</c> for a converter of a referenced assembly that it would use.
 /// </summary>
 /// <remarks>
 /// A converter is an edge from its argument's type to its return type.  For a property of type <c>T</c> whose database

@@ -97,10 +97,12 @@ public sealed class ColumnTypeTests
         column.Mapped.ShouldBe("public.users.id");
     }
 
+    // Two keys that both match the column, so the places decide, not a key replaced by its own: the header's, though
+    // the metadata's names the schema.
     [Fact]
     public void Run_HeaderColumnType_OverTheMetadata()
     {
-        var run = RunPosts("-- column: users.id -> UserId\n\n" + ListPosts, metadata: "users.id=OtherId");
+        var run = RunPosts("-- column: users.id -> UserId\n\n" + ListPosts, metadata: "public.users.id=OtherId");
 
         run.ShouldBeClean();
         var column = ColumnsOf(run).ShouldHaveSingleItem();

@@ -29,11 +29,11 @@ namespace SqlSource.Generation.Methods;
 /// </param>
 /// <param name="Drivers">Which engines' methods the project's drivers allow.</param>
 /// <param name="Converters">
-/// The converters that touch the type of a property of the type's files' models that an override chose, or its
-/// element's for an array, each as <see cref="ClrTypeName.KeywordTextOf" /> writes it, without the <c>?</c> of an
-/// element written nullable (<see cref="ConversionPlanner.EdgeElementOf" />), each once, in the order of
-/// <see cref="ConverterSet.Comparer" />, and each without its location, so that an edit that only moves a converter
-/// plans no method again.
+/// The converters that touch the type of a property of the type's files' models that a type override, a column type or
+/// a marker chose, or its element's for an array, each as <see cref="ClrTypeName.KeywordTextOf" /> writes it,
+/// without the <c>?</c> of an element written nullable (<see cref="ConversionPlanner.EdgeElementOf" />), each once, in
+/// the order of <see cref="ConverterSet.Comparer" />, and each without its location, so that an edit that only moves a
+/// converter plans no method again.
 /// </param>
 internal sealed record MethodsInput(
     TypeQueries Type,
@@ -87,8 +87,8 @@ internal sealed record MethodsInput(
         );
     }
 
-    // The converters of the overridden properties' types: a pass over the properties, and a search of the set only for
-    // a type that an override chose, so that a type without one costs no search.
+    // The converters of the chosen properties' types: a pass over the properties, and a search of the set only for a
+    // type that a type override, a column type or a marker chose, so that a type without one costs no search.
     private static EquatableArray<Converter> ConvertersOf(EquatableArray<FileModels> files, ConverterSet converters)
     {
         if (converters.Converters.Count == 0)

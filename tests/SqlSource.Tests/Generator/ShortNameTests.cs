@@ -279,6 +279,28 @@ public sealed class ShortNameTests
         type.Candidates.ShouldBeEmpty();
     }
 
+    // The project's own App.UserId and a reference's of one full name are one candidate, and the project's is the type:
+    // its struct, not the reference's class.
+    [Fact]
+    public void Resolve_ShortName_SameFullNameInTheProjectAndAReference_IsTheProjects()
+    {
+        var library = GeneratorHarness.CreateReference(
+            OutputKind.Sql,
+            "Lib",
+            "namespace App\n{\n    public sealed class UserId;\n}\n"
+        );
+        var compilation = GeneratorHarness.CreateCompilation(
+            [new SourceFile("/app/App.cs", AppUserId)],
+            references: [library]
+        );
+
+        var type = Resolve(compilation, "UserId");
+
+        type.Status.ShouldBe(MappedTypeStatus.Found);
+        type.IsValueType.ShouldBeTrue();
+        type.Text.ShouldBe("global::App.UserId");
+    }
+
     // UserId and App.UserId are one type, so two queries that name it each way share one model.
     [Fact]
     public void Run_ShortAndFullName_ShareAModel()

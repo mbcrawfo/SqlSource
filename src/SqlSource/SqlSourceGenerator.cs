@@ -772,7 +772,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         // Each type's own slice of what its methods need, which is equal until something of the type changes: its
         // queries, its files' models, the models its queries got, its names, the drivers or the converters of the
-        // types its overrides chose.
+        // types that its type overrides, column types and markers chose.
         var typeMethods = typeQueries
             .Combine(projectLevel)
             .Combine(allFileModels.Combine(assignments))

@@ -58,6 +58,20 @@ public sealed class ColumnTypeMapTests
         ColumnTypeMap.Find(map, "auth", "users", "id")!.Type.ShouldBe("UserId");
     }
 
+    // The header's entry wins by its place, though the metadata's key names the schema.
+    [Fact]
+    public void Find_HeaderWins_OverASchemaInTheMetadata()
+    {
+        var map = ColumnTypeMap
+            .Over(
+                Map(Entry("users.id", "UserId", SettingPlace.FileHeader)),
+                Map(Entry("public.users.id", "OtherId", SettingPlace.Metadata))
+            )!
+            .Value;
+
+        ColumnTypeMap.Find(map, "public", "users", "id")!.Type.ShouldBe("UserId");
+    }
+
     [Fact]
     public void Find_QuotedPart_ComparesExactly()
     {

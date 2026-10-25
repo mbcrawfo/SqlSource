@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation.Types;
@@ -130,6 +131,31 @@ public sealed class ShortNameIndexTests
         var compilation = Project();
 
         ShortNameIndex.MetadataNamesOf(compilation, "NoTypeHasThisName", 0).ShouldBeEmpty();
+    }
+
+    // Generated code writes global::Lib.UserId, which cannot reach a type behind extern alias Ext.
+    [Fact]
+    public void MetadataNamesOf_ReferenceUnderAnAlias_IsNotIndexed()
+    {
+        var library = GeneratorHarness.CreateReference(OutputKind.Sql, "Lib", LibrarySource);
+        var compilation = GeneratorHarness.CreateCompilation(
+            [new SourceFile("/app/App.cs", "namespace App;\n\npublic sealed class Sample;\n")],
+            references: [((PortableExecutableReference)library).WithAliases(["Ext"])]
+        );
+
+        ShortNameIndex.MetadataNamesOf(compilation, "UserId", 0).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void MetadataNamesOf_ReferenceUnderGlobalAndAnAlias_IsIndexed()
+    {
+        var library = GeneratorHarness.CreateReference(OutputKind.Sql, "Lib", LibrarySource);
+        var compilation = GeneratorHarness.CreateCompilation(
+            [new SourceFile("/app/App.cs", "namespace App;\n\npublic sealed class Sample;\n")],
+            references: [((PortableExecutableReference)library).WithAliases(["global", "Ext"])]
+        );
+
+        ShortNameIndex.MetadataNamesOf(compilation, "UserId", 0).ShouldBe(["Lib.UserId"]);
     }
 
     private static CSharpCompilation Project() =>
