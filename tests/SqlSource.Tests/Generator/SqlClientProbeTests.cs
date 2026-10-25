@@ -93,7 +93,7 @@ public sealed class SqlClientProbeTests
     {
         const string Expected =
             "SQLSRC267 (1,1)-(1,1): This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs "
-            + "Microsoft.Data.SqlClient 6.1 or later.  Update the package.";
+            + "Microsoft.Data.SqlClient 6.1 or later.  No query method is generated until the package is updated.";
 
         var oneFile = Run(OutputKind.Models, [SqlClientReferences.SqlClient60], UsersWithSidecar);
         var twoFiles = Run(OutputKind.Models, [SqlClientReferences.SqlClient60], BothWithSidecars);
@@ -173,10 +173,10 @@ public sealed class SqlClientProbeTests
     {
         const string Npgsql =
             "SQLSRC247 (1,1)-(1,1): This project references Npgsql 7.0.0, and SqlSource needs Npgsql 8.0 or later.  "
-            + "Update the package.";
+            + "No query method is generated until the package is updated.";
         const string SqlClient =
             "SQLSRC267 (1,1)-(1,1): This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs "
-            + "Microsoft.Data.SqlClient 6.1 or later.  Update the package.";
+            + "Microsoft.Data.SqlClient 6.1 or later.  No query method is generated until the package is updated.";
         MetadataReference[] drivers =
         [
             NpgsqlReferences.Synthetic("7.0.0", slimBuilder: false, cube: false),
@@ -249,7 +249,8 @@ public sealed class SqlClientProbeTests
         DriverDiagnostics(old)
             .ShouldBe([
                 "SQLSRC267 (1,1)-(1,1): This project references Microsoft.Data.SqlClient of an unknown version, and "
-                    + "SqlSource needs Microsoft.Data.SqlClient 6.1 or later.  Update the package.",
+                    + "SqlSource needs Microsoft.Data.SqlClient 6.1 or later.  No query method is generated until the "
+                    + "package is updated.",
             ]);
         StepOutputs
             .Single<SqlClientProbe>(old, TrackingNames.SqlClientProbe)

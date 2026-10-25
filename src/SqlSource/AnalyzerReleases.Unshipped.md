@@ -110,3 +110,7 @@ SQLSRC268 | SqlSource | Info | Microsoft.Data.SqlClient is newer than SqlSource 
 SQLSRC269 | SqlSource | Error | Type needs Microsoft.Data.SqlClient
 SQLSRC270 | SqlSource | Error | Type needs a newer Microsoft.Data.SqlClient
 SQLSRC271 | SqlSource | Error | File is not saved as UTF-8
+SQLSRC272 | SqlSource | Error | Result shape needs rows
+SQLSRC273 | SqlSource | Error | Driver is not referenced
+SQLSRC274 | SqlSource | Error | Method name is taken
+SQLSRC275 | SqlSource | Error | Token is named as an argument of the method

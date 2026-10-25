@@ -19,8 +19,8 @@ internal static class TypeEmitter
     // under SqlLocation.Direct a query can hide a member of a base class.  That is what was asked for, and the
     // compiler's request to add "new" (CS0108) is one that nobody can act on in generated code.  Neither is its
     // request to add "new" or "override" (CS0114) to a method that has the name and the parameters of an inherited
-    // virtual method.
-    private const string Header =
+    // virtual method.  A file of methods on the type starts the same way.
+    internal const string Header =
         GeneratedText.Header
         + "#pragma warning disable CS0108, CS0114 // A query can have the name of an inherited member.\n"
         + "\n";
@@ -237,16 +237,22 @@ internal static class TypeEmitter
         return false;
     }
 
-    private static string GetSummaryXml(SqlQuery query, string fileName) =>
+    /// <summary>
+    /// The summary of a query's member, as escaped XML: its <c>-- summary:</c> text, or a sentence that names the query
+    /// and its file.
+    /// </summary>
+    internal static string GetSummaryXml(SqlQuery query, string fileName) =>
         query.Summary is null
             ? "The <c>" + query.Name + "</c> query from <c>" + XmlDocWriter.Escape(fileName) + "</c>."
             : XmlDocWriter.Escape(query.Summary);
 
-    private static void Open(StringBuilder builder, int depth, string header)
+    /// <summary>Opens a block at the depth: its header, and a brace on the next line.</summary>
+    internal static void Open(StringBuilder builder, int depth, string header)
     {
         var indent = GetIndent(depth);
         _ = builder.Append(indent).Append(header).Append('\n').Append(indent).Append("{\n");
     }
 
-    private static string GetIndent(int depth) => string.Concat(Enumerable.Repeat(GeneratedText.Indent, depth));
+    /// <summary>The indentation of the depth.</summary>
+    internal static string GetIndent(int depth) => string.Concat(Enumerable.Repeat(GeneratedText.Indent, depth));
 }

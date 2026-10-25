@@ -172,6 +172,15 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 |----|----|
 | [SQLSRC271](#sqlsrc271) | File is not saved as UTF-8 |
 
+**The methods of a query**
+
+| Id | Title |
+|----|----|
+| [SQLSRC272](#sqlsrc272) | Result shape needs rows |
+| [SQLSRC273](#sqlsrc273) | Driver is not referenced |
+| [SQLSRC274](#sqlsrc274) | Method name is taken |
+| [SQLSRC275](#sqlsrc275) | Token is named as an argument of the method |
+
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 120 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
@@ -191,6 +200,8 @@ The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type overri
 `SQLSRC261` is reported at a query that has a column or a parameter of an array of a type outside `pg_catalog`, or of a domain over such an array, when the type override has an entry for the array's name in the database.  It names the column or parameter, the entry, the place that wrote it and the key to write.  It is reported once for the query, for its first column or parameter that has no C# type, as `SQLSRC246` and `SQLSRC249` to `SQLSRC252` are, so the query has no models until it is fixed.
 
 The ids from `SQLSRC253` to `SQLSRC260` are reported by the build, about the [models](generator.md#models) of a query whose entry in its sidecar is current and whose columns and parameters all have a C# type, except `SQLSRC259` and `SQLSRC260`, which a query with a current entry gets whatever its C# types.  Each property of a model is named by the PascalCase of its column or parameter: `created_at` gives `CreatedAt`.  `SQLSRC253` to `SQLSRC255`, `SQLSRC256` for a name that a record or `object` has, `SQLSRC259` and `SQLSRC260` are about the query's own columns, parameters and markers: each is reported once for the query, however many types claim its file, at the query's name, or at its marker for `SQLSRC259` and `SQLSRC260`, and the query gets no models until it is fixed.  `SQLSRC257` and `SQLSRC258`, `SQLSRC256` for a property named as its model, and `SQLSRC251` for each property whose type is not public in a public model, are about a model, whose name and accessibility come from the types that claim its queries: `SQLSRC257` is reported at the later of two queries whose models differ, at its marker when it has one, and the others at the name of each query of the model, which is not generated until it is fixed.  A query gets every error it has, and its constant or method is still generated.
+
+The ids from `SQLSRC272` to `SQLSRC275` are reported by the build, about the [method](generator.md#query-methods) of a query whose output is `codegen`.  `SQLSRC272`, `SQLSRC274` and `SQLSRC275` are reported at the query's name, for each type that claims its file, and the query gets no method until it is fixed; its models are still generated.  `SQLSRC273` has no file and line, and is reported once for the project and database.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
@@ -1802,10 +1813,10 @@ See: [PostgreSQL types](postgresql.md#type-map), [SQL Server types](sqlserver.md
 The project references a version of Npgsql older than 8.0, and SqlSource gives the queries of the `postgres` dialect the C# types of Npgsql 8.0 and later.  The message names the version the project references.
 
 ```console
-CSC : error SQLSRC247: This project references Npgsql 7.0.4, and SqlSource needs Npgsql 8.0 or later.  Update the package.
+CSC : error SQLSRC247: This project references Npgsql 7.0.4, and SqlSource needs Npgsql 8.0 or later.  No query method is generated until the package is updated.
 ```
 
-Update the `Npgsql` package to 8.0 or later.  When another package brings the older version, reference `Npgsql` from the project itself, at the version you want.  The error has no file and line, because it is about the project's references, and it is reported once for the project, only while a query's output is `models` or `codegen` under the `postgres` dialect.
+Until the package is updated, no query of the `postgres` dialect gets its method; its models are still generated.  Update the `Npgsql` package to 8.0 or later.  When another package brings the older version, reference `Npgsql` from the project itself, at the version you want.  The error has no file and line, because it is about the project's references, and it is reported once for the project, only while a query's output is `models` or `codegen` under the `postgres` dialect.
 
 See: [Which version of Npgsql](postgresql.md#which-npgsql)
 
@@ -2287,10 +2298,10 @@ See: [What SQL Server can describe](sqlserver.md#what-can-be-described)
 The project references a version of Microsoft.Data.SqlClient older than 6.1, and SqlSource gives the queries of the `mssql` dialect the C# types of Microsoft.Data.SqlClient 6.1 and later.  The message names the version the project references.
 
 ```console
-CSC : error SQLSRC267: This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs Microsoft.Data.SqlClient 6.1 or later.  Update the package.
+CSC : error SQLSRC267: This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs Microsoft.Data.SqlClient 6.1 or later.  No query method is generated until the package is updated.
 ```
 
-Update the `Microsoft.Data.SqlClient` package to 6.1 or later.  When another package brings the older version, reference `Microsoft.Data.SqlClient` from the project itself, at the version you want.  EF Core 8 and 9 bring Microsoft.Data.SqlClient 5.1, so a project that uses either references Microsoft.Data.SqlClient 6.1 or later directly, beside the EF Core packages.  The error has no file and line, because it is about the project's references, and it is reported once for the project, only while a query's output is `models` or `codegen` under the `mssql` dialect.  A query with a `vector` column or parameter also gets [SQLSRC270](#sqlsrc270), at its name, and the same update clears both.
+Until the package is updated, no query of the `mssql` dialect gets its method; its models are still generated.  Update the `Microsoft.Data.SqlClient` package to 6.1 or later.  When another package brings the older version, reference `Microsoft.Data.SqlClient` from the project itself, at the version you want.  EF Core 8 and 9 bring Microsoft.Data.SqlClient 5.1, so a project that uses either references Microsoft.Data.SqlClient 6.1 or later directly, beside the EF Core packages.  The error has no file and line, because it is about the project's references, and it is reported once for the project, only while a query's output is `models` or `codegen` under the `mssql` dialect.  A query with a `vector` column or parameter also gets [SQLSRC270](#sqlsrc270), at its name, and the same update clears both.
 
 See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)
 
@@ -2361,3 +2372,65 @@ The tool also reports a C# file in another encoding whose `[SqlSourceGenerate]` 
 Save the file as UTF-8, with the "Save with encoding" command of your editor, and run `dotnet sqlsource describe` again.  That fixes the entries the build reported as missing or out of date.  For a `.sql` file the error is reported once, at the file with no line or column; for a C# file it is reported at the `Path` argument, with its line and column.  When the file has a parse error of its own, the tool reports this error instead of the parse errors, since what it read may not be what the build reads.  A file that is also [SQLSRC209](#sqlsrc209) gets this error alone.
 
 See: [Describing again](tool.md#describing-again)
+
+## SQLSRC272
+
+**Result shape needs rows**
+
+A query's name marker gives it the shape `one`, `one-optional` or `many`, and its entry in the sidecar says that its statement returns no rows, as an `UPDATE` without `RETURNING` or `OUTPUT` does.  Those shapes read rows, so the query's method cannot be generated.  The message names the query and its shape.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC272: The query 'RenameUser' has the shape 'one', and its statement returns no rows.  Remove the shape, or write 'rowcount' or 'none'.
+```
+
+Remove the shape, which gives a query without rows the shape `rowcount`, or write `-> rowcount` for the number of rows the statement affected, or `-> none` for nothing.  When the statement should return rows, change it, and run `dotnet sqlsource describe` again.  The error is reported only while the query's output is `codegen`, since a shape changes nothing under `models` or `sql`.
+
+See: [Result shapes](sql-files.md#result-shapes)
+
+## SQLSRC273
+
+**Driver is not referenced**
+
+A query of the `postgres` dialect has the output `codegen`, and the project does not reference Npgsql, or a query of the `mssql` dialect has it and the project does not reference Microsoft.Data.SqlClient.  The query's method runs on the driver, so it is not generated.  The message names the database and the package.
+
+```console
+CSC : error SQLSRC273: A query for PostgreSQL has the output codegen, and this project does not reference Npgsql, which its method needs.  Reference Npgsql, or set the output to models.
+```
+
+Reference the package from the project: `Npgsql` 8.0 or later for PostgreSQL, `Microsoft.Data.SqlClient` 6.1 or later for SQL Server.  A project that runs its queries some other way, with Dapper on a connection that a package of its own brings, sets the output to `models`, which gives the SQL and the models without the methods.  The error has no file and line, because it is about the project's references, and it is reported once for the project and database, however many of its queries have the output `codegen`.  The models are still generated.
+
+See: [Query methods](generator.md#query-methods)
+
+## SQLSRC274
+
+**Method name is taken**
+
+The method of a query whose output is `codegen` would have the name of something else, and so it is not generated.  Its name is the query's, with `Async` after it under `async-method-suffix`.  It is taken when it is:
+
+- under the default `MethodLocation.ExtensionClass`, the name of the extension class that holds it, or of a member of `DbConnection` or of `object`, such as `Open` or `ToString`, which a call on a connection would find before the extension method;
+- under `MethodLocation.Public`, `Internal` or `Private`, the name of a member of the type, of the type itself or of one of its type parameters, of the constant or token method of another query of the type under `SqlLocation.Direct`, or of the class that holds the type's queries under `SqlLocation.Nested`;
+- the name of the method of another query of the same type, which is reported at both queries.
+
+The message names the query, the method's name and what takes it.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC274: The method of the query 'Open' cannot be named 'Open', because DbConnection has a member of that name, which a call on a connection finds before the method.  Rename the query.
+```
+
+Rename the query, with its `-- name:` marker, or rename the member that takes the name.  For two queries `Get` and `GetAsync` under `async-method-suffix`, rename one of them.  The error is reported at the query's name, and the query's models are still generated.
+
+See: [Query methods](generator.md#query-methods)
+
+## SQLSRC275
+
+**Token is named as an argument of the method**
+
+A token of a query whose output is `codegen` has the name of one of the arguments that every query method has: `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`.  A token is an argument of the method too, so the two would have one name, and the method is not generated.  The message names the token and the query.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC275: The token 'transaction' of the query 'ListFrom' has the name of an argument that every query method has: connection, parameters, transaction, commandTimeout or cancellationToken.  Rename the token.
+```
+
+Rename the token, everywhere the query writes it and in its `-- token:` marker.  The error is reported at the query's name, once for each such token, and the query's models are still generated.
+
+See: [Query methods](generator.md#query-methods)

@@ -1,0 +1,328 @@
+// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
+
+using System;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
+using Shouldly;
+using SqlSource.Snapshot;
+using SqlSource.Testing.Generator;
+using Xunit;
+using static SqlSource.Testing.Generator.ModelRuns;
+using OutputKind = SqlSource.Settings.OutputKind;
+
+namespace SqlSource.Tests.Generator;
+
+// The method of each query whose output is CodeGen: where it goes, how it is named, and which models it reads and
+// binds.  Each run is at CodeGen under postgres on Npgsql 10, with an entry written for each query's current hash, and
+// every method must compile without a warning.
+public sealed class MethodTests
+{
+    private static readonly SqlFile Users = new(
+        GeneratorHarness.UsersPath,
+        "-- name: GetUser\nSELECT id, name FROM users WHERE id = @id;\n"
+    );
+
+    private static readonly SidecarEntry[] UsersEntries =
+    [
+        Entry(Users, "GetUser", [Parameter("id")], [Column("id"), Column("name", Text, nullable: true)]),
+    ];
+
+    [Fact]
+    public void Run_CodeGenQuery_IsAnExtensionMethodOfTheTypesExtensionClass()
+    {
+        var run = MethodRuns.Run(Users, UsersEntries);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile]
+            .ShouldBe(
+                Joined(
+                    $$$"""
+                    {{{GeneratedFile.ModelHeader}}}
+                    namespace App
+                    {
+                        /// <summary>
+                        /// The query methods of <c>App.Sample</c>, which extend the connection they run on.
+                        /// </summary>
+                        public static partial class SampleExtensions
+                        {
+                            /// <summary>
+                            /// The <c>GetUser</c> query from <c>Users.sql</c>.
+                            /// </summary>
+                            /// <remarks>
+                            /// <code>
+                            /// SELECT id, name FROM users WHERE id = @id;
+                            /// </code>
+                            /// </remarks>
+                            /// <param name="connection">The connection to run the query on.  ↩
+                        It is opened when it is closed, and closed again when the method opened it.</param>
+                            /// <param name="parameters">The query's parameters.</param>
+                            /// <param name="transaction">The transaction to run the query in, or null.</param>
+                            /// <param name="commandTimeout">↩
+                        The command's timeout in seconds, or null for the driver's.</param>
+                            /// <param name="cancellationToken">Cancels the query.</param>
+                            /// <returns>The rows the query returned.</returns>
+                            public static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(
+                                this global::System.Data.Common.DbConnection connection,
+                                global::App.GetUserParams parameters,
+                                global::System.Data.Common.DbTransaction? transaction = null,
+                                int? commandTimeout = null,
+                                global::System.Threading.CancellationToken cancellationToken = default)
+                            {
+                                global::System.ArgumentNullException.ThrowIfNull(connection);
+                                global::System.ArgumentNullException.ThrowIfNull(parameters);
+                                const string sql = "SELECT id, name FROM users WHERE id = @id;";
+                                var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
+                                if (wasClosed)
+                                {
+                                    await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                                }
+
+                                try
+                                {
+                                    var command = connection.CreateCommand();
+                                    await using var commandScope = ↩
+                        global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(command, false);
+                                    command.CommandText = sql;
+                                    command.Transaction = transaction;
+                                    if (commandTimeout.HasValue)
+                                    {
+                                        command.CommandTimeout = commandTimeout.Value;
+                                    }
+
+                                    {
+                                        var parameter = command.CreateParameter();
+                                        parameter.ParameterName = "id";
+                                        parameter.Value = parameters.Id;
+                                        command.Parameters.Add(parameter);
+                                    }
+
+                                    var reader = await command.ExecuteReaderAsync(↩
+                        global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
+                                    await using var readerScope = ↩
+                        global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
+                                    var rows = new global::System.Collections.Generic.List<global::App.GetUserDto>();
+                                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                                    {
+                                        rows.Add(new global::App.GetUserDto(reader.GetFieldValue<int>(0), ↩
+                        reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1)));
+                                    }
+
+                                    return rows.ToArray();
+                                }
+                                finally
+                                {
+                                    if (wasClosed)
+                                    {
+                                        await connection.CloseAsync().ConfigureAwait(false);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    """
+                )
+            );
+    }
+
+    [Theory]
+    [InlineData("Public", "public static")]
+    [InlineData("Internal", "internal static")]
+    [InlineData("Private", "private static")]
+    public void Run_EachTypePlacement_PutsTheMethodOnTheType(string placement, string modifiers)
+    {
+        var run = MethodRuns.Run(
+            Users,
+            UsersEntries,
+            MethodRuns.SampleSource("MethodLocation = MethodLocation." + placement)
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldStartWith(GeneratedFile.Header + "\nnamespace App\n{\n    partial class Sample\n    {\n");
+        methods.ShouldContain(
+            "        "
+                + modifiers
+                + " async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(\n"
+                + "            global::System.Data.Common.DbConnection connection,\n"
+        );
+        methods.ShouldNotContain("SampleExtensions");
+    }
+
+    [Fact]
+    public void Run_InternalType_GivesAnInternalExtensionClass()
+    {
+        var source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                internal partial class Sample;
+            }
+            """;
+
+        var run = MethodRuns.Run(Users, UsersEntries, source);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("    internal static partial class SampleExtensions\n");
+    }
+
+    // Review Focus 4: one top-level class for each, named by the type's own name, internal unless the type and every
+    // type around it are public.
+    [Fact]
+    public void Run_NestedAndGenericTypes_GiveOneTopLevelExtensionClassEach()
+    {
+        var source = """
+            using SqlSource;
+
+            namespace App
+            {
+                public partial class Outer
+                {
+                    [SqlSourceGenerate(Path = "Users.sql")]
+                    public partial class Inner;
+
+                    [SqlSourceGenerate(Path = "Orders.sql")]
+                    private partial class Hidden;
+                }
+
+                [SqlSourceGenerate(Path = "Lines.sql")]
+                public partial class Repository<T>;
+            }
+            """;
+        var orders = new SqlFile("/app/Repo/Orders.sql", "-- name: GetOrder\nSELECT id FROM orders;\n");
+        var lines = new SqlFile("/app/Repo/Lines.sql", "-- name: GetLine\nSELECT id FROM lines;\n");
+
+        var run = GeneratorHarness.Run(
+            OutputKind.CodeGen,
+            [new SourceFile(GeneratorHarness.SourcePath, source)],
+            [
+                Users,
+                Sidecars.Of(Users, UsersEntries),
+                orders,
+                Sidecars.Of(orders, Entry(orders, "GetOrder", [], [Column("id")])),
+                lines,
+                Sidecars.Of(lines, Entry(lines, "GetLine", [], [Column("id")])),
+            ],
+            references: [NpgsqlReferences.Npgsql10],
+            dialect: "postgres"
+        );
+
+        run.ShouldBeClean();
+        run.Sources["App.Outer.Inner-Methods.g.cs"]
+            .ShouldStartWith(
+                GeneratedFile.ModelHeader
+                    + "\nnamespace App\n{\n    /// <summary>\n"
+                    + "    /// The query methods of <c>App.Outer.Inner</c>, which extend the connection they run on.\n"
+                    + "    /// </summary>\n    public static partial class InnerExtensions\n    {\n"
+            );
+        run.Sources["App.Outer.Hidden-Methods.g.cs"]
+            .ShouldContain("    internal static partial class HiddenExtensions\n");
+        run.Sources["App.Repository-1-Methods.g.cs"]
+            .ShouldContain(
+                "    /// The query methods of <c>App.Repository&lt;T&gt;</c>, which extend the connection they run "
+                    + "on.\n"
+                    + "    /// </summary>\n    public static partial class RepositoryExtensions\n"
+            );
+    }
+
+    [Fact]
+    public void Run_AsyncMethodSuffix_NamesTheMethodWithAsync()
+    {
+        var run = MethodRuns.Run(Users, UsersEntries, MethodRuns.SampleSource("Parameters = \"async-method-suffix\""));
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUserAsync(\n");
+        run.Sources[MethodRuns.MethodsFile].ShouldNotContain(" GetUser(\n");
+    }
+
+    [Fact]
+    public void Run_SharedModelAndTableModel_AreReadAndBoundByTheirNames()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetA\n-- input-model: ById\n-- output-model: Row\nSELECT id FROM a WHERE id = @id;\n"
+                + "-- name: GetB\n-- input-model: ById\n-- output-model: Row\nSELECT id FROM b WHERE id = @id;\n"
+                + "-- name: GetUser\nSELECT id FROM users;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [
+                Entry(file, "GetA", [Parameter("id")], [Column("id")]),
+                Entry(file, "GetB", [Parameter("id")], [Column("id")]),
+                Entry(file, "GetUser", [], [Column("id")], new SidecarTable("public", "users")),
+            ]
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("Task<global::App.Row[]> GetA(\n");
+        methods.ShouldContain("Task<global::App.Row[]> GetB(\n");
+        methods.ShouldContain("            global::App.ById parameters,\n");
+        methods.ShouldContain("rows.Add(new global::App.Row(reader.GetFieldValue<int>(0)));\n");
+        methods.ShouldContain("Task<global::App.UsersDto[]> GetUser(\n");
+        methods.ShouldContain("rows.Add(new global::App.UsersDto(reader.GetFieldValue<int>(0)));\n");
+    }
+
+    // Review Focus 5: the method names the model from global::, whatever its namespace.
+    [Theory]
+    [InlineData("", "global::GetUserDto")]
+    [InlineData("namespace @class.Rows;\n\n", "global::@class.Rows.GetUserDto")]
+    public void Run_ModelInTheGlobalNamespaceOrUnderAnEscapedKeyword_Compiles(string namespaceLine, string model)
+    {
+        var source = "using SqlSource;\n\n" + namespaceLine + "[SqlSourceGenerate]\npublic partial class Sample;\n";
+
+        var run = MethodRuns.Run(Users, UsersEntries, source);
+
+        run.ShouldBeClean();
+        run.Sources.Values.ShouldContain(text => text.Contains("Task<" + model + "[]> GetUser(\n"));
+    }
+
+    [Fact]
+    public void Run_TypeOverride_ReadsAndBindsTheOverridesType()
+    {
+        var run = MethodRuns.Run(
+            Users,
+            UsersEntries,
+            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "int4=long" }
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("reader.GetFieldValue<long>(0)");
+        run.Sources["App.GetUserParams-Model.g.cs"].ShouldContain("(long Id)");
+    }
+
+    [Fact]
+    public void Run_ModelsOutput_GivesNoMethod()
+    {
+        var run = MethodRuns.Run(Users, UsersEntries, MethodRuns.SampleSource("Output = GeneratorOutput.Models"));
+
+        run.ShouldBeClean();
+        run.Sources.Keys.ShouldContain("App.GetUserDto-Model.g.cs");
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
+    [Fact]
+    public void Run_QueryWithoutAUsableEntry_GivesNoMethod()
+    {
+        var stale = Users with { Text = "-- name: GetUser\nSELECT id, name FROM users WHERE id = @id AND 1 = 1;\n" };
+
+        var run = GeneratorHarness.Run(
+            OutputKind.CodeGen,
+            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [stale, Sidecars.Of(stale, UsersEntries)],
+            references: [NpgsqlReferences.Npgsql10],
+            dialect: "postgres"
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC244 ");
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
+    // An expected text with each line that ends in the mark joined to the next, whose indentation goes.
+    private static string Joined(string text) =>
+        Regex.Replace(text, "\u21a9\n *", string.Empty, RegexOptions.None, TimeSpan.FromSeconds(1));
+}

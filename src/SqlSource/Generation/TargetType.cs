@@ -10,7 +10,7 @@ namespace SqlSource.Generation;
 /// <param name="Namespace">The namespace as it is written in code.  Empty for the global namespace.</param>
 /// <param name="Types">The containing types from the outermost to the type itself.  Never empty.</param>
 /// <param name="Placement">Where the members go.</param>
-/// <param name="MethodPlacement">Where the type's methods go.  It has no effect yet.</param>
+/// <param name="MethodPlacement">Where the methods of the type's queries go.</param>
 /// <param name="Settings">What the attribute says about the settings.</param>
 /// <param name="IsPublic">
 /// Whether the type and every type it is nested in are declared <c>public</c>, which makes its models public.

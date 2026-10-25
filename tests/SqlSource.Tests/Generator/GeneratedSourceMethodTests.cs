@@ -1,5 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
+using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
@@ -187,6 +188,14 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("field")]
     [InlineData("_")]
     [InlineData("from")]
+    [InlineData("sql")]
+    [InlineData("command")]
+    [InlineData("reader")]
+    [InlineData("rows")]
+    [InlineData("row")]
+    [InlineData("wasClosed")]
+    [InlineData("parameter")]
+    [InlineData("App")]
     public void Run_TokenWithAnAwkwardName_Compiles(string name)
     {
         var run = GeneratorHarness.Run(
@@ -218,6 +227,48 @@ public sealed class GeneratedSourceMethodTests
         );
 
         run.ShouldBeClean();
+    }
+
+    // The same names as the token of a query's method, beside its parameters, its connection and its locals, under
+    // CodeGen: one method reads many rows, the other one.
+    [Theory]
+    [InlineData("span")]
+    [InlineData("state")]
+    [InlineData("span1")]
+    [InlineData("Item1")]
+    [InlineData("Item2")]
+    [InlineData("Rest")]
+    [InlineData("System")]
+    [InlineData("String")]
+    [InlineData("ArgumentException")]
+    [InlineData("Sql")]
+    [InlineData("Sample")]
+    [InlineData("Probe")]
+    [InlineData("T")]
+    [InlineData("var")]
+    [InlineData("dynamic")]
+    [InlineData("await")]
+    [InlineData("nameof")]
+    [InlineData("global")]
+    [InlineData("value")]
+    [InlineData("scoped")]
+    [InlineData("field")]
+    [InlineData("_")]
+    [InlineData("from")]
+    [InlineData("sql")]
+    [InlineData("command")]
+    [InlineData("reader")]
+    [InlineData("rows")]
+    [InlineData("row")]
+    [InlineData("wasClosed")]
+    [InlineData("parameter")]
+    [InlineData("App")]
+    public void Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles(string name)
+    {
+        var run = MethodRuns.RunTokenNamed(name, LanguageVersion.CSharp12);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(" ProbeOne(\n");
     }
 
     [Fact]

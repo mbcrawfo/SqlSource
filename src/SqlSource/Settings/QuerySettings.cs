@@ -46,9 +46,8 @@ internal readonly record struct QuerySettings(
 
     /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
-    /// the attribute, then the metadata of the file's item, then the project's property, then the default.
-    /// <see cref="CollectionType" /> has no effect yet.  The type override is not among them:
-    /// <see cref="ResolveTypeOverrides" /> gives it.
+    /// the attribute, then the metadata of the file's item, then the project's property, then the default.  The type
+    /// override is not among them: <see cref="ResolveTypeOverrides" /> gives it.
     /// </summary>
     public static QuerySettings Resolve(
         SettingsLevel markers,

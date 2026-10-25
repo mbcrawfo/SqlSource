@@ -50,13 +50,15 @@ internal static class TargetTypeReader
         var source = new AttributeSettings(attribute, attributeLocation, diagnostics);
         var types = ReadDeclarations(declaration, diagnostics);
         var placement = source.Choice<MemberPlacement>(AttributeSource.LocationProperty) ?? MemberPlacement.Nested;
+        var methodPlacement =
+            source.Choice<MethodPlacement>(AttributeSource.MethodLocationProperty) ?? MethodPlacement.ExtensionClass;
         var type = new TargetType(
             symbol.ContainingNamespace.IsGlobalNamespace
                 ? string.Empty
                 : symbol.ContainingNamespace.ToDisplayString(NamespaceFormat),
             new EquatableArray<TypeDeclaration>(types),
             placement,
-            source.Choice<MethodPlacement>(AttributeSource.MethodLocationProperty) ?? MethodPlacement.ExtensionClass,
+            methodPlacement,
             SettingsLevelReader.Read(ref source),
             IsPublic(symbol),
             ReadPath(attribute),
@@ -66,7 +68,9 @@ internal static class TargetTypeReader
         );
         return new DeclaredType(
             type,
-            placement == MemberPlacement.Nested ? GetTakenNames(symbol) : EquatableArray<string>.Empty
+            placement == MemberPlacement.Nested || methodPlacement != MethodPlacement.ExtensionClass
+                ? GetTakenNames(symbol)
+                : EquatableArray<string>.Empty
         );
     }
 
@@ -85,9 +89,10 @@ internal static class TargetTypeReader
         return true;
     }
 
-    // A nested class cannot share its name with a member of the type, with the type itself or with one of the
-    // type's parameters.  The name is not known until the project's property joins, so every one of them is kept,
-    // sorted, for NestedClassCheck.  MemberNames leaves out the nested types.
+    // A nested class, or a method on the type, cannot share its name with a member of the type, with the type itself
+    // or with one of the type's parameters.  The nested class's name is not known until the project's property joins,
+    // so every one of them is kept, sorted, for NestedClassCheck and for the methods' check.  MemberNames leaves out
+    // the nested types.
     private static EquatableArray<string> GetTakenNames(INamedTypeSymbol symbol) =>
         new(
             symbol

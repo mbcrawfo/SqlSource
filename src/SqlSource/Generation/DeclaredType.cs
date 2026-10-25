@@ -5,7 +5,8 @@ namespace SqlSource.Generation;
 /// </summary>
 /// <param name="Type">The type.</param>
 /// <param name="TakenNames">
-/// The names that the type's nested class cannot have, sorted ordinally: those of the type, its members and its type
-/// parameters.  Empty in <see cref="Settings.MemberPlacement.Direct" /> placement, which has no nested class.
+/// The names that the type's nested class, and its methods when they go on the type, cannot have, sorted ordinally:
+/// those of the type, its members and its type parameters.  Empty in <see cref="Settings.MemberPlacement.Direct" />
+/// placement under <see cref="Settings.MethodPlacement.ExtensionClass" />, which has neither.
 /// </param>
 internal sealed record DeclaredType(TargetType Type, EquatableArray<string> TakenNames);

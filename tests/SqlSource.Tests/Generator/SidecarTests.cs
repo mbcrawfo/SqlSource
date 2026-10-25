@@ -773,6 +773,8 @@ public sealed class SidecarTests
                 ),
             ],
             files,
+            // A query whose output is CodeGen needs the driver for its method (SQLSRC273).
+            references: [NpgsqlReferences.Npgsql10],
             dialect: "postgres"
         );
 
