@@ -72,7 +72,8 @@ internal static class RealisticNullabilityOracle
     private static SqlParameter Text(string name, string value) => new(name, SqlDbType.NVarChar, -1) { Value = value };
 
     // The rollback of a query that failed, which fails too when the error ended the transaction or the connection.
-    private static async Task RollBackAfterAsync(SqlTransaction transaction)
+    // RealisticMethodTests rolls back a method that failed by it too.
+    public static async Task RollBackAfterAsync(SqlTransaction transaction)
     {
         try
         {

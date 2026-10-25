@@ -3,8 +3,9 @@ namespace SqlSource.Tests.Postgres.Realistic.Generation;
 // Each realistic case with models is a Models query of the project, claimed here by a class of its own: a Path that
 // names a folder searches none of the folders below it, and the attribute is not AllowMultiple, so no one class can
 // claim the query.sql of every folder of Cases.  The csproj gives these files the database realistic.  A case that
-// the describer or the generator refuses has no class, and its case.json says so.  RealisticClaimsTests fails on a
-// case with models and no class, or a class of a case without them.
+// the describer or the generator refuses has no class, and its case.json says so.  RealisticMethods.cs claims each
+// of these cases a second time, at CodeGen.  RealisticClaimsTests fails on a case with models and no class, or a
+// class of a case without them.
 
 [SqlSourceGenerate(
     Path = "../Cases/aggregate-cte-joined-inner/query.sql",

@@ -59,8 +59,9 @@ internal static class RealisticNullabilityOracle
         return run;
     }
 
-    // The rollback of a query that failed, which fails too when the connection broke.
-    private static async Task RollBackAfterAsync(NpgsqlTransaction transaction)
+    // The rollback of a query that failed, which fails too when the connection broke.  RealisticMethodTests rolls back
+    // a method that failed by it too.
+    public static async Task RollBackAfterAsync(NpgsqlTransaction transaction)
     {
         try
         {

@@ -24,6 +24,6 @@
     { "filter": "'{\"device\":\"phone\"}'", "key": "'device'" }
   ],
   "dapper": {
-    "why": "@filter is a string, sent as text: the server has no operator jsonb @> text; phase 8 binds it by its type"
+    "why": "@filter is a string, sent as text: the server has no operator jsonb @> text"
   }
 }
