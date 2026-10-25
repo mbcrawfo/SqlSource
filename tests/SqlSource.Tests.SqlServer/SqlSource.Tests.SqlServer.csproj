@@ -38,6 +38,8 @@
             Update="EndToEnd/Queries/Collections/ByMetadata.sql"
             SqlSourceCollectionType="ImmutableArray"
         />
+        <!-- The queries of the notes: accounts.id as the project's AccountId, by its short name. -->
+        <AdditionalFiles Update="EndToEnd/Queries/Notes.sql" SqlSourceColumnTypes="accounts.id=AccountId" />
         <!-- The realistic corpus: the database realistic, and the type map's own C# type for date. -->
         <AdditionalFiles
             Update="Realistic/Cases/**/*.sql"

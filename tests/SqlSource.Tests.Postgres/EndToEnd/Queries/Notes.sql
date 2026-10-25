@@ -1,23 +1,40 @@
 -- The queries of the notes, claimed by NoteQueries.  The schema's enum and domains are read as C# types of the project:
--- the enum as a C# enum that the data source maps, and each domain through the converters of its type.
+-- the enum as a C# enum that the data source maps, and each domain through the converters of its type.  The ids of the
+-- accounts are AccountIds, read and sent through its converters: accounts.id by the file's column types in the
+-- project, and notes.account_id by the header's -- column: marker.
 -- type-override: public.note_kind = SqlSource.Tests.Postgres.EndToEnd.Types.NoteKind
 -- type-override: public.email = SqlSource.Tests.Postgres.EndToEnd.Types.Email
 -- type-override: public.note_ref = SqlSource.Tests.Postgres.EndToEnd.Types.NoteRef
+-- column: notes.account_id -> AccountId
 
 -- name: ListAccountNotes
 -- summary: Every account with its notes, and an account with none once, with NULL for the note.
-SELECT a.id, a.name, n.id AS note_id, n.kind, n.body
+SELECT a.id, a.name, n.id AS note_id, n.account_id, n.kind, n.body
 FROM accounts AS a
 LEFT JOIN notes AS n ON n.account_id = a.id
 ORDER BY a.id, n.id;
 
 -- name: CountAccountNotes
 -- summary: The number of notes of each account.
+-- A count has no source column, so the column types do not reach it, and the marker gives it its type.
+-- column: note_count -> NoteCount
 SELECT a.id, count(n.id) AS note_count
 FROM accounts AS a
 LEFT JOIN notes AS n ON n.account_id = a.id
 GROUP BY a.id
 ORDER BY a.id;
+
+-- name: GetAccountNoteCount -> one
+-- summary: The number of notes of the account that an id names.
+-- A parameter has no source column either: the marker gives it its C# type, and the database infers its type from the
+-- column it is compared with.
+-- param: @id -> AccountId
+-- column: note_count -> NoteCount
+SELECT a.id, count(n.id) AS note_count
+FROM accounts AS a
+LEFT JOIN notes AS n ON n.account_id = a.id
+WHERE a.id = @id
+GROUP BY a.id;
 
 -- name: ListDisplayNames
 -- summary: The name of each account with each word capitalized.

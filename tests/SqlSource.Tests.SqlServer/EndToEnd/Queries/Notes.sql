@@ -1,22 +1,39 @@
 -- The queries of the notes, claimed by NoteQueries.  The schema's alias type dbo.Email is read and sent as a C# type of
--- the project, through its converters, and time as a TimeOnly.
+-- the project, through its converters, and time as a TimeOnly.  The ids of the accounts are AccountIds, read and sent
+-- through its converters: dbo.accounts.id by the file's column types in the project, and dbo.notes.account_id by the
+-- header's -- column: marker.
 -- type-override: dbo.Email = SqlSource.Tests.SqlServer.EndToEnd.Types.Email
 -- type-override: time = System.TimeOnly
+-- column: notes.account_id -> AccountId
 
 -- name: ListAccountNotes
 -- summary: Every account with its notes, and an account with none once, with NULL for the note.
-SELECT a.id, a.name, n.id AS note_id, n.kind, n.body, n.remind_at
+SELECT a.id, a.name, n.id AS note_id, n.account_id, n.kind, n.body, n.remind_at
 FROM dbo.accounts AS a
 LEFT JOIN dbo.notes AS n ON n.account_id = a.id
 ORDER BY a.id, n.id;
 
 -- name: CountAccountNotes
 -- summary: The number of notes of each account, which the tool shows is never null.
+-- A count has no source column, so the column types do not reach it, and the marker gives it its type.
+-- column: note_count -> NoteCount
 SELECT a.id, COUNT(n.id) AS note_count
 FROM dbo.accounts AS a
 LEFT JOIN dbo.notes AS n ON n.account_id = a.id
 GROUP BY a.id
 ORDER BY a.id;
+
+-- name: GetAccountNoteCount -> one
+-- summary: The number of notes of the account that an id names.
+-- A parameter has no source column either: the marker gives it its C# type, and SQL Server describes its type from the
+-- column it is compared with.
+-- param: @id -> AccountId
+-- column: note_count -> NoteCount
+SELECT a.id, COUNT(n.id) AS note_count
+FROM dbo.accounts AS a
+LEFT JOIN dbo.notes AS n ON n.account_id = a.id
+WHERE a.id = @id
+GROUP BY a.id;
 
 -- name: ListAccountMonths
 -- summary: The last day of the month each account opened in.

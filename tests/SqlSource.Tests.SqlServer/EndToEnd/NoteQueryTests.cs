@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Shouldly;
@@ -8,10 +9,11 @@ using Xunit;
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
 // The queries of Queries/Notes.sql, run on the seed of "app" through the methods that NoteQueries gets: the alias type
-// dbo.Email is read and sent as the record struct Email, through its converters, as a column and as a parameter, and
-// time is read as a TimeOnly, by the file's type override, or as a TimeSpan, by a query's.  Half the reads give the
-// method an open connection and half a closed one, which the method opens.  A write runs in a transaction that is
-// rolled back.
+// dbo.Email is read and sent as the record struct Email, and the ids of the accounts and a count, by the file's column
+// types and the queries' markers, as the record structs AccountId and NoteCount, through their converters, as columns
+// and as parameters, and time is read as a TimeOnly, by the file's type override, or as a TimeSpan, by a query's.  Half
+// the reads give the method an open connection and half a closed one, which the method opens.  A write runs in a
+// transaction that is rolled back.
 [Collection(UsesSqlServer.Name)]
 public sealed class NoteQueryTests(SqlServerContainer sqlServer)
 {
@@ -28,25 +30,80 @@ public sealed class NoteQueryTests(SqlServerContainer sqlServer)
         var notes = await connection.ListAccountNotes(cancellationToken: token);
 
         notes.ShouldBe([
-            new ListAccountNotesDto(1, "alice", 1, "call", "Asked for a larger plan.", new TimeOnly(9, 30)),
-            new ListAccountNotesDto(1, "alice", 2, "email", "Sent the quote.", null),
-            new ListAccountNotesDto(2, "bob", 3, "visit", "Closed the account on site.", null),
-            new ListAccountNotesDto(3, "carol", null, null, null, null),
+            new ListAccountNotesDto(
+                new AccountId(1),
+                "alice",
+                1,
+                new AccountId(1),
+                "call",
+                "Asked for a larger plan.",
+                new TimeOnly(9, 30)
+            ),
+            new ListAccountNotesDto(new AccountId(1), "alice", 2, new AccountId(1), "email", "Sent the quote.", null),
+            new ListAccountNotesDto(
+                new AccountId(2),
+                "bob",
+                3,
+                new AccountId(2),
+                "visit",
+                "Closed the account on site.",
+                null
+            ),
+            new ListAccountNotesDto(new AccountId(3), "carol", null, null, null, null, null),
         ]);
     }
 
+    // dbo.accounts.id is an AccountId by the file's column types in the project, and dbo.notes.account_id one by the
+    // header's -- column: marker, nullable on the optional side of the join: each is read from the int that SqlClient
+    // gives, through FromDatabase, and carol's NULL is read as null, never given to it.
     [Fact]
-    public async Task CountAccountNotes_EveryAccount_ReadsTheCounts()
+    public async Task ListAccountNotes_EveryRow_ReadsTheIdsAsAccountIds()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var notes = await connection.ListAccountNotes(cancellationToken: TestContext.Current.CancellationToken);
+
+        notes
+            .Select(static note => (note.Id, note.AccountId))
+            .ShouldBe([
+                (new AccountId(1), new AccountId(1)),
+                (new AccountId(1), new AccountId(1)),
+                (new AccountId(2), new AccountId(2)),
+                (new AccountId(3), null),
+            ]);
+    }
+
+    // The count, an int on SQL Server, is read from the int that SqlClient gives, through NoteCount's FromDatabase, by
+    // the query's -- column: marker.
+    [Fact]
+    public async Task CountAccountNotes_EveryAccount_ReadsTheCountsAsNoteCounts()
     {
         await using var connection = EndToEndSources.App(sqlServer);
 
         var counts = await connection.CountAccountNotes(cancellationToken: TestContext.Current.CancellationToken);
 
         counts.ShouldBe([
-            new CountAccountNotesDto(1, 2),
-            new CountAccountNotesDto(2, 1),
-            new CountAccountNotesDto(3, 0),
+            new CountAccountNotesDto(new AccountId(1), new NoteCount(2)),
+            new CountAccountNotesDto(new AccountId(2), new NoteCount(1)),
+            new CountAccountNotesDto(new AccountId(3), new NoteCount(0)),
         ]);
+    }
+
+    // The parameter, which the -- param: marker gives the type AccountId and SQL Server describes as an int, is sent as
+    // the int that ToDatabase returns.
+    [Fact]
+    public async Task GetAccountNoteCount_AnAccountId_ReadsItsNoteCount()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(token);
+
+        var count = await connection.GetAccountNoteCount(
+            new GetAccountNoteCountArgs(new AccountId(1)),
+            cancellationToken: token
+        );
+
+        count.ShouldBe(new GetAccountNoteCountDto(new AccountId(1), new NoteCount(2)));
     }
 
     [Fact]
@@ -59,9 +116,9 @@ public sealed class NoteQueryTests(SqlServerContainer sqlServer)
         var months = await connection.ListAccountMonths(cancellationToken: token);
 
         months.ShouldBe([
-            new ListAccountMonthsDto(1, new DateOnly(2024, 1, 31)),
-            new ListAccountMonthsDto(2, new DateOnly(2024, 2, 29)),
-            new ListAccountMonthsDto(3, new DateOnly(2024, 3, 31)),
+            new ListAccountMonthsDto(new AccountId(1), new DateOnly(2024, 1, 31)),
+            new ListAccountMonthsDto(new AccountId(2), new DateOnly(2024, 2, 29)),
+            new ListAccountMonthsDto(new AccountId(3), new DateOnly(2024, 3, 31)),
         ]);
     }
 
@@ -75,9 +132,9 @@ public sealed class NoteQueryTests(SqlServerContainer sqlServer)
         var names = await connection.ListMarkedNames(cancellationToken: TestContext.Current.CancellationToken);
 
         names.ShouldBe([
-            new ListMarkedNamesDto(1, "ALICE"),
-            new ListMarkedNamesDto(2, "BOB"),
-            new ListMarkedNamesDto(3, "CAROL"),
+            new ListMarkedNamesDto(new AccountId(1), "ALICE"),
+            new ListMarkedNamesDto(new AccountId(2), "BOB"),
+            new ListMarkedNamesDto(new AccountId(3), "CAROL"),
         ]);
     }
 
@@ -121,7 +178,7 @@ public sealed class NoteQueryTests(SqlServerContainer sqlServer)
             cancellationToken: token
         );
 
-        account.ShouldBe(new FindAccountByEmailDto(3, "carol", new Email("carol@example.com")));
+        account.ShouldBe(new FindAccountByEmailDto(new AccountId(3), "carol", new Email("carol@example.com")));
     }
 
     [Fact]
