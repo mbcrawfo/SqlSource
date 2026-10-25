@@ -124,6 +124,12 @@ DECLARE @written TABLE (value datetime2(3) NULL);
 INSERT INTO @written (value) VALUES (@value);
 SELECT value FROM @written;
 
+-- name: FindDatetime2Of3
+-- summary: The values of a datetime2(3) that holds 13:45:30.124 equal to a value, which is compared with seven digits.
+DECLARE @stored TABLE (value datetime2(3) NOT NULL);
+INSERT INTO @stored (value) VALUES ('2024-03-15T13:45:30.124');
+SELECT value FROM @stored WHERE value = @value;
+
 -- name: ListTinyintLevels
 -- summary: The tinyint values of the rows that hold a level, sent and read as a C# enum over byte.
 -- type-override: tinyint = SqlSource.Testing.EndToEnd.Level

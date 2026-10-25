@@ -1,5 +1,6 @@
 using System;
 using System.Data.Common;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -14,8 +15,9 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // by the methods of Queries/AllTypes.sql and Queries/NewTypes.sql, which bind each parameter as its described type,
 // with its facets.  The rows are row 1 and row 2 of the seed, as SqlServerAllTypesRows has them, written again as the
 // row InsertedId, and each write runs in a transaction that is rolled back.  The facets are proved at their edges: a
-// value longer than its column, more digits than a datetime2(3) or a decimal(12,4) holds, and a decimal outside its
-// precision.  The methods of NewTypes.sql need SQL Server 2025, and skip below it.
+// value longer than its column, by more than a trailing space or zero byte or by only that, more digits than a
+// datetime2(3) or a decimal(12,4) holds, in a write and in a WHERE, and a decimal outside its precision.  The
+// methods of NewTypes.sql need SQL Server 2025, and skip below it.
 [Collection(UsesSqlServer.Name)]
 public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
 {
@@ -25,6 +27,9 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
     private static readonly string TwentyOneCharacters = new('a', 21);
 
     private static readonly byte[] NineBytes = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+    // One longer than varchar_value by a space at its end.
+    private static readonly string TwentyCharactersAndASpace = new string('a', 20) + " ";
 
     // One longer than varbinary_value by a zero byte at its end.
     private static readonly byte[] EightBytesAndAZero = [1, 2, 3, 4, 5, 6, 7, 8, 0];
@@ -157,9 +162,10 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
     }
 
     // A string longer than its varchar(20) and a byte[] longer than its varbinary(8) are sent whole, so the server
-    // refuses the insert, where SqlClient would cut them to the parameter's Size and store less than was given: 2628
-    // from SQL Server 2019, which names the column, and 8152 before it.  Neither ends in what the server drops without
-    // an error, a space of a string or a zero byte of a byte[].
+    // refuses the insert, where SqlClient would cut them to the parameter's Size and store less than was given: 2628,
+    // which names the column, from SQL Server 2019 in a database of compatibility level 150 or later, as the server's
+    // own default makes this one, and 8152 on 2017.  Neither ends in what the server drops without an error, a space
+    // of a string or a zero byte of a byte[].
     [Theory]
     [InlineData(nameof(WriteAllTypesArgs.VarcharValue))]
     [InlineData(nameof(WriteAllTypesArgs.VarbinaryValue))]
@@ -186,7 +192,7 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
 
     // A byte[] longer than its varbinary(8) only by a trailing zero byte is sent whole, bound at varbinary(max) as the
     // refusal above proves, and the server stores it without that byte and with no error, as it drops the trailing
-    // spaces of a string: the one over-long value that an insert takes.
+    // space of a string below: the over-long values that an insert takes.
     [Fact]
     public async Task WriteAllTypes_ByteArrayLongerOnlyByATrailingZero_IsStoredWithoutIt()
     {
@@ -207,6 +213,33 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
                 );
 
                 written.VarbinaryValue.ShouldBe(EightBytesAndAZero[..8]);
+            },
+            token
+        );
+    }
+
+    // A string longer than its varchar(20) only by a trailing space is sent whole, and the server stores it without the
+    // space and with no error.
+    [Fact]
+    public async Task WriteAllTypes_StringLongerOnlyByATrailingSpace_IsStoredWithoutIt()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
+            {
+                var written = await connection.WriteAllTypes(
+                    SqlServerAllTypesRows.ArgsOf<WriteAllTypesArgs>(InsertedId, row: null) with
+                    {
+                        VarcharValue = TwentyCharactersAndASpace,
+                    },
+                    transaction: transaction,
+                    cancellationToken: token
+                );
+
+                written.VarcharValue.ShouldBe(TwentyCharactersAndASpace[..20]);
             },
             token
         );
@@ -251,6 +284,39 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
         );
     }
 
+    // A value longer than the char(5) only by a trailing space matches the row of its first five characters, since the
+    // server pads the shorter side with spaces to compare two strings.
+    [Fact]
+    public async Task FindByChar_ValueLongerOnlyByASpace_MatchesTheRow()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
+            {
+                _ = await connection.WriteAllTypes(
+                    SqlServerAllTypesRows.ArgsOf<WriteAllTypesArgs>(InsertedId, row: null) with
+                    {
+                        CharValue = "abcde",
+                    },
+                    transaction: transaction,
+                    cancellationToken: token
+                );
+
+                var found = await connection.FindByChar(
+                    new FindByCharArgs("abcde "),
+                    transaction: transaction,
+                    cancellationToken: token
+                );
+
+                found.ShouldBe([new FindByCharDto(InsertedId)]);
+            },
+            token
+        );
+    }
+
     // The parameter is bound at scale 7 whatever the column's, so the server rounds the value as it assigns it, and
     // SqlClient, which would truncate it at scale 3, does not: .1235678 reads back .1240000.
     [Theory]
@@ -269,12 +335,35 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
         written.ShouldBe(new WriteDatetime2Of3Dto(second.AddTicks(expectedTicks)));
     }
 
+    // The parameter is bound at scale 7, so a WHERE compares a datetime2(3) with all seven digits of the value: the
+    // column's .124 equals .1240000, and not .1235678, which the server would round to .124 on an insert.
+    [Theory]
+    [InlineData(1240000, true)]
+    [InlineData(1235678, false)]
+    public async Task FindDatetime2Of3_SevenDigits_ComparesThemAll(long ticks, bool isFound)
+    {
+        var second = new DateTime(2024, 3, 15, 13, 45, 30, DateTimeKind.Unspecified);
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var found = await connection.FindDatetime2Of3(
+            new FindDatetime2Of3Args(second.AddTicks(ticks)),
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        found.Count.ShouldBe(isFound ? 1 : 0);
+    }
+
     // A decimal with more scale than its decimal(12,4) is rounded to it by SqlClient, half away from zero, as the
     // server rounds it on an insert, so the row holds 1.2346 and a WHERE given 1.23456 compares 1.2346 and matches it.
     // Bound by its value, 1.23456 would be a decimal(6,5), which the WHERE compares unrounded, and matches nothing.
-    [Fact]
-    public async Task WriteAllTypes_DecimalWithMoreScale_IsRoundedAndMatchedRounded()
+    // 1.23465 is rounded to 1.2347, where rounding half to even would give 1.2346.
+    [Theory]
+    [InlineData("1.23456", "1.2346")]
+    [InlineData("1.23465", "1.2347")]
+    public async Task WriteAllTypes_DecimalWithMoreScale_IsRoundedAndMatchedRounded(string given, string rounded)
     {
+        var value = decimal.Parse(given, CultureInfo.InvariantCulture);
+        var expected = decimal.Parse(rounded, CultureInfo.InvariantCulture);
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
 
@@ -285,19 +374,19 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
                 var written = await connection.WriteAllTypes(
                     SqlServerAllTypesRows.ArgsOf<WriteAllTypesArgs>(InsertedId, row: null) with
                     {
-                        DecimalValue = 1.23456m,
+                        DecimalValue = value,
                     },
                     transaction: transaction,
                     cancellationToken: token
                 );
 
                 var found = await connection.FindByDecimal(
-                    new FindByDecimalArgs(1.23456m),
+                    new FindByDecimalArgs(value),
                     transaction: transaction,
                     cancellationToken: token
                 );
 
-                written.DecimalValue.ShouldBe(1.2346m);
+                written.DecimalValue.ShouldBe(expected);
                 found.ShouldBe([new FindByDecimalDto(InsertedId)]);
             },
             token

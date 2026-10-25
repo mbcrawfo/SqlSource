@@ -168,7 +168,8 @@ public sealed class NoteQueryTests(SqlServerContainer sqlServer)
     }
 
     // The parameter is described as nvarchar(320), and a converted value longer than that is sent whole, so the server
-    // refuses it rather than storing it cut: 2628 from SQL Server 2019, which names the column, and 8152 before it.
+    // refuses it rather than storing it cut: 2628, which names the column, from SQL Server 2019 in a database of
+    // compatibility level 150 or later, as the server's own default makes this one, and 8152 on 2017.
     [Fact]
     public async Task AddAccount_EmailLongerThanTheType_IsRefusedByTheServer()
     {

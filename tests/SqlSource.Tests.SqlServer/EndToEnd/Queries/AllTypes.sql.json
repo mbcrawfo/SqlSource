@@ -2851,6 +2851,47 @@
         }
       ]
     },
+    "FindDatetime2Of3": {
+      "hash": "fae789bd1e354a7886752a4be98820585736807bfa9646f1337411d256d0ef87",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "value",
+          "ordinal": 0,
+          "type": {
+            "name": "datetime2(3)",
+            "maxLength": 7,
+            "precision": 23,
+            "scale": 3
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "value",
+          "type": {
+            "name": "datetime2(3)",
+            "maxLength": 7,
+            "precision": 23,
+            "scale": 3
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "ListTinyintLevels": {
       "hash": "091e1314ce12f11ba407e59ef93e2666d0d480f875aa41b579169743f5a6e550",
       "engine": "mssql",
