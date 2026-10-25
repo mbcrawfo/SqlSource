@@ -67,11 +67,25 @@ public sealed class ShortNameIndexTests
         ShortNameIndex.IndexOf(library).ShouldBeSameAs(index);
     }
 
+    // A run that resolves full names alone builds no index.
     [Fact]
-    public void IndexOf_ReferenceNoShortNameAsked_IsNull()
+    public void Resolve_FullNamesOnly_BuildsNoIndex()
     {
         var library = GeneratorHarness.CreateReference(OutputKind.Sql, "Lib", LibrarySource);
+        var compilation = GeneratorHarness.CreateCompilation(
+            [new SourceFile("/app/App.cs", "namespace App;\n\npublic sealed class Sample;\n")],
+            references: [library]
+        );
 
+        var types = MappedTypeResolver
+            .Resolve(
+                compilation,
+                new EquatableArray<string>(["global::Lib.UserId"]),
+                TestContext.Current.CancellationToken
+            )
+            .Types;
+
+        types.ShouldHaveSingleItem().Status.ShouldBe(MappedTypeStatus.Found);
         ShortNameIndex.IndexOf(library).ShouldBeNull();
     }
 

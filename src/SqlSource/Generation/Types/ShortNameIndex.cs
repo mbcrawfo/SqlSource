@@ -10,7 +10,8 @@ namespace SqlSource.Generation.Types;
 
 /// <summary>
 /// Finds the types that a short name can mean: the types of that name and arity, in any namespace and nested in no
-/// other type, of the project's source and of its references, that the project can see.
+/// other type, of the project's source and of its references, that the project can see and name, so no file-local
+/// type.
 /// </summary>
 /// <remarks>
 /// The project's own types are found by the compiler's lookup by name.  Each reference's top-level types are indexed by
@@ -39,7 +40,12 @@ internal static class ShortNameIndex
         var names = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var symbol in compilation.GetSymbolsWithName(name, SymbolFilter.Type))
         {
-            if (symbol is INamedTypeSymbol { ContainingType: null } type && type.Arity == arity)
+            // A file-local type has a name that no other file, generated code included, can write.
+            if (
+                symbol
+                    is INamedTypeSymbol { ContainingType: null, IsFileLocal: false, CanBeReferencedByName: true } type
+                && type.Arity == arity
+            )
             {
                 _ = names.Add(MetadataNameOf(type));
             }
@@ -150,8 +156,9 @@ internal static class ShortNameIndex
         {
             foreach (var type in name.GetTypeMembers())
             {
-                // <Module> and the compiler's other types have names no C# can write.
-                if (!type.CanBeReferencedByName)
+                // <Module> and the compiler's other types have names no C# can write, nor has a file-local type
+                // outside its file.
+                if (!type.CanBeReferencedByName || type.IsFileLocal)
                 {
                     continue;
                 }

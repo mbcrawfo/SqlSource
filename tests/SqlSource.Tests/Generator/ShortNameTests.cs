@@ -151,6 +151,97 @@ public sealed class ShortNameTests
         TextOf(run).ShouldBe("global::App.UserId");
     }
 
+    // A file-local type has a name no other file can write, so it is no candidate beside App.UserId.
+    [Fact]
+    public void Run_ShortName_FileLocalTypeBesideAPublicOne_IsThePublicOne()
+    {
+        const string FileLocal = """
+
+            namespace Other
+            {
+                file sealed class UserId;
+            }
+            """;
+
+        var run = RunOf(Source + AppUserId + FileLocal, "int8=UserId", Int8);
+
+        run.ShouldBeClean();
+        TextOf(run).ShouldBe("global::App.UserId");
+    }
+
+    [Fact]
+    public void Run_ShortName_OnlyAFileLocalType_IsSQLSRC250()
+    {
+        const string FileLocal = """
+
+            namespace App
+            {
+                file readonly record struct UserId(long Value);
+            }
+            """;
+
+        var run = RunOf(Source + FileLocal, "int8=UserId", Int8);
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC250 ");
+        run.CompilationErrors.ShouldBeEmpty();
+    }
+
+    // A reference that gives the project its internals makes its internal type a candidate.  A model of it is then
+    // SQLSRC251 unless the claiming type is internal, which is another rule, so the resolution is asked alone.
+    [Fact]
+    public void Resolve_ShortName_InternalOfAReferenceThatShowsItsInternals_IsItsFullName()
+    {
+        var library = GeneratorHarness.CreateReference(
+            OutputKind.Sql,
+            "Lib",
+            "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"TestAssembly\")]\n"
+                + LibraryUserId.Replace("public readonly", "internal readonly", System.StringComparison.Ordinal)
+        );
+        var compilation = GeneratorHarness.CreateCompilation(
+            [new SourceFile("/app/App.cs", "namespace App;\n\npublic sealed class Sample;\n")],
+            references: [library]
+        );
+
+        var type = Resolve(compilation, "UserId");
+
+        type.Status.ShouldBe(MappedTypeStatus.Found);
+        type.Text.ShouldBe("global::Lib.UserId");
+        type.IsPublic.ShouldBeFalse();
+    }
+
+    // The converters of a type named by its short name are found and applied, as for its full name.
+    [Fact]
+    public void Run_ShortNameWithConverters_AppliesThem()
+    {
+        const string Converting = """
+
+            namespace App
+            {
+                public readonly record struct UserId(long Value)
+                {
+                    [SqlSourceConverter]
+                    public static UserId FromDatabase(long value) => new(value);
+
+                    [SqlSourceConverter]
+                    public static long ToDatabase(UserId id) => id.Value;
+                }
+            }
+            """;
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n");
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "GetUser", [Parameter("id", Int8)], [Column("id", Int8)])],
+            Source + Converting,
+            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "int8=UserId" }
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("global::App.UserId.FromDatabase(reader.GetFieldValue<long>(0))");
+        methods.ShouldContain("global::App.UserId.ToDatabase(");
+    }
+
     [Fact]
     public void Run_ShortName_NestedType_IsNotFound()
     {
@@ -241,6 +332,39 @@ public sealed class ShortNameTests
             .Columns.ShouldNotBeNull()
             .ShouldHaveSingleItem()
             .Text;
+
+    // A full name that two references both have is ambiguous by itself, so its argument's short name, ambiguous too,
+    // lends it no candidates: they would name types of another part.
+    [Fact]
+    public void Resolve_AmbiguousFullNameWithAnAmbiguousShortArgument_HasNoCandidates()
+    {
+        const string Box = "namespace Shared\n{\n    public sealed class Box<T>;\n}\n";
+        var compilation = GeneratorHarness.CreateCompilation(
+            [new SourceFile("/app/App.cs", AppUserId + OtherUserId)],
+            references:
+            [
+                GeneratorHarness.CreateReference(OutputKind.Sql, "First", Box),
+                GeneratorHarness.CreateReference(OutputKind.Sql, "Second", Box),
+            ]
+        );
+
+        var type = Resolve(compilation, "global::Shared.Box<UserId>");
+
+        type.Status.ShouldBe(MappedTypeStatus.Ambiguous);
+        type.Candidates.ShouldBeEmpty();
+    }
+
+    // The candidates of an ambiguous short argument are the name's, when the type around it is found.
+    [Fact]
+    public void Resolve_FoundFullNameWithAnAmbiguousShortArgument_HasTheArgumentsCandidates()
+    {
+        var compilation = GeneratorHarness.CreateCompilation([new SourceFile("/app/App.cs", AppUserId + OtherUserId)]);
+
+        var type = Resolve(compilation, "global::System.Collections.Generic.List<UserId>");
+
+        type.Status.ShouldBe(MappedTypeStatus.Ambiguous);
+        type.Candidates.ShouldBe(["App.UserId", "Other.UserId"]);
+    }
 
     private static MappedType Resolve(Compilation compilation, string name) =>
         MappedTypeResolver

@@ -204,6 +204,8 @@ internal static class MappedTypeResolver
             }
         }
 
+        // A failure of the name's own lookup, an ambiguity across references among them, returns here before its
+        // arguments are read, so the candidates gathered below are always those of an argument of a type found.
         if (type is null)
         {
             return Resolution.Failed(status);
