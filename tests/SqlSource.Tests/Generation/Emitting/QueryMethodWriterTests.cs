@@ -569,6 +569,34 @@ public sealed class QueryMethodWriterTests
         text.ShouldNotContain("(await, b)");
     }
 
+    // A conversion by element is not written yet: the column is read as its property's type, and ReadText says so.
+    [Fact]
+    public void Append_ColumnConvertedByElement_IsReadAsItsPropertysType()
+    {
+        var column = new MethodColumn(
+            "emails",
+            "Emails",
+            "global::App.Email[]",
+            false,
+            new Conversion("global::App.Email.FromDatabase", "string[]", false, true, "global::App.Email", true)
+        );
+
+        var text = Write(
+            GetUser with
+            {
+                Output = GetUser.Output! with
+                {
+                    Columns = TestModels.Array(column),
+                    ConstructorOrder = TestModels.Array(0),
+                },
+            }
+        );
+
+        column.ReadText.ShouldBe("global::App.Email[]");
+        text.ShouldContain("new global::App.GetUserDto(reader.GetFieldValue<global::App.Email[]>(0))");
+        text.ShouldNotContain("FromDatabase");
+    }
+
     [Fact]
     public void Append_SummaryOfTheQuery_IsTheMethodsSummary() =>
         Write(GetUser with { SummaryXml = "Finds a user by <c>id</c>,\nor none." })

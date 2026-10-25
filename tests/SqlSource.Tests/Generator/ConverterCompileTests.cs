@@ -13,8 +13,9 @@ namespace SqlSource.Tests.Generator;
 
 // The methods that read and bind through converters, compiled against each driver the generator supports, as
 // MethodCompileTests compiles those without: a column and a parameter converted from and to a value type and a
-// reference type, nullable and not, in a query of each shape.  The compilation reports every warning wave, so the
-// converted code compiles with no error and no warning in what is generated.  Each run is at CodeGen.
+// reference type, nullable and not, in a query of each shape, and on SqlClient a vector read and bound through one.
+// The compilation reports every warning wave, so the converted code compiles with no error and no warning in what is
+// generated.  Each run is at CodeGen.
 public sealed class ConverterCompileTests
 {
     // UserId, a value type over a long; Email, a value type over a string; and Name, a reference type over a string.
@@ -102,13 +103,16 @@ public sealed class ConverterCompileTests
         -- type-override: vector=App.Embedding
         -- name: ListDocuments
         SELECT id, manager, email, contact, title, note, embedding, draft FROM documents
-        WHERE id = @id OR manager = @manager OR email = @email OR title = @title;
+        WHERE id = @id OR manager = @manager OR email = @email OR title = @title
+            OR embedding = @embedding OR draft = @draft;
         -- name: GetDocument -> one
         SELECT id, manager, email, contact, title, note, embedding, draft FROM documents
-        WHERE id = @id OR manager = @manager OR email = @email OR title = @title;
+        WHERE id = @id OR manager = @manager OR email = @email OR title = @title
+            OR embedding = @embedding OR draft = @draft;
         -- name: FindDocument -> one-optional
         SELECT id, manager, email, contact, title, note, embedding, draft FROM documents
-        WHERE id = @id OR manager = @manager OR email = @email OR title = @title;
+        WHERE id = @id OR manager = @manager OR email = @email OR title = @title
+            OR embedding = @embedding OR draft = @draft;
         -- name: RenameDocument
         UPDATE documents SET title = @title, email = @email, manager = @manager WHERE id = @id;
 
@@ -211,6 +215,8 @@ public sealed class ConverterCompileTests
             TestSidecars.Parameter(1, "manager", bigint, true),
             TestSidecars.Parameter(2, "email", varchar, true),
             TestSidecars.Parameter(3, "title", nvarchar, false),
+            TestSidecars.Parameter(4, "embedding", vector, false),
+            TestSidecars.Parameter(5, "draft", vector, true),
         ];
         SidecarColumn[] columns =
         [
@@ -252,6 +258,8 @@ public sealed class ConverterCompileTests
         methods.ShouldNotContain("value7");
         methods.ShouldContain("parameter.Value = global::App.UserId.ToDatabase(parameters.Id);\n");
         methods.ShouldContain("parameters.Title is { } value ? (object)global::App.Name.ToDatabase(value)");
+        methods.ShouldContain("parameters.Embedding is { } value ? (object)global::App.Embedding.ToDatabase(value)");
+        methods.ShouldContain("parameters.Draft is { } value ? (object)global::App.Embedding.ToDatabase(value)");
     }
 
     private static string SourceWith(string extra) => Source.Replace("EXTRA", extra, StringComparison.Ordinal);

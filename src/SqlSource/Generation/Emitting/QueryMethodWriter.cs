@@ -607,7 +607,7 @@ internal static class QueryMethodWriter
         _ = builder
             .Append(locals.Reader)
             .Append(".GetFieldValue<")
-            .Append(read?.DatabaseText ?? column.TypeText)
+            .Append(column.ReadText)
             .Append(">(")
             .Append(ordinalText)
             .Append(')');
