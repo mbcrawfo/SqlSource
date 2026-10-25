@@ -13,11 +13,11 @@ using Xunit;
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
 // The bytes that a generated method allocates for each call, against a hand-written ADO.NET method of the same calls:
-// ShapeQueries.SearchAccounts, with two parameters and three rows of the seed of "app".  The hand-written method is
-// written as the manual's own-code recipe writes one, with the binding of each parameter that the generated method
-// makes and the open/close rule of the methods, and returns the same rows in the same collection, an IReadOnlyList
-// with an array behind it, which it can only build by copying a List, since the count of the rows is not known until
-// they are read.  GC.GetTotalAllocatedBytes(true) counts every thread, where the driver completes the continuations of
+// ShapeQueries.SearchAccounts, with two parameters and three rows of the seed of "app".  The hand-written method makes
+// the generated method's calls, one by one: the open/close rule of the methods, the command and its arguments, the
+// binding of each parameter, the reads of each column, and the same rows in the same collection, an IReadOnlyList with
+// an array behind it, which it can only build by copying a List, since the count of the rows is not known until they
+// are read.  GC.GetTotalAllocatedBytes(true) counts every thread, where the driver completes the continuations of
 // an asynchronous call, so the test runs in MeasuresAllocations, alone and on a server of its own.
 [Collection(MeasuresAllocations.Name)]
 public sealed class AllocationTests(SqlServerContainer sqlServer)
@@ -31,20 +31,24 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
     // them fell no further.
     private const int WarmUpCalls = 50;
 
-    // Twenty blocks of fifty calls of each method, alternated so that the two see the same state of the process.  A
-    // call allocated about 6.7 KB on an open connection and 7.2 KB on a closed one, on SQL Server 2025 and 2017 alike
-    // when the counts were set, and the median of the blocks of the two methods was within 6 bytes of each other; a
-    // run of the test takes some seconds.
-    private const int Blocks = 20;
+    // Twenty pairs of blocks of fifty calls, one block of each method, alternated so that the two see the same state
+    // of the process.  A call allocated about 6.7 KB on an open connection and 7.2 KB on a closed one, on SQL Server
+    // 2025 and 2017 alike when the counts were set, and the median of the differences of the pairs was within 6 bytes
+    // of zero; a run of the test takes some seconds.
+    private const int Pairs = 20;
 
     private const int CallsPerBlock = 50;
 
-    // The bytes a call of the generated method may allocate over the hand-written one's, compared by the median of the
-    // blocks.  It is below the 24 bytes of the smallest object of a 64-bit process, so that any object the generated
-    // method allocates for each call and the hand-written does not fails the test, and above the noise of the median,
-    // 6 bytes when it was set.  A median leaves out a block that another thread's allocation landed in, such as the
-    // pool's timer, which a total would spread over every call.  Lower it if the noise allows; never raise it to make a
-    // change pass.
+    // The bytes a call of the generated method may allocate over the hand-written one's, by the median of the
+    // differences of the pairs of blocks: each block of the generated method less the block of the hand-written one
+    // measured beside it.  A pair shares the state of the process, so a drift of the run, such as a pool or a buffer
+    // that grows, or a server that answers at another pace, which changes how many of the driver's awaits complete
+    // asynchronously, cancels within the pair, where the medians of each method's blocks taken apart would carry it
+    // into one of them.  The median leaves out a pair that another thread's allocation landed in, such as the pool's
+    // timer, which a total would spread over every call.  The margin is below the 24 bytes of the smallest object of a
+    // 64-bit process, so that any object the generated method allocates for each call and the hand-written does not
+    // fails the test, and above the noise of the median, 6 bytes when it was set.  Lower it if the noise allows; never
+    // raise it to make a change pass.
     private const double MarginInBytesPerCall = 16;
 
     // A call allocates its command, its parameters, its reader and its rows: some kilobytes on the drivers that the
@@ -79,26 +83,33 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
 
         var generatedBlocks = new List<double>();
         var byHandBlocks = new List<double>();
-        for (var block = 0; block < Blocks; block++)
+        var differences = new List<double>();
+        for (var pair = 0; pair < Pairs; pair++)
         {
-            // Each method goes first in every other block.
-            var generatedFirst = block % 2 == 0;
+            // Each method goes first in every other pair.
+            var generatedFirst = pair % 2 == 0;
+            var perCall = new Dictionary<bool, double>();
             foreach (var generated in new[] { generatedFirst, !generatedFirst })
             {
-                var perCall = await AllocatedPerCallAsync(generated, connection, filter, CallsPerBlock, token);
-                (generated ? generatedBlocks : byHandBlocks).Add(perCall);
+                perCall[generated] = await AllocatedPerCallAsync(generated, connection, filter, CallsPerBlock, token);
             }
+
+            generatedBlocks.Add(perCall[true]);
+            byHandBlocks.Add(perCall[false]);
+            differences.Add(perCall[true] - perCall[false]);
         }
 
         var generatedPerCall = Median(generatedBlocks);
         var byHandPerCall = Median(byHandBlocks);
+        var differencePerCall = Median(differences);
         TestContext.Current.TestOutputHelper?.WriteLine(
-            $"Bytes per call: generated {generatedPerCall:F1}, by hand {byHandPerCall:F1}."
+            $"Bytes per call: generated {generatedPerCall:F1}, by hand {byHandPerCall:F1}, "
+                + $"difference of the pairs {differencePerCall:F1}."
         );
 
         byHandPerCall.ShouldBeGreaterThan(LeastBytesPerCall);
         generatedPerCall.ShouldBeGreaterThan(LeastBytesPerCall);
-        generatedPerCall.ShouldBeLessThanOrEqualTo(byHandPerCall + MarginInBytesPerCall);
+        differencePerCall.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     // The bytes that every thread allocated for each of the calls of one method.
