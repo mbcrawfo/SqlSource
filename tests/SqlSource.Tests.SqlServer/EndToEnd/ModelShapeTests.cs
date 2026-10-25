@@ -278,11 +278,18 @@ public sealed class ModelShapeTests
             ModelShape.Record,
             ("Email", typeof(Email), false)
         );
-        TypedPropertiesOf(typeof(AddAccountArgs)).ShouldContain(("Email", typeof(Email), false));
+        ShouldBeModel(
+            typeof(AddAccountArgs),
+            $"{Namespace}.AddAccountArgs",
+            ModelShape.Record,
+            ("Name", typeof(string), false),
+            ("Email", typeof(Email), false),
+            ("OpenedOn", typeof(DateOnly), false)
+        );
     }
 
-    // The alias type over bigint is a value type of the project, as a parameter and as a column of the table model of
-    // external_refs, which both queries read the whole of.
+    // The alias type over bigint is a value type of the project, as a parameter, as a column of the table model of
+    // external_refs, which two queries read the whole of, and as a nullable column of a LEFT JOIN.
     [Fact]
     public void Build_HeaderOverrideOfAnAliasTypeOverBigint_MapsTheColumnAndTheParameterToAValueType()
     {
@@ -299,6 +306,13 @@ public sealed class ModelShapeTests
             ("Id", typeof(int), false),
             ("AccountId", typeof(int), false),
             ("ExternalId", typeof(ExternalId), false)
+        );
+        ShouldBeModel(
+            typeof(ListAccountExternalIdsDto),
+            $"{Namespace}.ListAccountExternalIdsDto",
+            ModelShape.SealedRecord,
+            ("Id", typeof(int), false),
+            ("ExternalId", typeof(ExternalId?), true)
         );
     }
 

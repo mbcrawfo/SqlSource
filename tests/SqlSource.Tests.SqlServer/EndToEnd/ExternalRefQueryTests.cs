@@ -7,8 +7,8 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 
 // The queries of Queries/ExternalRefs.sql, run on the seed of "app" through the methods that ExternalRefQueries gets:
 // the alias type dbo.ExternalId, over bigint, is read and sent as the value type ExternalId, through its converters, as
-// a column and as a parameter.  Both queries read every column of external_refs, into its table model.  Each id is
-// beyond the range of an int, so a value cut to one would not match.  A write is rolled back.
+// a column, nullable or not, and as a parameter.  Two queries read every column of external_refs, into its table
+// model.  Each id is beyond the range of an int, so a value cut to one would not match.  A write is rolled back.
 [Collection(UsesSqlServer.Name)]
 public sealed class ExternalRefQueryTests(SqlServerContainer sqlServer)
 {
@@ -40,6 +40,22 @@ public sealed class ExternalRefQueryTests(SqlServerContainer sqlServer)
         );
 
         found.ShouldBeNull();
+    }
+
+    // The column is an ExternalId?: carol's NULL is read as null, never given to FromDatabase, and the others' longs
+    // through it.
+    [Fact]
+    public async Task ListAccountExternalIds_AnAccountWithNoId_ReadsNull()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var ids = await connection.ListAccountExternalIds(cancellationToken: TestContext.Current.CancellationToken);
+
+        ids.ShouldBe([
+            new ListAccountExternalIdsDto(1, new ExternalId(5_000_000_001)),
+            new ListAccountExternalIdsDto(2, new ExternalId(5_000_000_002)),
+            new ListAccountExternalIdsDto(3, null),
+        ]);
     }
 
     // The largest bigint is written through ToDatabase and read back through FromDatabase, by the insert's OUTPUT and

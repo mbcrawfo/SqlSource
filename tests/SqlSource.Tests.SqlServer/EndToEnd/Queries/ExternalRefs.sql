@@ -13,3 +13,10 @@ WHERE r.external_id = @externalId;
 INSERT INTO dbo.external_refs (id, account_id, external_id)
 OUTPUT INSERTED.id, INSERTED.account_id, INSERTED.external_id
 VALUES (@id, @accountId, @externalId);
+
+-- name: ListAccountExternalIds
+-- summary: Every account with its external id, and NULL for an account with none, which a LEFT JOIN gives.
+SELECT a.id, r.external_id
+FROM dbo.accounts AS a
+LEFT JOIN dbo.external_refs AS r ON r.account_id = a.id
+ORDER BY a.id;
