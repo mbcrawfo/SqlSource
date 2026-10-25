@@ -76,7 +76,11 @@
             "name": "nvarchar(200)",
             "maxLength": 400,
             "precision": 0,
-            "scale": 0
+            "scale": 0,
+            "userType": {
+              "schema": "dbo",
+              "name": "Email"
+            }
           },
           "nullable": false,
           "nullableSource": "server",

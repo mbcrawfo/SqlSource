@@ -5,10 +5,13 @@
 
 CREATE TYPE order_status AS ENUM ('pending', 'shipped', 'cancelled');
 
+-- An email address, a domain over text.  CodeGen/Users.sql maps it to the C# type EmailAddress.
+CREATE DOMAIN email AS text CHECK (VALUE LIKE '%_@_%');
+
 CREATE TABLE users (
     id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name text NOT NULL,
-    email text NOT NULL,
+    email email NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
