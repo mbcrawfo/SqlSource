@@ -356,10 +356,11 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
     // A decimal with more scale than its decimal(12,4) is rounded to it by SqlClient, half away from zero, as the
     // server rounds it on an insert, so the row holds 1.2346 and a WHERE given 1.23456 compares 1.2346 and matches it.
     // Bound by its value, 1.23456 would be a decimal(6,5), which the WHERE compares unrounded, and matches nothing.
-    // 1.23465 is rounded to 1.2347, where rounding half to even would give 1.2346.
+    // 1.23465 is rounded to 1.2347, and -1.23465 to -1.2347, where rounding half to even would give 1.2346 and -1.2346.
     [Theory]
     [InlineData("1.23456", "1.2346")]
     [InlineData("1.23465", "1.2347")]
+    [InlineData("-1.23465", "-1.2347")]
     public async Task WriteAllTypes_DecimalWithMoreScale_IsRoundedAndMatchedRounded(string given, string rounded)
     {
         var value = decimal.Parse(given, CultureInfo.InvariantCulture);

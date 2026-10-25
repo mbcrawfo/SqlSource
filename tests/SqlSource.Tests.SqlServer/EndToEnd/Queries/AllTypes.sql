@@ -125,7 +125,7 @@ INSERT INTO @written (value) VALUES (@value);
 SELECT value FROM @written;
 
 -- name: FindDatetime2Of3
--- summary: The values of a datetime2(3) that holds 13:45:30.124 equal to a value, which is compared with seven digits.
+-- summary: Finds 13:45:30.124, held in a datetime2(3), by a value that is compared with all seven of its digits.
 DECLARE @stored TABLE (value datetime2(3) NOT NULL);
 INSERT INTO @stored (value) VALUES ('2024-03-15T13:45:30.124');
 SELECT value FROM @stored WHERE value = @value;
