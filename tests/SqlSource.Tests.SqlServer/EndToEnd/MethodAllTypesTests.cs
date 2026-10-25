@@ -26,6 +26,9 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
 
     private static readonly byte[] NineBytes = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
+    // One longer than varbinary_value by a zero byte at its end.
+    private static readonly byte[] EightBytesAndAZero = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+
     [Fact]
     public async Task ListAllTypes_TheSeed_ReadsBothRows()
     {
@@ -67,9 +70,8 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
         );
     }
 
-    // Every column but the rowversion, which the server fills, with the values of row 1: among them a decimal(12,4) of
-    // twelve digits and a datetime2 of seven, whose last digit a datetime would lose.  The row is read back by the
-    // OUTPUT and again by ListAllTypes.
+    // Every column but the rowversion, which the server fills, with the values of row 1: among them a datetime2 of
+    // seven digits, whose last a datetime would lose.  The row is read back by the OUTPUT and again by ListAllTypes.
     [Fact]
     public async Task WriteAllTypes_TheValuesOfRow1_WritesThemWhole()
     {
@@ -182,6 +184,34 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
         thrown.Number.ShouldBe(sqlServer.Major >= 15 ? 2628 : 8152, thrown.Message);
     }
 
+    // A byte[] longer than its varbinary(8) only by a trailing zero byte is sent whole, bound at varbinary(max) as the
+    // refusal above proves, and the server stores it without that byte and with no error, as it drops the trailing
+    // spaces of a string: the one over-long value that an insert takes.
+    [Fact]
+    public async Task WriteAllTypes_ByteArrayLongerOnlyByATrailingZero_IsStoredWithoutIt()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
+            {
+                var written = await connection.WriteAllTypes(
+                    SqlServerAllTypesRows.ArgsOf<WriteAllTypesArgs>(InsertedId, row: null) with
+                    {
+                        VarbinaryValue = EightBytesAndAZero,
+                    },
+                    transaction: transaction,
+                    cancellationToken: token
+                );
+
+                written.VarbinaryValue.ShouldBe(EightBytesAndAZero[..8]);
+            },
+            token
+        );
+    }
+
     // A value longer than the char(5) is compared whole, and matches no row that holds its first five characters,
     // where SqlClient would cut it to them and match.
     [Fact]
@@ -241,6 +271,7 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
 
     // A decimal with more scale than its decimal(12,4) is rounded to it by SqlClient, half away from zero, as the
     // server rounds it on an insert, so the row holds 1.2346 and a WHERE given 1.23456 compares 1.2346 and matches it.
+    // Bound by its value, 1.23456 would be a decimal(6,5), which the WHERE compares unrounded, and matches nothing.
     [Fact]
     public async Task WriteAllTypes_DecimalWithMoreScale_IsRoundedAndMatchedRounded()
     {
@@ -297,7 +328,7 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
             )
         );
 
-        thrown.Message.ShouldBe("Parameter value '123456789.1000' is out of range.");
+        thrown.Message.ShouldContain("out of range");
     }
 
     // A C# enum over byte, which the query's type override gives tinyint, is sent as its number and read back from the

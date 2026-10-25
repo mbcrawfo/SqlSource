@@ -49,6 +49,8 @@ public sealed class MethodAllTypesTests(AppContainer app)
                 );
 
                 SqlServerAllTypesRows.ShouldBeTheFullRow(written, InsertedId);
+                var rows = await connection.ListAllTypes(transaction: transaction, cancellationToken: token);
+                SqlServerAllTypesRows.ShouldBeTheFullRow(rows.Single(static row => row.Id == InsertedId), InsertedId);
             }
         );
 
@@ -141,6 +143,20 @@ public sealed class MethodAllTypesTests(AppContainer app)
                 SqlServerAllTypesRows.ShouldBeTheNullNewTypesRow(written, InsertedId);
             }
         );
+
+    [Fact]
+    public async Task GetNewType_RowWithAVector_ReadsIt()
+    {
+        await using var connection = new SqlConnection(app.ConnectionString);
+
+        var row = await connection.GetNewType(
+            new GetNewTypeParams(SqlServerAllTypesRows.FullRowId),
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        row.Id.ShouldBe(SqlServerAllTypesRows.FullRowId);
+        row.V.Memory.ToArray().ShouldBe([1.5f, -2.25f, 0.5f]);
+    }
 
     [Fact]
     public async Task GetNewType_NullInANotNullVector_ThrowsInvalidCastException()
