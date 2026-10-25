@@ -24,32 +24,18 @@ internal sealed class CachingScene
 {
     public const string UsersSourcePath = "/app/Users/UserQueries.cs";
 
-    public const string UsersSource = """
-        using SqlSource;
+    public const string OrdersSourcePath = "/app/Orders/OrderQueries.cs";
 
-        namespace App.Users;
-
-        [SqlSourceGenerate]
-        public partial class UserQueries
-        {
-            public static string Get() => Sql.GetUser;
-        }
-        """;
+    public static readonly string UsersSource = TypeSource(
+        "App.Users",
+        "UserQueries",
+        members: "    public static string Get() => Sql.GetUser;\n"
+    );
 
     public static readonly SourceFile[] Sources =
     [
         new(UsersSourcePath, UsersSource),
-        new(
-            "/app/Orders/OrderQueries.cs",
-            """
-            using SqlSource;
-
-            namespace App.Orders;
-
-            [SqlSourceGenerate]
-            public partial class OrderQueries;
-            """
-        ),
+        new(OrdersSourcePath, TypeSource("App.Orders", "OrderQueries")),
     ];
 
     public InMemoryAdditionalText Users { get; } = new("/app/Users/Users.sql", SqlTexts.GetUser);
@@ -106,25 +92,30 @@ internal sealed class CachingScene
         return driver;
     }
 
-    // The source of UserQueries for the tests of the methods, with these arguments on its attribute when they are given
-    // and these members.  It is in the namespace App, as OrderQueries of MethodsCompilation is, so that a method of
-    // each can clash.  It reads no constant, since a query at CodeGen has none.
-    public static string UserQueriesSource(string? arguments = null, string members = "") =>
-        "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate"
+    // The source of an attributed type in the namespace, with these arguments on its attribute when they are given
+    // and these members, each a line of its own.  A type with no members has no body.
+    public static string TypeSource(
+        string namespaceName,
+        string typeName,
+        string? arguments = null,
+        string members = ""
+    ) =>
+        "using SqlSource;\n\nnamespace "
+        + namespaceName
+        + ";\n\n[SqlSourceGenerate"
         + (arguments is null ? string.Empty : "(" + arguments + ")")
-        + "]\npublic partial class UserQueries\n{\n"
-        + members
-        + "}\n";
+        + "]\npublic partial class "
+        + typeName
+        + (members.Length == 0 ? ";\n" : "\n{\n" + members + "}\n");
 
-    // The two types of the tests of the methods, both in the namespace App, with this source of UserQueries.
-    public static CSharpCompilation MethodsCompilation(string usersSource) =>
+    // The two types of the tests of the methods with these sources, which put both in the namespace App, so that a
+    // method of each can clash, and read no constant, since a query at CodeGen has none.  OrderQueries is the plain
+    // type of App unless its source is given.
+    public static CSharpCompilation MethodsCompilation(string usersSource, string? ordersSource = null) =>
         GeneratorHarness.CreateCompilation(
             [
                 new(UsersSourcePath, usersSource),
-                new(
-                    "/app/Orders/OrderQueries.cs",
-                    "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate]\npublic partial class OrderQueries;\n"
-                ),
+                new(OrdersSourcePath, ordersSource ?? TypeSource("App", "OrderQueries")),
             ],
             references: [NpgsqlReferences.Npgsql10]
         );

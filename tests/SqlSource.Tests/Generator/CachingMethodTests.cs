@@ -23,6 +23,8 @@ public sealed class CachingMethodTests
 
     private const string OrderMethods = "App.OrderQueries-Methods.g.cs";
 
+    private const string AdminMethods = "App.Admin.AdminQueries-Methods.g.cs";
+
     private readonly CachingScene _scene = new();
 
     // Orders with its query renamed GetUser, as UserQueries' is, and a model of its own by its marker.
@@ -42,9 +44,9 @@ public sealed class CachingMethodTests
     // The edit changes the SQL of Users within its line, with its sidecar written for the new hash, so the entry stays
     // current.  Only UserQueries plans and writes its methods again.
     [Fact]
-    public void Run_EditToOneQuery_ReEmitsOnlyTheMethodsOfItsClaimingTypes()
+    public void Run_EditToOneQuery_ReEmitsOnlyTheMethodsOfItsClaimingType()
     {
-        var compilation = MethodsCompilation(UserQueriesSource());
+        var compilation = MethodsCompilation(UserQueries());
         var usersSidecar = TypedSidecar(_scene.Users, "GetUser", "int4");
         var driver = _scene.FirstRunOfMethods(compilation, usersSidecar);
 
@@ -67,7 +69,7 @@ public sealed class CachingMethodTests
     [Fact]
     public void Run_SidecarEdit_ReEmitsTheMethodsAndNotTheTypesFile()
     {
-        var compilation = MethodsCompilation(UserQueriesSource());
+        var compilation = MethodsCompilation(UserQueries());
         var usersSidecar = TypedSidecar(_scene.Users, "GetUser", "int4");
         var driver = _scene.FirstRunOfMethods(compilation, usersSidecar);
         MethodsOf(driver.GetRunResult(), UserMethods).ShouldContain("GetFieldValue<int>(");
@@ -79,11 +81,16 @@ public sealed class CachingMethodTests
         );
 
         result.Diagnostics.ShouldBeEmpty();
-        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.TypeOutput)
+            .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
         MethodReasons(result, TrackingNames.TypeMethods)
             .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
         MethodReasons(result, TrackingNames.MethodOutput)
             .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+
+        // A call gives no column, so the signatures are equal and the conflicts are not looked for again.
+        AllReasons(result, TrackingNames.MethodSignatures).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.MethodConflicts).ShouldBe([IncrementalStepRunReason.Cached]);
         MethodsOf(result, UserMethods).ShouldContain("GetFieldValue<string>(");
     }
 
@@ -93,14 +100,11 @@ public sealed class CachingMethodTests
     [Fact]
     public void Run_MethodLocationEdit_ReEmitsThatTypesMethods()
     {
-        var compilation = MethodsCompilation(UserQueriesSource());
+        var compilation = MethodsCompilation(UserQueries());
         var driver = _scene.FirstRunOfMethods(compilation);
         MethodsOf(driver.GetRunResult(), UserMethods).ShouldContain("class UserQueriesExtensions");
 
-        var result = Run(
-            driver,
-            WithUserQueries(compilation, UserQueriesSource("MethodLocation = MethodLocation.Public"))
-        );
+        var result = Run(driver, WithUserQueries(compilation, UserQueries("MethodLocation = MethodLocation.Public")));
 
         result.Diagnostics.ShouldBeEmpty();
         MethodReasons(result, TrackingNames.MethodOutput)
@@ -117,10 +121,10 @@ public sealed class CachingMethodTests
     [Fact]
     public void Run_ModelSettingEdit_ReEmitsTheMethodsThatReadTheModel()
     {
-        var compilation = MethodsCompilation(UserQueriesSource());
+        var compilation = MethodsCompilation(UserQueries());
         var driver = _scene.FirstRunOfMethods(compilation);
 
-        var result = Run(driver, WithUserQueries(compilation, UserQueriesSource("OutputModelSuffix = \"Row\"")));
+        var result = Run(driver, WithUserQueries(compilation, UserQueries("OutputModelSuffix = \"Row\"")));
 
         result.Diagnostics.ShouldBeEmpty();
         MethodReasons(result, TrackingNames.MethodsInput)
@@ -137,12 +141,12 @@ public sealed class CachingMethodTests
     public void Run_MemberAddedToATypePlacedOnItself_ReachesNoOutput()
     {
         const string Arguments = "MethodLocation = MethodLocation.Public";
-        var compilation = MethodsCompilation(UserQueriesSource(Arguments));
+        var compilation = MethodsCompilation(UserQueries(Arguments));
         var driver = _scene.FirstRunOfMethods(compilation);
 
         var result = Run(
             driver,
-            WithUserQueries(compilation, UserQueriesSource(Arguments, "    public static int Count() => 0;\n"))
+            WithUserQueries(compilation, UserQueries(Arguments, "    public static int Count() => 0;\n"))
         );
 
         result.Diagnostics.ShouldBeEmpty();
@@ -153,7 +157,7 @@ public sealed class CachingMethodTests
             .ShouldBe(Expect(IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Cached), ignoreOrder: true);
         MethodReasons(result, TrackingNames.MethodOutput)
             .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        ShouldAllBeCached(OutputReasons(result));
     }
 
     // A C# edit gives the generator a new compilation, so the probes and the lookup of the extension classes run
@@ -161,19 +165,20 @@ public sealed class CachingMethodTests
     [Fact]
     public void Run_CSharpEdit_ReEmitsNoMethod()
     {
-        var compilation = MethodsCompilation(UserQueriesSource(members: "    public static int Count() => 0;\n"));
+        var compilation = MethodsCompilation(UserQueries(members: "    public static int Count() => 0;\n"));
         var driver = _scene.FirstRunOfMethods(compilation);
 
         var result = Run(
             driver,
-            WithUserQueries(compilation, UserQueriesSource(members: "    public static int Count() => 1;\n"))
+            WithUserQueries(compilation, UserQueries(members: "    public static int Count() => 1;\n"))
         );
 
         result.Diagnostics.ShouldBeEmpty();
         AllReasons(result, TrackingNames.MethodDrivers).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.TakenExtensionClasses).ShouldBe([IncrementalStepRunReason.Unchanged]);
-        AllReasons(result, TrackingNames.MethodsInput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        MethodReasons(result, TrackingNames.MethodsInput)
+            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
+        ShouldAllBeCached(OutputReasons(result));
     }
 
     // Npgsql 9 allows the methods as Npgsql 10 does, so the drivers' value is equal, and no type gathers its input
@@ -181,15 +186,17 @@ public sealed class CachingMethodTests
     [Fact]
     public void Run_DriverVersionEdit_ReEmitsNoMethod()
     {
-        var compilation = MethodsCompilation(UserQueriesSource());
+        var compilation = MethodsCompilation(UserQueries());
         var driver = _scene.FirstRunOfMethods(compilation);
 
         var result = Run(driver, compilation.ReplaceReference(NpgsqlReferences.Npgsql10, NpgsqlReferences.Npgsql9));
 
         result.Diagnostics.ShouldBeEmpty();
         AllReasons(result, TrackingNames.MethodDrivers).ShouldBe([IncrementalStepRunReason.Unchanged]);
-        AllReasons(result, TrackingNames.MethodsInput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.MethodOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        MethodReasons(result, TrackingNames.MethodsInput)
+            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
+        MethodReasons(result, TrackingNames.MethodOutput)
+            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
     }
 
     // A class of the project takes the name of UserQueries' extension class, which SQLSRC276 reports, and UserQueries
@@ -197,7 +204,7 @@ public sealed class CachingMethodTests
     [Fact]
     public void Run_TypeTakesAnExtensionClassName_ReEmitsOnlyThatTypesMethods()
     {
-        var compilation = MethodsCompilation(UserQueriesSource());
+        var compilation = MethodsCompilation(UserQueries());
         var driver = _scene.FirstRunOfMethods(compilation);
         var taken = CSharpSyntaxTree.ParseText(
             "namespace App;\n\npublic static class UserQueriesExtensions;\n",
@@ -224,7 +231,7 @@ public sealed class CachingMethodTests
     [Fact]
     public void Run_EditThatMakesAClash_ReEmitsBothTypes()
     {
-        var compilation = MethodsCompilation(UserQueriesSource());
+        var compilation = MethodsCompilation(UserQueries());
         var ordersSidecar = TypedSidecar(_scene.Orders, "GetOrder", "int4");
         var driver = _scene.FirstRunOfMethods(compilation, ordersSidecar);
 
@@ -245,7 +252,7 @@ public sealed class CachingMethodTests
     [Fact]
     public void Run_EditThatRemovesAClash_ReEmitsBothTypes()
     {
-        var compilation = MethodsCompilation(UserQueriesSource());
+        var compilation = MethodsCompilation(UserQueries());
         var ordersSidecar = TypedSidecar(_scene.Orders, "GetOrder", "int4");
         var driver = _scene.FirstRunOfMethods(compilation, ordersSidecar);
         var clashing = MakeClash(driver, ordersSidecar)
@@ -273,7 +280,7 @@ public sealed class CachingMethodTests
     [Fact]
     public void Run_EditThatLeavesTheSignaturesAlone_ChecksNoConflictAgain()
     {
-        var compilation = MethodsCompilation(UserQueriesSource());
+        var compilation = MethodsCompilation(UserQueries());
         var usersSidecar = TypedSidecar(_scene.Users, "GetUser", "int4");
         var driver = _scene.FirstRunOfMethods(compilation, usersSidecar);
 
@@ -292,6 +299,110 @@ public sealed class CachingMethodTests
         AllReasons(result, TrackingNames.CodeGenEngines).ShouldBe([IncrementalStepRunReason.Cached]);
     }
 
+    // AdminQueries, in a namespace of its own so that its method and model clash with none, claims Users too.  The edit
+    // to Users re-emits the methods of both types that claim it, and not those of OrderQueries.
+    [Fact]
+    public void Run_EditToAFileTwoTypesClaim_ReEmitsTheMethodsOfBothAndNoOther()
+    {
+        var compilation = MethodsCompilation(UserQueries())
+            .AddSyntaxTrees(
+                CSharpSyntaxTree.ParseText(
+                    TypeSource("App.Admin", "AdminQueries", "Path = \"Users.sql\""),
+                    GeneratorHarness.ParseOptions,
+                    "/app/Users/AdminQueries.cs",
+                    cancellationToken: TestContext.Current.CancellationToken
+                )
+            );
+        var usersSidecar = TypedSidecar(_scene.Users, "GetUser", "int4");
+        var driver = _scene.FirstRunOfMethods(compilation, usersSidecar);
+
+        var result = Run(EditUsersSql(driver, usersSidecar, "SELECT 10;"), compilation);
+
+        result.Diagnostics.ShouldBeEmpty();
+        var expected = new Dictionary<string, IncrementalStepRunReason>
+        {
+            [UserMethods] = IncrementalStepRunReason.Modified,
+            [OrderMethods] = IncrementalStepRunReason.Cached,
+            [AdminMethods] = IncrementalStepRunReason.Modified,
+        };
+        MethodReasons(result, TrackingNames.TypeMethods).ShouldBe(expected, ignoreOrder: true);
+        MethodReasons(result, TrackingNames.MethodOutput).ShouldBe(expected, ignoreOrder: true);
+        MethodsOf(result, UserMethods).ShouldContain("SELECT 10;");
+        MethodsOf(result, AdminMethods).ShouldContain("SELECT 10;");
+    }
+
+    // The query of Users is renamed FindUser, so its method's signature changes, and the conflicts are looked for
+    // again.  There are none, as before, so OrderQueries' methods are not written again.
+    [Fact]
+    public void Run_QueryRenamed_ComparesTheSignaturesAgain()
+    {
+        var compilation = MethodsCompilation(UserQueries());
+        var usersSidecar = TypedSidecar(_scene.Users, "GetUser", "int4");
+        var driver = _scene.FirstRunOfMethods(compilation, usersSidecar);
+
+        var result = Run(EditUsers(driver, usersSidecar, "FindUser", "-- name: FindUser\nSELECT 1;\n"), compilation);
+
+        result.Diagnostics.ShouldBeEmpty();
+        AllReasons(result, TrackingNames.MethodSignatures).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.MethodConflicts).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        MethodReasons(result, TrackingNames.MethodOutput)
+            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+        MethodsOf(result, UserMethods).ShouldContain("FindUser(");
+    }
+
+    // The entry of Users now has no rows, and the query asks for one, which SQLSRC272 reports at the query, and
+    // UserQueries gets no method.  OrderQueries' methods are not written again.
+    [Fact]
+    public void Run_QueryGainsAProblem_ReportsTheMethodsProblemsAgain()
+    {
+        var compilation = MethodsCompilation(UserQueries());
+        var usersSidecar = TypedSidecar(_scene.Users, "GetUser", "int4");
+        var driver = _scene.FirstRunOfMethods(compilation, usersSidecar);
+        var edited = new SqlFile(_scene.Users.Path, "-- name: GetUser -> one\nSELECT 1;\n");
+        var noRows = Sidecars.Of(edited, ModelRuns.Entry(edited, "GetUser", [], null));
+
+        var result = Run(
+            driver
+                .ReplaceAdditionalText(_scene.Users, new InMemoryAdditionalText(edited.Path, edited.Text))
+                .ReplaceAdditionalText(usersSidecar, new InMemoryAdditionalText(noRows.Path, noRows.Text)),
+            compilation
+        );
+
+        result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC272");
+        AllReasons(result, TrackingNames.MethodDiagnostics).ShouldBe([IncrementalStepRunReason.Modified]);
+        MethodReasons(result, TrackingNames.MethodOutput)
+            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+    }
+
+    // Both types are at Models by their attributes, so the project has no CodeGen query, and then UserQueries is at
+    // CodeGen again: its query's engine is now among those of the project's methods.
+    [Fact]
+    public void Run_TypeTurnedToCodeGen_FindsTheEnginesAgain()
+    {
+        const string AtModels = "Output = GeneratorOutput.Models";
+        var compilation = MethodsCompilation(UserQueries(AtModels), TypeSource("App", "OrderQueries", AtModels));
+        var driver = _scene.FirstRunOfMethods(compilation);
+
+        var result = Run(driver, WithUserQueries(compilation, UserQueries()));
+
+        result.Diagnostics.ShouldBeEmpty();
+        AllReasons(result, TrackingNames.CodeGenEngines).ShouldBe([IncrementalStepRunReason.Modified]);
+        MethodReasons(result, TrackingNames.MethodOutput)
+            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+        MethodsOf(result, UserMethods).ShouldContain("GetUser(");
+    }
+
+    // The source of UserQueries, in the namespace App, with these arguments on its attribute and these members.
+    private static string UserQueries(string? arguments = null, string members = "") =>
+        TypeSource("App", "UserQueries", arguments, members);
+
+    // Every reason is Cached, and there is at least one.
+    private static void ShouldAllBeCached(IncrementalStepRunReason[] reasons)
+    {
+        reasons.ShouldNotBeEmpty();
+        reasons.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
     // The reasons of UserQueries' and OrderQueries' methods at a step of their own.
     private static Dictionary<string, IncrementalStepRunReason> Expect(
         IncrementalStepRunReason users,
@@ -304,12 +415,22 @@ public sealed class CachingMethodTests
 
     // Users with this line of SQL in place of SELECT 1;, and its sidecar, which the first run had, written for the new
     // hash.
-    private GeneratorDriver EditUsersSql(GeneratorDriver driver, InMemoryAdditionalText usersSidecar, string line)
+    private GeneratorDriver EditUsersSql(GeneratorDriver driver, InMemoryAdditionalText usersSidecar, string line) =>
+        EditUsers(driver, usersSidecar, "GetUser", "-- name: GetUser\n" + line + "\n");
+
+    // Users with this text, and its sidecar, which the first run had, written for the query of this name, with one
+    // column, of int4.
+    private GeneratorDriver EditUsers(
+        GeneratorDriver driver,
+        InMemoryAdditionalText usersSidecar,
+        string queryName,
+        string text
+    )
     {
-        var edited = new InMemoryAdditionalText(_scene.Users.Path, "-- name: GetUser\n" + line + "\n");
+        var edited = new InMemoryAdditionalText(_scene.Users.Path, text);
         return driver
             .ReplaceAdditionalText(_scene.Users, edited)
-            .ReplaceAdditionalText(usersSidecar, TypedSidecar(edited, "GetUser", "int4"));
+            .ReplaceAdditionalText(usersSidecar, TypedSidecar(edited, queryName, "int4"));
     }
 
     // Orders and its sidecar, which the first run had, with the query renamed GetUser.
