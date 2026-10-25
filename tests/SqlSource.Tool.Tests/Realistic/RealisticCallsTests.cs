@@ -130,12 +130,26 @@ public sealed class RealisticCallsTests
                     + "over the seed"
             );
 
-    // The second column held a NULL too, and its property can hold null, so only the first is named.
+    // Both columns held a NULL, and the second's property can hold null, so only the first is named.
     [Fact]
     public void NullColumnsOf_NullableColumnThatHeldNull_IsNotNamed() =>
         RealisticCalls
             .NullColumnsOf(RealisticTestCases.Keyed(), typeof(Row), ["id", "name"], [true, true])
-            .ShouldNotContain("Row.Name");
+            .ShouldBe(
+                "realistic/keyed column 0 id is the property Row.Id of Int32, which is not nullable, and held a NULL "
+                    + "over the seed"
+            );
+
+    // A run of more columns than the model has properties says so, and names the columns that have a property.
+    [Fact]
+    public void NullColumnsOf_MoreColumnsThanProperties_NamesTheMismatch() =>
+        RealisticCalls
+            .NullColumnsOf(RealisticTestCases.Keyed(), typeof(Row), ["id", "name", "extra"], [true, false, true])
+            .ShouldBe(
+                "realistic/keyed read 3 columns over the seed, and Row has 2 properties\n"
+                    + "realistic/keyed column 0 id is the property Row.Id of Int32, which is not nullable, and held a "
+                    + "NULL over the seed"
+            );
 
     [Fact]
     public void NullColumnsOf_NoNotNullColumnHeldNull_SaysNone() =>

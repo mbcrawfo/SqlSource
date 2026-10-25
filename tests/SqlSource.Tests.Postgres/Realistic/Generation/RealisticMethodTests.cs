@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,6 +44,7 @@ public sealed class RealisticMethodTests(PostgresContainer postgres)
             await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
             await using var transaction = await connection.BeginTransactionAsync(TestContext.Current.CancellationToken);
             InvalidCastException? cast = null;
+            var succeeded = false;
             try
             {
                 var read = await RealisticCalls.InvokeAsync(
@@ -54,6 +56,7 @@ public sealed class RealisticMethodTests(PostgresContainer postgres)
                 );
                 read.ShouldAllBe(row => row.GetType() == output, $"{found} read a row that is not a {output.Name}");
                 rows += read.Count;
+                succeeded = true;
             }
             catch (InvalidCastException thrown)
             {
@@ -61,8 +64,16 @@ public sealed class RealisticMethodTests(PostgresContainer postgres)
             }
             finally
             {
-                // Not the test's token: a cancelled test still rolls back what its query wrote.
-                await transaction.RollbackAsync(CancellationToken.None);
+                // Not the test's token: a cancelled test still rolls back what its query wrote.  After a failure, a
+                // rollback that fails on the broken connection does not take the place of the failure.
+                if (succeeded)
+                {
+                    await transaction.RollbackAsync(CancellationToken.None);
+                }
+                else
+                {
+                    await RealisticNullabilityOracle.RollBackAfterAsync(transaction);
+                }
             }
 
             // After the rollback, since the oracle runs the query again on a connection of its own, which would wait
@@ -82,9 +93,31 @@ public sealed class RealisticMethodTests(PostgresContainer postgres)
     }
 
     // The columns of the sample's run over the seed that held a NULL where the output model's property cannot, run as
-    // RealisticNullabilitySafetyTests runs a case.  The case runs on this server and has models, so its description
-    // needs no Start.
+    // RealisticNullabilitySafetyTests runs a case, or why that run failed: it is called on a failure, whose message an
+    // exception of its own must not take the place of.  The case runs on this server and has models, so its
+    // description needs no Start.
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Any failure of the run is put in the failure's message, which already holds the cast's."
+    )]
     private async Task<string> NullColumnsAsync(
+        RealisticCase found,
+        Type output,
+        IReadOnlyDictionary<string, string> sample
+    )
+    {
+        try
+        {
+            return await OracleColumnsAsync(found, output, sample);
+        }
+        catch (Exception thrown)
+        {
+            return $"{found}: the oracle's run of the sample failed too, so no column is named: {thrown}";
+        }
+    }
+
+    private async Task<string> OracleColumnsAsync(
         RealisticCase found,
         Type output,
         IReadOnlyDictionary<string, string> sample

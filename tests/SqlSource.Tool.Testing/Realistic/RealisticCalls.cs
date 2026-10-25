@@ -86,7 +86,9 @@ internal static class RealisticCalls
     }
 
     // How a failure names each column that held a NULL over the seed where the output model's property cannot hold
-    // one, a line each, or says that there is none.  A column is paired with the property at its position.
+    // one, a line each, or says that there is none.  A column is paired with the property at its position, and a run
+    // of another count of columns than the model's properties says so first, since it is called on a failure whose
+    // own message must not be lost to an exception of its own.
     public static string NullColumnsOf(
         RealisticCase found,
         Type output,
@@ -96,7 +98,15 @@ internal static class RealisticCalls
     {
         var properties = ModelReflection.PropertiesOf(output);
         var lines = new List<string>();
-        for (var index = 0; index < sawNull.Count; index++)
+        if (sawNull.Count != properties.Count)
+        {
+            lines.Add(
+                $"{found} read {sawNull.Count} columns over the seed, and {output.Name} has "
+                    + $"{properties.Count} properties"
+            );
+        }
+
+        for (var index = 0; index < Math.Min(sawNull.Count, properties.Count); index++)
         {
             var property = properties[index];
             if (sawNull[index] && !ModelReflection.IsNullable(property))
