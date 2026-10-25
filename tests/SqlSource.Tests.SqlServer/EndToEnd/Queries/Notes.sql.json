@@ -377,6 +377,193 @@
           "computed": false
         }
       ]
+    },
+    "FindAccountByEmail": {
+      "hash": "d085d1cded8602a39251a52673dbc7d30a5e9b0ebebf79a804a554489ac68008",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "email",
+          "ordinal": 0,
+          "type": {
+            "name": "nvarchar(320)",
+            "maxLength": 640,
+            "precision": 0,
+            "scale": 0,
+            "userType": {
+              "schema": "dbo",
+              "name": "Email"
+            }
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type": {
+            "name": "nvarchar(100)",
+            "maxLength": 200,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "accounts",
+            "column": "name"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "email",
+          "type": {
+            "name": "nvarchar(320)",
+            "maxLength": 640,
+            "precision": 0,
+            "scale": 0,
+            "userType": {
+              "schema": "dbo",
+              "name": "Email"
+            }
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "accounts",
+            "column": "email"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "AddAccount": {
+      "hash": "7a4cf7f0ba4a4871581582d7b370fbc5da334f7c396328bf16a67eaf1092683c",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "name",
+          "ordinal": 0,
+          "type": {
+            "name": "nvarchar(100)",
+            "maxLength": 200,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "email",
+          "ordinal": 1,
+          "type": {
+            "name": "nvarchar(320)",
+            "maxLength": 640,
+            "precision": 0,
+            "scale": 0,
+            "userType": {
+              "schema": "dbo",
+              "name": "Email"
+            }
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "openedOn",
+          "ordinal": 2,
+          "type": {
+            "name": "date",
+            "maxLength": 3,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "email",
+          "type": {
+            "name": "nvarchar(320)",
+            "maxLength": 640,
+            "precision": 0,
+            "scale": 0,
+            "userType": {
+              "schema": "dbo",
+              "name": "Email"
+            }
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "accounts",
+            "column": "email"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
     }
   }
 }

@@ -1,5 +1,5 @@
--- The queries of the notes, claimed by NoteQueries.  The schema's alias type dbo.Email is read as a C# type of the
--- project, and time as a TimeOnly.
+-- The queries of the notes, claimed by NoteQueries.  The schema's alias type dbo.Email is read and sent as a C# type of
+-- the project, through its converters, and time as a TimeOnly.
 -- type-override: dbo.Email = SqlSource.Tests.SqlServer.EndToEnd.Types.Email
 -- type-override: time = System.TimeOnly
 
@@ -49,3 +49,15 @@ SELECT n.id, n.remind_at
 FROM dbo.notes AS n
 WHERE n.remind_at IS NOT NULL
 ORDER BY n.id;
+
+-- name: FindAccountByEmail -> one-optional
+-- summary: The account that an email names, or none: a parameter that SQL Server describes as the alias type.
+SELECT id, name, email
+FROM dbo.accounts
+WHERE email = @email;
+
+-- name: AddAccount -> one
+-- summary: Adds an account, and returns its id and its email: a parameter written to a column of the alias type.
+INSERT INTO dbo.accounts (name, email, opened_on)
+OUTPUT INSERTED.id, INSERTED.email
+VALUES (@name, @email, @openedOn);

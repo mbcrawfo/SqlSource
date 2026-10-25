@@ -7,6 +7,10 @@
 CREATE TYPE dbo.Email FROM nvarchar(320) NOT NULL;
 GO
 
+-- The alias type over bigint of external_refs.external_id, which a query reads and sends as a value type.
+CREATE TYPE dbo.ExternalId FROM bigint NOT NULL;
+GO
+
 -- A nullable column, a not null one, an identity, an alias type, a computed column and two defaults.
 CREATE TABLE dbo.accounts (
     id int IDENTITY PRIMARY KEY,
@@ -72,4 +76,11 @@ CREATE TABLE dbo.all_types (
     uniqueidentifier_value uniqueidentifier NULL,
     sql_variant_value sql_variant NULL,
     sysname_value sysname NULL
+);
+
+-- An id of an account in another system, of the alias type over bigint.
+CREATE TABLE dbo.external_refs (
+    id int PRIMARY KEY,
+    account_id int NOT NULL REFERENCES dbo.accounts (id),
+    external_id dbo.ExternalId NOT NULL
 );

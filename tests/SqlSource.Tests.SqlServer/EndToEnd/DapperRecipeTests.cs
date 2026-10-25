@@ -21,7 +21,7 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // TypedParameter; a string is written to json as it is; DateOnly, TimeOnly and an alias type mapped to a struct are
 // read through their handlers; a mark in an alias is matched neither by a record nor by a class; and a command on a
 // connection in a transaction is given the transaction.  The generated SQL it runs is that of the claims at the output
-// models, in DapperQueries.cs and NoteQueries.  A test that writes rolls back.
+// models, in DapperQueries.cs.  A test that writes rolls back.
 [Collection(UsesSqlServer.Name)]
 public sealed class DapperRecipeTests(SqlServerContainer sqlServer)
 {
@@ -201,7 +201,7 @@ public sealed class DapperRecipeTests(SqlServerContainer sqlServer)
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 
         var error = await Should.ThrowAsync<InvalidOperationException>(() =>
-            connection.QueryAsync<ListMarkedNamesDto>(NoteQueries.ListMarkedNames)
+            connection.QueryAsync<ListMarkedNamesDto>(NoteDapperQueries.ListMarkedNames)
         );
 
         error.Message.ShouldContain("upper_name!");
@@ -215,7 +215,7 @@ public sealed class DapperRecipeTests(SqlServerContainer sqlServer)
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var names = (await connection.QueryAsync<MarkedNames>(NoteQueries.ListMarkedNames)).ToList();
+        var names = (await connection.QueryAsync<MarkedNames>(NoteDapperQueries.ListMarkedNames)).ToList();
 
         names.Count.ShouldBe(3);
         names.ShouldAllBe(static name => name.Id == MarkedNames.Unset && name.UpperName == nameof(MarkedNames.Unset));

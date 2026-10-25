@@ -6,6 +6,8 @@
 -- accounts: alice (1) is active and has two notes, bob (2) is closed, with closed_at set, and has one, and carol (3)
 -- is suspended and has none, which gives a LEFT JOIN of notes its NULLs.  Note 1 alone has a remind_at.
 --
+-- external_refs: alice (1) and bob (2) each have an external id, beyond the range of an int, and carol (3) has none.
+--
 -- all_types: row 1 has a value in every column, chosen to show the range of its type and to be exact in it, so that a
 -- test can compare it as it is read: float and real hold binary fractions, datetime ends in .003, which it holds
 -- exactly, smalldatetime is on a whole minute, both written with a T, which no SET DATEFORMAT or language reads
@@ -31,6 +33,11 @@ INSERT INTO dbo.notes (id, account_id, kind, body, written_at, remind_at) VALUES
     (3, 2, 'visit', N'Closed the account on site.', '2024-09-01 17:30:00.000', NULL);
 
 SET IDENTITY_INSERT dbo.notes OFF;
+GO
+
+INSERT INTO dbo.external_refs (id, account_id, external_id) VALUES
+    (1, 1, 5000000001),
+    (2, 2, 5000000002);
 GO
 
 INSERT INTO dbo.all_types (

@@ -15,3 +15,7 @@ internal static partial class NewTypesDapperQueries;
 // The SQL of Queries/Writes.sql, whose AddNote DapperRecipeTests runs through Dapper.
 [SqlSourceGenerate(Path = "Queries/Writes.sql", SqlLocation = SqlLocation.Direct, Output = GeneratorOutput.Models)]
 internal static partial class WriteDapperQueries;
+
+// The SQL of Queries/Notes.sql, whose ListMarkedNames DapperRecipeTests runs through Dapper.
+[SqlSourceGenerate(Path = "Queries/Notes.sql", SqlLocation = SqlLocation.Direct, Output = GeneratorOutput.Models)]
+internal static partial class NoteDapperQueries;

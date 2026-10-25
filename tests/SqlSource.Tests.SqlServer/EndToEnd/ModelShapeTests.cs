@@ -267,6 +267,41 @@ public sealed class ModelShapeTests
             ("Email", typeof(Email), false)
         );
 
+    // SQL Server describes a parameter compared with a column of the alias type, or written to one, as the alias type,
+    // so the header's override gives the parameter its type too.
+    [Fact]
+    public void Build_HeaderOverride_MapsTheAliasTypesParameterToATypeOfTheProject()
+    {
+        ShouldBeModel(
+            typeof(FindAccountByEmailArgs),
+            $"{Namespace}.FindAccountByEmailArgs",
+            ModelShape.Record,
+            ("Email", typeof(Email), false)
+        );
+        TypedPropertiesOf(typeof(AddAccountArgs)).ShouldContain(("Email", typeof(Email), false));
+    }
+
+    // The alias type over bigint is a value type of the project, as a parameter and as a column of the table model of
+    // external_refs, which both queries read the whole of.
+    [Fact]
+    public void Build_HeaderOverrideOfAnAliasTypeOverBigint_MapsTheColumnAndTheParameterToAValueType()
+    {
+        ShouldBeModel(
+            typeof(GetExternalRefArgs),
+            $"{Namespace}.GetExternalRefArgs",
+            ModelShape.Record,
+            ("ExternalId", typeof(ExternalId), false)
+        );
+        ShouldBeModel(
+            typeof(ExternalRefsDto),
+            $"{Namespace}.ExternalRefsDto",
+            ModelShape.SealedRecord,
+            ("Id", typeof(int), false),
+            ("AccountId", typeof(int), false),
+            ("ExternalId", typeof(ExternalId), false)
+        );
+    }
+
     [Fact]
     public void Build_HeaderOverride_MakesTimeATimeOnly() =>
         TypedPropertiesOf(typeof(ListAccountNotesDto)).ShouldContain(("RemindAt", typeof(TimeOnly?), true));

@@ -1,6 +1,7 @@
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
-// The output models by the attribute, and the type overrides of the header and of a query.  Sub-phases 8.3 and 8.4 set
-// it back to CodeGen, when the generated methods are what the tests run.
-[SqlSourceGenerate(Path = "Queries/Notes.sql", SqlLocation = SqlLocation.Direct, Output = GeneratorOutput.Models)]
+// The project's output, codegen, with the type overrides of the header and of a query: the alias type dbo.Email to a
+// record struct of the project, read and sent through its converters, and time to TimeOnly, which SqlClient reads and
+// sends itself.  Extension methods of the connection in NoteQueriesExtensions.
+[SqlSourceGenerate(Path = "Queries/Notes.sql", SqlLocation = SqlLocation.Direct)]
 internal static partial class NoteQueries;
