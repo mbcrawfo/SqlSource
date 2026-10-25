@@ -1,5 +1,6 @@
 -- The queries of the settings of query methods, claimed by MethodQueries: each result shape, what rowcount counts, a
--- token, and the method's suffix.  Each is run on the seed's accounts and notes.
+-- token, and the method's suffix, run on the seed's accounts and notes; and two that sleep, for the command's timeout
+-- and its cancellation.
 
 -- name: TouchAccount
 -- summary: Updates an account without changing it, as rowcount by default, since it returns no rows.
@@ -38,3 +39,13 @@ SELECT id, name FROM accounts ORDER BY id;
 -- name: RenameInCte -> rowcount
 -- summary: An update inside a WITH whose last statement is a SELECT, which counts as one.
 WITH u AS (UPDATE accounts SET name = name WHERE id = @accountId RETURNING id) SELECT id FROM u;
+
+-- name: Sleep -> none
+-- summary: Sleeps for a number of seconds and returns nothing, for the timeout and the cancellation of the command.
+SELECT 1 AS slept FROM pg_sleep(@seconds);
+
+-- name: ListThenSleep
+-- summary: The numbers from one to a count, which sleeps for a number of seconds before the last, so that the server
+-- summary: has sent most of the rows before it when the sleep starts.
+SELECT n FROM generate_series(1, @count) AS n
+CROSS JOIN LATERAL (SELECT FROM pg_sleep(CASE WHEN n = @count THEN @seconds ELSE 0 END)) AS s;

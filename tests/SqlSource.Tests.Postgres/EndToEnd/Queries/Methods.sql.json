@@ -466,6 +466,103 @@
           "computed": false
         }
       ]
+    },
+    "Sleep": {
+      "hash": "27c7b925394500c7bfec55b3b6f23355f4d5b67c70162a0e017268b60cab3684",
+      "engine": "postgres",
+      "database": "app",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "walked",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "seconds",
+          "ordinal": 0,
+          "type": {
+            "name": "double precision",
+            "bindName": "double precision",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "float8"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "slept",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": null,
+          "computed": null
+        }
+      ]
+    },
+    "ListThenSleep": {
+      "hash": "e65127d05327367a17fd809c96c76d51361fae9b6d49a80f88d8d52ea211dc14",
+      "engine": "postgres",
+      "database": "app",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "walked",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "seconds",
+          "ordinal": 1,
+          "type": {
+            "name": "integer",
+            "bindName": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "n",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "nullableSource": "no-origin",
+          "origin": null,
+          "identity": null,
+          "computed": null
+        }
+      ]
     }
   }
 }
