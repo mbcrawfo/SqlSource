@@ -1,4 +1,3 @@
-using System;
 using System.Text;
 using Shouldly;
 using SqlSource.Generation.Emitting;
@@ -13,11 +12,9 @@ public sealed class ParameterBinderTests
     // A converter of a value type to a long.
     private static readonly Conversion ToLong = new("global::App.Ids.ToLong", "long", true, false, null, false);
 
-    [Theory]
-    [InlineData(nameof(DatabaseEngine.PostgreSql))]
-    [InlineData(nameof(DatabaseEngine.SqlServer))]
-    public void For_EachEngine_WritesTheBindingByValue(string engine) =>
-        Write(Enum.Parse<DatabaseEngine>(engine), new MethodParameter("user_id", "UserId", true, false))
+    [Fact]
+    public void For_SqlServer_WritesTheBindingByValue() =>
+        Write(new MethodParameter("user_id", "UserId", "int", true, false))
             .ShouldBe(
                 """
                     var p0 = command.CreateParameter();
@@ -34,21 +31,15 @@ public sealed class ParameterBinderTests
     [InlineData(false, true)]
     public void Append_NullableOrReferenceProperty_SendsDbNullForNull(bool isValueType, bool isNullable)
     {
-        foreach (var engine in new[] { DatabaseEngine.PostgreSql, DatabaseEngine.SqlServer })
-        {
-            Write(engine, new MethodParameter("name", "Name", isValueType, isNullable))
-                .ShouldContain("    p0.Value = (object?)parameters.Name ?? global::System.DBNull.Value;\n");
-        }
+        Write(new MethodParameter("name", "Name", isValueType ? "int" : "string", isValueType, isNullable))
+            .ShouldContain("    p0.Value = (object?)parameters.Name ?? global::System.DBNull.Value;\n");
     }
 
     [Fact]
     public void Append_NotNullValueTypeWithAConverter_SendsTheConvertedValue()
     {
-        foreach (var engine in new[] { DatabaseEngine.PostgreSql, DatabaseEngine.SqlServer })
-        {
-            Write(engine, new MethodParameter("id", "Id", true, false, ToLong))
-                .ShouldContain("    p0.Value = global::App.Ids.ToLong(parameters.Id);\n");
-        }
+        Write(new MethodParameter("id", "Id", "global::App.Id", true, false, ToLong))
+            .ShouldContain("    p0.Value = global::App.Ids.ToLong(parameters.Id);\n");
     }
 
     // The converter never sees a null, and the pattern variable has the name the method gave it.
@@ -58,14 +49,11 @@ public sealed class ParameterBinderTests
     [InlineData(false, true)]
     public void Append_NullableOrReferencePropertyWithAConverter_SendsDbNullForNull(bool isValueType, bool isNullable)
     {
-        foreach (var engine in new[] { DatabaseEngine.PostgreSql, DatabaseEngine.SqlServer })
-        {
-            Write(engine, new MethodParameter("id", "Id", isValueType, isNullable, ToLong), "v1")
-                .ShouldContain(
-                    "    p0.Value = parameters.Id is { } v1 ? (object)global::App.Ids.ToLong(v1) : "
-                        + "global::System.DBNull.Value;\n"
-                );
-        }
+        Write(new MethodParameter("id", "Id", "global::App.Id", isValueType, isNullable, ToLong), "v1")
+            .ShouldContain(
+                "    p0.Value = parameters.Id is { } v1 ? (object)global::App.Ids.ToLong(v1) : "
+                    + "global::System.DBNull.Value;\n"
+            );
     }
 
     // An array is converted element by element into the database's array, by a static lambda whose names are the
@@ -110,22 +98,17 @@ public sealed class ParameterBinderTests
             elementText,
             elementIsValueType
         );
-        foreach (var engine in new[] { DatabaseEngine.PostgreSql, DatabaseEngine.SqlServer })
-        {
-            Write(engine, new MethodParameter("ids", "Ids", false, false, write), "v1")
-                .ShouldContain(
-                    "    p0.Value = parameters.Ids is { } v1 ? (object)"
-                        + converted
-                        + " : global::System.DBNull.Value;\n"
-                );
-        }
+        Write(new MethodParameter("ids", "Ids", elementText + "[]", false, false, write), "v1")
+            .ShouldContain(
+                "    p0.Value = parameters.Ids is { } v1 ? (object)" + converted + " : global::System.DBNull.Value;\n"
+            );
     }
 
-    private static string Write(DatabaseEngine engine, MethodParameter bound, string value = "value")
+    private static string Write(MethodParameter bound, string value = "value")
     {
         var builder = new StringBuilder();
         ParameterBinder
-            .For(engine)
+            .For(DatabaseEngine.SqlServer)
             .Append(builder, "    ", "command", "p0", "parameters", bound, new ConversionNames(value, "e1", "i1"));
         return builder.ToString();
     }

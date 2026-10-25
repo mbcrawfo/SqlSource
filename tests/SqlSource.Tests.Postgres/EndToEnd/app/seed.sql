@@ -5,6 +5,8 @@
 -- accounts: alice (1) is active and has two notes, bob (2) is closed, with closed_at set, and has one, and carol (3)
 -- is suspended and has none, which gives a LEFT JOIN of notes its NULLs.
 --
+-- notes: 1 and 3 have a ref, past the range of an integer so that it is read as a long, and 2 has none.
+--
 -- all_types: row 1 has a value in every column, chosen to show the range of its type, and row 2 has NULL in every
 -- column but id.  Row 1 holds no value that Npgsql cannot read: no NaN or infinity in a numeric, no timestamptz
 -- infinity, no interval with months or years, and no NULL element in an array.  Its values are exact in binary (1.5,
@@ -17,10 +19,10 @@ INSERT INTO accounts (id, name, email, status, created_at, closed_at) OVERRIDING
 
 SELECT setval(pg_get_serial_sequence('accounts', 'id'), 3);
 
-INSERT INTO notes (id, account_id, kind, body, written_at) OVERRIDING SYSTEM VALUE VALUES
-    (1, 1, 'call', 'Asked for a larger plan.', '2024-01-10 11:00:00+00'),
-    (2, 1, 'email', 'Sent the quote.', '2024-01-12 14:20:00+00'),
-    (3, 2, 'visit', 'Closed the account on site.', '2024-09-01 17:30:00+00');
+INSERT INTO notes (id, account_id, kind, body, written_at, ref) OVERRIDING SYSTEM VALUE VALUES
+    (1, 1, 'call', 'Asked for a larger plan.', '2024-01-10 11:00:00+00', 5000000001),
+    (2, 1, 'email', 'Sent the quote.', '2024-01-12 14:20:00+00', NULL),
+    (3, 2, 'visit', 'Closed the account on site.', '2024-09-01 17:30:00+00', 5000000003);
 
 SELECT setval(pg_get_serial_sequence('notes', 'id'), 3);
 

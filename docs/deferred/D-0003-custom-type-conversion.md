@@ -10,7 +10,7 @@ Converters, sub-phase 8.2: a static method marked `[SqlSourceConverter]`, read b
 
 The database types the base map gives none have nothing to convert from:
 
-- **A parameter** of a composite type, a table's row type, `regclass` and the other types of the system catalogs that Npgsql does not load, or a type whose schema or name holds a `.`, is still [`SQLSRC232`](../manual/diagnostics.md#sqlsrc232), raised by [`PostgresErrors`](../../src/SqlSource.Tool/Describing/Postgres/PostgresErrors.cs) when the tool describes the query.  The workaround is a `text` parameter with a cast in the SQL, and the tool never rewrites a user's SQL to make a parameter bindable.
+- **A parameter** of a composite type, a table's row type, `regclass` and the other types of the system catalogs that Npgsql does not load, or a type whose schema or name holds a `.`, is still [`SQLSRC232`](../manual/diagnostics.md#sqlsrc232), raised by [`PostgresErrors`](../../src/SqlSource.Tool/Describing/Postgres/PostgresErrors.cs) when the tool describes the query.  The workaround is a `text` parameter with a cast in the SQL, and the tool never rewrites a user's SQL to make a parameter bindable.  [Sub-phase 8.3](../superpowers/specs/2026-10-24-query-generation-phase-8-3-postgresql-binding-design.md)'s binding of each parameter by its `bindName` did not change this: such a parameter is refused before the sidecar is written, so it has no `bindName` to bind by.
 - **A column** of such a type, mapped by the type override to a type that has converters, is [`SQLSRC279`](../manual/diagnostics.md#sqlsrc279) at its query, in the form that says the database type has no C# type to convert from.  Mapped to a type with no converter, it is read with `GetFieldValue<T>` of the override's type, which works when the application's data source maps the type, as with `MapComposite<T>()`.
 
 ## Why deferred
@@ -27,4 +27,4 @@ A way for a query method to send a parameter of a type that the base map reads a
 
 ## Trigger
 
-A user's report of `SQLSRC232` for a composite type, or the binding by `bindName` of sub-phase 8.3, if it gives a way to send a composite by its name.
+A user's report of `SQLSRC232` for a composite type.

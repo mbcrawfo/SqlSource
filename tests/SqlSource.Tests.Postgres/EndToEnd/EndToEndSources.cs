@@ -4,9 +4,10 @@ using SqlSource.Tests.Postgres.EndToEnd.Types;
 
 namespace SqlSource.Tests.Postgres.EndToEnd;
 
-// The data sources that the Dapper tests run the end-to-end queries and the realistic corpus on, set up as the
-// manual's recipe tells a project to and no further: Dapper matches snake_case columns to properties and has a handler
-// for each type that a type override names and Npgsql does not give, and "app" maps the enum that its queries read as
+// The data sources that the tests run the end-to-end queries on, through their methods or through Dapper, and the
+// realistic corpus on, set up as the manual's recipe tells a project to and no further: Dapper matches snake_case
+// columns to properties and has a handler for each type that a type override of a query it reads names and Npgsql does
+// not give, Email's by the recipe's handler that calls its converters, and "app" maps the enum that its queries read as
 // a C# enum.  A test disposes the source it is given.
 internal static class EndToEndSources
 {

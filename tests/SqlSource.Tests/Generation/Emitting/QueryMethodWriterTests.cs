@@ -8,7 +8,9 @@ using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
@@ -24,6 +26,9 @@ public sealed class QueryMethodWriterTests
     // Ends a line of an expected text that goes on in the next, written so to keep within the width of a line.
     private const string Continued = "\u21a9";
 
+    // The type integer, as the entry of a parameter describes it.
+    private static readonly PostgresType Integer = TestSidecars.Postgres(bindName: "integer");
+
     // GetUser -> one-optional of the spec: one parameter, one token, a record of two columns.
     private static readonly QueryMethod GetUser = new(
         "GetUser",
@@ -34,7 +39,10 @@ public sealed class QueryMethodWriterTests
         DatabaseEngine.PostgreSql,
         TestModels.Array(TestModels.Literal("SELECT id, name FROM users WHERE id = @id ORDER BY "), Token("orderBy")),
         true,
-        new MethodInput("global::App.GetUserParams", TestModels.Array(new MethodParameter("id", "Id", true, false))),
+        new MethodInput(
+            "global::App.GetUserParams",
+            TestModels.Array(new MethodParameter("id", "Id", "int", true, false, Described: Integer))
+        ),
         new MethodOutput(
             "global::App.GetUserDto",
             true,
@@ -111,7 +119,9 @@ public sealed class QueryMethodWriterTests
                                 var command = connection.CreateCommand();
                                 await using var commandScope = ↩
                     global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(command, false);
+                                #pragma warning disable CA2100 // The text of a token is the caller's own choice.
                                 command.CommandText = sql;
+                                #pragma warning restore CA2100
                                 command.Transaction = transaction;
                                 if (commandTimeout.HasValue)
                                 {
@@ -119,9 +129,10 @@ public sealed class QueryMethodWriterTests
                                 }
 
                                 {
-                                    var parameter = command.CreateParameter();
+                                    var parameter = new global::Npgsql.NpgsqlParameter<int>();
                                     parameter.ParameterName = "id";
-                                    parameter.Value = parameters.Id;
+                                    parameter.DataTypeName = "integer";
+                                    parameter.TypedValue = parameters.Id;
                                     command.Parameters.Add(parameter);
                                 }
 
@@ -360,6 +371,25 @@ public sealed class QueryMethodWriterTests
         text.ShouldContain("        }\n\n        var reader = await command.ExecuteReaderAsync(", Case.Sensitive);
     }
 
+    // CA2100 flags a command whose SQL is not a constant, which the tokens make it: the rule is off around that one
+    // assignment, and back on for the rest of the method.
+    [Fact]
+    public void Append_Tokens_TurnsCA2100OffAroundTheAssignmentOfTheSqlAlone()
+    {
+        var text = Write(GetUser);
+
+        text.ShouldContain(
+            "        var command = connection.CreateCommand();\n"
+                + "        await using var commandScope = "
+                + "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(command, false);\n"
+                + "        #pragma warning disable CA2100 // The text of a token is the caller's own choice.\n"
+                + "        command.CommandText = sql;\n"
+                + "        #pragma warning restore CA2100\n"
+                + "        command.Transaction = transaction;\n"
+        );
+        Regex.Count(text, "#pragma", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(2);
+    }
+
     [Fact]
     public void Append_NoTokens_HoldsTheSqlInAConstant()
     {
@@ -383,6 +413,8 @@ public sealed class QueryMethodWriterTests
         );
         text.ShouldNotContain("ThrowIfNullOrWhiteSpace");
         text.ShouldNotContain("string.Create");
+        text.ShouldNotContain("#pragma");
+        text.ShouldContain("        command.CommandText = sql;\n        command.Transaction = transaction;\n");
     }
 
     [Fact]
@@ -504,29 +536,38 @@ public sealed class QueryMethodWriterTests
         );
     }
 
+    // A null of a reference type is bound as the null of the parameter's type, as the property holds it.
     [Fact]
-    public void Append_NotNullReferenceParameter_SendsDbNullForNull() =>
+    public void Append_NotNullReferenceParameter_BindsItsValueAsItIs() =>
         Write(
                 GetUser with
                 {
                     Input = new MethodInput(
                         "global::App.GetUserParams",
                         TestModels.Array(
-                            new MethodParameter("id", "Id", true, false),
-                            new MethodParameter("name", "Name", false, false)
+                            new MethodParameter("id", "Id", "int", true, false, Described: Integer),
+                            new MethodParameter(
+                                "name",
+                                "Name",
+                                "string",
+                                false,
+                                false,
+                                Described: TestSidecars.Postgres(bindName: "text")
+                            )
                         )
                     ),
                 }
             )
             .ShouldContain(
-                "            parameter.Value = parameters.Id;\n"
+                "            parameter.TypedValue = parameters.Id;\n"
                     + "            command.Parameters.Add(parameter);\n"
                     + "        }\n"
                     + "\n"
                     + "        {\n"
-                    + "            var parameter = command.CreateParameter();\n"
+                    + "            var parameter = new global::Npgsql.NpgsqlParameter<string>();\n"
                     + "            parameter.ParameterName = \"name\";\n"
-                    + "            parameter.Value = (object?)parameters.Name ?? global::System.DBNull.Value;\n"
+                    + "            parameter.DataTypeName = \"text\";\n"
+                    + "            parameter.TypedValue = parameters.Name;\n"
                     + "            command.Parameters.Add(parameter);\n"
                     + "        }\n"
                     + "\n"
@@ -544,7 +585,11 @@ public sealed class QueryMethodWriterTests
 
         text.ShouldContain("    var sql1 = string.Create(\n");
         text.ShouldContain("        static (span1, state) =>\n");
-        text.ShouldContain("        command.CommandText = sql1;\n");
+        text.ShouldContain(
+            "        #pragma warning disable CA2100 // The text of a token is the caller's own choice.\n"
+                + "        command.CommandText = sql1;\n"
+                + "        #pragma warning restore CA2100\n"
+        );
     }
 
     // An asynchronous method cannot use await as an identifier, so the argument is verbatim wherever the method uses
@@ -664,7 +709,7 @@ public sealed class QueryMethodWriterTests
 
     // Not required of this writer's tests, which compare text: the driver tests compile it.  Every shape, collection
     // type and placement, with names that could hide what the method writes, compiled together against the real
-    // System.Data and SqlClient's SqlVector.
+    // System.Data, Npgsql's parameter and SqlClient's SqlVector.
     [Fact]
     public void Append_EveryShapeAndCollectionType_Compiles()
     {
@@ -758,7 +803,7 @@ public sealed class QueryMethodWriterTests
 
         var compilation = GeneratorHarness.CreateCompilation(
             [new SourceFile("/app/Queries.cs", "#nullable enable\n" + builder)],
-            references: [SqlClientReferences.SqlClient7]
+            references: [NpgsqlReferences.Npgsql10, SqlClientReferences.SqlClient7]
         );
 
         compilation

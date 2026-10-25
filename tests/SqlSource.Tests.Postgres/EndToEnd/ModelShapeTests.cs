@@ -5,8 +5,12 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Reflection;
 using NpgsqlTypes;
 using Shouldly;
+using SqlSource.Generation.Types;
+using SqlSource.Snapshot;
+using SqlSource.Snapshot.Reading;
 using SqlSource.Testing.EndToEnd;
 using SqlSource.Tests.Postgres.EndToEnd.Types;
 using Xunit;
@@ -185,7 +189,6 @@ public sealed class ModelShapeTests
         );
         ModelNamed($"{ReportingNamespace}.ListAccountsDto").ShouldBeNull();
         ModelNamed($"{ReportingNamespace}.ListAccountsInTableOrderDto").ShouldBeNull();
-        Reporting.AccountReports.GetAccount.ShouldBe("SELECT name, id, email\nFROM accounts\nWHERE id = @accountId;");
     }
 
     [Fact]
@@ -240,6 +243,27 @@ public sealed class ModelShapeTests
             ("Kind", typeof(NoteKind), false),
             ("Email", typeof(Email), false)
         );
+
+    // The domain over bigint is a value type of the project, so its nullable column is a NoteRef?, and the parameter
+    // that the marker declares as the domain is a NoteRef.
+    [Fact]
+    public void Build_HeaderOverrideOfADomain_MapsTheColumnAndTheParameterToAValueType()
+    {
+        ShouldBeModel(
+            typeof(GetNoteByRefArgs),
+            $"{Namespace}.GetNoteByRefArgs",
+            ModelShape.Record,
+            ("Ref", typeof(NoteRef), false)
+        );
+        ShouldBeModel(
+            typeof(GetNoteByRefDto),
+            $"{Namespace}.GetNoteByRefDto",
+            ModelShape.SealedRecord,
+            ("Id", typeof(int), false),
+            ("Ref", typeof(NoteRef?), true),
+            ("Body", typeof(string), false)
+        );
+    }
 
     [Fact]
     public void Build_SortInput_OrdersTheInputByName()
@@ -333,12 +357,28 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Build_InvoiceQueriesWithADirectLocation_HasTheConstantsOnTheType()
+    public void Build_AllTypesSqlWithADirectLocation_HasTheConstantsOnTheType()
     {
-        InvoiceQueries.ListInvoices.ShouldBe("SELECT *\nFROM billing.invoices\nORDER BY id;");
-        InvoiceQueries.GetInvoice.ShouldBe(
-            "SELECT id, number, amount, paid_at\nFROM billing.invoices\nWHERE id = @invoiceId;"
-        );
+        AllTypesSql.ListAllTypes.ShouldBe("SELECT *\nFROM all_types\nORDER BY id;");
+        AllTypesSql.InsertAllTypes.ShouldStartWith("INSERT INTO all_types (\n    id,\n    bool_value,");
+        AllTypesSql.InsertAllTypes.ShouldEndWith("@dateArrayValue, @emailValue\n)\nRETURNING *;");
+    }
+
+    // A query whose output is codegen has its method and no constant: the type that claims it declares no field, and
+    // no nested class, the class Sql of SqlLocation.Nested.
+    [Theory]
+    [InlineData(typeof(AccountQueries))]
+    [InlineData(typeof(Reporting.AccountReports))]
+    [InlineData(typeof(InvoiceQueries))]
+    [InlineData(typeof(AllTypesQueries))]
+    [InlineData(typeof(CubeQueries))]
+    public void Build_CodeGenOutput_GivesNoConstant(Type type)
+    {
+        const BindingFlags Declared =
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+        type.GetFields(Declared).ShouldBeEmpty();
+        type.GetNestedTypes(Declared).ShouldBeEmpty();
     }
 
     [Fact]
@@ -404,6 +444,55 @@ public sealed class ModelShapeTests
             );
         TypedPropertiesOf(typeof(InsertAllTypesArgs)).ShouldBe(expected);
         TypedPropertiesOf(typeof(InsertAllTypesArgs)).Length.ShouldBe(39);
+    }
+
+    [Fact]
+    public void Build_InsertEveryType_HasANullableParameterForEveryColumn()
+    {
+        ModelNamed($"{Namespace}.InsertEveryTypeDto").ShouldBeNull();
+        ShapeOf(typeof(InsertEveryTypeArgs)).ShouldBe(ModelShape.Record);
+
+        // A parameter for each column, in its order, with the column's type, and each but the id can be null, as its
+        // -- param: marker says.  A parameter of bit(1) has no length, so it is a BitArray where the column is a bool.
+        var expected = TypedPropertiesOf(typeof(AllTypesDto))
+            .Select(static column => column.Name == "Bit1Value" ? (column.Name, typeof(BitArray), true) : column);
+        TypedPropertiesOf(typeof(InsertEveryTypeArgs)).ShouldBe(expected);
+    }
+
+    // Every key of the type map is written through a method's parameter and read back through its column, by the
+    // property of InsertEveryTypeArgs that EveryTypeTests writes, or by EchoCube, or is named with why it is not.
+    [Fact]
+    public void Map_EveryKey_IsWrittenAndReadOrNamed()
+    {
+        var keys = PostgresTypeMap.Keys.ToList();
+
+        keys.ShouldBeUnique();
+        MapWritten.Keys.Intersect(MapLeftOut.Keys, StringComparer.OrdinalIgnoreCase).ShouldBeEmpty();
+        MapWritten
+            .Keys.Concat(MapLeftOut.Keys)
+            .Order(StringComparer.Ordinal)
+            .ShouldBe(keys.Order(StringComparer.Ordinal));
+        // Each property exists, and the committed entry describes its parameter as the key's type, so that a key named
+        // to the wrong column fails.  Every key is the internal name of the type it maps, bit and varbit included,
+        // whose rule of length reads the parameter's internal name too: bit(1) and bit(8) are both bit.
+        var insertEveryType = EntryOf("AllTypes.sql", "InsertEveryType");
+        var echoCube = EntryOf("Cube.sql", EchoCube);
+        foreach (var (key, written) in MapWritten)
+        {
+            string parameter;
+            if (written == EchoCube)
+            {
+                _ = typeof(CubeQueriesExtensions).GetMethod(EchoCube).ShouldNotBeNull(key);
+                parameter = InternalNameOf(echoCube, "value");
+            }
+            else
+            {
+                _ = typeof(InsertEveryTypeArgs).GetProperty(written).ShouldNotBeNull(key);
+                parameter = InternalNameOf(insertEveryType, char.ToLowerInvariant(written[0]) + written[1..]);
+            }
+
+            parameter.ShouldBe(key, $"The parameter that writes {key}, {written}");
+        }
     }
 
     [Fact]
@@ -489,6 +578,127 @@ public sealed class ModelShapeTests
             ("EmailValue", typeof(string), true),
             ("StatusValue", typeof(string), true)
         );
+
+    private const string EchoCube = nameof(CubeQueriesExtensions.EchoCube);
+
+    // Each key of the type map that a method writes and reads, by the property of InsertEveryTypeArgs that writes it,
+    // or EchoCube.  bit is written by Bit1Value, a bit(1) read as a bool, and by Bit8Value, a bit(8) read as a
+    // BitArray.
+    private static readonly Dictionary<string, string> MapWritten = new(StringComparer.Ordinal)
+    {
+        ["bool"] = "BoolValue",
+        ["int2"] = "Int2Value",
+        ["int4"] = "Int4Value",
+        ["int8"] = "Int8Value",
+        ["float4"] = "Float4Value",
+        ["float8"] = "Float8Value",
+        ["numeric"] = "NumericValue",
+        ["money"] = "MoneyValue",
+        ["text"] = "TextValue",
+        ["varchar"] = "VarcharValue",
+        ["bpchar"] = "BpcharValue",
+        ["name"] = "NameValue",
+        ["refcursor"] = "RefcursorValue",
+        ["char"] = "CharValue",
+        ["citext"] = "CitextValue",
+        ["bytea"] = "ByteaValue",
+        ["date"] = "DateValue",
+        ["time"] = "TimeValue",
+        ["timetz"] = "TimetzValue",
+        ["timestamp"] = "TimestampValue",
+        ["timestamptz"] = "TimestamptzValue",
+        ["interval"] = "IntervalValue",
+        ["uuid"] = "UuidValue",
+        ["json"] = "JsonValue",
+        ["jsonb"] = "JsonbValue",
+        ["jsonpath"] = "JsonpathValue",
+        ["xml"] = "XmlValue",
+        ["inet"] = "InetValue",
+        ["cidr"] = "CidrValue",
+        ["macaddr"] = "MacaddrValue",
+        ["macaddr8"] = "Macaddr8Value",
+        ["point"] = "PointValue",
+        ["line"] = "LineValue",
+        ["lseg"] = "LsegValue",
+        ["box"] = "BoxValue",
+        ["path"] = "PathValue",
+        ["polygon"] = "PolygonValue",
+        ["circle"] = "CircleValue",
+        ["tsvector"] = "TsvectorValue",
+        ["tsquery"] = "TsqueryValue",
+        ["oid"] = "OidValue",
+        ["xid"] = "XidValue",
+        ["cid"] = "CidValue",
+        ["regtype"] = "RegtypeValue",
+        ["regconfig"] = "RegconfigValue",
+        ["xid8"] = "Xid8Value",
+        ["tid"] = "TidValue",
+        ["pg_lsn"] = "PgLsnValue",
+        ["int2vector"] = "Int2vectorValue",
+        ["oidvector"] = "OidvectorValue",
+        ["hstore"] = "HstoreValue",
+        ["ltree"] = "LtreeValue",
+        ["lquery"] = "LqueryValue",
+        ["ltxtquery"] = "LtxtqueryValue",
+        ["cube"] = EchoCube,
+        ["int4range"] = "Int4rangeValue",
+        ["int8range"] = "Int8rangeValue",
+        ["numrange"] = "NumrangeValue",
+        ["tsrange"] = "TsrangeValue",
+        ["tstzrange"] = "TstzrangeValue",
+        ["daterange"] = "DaterangeValue",
+        ["int4multirange"] = "Int4multirangeValue",
+        ["int8multirange"] = "Int8multirangeValue",
+        ["nummultirange"] = "NummultirangeValue",
+        ["tsmultirange"] = "TsmultirangeValue",
+        ["tstzmultirange"] = "TstzmultirangeValue",
+        ["datemultirange"] = "DatemultirangeValue",
+        ["bit"] = "Bit8Value",
+        ["varbit"] = "VarbitValue",
+    };
+
+    // Each key of the type map that no method writes and reads, with why, as the comment on all_types in
+    // EndToEnd/app/schema.sql says: the map gives none of them a C# type, so no model has a property of one.
+    private static readonly Dictionary<string, string> MapLeftOut = new(StringComparer.Ordinal)
+    {
+        ["regclass"] = CastToOid,
+        ["regproc"] = CastToOid,
+        ["regprocedure"] = CastToOid,
+        ["regoper"] = CastToOid,
+        ["regoperator"] = CastToOid,
+        ["regrole"] = CastToOid,
+        ["regnamespace"] = CastToOid,
+        ["regcollation"] = CastToOid,
+        ["regdictionary"] = CastToOid,
+        ["pg_snapshot"] = CastToText,
+        ["txid_snapshot"] = CastToText,
+        ["pg_node_tree"] = CastToText,
+        ["record"] = NoTable,
+        ["unknown"] = NoTable,
+        ["void"] = NoTable,
+    };
+
+    private const string CastToOid = "A registered type, which Npgsql reads only by a cast to oid.";
+
+    private const string CastToText = "Npgsql reads it only by a cast to text.";
+
+    private const string NoTable = "No table can hold it.";
+
+    // The committed entry of a query of EndToEnd/Queries/, read from the repository by the generator's reader.
+    private static SidecarEntry EntryOf(string file, string query)
+    {
+        var path = Path.Combine(RepositoryPaths.EndToEnd, "Queries", file + ".json");
+        var sidecar = SidecarReader.Read(File.ReadAllText(path)).Sidecar.ShouldNotBeNull(path);
+        return sidecar.Find(query).ShouldNotBeNull(query);
+    }
+
+    // The internal name of the PostgreSQL type of a parameter of an entry, by its name.
+    private static string InternalNameOf(SidecarEntry entry, string parameter) =>
+        entry
+            .Parameters.SingleOrDefault(candidate => candidate.Name == parameter)
+            .ShouldNotBeNull(parameter)
+            .Type.ShouldBeOfType<PostgresType>(parameter)
+            .InternalName;
 
     private static Type? ModelNamed(string fullName) =>
         ModelReflection.ModelNamed(typeof(ModelShapeTests).Assembly, fullName);
