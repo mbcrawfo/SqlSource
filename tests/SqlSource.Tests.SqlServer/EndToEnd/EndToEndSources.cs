@@ -1,3 +1,7 @@
+using System;
+using System.Data.Common;
+using System.Threading;
+using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using SqlSource.Tests.SqlServer.EndToEnd.Types;
@@ -27,4 +31,25 @@ internal static class EndToEndSources
         new(sqlServer.ConnectionStringOf(SqlServerContainer.BillingDatabase));
 
     public static SqlConnection Realistic(SqlServerContainer sqlServer) => new(sqlServer.RealisticConnectionString);
+
+    // Opens the connection, runs the write in a transaction and rolls it back, so that the seed is as it was.  The
+    // write gives the transaction to every call, since SqlClient refuses a command on a connection whose transaction it
+    // is not given.
+    public static async Task RolledBackAsync(
+        SqlConnection connection,
+        Func<DbTransaction, Task> write,
+        CancellationToken cancellationToken
+    )
+    {
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await write(transaction);
+        }
+        finally
+        {
+            await transaction.RollbackAsync(cancellationToken);
+        }
+    }
 }

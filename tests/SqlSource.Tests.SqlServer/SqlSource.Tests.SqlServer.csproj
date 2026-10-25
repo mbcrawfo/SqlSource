@@ -22,6 +22,8 @@
         <SqlSourceInputModelType>record</SqlSourceInputModelType>
         <!-- The C# type that date is read as, in place of the default of the type map. -->
         <SqlSourceTypeOverrides>date=System.DateOnly</SqlSourceTypeOverrides>
+        <!-- The collection type of a query's rows, where no attribute, metadata or marker sets one. -->
+        <SqlSourceCollectionType>IReadOnlyList</SqlSourceCollectionType>
     </PropertyGroup>
     <ItemGroup>
         <!-- The queries of billing: sealed class output models, the suffix Row, and date as a DateTime. -->
@@ -30,6 +32,11 @@
             SqlSourceOutputModelType="sealed class"
             SqlSourceOutputModelSuffix="Row"
             SqlSourceTypeOverrides="date=default"
+        />
+        <!-- One file of the collection types, whose rows are an ImmutableArray. -->
+        <AdditionalFiles
+            Update="EndToEnd/Queries/Collections/ByMetadata.sql"
+            SqlSourceCollectionType="ImmutableArray"
         />
         <!-- The realistic corpus: the database realistic, and the type map's own C# type for date. -->
         <AdditionalFiles

@@ -1,0 +1,181 @@
+using System.Threading.Tasks;
+using Dapper;
+using Shouldly;
+using Xunit;
+
+namespace SqlSource.Tests.SqlServer.EndToEnd;
+
+// The result shapes of Queries/Methods.sql, and its token, run through MethodQueries' methods on the seed of "app": a
+// query with no rows is rowcount by default and runs as none, one and one-optional read their row and refuse the rows
+// their shape does not allow, and a token is filled with its default or with another fragment.  A write runs in a
+// transaction that is rolled back.
+[Collection(UsesSqlServer.Name)]
+public sealed class MethodShapeTests(SqlServerContainer sqlServer)
+{
+    [Fact]
+    public async Task TouchAccount_NoRows_IsRowCountByDefault()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+        var token = TestContext.Current.CancellationToken;
+
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
+            {
+                var count = await connection.TouchAccount(
+                    new TouchAccountArgs(1),
+                    transaction: transaction,
+                    cancellationToken: token
+                );
+
+                count.ShouldBe(1);
+            },
+            token
+        );
+    }
+
+    [Fact]
+    public async Task SetAccountStatus_None_RunsTheUpdate()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+        var token = TestContext.Current.CancellationToken;
+
+        await EndToEndSources.RolledBackAsync(
+            connection,
+            async transaction =>
+            {
+                await connection.SetAccountStatus(
+                    new SetAccountStatusArgs("active", 2),
+                    transaction: transaction,
+                    cancellationToken: token
+                );
+
+                typeof(MethodQueriesExtensions)
+                    .GetMethod(nameof(MethodQueriesExtensions.SetAccountStatus))!
+                    .ReturnType.ShouldBe(typeof(Task));
+                var status = await connection.ExecuteScalarAsync<string>(
+                    "SELECT status FROM dbo.accounts WHERE id = 2",
+                    transaction: transaction
+                );
+                status.ShouldBe("active");
+            },
+            token
+        );
+    }
+
+    [Fact]
+    public async Task GetAccountInRange_OneRow_ReadsIt()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var account = await connection.GetAccountInRange(
+            new GetAccountInRangeArgs(2, 2),
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        account.ShouldBe(new GetAccountInRangeDto(2, "bob"));
+    }
+
+    [Fact]
+    public async Task GetAccountInRange_NoRow_Throws()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var thrown = await Should.ThrowAsync<UnexpectedRowCountException>(() =>
+            connection.GetAccountInRange(
+                new GetAccountInRangeArgs(4, 5),
+                cancellationToken: TestContext.Current.CancellationToken
+            )
+        );
+
+        thrown.QueryName.ShouldBe("GetAccountInRange");
+        thrown.Message.ShouldBe("The query 'GetAccountInRange' returned no rows.");
+    }
+
+    [Fact]
+    public async Task GetAccountInRange_TwoRows_Throws()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var thrown = await Should.ThrowAsync<UnexpectedRowCountException>(() =>
+            connection.GetAccountInRange(
+                new GetAccountInRangeArgs(1, 2),
+                cancellationToken: TestContext.Current.CancellationToken
+            )
+        );
+
+        thrown.QueryName.ShouldBe("GetAccountInRange");
+        thrown.Message.ShouldBe("The query 'GetAccountInRange' returned more than one row.");
+    }
+
+    [Fact]
+    public async Task FindAccountInRange_OneRow_ReadsIt()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var account = await connection.FindAccountInRange(
+            new FindAccountInRangeArgs(3, 4),
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        account.ShouldBe(new FindAccountInRangeDto(3, "carol"));
+    }
+
+    [Fact]
+    public async Task FindAccountInRange_NoRow_ReturnsNull()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var account = await connection.FindAccountInRange(
+            new FindAccountInRangeArgs(4, 5),
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        account.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task FindAccountInRange_TwoRows_Throws()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var thrown = await Should.ThrowAsync<UnexpectedRowCountException>(() =>
+            connection.FindAccountInRange(
+                new FindAccountInRangeArgs(2, 3),
+                cancellationToken: TestContext.Current.CancellationToken
+            )
+        );
+
+        thrown.QueryName.ShouldBe("FindAccountInRange");
+        thrown.Message.ShouldBe("The query 'FindAccountInRange' returned more than one row.");
+    }
+
+    [Fact]
+    public async Task ListAccountsWhere_TheDefault_UsesTheParameter()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var accounts = await connection.ListAccountsWhere(
+            new ListAccountsWhereArgs(2),
+            "WHERE id <= @lastId",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        accounts.ShouldBe([new ListAccountsWhereDto(1, "alice"), new ListAccountsWhereDto(2, "bob")]);
+    }
+
+    // The declared @lastId is sent all the same, and SQL Server accepts a parameter that the text does not use.
+    [Fact]
+    public async Task ListAccountsWhere_AnotherFragment_LeavesTheParameterUnused()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var accounts = await connection.ListAccountsWhere(
+            new ListAccountsWhereArgs(1),
+            "WHERE status = 'suspended'",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        accounts.ShouldBe([new ListAccountsWhereDto(3, "carol")]);
+    }
+}
