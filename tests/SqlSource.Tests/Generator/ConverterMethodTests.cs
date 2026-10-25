@@ -589,6 +589,68 @@ public sealed class ConverterMethodTests
         methods.ShouldContain("(global::App.Embedding.FromDatabase(value0))");
     }
 
+    // SqlClient reads date and time as DateOnly and TimeOnly when asked, so the override to either is no foreign type,
+    // and converters between it and string do not touch a date or time column.
+    [Fact]
+    public void RunSqlServer_DateOnlyAndTimeOnlyOverridesWithConvertersOfString_ReadThemAsTheDriverDoes()
+    {
+        const string Source = """
+            using System;
+            using System.Globalization;
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class Sample;
+
+                public static class IsoText
+                {
+                    [SqlSourceConverter]
+                    public static DateOnly ToDate(string value) => DateOnly.Parse(value, CultureInfo.InvariantCulture);
+
+                    [SqlSourceConverter]
+                    public static string FromDate(DateOnly value) => value.ToString("O", CultureInfo.InvariantCulture);
+
+                    [SqlSourceConverter]
+                    public static TimeOnly ToTime(string value) => TimeOnly.Parse(value, CultureInfo.InvariantCulture);
+
+                    [SqlSourceConverter]
+                    public static string FromTime(TimeOnly value) => value.ToString("O", CultureInfo.InvariantCulture);
+                }
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: date=System.DateOnly\n-- type-override: time=System.TimeOnly\n-- name: FindBorn\n"
+                + "SELECT born, woke FROM users WHERE born = @born AND woke = @woke;\n"
+        );
+        var date = TestSidecars.SqlServer("date", 3, 10);
+        var time = TestSidecars.SqlServer("time", 5, 16, 7);
+
+        var run = MethodRuns.RunSqlServer(
+            file,
+            [
+                MethodRuns.SqlServerEntry(
+                    file,
+                    "FindBorn",
+                    [TestSidecars.Parameter(0, "born", date, false), TestSidecars.Parameter(0, "woke", time, false)],
+                    [TestSidecars.Column(0, "born", date), TestSidecars.Column(0, "woke", time)]
+                ),
+            ],
+            Source
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(
+            "(reader.GetFieldValue<global::System.DateOnly>(0), reader.GetFieldValue<global::System.TimeOnly>(1))"
+        );
+        methods.ShouldContain("parameter.Value = parameters.Born;\n");
+        methods.ShouldContain("parameter.Value = parameters.Woke;\n");
+        methods.ShouldNotContain("IsoText");
+    }
+
     [Fact]
     public void Run_ObsoleteConverter_DisablesItsWarning()
     {
@@ -605,6 +667,26 @@ public sealed class ConverterMethodTests
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldContain("#nullable enable\n#pragma warning disable CS0612, CS0618 ");
         methods.ShouldContain(NullableEmailRead);
+    }
+
+    // A parameter's converter warns where the parameter is bound, so its ids are the method's even when no column
+    // reads the type.
+    [Fact]
+    public void Run_ObsoleteWriteConverter_DisablesItsWarning()
+    {
+        var source = AppSourceOf(Struct)
+            .Replace(
+                "        public static string ToDatabase",
+                "        [System.Obsolete(\"Write emails another way.\")]\n        public static string ToDatabase",
+                StringComparison.Ordinal
+            );
+
+        var run = RunEmailParameter(Struct, nullable: true, source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("#nullable enable\n#pragma warning disable CS0612, CS0618 ");
+        methods.ShouldContain(EmailWrite);
     }
 
     // 8.1's methods name a mapped type in GetFieldValue<T>, and an obsolete one warns there as it would in a model.
@@ -975,6 +1057,42 @@ public sealed class ConverterMethodTests
         );
     }
 
+    // A domain over an array is read as its base, the array, so an override of the domain to an array of a type of
+    // the project converts element by element, and a NULL element of the value type is the method's own throw.
+    [Fact]
+    public void Run_DomainOverAnArrayOverriddenToAnArray_ConvertsEachElement()
+    {
+        var ids = TestSidecars.Postgres(
+            name: "ids",
+            kind: SidecarValues.Kind.Domain,
+            schema: "public",
+            internalName: "ids",
+            baseType: ArrayOf(Catalog("int8"), "_int8")
+        );
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: public.ids=App.UserId[]\n-- name: FindIds\nSELECT ids FROM teams WHERE ids = @ids;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "FindIds", [Parameter("ids", ids, nullable: false)], [Column("ids", ids)])],
+            AppSourceOf(Struct)
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(
+            "(global::System.Array.ConvertAll<long?, global::App.UserId>(reader.GetFieldValue<long?[]>(0), "
+                + "static element => element is { } item ? global::App.Conversions.ToUserId(item) : "
+                + "throw new global::System.InvalidCastException(\"Column 'ids' holds a null element.\")))"
+        );
+        methods.ShouldContain(
+            "(object)global::System.Array.ConvertAll<global::App.UserId, long>(value, "
+                + "static element => global::App.Conversions.FromUserId(element))"
+        );
+    }
+
     private static GeneratorRun RunEmailsColumn(string kind, bool nullable)
     {
         var file = new SqlFile(
@@ -1001,7 +1119,7 @@ public sealed class ConverterMethodTests
         );
     }
 
-    private static GeneratorRun RunEmailParameter(string kind, bool nullable)
+    private static GeneratorRun RunEmailParameter(string kind, bool nullable, string? source = null)
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -1010,7 +1128,7 @@ public sealed class ConverterMethodTests
         return MethodRuns.Run(
             file,
             [Entry(file, "DeleteUser", [Parameter("email", Email, nullable)], null)],
-            AppSourceOf(kind)
+            source ?? AppSourceOf(kind)
         );
     }
 

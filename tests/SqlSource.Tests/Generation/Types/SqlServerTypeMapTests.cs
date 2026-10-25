@@ -118,11 +118,16 @@ public sealed class SqlServerTypeMapTests
     [InlineData(Vector)]
     public void Gives_TypesOfTheMap_AreGiven(string text) => SqlServerTypeMap.Gives(text).ShouldBeTrue();
 
+    // No row gives them, but SqlClient reads date and time as them when asked, under date=System.DateOnly.
+    [Theory]
+    [InlineData("global::System.DateOnly")]
+    [InlineData("global::System.TimeOnly")]
+    public void Gives_TypesSqlClientReadsWhenAsked_AreGiven(string text) => SqlServerTypeMap.Gives(text).ShouldBeTrue();
+
     // A type of the package Microsoft.SqlServer.Types is never the map's, which gives such a type none.
     [Theory]
     [InlineData("global::MyApp.Email")]
     [InlineData("global::MyApp.Email[]")]
-    [InlineData("global::System.DateOnly")]
     [InlineData("uint")]
     [InlineData("global::Microsoft.SqlServer.Types.SqlHierarchyId")]
     public void Gives_ForeignTypes_AreNot(string text) => SqlServerTypeMap.Gives(text).ShouldBeFalse();

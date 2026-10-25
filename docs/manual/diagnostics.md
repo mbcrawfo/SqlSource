@@ -2480,6 +2480,7 @@ A method marked `[SqlSourceConverter]` must be a converter: a `static` method of
 - `it is not static`: the method is an instance method.
 - `it is abstract or virtual`: the method is a `static abstract` or `static virtual` member of an interface, which a call through the interface cannot reach.
 - `it is generic`: the method has type parameters of its own.
+- `it is in an extension block`: the method is declared inside an `extension` block, which the generated code cannot call it through.  Declare it in a class or a struct, as a member of the type it converts or of a static class.
 - `it is in a generic type`: the method is in a generic type, or in a type nested in one.
 - `it does not take exactly one argument`: the method has no argument, or more than one.
 - `its argument is ref, out, in, params or optional`: the argument has one of those modifiers, or a default value.

@@ -148,11 +148,15 @@ internal static class ConverterReader
         var canBeCalled = MappedTypeWarnings.Add(method, warningIds);
         var inGenericType = false;
         var inFileLocalType = false;
+        var inExtensionBlock = false;
         for (var type = method.ContainingType; type is not null; type = type.ContainingType)
         {
             canBeCalled &= MappedTypeWarnings.Add(type, warningIds);
             inGenericType |= type.IsGenericType;
             inFileLocalType |= type.IsFileLocal;
+
+            // A C# 14 extension block is a type whose kind Roslyn 4.8.0 does not name, so any kind but these is one.
+            inExtensionBlock |= type.TypeKind is not (TypeKind.Class or TypeKind.Struct or TypeKind.Interface);
         }
 
         if (method.MethodKind == MethodKind.LocalFunction)
@@ -180,6 +184,13 @@ internal static class ConverterReader
         if (method.IsGenericMethod)
         {
             return "it is generic";
+        }
+
+        // Generated code calls a converter through the types it is in, and an extension block has no name to call
+        // through (CS0117).
+        if (inExtensionBlock)
+        {
+            return "it is in an extension block";
         }
 
         if (inGenericType)

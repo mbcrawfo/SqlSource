@@ -348,6 +348,29 @@ public sealed class ConversionPlannerTests
         problems.ShouldBeEmpty();
     }
 
+    // A converter of the array type itself, though not to the base map's array, keeps the elements' converters out:
+    // the array is foreign with converters of another type.
+    [Fact]
+    public void Plan_ArrayWithAConverterOfItsOwnToAnotherType_ReportsSQLSRC279ForTheArray()
+    {
+        var type = Overridden(UserId + "[]", false, "int8[]", "long[]", false, elementIsValueType: true);
+        var converters = Of(
+            Project("global::MyApp.Ids.ToUserId", "long", true, UserId, true),
+            Project("global::MyApp.Ids.FromUserId", UserId, true, "long", true),
+            Project("global::MyApp.Ids.Join", UserId + "[]", false, "string", false)
+        );
+
+        var (conversion, problems, blocked) = Plan(type, isRead: true, converters, "column 'ids'");
+
+        conversion.ShouldBeNull();
+        blocked.ShouldBeTrue();
+        problems.ShouldBe([
+            "SQLSRC279: The column 'ids' has type 'MyApp.UserId[]', whose converters convert from and to 'string', "
+                + "and not from and to 'long[]', the type the database type 'int8[]' is read as.  Add a converter "
+                + "between 'MyApp.UserId[]' and 'long[]'.",
+        ]);
+    }
+
     // SQLSRC278 at the methods fails the build already.
     [Fact]
     public void Plan_DoubledEdgeOfTheProject_IsBlockedSilently()
@@ -446,6 +469,32 @@ public sealed class ConversionPlannerTests
         var converters = Of(Project("global::MyApp.Vectors.ToArray", Vector, true, "float[]", false));
 
         var (conversion, problems, blocked) = Plan(type, isRead: true, converters, engine: DatabaseEngine.SqlServer);
+
+        conversion.ShouldBeNull();
+        problems.ShouldBeEmpty();
+        blocked.ShouldBeFalse();
+    }
+
+    // PostgreSQL's map gives DateOnly, as Npgsql 10 reads a date, and IPAddress, which SQL Server's never gives, so
+    // neither is a foreign type there, even where the override chose it over a type Npgsql 8 reads.
+    [Theory]
+    [InlineData("global::System.DateOnly", true, "date", DateTime, true)]
+    [InlineData("global::System.Net.IPAddress", false, "inet", "global::System.Net.IPAddress", false)]
+    public void Plan_TypeOfThePostgresMapWithConvertersOfAnotherType_GivesNull(
+        string text,
+        bool isValueType,
+        string key,
+        string databaseText,
+        bool databaseIsValueType
+    )
+    {
+        var type = Overridden(text, isValueType, key, databaseText, databaseIsValueType);
+        var converters = Of(
+            Project("global::MyApp.Texts.From", "string", false, text, isValueType),
+            Project("global::MyApp.Texts.To", text, isValueType, "string", false)
+        );
+
+        var (conversion, problems, blocked) = Plan(type, isRead: true, converters, engine: DatabaseEngine.PostgreSql);
 
         conversion.ShouldBeNull();
         problems.ShouldBeEmpty();
