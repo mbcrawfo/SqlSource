@@ -346,6 +346,46 @@ public sealed class ConverterDiagnosticsTests
             .ShouldBe([("App.Conversions.From(string)", null), (displayName, fault)], ignoreOrder: true);
     }
 
+    // Two local functions of one name in two blocks of one method are two functions, each reported.
+    [Fact]
+    public void Run_TwoLocalFunctionsOfOneName_ReportSQLSRC277AtEach()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Models,
+            """
+            using SqlSource;
+
+            namespace App;
+
+            public readonly record struct Email(string Value);
+
+            public static class Conversions
+            {
+                public static void Outer()
+                {
+                    {
+                        [SqlSourceConverter]
+                        static Email F(string value) => new(value);
+                    }
+                    {
+                        [SqlSourceConverter]
+                        static Email F(string value) => new(value);
+                    }
+                }
+            }
+            """
+        );
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC277 /app/Repo/Sample.cs(13,26)-(13,27): The method 'App.Conversions.Outer.F(string)' is marked "
+                + "[SqlSourceConverter], but it is a local function.  A converter is a static method of one argument "
+                + "that returns the converted value.",
+            "SQLSRC277 /app/Repo/Sample.cs(17,26)-(17,27): The method 'App.Conversions.Outer.F(string)' is marked "
+                + "[SqlSourceConverter], but it is a local function.  A converter is a static method of one argument "
+                + "that returns the converted value.",
+        ]);
+    }
+
     [Fact]
     public void Run_ObsoleteAsAWarning_ReportsNothing()
     {

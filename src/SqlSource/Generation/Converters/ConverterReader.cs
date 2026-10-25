@@ -50,6 +50,12 @@ internal static class ConverterReader
     );
 
     /// <summary>
+    /// The fault of a local function, whose place <see cref="ConverterSet" /> compares, since two of one name can be
+    /// declared in two blocks of one method.
+    /// </summary>
+    public const string LocalFunctionFault = "it is a local function";
+
+    /// <summary>
     /// Whether a node that carries the attribute is read: a method, or a local function, which is reported.  A lambda
     /// is not.
     /// </summary>
@@ -128,7 +134,7 @@ internal static class ConverterReader
 
         if (method.MethodKind == MethodKind.LocalFunction)
         {
-            return "it is a local function";
+            return LocalFunctionFault;
         }
 
         if (!method.IsStatic)

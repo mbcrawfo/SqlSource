@@ -12,7 +12,8 @@ namespace SqlSource.Generation.Converters;
 /// <c>SQLSRC278</c> at the methods of its source.
 /// </summary>
 /// <param name="Converters">
-/// The converters, in the order of <see cref="Comparer" />: ordinal by argument, then by return type, then by method.
+/// The converters, in the order of <see cref="Comparer" />: ordinal by argument, then by return type, then by method,
+/// then by display name.
 /// A mapped type's converter of an edge that one of the project's source has is left out, so that a project can replace
 /// a library's conversion.
 /// </param>
@@ -149,12 +150,14 @@ internal sealed record ConverterSet(EquatableArray<Converter> Converters, Equata
             : new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable());
     }
 
-    // The display name tells overloads apart, by their type parameters and the modifiers of their argument.
+    // The display name tells overloads apart, by their type parameters and the modifiers of their argument.  Two local
+    // functions of one name in two blocks of one method have one display name, so only their places tell them apart.
     private static bool IsSameMethod(Converter left, Converter right) =>
         IsText(left.Method, right.Method)
         && IsText(left.DisplayName, right.DisplayName)
         && IsText(left.ArgumentText, right.ArgumentText)
-        && IsText(left.ReturnText, right.ReturnText);
+        && IsText(left.ReturnText, right.ReturnText)
+        && (left.Fault != ConverterReader.LocalFunctionFault || Equals(left.Location, right.Location));
 
     private static bool IsText(string left, string right) => left.Equals(right, StringComparison.Ordinal);
 
