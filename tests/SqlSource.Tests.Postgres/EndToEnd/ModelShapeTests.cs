@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Reflection;
 using NpgsqlTypes;
 using Shouldly;
 using SqlSource.Testing.EndToEnd;
@@ -185,7 +186,6 @@ public sealed class ModelShapeTests
         );
         ModelNamed($"{ReportingNamespace}.ListAccountsDto").ShouldBeNull();
         ModelNamed($"{ReportingNamespace}.ListAccountsInTableOrderDto").ShouldBeNull();
-        Reporting.AccountReports.GetAccount.ShouldBe("SELECT name, id, email\nFROM accounts\nWHERE id = @accountId;");
     }
 
     [Fact]
@@ -333,12 +333,27 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Build_InvoiceQueriesWithADirectLocation_HasTheConstantsOnTheType()
+    public void Build_AllTypesSqlWithADirectLocation_HasTheConstantsOnTheType()
     {
-        InvoiceQueries.ListInvoices.ShouldBe("SELECT *\nFROM billing.invoices\nORDER BY id;");
-        InvoiceQueries.GetInvoice.ShouldBe(
-            "SELECT id, number, amount, paid_at\nFROM billing.invoices\nWHERE id = @invoiceId;"
-        );
+        AllTypesSql.ListAllTypes.ShouldBe("SELECT *\nFROM all_types\nORDER BY id;");
+        AllTypesSql.InsertAllTypes.ShouldStartWith("INSERT INTO all_types (\n    id,\n    bool_value,");
+        AllTypesSql.InsertAllTypes.ShouldEndWith("@dateArrayValue, @emailValue\n)\nRETURNING *;");
+    }
+
+    // A query whose output is codegen has its method and no constant: the type that claims it declares no field, and
+    // no nested class, the class Sql of SqlLocation.Nested.
+    [Theory]
+    [InlineData(typeof(AccountQueries))]
+    [InlineData(typeof(Reporting.AccountReports))]
+    [InlineData(typeof(InvoiceQueries))]
+    [InlineData(typeof(AllTypesQueries))]
+    public void Build_CodeGenOutput_GivesNoConstant(Type type)
+    {
+        const BindingFlags Declared =
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+        type.GetFields(Declared).ShouldBeEmpty();
+        type.GetNestedTypes(Declared).ShouldBeEmpty();
     }
 
     [Fact]

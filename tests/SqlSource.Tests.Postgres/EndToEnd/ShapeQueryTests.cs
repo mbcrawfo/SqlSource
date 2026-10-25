@@ -1,6 +1,4 @@
-using System.Linq;
 using System.Threading.Tasks;
-using Dapper;
 using Shouldly;
 using SqlSource.Tests.Postgres.EndToEnd.Shapes;
 using SqlSource.Tests.Postgres.EndToEnd.Shared;
@@ -8,33 +6,38 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.EndToEnd;
 
-// The queries of Queries/Shapes.sql, run on the seed of "app" with their class input models as the parameters, into
-// their record and class output models.  The tests read this project's own generated models, which the other engine's
+// The queries of Queries/Shapes.sql, run on the seed of "app" through the static methods that ShapeQueries gets under
+// MethodLocation.Public, with their class input models as the parameters, into their record and class output models,
+// each list an IReadOnlyList by the file's collection type.  Half the tests give the method an open connection and half
+// a closed one, which the method opens.  The tests read this project's own generated models, which the other engine's
 // project does not have, so they are not shared.
 [Collection(UsesPostgres.Name)]
 public sealed class ShapeQueryTests(PostgresContainer postgres)
 {
     [Fact]
-    public async Task QueryAsync_SearchAccounts_ReadsTheAccountsOfEitherParameter()
+    public async Task SearchAccounts_IdOrName_ReadsTheAccountsOfEitherParameter()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = await source.OpenConnectionAsync(token);
 
-        var accounts = await connection.QueryAsync<SearchAccountsView>(
-            ShapeQueries.SearchAccounts,
-            new SearchAccountsFilter { AccountId = 1, Name = "c%" }
+        var accounts = await ShapeQueries.SearchAccounts(
+            connection,
+            new SearchAccountsFilter { AccountId = 1, Name = "c%" },
+            cancellationToken: token
         );
 
         accounts.ShouldBe([new SearchAccountsView(1, "alice"), new SearchAccountsView(3, "carol")]);
     }
 
     [Fact]
-    public async Task QueryAsync_ListAccountColumns_ReadsTheSortedClass()
+    public async Task ListAccountColumns_EveryAccount_ReadsTheSortedClass()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = source.CreateConnection();
 
-        var accounts = (await connection.QueryAsync<ListAccountColumnsView>(ShapeQueries.ListAccountColumns)).ToList();
+        var accounts = await ShapeQueries.ListAccountColumns(connection, cancellationToken: token);
 
         accounts.ShouldBeEquivalentTo(
             new[]
@@ -57,35 +60,39 @@ public sealed class ShapeQueryTests(PostgresContainer postgres)
                     Name = "carol",
                     Status = "suspended",
                 },
-            }.ToList()
+            }
         );
     }
 
     [Fact]
-    public async Task QuerySingleAsync_GetHeadline_ReadsTheNamedModel()
+    public async Task GetHeadline_OfBob_ReadsTheNamedModel()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = await source.OpenConnectionAsync(token);
 
-        var headline = await connection.QuerySingleAsync<AccountHeadline>(
-            ShapeQueries.GetHeadline,
-            new GetHeadlineFilter { AccountId = 2 }
+        var headlines = await ShapeQueries.GetHeadline(
+            connection,
+            new GetHeadlineFilter { AccountId = 2 },
+            cancellationToken: token
         );
 
-        headline.ShouldBe(new AccountHeadline(2, "bob"));
+        headlines.ShouldBe([new AccountHeadline(2, "bob")]);
     }
 
     [Fact]
-    public async Task QuerySingleAsync_LookUpAccount_TakesTheInputModelOfAnotherNamespace()
+    public async Task LookUpAccount_OfCarol_TakesTheInputModelOfAnotherNamespace()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = source.CreateConnection();
 
-        var account = await connection.QuerySingleAsync<LookUpAccountView>(
-            ShapeQueries.LookUpAccount,
-            new AccountLookup { Email = "carol@example.com" }
+        var accounts = await ShapeQueries.LookUpAccount(
+            connection,
+            new AccountLookup { Email = "carol@example.com" },
+            cancellationToken: token
         );
 
-        account.ShouldBe(new LookUpAccountView(3, "carol", "suspended"));
+        accounts.ShouldBe([new LookUpAccountView(3, "carol", "suspended")]);
     }
 }

@@ -1,25 +1,26 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Dapper;
 using Shouldly;
 using SqlSource.Tests.Postgres.EndToEnd.Billing;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.EndToEnd;
 
-// The queries of Queries/Billing/, run on the seed of the database "billing" into their sealed class models, whose
-// timestamptz is a DateTime by the folder's type override.
+// The queries of Queries/Billing/, run on the seed of the database "billing" through the methods that InvoiceQueries
+// gets, into their sealed class models, whose timestamptz is a DateTime by the folder's type override.  One test gives
+// the method an open connection and the other a closed one, which the method opens.
 [Collection(UsesPostgres.Name)]
 public sealed class InvoiceQueryTests(PostgresContainer postgres)
 {
     [Fact]
-    public async Task QueryAsync_ListInvoices_ReadsTheTableModel()
+    public async Task ListInvoices_EveryInvoice_ReadsTheTableModel()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.Billing(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = await source.OpenConnectionAsync(token);
 
-        var invoices = (await connection.QueryAsync<BillingInvoicesRow>(InvoiceQueries.ListInvoices)).ToList();
+        var invoices = await connection.ListInvoices(cancellationToken: token);
 
         invoices.ShouldBeEquivalentTo(
             new[]
@@ -51,30 +52,30 @@ public sealed class InvoiceQueryTests(PostgresContainer postgres)
                     IssuedOn = new DateOnly(2024, 3, 15),
                     PaidAt = null,
                 },
-            }.ToList()
+            }
         );
         invoices.Take(2).ShouldAllBe(static invoice => invoice.PaidAt!.Value.Kind == DateTimeKind.Utc);
     }
 
     [Fact]
-    public async Task QuerySingleAsync_GetInvoice_ReadsTheUnpaidInvoice()
+    public async Task GetInvoice_OfTheUnpaidInvoice_ReadsTheInvoice()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.Billing(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = source.CreateConnection();
 
-        var invoice = await connection.QuerySingleAsync<GetInvoiceRow>(
-            InvoiceQueries.GetInvoice,
-            new GetInvoiceArgs(3)
-        );
+        var invoices = await connection.GetInvoice(new GetInvoiceArgs(3), cancellationToken: token);
 
-        invoice.ShouldBeEquivalentTo(
-            new GetInvoiceRow
-            {
-                Id = 3,
-                Number = "INV-0003",
-                Amount = 45.25m,
-                PaidAt = null,
-            }
-        );
+        invoices
+            .ShouldHaveSingleItem()
+            .ShouldBeEquivalentTo(
+                new GetInvoiceRow
+                {
+                    Id = 3,
+                    Number = "INV-0003",
+                    Amount = 45.25m,
+                    PaidAt = null,
+                }
+            );
     }
 }

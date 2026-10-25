@@ -110,7 +110,7 @@ public sealed class DapperRecipeTests(PostgresContainer postgres)
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(token);
-        var full = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypes)).Single(static row =>
+        var full = (await connection.QueryAsync<AllTypesDto>(AllTypesSql.ListAllTypes)).Single(static row =>
             row.Id == AllTypesRows.FullRowId
         );
         var value = typeof(AllTypesDto).GetProperty(property).ShouldNotBeNull(property).GetValue(full);
