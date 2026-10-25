@@ -229,6 +229,15 @@ public sealed class MethodWriterTests
                 """
             );
 
+    // The token method is not asynchronous, so await is an identifier there as it is written.
+    [Fact]
+    public void Append_TokenNamedAwait_WritesItAsItIs() =>
+        Body(Token("await"), TestModels.Literal(";"))
+            .ShouldStartWith(
+                "public static string Q(string await)\n{\n    return string.Create(\n"
+                    + "        checked(1 + await.Length),\n        await,\n"
+            );
+
     [Fact]
     public void Append_OneTokenNamedState_ReadsTheStateByItsOtherName()
     {

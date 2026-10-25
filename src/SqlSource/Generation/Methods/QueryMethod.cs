@@ -71,6 +71,11 @@ internal sealed record MethodOutput(
 /// </summary>
 /// <param name="Name">The column's name, as the server gives it.</param>
 /// <param name="Property">The property's name.</param>
-/// <param name="TypeText">The property's type without <c>?</c>, from <c>global::</c> or as a keyword.</param>
+/// <param name="TypeText">
+/// The property's type without <c>?</c>, from <c>global::</c> or as a keyword.  A not-null column whose text is exactly
+/// <see cref="Emitting.QueryMethodWriter.VectorType" />,
+/// <c>global::Microsoft.Data.SqlTypes.SqlVector&lt;float&gt;</c>, is checked with <c>IsNull</c> after its read, since
+/// SqlClient gives <c>SqlVector&lt;float&gt;.Null</c> for a <c>NULL</c>.
+/// </param>
 /// <param name="IsNullable">Whether the model calls the property nullable.</param>
 internal sealed record MethodColumn(string Name, string Property, string TypeText, bool IsNullable);

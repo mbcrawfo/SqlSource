@@ -31,8 +31,12 @@ internal static class QueryMethodWriter
 
     private const string ExceptionType = "global::SqlSource.UnexpectedRowCountException";
 
-    // The read of SqlClient's vector, which gives SqlVector<float>.Null on a NULL instead of throwing.
-    private const string VectorType = "global::Microsoft.Data.SqlTypes.SqlVector<float>";
+    /// <summary>
+    /// The spelling of <see cref="MethodColumn.TypeText" /> that marks a column read as SqlClient's vector, which gives
+    /// <c>SqlVector&lt;float&gt;.Null</c> on a <c>NULL</c> instead of throwing: a not-null column of exactly this text
+    /// is read into a local and refused when it <c>IsNull</c>.
+    /// </summary>
+    internal const string VectorType = "global::Microsoft.Data.SqlTypes.SqlVector<float>";
 
     // DbCommand and DbDataReader are IAsyncDisposable, whose ConfigureAwait is an extension method.  The generated file
     // imports no namespace, so it is called by its class.
@@ -58,15 +62,19 @@ internal static class QueryMethodWriter
     )
     {
         var tokens = MethodWriter.GetTokens(method.Segments);
-        var locals = new Locals(tokens, method.Output);
+        var arguments = GetArguments(tokens);
+        var locals = new Locals(
+            tokens,
+            method.Shape is ResultShape.None or ResultShape.RowCount ? null : method.Output
+        );
         var bodyIndent = indent + GeneratedText.Indent;
         var blockIndent = bodyIndent + GeneratedText.Indent;
 
         AppendDocumentation(builder, indent, method, tokens);
-        AppendSignature(builder, indent, method, modifiers, isExtension, tokens);
+        AppendSignature(builder, indent, method, modifiers, isExtension, arguments);
         _ = builder.Append(indent).Append("{\n");
-        AppendChecks(builder, bodyIndent, method, tokens);
-        AppendSql(builder, bodyIndent, method, tokens, locals);
+        AppendChecks(builder, bodyIndent, method, arguments);
+        AppendSql(builder, bodyIndent, method, tokens, arguments, locals);
 
         _ = builder
             .Append(bodyIndent)
@@ -193,7 +201,7 @@ internal static class QueryMethodWriter
         QueryMethod method,
         string modifiers,
         bool isExtension,
-        List<string> tokens
+        List<string> arguments
     )
     {
         var argumentIndent = indent + GeneratedText.Indent;
@@ -217,9 +225,9 @@ internal static class QueryMethodWriter
             _ = builder.Append(argumentIndent).Append(input.TypeText).Append(' ').Append(Parameters).Append(",\n");
         }
 
-        foreach (var token in tokens)
+        foreach (var argument in arguments)
         {
-            _ = builder.Append(argumentIndent).Append("string ").Append(token).Append(",\n");
+            _ = builder.Append(argumentIndent).Append("string ").Append(argument).Append(",\n");
         }
 
         _ = builder
@@ -286,7 +294,7 @@ internal static class QueryMethodWriter
             or _ => ("new global::System.Collections.Generic.List<" + row + ">()", rows + ".ToArray()"),
         };
 
-    private static void AppendChecks(StringBuilder builder, string indent, QueryMethod method, List<string> tokens)
+    private static void AppendChecks(StringBuilder builder, string indent, QueryMethod method, List<string> arguments)
     {
         AppendThrowIfNull(builder, indent, Connection);
         if (method.Input is not null)
@@ -296,15 +304,33 @@ internal static class QueryMethodWriter
 
         if (method.ValidateTokens)
         {
-            foreach (var token in tokens)
+            foreach (var argument in arguments)
             {
                 _ = builder
                     .Append(indent)
                     .Append("global::System.ArgumentException.ThrowIfNullOrWhiteSpace(")
-                    .Append(token)
+                    .Append(argument)
                     .Append(");\n");
             }
         }
+    }
+
+    // How each token's argument is written in the method.  An asynchronous method cannot use await as an identifier,
+    // so that one is verbatim; its documentation keeps the name.
+    private static List<string> GetArguments(List<string> tokens)
+    {
+        if (!tokens.Contains("await"))
+        {
+            return tokens;
+        }
+
+        var arguments = new List<string>(tokens.Count);
+        foreach (var token in tokens)
+        {
+            arguments.Add(token == "await" ? "@await" : token);
+        }
+
+        return arguments;
     }
 
     private static void AppendThrowIfNull(StringBuilder builder, string indent, string argument) =>
@@ -321,6 +347,7 @@ internal static class QueryMethodWriter
         string indent,
         QueryMethod method,
         List<string> tokens,
+        List<string> arguments,
         Locals locals
     )
     {
@@ -343,6 +370,7 @@ internal static class QueryMethodWriter
             indent,
             method.Segments,
             tokens,
+            arguments,
             locals.Span,
             locals.State
         );
@@ -577,7 +605,8 @@ internal static class QueryMethodWriter
 
     private static void AppendEnd(StringBuilder builder, string indent) => _ = builder.Append(indent).Append("}\n");
 
-    // The names of the method's locals and of the lambda's parameters, none of which an argument has.
+    // The names of the method's locals and of the lambda's parameters, none of which an argument has.  The locals
+    // that read rows are named only for a method that reads them, whose output is given.
     private sealed class Locals
     {
         public Locals(List<string> tokens, MethodOutput? output)
@@ -588,18 +617,25 @@ internal static class QueryMethodWriter
             Command = names.Take("command");
             CommandScope = names.Take("commandScope");
             Parameter = names.Take("parameter");
-            Reader = names.Take("reader");
-            ReaderScope = names.Take("readerScope");
-            Rows = names.Take("rows");
-            Row = names.Take("row");
-            var count = output?.Columns.Count ?? 0;
-            Values = new string?[count];
-            for (var index = 0; index < count; index++)
+            if (output is null)
             {
-                var column = output!.Columns[index];
-                if (!column.IsNullable && column.TypeText == VectorType)
+                Reader = ReaderScope = Rows = Row = string.Empty;
+                Values = [];
+            }
+            else
+            {
+                Reader = names.Take("reader");
+                ReaderScope = names.Take("readerScope");
+                Rows = names.Take("rows");
+                Row = names.Take("row");
+                Values = new string?[output.Columns.Count];
+                for (var index = 0; index < output.Columns.Count; index++)
                 {
-                    Values[index] = names.Take("value" + index.ToString(CultureInfo.InvariantCulture));
+                    var column = output.Columns[index];
+                    if (!column.IsNullable && column.TypeText == VectorType)
+                    {
+                        Values[index] = names.Take("value" + index.ToString(CultureInfo.InvariantCulture));
+                    }
                 }
             }
 

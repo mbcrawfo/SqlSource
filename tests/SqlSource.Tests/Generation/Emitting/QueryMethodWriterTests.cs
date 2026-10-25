@@ -212,6 +212,7 @@ public sealed class QueryMethodWriterTests
                 "/// <exception cref=\"global::SqlSource.UnexpectedRowCountException\">"
                     + "The query returned no rows, or more than one.</exception>\n"
             );
+            text.ShouldNotContain("return null;");
             text.ShouldContain(
                 "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", false);\n"
             );
@@ -546,6 +547,28 @@ public sealed class QueryMethodWriterTests
         text.ShouldContain("        command.CommandText = sql1;\n");
     }
 
+    // An asynchronous method cannot use await as an identifier, so the argument is verbatim wherever the method uses
+    // it; its documentation keeps the name.
+    [Fact]
+    public void Append_TokenNamedAwait_WritesItVerbatimWhereItIsAnIdentifier()
+    {
+        var text = Write(
+            GetUser with
+            {
+                Segments = TestModels.Array(TestModels.Literal("SELECT 1 FROM "), Token("await"), Token("b")),
+            }
+        );
+
+        text.ShouldContain("/// <param name=\"await\">The text that replaces <c>{{await}}</c>.</param>\n");
+        text.ShouldContain("    string @await,\n    string b,\n");
+        text.ShouldContain("    global::System.ArgumentException.ThrowIfNullOrWhiteSpace(@await);\n");
+        text.ShouldContain("        checked(14 + @await.Length + b.Length),\n        (@await, b),\n");
+        text.ShouldNotContain("string await");
+        text.ShouldNotContain("(await)");
+        text.ShouldNotContain(" await.Length");
+        text.ShouldNotContain("(await, b)");
+    }
+
     [Fact]
     public void Append_SummaryOfTheQuery_IsTheMethodsSummary() =>
         Write(GetUser with { SummaryXml = "Finds a user by <c>id</c>,\nor none." })
@@ -571,7 +594,9 @@ public sealed class QueryMethodWriterTests
             Token("parameter"),
             Token("global"),
             Token("var"),
-            Token("System")
+            Token("System"),
+            Token("App"),
+            Token("await")
         );
         var withVector = GetUser.Output! with
         {
@@ -601,7 +626,8 @@ public sealed class QueryMethodWriterTests
                         Segments = index % 2 == 0 ? awkward : GetUser.Segments,
                         Input = index % 3 == 0 ? null : GetUser.Input,
                     };
-                    QueryMethodWriter.Append(builder, "        ", method, "public static", isExtension: index % 2 == 0);
+                    // Every awkward method once by each placement: the segments go by twos, the placement by fours.
+                    QueryMethodWriter.Append(builder, "        ", method, "public static", isExtension: index % 4 < 2);
                 }
             }
         }

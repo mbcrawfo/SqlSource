@@ -70,7 +70,7 @@ internal static class MethodWriter
         }
 
         _ = builder.Append(bodyIndent).Append("return ");
-        AppendCreate(builder, argumentIndent, bodyIndent, segments, parameters, span, state);
+        AppendCreate(builder, argumentIndent, bodyIndent, segments, parameters, parameters, span, state);
         _ = builder.Append(";\n").Append(indent).Append("}\n");
     }
 
@@ -82,7 +82,11 @@ internal static class MethodWriter
     /// <param name="argumentIndent">The whitespace that starts each argument of <c>string.Create</c>.</param>
     /// <param name="bodyIndent">The whitespace that starts the line of the closing parenthesis.</param>
     /// <param name="segments">The query's SQL.  It holds at least one token.</param>
-    /// <param name="tokens">The token names, as <see cref="GetTokens" /> gives them, which are the arguments'.</param>
+    /// <param name="tokens">The token names, as <see cref="GetTokens" /> gives them.</param>
+    /// <param name="arguments">
+    /// How each token's argument is written, in the order of <paramref name="tokens" />: its name, or <c>@await</c>
+    /// in an asynchronous method, where <c>await</c> cannot be an identifier.
+    /// </param>
     /// <param name="span">The name of the lambda's span, which no token has.</param>
     /// <param name="state">The name of the lambda's state, which no token has.</param>
     internal static void AppendCreate(
@@ -91,22 +95,23 @@ internal static class MethodWriter
         string bodyIndent,
         EquatableArray<SqlSegment> segments,
         List<string> tokens,
+        List<string> arguments,
         string span,
         string state
     )
     {
         var stepIndent = argumentIndent + GeneratedText.Indent;
         _ = builder.Append("string.Create(\n").Append(argumentIndent);
-        AppendLength(builder, segments, tokens);
+        AppendLength(builder, segments, tokens, arguments);
         _ = builder.Append(",\n").Append(argumentIndent);
-        if (tokens.Count == 1)
+        if (arguments.Count == 1)
         {
-            _ = builder.Append(tokens[0]);
+            _ = builder.Append(arguments[0]);
         }
         else
         {
             _ = builder.Append('(');
-            AppendList(builder, tokens, string.Empty);
+            AppendList(builder, arguments, string.Empty);
             _ = builder.Append(')');
         }
 
@@ -193,7 +198,8 @@ internal static class MethodWriter
     private static void AppendLength(
         StringBuilder builder,
         EquatableArray<SqlSegment> segments,
-        List<string> parameters
+        List<string> parameters,
+        List<string> arguments
     )
     {
         var literalLength = 0;
@@ -226,7 +232,7 @@ internal static class MethodWriter
         {
             _ = builder
                 .Append(literalLength > 0 || index > 0 ? " + " : string.Empty)
-                .Append(parameters[index])
+                .Append(arguments[index])
                 .Append(".Length");
             if (uses[index] > 1)
             {
