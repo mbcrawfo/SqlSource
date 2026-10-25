@@ -20,7 +20,8 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // in DynamicParameters over the generated input model; a SqlVector<float>, which Dapper refuses, goes as a
 // TypedParameter; a string is written to json as it is; DateOnly, TimeOnly and an alias type mapped to a struct are
 // read through their handlers; a mark in an alias is matched neither by a record nor by a class; and a command on a
-// connection in a transaction is given the transaction.  A test that writes rolls back.
+// connection in a transaction is given the transaction.  The generated SQL it runs is that of the claims at the output
+// models, in DapperQueries.cs and NoteQueries.  A test that writes rolls back.
 [Collection(UsesSqlServer.Name)]
 public sealed class DapperRecipeTests(SqlServerContainer sqlServer)
 {
@@ -106,8 +107,12 @@ public sealed class DapperRecipeTests(SqlServerContainer sqlServer)
             var parameters = new DynamicParameters(args);
             parameters.Add("writtenAt", args.WrittenAt, DbType.DateTime2);
 
-            var exact = await connection.QuerySingleAsync<AddNoteDto>(WriteQueries.AddNote, parameters, transaction);
-            var alone = await connection.QuerySingleAsync<AddNoteDto>(WriteQueries.AddNote, args, transaction);
+            var exact = await connection.QuerySingleAsync<AddNoteDto>(
+                WriteDapperQueries.AddNote,
+                parameters,
+                transaction
+            );
+            var alone = await connection.QuerySingleAsync<AddNoteDto>(WriteDapperQueries.AddNote, args, transaction);
             const string Read = "SELECT written_at FROM dbo.notes WHERE id = @id";
             var writtenExact = await connection.ExecuteScalarAsync<DateTime>(Read, new { id = exact.Id }, transaction);
             var writtenAlone = await connection.ExecuteScalarAsync<DateTime>(Read, new { id = alone.Id }, transaction);
@@ -267,7 +272,7 @@ public sealed class DapperRecipeTests(SqlServerContainer sqlServer)
     {
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
-        return (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypes)).Single(static row =>
+        return (await connection.QueryAsync<AllTypesDto>(AllTypesDapperQueries.ListAllTypes)).Single(static row =>
             row.Id == SqlServerAllTypesRows.FullRowId
         );
     }

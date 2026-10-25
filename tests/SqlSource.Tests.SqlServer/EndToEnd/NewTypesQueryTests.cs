@@ -7,8 +7,9 @@ using Xunit;
 
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
-// The types that SQL Server 2025 brings, json and vector: both rows of new_types into NewTypesDto.  The table is made
-// on a server of major 17 or later alone, so the test skips below it.
+// The types that SQL Server 2025 brings, json and vector: both rows of new_types into NewTypesDto, through Dapper,
+// which runs the SQL of NewTypesDapperQueries, the claim of Queries/NewTypes.sql at the output models.  The table is
+// made on a server of major 17 or later alone, so the test skips below it.
 [Collection(UsesSqlServer.Name)]
 public sealed class NewTypesQueryTests(SqlServerContainer sqlServer)
 {
@@ -19,7 +20,7 @@ public sealed class NewTypesQueryTests(SqlServerContainer sqlServer)
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var rows = (await connection.QueryAsync<NewTypesDto>(NewTypesQueries.ListNewTypes)).ToList();
+        var rows = (await connection.QueryAsync<NewTypesDto>(NewTypesDapperQueries.ListNewTypes)).ToList();
 
         rows.Count.ShouldBe(2);
         SqlServerAllTypesRows.ShouldBeTheFullNewTypesRow(rows[0]);

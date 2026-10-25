@@ -1,5 +1,5 @@
 using System;
-using System.Data;
+using System.Data.Common;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
@@ -8,9 +8,10 @@ using Xunit;
 
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
-// The queries of Queries/Writes.sql, each run on the seed of "app" in a transaction that is rolled back, with the
-// transaction given to every call, since SqlClient refuses a command on a connection whose transaction it is not
-// given.  Each reads the row of its OUTPUT into its model, and the seed is as it was after the rollback.
+// The queries of Queries/Writes.sql, each run through its generated method on the seed of "app" in a transaction that
+// is rolled back, with the transaction given to every call, since SqlClient refuses a command on a connection whose
+// transaction it is not given.  Each reads the row of its OUTPUT into its model, and the seed is as it was after the
+// rollback.  The test's own statements, which read the next id and the seed, run through Dapper.
 [Collection(UsesSqlServer.Name)]
 public sealed class WriteQueryTests(SqlServerContainer sqlServer)
 {
@@ -30,7 +31,7 @@ public sealed class WriteQueryTests(SqlServerContainer sqlServer)
     ];
 
     [Fact]
-    public async Task QuerySingleAsync_AddNote_ReturnsTheNewNote() =>
+    public async Task AddNote_InTransaction_ReturnsTheNewNote() =>
         await InTransactionAsync(
             async (connection, transaction) =>
             {
@@ -39,54 +40,54 @@ public sealed class WriteQueryTests(SqlServerContainer sqlServer)
                     transaction: transaction
                 );
 
-                var note = await connection.QuerySingleAsync<AddNoteDto>(
-                    WriteQueries.AddNote,
+                var notes = await connection.AddNote(
                     new AddNoteArgs(
                         3,
                         "call",
                         "Asked to reopen.",
                         new DateTime(2024, 10, 1, 9, 0, 0, DateTimeKind.Unspecified)
                     ),
-                    transaction
+                    transaction,
+                    cancellationToken: TestContext.Current.CancellationToken
                 );
 
-                note.ShouldBe(new AddNoteDto(next, "call"));
+                notes.ShouldBe([new AddNoteDto(next, "call")]);
             }
         );
 
     [Fact]
-    public async Task QuerySingleAsync_RenameAccount_ReturnsTheOldAndNewNames() =>
+    public async Task RenameAccount_InTransaction_ReturnsTheOldAndNewNames() =>
         await InTransactionAsync(
             async (connection, transaction) =>
             {
-                var names = await connection.QuerySingleAsync<RenameAccountDto>(
-                    WriteQueries.RenameAccount,
+                var names = await connection.RenameAccount(
                     new RenameAccountArgs("caroline", 3),
-                    transaction
+                    transaction,
+                    cancellationToken: TestContext.Current.CancellationToken
                 );
 
-                names.ShouldBe(new RenameAccountDto("carol", "caroline"));
+                names.ShouldBe([new RenameAccountDto("carol", "caroline")]);
             }
         );
 
     [Fact]
-    public async Task QuerySingleAsync_MergeAccountStatus_ReturnsTheUpdate() =>
+    public async Task MergeAccountStatus_InTransaction_ReturnsTheUpdate() =>
         await InTransactionAsync(
             async (connection, transaction) =>
             {
-                var change = await connection.QuerySingleAsync<MergeAccountStatusDto>(
-                    WriteQueries.MergeAccountStatus,
+                var changes = await connection.MergeAccountStatus(
                     new MergeAccountStatusArgs(2, "active"),
-                    transaction
+                    transaction,
+                    cancellationToken: TestContext.Current.CancellationToken
                 );
 
-                change.ShouldBe(new MergeAccountStatusDto("UPDATE", 2));
+                changes.ShouldBe([new MergeAccountStatusDto("UPDATE", 2)]);
             }
         );
 
     // Runs the write in a transaction that is rolled back, then reads the notes and the accounts on another
     // connection, as the seed has them.
-    private async Task InTransactionAsync(Func<SqlConnection, IDbTransaction, Task> write)
+    private async Task InTransactionAsync(Func<SqlConnection, DbTransaction, Task> write)
     {
         var token = TestContext.Current.CancellationToken;
         await using (var connection = EndToEndSources.App(sqlServer))

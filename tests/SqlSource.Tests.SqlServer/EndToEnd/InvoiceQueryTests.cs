@@ -1,25 +1,25 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Dapper;
 using Shouldly;
 using SqlSource.Tests.SqlServer.EndToEnd.Billing;
 using Xunit;
 
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
-// The queries of Queries/Billing/, run on the seed of the database "billing" into their sealed class models, whose date
-// is a DateTime by the folder's type override.
+// The queries of Queries/Billing/, run through their generated methods on the seed of the database "billing" into their
+// sealed class models, whose date is a DateTime by the folder's type override.
 [Collection(UsesSqlServer.Name)]
 public sealed class InvoiceQueryTests(SqlServerContainer sqlServer)
 {
     [Fact]
-    public async Task QueryAsync_ListInvoices_ReadsTheTableModel()
+    public async Task ListInvoices_Seed_ReadsTheTableModel()
     {
         await using var connection = EndToEndSources.Billing(sqlServer);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var invoices = (await connection.QueryAsync<BillingInvoicesRow>(InvoiceQueries.ListInvoices)).ToList();
+        var invoices = (
+            await connection.ListInvoices(cancellationToken: TestContext.Current.CancellationToken)
+        ).ToList();
 
         invoices.ShouldBeEquivalentTo(
             new[]
@@ -62,15 +62,13 @@ public sealed class InvoiceQueryTests(SqlServerContainer sqlServer)
     }
 
     [Fact]
-    public async Task QuerySingleAsync_GetInvoice_ReadsThePaidInvoice()
+    public async Task GetInvoice_PaidInvoice_ReadsItsPayment()
     {
         await using var connection = EndToEndSources.Billing(sqlServer);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var invoice = await connection.QuerySingleAsync<GetInvoiceRow>(
-            InvoiceQueries.GetInvoice,
-            new GetInvoiceArgs(1)
-        );
+        var invoice = (
+            await connection.GetInvoice(new GetInvoiceArgs(1), cancellationToken: TestContext.Current.CancellationToken)
+        ).ShouldHaveSingleItem();
 
         invoice.ShouldBeEquivalentTo(
             new GetInvoiceRow
@@ -86,15 +84,13 @@ public sealed class InvoiceQueryTests(SqlServerContainer sqlServer)
     }
 
     [Fact]
-    public async Task QuerySingleAsync_GetInvoice_ReadsTheUnpaidInvoice()
+    public async Task GetInvoice_UnpaidInvoice_ReadsANullPayment()
     {
         await using var connection = EndToEndSources.Billing(sqlServer);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var invoice = await connection.QuerySingleAsync<GetInvoiceRow>(
-            InvoiceQueries.GetInvoice,
-            new GetInvoiceArgs(3)
-        );
+        var invoice = (
+            await connection.GetInvoice(new GetInvoiceArgs(3), cancellationToken: TestContext.Current.CancellationToken)
+        ).ShouldHaveSingleItem();
 
         invoice.ShouldBeEquivalentTo(
             new GetInvoiceRow
