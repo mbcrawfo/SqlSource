@@ -15,7 +15,8 @@ namespace SqlSource.Generation.Emitting;
 /// converted by element, the array <c>Array.ConvertAll</c> gives.  A null is bound as <c>TypedValue = null</c>, never
 /// <c>DBNull.Value</c>, which the setter of <c>NpgsqlParameter&lt;T&gt;.Value</c> refuses.  No <c>NpgsqlDbType</c> is
 /// named, and a <c>bindName</c> is written as the entry holds it, so the binding compiles and binds alike on every
-/// supported Npgsql.
+/// supported Npgsql.  Npgsql resolves that display name on every call, which costs more than a canonical internal name
+/// would (TD-0078).
 /// </remarks>
 internal sealed class PostgresParameterBinder : ParameterBinder
 {
