@@ -1,6 +1,7 @@
 namespace SqlSource.Tests.Postgres.EndToEnd;
 
-// The output models by the attribute, and the header's type overrides to an enum and a record struct of the project.
-// Sub-phases 8.3 and 8.4 set it back to CodeGen, when the generated methods are what the tests run.
-[SqlSourceGenerate(Path = "Queries/Notes.sql", SqlLocation = SqlLocation.Direct, Output = GeneratorOutput.Models)]
+// The project's output, codegen, with the header's type overrides to an enum, which the data source maps, and to two
+// record structs of the project, read and sent through their converters: extension methods of the connection in
+// NoteQueriesExtensions.
+[SqlSourceGenerate(Path = "Queries/Notes.sql", SqlLocation = SqlLocation.Direct)]
 internal static partial class NoteQueries;

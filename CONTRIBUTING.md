@@ -28,8 +28,8 @@ The seven test projects and the two libraries they share, which [`tests/README.m
 - `tests/SqlSource.Tests` runs every test of the generator.
 - `tests/SqlSource.Tests.RoslynFloor` compiles the generator driver tests a second time, on the oldest supported Roslyn.
 - `tests/SqlSource.Tool.Tests` runs the tests of the tool.
-- `tests/SqlSource.Tests.Postgres` runs the PostgreSQL describer against a real server and is the end-to-end project, which builds models from its own queries and reads rows into them through Dapper, and needs Docker.
-- `tests/SqlSource.Tests.Postgres.Npgsql8` reads every mapped type through Dapper on Npgsql 8, the oldest supported driver, and needs Docker.
+- `tests/SqlSource.Tests.Postgres` runs the PostgreSQL describer against a real server and is the end-to-end project, which builds models and methods from its own queries and runs every described query through its method, and needs Docker.
+- `tests/SqlSource.Tests.Postgres.Npgsql8` writes and reads every mapped type through the generated methods, and reads them through Dapper, on Npgsql 8, the oldest supported driver, and needs Docker.
 - `tests/SqlSource.Tests.SqlServer` runs the tests of SQL Server against a real server and is SQL Server's end-to-end project, which builds models and query methods from its own queries, runs each query through its method, writes and reads every mapped type through the methods, measures their allocations against hand-written ADO.NET, and reads rows through Dapper for the manual's recipe, and needs Docker.
 - `tests/SqlSource.Tests.SqlServer.SqlClient61` reads every mapped type through Dapper, and writes and reads it through the generated methods, on Microsoft.Data.SqlClient 6.1, the oldest supported driver, and needs Docker.
 - `tests/SqlSource.Testing` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
@@ -55,7 +55,7 @@ and `tests/SqlSource.Tests.SqlServer` on SQL Server 2017, the oldest supported, 
 SQLSOURCE_TESTS_SQLSERVER_IMAGE=mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04 dotnet test --project tests/SqlSource.Tests.SqlServer
 ```
 
-The default SQL Server image is `mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04`.  SQL Server's images are built for x64 alone, and on Apple silicon Docker runs them under emulation: the first run takes minutes while each image is pulled.  The SQL Server tests' readme has [the images and how a tag is moved](tests/SqlSource.Tests.SqlServer/README.md#the-images).
+The default SQL Server image is `mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04`.  The nightly run, `.github/workflows/nightly.yml`, runs the same two projects on every supported major between the oldest and the default, PostgreSQL 15 to 17 and SQL Server 2019 and 2022, with the images it names in the same variables.  SQL Server's images are built for x64 alone, and on Apple silicon Docker runs them under emulation: the first run takes minutes while each image is pulled.  The SQL Server tests' readme has [the images and how a tag is moved](tests/SqlSource.Tests.SqlServer/README.md#the-images).
 
 The PostgreSQL tests' readme has the procedures of that project: [moving to a new image minor](tests/SqlSource.Tests.Postgres/README.md#the-image), [re-recording the describer's fixtures](tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures) with `tools/record-fixtures.sh postgres`, [adding a realistic case](tests/SqlSource.Tests.Postgres/README.md#the-realistic-corpus), writing its sidecar with `tools/describe-end-to-end.sh`, and [writing the sidecars of the end-to-end project, the realistic cases and the examples again](tests/SqlSource.Tests.Postgres/README.md#writing-the-sidecars) with `tools/describe-end-to-end.sh`.  The SQL Server tests' readme has [adding a realistic case](tests/SqlSource.Tests.SqlServer/README.md#adding-a-case), [re-recording the describer's fixtures](tests/SqlSource.Tests.SqlServer/README.md#the-describers-fixtures) with `tools/record-fixtures.sh mssql`, whose run with no engine records both, and [writing the sidecars of its end-to-end project, its realistic cases and its examples again](tests/SqlSource.Tests.SqlServer/README.md#writing-the-sidecars) with `tools/describe-end-to-end.sh`, which writes those of both engines in one run.  To [add a fixture project](tests/README.md#fixture-projects), see `tests/README.md`.
 
@@ -104,7 +104,7 @@ dotnet restore SqlSource.slnx
 
 ## Continuous integration
 
-CI runs the same checks as `pre-commit-validation.sh` on Linux, in parallel jobs.  It pulls the test images in a step of its own, with `tools/pull-test-images.sh`, and runs `tests/SqlSource.Tests.Postgres` again on PostgreSQL 14 and `tests/SqlSource.Tests.SqlServer` again on SQL Server 2017, each in a job of its own.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests that need no container on Windows and macOS every night, and by hand on a branch:
+CI runs the same checks as `pre-commit-validation.sh` on Linux, in parallel jobs.  It pulls the test images in a step of its own, with `tools/pull-test-images.sh`, and runs `tests/SqlSource.Tests.Postgres` again on PostgreSQL 14 and `tests/SqlSource.Tests.SqlServer` again on SQL Server 2017, each in a job of its own.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests that need no container on Windows and macOS every night, and `tests/SqlSource.Tests.Postgres` on PostgreSQL 15 to 17 and `tests/SqlSource.Tests.SqlServer` on SQL Server 2019 and 2022 on Linux, and by hand on a branch:
 
 ```bash
 gh workflow run nightly.yml --ref <branch>

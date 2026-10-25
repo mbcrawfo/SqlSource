@@ -1,15 +1,15 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Dapper;
 using Shouldly;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.EndToEnd;
 
-// The queries of Queries/Accounts.sql, run through Dapper on the seed of "app" with their input models as the
-// parameters, into their output models.  AccountQueries keeps its SQL private, so the SQL is Reporting.AccountReports',
-// which is the same file's.
+// The queries of Queries/Accounts.sql, run on the seed of "app" through the methods that AccountQueries gets, with
+// their input models as the parameters, into their output models, and two of them through Reporting.AccountReports',
+// which are of a second namespace.  Every query is many, so each method returns an IReadOnlyList, the project's
+// collection type.  Half the tests give the method an open connection and half a closed one, which the method opens.
 [Collection(UsesPostgres.Name)]
 public sealed class AccountQueryTests(PostgresContainer postgres)
 {
@@ -27,50 +27,49 @@ public sealed class AccountQueryTests(PostgresContainer postgres)
     ];
 
     [Fact]
-    public async Task QuerySingleAsync_GetAccount_ReadsTheAccount()
+    public async Task GetAccount_OfBob_ReadsTheAccount()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = await source.OpenConnectionAsync(token);
 
-        var account = await connection.QuerySingleAsync<GetAccountDto>(
-            Reporting.AccountReports.GetAccount,
-            new GetAccountArgs(2)
-        );
+        var accounts = await connection.GetAccount(new GetAccountArgs(2), cancellationToken: token);
 
-        account.ShouldBe(new GetAccountDto("bob", 2, "bob@example.com"));
+        accounts.ShouldBe([new GetAccountDto("bob", 2, "bob@example.com")]);
     }
 
     [Fact]
-    public async Task QueryAsync_ListAccounts_ReadsEveryAccountIntoTheTableModel()
+    public async Task ListAccounts_EveryAccount_ReadsTheTableModel()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = source.CreateConnection();
 
-        var accounts = await connection.QueryAsync<AccountsDto>(Reporting.AccountReports.ListAccounts);
+        var accounts = await connection.ListAccounts(cancellationToken: token);
 
         accounts.ShouldBe(Accounts);
     }
 
     [Fact]
-    public async Task QueryAsync_ListAccountsInTableOrder_ReadsTheSameRows()
+    public async Task ListAccountsInTableOrder_EveryAccount_ReadsTheSameRows()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = await source.OpenConnectionAsync(token);
 
-        var accounts = await connection.QueryAsync<AccountsDto>(Reporting.AccountReports.ListAccountsInTableOrder);
+        var accounts = await connection.ListAccountsInTableOrder(cancellationToken: token);
 
         accounts.ShouldBe(Accounts);
     }
 
     [Fact]
-    public async Task QueryAsync_ListAccountsUntabled_ReadsEveryAccount()
+    public async Task ListAccountsUntabled_EveryAccount_ReadsTheModelNamedAfterTheQuery()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = source.CreateConnection();
 
-        var accounts = await connection.QueryAsync<ListAccountsUntabledDto>(
-            Reporting.AccountReports.ListAccountsUntabled
-        );
+        var accounts = await connection.ListAccountsUntabled(cancellationToken: token);
 
         accounts.ShouldBe(
             Accounts.Select(static account => new ListAccountsUntabledDto(
@@ -86,34 +85,40 @@ public sealed class AccountQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task QuerySingleAsync_SharedModel_ReadsBothQueries()
+    public async Task GetAccountName_OfAlice_ReadsTheSharedModel()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = await source.OpenConnectionAsync(token);
 
-        var byId = await connection.QuerySingleAsync<AccountName>(
-            Reporting.AccountReports.GetAccountName,
-            new GetAccountNameArgs(1)
-        );
-        var byEmail = await connection.QuerySingleAsync<AccountName>(
-            Reporting.AccountReports.FindAccountName,
-            new FindAccountNameArgs("carol@example.com")
-        );
+        var names = await connection.GetAccountName(new GetAccountNameArgs(1), cancellationToken: token);
 
-        byId.ShouldBe(new AccountName(1, "alice"));
-        byEmail.ShouldBe(new AccountName(3, "carol"));
+        names.ShouldBe([new AccountName(1, "alice")]);
     }
 
     [Fact]
-    public async Task QueryAsync_ListClosedBeforeWithANullParameter_ReadsEveryAccount()
+    public async Task FindAccountName_OfCarol_ReadsTheSharedModel()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = source.CreateConnection();
 
-        var accounts = await connection.QueryAsync<ListClosedBeforeDto>(
-            Reporting.AccountReports.ListClosedBefore,
-            new ListClosedBeforeArgs(null)
+        var names = await connection.FindAccountName(
+            new FindAccountNameArgs("carol@example.com"),
+            cancellationToken: token
         );
+
+        names.ShouldBe([new AccountName(3, "carol")]);
+    }
+
+    [Fact]
+    public async Task ListClosedBefore_NullParameter_ReadsEveryAccount()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+
+        var accounts = await connection.ListClosedBefore(new ListClosedBeforeArgs(null), cancellationToken: token);
 
         accounts.ShouldBe([
             new ListClosedBeforeDto(1, "alice", null),
@@ -123,32 +128,47 @@ public sealed class AccountQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task QueryAsync_ListClosedBeforeADate_ReadsTheClosedAccount()
+    public async Task ListClosedBefore_ADate_ReadsTheClosedAccount()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = source.CreateConnection();
 
-        var accounts = await connection.QueryAsync<ListClosedBeforeDto>(
-            Reporting.AccountReports.ListClosedBefore,
-            new ListClosedBeforeArgs(new DateTimeOffset(2024, 10, 1, 0, 0, 0, TimeSpan.Zero))
+        var accounts = await connection.ListClosedBefore(
+            new ListClosedBeforeArgs(new DateTimeOffset(2024, 10, 1, 0, 0, 0, TimeSpan.Zero)),
+            cancellationToken: token
         );
 
         accounts.ShouldBe([new ListClosedBeforeDto(2, "bob", BobClosedAt)]);
     }
 
+    // The second namespace's methods are in Reporting.AccountReportsExtensions, which this namespace does not import,
+    // so they are called as static methods.
     [Fact]
-    public async Task QuerySingleAsync_SecondNamespace_ReadsTheSameAccount()
+    public async Task GetAccount_OfTheSecondNamespace_ReadsItsOwnModel()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = await source.OpenConnectionAsync(token);
 
-        var account = await connection.QuerySingleAsync<Reporting.GetAccountDto>(
-            Reporting.AccountReports.GetAccount,
-            new Reporting.GetAccountArgs(3)
+        var accounts = await Reporting.AccountReportsExtensions.GetAccount(
+            connection,
+            new Reporting.GetAccountArgs(3),
+            cancellationToken: token
         );
-        var accounts = await connection.QueryAsync<Reporting.AccountsDto>(Reporting.AccountReports.ListAccounts);
 
-        account.ShouldBe(new Reporting.GetAccountDto("carol", 3, "carol@example.com"));
+        accounts.ShouldBe([new Reporting.GetAccountDto("carol", 3, "carol@example.com")]);
+    }
+
+    [Fact]
+    public async Task ListAccounts_OfTheSecondNamespace_ReadsItsOwnTableModel()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = source.CreateConnection();
+
+        var accounts = await Reporting.AccountReportsExtensions.ListAccounts(connection, cancellationToken: token);
+
         accounts.ShouldBe(
             Accounts.Select(static account => new Reporting.AccountsDto(
                 account.Id,

@@ -367,10 +367,11 @@ internal static class MethodPlanner
                 new MethodParameter(
                     query.Parameters[index].Name,
                     property.Name,
+                    property.Type.Text,
                     property.Type.IsValueType,
                     property.IsNullable,
                     write,
-                    property.Described
+                    models.ParameterTypes?[index]
                 )
             );
         }

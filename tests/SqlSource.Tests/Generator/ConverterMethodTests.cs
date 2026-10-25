@@ -119,8 +119,7 @@ public sealed class ConverterMethodTests
         + "global::App.Email.FromDatabase(reader.GetFieldValue<string>(0))";
 
     private const string EmailWrite =
-        "parameter.Value = parameters.Email is { } value ? (object)global::App.Email.ToDatabase(value) : "
-        + "global::System.DBNull.Value;\n";
+        "parameter.TypedValue = parameters.Email is { } value ? global::App.Email.ToDatabase(value) : null;\n";
 
     private const string EmailMarker = "-- type-override: public.email=MyApp.Email\n";
 
@@ -194,9 +193,9 @@ public sealed class ConverterMethodTests
                         }
 
                         {
-                            var parameter = command.CreateParameter();
+                            var parameter = new global::Npgsql.NpgsqlParameter<global::MyApp.Email>();
                             parameter.ParameterName = "email";
-                            parameter.Value = parameters.Email;
+                            parameter.TypedValue = parameters.Email;
                             command.Parameters.Add(parameter);
                         }
 
@@ -493,11 +492,11 @@ public sealed class ConverterMethodTests
 
         run.ShouldBeClean();
         run.Sources[MethodRuns.MethodsFile]
-            .ShouldContain("parameter.Value = global::App.Conversions.FromUserId(parameters.Id);\n");
+            .ShouldContain("parameter.TypedValue = global::App.Conversions.FromUserId(parameters.Id);\n");
     }
 
     [Fact]
-    public void Run_NullableParameter_SendsDBNullForNull()
+    public void Run_NullableParameter_BindsNullForNull()
     {
         var run = RunEmailParameter(Struct, nullable: true);
 
@@ -507,7 +506,7 @@ public sealed class ConverterMethodTests
 
     // A caller can pass null for a property of a reference type that cannot be null, so it is checked as well.
     [Fact]
-    public void Run_NotNullParameterOfAReferenceType_SendsDBNullForNull()
+    public void Run_NotNullParameterOfAReferenceType_BindsNullForNull()
     {
         var run = RunEmailParameter(Class, nullable: false);
 
@@ -555,7 +554,7 @@ public sealed class ConverterMethodTests
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain("parameter.Value = global::App.Moments.Kind(parameters.At);\n");
+        methods.ShouldContain("parameter.TypedValue = global::App.Moments.Kind(parameters.At);\n");
         methods.ShouldContain("(global::App.Moments.Kind(reader.GetFieldValue<global::System.DateTime>(0)))");
     }
 
@@ -593,7 +592,7 @@ public sealed class ConverterMethodTests
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain("parameter.Value = global::App.Ids.FromId(parameters.Id);\n");
+        methods.ShouldContain("parameter.TypedValue = global::App.Ids.FromId(parameters.Id);\n");
         methods.ShouldContain("(global::App.Ids.ToId(reader.GetFieldValue<long>(0)))");
         run.Sources["App.FindIdDto-Model.g.cs"].ShouldContain(property + " Id");
     }
@@ -667,7 +666,7 @@ public sealed class ConverterMethodTests
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain("parameter.Value = global::App.Money.Round(parameters.Price);\n");
+        methods.ShouldContain("parameter.TypedValue = global::App.Money.Round(parameters.Price);\n");
         methods.ShouldContain("(global::App.Money.Round(reader.GetFieldValue<decimal>(0)))");
     }
 
@@ -904,7 +903,7 @@ public sealed class ConverterMethodTests
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldContain("#nullable enable\n#pragma warning disable CS0612, CS0618 ");
-        methods.ShouldContain("parameter.Value = global::App.Conversions.FromUserId(parameters.Id);\n");
+        methods.ShouldContain("parameter.TypedValue = global::App.Conversions.FromUserId(parameters.Id);\n");
         methods.ShouldContain("(global::App.Conversions.ToUserId(reader.GetFieldValue<long>(0)))");
     }
 
@@ -994,13 +993,12 @@ public sealed class ConverterMethodTests
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain("parameter.Value = global::App.Conversions.FromUserId(parameters.Id);\n");
+        methods.ShouldContain("parameter.TypedValue = global::App.Conversions.FromUserId(parameters.Id);\n");
         methods.ShouldContain(
-            "parameter.Value = parameters.Email is { } value ? (object)global::App.Conversions.FromEmail(value) : "
-                + "global::System.DBNull.Value;\n"
+            "parameter.TypedValue = parameters.Email is { } value ? global::App.Conversions.FromEmail(value) : null;\n"
         );
         methods.ShouldContain(
-            "(object)global::System.Array.ConvertAll<global::App.UserId, long>(value, "
+            "value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, "
                 + "static element => global::App.Conversions.FromUserId(element))"
         );
     }
@@ -1099,11 +1097,7 @@ public sealed class ConverterMethodTests
 
         run.ShouldBeClean();
         run.Sources[MethodRuns.MethodsFile]
-            .ShouldContain(
-                "parameter.Value = parameters.Emails is { } value ? (object)"
-                    + converted
-                    + " : global::System.DBNull.Value;\n"
-            );
+            .ShouldContain("parameter.TypedValue = parameters.Emails is { } value ? " + converted + " : null;\n");
     }
 
     // An override of the array itself takes its own converter, between it and the base map's array, and the
@@ -1144,8 +1138,7 @@ public sealed class ConverterMethodTests
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldContain("(global::App.Emails.FromDatabase(reader.GetFieldValue<string[]>(0)))");
         methods.ShouldContain(
-            "parameter.Value = parameters.Emails is { } value ? (object)global::App.Emails.ToDatabase(value) : "
-                + "global::System.DBNull.Value;\n"
+            "parameter.TypedValue = parameters.Emails is { } value ? global::App.Emails.ToDatabase(value) : null;\n"
         );
         methods.ShouldNotContain("ConvertAll");
         methods.ShouldNotContain("global::App.Email.");
@@ -1189,9 +1182,9 @@ public sealed class ConverterMethodTests
                 + "static element => element is { } item ? global::App.Conversions.ToUserId(item) : null))"
         );
         methods.ShouldContain(
-            "parameter.Value = parameters.Ids is { } value ? (object)global::System.Array.ConvertAll<"
+            "parameter.TypedValue = parameters.Ids is { } value ? global::System.Array.ConvertAll<"
                 + "global::App.UserId?, long?>(value, static element => element is { } item ? "
-                + "global::App.Conversions.FromUserId(item) : null) : global::System.DBNull.Value;\n"
+                + "global::App.Conversions.FromUserId(item) : null) : null;\n"
         );
     }
 
@@ -1226,7 +1219,7 @@ public sealed class ConverterMethodTests
                 + "throw new global::System.InvalidCastException(\"Column 'ids' holds a null element.\")))"
         );
         methods.ShouldContain(
-            "(object)global::System.Array.ConvertAll<global::App.UserId, long>(value, "
+            "value ? global::System.Array.ConvertAll<global::App.UserId, long>(value, "
                 + "static element => global::App.Conversions.FromUserId(element))"
         );
     }

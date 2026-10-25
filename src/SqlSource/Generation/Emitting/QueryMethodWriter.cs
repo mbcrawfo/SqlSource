@@ -399,18 +399,19 @@ internal static class QueryMethodWriter
             .Append(Connection)
             .Append(".CreateCommand();\n");
         AppendScope(builder, indent, locals.CommandScope, locals.Command);
-        if (builtAtRunTime)
-        {
-            _ = builder.Append(indent).Append(SqlFromTokensStart);
-        }
-
-        _ = builder.Append(indent).Append(locals.Command).Append(".CommandText = ").Append(locals.Sql).Append(";\n");
-        if (builtAtRunTime)
-        {
-            _ = builder.Append(indent).Append(SqlFromTokensEnd);
-        }
-
-        _ = builder.Append(indent).Append(locals.Command).Append(".Transaction = ").Append(Transaction).Append(";\n");
+        _ = builder
+            .Append(builtAtRunTime ? indent + SqlFromTokensStart : string.Empty)
+            .Append(indent)
+            .Append(locals.Command)
+            .Append(".CommandText = ")
+            .Append(locals.Sql)
+            .Append(";\n")
+            .Append(builtAtRunTime ? indent + SqlFromTokensEnd : string.Empty)
+            .Append(indent)
+            .Append(locals.Command)
+            .Append(".Transaction = ")
+            .Append(Transaction)
+            .Append(";\n");
         AppendIf(builder, indent, CommandTimeout + ".HasValue");
         _ = builder
             .Append(indent)

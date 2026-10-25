@@ -142,6 +142,7 @@ internal static class ModelReader
 
         AddUnusableColumnMarkers(entry, query, reading);
 
+        var parameterTypes = input is null ? null : TypesOf(entry.Parameters);
         return reading.Diagnostics.Count != errors
             ? null
             : new QueryModels(
@@ -154,8 +155,27 @@ internal static class ModelReader
                 input,
                 output,
                 columnNames,
-                entry.MatchesTable
+                entry.MatchesTable,
+                parameterTypes
             );
+    }
+
+    // The type of each parameter, or null when one has none: QueryTyper reports a parameter without a type, so a
+    // query that reaches its models has a type for each.
+    private static EquatableArray<SidecarType>? TypesOf(EquatableArray<SidecarParameter> parameters)
+    {
+        var types = ImmutableArray.CreateBuilder<SidecarType>(parameters.Count);
+        foreach (var parameter in parameters)
+        {
+            if (parameter.Type is not { } type)
+            {
+                return null;
+            }
+
+            types.Add(type);
+        }
+
+        return new EquatableArray<SidecarType>(types.MoveToImmutable());
     }
 
     private static EquatableArray<string> NamesOf(EquatableArray<SidecarColumn> columns)
@@ -248,8 +268,7 @@ internal static class ModelReader
                     parameter.Nullable == true,
                     ParameterDocumentation(parameter, reading.Text),
                     MessageSubject.Of(MessageSubject.Parameter, parameter.Name),
-                    false,
-                    parameter.Type
+                    false
                 )
             );
         }

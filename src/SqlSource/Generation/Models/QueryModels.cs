@@ -25,6 +25,9 @@ namespace SqlSource.Generation.Models;
 /// is.
 /// </param>
 /// <param name="Table">The table whose column list the rows are, as the entry says, or null.</param>
+/// <param name="ParameterTypes">
+/// The type the entry describes for each of its parameters, in order, or null when <paramref name="Input" /> is.
+/// </param>
 internal sealed record QueryModels(
     string Name,
     int Index,
@@ -35,5 +38,6 @@ internal sealed record QueryModels(
     EquatableArray<ModelProperty>? Input,
     EquatableArray<ModelProperty>? Output,
     EquatableArray<string>? ColumnNames,
-    SidecarTable? Table
+    SidecarTable? Table,
+    EquatableArray<SidecarType>? ParameterTypes
 );

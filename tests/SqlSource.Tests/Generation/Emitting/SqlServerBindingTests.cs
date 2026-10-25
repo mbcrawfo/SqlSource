@@ -31,6 +31,7 @@ public sealed class SqlServerBindingTests
                 new MethodParameter(
                     "name",
                     "Name",
+                    "string",
                     false,
                     true,
                     Described: TestSidecars.SqlServer("nvarchar(50)", 100, 0)
@@ -157,6 +158,7 @@ public sealed class SqlServerBindingTests
                 new MethodParameter(
                     "cents",
                     "Cents",
+                    "global::App.Cents",
                     false,
                     true,
                     write,
@@ -275,6 +277,7 @@ public sealed class SqlServerBindingTests
             new MethodParameter(
                 "embedding",
                 "Embedding",
+                "global::Microsoft.Data.SqlTypes.SqlVector<float>",
                 true,
                 true,
                 Described: TestSidecars.SqlServer("vector(3)", 20, 0)
@@ -296,6 +299,7 @@ public sealed class SqlServerBindingTests
             new MethodParameter(
                 "embedding",
                 "Embedding",
+                "global::Microsoft.Data.SqlTypes.SqlVector<float>",
                 true,
                 false,
                 Described: TestSidecars.SqlServer("vector(3)", 20, 0)
@@ -323,6 +327,7 @@ public sealed class SqlServerBindingTests
                 new MethodParameter(
                     "embedding",
                     "Embedding",
+                    "global::App.Embedding",
                     false,
                     true,
                     write,
@@ -357,6 +362,7 @@ public sealed class SqlServerBindingTests
             new MethodParameter(
                 "email",
                 "Email",
+                "global::App.Email",
                 false,
                 false,
                 write,
@@ -375,7 +381,7 @@ public sealed class SqlServerBindingTests
 
     [Fact]
     public void Append_NoDescribedType_BindsByValue() =>
-        Write(new MethodParameter("name", "Name", false, true)).ShouldBe(ByValue);
+        Write(new MethodParameter("name", "Name", "string", false, true)).ShouldBe(ByValue);
 
     // A type with no row of the binding, a type of another engine, a vector whose dimension cannot be read and facets
     // no SqlParameter can hold, all from a sidecar edited by hand but for the first, are bound by value.
@@ -416,7 +422,8 @@ public sealed class SqlServerBindingTests
         );
     }
 
-    private static MethodParameter Described(SidecarType type) => new("name", "Name", false, true, Described: type);
+    private static MethodParameter Described(SidecarType type) =>
+        new("name", "Name", "string", false, true, Described: type);
 
     private static string Write(MethodParameter bound)
     {

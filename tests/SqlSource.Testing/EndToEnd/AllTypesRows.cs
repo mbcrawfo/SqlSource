@@ -165,13 +165,36 @@ internal static class AllTypesRows
         }
     }
 
-    // Asserts that the row is row 2 of the seed, with null in every column but id.
-    public static void ShouldBeTheNullRow(object row)
+    // Asserts that the row is row 2 of the seed, with null in every column but id, which may be another.
+    public static void ShouldBeTheNullRow(object row, int id = NullRowId)
     {
         foreach (var property in PropertiesOf(row))
         {
-            ShouldBeValue(property.GetValue(row), property.Name == "Id" ? NullRowId : null, property.Name);
+            ShouldBeValue(property.GetValue(row), property.Name == "Id" ? id : null, property.Name);
         }
+    }
+
+    // An input model of an insert into all_types, built by its constructor, with the values of a row read from the
+    // table, property by property by name, and the id of the new row.  A parameter of bit(1) has no length, so it is a
+    // BitArray where the column is a bool.
+    public static TArgs ArgsFrom<TArgs>(object row, int id)
+    {
+        var constructor = typeof(TArgs).GetConstructors().ShouldHaveSingleItem();
+        var arguments = constructor
+            .GetParameters()
+            .Select(parameter =>
+            {
+                var name = parameter.Name.ShouldNotBeNull();
+                if (name == "Id")
+                {
+                    return id;
+                }
+
+                var value = row.GetType().GetProperty(name).ShouldNotBeNull(name).GetValue(row);
+                return name == "Bit1Value" && value is bool bit ? new BitArray([bit]) : value;
+            })
+            .ToArray();
+        return (TArgs)constructor.Invoke(arguments);
     }
 
     // The public properties of the row, which are those that the expectations name, no more and no fewer.

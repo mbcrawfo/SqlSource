@@ -10,10 +10,17 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.Npgsql8;
 
-// The type map on Npgsql 8, the oldest driver that is supported: the models the generator gives under it, and both rows
-// of all_types read through Dapper into AllTypesDto.  The end-to-end project proves the same table on Npgsql 10.
+// The type map on Npgsql 8, the oldest driver that is supported: the models the generator gives under it, both rows of
+// all_types read through ListAllTypes' method and through Dapper into AllTypesDto, and every column written through
+// InsertEveryType's method and read back, and the columns that InsertAllTypes writes by its method, each in a
+// transaction that is rolled back.  The end-to-end project proves the same table on Npgsql 10.  The data source maps
+// nothing: all_types reads its enum as a string.
 public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppContainer>
 {
+    private const int FullRowCopyId = 3;
+
+    private const int NullRowCopyId = 4;
+
     // Dapper's settings are the process's, so the snake_case columns are matched from before the first test.
     static AllTypesQueryTests()
     {
@@ -38,12 +45,92 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
     }
 
     [Fact]
+    public async Task ListAllTypes_BothRows_ReadsEveryColumn()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NpgsqlDataSource.Create(app.ConnectionString);
+        await using var connection = source.CreateConnection();
+
+        var rows = await connection.ListAllTypes(cancellationToken: token);
+
+        rows.Length.ShouldBe(2);
+        AllTypesRows.ShouldBeTheFullRow(rows[0]);
+        AllTypesRows.ShouldBeTheNullRow(rows[1]);
+    }
+
+    [Fact]
+    public async Task InsertEveryType_FullRowAndNullRow_ReadEveryValueBack()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NpgsqlDataSource.Create(app.ConnectionString);
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+        var seeded = await connection.ListAllTypes(transaction, cancellationToken: token);
+
+        var full = await connection.InsertEveryType(
+            AllTypesRows.ArgsFrom<InsertEveryTypeParams>(
+                seeded.Single(static row => row.Id == AllTypesRows.FullRowId),
+                FullRowCopyId
+            ),
+            transaction,
+            cancellationToken: token
+        );
+        var nulls = await connection.InsertEveryType(
+            AllTypesRows.ArgsFrom<InsertEveryTypeParams>(
+                seeded.Single(static row => row.Id == AllTypesRows.NullRowId),
+                NullRowCopyId
+            ),
+            transaction,
+            cancellationToken: token
+        );
+        var read = await connection.ListAllTypes(transaction, cancellationToken: token);
+        await transaction.RollbackAsync(token);
+
+        AllTypesRows.ShouldBeTheFullRow(full.ShouldHaveSingleItem(), FullRowCopyId);
+        AllTypesRows.ShouldBeTheNullRow(nulls.ShouldHaveSingleItem(), NullRowCopyId);
+        read.Length.ShouldBe(4);
+        AllTypesRows.ShouldBeTheFullRow(read.Single(static row => row.Id == FullRowCopyId), FullRowCopyId);
+        AllTypesRows.ShouldBeTheNullRow(read.Single(static row => row.Id == NullRowCopyId), NullRowCopyId);
+    }
+
+    // The method of the query that the end-to-end project's Dapper write runs, whose parameters are not nullable, so
+    // that each is bound as a value of its type and never as null.  The columns it does not write are the properties of
+    // AllTypesDto that InsertAllTypesParams lacks, found by reflection, since this project has no list of its own.
+    [Fact]
+    public async Task InsertAllTypes_FullRow_ReturnsTheValuesWritten()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NpgsqlDataSource.Create(app.ConnectionString);
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+        var full = (await connection.ListAllTypes(transaction, cancellationToken: token)).Single(static row =>
+            row.Id == AllTypesRows.FullRowId
+        );
+
+        var rows = await connection.InsertAllTypes(
+            AllTypesRows.ArgsFrom<InsertAllTypesParams>(full, FullRowCopyId),
+            transaction,
+            cancellationToken: token
+        );
+        await transaction.RollbackAsync(token);
+
+        var written = typeof(InsertAllTypesParams).GetProperties().Select(static property => property.Name);
+        var notWritten = typeof(AllTypesDto)
+            .GetProperties()
+            .Select(static property => property.Name)
+            .Except(written, StringComparer.Ordinal)
+            .ToHashSet(StringComparer.Ordinal);
+        notWritten.ShouldNotBeEmpty();
+        AllTypesRows.ShouldBeTheFullRow(rows.ShouldHaveSingleItem(), FullRowCopyId, nullProperties: notWritten);
+    }
+
+    [Fact]
     public async Task QueryAsync_ListAllTypes_ReadsBothRows()
     {
         await using var source = NpgsqlDataSource.Create(app.ConnectionString);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
 
-        var rows = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypes)).ToList();
+        var rows = (await connection.QueryAsync<AllTypesDto>(AllTypesSql.ListAllTypes)).ToList();
 
         rows.Count.ShouldBe(2);
         AllTypesRows.ShouldBeTheFullRow(rows[0]);

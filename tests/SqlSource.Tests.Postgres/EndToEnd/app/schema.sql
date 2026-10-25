@@ -2,9 +2,10 @@
 -- PostgresContainer and tools/describe-end-to-end.sh apply it, then seed.sql.  A change to it is followed by a run of
 -- tools/describe-end-to-end.sh, which writes the sidecars again.
 
--- The extensions whose types all_types reads.  cube is left out: Npgsql 8 cannot read it, and its row of the type map
--- is proved by PostgresTypeMapTests in tests/SqlSource.Tests.
+-- The extensions whose types all_types reads, and cube, which it leaves out: Npgsql 8 cannot read it, so the query
+-- EchoCube of Queries/Cube.sql writes and reads it alone, on Npgsql 10.
 CREATE EXTENSION citext;
+CREATE EXTENSION cube;
 CREATE EXTENSION hstore;
 CREATE EXTENSION ltree;
 
@@ -15,6 +16,9 @@ CREATE TYPE account_status AS ENUM ('active', 'suspended', 'closed');
 CREATE TYPE note_kind AS ENUM ('call', 'email', 'visit');
 
 CREATE DOMAIN email AS text CHECK (VALUE LIKE '%@%');
+
+-- The id that the queries read and send as a value type of the project, through its converters.
+CREATE DOMAIN note_ref AS bigint;
 
 -- A nullable column, a not null one, an identity, a generated column and a default.
 CREATE TABLE accounts (
@@ -27,17 +31,19 @@ CREATE TABLE accounts (
     name_length integer GENERATED ALWAYS AS (length(name)) STORED
 );
 
--- An account with no note gives a LEFT JOIN its NULLs.
+-- An account with no note gives a LEFT JOIN its NULLs, and a note with no ref a NULL of the domain.
 CREATE TABLE notes (
     id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     account_id integer NOT NULL REFERENCES accounts (id),
     kind note_kind NOT NULL,
     body text NOT NULL,
-    written_at timestamptz NOT NULL
+    written_at timestamptz NOT NULL,
+    ref note_ref
 );
 
 -- One nullable column for each type that the base map gives a C# type on both Npgsql 8 and Npgsql 10 and that
--- PostgreSQL 14 has, named for its type.  Every column is read through Dapper into a generated model.
+-- PostgreSQL 14 has, named for its type.  Every column is written and read through the generated methods, and read
+-- through Dapper into a generated model.
 --
 -- Left out: cube, as above.  The registered types that Npgsql reads only by a cast to oid (regclass and the others),
 -- pg_snapshot, txid_snapshot and pg_node_tree, which it reads only by a cast to text, and record, unknown and void,

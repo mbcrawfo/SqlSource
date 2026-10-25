@@ -159,14 +159,17 @@ internal abstract class ParameterBinder
         _ = builder.Append(" : ").Append(nullText);
     }
 
-    // Array.ConvertAll of the value, by a static lambda that converts each element.  An element of a reference type,
-    // or one the property writes nullable, can be null, and a null is sent as a NULL element, the converter not called
-    // for it; the result's element is then nullable, of any database element, unlike the element a column is read as.
-    private static void AppendByElement(StringBuilder builder, Conversion write, ConversionNames names)
+    /// <summary>
+    /// Appends <c>Array.ConvertAll</c> of the value, by a static lambda that converts each element.  An element of a
+    /// reference type, or one the property writes nullable, can be null, and a null is sent as a <c>NULL</c> element,
+    /// the converter not called for it; the result's element, <see cref="ConvertedElementText" />, is then nullable,
+    /// of any database element, unlike the element a column is read as.
+    /// </summary>
+    protected static void AppendByElement(StringBuilder builder, Conversion write, ConversionNames names)
     {
-        var canBeNull = write.ElementIsNullable || !write.ElementIsValueType;
+        var canBeNull = CanElementBeNull(write);
         var element = canBeNull && !write.ElementIsNullable ? write.ElementText + "?" : write.ElementText;
-        var database = canBeNull ? write.DatabaseElementText + "?" : write.DatabaseElementText;
+        var database = ConvertedElementText(write);
         _ = builder
             .Append("global::System.Array.ConvertAll<")
             .Append(element)
@@ -196,23 +199,15 @@ internal abstract class ParameterBinder
 
         _ = builder.Append(')');
     }
-}
 
-/// <summary>
-/// Binds a parameter for Npgsql.
-/// </summary>
-internal sealed class PostgresParameterBinder : ParameterBinder
-{
-    /// <inheritdoc />
-    public override void Append(
-        StringBuilder builder,
-        string indent,
-        string command,
-        string parameter,
-        string parameters,
-        MethodParameter bound,
-        ConversionNames names
-    ) => AppendByValue(builder, indent, command, parameter, parameters, bound, names);
+    /// <summary>
+    /// The element of the array that <see cref="AppendByElement" /> gives: the database's element, with <c>?</c> when
+    /// the property's element can be null.
+    /// </summary>
+    protected static string ConvertedElementText(Conversion write) =>
+        CanElementBeNull(write) ? write.DatabaseElementText + "?" : write.DatabaseElementText!;
+
+    private static bool CanElementBeNull(Conversion write) => write.ElementIsNullable || !write.ElementIsValueType;
 }
 
 /// <summary>

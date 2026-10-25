@@ -110,7 +110,7 @@ public sealed class DapperRecipeTests(PostgresContainer postgres)
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(token);
-        var full = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypes)).Single(static row =>
+        var full = (await connection.QueryAsync<AllTypesDto>(AllTypesSql.ListAllTypes)).Single(static row =>
             row.Id == AllTypesRows.FullRowId
         );
         var value = typeof(AllTypesDto).GetProperty(property).ShouldNotBeNull(property).GetValue(full);
@@ -169,6 +169,39 @@ public sealed class DapperRecipeTests(PostgresContainer postgres)
 
         error.SqlState.ShouldBe(PostgresErrorCodes.UndefinedFunction, error.MessageText);
         error.MessageText.ShouldContain("note_kind = integer");
+    }
+
+    // The recipe's handler, Types/EmailHandler.cs, gives FromDatabase the string that Npgsql reads for the domain
+    // email, and the enum is read through the data source's MapEnum.
+    [Fact]
+    public async Task QueryAsync_EmailColumnByTheRecipesHandler_IsReadThroughTheConverter()
+    {
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+
+        var kinds = await connection.QueryAsync<ListNoteKindsDto>(NoteSql.ListNoteKinds);
+
+        kinds.ShouldBe([
+            new ListNoteKindsDto(NoteKind.Call, new Email("alice@example.com")),
+            new ListNoteKindsDto(NoteKind.Email, new Email("alice@example.com")),
+            new ListNoteKindsDto(NoteKind.Visit, new Email("bob@example.com")),
+        ]);
+    }
+
+    // The recipe's handler sends the string that ToDatabase returns, which the server compares with the domain.  With
+    // no handler, Dapper refuses an Email parameter.
+    [Fact]
+    public async Task ExecuteScalarAsync_EmailParameterByTheRecipesHandler_IsSentThroughTheConverter()
+    {
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+
+        var count = await connection.ExecuteScalarAsync<long>(
+            "SELECT count(*) FROM notes AS n JOIN accounts AS a ON a.id = n.account_id WHERE a.email = @email",
+            new { email = new Email("alice@example.com") }
+        );
+
+        count.ShouldBe(2);
     }
 
     [Fact]

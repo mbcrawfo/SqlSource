@@ -46,18 +46,20 @@ internal sealed record MethodInput(string TypeText, EquatableArray<MethodParamet
 /// </summary>
 /// <param name="Name">The parameter's name in the SQL, without the <c>@</c>.</param>
 /// <param name="Property">The property's name.</param>
+/// <param name="TypeText">The property's type without <c>?</c>, from <c>global::</c> or as a keyword.</param>
 /// <param name="IsValueType">Whether the property's type is a value type.</param>
 /// <param name="IsNullable">Whether the model calls the property nullable.</param>
 /// <param name="Write">
 /// The converter the property's value is converted through before it is bound, or null for a value bound as it is.
 /// </param>
 /// <param name="Described">
-/// The parameter's type as the sidecar describes it, whose database type the binder of its engine binds it as, or
-/// null when it is bound by value alone.
+/// The type the entry describes for the parameter, or null.  The PostgreSQL binding sets its
+/// <see cref="SidecarType.BindName" />; the SQL Server binding sets the <c>SqlDbType</c> and facets it names.
 /// </param>
 internal sealed record MethodParameter(
     string Name,
     string Property,
+    string TypeText,
     bool IsValueType,
     bool IsNullable,
     Conversion? Write = null,
