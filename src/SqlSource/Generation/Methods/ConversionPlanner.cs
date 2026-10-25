@@ -71,7 +71,21 @@ internal static class ConversionPlanner
         var element = ElementOf(text);
         if (database.Text is not { } databaseText)
         {
-            blocked = decision.ReportNoBase(text, element, type.Key);
+            // A foreign type with converters, else a foreign element with them, which the message names.
+            if (decision.IsForeignWithConverters(text))
+            {
+                decision.ReportNoBase(text, type.Key);
+                blocked = true;
+            }
+            else if (element is not null && decision.IsForeignWithConverters(element))
+            {
+                new Decision(isRead, engine, converters, ElementSubject + subject, at, problems).ReportNoBase(
+                    element,
+                    ElementKeyOf(type.Key)
+                );
+                blocked = true;
+            }
+
             return null;
         }
 
@@ -172,21 +186,9 @@ internal static class ConversionPlanner
             return true;
         }
 
-        // SQLSRC279 for a foreign type with converters, or an array of a foreign element with converters, whose
-        // database type the base map gives no C# type, which blocks the query; false, and nothing, for any other.
-        public bool ReportNoBase(string type, string? element, string key)
-        {
-            var touched = type;
-            if (!IsForeignWithConverters(type))
-            {
-                if (element is null || !IsForeignWithConverters(element))
-                {
-                    return false;
-                }
-
-                touched = element;
-            }
-
+        // SQLSRC279 for a foreign type with converters, the property's or its element's, whose database type the base
+        // map gives no C# type.
+        public void ReportNoBase(string type, string key) =>
             problems.Add(
                 DiagnosticInfo.Create(
                     SqlDiagnostics.ConverterTypeMismatch,
@@ -194,11 +196,9 @@ internal static class ConversionPlanner
                     subject,
                     PostgresTypeMap.AsWritten(type),
                     "which has converters, but the database type '" + key + "' has no C# type to convert from",
-                    "Remove the type override, or the converters of '" + PostgresTypeMap.AsWritten(touched) + "'"
+                    "Remove the type override, or the converters of '" + PostgresTypeMap.AsWritten(type) + "'"
                 )
             );
-            return true;
-        }
 
         // Whether any converter takes or returns the type.
         public bool Touches(string type) =>

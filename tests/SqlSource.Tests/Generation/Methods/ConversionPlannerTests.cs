@@ -173,6 +173,24 @@ public sealed class ConversionPlannerTests
         ]);
     }
 
+    // An array of a composite element that the override maps to a foreign type with converters names the element.
+    [Fact]
+    public void Plan_NoBaseTypeOfAnElementWithAConverter_ReportsSQLSRC279ForTheElement()
+    {
+        var type = Overridden(Email + "[]", false, "public.address", null, false);
+        var converters = Of(Project("global::MyApp.Email.From", "string", false, Email, false));
+
+        var (conversion, problems, blocked) = Plan(type, isRead: true, converters, "column 'addresses'");
+
+        conversion.ShouldBeNull();
+        blocked.ShouldBeTrue();
+        problems.ShouldBe([
+            "SQLSRC279: The element of column 'addresses' has type 'MyApp.Email', which has converters, but the "
+                + "database type 'public.address' has no C# type to convert from.  Remove the type override, or the "
+                + "converters of 'MyApp.Email'.",
+        ]);
+    }
+
     // A converter of a type to itself serves both directions.
     [Theory]
     [InlineData(true)]
