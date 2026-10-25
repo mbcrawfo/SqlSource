@@ -193,6 +193,7 @@ public sealed class CachingConverterTests
             .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
         MethodReasons(result, TrackingNames.MethodOutput)
             .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
+        ShouldAllBeCached(OutputReasons(result));
     }
 
     // Conversions has a method marked as a converter that returns nothing, SQLSRC277 at its name.  A line added above
