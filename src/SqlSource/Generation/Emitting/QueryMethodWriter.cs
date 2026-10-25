@@ -33,6 +33,12 @@ internal static class QueryMethodWriter
 
     private const string ExceptionType = "global::SqlSource.UnexpectedRowCountException";
 
+    // The lines around the assignment of a command's SQL when its tokens build it.
+    private const string SqlFromTokensStart =
+        "#pragma warning disable CA2100 // The text of a token is the caller's own choice.\n";
+
+    private const string SqlFromTokensEnd = "#pragma warning restore CA2100\n";
+
     /// <summary>
     /// The spelling of <see cref="MethodColumn.ReadText" /> that marks a column read as SqlClient's vector, which gives
     /// <c>SqlVector&lt;float&gt;.Null</c> on a <c>NULL</c> instead of throwing: a not-null column read as exactly this
@@ -97,7 +103,7 @@ internal static class QueryMethodWriter
         AppendEnd(builder, bodyIndent);
         _ = builder.Append('\n').Append(bodyIndent).Append("try\n").Append(bodyIndent).Append("{\n");
 
-        AppendCommand(builder, blockIndent, locals);
+        AppendCommand(builder, blockIndent, locals, builtAtRunTime: tokens.Count > 0);
         if (method.Input is { } input)
         {
             var binder = ParameterBinder.For(method.Engine);
@@ -381,7 +387,9 @@ internal static class QueryMethodWriter
         _ = builder.Append(";\n");
     }
 
-    private static void AppendCommand(StringBuilder builder, string indent, Locals locals)
+    // A command whose SQL is built at run time, from the text of its tokens, is what CA2100 flags, and its tokens are
+    // text that the caller chooses, so the assignment turns the rule off around itself and nothing else.
+    private static void AppendCommand(StringBuilder builder, string indent, Locals locals, bool builtAtRunTime)
     {
         _ = builder
             .Append(indent)
@@ -391,17 +399,18 @@ internal static class QueryMethodWriter
             .Append(Connection)
             .Append(".CreateCommand();\n");
         AppendScope(builder, indent, locals.CommandScope, locals.Command);
-        _ = builder
-            .Append(indent)
-            .Append(locals.Command)
-            .Append(".CommandText = ")
-            .Append(locals.Sql)
-            .Append(";\n")
-            .Append(indent)
-            .Append(locals.Command)
-            .Append(".Transaction = ")
-            .Append(Transaction)
-            .Append(";\n");
+        if (builtAtRunTime)
+        {
+            _ = builder.Append(indent).Append(SqlFromTokensStart);
+        }
+
+        _ = builder.Append(indent).Append(locals.Command).Append(".CommandText = ").Append(locals.Sql).Append(";\n");
+        if (builtAtRunTime)
+        {
+            _ = builder.Append(indent).Append(SqlFromTokensEnd);
+        }
+
+        _ = builder.Append(indent).Append(locals.Command).Append(".Transaction = ").Append(Transaction).Append(";\n");
         AppendIf(builder, indent, CommandTimeout + ".HasValue");
         _ = builder
             .Append(indent)

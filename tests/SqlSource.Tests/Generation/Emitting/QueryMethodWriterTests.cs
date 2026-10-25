@@ -111,7 +111,9 @@ public sealed class QueryMethodWriterTests
                                 var command = connection.CreateCommand();
                                 await using var commandScope = ↩
                     global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(command, false);
+                                #pragma warning disable CA2100 // The text of a token is the caller's own choice.
                                 command.CommandText = sql;
+                                #pragma warning restore CA2100
                                 command.Transaction = transaction;
                                 if (commandTimeout.HasValue)
                                 {
@@ -360,6 +362,25 @@ public sealed class QueryMethodWriterTests
         text.ShouldContain("        }\n\n        var reader = await command.ExecuteReaderAsync(", Case.Sensitive);
     }
 
+    // CA2100 flags a command whose SQL is not a constant, which the tokens make it: the rule is off around that one
+    // assignment, and back on for the rest of the method.
+    [Fact]
+    public void Append_Tokens_TurnsCA2100OffAroundTheAssignmentOfTheSqlAlone()
+    {
+        var text = Write(GetUser);
+
+        text.ShouldContain(
+            "        var command = connection.CreateCommand();\n"
+                + "        await using var commandScope = "
+                + "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(command, false);\n"
+                + "        #pragma warning disable CA2100 // The text of a token is the caller's own choice.\n"
+                + "        command.CommandText = sql;\n"
+                + "        #pragma warning restore CA2100\n"
+                + "        command.Transaction = transaction;\n"
+        );
+        Regex.Count(text, "#pragma", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(2);
+    }
+
     [Fact]
     public void Append_NoTokens_HoldsTheSqlInAConstant()
     {
@@ -383,6 +404,8 @@ public sealed class QueryMethodWriterTests
         );
         text.ShouldNotContain("ThrowIfNullOrWhiteSpace");
         text.ShouldNotContain("string.Create");
+        text.ShouldNotContain("#pragma");
+        text.ShouldContain("        command.CommandText = sql;\n        command.Transaction = transaction;\n");
     }
 
     [Fact]
@@ -544,7 +567,11 @@ public sealed class QueryMethodWriterTests
 
         text.ShouldContain("    var sql1 = string.Create(\n");
         text.ShouldContain("        static (span1, state) =>\n");
-        text.ShouldContain("        command.CommandText = sql1;\n");
+        text.ShouldContain(
+            "        #pragma warning disable CA2100 // The text of a token is the caller's own choice.\n"
+                + "        command.CommandText = sql1;\n"
+                + "        #pragma warning restore CA2100\n"
+        );
     }
 
     // An asynchronous method cannot use await as an identifier, so the argument is verbatim wherever the method uses
