@@ -108,6 +108,45 @@ public sealed class ConverterDiagnosticsTests
             ]);
     }
 
+    // A converter never sees null, so an argument that may be null is as good as one that may not: its type is taken
+    // without its ?, the T of Nullable<T> or the reference type unannotated, and the message's name keeps it.
+    [Fact]
+    public void Run_ConverterWhoseArgumentMayBeNull_TakesTheTypeWithoutItsQuestionMark()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Models,
+            """
+            using SqlSource;
+
+            namespace App;
+
+            public sealed record Email(string Value);
+
+            public readonly record struct UserId(long Value);
+
+            internal static class Conversions
+            {
+                [SqlSourceConverter]
+                public static long FromUserId(UserId? id) => id?.Value ?? 0;
+
+                [SqlSourceConverter]
+                public static string FromEmail(Email? email) => email?.Value ?? string.Empty;
+            }
+            """
+        );
+
+        run.ShouldBeClean();
+        StepOutputs
+            .Single<ConverterSet>(run, TrackingNames.Converters)
+            .Converters.Select(converter =>
+                (converter.DisplayName, converter.ArgumentText, converter.ArgumentIsValueType)
+            )
+            .ShouldBe([
+                ("App.Conversions.FromEmail(App.Email?)", "global::App.Email", false),
+                ("App.Conversions.FromUserId(App.UserId?)", "global::App.UserId", true),
+            ]);
+    }
+
     [Theory]
     [InlineData(
         "public class Conversions",

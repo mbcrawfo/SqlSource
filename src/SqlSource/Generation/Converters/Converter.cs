@@ -9,10 +9,11 @@ namespace SqlSource.Generation.Converters;
 /// <param name="Method">The call's target, <c>global::App.Email.FromDatabase</c>.</param>
 /// <param name="DisplayName">The method as a message names it, <c>App.Email.FromDatabase(string)</c>.</param>
 /// <param name="ArgumentText">
-/// The type of its argument as <see cref="Settings.ClrTypes.ClrTypeName.Text" /> writes it, or empty for a method
+/// The type of its argument as <see cref="Settings.ClrTypes.ClrTypeName.Text" /> writes it, without a <c>?</c> at its
+/// top, <c>global::App.UserId</c> of <c>App.UserId?</c>, since a converter never sees null; or empty for a method
 /// without one.
 /// </param>
-/// <param name="ArgumentIsValueType">Whether the type of its argument is a value type.</param>
+/// <param name="ArgumentIsValueType">Whether the type of its argument, without that <c>?</c>, is a value type.</param>
 /// <param name="ReturnText">Its return type as <see cref="Settings.ClrTypes.ClrTypeName.Text" /> writes it.</param>
 /// <param name="ReturnIsValueType">Whether its return type is a value type.</param>
 /// <param name="WarningIds">

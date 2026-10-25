@@ -99,14 +99,14 @@ internal static class ConverterReader
         Location? location
     )
     {
-        var argument = method.Parameters.Length > 0 ? method.Parameters[0] : null;
+        var argument = method.Parameters.Length > 0 ? WithoutNullable(method.Parameters[0].Type) : null;
         var warningIds = new List<string>();
         var fault = FindFault(method, compilation, warningIds);
         return new Converter(
             method.ContainingType.ToDisplayString(TypeFormat) + "." + method.ToDisplayString(NameFormat),
             DisplayNameOf(method),
-            argument?.Type.ToDisplayString(TypeFormat) ?? string.Empty,
-            argument?.Type.IsValueType ?? false,
+            argument?.ToDisplayString(TypeFormat) ?? string.Empty,
+            argument?.IsValueType ?? false,
             method.ReturnType.ToDisplayString(TypeFormat),
             method.ReturnType.IsValueType,
             MappedTypeWarnings.Distinct(warningIds),
@@ -114,6 +114,20 @@ internal static class ConverterReader
             origin,
             location is null ? null : LocationInfo.From(location)
         );
+    }
+
+    // The type without a ? at its top: the T of Nullable<T>, or a reference type unannotated.  A converter never sees
+    // null, so an argument that accepts null is the edge of the type it accepts, which the call converts to it.
+    private static ITypeSymbol WithoutNullable(ITypeSymbol type)
+    {
+        if (type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable)
+        {
+            return nullable.TypeArguments[0];
+        }
+
+        return type.NullableAnnotation == NullableAnnotation.Annotated
+            ? type.WithNullableAnnotation(NullableAnnotation.NotAnnotated)
+            : type;
     }
 
     // App.Conversions.Outer.Local(string) for a local function, which its own display would name as Local(string).

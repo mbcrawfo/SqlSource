@@ -726,6 +726,69 @@ public sealed class ConverterMethodTests
         methods.ShouldContain("reader.GetFieldValue<global::App.Email>(0)");
     }
 
+    // A converter whose argument may be null is the edge of the type without its ?, and is called with the value,
+    // which converts to its argument's type.
+    [Fact]
+    public void Run_WriteConverterWhoseArgumentMayBeNull_IsUsed()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class Sample;
+
+                public readonly record struct UserId(long Value);
+
+                public sealed record Email(string Value);
+
+                public static class Conversions
+                {
+                    [SqlSourceConverter]
+                    public static long FromUserId(UserId? id) => id?.Value ?? 0;
+
+                    [SqlSourceConverter]
+                    public static string FromEmail(Email? email) => email?.Value ?? string.Empty;
+                }
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: int8=App.UserId\n-- type-override: public.email=App.Email\n-- name: DeleteUser\n"
+                + "DELETE FROM users WHERE id = @id OR email = @email OR id = ANY(@ids);\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [
+                Entry(
+                    file,
+                    "DeleteUser",
+                    [
+                        Parameter("id", Catalog("int8"), nullable: false),
+                        Parameter("email", Email, nullable: false),
+                        Parameter("ids", ArrayOf(Catalog("int8"), "_int8"), nullable: false),
+                    ],
+                    null
+                ),
+            ],
+            Source
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("parameter.Value = global::App.Conversions.FromUserId(parameters.Id);\n");
+        methods.ShouldContain(
+            "parameter.Value = parameters.Email is { } value ? (object)global::App.Conversions.FromEmail(value) : "
+                + "global::System.DBNull.Value;\n"
+        );
+        methods.ShouldContain(
+            "(object)global::System.Array.ConvertAll<global::App.UserId, long>(value, "
+                + "static element => global::App.Conversions.FromUserId(element))"
+        );
+    }
+
     // An array whose element an override chose is read as the base map's array and converted element by element.  A
     // NULL element of a value type cannot be converted, and the method's throw names the column, which Npgsql's does
     // not.

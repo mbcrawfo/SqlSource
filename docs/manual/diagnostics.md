@@ -2484,7 +2484,7 @@ A method marked `[SqlSourceConverter]` must be a converter: a `static` method of
 - `it does not take exactly one argument`: the method has no argument, or more than one.
 - `its argument is ref, out, in, params or optional`: the argument has one of those modifiers, or a default value.
 - `it returns nothing`: the method returns `void`, `Task` or `ValueTask`, or `Task<T>` or `ValueTask<T>`.  A converter returns its result itself.
-- `its return type is annotated as nullable`: the method returns a type written with `?`, as `string?` or `int?`.  A converter's result is never null.
+- `its return type is annotated as nullable`: the method returns a type written with `?`, as `string?` or `int?`.  A converter's result is never null.  Its argument may be written with `?`, as `Email?` or `UserId?`: it converts the type without the `?`, and is never given null.
 - `this project cannot call it`: the method is `private`, `protected` or `private protected` (a `protected internal` method can be called), it is in a type that the project cannot reach, or it is in a `file` type, which code in another file of the project cannot name.
 - `it is marked [Obsolete] as an error`: the method, or a type it is in, has `[Obsolete]` with `true` as its second argument, so that no call of it compiles.  A method marked `[Obsolete]` as a warning is a converter.
 
@@ -2508,7 +2508,7 @@ Two methods of the project marked `[SqlSourceConverter]` take the same type and 
 /work/App/Conversions.cs(8,25): error SQLSRC278: The converters 'App.Conversions.ToEmail(string)' and 'App.Email.FromDatabase(string)' both convert 'string' to 'App.Email'.  Keep one.
 ```
 
-Remove `[SqlSourceConverter]` from one of them, or remove the method.  The error is reported at the name of each of the methods.  Two converters of opposite directions, one from `string` to `Email` and one from `Email` to `string`, are a pair and not this error, and a converter of a type to itself, as `DateTime` to `DateTime`, is one converter.  A method that has [SQLSRC277](#sqlsrc277) is not counted until it is fixed.
+Remove `[SqlSourceConverter]` from one of them, or remove the method.  The error is reported at the name of each of the methods.  Two converters of opposite directions, one from `string` to `Email` and one from `Email` to `string`, are a pair and not this error, and a converter of a type to itself, as `DateTime` to `DateTime`, is one converter.  A method that has [SQLSRC277](#sqlsrc277) is not counted until it is fixed.  An argument written with `?` takes the type without it, since a converter is never given null, so `ToDatabase(Email? email)` and `ToDatabase(Email email)` both convert `Email` to `string`, and are this error together.
 
 Two such converters declared in referenced assemblies, on the types that the type override names, are reported at the name of each query whose output is `codegen` and whose method would convert through one of them, and that query gets no method.  Declare a converter of your own between the same two types, which is used instead of both.
 
