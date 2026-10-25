@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
@@ -20,7 +22,8 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 // array, the collection the method returns.  Both run on the same open connection of one data source, with the same
 // token, and ConfigureAwait(false) on each await.  GC.GetTotalAllocatedBytes counts every thread, since an awaited
 // continuation runs where the driver completes it, so the class is in MeasuresAllocations, which runs alone on a
-// container of its own.
+// container of its own.  That keeps other tests out of the count, but not the process's own background work, which
+// the measure leaves out by comparing the methods in pairs of blocks.
 [Collection(MeasuresAllocations.Name)]
 public sealed class AllocationTests(PostgresContainer postgres)
 {
@@ -36,15 +39,18 @@ public sealed class AllocationTests(PostgresContainer postgres)
     // runtime, and the statement's first parse.
     private const int WarmUpCalls = 200;
 
-    // Enough calls that the jitter of Npgsql's pooled buffers, which a call now and then grows or rents anew, averages
-    // to well below the margin: a few bytes a call over 2,000.
-    private const int MeasuredCalls = 2_000;
+    // The measured calls are made in pairs of blocks, one block of each method, one after the other, and which method
+    // goes first alternates from pair to pair.  What the generated method allocates beyond the hand-written one is the
+    // median of the pairs' differences.  A block that nothing else disturbs allocates the same to the byte each time,
+    // but what another thread allocates in the meantime is counted in the block it falls in: the test platform sends
+    // its telemetry over HTTPS while the tests run, which added up to 66 KB to one block and failed a sum of the
+    // blocks.  A burst of such work moves the few pairs it falls in and not their median, and work that goes on
+    // throughout falls on both blocks of a pair alike.  A cost that the generated method pays on each call is in
+    // every pair.
+    private const int CallsPerBlock = 100;
 
-    // The measured calls of each method are made in blocks taken in turn, so that what the process does in the
-    // background over the run, a timer, the GC or the runner, falls on both methods alike, and which method goes first
-    // alternates from block to block: the first of a pair was measured up to 40 bytes a call higher than the same
-    // method second.
-    private const int Blocks = 10;
+    // Enough pairs, of about 25 ms each, that a burst of a few hundred milliseconds moves fewer than half of them.
+    private const int Pairs = 20;
 
     private const string GetAccountNameSql = "SELECT id, name\nFROM accounts\nWHERE id = @accountId;";
 
@@ -66,14 +72,14 @@ public sealed class AllocationTests(PostgresContainer postgres)
         (await connection.GetAccountName(parameters, cancellationToken: token)).ShouldBe([new AccountName(1, "alice")]);
         (await GetAccountNameByHand(connection, 1, cancellationToken: token)).ShouldBe([new AccountName(1, "alice")]);
 
-        var (generated, handWritten) = await MeasureAsync(
+        var perCall = await MeasureAsync(
             () => connection.GetAccountName(parameters, cancellationToken: token),
             () => GetAccountNameByHand(connection, 1, cancellationToken: token)
         );
 
-        generated.ShouldBeGreaterThan(0);
-        handWritten.ShouldBeGreaterThan(0);
-        generated.ShouldBeLessThanOrEqualTo(handWritten + MarginInBytesPerCall);
+        perCall.Generated.ShouldBeGreaterThan(0);
+        perCall.HandWritten.ShouldBeGreaterThan(0);
+        perCall.GeneratedBeyondHandWritten.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     [Fact]
@@ -86,14 +92,14 @@ public sealed class AllocationTests(PostgresContainer postgres)
         accounts.Count.ShouldBe(3);
         (await ListAccountsByHand(connection, cancellationToken: token)).ShouldBe(accounts);
 
-        var (generated, handWritten) = await MeasureAsync(
+        var perCall = await MeasureAsync(
             () => connection.ListAccounts(cancellationToken: token),
             () => ListAccountsByHand(connection, cancellationToken: token)
         );
 
-        generated.ShouldBeGreaterThan(0);
-        handWritten.ShouldBeGreaterThan(0);
-        generated.ShouldBeLessThanOrEqualTo(handWritten + MarginInBytesPerCall);
+        perCall.Generated.ShouldBeGreaterThan(0);
+        perCall.HandWritten.ShouldBeGreaterThan(0);
+        perCall.GeneratedBeyondHandWritten.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     // A query with a parameter and a few rows: a null date reads every account, a NULL among them.
@@ -108,19 +114,20 @@ public sealed class AllocationTests(PostgresContainer postgres)
         (await connection.ListClosedBefore(parameters, cancellationToken: token)).ShouldBe(expected);
         (await ListClosedBeforeByHand(connection, null, cancellationToken: token)).ShouldBe(expected);
 
-        var (generated, handWritten) = await MeasureAsync(
+        var perCall = await MeasureAsync(
             () => connection.ListClosedBefore(parameters, cancellationToken: token),
             () => ListClosedBeforeByHand(connection, null, cancellationToken: token)
         );
 
-        generated.ShouldBeGreaterThan(0);
-        handWritten.ShouldBeGreaterThan(0);
-        generated.ShouldBeLessThanOrEqualTo(handWritten + MarginInBytesPerCall);
+        perCall.Generated.ShouldBeGreaterThan(0);
+        perCall.HandWritten.ShouldBeGreaterThan(0);
+        perCall.GeneratedBeyondHandWritten.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
-    // The bytes for each call of each method, after both are warmed up.  Each delegate is made once, before the
+    // The bytes for each call, after both methods are warmed up: of each method, the median of its blocks, and of the
+    // generated method beyond the hand-written one, the median of the pairs.  Each delegate is made once, before the
     // measure, and calling it allocates nothing of its own.
-    private static async Task<(double Generated, double HandWritten)> MeasureAsync<T>(
+    private static async Task<PerCallBytes> MeasureAsync<T>(
         Func<Task<IReadOnlyList<T>>> generated,
         Func<Task<IReadOnlyList<T>>> handWritten
     )
@@ -128,31 +135,50 @@ public sealed class AllocationTests(PostgresContainer postgres)
         _ = await AllocatedByAsync(generated, WarmUpCalls);
         _ = await AllocatedByAsync(handWritten, WarmUpCalls);
 
-        long generatedBytes = 0;
-        long handWrittenBytes = 0;
-        for (var block = 0; block < Blocks; block++)
+        var generatedBlocks = new long[Pairs];
+        var handWrittenBlocks = new long[Pairs];
+        for (var pair = 0; pair < Pairs; pair++)
         {
-            if (block % 2 == 0)
+            if (pair % 2 == 0)
             {
-                generatedBytes += await AllocatedByAsync(generated, MeasuredCalls / Blocks);
-                handWrittenBytes += await AllocatedByAsync(handWritten, MeasuredCalls / Blocks);
+                generatedBlocks[pair] = await AllocatedByAsync(generated, CallsPerBlock);
+                handWrittenBlocks[pair] = await AllocatedByAsync(handWritten, CallsPerBlock);
             }
             else
             {
-                handWrittenBytes += await AllocatedByAsync(handWritten, MeasuredCalls / Blocks);
-                generatedBytes += await AllocatedByAsync(generated, MeasuredCalls / Blocks);
+                handWrittenBlocks[pair] = await AllocatedByAsync(handWritten, CallsPerBlock);
+                generatedBlocks[pair] = await AllocatedByAsync(generated, CallsPerBlock);
             }
         }
 
-        var perCall = (
-            Generated: generatedBytes / (double)MeasuredCalls,
-            HandWritten: handWrittenBytes / (double)MeasuredCalls
+        var differences = generatedBlocks.Zip(handWrittenBlocks, (g, h) => g - h).ToArray();
+        var perCall = new PerCallBytes(
+            MedianPerCall(generatedBlocks),
+            MedianPerCall(handWrittenBlocks),
+            MedianPerCall(differences)
         );
         TestContext.Current.TestOutputHelper?.WriteLine(
-            $"Per call: generated {perCall.Generated:F1} bytes, hand-written {perCall.HandWritten:F1} bytes."
+            $"Per call: generated {perCall.Generated:F1} bytes, hand-written {perCall.HandWritten:F1} bytes, generated "
+                + $"beyond hand-written {perCall.GeneratedBeyondHandWritten:F1} bytes, the medians of {Pairs} pairs of "
+                + $"blocks of {CallsPerBlock} calls.  Each pair, generated: {PerCallOf(generatedBlocks)}; "
+                + $"hand-written: {PerCallOf(handWrittenBlocks)}."
         );
         return perCall;
     }
+
+    private static double MedianPerCall(long[] blocks)
+    {
+        var sorted = blocks.Order().ToArray();
+        var middle = sorted.Length / 2;
+        var median = sorted.Length % 2 == 0 ? (sorted[middle - 1] + sorted[middle]) / 2.0 : sorted[middle];
+        return median / CallsPerBlock;
+    }
+
+    private static string PerCallOf(long[] blocks) =>
+        string.Join(
+            ", ",
+            blocks.Select(bytes => (bytes / (double)CallsPerBlock).ToString("F1", CultureInfo.InvariantCulture))
+        );
 
     private static async Task<long> AllocatedByAsync<T>(Func<Task<IReadOnlyList<T>>> method, int calls)
     {
@@ -363,4 +389,6 @@ public sealed class AllocationTests(PostgresContainer postgres)
             }
         }
     }
+
+    private sealed record PerCallBytes(double Generated, double HandWritten, double GeneratedBeyondHandWritten);
 }
