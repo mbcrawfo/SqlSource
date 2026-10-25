@@ -95,6 +95,10 @@ public sealed class MethodCompileTests
         methods.ShouldContain(" FindUser(\n");
         methods.ShouldContain(" TouchUsers(\n");
         methods.ShouldContain(" RenameUser(\n");
+
+        // A query without rows and without a shape counts the rows it changes.
+        methods.ShouldContain("Task<int> RenameUser(\n");
+        methods.ShouldContain("return await command.ExecuteNonQueryAsync(");
         methods.ShouldContain(" ListFrom(\n");
     }
 
@@ -156,6 +160,8 @@ public sealed class MethodCompileTests
         methods.ShouldNotContain("value5");
         methods.ShouldContain(" TouchDocuments(\n");
         methods.ShouldContain(" RenameDocument(\n");
+        methods.ShouldContain("Task<int> RenameDocument(\n");
+        methods.ShouldContain("return await command.ExecuteNonQueryAsync(");
         methods.ShouldContain(" ListFrom(\n");
     }
 }

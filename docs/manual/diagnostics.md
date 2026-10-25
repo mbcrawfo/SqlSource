@@ -316,14 +316,15 @@ See: [Which files belong to a type](generator.md#files-of-a-type)
 
 **Query is named like its containing type**
 
-A member cannot have the name of the type that contains it.  With `SqlLocation.Nested` that type is the generated class, so no query can have its name, `Sql` unless [the nested class](settings.md#setting-nested-class) is named otherwise.  With `SqlLocation.Direct` it is the attributed type, so no query can have that type's name.
+A member cannot have the name of the type that contains it.  This applies to a query whose output is `sql` or `models`, whose constant or token method is a member of that type.  With `SqlLocation.Nested` that type is the generated class, so no such query can have its name, `Sql` unless [the nested class](settings.md#setting-nested-class) is named otherwise.  With `SqlLocation.Direct` it is the attributed type, so no such query can have that type's name.
 
 ```sql
 -- name: Sql
+-- output: sql
 SELECT 1;
 ```
 
-Rename the query.
+Rename the query.  A query whose output is `codegen` has a method in place of the member, and may have either name when its method can: what its method cannot be named is [SQLSRC274](#sqlsrc274).
 
 See: [Where the members go](generator.md#locations)
 

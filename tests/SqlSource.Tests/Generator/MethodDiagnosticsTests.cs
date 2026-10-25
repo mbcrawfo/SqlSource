@@ -210,6 +210,27 @@ public sealed class MethodDiagnosticsTests
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
+    // Under SqlLocation.Direct a CodeGen query has no constant on the type, so its name is judged as its method's.
+    [Fact]
+    public void Run_QueryNamedAsTheTypeUnderDirectAndPublic_IsSqlsrc274()
+    {
+        var file = new SqlFile(Path, "-- name: Sample\nSELECT id FROM users;\n");
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "Sample", [], [Column("id")])],
+            MethodRuns.SampleSource("SqlLocation = SqlLocation.Direct, MethodLocation = MethodLocation.Public")
+        );
+
+        Problems(run)
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,16): The method of the query 'Sample' cannot be named "
+                    + "'Sample', because it is the name of the type 'App.Sample' that holds the method.  Rename the "
+                    + "query.",
+            ]);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
     [Fact]
     public void Run_QueryNamedAsATypeParameterUnderPublic_IsSqlsrc274()
     {

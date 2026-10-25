@@ -49,7 +49,8 @@ internal static class TypeEmitter
 
     /// <summary>
     /// Which of the type's files it can use.  A file contributes all of its queries or none: one that has a query
-    /// with a name that cannot be used here (<c>SQLSRC008</c>, <c>SQLSRC009</c>), or a query that keeps its comments
+    /// with a name that cannot be used here (<c>SQLSRC008</c>, or <c>SQLSRC009</c> for a query whose output is not
+    /// <see cref="OutputKind.CodeGen" />), or a query that keeps its comments
     /// here and has an error in the form with them (<see cref="SqlQuery.KeptErrors" />), is left out, with its
     /// diagnostics when <paramref name="diagnostics" /> is given.
     /// </summary>
@@ -77,7 +78,13 @@ internal static class TypeEmitter
             var isUsable = true;
             foreach (var query in file.Queries)
             {
-                if (string.Equals(query.Name, containingTypeName, StringComparison.Ordinal))
+                // A CodeGen query has no member in the type that contains the others, and the methods' planner judges
+                // its method's name.  The settings are resolved only for a query of that name, which is rare.
+                if (
+                    string.Equals(query.Name, containingTypeName, StringComparison.Ordinal)
+                    && QuerySettings.Resolve(query.Markers, type.Settings, fileSettings[index], property).Output
+                        != OutputKind.CodeGen
+                )
                 {
                     diagnostics?.Add(
                         DiagnosticInfo.Create(

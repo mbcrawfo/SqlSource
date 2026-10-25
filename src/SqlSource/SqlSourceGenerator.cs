@@ -744,7 +744,9 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => MethodPlanner.Plan(input))
             .WithTrackingName(TrackingNames.TypeMethods);
 
-        // Every type's methods as a call sees them, which an edit to a query's SQL leaves equal.
+        // Every type's methods as a call sees them, with the place of each query's name: an edit to a query's SQL that
+        // moves no query's name leaves them equal, and one that moves a later query's name runs the steps after them
+        // again, whose values stay equal when nothing clashes.
         var signatures = typeMethods
             .Select(static (methods, _) => MethodSignature.Of(methods))
             .Collect()

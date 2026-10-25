@@ -285,6 +285,29 @@ public sealed class TypeEmitterTests
         source.ShouldNotContain("SELECT 2;");
     }
 
+    // A CodeGen query has no member in the type its member would go in, so its file is usable, and a query at sql of
+    // the file keeps its constant.
+    [Theory]
+    [InlineData(false, "Sql")]
+    [InlineData(true, "UserRepository")]
+    public void Emit_CodeGenQueryNamedLikeTheTypeItsMemberWouldGoIn_IsAllowed(bool direct, string name)
+    {
+        var output = Emit(
+            OutputKind.CodeGen,
+            TestModels.Type(placement: Placement(direct)),
+            File(
+                "A.sql",
+                TestModels.Query(name, "SELECT 1;"),
+                TestModels.Query("Other", "SELECT 2;", markers: new SettingsLevel { Output = OutputKind.Sql })
+            )
+        );
+
+        output.Diagnostics.ShouldBeEmpty();
+        var source = output.Source.ShouldNotBeNull();
+        source.ShouldContain("public const string Other = \"SELECT 2;\";");
+        source.ShouldNotContain("SELECT 1;");
+    }
+
     [Theory]
     [InlineData(false, "UserRepository")]
     [InlineData(true, "Sql")]

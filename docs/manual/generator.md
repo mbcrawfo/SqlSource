@@ -109,7 +109,7 @@ This section is about the constants and token methods of the queries whose outpu
 
 - Use `Nested` for queries that one class runs, and `Direct` for a type whose job is to hold queries that other code uses.
 - With `Nested`, the type cannot have a member or a type parameter named like the nested class, and cannot have that name itself ([SQLSRC007](diagnostics.md#sqlsrc007)).  Rename it, give the nested class another name, or use `Direct`.  The nested class holds the queries whose output is `sql` or `models`, and is not written when every query of the type's usable files is `codegen`.  A type with no queries at all keeps it, empty.
-- A query is not named like the class that holds the members: the nested class under `Nested`, `Sql` unless it is named otherwise, and the type's own name under `Direct` ([SQLSRC009](diagnostics.md#sqlsrc009)).
+- A query whose output is `sql` or `models` is not named like the class that holds the members: the nested class under `Nested`, `Sql` unless it is named otherwise, and the type's own name under `Direct` ([SQLSRC009](diagnostics.md#sqlsrc009)).  A query whose output is `codegen` has no member there, and may have that name when [its method](#method-location) can.
 - A query may share its name with a member that the type inherits, such as `ToString`.  The constant hides it, with no warning in the generated code.
 
 <a id="constants"></a>

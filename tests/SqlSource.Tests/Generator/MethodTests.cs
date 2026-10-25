@@ -209,6 +209,79 @@ public sealed class MethodTests
         run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUserAsync(\n");
     }
 
+    // A CodeGen query has no member in the nested class, so it may have the nested class's name: its method goes into
+    // the extension class, alone, beside another CodeGen query, or beside a query at sql whose constant the nested
+    // class holds.
+    [Theory]
+    [InlineData("")]
+    [InlineData("-- name: GetUser\nSELECT id FROM users;\n")]
+    [InlineData("-- name: GetName\n-- output: sql\nSELECT name FROM users;\n")]
+    public void Run_CodeGenQueryNamedLikeTheNestedClass_IsAMethodOfTheExtensionClass(string other)
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Sql\nSELECT id FROM users;\n" + other);
+        var entries = new List<SidecarEntry> { Entry(file, "Sql", [], [Column("id")]) };
+        if (other.Contains("GetUser", StringComparison.Ordinal))
+        {
+            entries.Add(Entry(file, "GetUser", [], [Column("id")]));
+        }
+
+        var run = MethodRuns.Run(file, [.. entries]);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("    public static partial class SampleExtensions\n");
+        methods.ShouldContain("Task<global::App.SqlDto[]> Sql(\n");
+        if (other.Contains("GetUser", StringComparison.Ordinal))
+        {
+            methods.ShouldContain("Task<global::App.GetUserDto[]> GetUser(\n");
+        }
+
+        if (other.Contains("GetName", StringComparison.Ordinal))
+        {
+            run.Sources["App.Sample.g.cs"].ShouldContain("public const string GetName = \"SELECT name FROM users;\";");
+        }
+    }
+
+    // Under SqlLocation.Direct a CodeGen query has no member on the type, so it may have the type's name when its
+    // method goes into the extension class.
+    [Fact]
+    public void Run_CodeGenQueryNamedLikeTheTypeUnderDirect_IsAMethodOfTheExtensionClass()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Sample\nSELECT id FROM users;\n");
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "Sample", [], [Column("id")])],
+            MethodRuns.SampleSource("SqlLocation = SqlLocation.Direct")
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("    public static partial class SampleExtensions\n");
+        methods.ShouldContain("Task<global::App.SampleDto[]> Sample(\n");
+    }
+
+    // A query at sql still has a constant in the nested class, so it cannot have its name, and its file, the CodeGen
+    // query of it too, is left out.
+    [Fact]
+    public void Run_SqlQueryNamedLikeTheNestedClass_IsSqlsrc009()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: Sql\n-- output: sql\nSELECT 1;\n-- name: GetUser\nSELECT id FROM users;\n"
+        );
+
+        var run = MethodRuns.Run(file, [Entry(file, "GetUser", [], [Column("id")])]);
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC009 /app/Repo/Users.sql(1,10)-(1,13): A query of 'Sample' cannot be named 'Sql', because its member "
+                + "would have the name of the type that contains it",
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
     // One file of a query at each output, by its marker, under SqlLocation.Direct and MethodLocation.Public.
     [Fact]
     public void Run_MixedType_HasConstantsMethodsAndModels()
@@ -344,6 +417,83 @@ public sealed class MethodTests
         run.ShouldBeClean();
         run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUserAsync(\n");
         run.Sources[MethodRuns.MethodsFile].ShouldNotContain(" GetUser(\n");
+    }
+
+    // Under sort-output a record's properties are in the order of their names, and its constructor takes each column
+    // in that order: two columns of one type out of that order would compile in either order.
+    [Fact]
+    public void Run_SortedRecordOutput_PassesEachColumnToItsProperty()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT zeta, alpha FROM users;\n");
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "GetUser", [], [Column("zeta"), Column("alpha")])],
+            MethodRuns.SampleSource("Parameters = \"sort-output\"")
+        );
+
+        run.ShouldBeClean();
+        run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain("record GetUserDto(int Alpha, int Zeta);");
+        run.Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                "rows.Add(new global::App.GetUserDto(reader.GetFieldValue<int>(1), reader.GetFieldValue<int>(0)));\n"
+            );
+    }
+
+    // A class is set by an object initializer, which names each property, so sort-output leaves it in column order.
+    [Fact]
+    public void Run_SortedClassOutput_SetsEachPropertyByItsName()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT zeta, alpha FROM users;\n");
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "GetUser", [], [Column("zeta"), Column("alpha")])],
+            MethodRuns.SampleSource("Parameters = \"sort-output\", OutputModelType = GeneratorModelType.Class")
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                "rows.Add(new global::App.GetUserDto { Zeta = reader.GetFieldValue<int>(0), "
+                    + "Alpha = reader.GetFieldValue<int>(1) });\n"
+            );
+    }
+
+    // The method checks each token unless the query says no-token-validation.
+    [Theory]
+    [InlineData("", true)]
+    [InlineData("-- generator: no-token-validation\n", false)]
+    public void Run_TokenQuery_ChecksItsTokenUnlessNoTokenValidation(string marker, bool checks)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: ListFrom\n" + marker + "-- token: {{table:users}}\nSELECT id FROM {{table}};\n"
+        );
+
+        var run = MethodRuns.Run(file, [Entry(file, "ListFrom", [], [Column("id")])]);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(" ListFrom(\n");
+        methods.Contains("ThrowIfNullOrWhiteSpace(", StringComparison.Ordinal).ShouldBe(checks);
+    }
+
+    // The method's SQL keeps the query's comments under keep-comments, and has none without it.
+    [Theory]
+    [InlineData("", "SELECT id\\nFROM users;")]
+    [InlineData("-- generator: keep-comments\n", "SELECT id -- the key\\nFROM users;")]
+    public void Run_QueryWithAComment_KeepsItUnderKeepComments(string marker, string sql)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n" + marker + "SELECT id -- the key\nFROM users;\n"
+        );
+
+        var run = MethodRuns.Run(file, [Entry(file, "GetUser", [], [Column("id")])]);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("const string sql = \"" + sql + "\";\n");
     }
 
     [Fact]
