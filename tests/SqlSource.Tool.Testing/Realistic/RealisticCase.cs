@@ -23,8 +23,8 @@ internal sealed record CheckedFrom(int Major, string Why);
 // its models.  A case refused by the describer has the failure's id and no columns; one whose models the generator
 // refuses says so by Models, and one whose sidecar an earlier major describes otherwise says from which major it is
 // checked by CheckedFrom.  One with a parameter that Dapper cannot send says why by Dapper, which leaves it out of the
-// run through Dapper alone.  A sample set holds a SQL literal for each parameter, by its name without @, compared
-// ignoring case.
+// run through Dapper alone, and never out of the run through its method.  A sample set holds a SQL literal for each
+// parameter, by its name without @, compared ignoring case.
 internal sealed record RealisticCase(
     RealisticEngine Engine,
     string Name,
@@ -78,6 +78,10 @@ internal sealed record RealisticCase(
     // Whether the run through Dapper reads the case's rows on the server of that major: the case has models, the
     // server runs it, and Dapper can send its parameters.
     public bool IsReadThroughDapperOn(int major) => HasModels && Dapper is null && RunsOn(major);
+
+    // Whether the run through its generated method reads the case's rows on the server of that major: the case has
+    // models, so a method, and the server runs it.  Dapper's limits are not the method's, so Dapper leaves no case out.
+    public bool IsReadThroughMethodOn(int major) => HasModels && RunsOn(major);
 
     // The case as FixtureReplay plans one.
     public FixtureCase AsFixture => new(Engine.Engine, Name, Folder);

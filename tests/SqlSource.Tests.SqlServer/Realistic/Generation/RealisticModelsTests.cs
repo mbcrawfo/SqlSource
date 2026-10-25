@@ -6,9 +6,9 @@ using Xunit;
 
 namespace SqlSource.Tests.SqlServer.Realistic.Generation;
 
-// The reading of a case's models: the model the generator names from its sidecar entry.  It reads the compiled models
-// and needs no server.  The tests of OutputModelOf and InputModelOf name this project's own generated models, which the
-// other engine's project does not have, so they are not shared.
+// The reading of a case's models: the model the generator names from its sidecar entry, and the method of its claim at
+// CodeGen.  It reads the compiled models and needs no server.  The tests name this project's own generated models and
+// methods, which the other engine's project does not have, so they are not shared.
 public sealed class RealisticModelsTests
 {
     [Fact]
@@ -37,5 +37,33 @@ public sealed class RealisticModelsTests
     public void InputModelOf_EntryWithoutParameters_IsNull() =>
         RealisticCases.Models.InputModelOf(EntryOf("categories-right-join-products")).ShouldBeNull();
 
-    private static SidecarEntry EntryOf(string name) => RealisticModels.EntryOf(RealisticCases.Corpus.ReadNamed(name));
+    [Fact]
+    public void MethodOf_Entry_IsTheMethodOfItsCodeGenClaim()
+    {
+        var method = RealisticCases.Models.MethodOf(
+            RealisticCases.Corpus,
+            Case("category-tree-recursive"),
+            EntryOf("category-tree-recursive")
+        );
+
+        method.DeclaringType.ShouldBe(typeof(CategoryTreeRecursiveMethodExtensions));
+        method.Name.ShouldBe(nameof(CategoryTreeRecursiveMethodExtensions.ListCategoryTree));
+    }
+
+    [Fact]
+    public void MethodOf_EntryWithoutAMethod_ThrowsNamingIt()
+    {
+        var entry = EntryOf("category-tree-recursive") with { Name = "Missing" };
+
+        var thrown = Should.Throw<InvalidOperationException>(() =>
+            RealisticCases.Models.MethodOf(RealisticCases.Corpus, Case("category-tree-recursive"), entry)
+        );
+
+        thrown.Message.ShouldContain(nameof(CategoryTreeRecursiveMethodExtensions));
+        thrown.Message.ShouldContain("of realistic/category-tree-recursive has no method Missing");
+    }
+
+    private static RealisticCase Case(string name) => RealisticCases.Corpus.ReadNamed(name);
+
+    private static SidecarEntry EntryOf(string name) => RealisticModels.EntryOf(Case(name));
 }

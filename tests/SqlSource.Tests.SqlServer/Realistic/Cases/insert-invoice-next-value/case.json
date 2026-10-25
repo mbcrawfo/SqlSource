@@ -26,6 +26,6 @@
     { "order_id": "14", "issued_at": "'2024-10-12'", "terms_days": "30", "tax_rate": "0.2000" }
   ],
   "dapper": {
-    "why": "a null @terms_days has no type for Dapper, which sends nvarchar, refused by DATEADD; phase 8 binds by type"
+    "why": "a null @terms_days has no type for Dapper, which sends nvarchar, refused by DATEADD"
   }
 }

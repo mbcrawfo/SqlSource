@@ -6,8 +6,8 @@ using SqlSource.Testing;
 namespace SqlSource.Tool.Testing.Realistic;
 
 // The realistic corpus of an engine, the folder Realistic/ of that engine's project, read from the repository: the
-// schema and the seed of its database "realistic", the folder of its cases, the file of the classes that claim them,
-// and the engine its cases are read for.  A case folder that is wrong fails naming the case and the fault.
+// schema and the seed of its database "realistic", the folder of its cases, the two files of the classes that claim
+// them, and the engine its cases are read for.  A case folder that is wrong fails naming the case and the fault.
 internal sealed class RealisticCorpus
 {
     private RealisticCorpus(string project, string engine, EngineImage image)
@@ -38,8 +38,11 @@ internal sealed class RealisticCorpus
 
     public string Cases => Path.Combine(Folder, "Cases");
 
-    // The classes that claim each case with models as a query of the project.
+    // The classes that claim each case with models as a query of the project, at the output Models.
     public string Queries => Path.Combine(Folder, "Generation", "RealisticQueries.cs");
+
+    // The classes that claim each case with models a second time, at the output CodeGen, so that it has a method.
+    public string Methods => Path.Combine(Folder, "Generation", "RealisticMethods.cs");
 
     // The name of every folder of Cases, in order: each is a case, and a folder that is no case fails when it is
     // read.  Listing them reads no case.json, so that a broken one fails its own case and not every one.

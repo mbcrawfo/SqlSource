@@ -8,11 +8,11 @@ using SqlSource.Snapshot;
 
 namespace SqlSource.Tool.Testing.Realistic;
 
-// The input model of a case's sample in the run through Dapper, whatever the engine: built by its constructor from the
-// values the server reads the sample as, which fails when the driver gives a value of another type than the
-// property's, and the arguments Dapper is given from it.  The query names its parameters in snake_case, which Dapper
-// does not bind to the model's PascalCase properties, so the model's values go to Dapper under the SQL's names
-// (D-0004).  Each engine's RealisticParameters reads the values on its own driver.
+// The input model of a case's sample, whatever the engine, which the run through its method is given as it is: built by
+// its constructor from the values the server reads the sample as, which fails when the driver gives a value of another
+// type than the property's, and the arguments the run through Dapper is given from it.  The query names its parameters
+// in snake_case, which Dapper does not bind to the model's PascalCase properties, so the model's values go to Dapper
+// under the SQL's names (D-0004).  Each engine's RealisticParameters reads the values on its own driver.
 internal static class RealisticInputs
 {
     // A value as a model holds it: a column's NULL, which the driver reads as DBNull, is null.

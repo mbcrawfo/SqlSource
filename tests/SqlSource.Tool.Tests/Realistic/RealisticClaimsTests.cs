@@ -5,9 +5,10 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Realistic;
 
-// The reading of the claims of a corpus's RealisticQueries.cs from its source: a class whose attribute's Path names
-// the query.sql of a folder of Cases claims that case, and any other path fails naming the class.  The corpus tests
-// that each engine's cases are claimed as they should be are in each engine's project.
+// The reading of the claims of a corpus's RealisticQueries.cs and RealisticMethods.cs from their source: a class whose
+// attribute's Path names the query.sql of a folder of Cases claims that case at the member of GeneratorOutput its
+// Output names, and any other path or Output fails naming the class.  The corpus tests that each engine's cases are
+// claimed as they should be are in each engine's project.
 public sealed class RealisticClaimsTests
 {
     [Fact]
@@ -19,7 +20,7 @@ public sealed class RealisticClaimsTests
                 internal static partial class ABQuery;
                 """
             )
-            .ShouldBe([new RealisticClaim("ABQuery", "a-b")]);
+            .ShouldBe([new RealisticClaim("ABQuery", "a-b", "Models")]);
 
     [Theory]
     [InlineData("SqlSource.SqlSourceGenerate")]
@@ -32,7 +33,44 @@ public sealed class RealisticClaimsTests
                 internal static partial class ABQuery;
                 """
             )
-            .ShouldBe([new RealisticClaim("ABQuery", "a-b")]);
+            .ShouldBe([new RealisticClaim("ABQuery", "a-b", null)]);
+
+    [Fact]
+    public void Parse_ClaimAtCodeGen_HasThatOutput() =>
+        RealisticClaims
+            .Parse(
+                """
+                [SqlSourceGenerate(Path = "../Cases/a-b/query.sql", Output = GeneratorOutput.CodeGen)]
+                internal static partial class ABMethod;
+                """
+            )
+            .ShouldBe([new RealisticClaim("ABMethod", "a-b", "CodeGen")]);
+
+    [Fact]
+    public void Parse_QualifiedOutput_IsItsMemberName() =>
+        RealisticClaims
+            .Parse(
+                """
+                [SqlSourceGenerate(Path = "../Cases/a-b/query.sql", Output = SqlSource.GeneratorOutput.CodeGen)]
+                internal static partial class ABMethod;
+                """
+            )
+            .ShouldBe([new RealisticClaim("ABMethod", "a-b", "CodeGen")]);
+
+    [Fact]
+    public void Parse_OutputThatIsNotAMemberAccess_ThrowsNamingTheClass()
+    {
+        var thrown = Should.Throw<InvalidOperationException>(() =>
+            RealisticClaims.Parse(
+                """
+                [SqlSourceGenerate(Path = "../Cases/a-b/query.sql", Output = "CodeGen")]
+                internal static partial class XMethod;
+                """
+            )
+        );
+
+        thrown.Message.ShouldContain("XMethod");
+    }
 
     [Fact]
     public void Parse_ClassWithAnotherAttribute_IsNoClaim() =>
