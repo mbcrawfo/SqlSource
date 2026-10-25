@@ -78,7 +78,7 @@ internal static class QueryTyper
 
             next = at + 1;
             var query = file.Queries[at];
-            var level = LookupOf(query.Markers, input, engine, levels);
+            var level = LevelTypesOf(query.Markers, input, engine, levels);
             var typing = new Typing(
                 input.NpgsqlProbe.Column,
                 input.SqlClientProbe.Column,
@@ -616,7 +616,7 @@ internal static class QueryTyper
     // made once for each distinct level of markers, by reference: a query without markers of its own holds its file
     // header's level.  No lookup for an empty map.  A map of defaults alone is asked, since a default of an array's
     // own key maps nothing and is reported.
-    private static LevelTypes LookupOf(
+    private static LevelTypes LevelTypesOf(
         SettingsLevel markers,
         FileTypesInput input,
         DatabaseEngine engine,

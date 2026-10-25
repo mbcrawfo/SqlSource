@@ -178,6 +178,17 @@ public sealed class ColumnTypeTests
         column.Place.ShouldBe(ThePropertyPlace);
     }
 
+    // A marker that says only the nullability leaves the column to the column types, which keep the marker's null.
+    [Fact]
+    public void Run_NullabilityOnlyMarker_KeepsTheColumnType()
+    {
+        var run = RunPosts("-- name: ListPosts\n-- column: id null\nSELECT id FROM users;\n", "users.id=UserId");
+
+        run.ShouldBeClean();
+        ColumnsOf(run).ShouldHaveSingleItem().Place.ShouldBe(ThePropertyPlace);
+        run.Sources[DtoModel].ShouldContain("(global::App.UserId? Id)");
+    }
+
     // An expression has no origin, and an origin without a table names no source.
     [Fact]
     public void Run_ColumnWithoutOrigin_IsUntouchedByAColumnType()
@@ -268,7 +279,7 @@ public sealed class ColumnTypeTests
     [InlineData("metadata", "users.id", TheMetadataPlace)]
     [InlineData("header", "users.id", TheHeaderPlace)]
     [InlineData("query", "id", TheQueryPlace)]
-    public void Run_ColumnType_MissingType_IsSQLSRC250AtItsPlace(string level, string key, string place)
+    public void Run_ColumnType_MissingType_IsSqlsrc250AtItsPlace(string level, string key, string place)
     {
         var text = level switch
         {

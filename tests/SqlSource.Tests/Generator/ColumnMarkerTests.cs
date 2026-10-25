@@ -244,7 +244,7 @@ public sealed class ColumnMarkerTests
     }
 
     [Fact]
-    public void Run_TypeMarker_NamingNoColumn_IsSQLSRC260()
+    public void Run_TypeMarker_NamingNoColumn_IsSqlsrc260()
     {
         var file = Query("-- column: nope -> string\n", "SELECT 1 AS id;");
 

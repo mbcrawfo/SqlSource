@@ -208,7 +208,7 @@ internal static class ModelReader
         foreach (var marker in query.ColumnMarkers)
         {
             var column = entry.Columns is { } columns ? FindColumn(columns, marker) : null;
-            if (column is null || (HasMark(column.Name) && marker.IsNullable is not null))
+            if (column is null || (ColumnMarker.HasMark(column.Name) && marker.IsNullable is not null))
             {
                 reading.Diagnostics.Add(
                     DiagnosticInfo.Create(
@@ -403,8 +403,6 @@ internal static class ModelReader
 
         return column.Nullable != false;
     }
-
-    private static bool HasMark(string name) => name.Length > 0 && name[name.Length - 1] is '!' or '?';
 
     // "The column <c>id</c>, <c>integer</c>, from <c>public.users.id</c>.  An identity column."
     private static string ColumnDocumentation(SidecarColumn column, StringBuilder text)

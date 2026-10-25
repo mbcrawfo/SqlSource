@@ -77,7 +77,7 @@ public sealed class ShortNameTests
     }
 
     [Fact]
-    public void Run_ShortName_TwoCandidates_IsSQLSRC250()
+    public void Run_ShortName_TwoCandidates_IsSqlsrc250()
     {
         var run = RunOf(Source + AppUserId + OtherUserId, "int8=UserId", Int8);
 
@@ -170,7 +170,7 @@ public sealed class ShortNameTests
     }
 
     [Fact]
-    public void Run_ShortName_OnlyAFileLocalType_IsSQLSRC250()
+    public void Run_ShortName_OnlyAFileLocalType_IsSqlsrc250()
     {
         const string FileLocal = """
 

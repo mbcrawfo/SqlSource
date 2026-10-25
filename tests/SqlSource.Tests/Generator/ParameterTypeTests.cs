@@ -154,7 +154,7 @@ public sealed class ParameterTypeTests
     }
 
     [Fact]
-    public void Run_ParamMarker_MissingType_IsSQLSRC250AtItsPlace()
+    public void Run_ParamMarker_MissingType_IsSqlsrc250AtItsPlace()
     {
         var run = RunPosts("-- param: @author -> NoSuchType\n");
 
@@ -215,7 +215,7 @@ public sealed class ParameterTypeTests
 
     // The model's error names what the marker mapped, as the typing's errors do.
     [Fact]
-    public void Run_ParamMarker_TypeNotPublicInAPublicModel_IsSQLSRC251NamingTheParameter()
+    public void Run_ParamMarker_TypeNotPublicInAPublicModel_IsSqlsrc251NamingTheParameter()
     {
         var source = UserIdSource.Replace(
             "    public readonly record struct UserId",
@@ -238,7 +238,7 @@ public sealed class ParameterTypeTests
     [InlineData("postgres", "@author -> UserId", "parameter 'author'", "int8")]
     [InlineData("postgres", "@ids -> UserId[]", "element of parameter 'ids'", "int8")]
     [InlineData("mssql", "@author -> UserId", "parameter 'author'", "bigint")]
-    public void Run_ParamMarker_NoConverter_IsSQLSRC279NamingTheDatabaseType(
+    public void Run_ParamMarker_NoConverter_IsSqlsrc279NamingTheDatabaseType(
         string dialect,
         string marker,
         string subject,

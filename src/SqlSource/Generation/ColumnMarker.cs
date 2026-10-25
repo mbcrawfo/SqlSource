@@ -30,11 +30,14 @@ internal sealed record ColumnMarker(
     /// </summary>
     public bool Names(string column)
     {
-        var length = column.Length - (column.Length > 0 && column[column.Length - 1] is '!' or '?' ? 1 : 0);
+        var length = column.Length - (HasMark(column) ? 1 : 0);
         return string.Equals(column, Name, StringComparison.OrdinalIgnoreCase)
             || (
                 Name.Length == length
                 && string.Compare(column, 0, Name, 0, length, StringComparison.OrdinalIgnoreCase) == 0
             );
     }
+
+    /// <summary>Whether a column's name ends in a <c>!</c> or <c>?</c> mark, which sets its nullability.</summary>
+    internal static bool HasMark(string name) => name.Length > 0 && name[name.Length - 1] is '!' or '?';
 }
