@@ -21,7 +21,7 @@ internal static class SqlServerTypeMap
 
     private static readonly Dictionary<string, Row> Rows = BuildRows();
 
-    // Every C# type the map gives, each without the [] of an array, for Gives.
+    // Every C# type a row gives, as it writes it, for Gives.
     private static readonly HashSet<string> Given = BuildGiven();
 
     /// <summary>The keys of the map: every type name it has a row for.</summary>
@@ -91,11 +91,13 @@ internal static class SqlServerTypeMap
     }
 
     /// <summary>
-    /// Whether the map gives <paramref name="text" /> for any type, under any driver's column, with every trailing
-    /// <c>[]</c> taken off it first.  A type it never gives, as <c>MyApp.Email</c> or a type of the package
+    /// Whether the map gives <paramref name="text" /> for some type: a row's C# type exactly, or an array <c>X[]</c>
+    /// of a type <c>X</c> it gives.  A type it never gives, as <c>MyApp.Email</c> or a type of the package
     /// Microsoft.SqlServer.Types, is foreign, which a converter is needed for.
     /// </summary>
-    public static bool Gives(string text) => Given.Contains(PostgresTypeMap.ElementOf(text));
+    public static bool Gives(string text) =>
+        Given.Contains(text)
+        || (text.EndsWith("[]", StringComparison.Ordinal) && Gives(text.Substring(0, text.Length - 2)));
 
     /// <summary>
     /// <paramref name="name" /> cut before its first <c>(</c>, which drops its facets: <c>nvarchar(50)</c> is
@@ -120,7 +122,7 @@ internal static class SqlServerTypeMap
         {
             if (row.Text is { } text)
             {
-                _ = given.Add(PostgresTypeMap.ElementOf(text));
+                _ = given.Add(text);
             }
         }
 

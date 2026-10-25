@@ -865,11 +865,14 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // {0} is the column or parameter, as "column 'id'", {1} its type as PostgresTypeMap.AsWritten writes it, {2} what
-    // its converters convert between, as "whose converters convert from and to 'int', and not from and to 'long', the
-    // type the database type 'int8' is read as", or, for a database type the base map gives no C# type, "which has
-    // converters, but the database type 'public.address' has no C# type to convert from", and {3} the help, as "Add a
-    // converter between 'MyApp.UserId' and 'long'".  Reported at the query's name.
+    // It has two forms, which ConversionPlanner builds.  {0} is the column or parameter, as "column 'id'", or "element
+    // of column 'ids'" for an array converted element by element, and {1} its type, or the element's, as
+    // PostgresTypeMap.AsWritten writes it.  For a foreign type whose converters are of other types, {2} is "whose
+    // converters convert from and to <the other types, as 'int' or 'int' and 'short'>, and not from and to '<the
+    // base map's type>', the type the database type '<its key>' is read as", and {3} "Add a converter between '<the
+    // type>' and '<the base map's type>'".  For a database type the base map gives no C# type, {2} is "which has
+    // converters, but the database type '<its key>' has no C# type to convert from", and {3} "Remove the type
+    // override, or the converters of '<the type, or its element, that has them>'".  Reported at the query's name.
     public static readonly DiagnosticDescriptor ConverterTypeMismatch = new(
         id: "SQLSRC279",
         title: "Converters do not convert from the database type",
@@ -881,7 +884,8 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // {0} is the column or parameter, as "column 'email'", {1} its type, {2} "to" or "from", the direction of the
+    // {0} is the column or parameter, as "column 'email'", or "element of column 'emails'" for an array converted
+    // element by element, {1} its type or the element's, {2} "to" or "from", the direction of the
     // converter it has, {3} the type the base map reads its database type as, {4} the other of "to" and "from", {5}
     // "column" or "parameter", and {6} and {7} the argument and return types of the converter it needs.  The types are
     // as PostgresTypeMap.AsWritten writes them.  Reported at the query's name.

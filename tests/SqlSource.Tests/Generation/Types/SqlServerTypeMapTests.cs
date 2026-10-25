@@ -112,6 +112,7 @@ public sealed class SqlServerTypeMapTests
     [InlineData("byte")]
     [InlineData("string")]
     [InlineData("byte[]")]
+    [InlineData("int[]")]
     [InlineData("object")]
     [InlineData(DateTime)]
     [InlineData(Vector)]
@@ -122,6 +123,7 @@ public sealed class SqlServerTypeMapTests
     [InlineData("global::MyApp.Email")]
     [InlineData("global::MyApp.Email[]")]
     [InlineData("global::System.DateOnly")]
+    [InlineData("uint")]
     [InlineData("global::Microsoft.SqlServer.Types.SqlHierarchyId")]
     public void Gives_ForeignTypes_AreNot(string text) => SqlServerTypeMap.Gives(text).ShouldBeFalse();
 

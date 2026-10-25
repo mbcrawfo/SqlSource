@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using SqlSource.Diagnostics;
+using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Models;
 using SqlSource.Parsing;
@@ -222,29 +223,14 @@ internal static class MethodPlanner
         // A query that gets no method takes no name, so it is compared with the other methods' only once it has one.
         // Its models are read whatever its other problems, so that it gets every problem of its converters too.
         var planned = new Planned(problems, name, query.Name, query.NameLocation, null, false);
+        // A query whose driver is missing gets no method, which SQLSRC273 says, so its converters are not decided.
         var databaseEngine = SqlDescribableDialects.EngineOf(file.Dialect);
-        var hasInput = TryReadInput(
-            input,
-            key,
-            file,
-            queryIndex,
-            query,
-            models,
-            databaseEngine,
-            problems,
-            out var methodInput
-        );
-        var hasOutput = TryReadOutput(
-            input,
-            key,
-            file,
-            queryIndex,
-            settings,
-            models,
-            databaseEngine,
-            problems,
-            out var methodOutput
-        );
+        var isUsable =
+            (engine == CodeGenEngines.Postgres && input.Drivers.Postgres)
+            || (engine == CodeGenEngines.SqlServer && input.Drivers.SqlServer);
+        var reading = new Reading(databaseEngine, isUsable, query.NameLocation, problems);
+        var hasInput = TryReadInput(input, key, file, queryIndex, query, models, reading, out var methodInput);
+        var hasOutput = TryReadOutput(input, key, file, queryIndex, settings, models, reading, out var methodOutput);
         if (problems.Count > 0 || !hasInput || !hasOutput)
         {
             return planned;
@@ -263,9 +249,6 @@ internal static class MethodPlanner
             methodOutput,
             query.NameLocation
         );
-        var isUsable =
-            (engine == CodeGenEngines.Postgres && input.Drivers.Postgres)
-            || (engine == CodeGenEngines.SqlServer && input.Drivers.SqlServer);
         return planned with { Method = method, IsDriverUsable = isUsable };
     }
 
@@ -320,8 +303,7 @@ internal static class MethodPlanner
         int queryIndex,
         SqlQuery query,
         QueryModels models,
-        DatabaseEngine engine,
-        List<DiagnosticInfo> problems,
+        Reading reading,
         out MethodInput? methodInput
     )
     {
@@ -344,17 +326,7 @@ internal static class MethodPlanner
         for (var index = 0; index < properties.Count; index++)
         {
             var property = properties[index];
-            var write = ConversionPlanner.Plan(
-                property.Type,
-                false,
-                engine,
-                input.Converters,
-                property.Subject,
-                query.NameLocation,
-                problems,
-                out var blocked
-            );
-            isBlocked |= blocked;
+            var write = reading.ConversionOf(property, false, input.Converters, ref isBlocked);
             parameters.Add(
                 new MethodParameter(
                     query.Parameters[index].Name,
@@ -382,8 +354,7 @@ internal static class MethodPlanner
         int queryIndex,
         QuerySettings settings,
         QueryModels models,
-        DatabaseEngine engine,
-        List<DiagnosticInfo> problems,
+        Reading reading,
         out MethodOutput? methodOutput
     )
     {
@@ -408,17 +379,7 @@ internal static class MethodPlanner
         for (var index = 0; index < properties.Count; index++)
         {
             var property = properties[index];
-            var read = ConversionPlanner.Plan(
-                property.Type,
-                true,
-                engine,
-                input.Converters,
-                property.Subject,
-                models.NameLocation,
-                problems,
-                out var blocked
-            );
-            isBlocked |= blocked;
+            var read = reading.ConversionOf(property, true, input.Converters, ref isBlocked);
             columns.Add(new MethodColumn(names[index], property.Name, property.Type.Text, property.IsNullable, read));
         }
 
@@ -602,6 +563,43 @@ internal static class MethodPlanner
             ResultShape.None => "none",
             ResultShape.RowCount or _ => "rowcount",
         };
+
+    // What deciding the converters of one query's properties reads: the engine of its file, whether its driver allows
+    // a method, without which nothing is decided, the query's name, where a problem goes, and its problems.
+    private readonly record struct Reading(
+        DatabaseEngine Engine,
+        bool IsDriverUsable,
+        LocationInfo At,
+        List<DiagnosticInfo> Problems
+    )
+    {
+        // The property's conversion, null with nothing decided when the driver allows no method.  A block is OR-ed in.
+        public Conversion? ConversionOf(
+            ModelProperty property,
+            bool isRead,
+            EquatableArray<Converter> converters,
+            ref bool isBlocked
+        )
+        {
+            if (!IsDriverUsable)
+            {
+                return null;
+            }
+
+            var conversion = ConversionPlanner.Plan(
+                property.Type,
+                isRead,
+                Engine,
+                converters,
+                property.Subject,
+                At,
+                Problems,
+                out var blocked
+            );
+            isBlocked |= blocked;
+            return conversion;
+        }
+    }
 
     // One query's problems, the name its method would have, and its method, with whether its driver allows it, when it
     // has no problem and its models were read.

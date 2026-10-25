@@ -231,6 +231,67 @@ public sealed class ConverterMethodTests
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
+    // A query gets every problem it has, its converters' beside the others.
+    [Fact]
+    public void Run_ShapeThatNeedsRowsAndAParameterWithoutTheWriteConverter_ReportsBoth()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            EmailMarker + "-- name: SetEmail -> one\nUPDATE users SET email = @email;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "SetEmail", [Parameter("email", Email)], null)],
+            SourceWith(FromDatabase)
+        );
+
+        Problems(run)
+            .ShouldBe([
+                "SQLSRC272 /app/Repo/Users.sql(2,10)-(2,18): The query 'SetEmail' has the shape 'one', and its "
+                    + "statement returns no rows.  Remove the shape, or write 'rowcount' or 'none'.",
+                "SQLSRC280 /app/Repo/Users.sql(2,10)-(2,18): The parameter 'email' has type 'MyApp.Email', which has "
+                    + "a converter from 'string' but none to it, which a parameter needs.  Add a static method marked "
+                    + "[SqlSourceConverter] that takes 'MyApp.Email' and returns 'string'.",
+            ]);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
+    // Without the engine's driver no method is generated, which SQLSRC273 says, so no converter is decided either:
+    // date has no C# type of its own without Npgsql, and is not SQLSRC279.
+    [Fact]
+    public void Run_ProjectWithoutTheDriver_ReportsNoConverterProblem()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class Sample;
+            }
+
+            namespace MyApp
+            {
+                public readonly record struct Day(System.DateOnly Value)
+                {
+                    [SqlSourceConverter] public static Day FromDatabase(System.DateOnly value) => new(value);
+
+                    [SqlSourceConverter] public static System.DateOnly ToDatabase(Day day) => day.Value;
+                }
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: date=MyApp.Day\n-- name: GetDay\nSELECT born FROM users;\n"
+        );
+
+        var run = MethodRuns.Run(file, [Entry(file, "GetDay", [], [Column("born", Catalog("date"))])], Source, []);
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC273 ");
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
     // A Models project uses no converter, so its queries are never reported.
     [Fact]
     public void Run_ModelsProjectWithConverters_ReportsNoQueryDiagnostic()

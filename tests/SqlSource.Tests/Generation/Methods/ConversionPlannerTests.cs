@@ -232,9 +232,27 @@ public sealed class ConversionPlannerTests
         conversion.ShouldBeNull();
         blocked.ShouldBeTrue();
         problems.ShouldBe([
-            "SQLSRC279: The column 'ids' has type 'MyApp.UserId', whose converters convert from and to 'int', and not "
-                + "from and to 'long', the type the database type 'int8' is read as.  Add a converter between "
-                + "'MyApp.UserId' and 'long'.",
+            "SQLSRC279: The element of column 'ids' has type 'MyApp.UserId', whose converters convert from and to "
+                + "'int', and not from and to 'long', the type the database type 'int8' is read as.  Add a converter "
+                + "between 'MyApp.UserId' and 'long'.",
+        ]);
+    }
+
+    // An element with the other direction's converter alone is SQLSRC280, naming the element.
+    [Fact]
+    public void Plan_ArrayOfAnElementWithOnlyTheWriteEdge_ReportsSQLSRC280ForTheElement()
+    {
+        var type = Overridden(Email + "[]", false, "public.email", "string[]", false);
+        var converters = Of(Project("global::MyApp.Email.To", Email, true, "string", false));
+
+        var (conversion, problems, blocked) = Plan(type, isRead: true, converters, "column 'emails'");
+
+        conversion.ShouldBeNull();
+        blocked.ShouldBeTrue();
+        problems.ShouldBe([
+            "SQLSRC280: The element of column 'emails' has type 'MyApp.Email', which has a converter to 'string' but "
+                + "none from it, which a column needs.  Add a static method marked [SqlSourceConverter] that takes "
+                + "'string' and returns 'MyApp.Email'.",
         ]);
     }
 
@@ -285,6 +303,28 @@ public sealed class ConversionPlannerTests
         problems.ShouldBe([
             "SQLSRC278: The converters 'MyApp.Email.From(string)' and 'MyApp.Email.Parse(string)' both convert "
                 + "'string' to 'MyApp.Email'.  Keep one.",
+        ]);
+    }
+
+    // A faulty converter of a reference is SQLSRC277, and with it the edge has one converter, so no SQLSRC278.
+    [Fact]
+    public void Plan_EdgeOfAReferenceWithASoundAndAFaultyConverter_ReportsSQLSRC277Alone()
+    {
+        var converters = Of(
+            Reference("global::MyApp.Email.From", "string", Email),
+            Reference("global::MyApp.Email.Parse", "string", Email) with
+            {
+                Fault = "it is not static",
+            }
+        );
+
+        var (conversion, problems, blocked) = Plan(EmailType, isRead: true, converters);
+
+        conversion.ShouldBeNull();
+        blocked.ShouldBeTrue();
+        problems.ShouldBe([
+            "SQLSRC277: The method 'MyApp.Email.Parse(string)' is marked [SqlSourceConverter], but it is not static.  "
+                + "A converter is a static method of one argument that returns the converted value.",
         ]);
     }
 

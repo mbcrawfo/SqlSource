@@ -31,6 +31,9 @@ internal static class ConversionPlanner
 
     private const string To = "to";
 
+    // Before the subject of an array's element: "element of column 'ids'".
+    private const string ElementSubject = "element of ";
+
     /// <summary>
     /// The conversion of one column or parameter, or null for one read or bound as its type is.  Its problems are
     /// added to <paramref name="problems" />, at <paramref name="at" />.
@@ -80,9 +83,11 @@ internal static class ConversionPlanner
         }
 
         // An array that no converter touches is converted by its element's, whichever level chose the element.
+        // Its messages name the element, whose converter is the one to add.
         if (element is not null && ElementOf(databaseText) is { } databaseElement && !decision.Touches(text))
         {
-            if (decision.TryEdge(element, databaseElement, out var byElement, out blocked))
+            var ofElement = new Decision(isRead, engine, converters, ElementSubject + subject, at, problems);
+            if (ofElement.TryEdge(element, databaseElement, out var byElement, out blocked))
             {
                 if (byElement is null)
                 {
@@ -100,7 +105,7 @@ internal static class ConversionPlanner
                 );
             }
 
-            blocked = decision.ReportForeign(element, databaseElement, ElementKeyOf(type.Key));
+            blocked = ofElement.ReportForeign(element, databaseElement, ElementKeyOf(type.Key));
             return null;
         }
 
