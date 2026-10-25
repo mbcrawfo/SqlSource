@@ -2494,7 +2494,7 @@ A method marked `[SqlSourceConverter]` must be a converter: a `static` method of
 
 Change the method so that it is a converter, or remove its `[SqlSourceConverter]` when it is not meant to be one.  The error is reported at the method's name, at an operator's symbol, or at the type that a conversion converts to.
 
-A converter declared in a referenced assembly, on a type that the type override names, is reported at the name of each query whose output is `codegen` and whose method would convert through it, since the project cannot change the method.  That query gets no method until the library is fixed, or until the project declares a converter of its own between the same two types, which is used instead of the library's.  The library's own build reports the error at the method, since the method is in the library's code.  A library's `internal` converter is seen only by a project that the library shows its internals to, so any other project neither uses it nor reports it.
+A converter declared in a referenced assembly, on a type that the type override names, is reported at the name of each query whose output is `codegen` and whose method would convert through it, since the project cannot change the method.  That query gets no method until the library is fixed, or until the project declares a converter of its own between the same two types, which is used instead of the library's.  The library's own build reports the error at the method, since the method is in the library's code.  A library's converter is used only when the project can call it: when it is `public`, or `internal` in a library that gives the project its internals with `InternalsVisibleTo`.
 
 See: [Converters](settings.md#converters)
 

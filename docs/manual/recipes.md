@@ -199,6 +199,8 @@ await transaction.CommitAsync();
 
 Open the connection yourself: a query method leaves a connection that is open as it is, and opens and closes again only one that is closed.  Give every method the transaction.  Microsoft.Data.SqlClient refuses a command on a connection with a transaction that the command was not given, and Npgsql runs it in the transaction all the same.
 
+Rules: [the connection](generator.md#method-connection), [the signature](generator.md#method-signature), [result shapes](sql-files.md#result-shapes).
+
 <a id="strongly-typed-id"></a>
 
 ## Give an id a type of its own
@@ -229,11 +231,9 @@ GetCustomerDto? customer = await connection.GetCustomer(new GetCustomerParams(cu
 // customer.Id and GetCustomerParams.Id are CustomerId
 ```
 
-`id` is a `bigint`, which Npgsql reads as a `long`, and Npgsql knows nothing of `CustomerId`.  The type override gives each `bigint` of the query the type `CustomerId`, and the two converters say how to make one from a `long` and a `long` from one, so the method reads the column as a `long` and passes it to `FromDatabase`, and sends the `long` that `ToDatabase` returns for `@id`.  The converters take and return `long`, the type the driver reads a `bigint` as: an `int` would not do.  On SQL Server the key is `bigint`, `-- type-override: bigint=MyApp.CustomerId`, and the same converters serve it.  To give the type to the ids of one table alone, wherever they are, make them a domain, `CREATE DOMAIN customer_id AS bigint`, and map it, `public.customer_id=MyApp.CustomerId`, whose converters still take and return `long`.
+The type override gives each `bigint` of the query the type `CustomerId`, so the method reads `id` as a `long` and passes it to `FromDatabase`, and sends the `long` that `ToDatabase` returns for `@id`.  On SQL Server the key is `bigint`: `-- type-override: bigint=MyApp.CustomerId`.  To give the type to one table's ids alone, make them a domain, `CREATE DOMAIN customer_id AS bigint`, and map it: `public.customer_id=MyApp.CustomerId`.
 
 Rules: [converters](settings.md#converters), [type overrides](settings.md#setting-type-overrides).
-
-Rules: [the connection](generator.md#method-connection), [the signature](generator.md#method-signature), [result shapes](sql-files.md#result-shapes).
 
 <a id="dapper-and-adonet"></a>
 
