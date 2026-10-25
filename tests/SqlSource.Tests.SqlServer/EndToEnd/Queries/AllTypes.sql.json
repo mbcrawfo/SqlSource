@@ -1624,6 +1624,1277 @@
           "computed": false
         }
       ]
+    },
+    "WriteAllTypes": {
+      "hash": "24887554237b71d010ea0cc537530284d860ecf55d7d44f02ba578eb6efb3f0a",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": {
+        "schema": "dbo",
+        "table": "all_types"
+      },
+      "plan": "skipped",
+      "tableMatch": "matched",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "bigintValue",
+          "ordinal": 1,
+          "type": {
+            "name": "bigint",
+            "maxLength": 8,
+            "precision": 19,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "intValue",
+          "ordinal": 2,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "smallintValue",
+          "ordinal": 3,
+          "type": {
+            "name": "smallint",
+            "maxLength": 2,
+            "precision": 5,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "tinyintValue",
+          "ordinal": 4,
+          "type": {
+            "name": "tinyint",
+            "maxLength": 1,
+            "precision": 3,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "bitValue",
+          "ordinal": 5,
+          "type": {
+            "name": "bit",
+            "maxLength": 1,
+            "precision": 1,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "decimalValue",
+          "ordinal": 6,
+          "type": {
+            "name": "decimal(12,4)",
+            "maxLength": 9,
+            "precision": 12,
+            "scale": 4
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "numericValue",
+          "ordinal": 7,
+          "type": {
+            "name": "numeric(9,2)",
+            "maxLength": 5,
+            "precision": 9,
+            "scale": 2
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "moneyValue",
+          "ordinal": 8,
+          "type": {
+            "name": "money",
+            "maxLength": 8,
+            "precision": 19,
+            "scale": 4
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "smallmoneyValue",
+          "ordinal": 9,
+          "type": {
+            "name": "smallmoney",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 4
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "floatValue",
+          "ordinal": 10,
+          "type": {
+            "name": "float",
+            "maxLength": 8,
+            "precision": 53,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "realValue",
+          "ordinal": 11,
+          "type": {
+            "name": "real",
+            "maxLength": 4,
+            "precision": 24,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "dateValue",
+          "ordinal": 12,
+          "type": {
+            "name": "date",
+            "maxLength": 3,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "datetimeValue",
+          "ordinal": 13,
+          "type": {
+            "name": "datetime",
+            "maxLength": 8,
+            "precision": 23,
+            "scale": 3
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "datetime2Value",
+          "ordinal": 14,
+          "type": {
+            "name": "datetime2(7)",
+            "maxLength": 8,
+            "precision": 27,
+            "scale": 7
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "smalldatetimeValue",
+          "ordinal": 15,
+          "type": {
+            "name": "smalldatetime",
+            "maxLength": 4,
+            "precision": 16,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "timeValue",
+          "ordinal": 16,
+          "type": {
+            "name": "time(7)",
+            "maxLength": 5,
+            "precision": 16,
+            "scale": 7
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "datetimeoffsetValue",
+          "ordinal": 17,
+          "type": {
+            "name": "datetimeoffset(7)",
+            "maxLength": 10,
+            "precision": 34,
+            "scale": 7
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "charValue",
+          "ordinal": 18,
+          "type": {
+            "name": "char(5)",
+            "maxLength": 5,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "varcharValue",
+          "ordinal": 19,
+          "type": {
+            "name": "varchar(20)",
+            "maxLength": 20,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "textValue",
+          "ordinal": 20,
+          "type": {
+            "name": "text",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "ncharValue",
+          "ordinal": 21,
+          "type": {
+            "name": "nchar(5)",
+            "maxLength": 10,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "nvarcharValue",
+          "ordinal": 22,
+          "type": {
+            "name": "nvarchar(20)",
+            "maxLength": 40,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "ntextValue",
+          "ordinal": 23,
+          "type": {
+            "name": "ntext",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "xmlValue",
+          "ordinal": 24,
+          "type": {
+            "name": "xml",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "binaryValue",
+          "ordinal": 25,
+          "type": {
+            "name": "binary(4)",
+            "maxLength": 4,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "varbinaryValue",
+          "ordinal": 26,
+          "type": {
+            "name": "varbinary(8)",
+            "maxLength": 8,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "imageValue",
+          "ordinal": 27,
+          "type": {
+            "name": "image",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "uniqueidentifierValue",
+          "ordinal": 28,
+          "type": {
+            "name": "uniqueidentifier",
+            "maxLength": 16,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "sqlVariantValue",
+          "ordinal": 29,
+          "type": {
+            "name": "sql_variant",
+            "maxLength": 8016,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "sysnameValue",
+          "ordinal": 30,
+          "type": {
+            "name": "nvarchar(128)",
+            "maxLength": 256,
+            "precision": 0,
+            "scale": 0,
+            "userType": {
+              "schema": "sys",
+              "name": "sysname"
+            }
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "id"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "bigint_value",
+          "type": {
+            "name": "bigint",
+            "maxLength": 8,
+            "precision": 19,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "bigint_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "int_value",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "int_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 3,
+          "name": "smallint_value",
+          "type": {
+            "name": "smallint",
+            "maxLength": 2,
+            "precision": 5,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "smallint_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 4,
+          "name": "tinyint_value",
+          "type": {
+            "name": "tinyint",
+            "maxLength": 1,
+            "precision": 3,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "tinyint_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 5,
+          "name": "bit_value",
+          "type": {
+            "name": "bit",
+            "maxLength": 1,
+            "precision": 1,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "bit_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 6,
+          "name": "decimal_value",
+          "type": {
+            "name": "decimal(12,4)",
+            "maxLength": 9,
+            "precision": 12,
+            "scale": 4
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "decimal_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 7,
+          "name": "numeric_value",
+          "type": {
+            "name": "numeric(9,2)",
+            "maxLength": 5,
+            "precision": 9,
+            "scale": 2
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "numeric_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 8,
+          "name": "money_value",
+          "type": {
+            "name": "money",
+            "maxLength": 8,
+            "precision": 19,
+            "scale": 4
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "money_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 9,
+          "name": "smallmoney_value",
+          "type": {
+            "name": "smallmoney",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 4
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "smallmoney_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 10,
+          "name": "float_value",
+          "type": {
+            "name": "float",
+            "maxLength": 8,
+            "precision": 53,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "float_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 11,
+          "name": "real_value",
+          "type": {
+            "name": "real",
+            "maxLength": 4,
+            "precision": 24,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "real_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 12,
+          "name": "date_value",
+          "type": {
+            "name": "date",
+            "maxLength": 3,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "date_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 13,
+          "name": "datetime_value",
+          "type": {
+            "name": "datetime",
+            "maxLength": 8,
+            "precision": 23,
+            "scale": 3
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "datetime_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 14,
+          "name": "datetime2_value",
+          "type": {
+            "name": "datetime2(7)",
+            "maxLength": 8,
+            "precision": 27,
+            "scale": 7
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "datetime2_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 15,
+          "name": "smalldatetime_value",
+          "type": {
+            "name": "smalldatetime",
+            "maxLength": 4,
+            "precision": 16,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "smalldatetime_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 16,
+          "name": "time_value",
+          "type": {
+            "name": "time(7)",
+            "maxLength": 5,
+            "precision": 16,
+            "scale": 7
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "time_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 17,
+          "name": "datetimeoffset_value",
+          "type": {
+            "name": "datetimeoffset(7)",
+            "maxLength": 10,
+            "precision": 34,
+            "scale": 7
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "datetimeoffset_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 18,
+          "name": "char_value",
+          "type": {
+            "name": "char(5)",
+            "maxLength": 5,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "char_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 19,
+          "name": "varchar_value",
+          "type": {
+            "name": "varchar(20)",
+            "maxLength": 20,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "varchar_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 20,
+          "name": "text_value",
+          "type": {
+            "name": "text",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "text_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 21,
+          "name": "nchar_value",
+          "type": {
+            "name": "nchar(5)",
+            "maxLength": 10,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "nchar_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 22,
+          "name": "nvarchar_value",
+          "type": {
+            "name": "nvarchar(20)",
+            "maxLength": 40,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "nvarchar_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 23,
+          "name": "ntext_value",
+          "type": {
+            "name": "ntext",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "ntext_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 24,
+          "name": "xml_value",
+          "type": {
+            "name": "xml",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "xml_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 25,
+          "name": "binary_value",
+          "type": {
+            "name": "binary(4)",
+            "maxLength": 4,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "binary_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 26,
+          "name": "varbinary_value",
+          "type": {
+            "name": "varbinary(8)",
+            "maxLength": 8,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "varbinary_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 27,
+          "name": "image_value",
+          "type": {
+            "name": "image",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "image_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 28,
+          "name": "rowversion_value",
+          "type": {
+            "name": "timestamp",
+            "maxLength": 8,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "rowversion_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 29,
+          "name": "uniqueidentifier_value",
+          "type": {
+            "name": "uniqueidentifier",
+            "maxLength": 16,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "uniqueidentifier_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 30,
+          "name": "sql_variant_value",
+          "type": {
+            "name": "sql_variant",
+            "maxLength": 8016,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "sql_variant_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 31,
+          "name": "sysname_value",
+          "type": {
+            "name": "nvarchar(128)",
+            "maxLength": 256,
+            "precision": 0,
+            "scale": 0,
+            "userType": {
+              "schema": "sys",
+              "name": "sysname"
+            }
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "sysname_value"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "FindByRowversion": {
+      "hash": "b087eb999131d1ed635f25146e46524c57f2a7e10cc0f0197dc0a7fb8dadea06",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "rowversion",
+          "ordinal": 0,
+          "type": {
+            "name": "timestamp",
+            "maxLength": 8,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "id"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "FindByDatetime2": {
+      "hash": "61a26adc3aefcb337b283fe4fbe2e5c92d3feffbd7752bcf0d2b03469d0af7b5",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "value",
+          "ordinal": 0,
+          "type": {
+            "name": "datetime2(7)",
+            "maxLength": 8,
+            "precision": 27,
+            "scale": 7
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "id"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "FindByChar": {
+      "hash": "62463daf533d5f0cba1018f85df5d49458c3805186bb544f5c5768d2e233209a",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "value",
+          "ordinal": 0,
+          "type": {
+            "name": "char(5)",
+            "maxLength": 5,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "id"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "FindByDecimal": {
+      "hash": "3508d65cf7ef8919f334f7651c051b0cea62b728ddae0245ce957811df406516",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "value",
+          "ordinal": 0,
+          "type": {
+            "name": "decimal(12,4)",
+            "maxLength": 9,
+            "precision": 12,
+            "scale": 4
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "id"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "WriteDatetime2Of3": {
+      "hash": "8bed69a66396cdb2a5457e27bc46e5f1578260a2cfd6d135f23ea0cbcd25ab91",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "value",
+          "ordinal": 0,
+          "type": {
+            "name": "datetime2(3)",
+            "maxLength": 7,
+            "precision": 23,
+            "scale": 3
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "value",
+          "type": {
+            "name": "datetime2(3)",
+            "maxLength": 7,
+            "precision": 23,
+            "scale": 3
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "ListTinyintLevels": {
+      "hash": "091e1314ce12f11ba407e59ef93e2666d0d480f875aa41b579169743f5a6e550",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "level",
+          "ordinal": 0,
+          "type": {
+            "name": "tinyint",
+            "maxLength": 1,
+            "precision": 3,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tinyint_value",
+          "type": {
+            "name": "tinyint",
+            "maxLength": 1,
+            "precision": 3,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "all_types",
+            "column": "tinyint_value"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
     }
   }
 }

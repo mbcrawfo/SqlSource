@@ -133,14 +133,15 @@ internal static class SqlServerAllTypesRows
         }
     }
 
-    // Asserts that the row of all_types is row 2 of the seed, with null in every column but id and the rowversion.
-    public static void ShouldBeTheNullRow(object row)
+    // Asserts that the row of all_types is row 2 of the seed, with another id, with null in every column but id and the
+    // rowversion.
+    public static void ShouldBeTheNullRow(object row, int id = NullRowId)
     {
         foreach (var property in PropertiesOf(row, FullRow))
         {
             var expected = property.Name switch
             {
-                "Id" => NullRowId,
+                "Id" => id,
                 Rowversion => FullRow[Rowversion],
                 _ => null,
             };
@@ -148,23 +149,43 @@ internal static class SqlServerAllTypesRows
         }
     }
 
-    // Asserts that the row of new_types is row 1 of the seed.
-    public static void ShouldBeTheFullNewTypesRow(object row)
+    // Asserts that the row of new_types is row 1 of the seed, with another id.
+    public static void ShouldBeTheFullNewTypesRow(object row, int id = FullRowId)
     {
         foreach (var property in PropertiesOf(row, FullNewTypesRow))
         {
-            ShouldBeValue(property.GetValue(row), FullNewTypesRow[property.Name], property.Name);
+            ShouldBeValue(
+                property.GetValue(row),
+                property.Name == "Id" ? id : FullNewTypesRow[property.Name],
+                property.Name
+            );
         }
     }
 
-    // Asserts that the row of new_types is row 2 of the seed, with null in both columns.
-    public static void ShouldBeTheNullNewTypesRow(object row)
+    // Asserts that the row of new_types is row 2 of the seed, with another id, with null in both columns.
+    public static void ShouldBeTheNullNewTypesRow(object row, int id = NullRowId)
     {
         foreach (var property in PropertiesOf(row, FullNewTypesRow))
         {
-            ShouldBeValue(property.GetValue(row), property.Name == "Id" ? NullRowId : null, property.Name);
+            ShouldBeValue(property.GetValue(row), property.Name == "Id" ? id : null, property.Name);
         }
     }
+
+    // The input model of a write of all_types or of new_types, made by its one constructor: the id given, and each
+    // other parameter the property of its name of the row read, or null when no row is given.  The methods' tests on
+    // SqlClient 6.1 and 7 write the seed's rows back through it.
+    public static TArgs ArgsOf<TArgs>(int id, object? row)
+    {
+        var constructor = typeof(TArgs).GetConstructors().ShouldHaveSingleItem(typeof(TArgs).Name);
+        var arguments = constructor
+            .GetParameters()
+            .Select(parameter => parameter.Name == "Id" ? id : ValueOf(row, parameter.Name!))
+            .ToArray();
+        return (TArgs)constructor.Invoke(arguments);
+    }
+
+    private static object? ValueOf(object? row, string property) =>
+        row?.GetType().GetProperty(property).ShouldNotBeNull(property).GetValue(row);
 
     // The public properties of the row, which are those that the expectations name, no more and no fewer.
     private static PropertyInfo[] PropertiesOf(object row, Dictionary<string, object> expectations)

@@ -31,7 +31,7 @@ The seven test projects and the two libraries they share, which [`tests/README.m
 - `tests/SqlSource.Tests.Postgres` runs the PostgreSQL describer against a real server and is the end-to-end project, which builds models from its own queries and reads rows into them through Dapper, and needs Docker.
 - `tests/SqlSource.Tests.Postgres.Npgsql8` reads every mapped type through Dapper on Npgsql 8, the oldest supported driver, and needs Docker.
 - `tests/SqlSource.Tests.SqlServer` runs the tests of SQL Server against a real server and is SQL Server's end-to-end project, which builds models and query methods from its own queries and reads rows into the models through the methods and through Dapper, and needs Docker.
-- `tests/SqlSource.Tests.SqlServer.SqlClient61` reads every mapped type through Dapper on Microsoft.Data.SqlClient 6.1, the oldest supported driver, and needs Docker.
+- `tests/SqlSource.Tests.SqlServer.SqlClient61` reads every mapped type through Dapper, and writes and reads it through the generated methods, on Microsoft.Data.SqlClient 6.1, the oldest supported driver, and needs Docker.
 - `tests/SqlSource.Testing` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 
 `examples/PostgresExamples` shows a user SqlSource with PostgreSQL and Dapper, and `examples/SqlServerExamples` with SQL Server and Dapper; they build with the solution and hold no tests.

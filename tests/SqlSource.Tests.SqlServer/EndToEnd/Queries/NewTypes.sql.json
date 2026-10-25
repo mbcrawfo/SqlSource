@@ -76,6 +76,180 @@
           "computed": false
         }
       ]
+    },
+    "WriteNewTypes": {
+      "hash": "453d8bb99867821ac1dd3b2090e5a0c59d7d6f2537468010c4e290d43b26d74c",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": {
+        "schema": "dbo",
+        "table": "new_types"
+      },
+      "plan": "skipped",
+      "tableMatch": "matched",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "jsonValue",
+          "ordinal": 1,
+          "type": {
+            "name": "json",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "vectorValue",
+          "ordinal": 2,
+          "type": {
+            "name": "vector(3)",
+            "maxLength": 20,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "new_types",
+            "column": "id"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "json_value",
+          "type": {
+            "name": "json",
+            "maxLength": -1,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "new_types",
+            "column": "json_value"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "vector_value",
+          "type": {
+            "name": "vector(3)",
+            "maxLength": 20,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "new_types",
+            "column": "vector_value"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "GetNewType": {
+      "hash": "13ed5a1583a0367bd361e7cddd4c1ab82453be5e3712b24ce56b205853c5bcab",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "names-differ",
+      "parameters": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "new_types",
+            "column": "id"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "v",
+          "type": {
+            "name": "vector(3)",
+            "maxLength": 20,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "new_types",
+            "column": "vector_value"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
     }
   }
 }
