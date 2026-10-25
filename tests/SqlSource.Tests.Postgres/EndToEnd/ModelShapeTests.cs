@@ -11,7 +11,6 @@ using Shouldly;
 using SqlSource.Generation.Types;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
-using SqlSource.Testing;
 using SqlSource.Testing.EndToEnd;
 using SqlSource.Tests.Postgres.EndToEnd.Types;
 using Xunit;
@@ -688,14 +687,7 @@ public sealed class ModelShapeTests
     // The committed entry of a query of EndToEnd/Queries/, read from the repository by the generator's reader.
     private static SidecarEntry EntryOf(string file, string query)
     {
-        var path = Path.Combine(
-            RepositoryRoot.Folder,
-            "tests",
-            "SqlSource.Tests.Postgres",
-            "EndToEnd",
-            "Queries",
-            file + ".json"
-        );
+        var path = Path.Combine(RepositoryPaths.EndToEnd, "Queries", file + ".json");
         var sidecar = SidecarReader.Read(File.ReadAllText(path)).Sidecar.ShouldNotBeNull(path);
         return sidecar.Find(query).ShouldNotBeNull(query);
     }
