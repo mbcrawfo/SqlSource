@@ -762,6 +762,38 @@
           "computed": true
         }
       ]
+    },
+    "ListAccountIdsCancellingOnRead": {
+      "hash": "59cc8ee4f653af5397751c8aaead1cf9df7d25d492cdc81cec9a4b48f0fcacf5",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        }
+      ]
     }
   }
 }

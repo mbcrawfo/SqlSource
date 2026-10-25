@@ -1,5 +1,5 @@
--- The queries of the result shapes, a token and the counts that rowcount returns, claimed by MethodQueries.  Every
--- write runs in its tests in a transaction that is rolled back.
+-- The queries of the result shapes, a token, the counts that rowcount returns and the run-time arguments, claimed by
+-- MethodQueries.  Every write runs in its tests in a transaction that is rolled back.
 
 -- name: TouchAccount
 -- summary: Writes an account's status over itself: no rows, so its shape is rowcount, the one account it updates.
@@ -101,3 +101,11 @@ OUTPUT $action AS change, INSERTED.id;
 -- summary: Waits five seconds before its row, longer than a command timeout of one second.
 WAITFOR DELAY '00:00:05';
 SELECT 1 AS n;
+
+-- name: ListAccountIdsCancellingOnRead
+-- summary: The ids of the accounts, each read as a CancelOnRead, whose converter cancels the token of its test, so
+-- that the read of the second row sees it cancelled.
+-- type-override: int = SqlSource.Tests.SqlServer.EndToEnd.Types.CancelOnRead
+SELECT id
+FROM dbo.accounts
+ORDER BY id;
