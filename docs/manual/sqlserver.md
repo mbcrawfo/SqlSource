@@ -1,6 +1,6 @@
 # SQL Server
 
-SqlSource reads SQL Server and Azure SQL files by the `mssql` [dialect](dialects.md), and the `sqlsource` tool can describe their queries: it asks your database what each query's parameters and columns are, and writes the answer to the query's [sidecar](tool.md#sidecar-files).  This page is about describing, about the C# types that a described query's columns and parameters get, and about the models built from them.  How SqlSource reads a T-SQL file, its comments, strings and `[bracketed]` names, is on [the dialects page](dialects.md).
+SqlSource reads SQL Server and Azure SQL files by the `mssql` [dialect](dialects.md), and the `sqlsource` tool can describe their queries: it asks your database what each query's parameters and columns are, and writes the answer to the query's [sidecar](tool.md#sidecar-files).  This page is about describing, about the C# types that a described query's columns and parameters get, about the models built from them, and about the query methods that run them.  How SqlSource reads a T-SQL file, its comments, strings and `[bracketed]` names, is on [the dialects page](dialects.md).
 
 ```xml
 <PropertyGroup>
@@ -189,7 +189,7 @@ The names are SQL Server's, which are the [type override's](settings.md#setting-
 | `uniqueidentifier` | `System.Guid` |
 | `sql_variant` | `object` |
 | `vector` | `Microsoft.Data.SqlTypes.SqlVector<float>`.  Without Microsoft.Data.SqlClient, SQLSRC269; with one older than 6.1, SQLSRC270 |
-| `hierarchyid`, `geography`, `geometry` | None: SQLSRC246.  Reference the package `Microsoft.SqlServer.Types` and map the type with the type override: `hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId`, `geography=Microsoft.SqlServer.Types.SqlGeography`, `geometry=Microsoft.SqlServer.Types.SqlGeometry` |
+| `hierarchyid`, `geography`, `geometry` | None: SQLSRC246.  Reference the package `Microsoft.SqlServer.Types` and map the type with the type override: `hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId`, `geography=Microsoft.SqlServer.Types.SqlGeography`, `geometry=Microsoft.SqlServer.Types.SqlGeometry`.  A query method then reads the column as that type, and sends the parameter as its SQL Server type |
 
 A type that the table does not name gets its C# type by what it is:
 
@@ -204,7 +204,7 @@ A type that the table does not name gets its C# type by what it is:
 
 - **`timestamp`** is SQL Server's row version, which it also calls `rowversion`, and not a time, so it is a `byte[]`.  PostgreSQL's `timestamp` is a time: see [type overrides](settings.md#setting-type-overrides) for an entry in a project with both.
 - **`date` and `time`** are a `System.DateTime` and a `System.TimeSpan`, and never a `System.DateOnly` or a `System.TimeOnly`, on Microsoft.Data.SqlClient 6.1 and 7.
-- **`date`, `datetime`, `datetime2` and `smalldatetime`** are read as a `System.DateTime` whose `Kind` is `Unspecified`, and `datetimeoffset` keeps its offset.  Dapper sends a `DateTime` parameter as a `datetime`, to 1/300 of a second, so a `datetime2` loses digits unless it is sent as a `datetime2`: see [the recipe](recipes.md#dapper-with-sql-server).  A query method sends it by its value too, as a `datetime`: see [the generator's known issues](generator.md#known-issues).
+- **`date`, `datetime`, `datetime2` and `smalldatetime`** are read as a `System.DateTime` whose `Kind` is `Unspecified`, and `datetimeoffset` keeps its offset.  Dapper sends a `DateTime` parameter as a `datetime`, to 1/300 of a second, so a `datetime2` loses digits unless it is sent as a `datetime2`: see [the recipe](recipes.md#dapper-with-sql-server).  A query method sends it as a `datetime2`, with all seven digits: see [how a parameter is sent](#method-parameters).
 - **`float(1)` to `float(24)`** are a `real` to SQL Server, so they are a `float` in C#.  `float(25)` to `float(53)`, and `float` without a length, are a `double`.
 - **`sql_variant`** is an `object`, whose value is the C# type of the value the row holds: an `int` for an `int`, a `string` for an `nvarchar`.
 - **`json`**, SQL Server 2025's type, is a `string`.
@@ -242,16 +242,52 @@ A described SQL Server query gets the [models](generator.md#models) that every d
 
 ## Query methods
 
-Each described query whose output is `codegen` gets a method that runs it through Microsoft.Data.SqlClient, on a `DbConnection` such as `SqlConnection`: see [query methods](generator.md#query-methods).  The project references Microsoft.Data.SqlClient 6.1 or later ([SQLSRC273](diagnostics.md#sqlsrc273), [SQLSRC267](diagnostics.md#sqlsrc267)).
+```sql mssql
+-- name: AddOrder -> one
+INSERT INTO dbo.orders (customer_id, placed_at, total, status)
+OUTPUT INSERTED.id
+VALUES (@customerId, @placedAt, @total, @status);
+```
 
-- **Give each method the transaction** of a connection that has one: Microsoft.Data.SqlClient refuses a command that runs on such a connection without it, and throws `InvalidOperationException`.  See [the connection](generator.md#method-connection).
+```csharp
+AddOrderDto order = await connection.AddOrder(
+    new AddOrderParams(customerId, placedAt, 1234.5m, "placed"),
+    transaction);
+```
+
+Each described query whose output is `codegen` gets a method that runs it through Microsoft.Data.SqlClient, on a `DbConnection` such as `SqlConnection`: see [query methods](generator.md#query-methods).  The project references Microsoft.Data.SqlClient 6.1 or later ([SQLSRC273](diagnostics.md#sqlsrc273), [SQLSRC267](diagnostics.md#sqlsrc267)).  Above, `placed_at` is a `datetime2(7)`, `total` a `decimal(12,2)` and `status` an `nvarchar(20)`, so the method sends `@placedAt` as a `datetime2`, with all seven digits of its time, `@total` as a `decimal(12,2)` and `@status` as an `nvarchar(20)`.  A value that fits its type never changes how it is sent; what happens to one that does not is [below](#method-parameters).
+
+<a id="method-parameters"></a>
+
+### How a parameter is sent
+
+Each parameter is sent as the SQL Server type it was described with, with that type's length, precision and scale, and never as a type chosen from its value.  So a value keeps its digits, a null is a `NULL` of the parameter's type, which a column of that type takes, and the server sees one declaration of the query whatever the lengths of values that fit their types, and keeps one plan of it.  How a method names a parameter and sends a null is on [the generator page](generator.md#method-parameters).  For some types:
+
+- **A string or a `byte[]` longer than its type** is sent whole, as a `varchar(max)`, an `nvarchar(max)` or a `varbinary(max)`, and never cut.  The server refuses an `INSERT` or an `UPDATE` that would cut it.  The error is 2628, "String or binary data would be truncated".  It is 8152 on SQL Server 2017, and in a database whose compatibility level is below 150 or whose `VERBOSE_TRUNCATION_WARNINGS` is off.  A `WHERE` that compares a column with such a value finds no row that holds its start: `abcdef` finds no `char(5)` that holds `abcde`.
+
+  Spaces at the end of a string, and zero bytes at the end of a `byte[]`, are the exception.  When a value is longer than its column only by them, the server cuts them off with no error and stores the rest.  The server also pads the shorter of two strings with spaces to compare them, so `abcde ` finds the `char(5)` that holds `abcde`.
+- **`datetime2`, `time` and `datetimeoffset`** are sent with seven digits of a second, whatever the scale of their type, and the server rounds a value to the scale of the column it stores it in: `12:00:00.1235678` written to a `datetime2(3)` column is `12:00:00.124`.  A `WHERE` compares a column with all seven digits of the value, so a `datetime2(3)` that holds `12:00:00.124` is found by `12:00:00.124` and not by `12:00:00.1235678`.
+- **A `decimal` or `numeric` with more digits after the point than its type** is rounded to the type's scale, half away from zero, before it is sent, as the server rounds it when it stores it: `1.23456` for a `decimal(12,4)` is sent as `1.2346`, which an `INSERT` stores and a `WHERE` finds.  One with more digits before the point than the type holds throws `ArgumentException`, "Parameter value '123456789.1000' is out of range.", and nothing is sent.
+- **`json`** is sent as an `nvarchar(max)`, which the server checks and stores as `json`.
+- **`vector`** is sent as its `SqlVector<float>`, whose length is its dimension, and a null as the null `vector` of the parameter's dimension.
+- **An alias type** is sent as its base type: a parameter of `dbo.Email`, made `FROM nvarchar(320)`, as an `nvarchar(320)`.
+- **A parameter that has a [converter](settings.md#converters)** is sent as its database type too: an `Email` whose converter returns a `string` is sent as that `nvarchar(320)`, and a converted string longer than that whole, as above.
+- **`hierarchyid`, `geography`, `geometry` and a CLR type of your own assembly**, which only a [type override](settings.md#setting-type-overrides) gives a C# type, such as `Microsoft.SqlServer.Types.SqlGeography`, are sent as their SQL Server type, and a null as a `NULL` of it.  A CLR type is named by its schema: `Money` of the schema `dbo` is sent as `dbo.Money`.
+- **A type of a newer SQL Server**, which only a type override gives a C# type too, is sent by its value, and Microsoft.Data.SqlClient chooses its type from it.
+
+<a id="method-results"></a>
+
+### What a method reads and throws
+
+- **Give each method the transaction** of a connection that has one: Microsoft.Data.SqlClient refuses a command that runs on such a connection without it, and throws `InvalidOperationException` ("... requires the command to have a transaction when the connection assigned to the command is in a pending local transaction ...") before anything is sent.  See [the connection](generator.md#method-connection).
 - **A column is read as its property's C# type**, the one [the types](#types) give it.  A type of yours that Microsoft.Data.SqlClient never reads, such as an id of your own, takes [converters](settings.md#converters): the column is read as the type of [the table](#type-table), an alias type as its base type, and converted.
+- **A C# enum is read only from a column of its own underlying type**: an enum over `int`, the default, from an `int`, and an enum over `byte` from a `tinyint`.  An enum over `int` throws `InvalidCastException` for a `tinyint`, a `smallint` or a `bigint`, since Microsoft.Data.SqlClient never widens or narrows a value.  Declare the enum over its column's type, `enum Level : byte` for a `tinyint`.
 - **A column whose property cannot be null** throws Microsoft.Data.SqlClient's `SqlNullValueException` when it holds a null, and a `vector` column the method's own `InvalidCastException`, "Column 'name' is null.", before any converter is called.
-- **A query of several statements returns the rows of its first result set**, as its model has them, and its other statements still run.
-- **`rowcount` is `-1` after `SET NOCOUNT ON`**, which lasts for the connection's session: see [the generator's known issues](generator.md#known-issues).
-- **Each parameter is sent by its value**, so Microsoft.Data.SqlClient declares it from the value: a `DateTime` as `datetime`, which rounds a `datetime2` value, a `NULL` as `nvarchar(4000)`, which a binary column refuses, and a string by its length.  The [generator's known issues](generator.md#known-issues) list them, with what to do.
-
-> **Coming in a later release.**  Each parameter will be sent as the SQL Server type it was described with, with its length, precision and scale, which ends the known issues of sending a parameter by its value.  See [what works today](README.md#what-works-today).
+- **A query of several statements returns the rows of its first result set**, as its model has them, and its other statements still run.  Its `rowcount` adds up the rows its statements insert, update or delete, and a `SELECT` among them adds nothing.
+- **`rowcount` is `-1` for a `SELECT`, and under `SET NOCOUNT ON`.**  A query that sets `NOCOUNT` returns `-1`.  When it has no parameters, the setting also lasts for the connection's session, so a `rowcount` method called after it on the same open connection returns `-1` too; a query with parameters, which Microsoft.Data.SqlClient runs through `sp_executesql`, sets it for itself alone.  See [the generator's known issues](generator.md#known-issues).
+- **`commandTimeout`** that passes throws `SqlException` with `Number` `-2`, whose message starts "Execution Timeout Expired.".
+- **A cancelled method throws as Microsoft.Data.SqlClient does**, and the method passes it on unchanged: `TaskCanceledException` when the token is cancelled before the call or while the rows are read, and `SqlException`, with `Number` `0` and a message that ends "Operation cancelled by user.", when it is cancelled while the command runs.  A `catch (OperationCanceledException)` does not catch the second: check the token in a `catch (SqlException)` as well.
+- **The connection's commands create Microsoft.Data.SqlClient's `SqlParameter`**, as those of `SqlConnection` do, since a method sets the SQL Server type on it.  A connection that wraps a `SqlConnection` and creates parameters of its own is a [known issue](generator.md#known-issues).
 
 <a id="known-issues"></a>
 

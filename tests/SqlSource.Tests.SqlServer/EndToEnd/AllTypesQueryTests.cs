@@ -12,9 +12,10 @@ using static SqlSource.Testing.EndToEnd.ModelReflection;
 
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
-// The type map through Dapper.  The read side: both rows of all_types into AllTypesDto, every column of each.  The
-// write side: a row inserted with InsertAllTypesArgs, built from the values of row 1, and read back by OUTPUT, for
-// every type that Dapper sends exactly.  Each insert runs in a transaction that is rolled back.
+// The type map through Dapper, which runs the SQL of AllTypesDapperQueries, the claim of Queries/AllTypes.sql at the
+// output models.  The read side: both rows of all_types into AllTypesDto, every column of each.  The write side: a row
+// inserted with InsertAllTypesArgs, built from the values of row 1, and read back by OUTPUT, for every type that Dapper
+// sends exactly.  Each insert runs in a transaction that is rolled back.
 [Collection(UsesSqlServer.Name)]
 public sealed class AllTypesQueryTests(SqlServerContainer sqlServer)
 {
@@ -45,7 +46,7 @@ public sealed class AllTypesQueryTests(SqlServerContainer sqlServer)
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var rows = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypes)).ToList();
+        var rows = (await connection.QueryAsync<AllTypesDto>(AllTypesDapperQueries.ListAllTypes)).ToList();
 
         rows.Count.ShouldBe(2);
         SqlServerAllTypesRows.ShouldBeTheFullRow(rows[0]);
@@ -62,11 +63,11 @@ public sealed class AllTypesQueryTests(SqlServerContainer sqlServer)
         try
         {
             var full = (
-                await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypes, transaction: transaction)
+                await connection.QueryAsync<AllTypesDto>(AllTypesDapperQueries.ListAllTypes, transaction: transaction)
             ).Single(static row => row.Id == SqlServerAllTypesRows.FullRowId);
 
             var row = await connection.QuerySingleAsync<AllTypesDto>(
-                AllTypesQueries.InsertAllTypes,
+                AllTypesDapperQueries.InsertAllTypes,
                 ArgsFrom(full),
                 transaction
             );
@@ -96,7 +97,7 @@ public sealed class AllTypesQueryTests(SqlServerContainer sqlServer)
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(token);
-        var full = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypes)).Single(static row =>
+        var full = (await connection.QueryAsync<AllTypesDto>(AllTypesDapperQueries.ListAllTypes)).Single(static row =>
             row.Id == SqlServerAllTypesRows.FullRowId
         );
         var column = typeof(AllTypesDto).GetProperty(property).ShouldNotBeNull(property);

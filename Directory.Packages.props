@@ -31,6 +31,11 @@
             examples/SqlServerExamples/README.md lists this version.
         -->
         <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+        <!--
+            The types of hierarchyid, geography and geometry, which tests/SqlSource.Tests.SqlServer writes and reads
+            through the query methods.  It brings nothing that Microsoft.Data.SqlClient does not.
+        -->
+        <PackageVersion Include="Microsoft.SqlServer.Types" Version="170.1000.7" />
         <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.2" />
         <!-- Reads .sln and .slnx files for the tool, as the dotnet command does with the same library. -->
         <PackageVersion Include="Microsoft.VisualStudio.SolutionPersistence" Version="1.0.52" />

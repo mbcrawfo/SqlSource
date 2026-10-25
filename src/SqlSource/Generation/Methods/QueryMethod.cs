@@ -53,8 +53,8 @@ internal sealed record MethodInput(string TypeText, EquatableArray<MethodParamet
 /// The converter the property's value is converted through before it is bound, or null for a value bound as it is.
 /// </param>
 /// <param name="Described">
-/// The type the entry describes for the parameter, whose <see cref="SidecarType.BindName" /> the PostgreSQL binding
-/// sets, or null.
+/// The type the entry describes for the parameter, or null.  The PostgreSQL binding sets its
+/// <see cref="SidecarType.BindName" />; the SQL Server binding sets the <c>SqlDbType</c> and facets it names.
 /// </param>
 internal sealed record MethodParameter(
     string Name,

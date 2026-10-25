@@ -50,7 +50,7 @@ internal abstract class ParameterBinder
     /// <c>DBNull.Value</c> for null.  A property with a converter sends the converter's result, and the converter
     /// never sees a null; an array converted by element sends the array of each element's result.
     /// </summary>
-    protected static void AppendByValue(
+    internal static void AppendByValue(
         StringBuilder builder,
         string indent,
         string command,
@@ -75,24 +75,7 @@ internal abstract class ParameterBinder
             .Append(indent)
             .Append(parameter)
             .Append(".Value = ");
-        if (bound.Write is { } write)
-        {
-            AppendConverted(builder, parameters, bound, write, names);
-        }
-        else if (bound.IsNullable || !bound.IsValueType)
-        {
-            _ = builder
-                .Append("(object?)")
-                .Append(parameters)
-                .Append('.')
-                .Append(bound.Property)
-                .Append(" ?? global::System.DBNull.Value");
-        }
-        else
-        {
-            _ = builder.Append(parameters).Append('.').Append(bound.Property);
-        }
-
+        AppendValueOrNull(builder, parameters, bound, names, "global::System.DBNull.Value");
         _ = builder
             .Append(";\n")
             .Append(indent)
@@ -102,14 +85,47 @@ internal abstract class ParameterBinder
             .Append(");\n");
     }
 
-    // The converter of the property's value; a value that can be null is matched first, and null sends DBNull.Value.
+    /// <summary>
+    /// Appends the value that the parameter sends, the expression after <c>Value = </c>: the property's value, or the
+    /// converter's result, with <paramref name="nullText" /> for a null of a property that can be one.
+    /// </summary>
+    internal static void AppendValueOrNull(
+        StringBuilder builder,
+        string parameters,
+        MethodParameter bound,
+        ConversionNames names,
+        string nullText
+    )
+    {
+        if (bound.Write is { } write)
+        {
+            AppendConverted(builder, parameters, bound, write, names, nullText);
+        }
+        else if (bound.IsNullable || !bound.IsValueType)
+        {
+            _ = builder
+                .Append("(object?)")
+                .Append(parameters)
+                .Append('.')
+                .Append(bound.Property)
+                .Append(" ?? ")
+                .Append(nullText);
+        }
+        else
+        {
+            _ = builder.Append(parameters).Append('.').Append(bound.Property);
+        }
+    }
+
+    // The converter of the property's value; a value that can be null is matched first, and null sends the null text.
     // An array converted by element, which is of a reference type and so matched too, sends the database's array.
     private static void AppendConverted(
         StringBuilder builder,
         string parameters,
         MethodParameter bound,
         Conversion write,
-        ConversionNames names
+        ConversionNames names,
+        string nullText
     )
     {
         if (!bound.IsNullable && bound.IsValueType)
@@ -140,7 +156,7 @@ internal abstract class ParameterBinder
             _ = builder.Append(write.Method).Append('(').Append(names.Value).Append(')');
         }
 
-        _ = builder.Append(" : global::System.DBNull.Value");
+        _ = builder.Append(" : ").Append(nullText);
     }
 
     /// <summary>
@@ -208,5 +224,5 @@ internal sealed class SqlServerParameterBinder : ParameterBinder
         string parameters,
         MethodParameter bound,
         ConversionNames names
-    ) => AppendByValue(builder, indent, command, parameter, parameters, bound, names);
+    ) => SqlServerBinding.Append(builder, indent, command, parameter, parameters, bound, names);
 }

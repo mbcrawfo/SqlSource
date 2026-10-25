@@ -1,15 +1,15 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Dapper;
 using Shouldly;
 using Xunit;
 
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
-// The queries of Queries/Accounts.sql, run through Dapper on the seed of "app" with their input models as the
-// parameters, into their output models.  AccountQueries keeps its SQL private, so the SQL is Reporting.AccountReports',
-// which is the same file's.
+// The queries of Queries/Accounts.sql, run through their generated methods on the seed of "app" with their input models
+// as the parameters, into their output models: AccountQueries' methods, extensions of the connection in this
+// namespace, and Reporting.AccountReports', in the extension class of its own namespace.  Each method opens the
+// connection it is given and closes it again.
 [Collection(UsesSqlServer.Name)]
 public sealed class AccountQueryTests(SqlServerContainer sqlServer)
 {
@@ -27,50 +27,46 @@ public sealed class AccountQueryTests(SqlServerContainer sqlServer)
     ];
 
     [Fact]
-    public async Task QuerySingleAsync_GetAccount_ReadsTheAccount()
+    public async Task GetAccount_ById_ReadsTheAccount()
     {
         await using var connection = EndToEndSources.App(sqlServer);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var account = await connection.QuerySingleAsync<GetAccountDto>(
-            Reporting.AccountReports.GetAccount,
-            new GetAccountArgs(2)
+        var accounts = await connection.GetAccount(
+            new GetAccountArgs(2),
+            cancellationToken: TestContext.Current.CancellationToken
         );
 
-        account.ShouldBe(new GetAccountDto("bob", 2, "bob@example.com"));
+        accounts.ShouldBe([new GetAccountDto("bob", 2, "bob@example.com")]);
     }
 
     [Fact]
-    public async Task QueryAsync_ListAccounts_ReadsEveryAccountIntoTheTableModel()
+    public async Task ListAccounts_Seed_ReadsEveryAccountIntoTheTableModel()
     {
         await using var connection = EndToEndSources.App(sqlServer);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var accounts = await connection.QueryAsync<AccountsDto>(Reporting.AccountReports.ListAccounts);
+        var accounts = await connection.ListAccounts(cancellationToken: TestContext.Current.CancellationToken);
 
         accounts.ShouldBe(Accounts);
     }
 
     [Fact]
-    public async Task QueryAsync_ListAccountsInTableOrder_ReadsTheSameRows()
+    public async Task ListAccountsInTableOrder_Seed_ReadsTheSameRows()
     {
         await using var connection = EndToEndSources.App(sqlServer);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var accounts = await connection.QueryAsync<AccountsDto>(Reporting.AccountReports.ListAccountsInTableOrder);
+        var accounts = await connection.ListAccountsInTableOrder(
+            cancellationToken: TestContext.Current.CancellationToken
+        );
 
         accounts.ShouldBe(Accounts);
     }
 
     [Fact]
-    public async Task QueryAsync_ListAccountsUntabled_ReadsEveryAccount()
+    public async Task ListAccountsUntabled_Seed_ReadsEveryAccount()
     {
         await using var connection = EndToEndSources.App(sqlServer);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var accounts = await connection.QueryAsync<ListAccountsUntabledDto>(
-            Reporting.AccountReports.ListAccountsUntabled
-        );
+        var accounts = await connection.ListAccountsUntabled(cancellationToken: TestContext.Current.CancellationToken);
 
         accounts.ShouldBe(
             Accounts.Select(static account => new ListAccountsUntabledDto(
@@ -88,33 +84,29 @@ public sealed class AccountQueryTests(SqlServerContainer sqlServer)
 
     // The email is a parameter of the alias type dbo.Email, which the input model has as a string.
     [Fact]
-    public async Task QuerySingleAsync_SharedModel_ReadsBothQueries()
+    public async Task FindAccountName_SharedModel_ReadsTheSameModelAsGetAccountName()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var byId = await connection.QuerySingleAsync<AccountName>(
-            Reporting.AccountReports.GetAccountName,
-            new GetAccountNameArgs(1)
-        );
-        var byEmail = await connection.QuerySingleAsync<AccountName>(
-            Reporting.AccountReports.FindAccountName,
-            new FindAccountNameArgs("carol@example.com")
+        var byId = await connection.GetAccountName(new GetAccountNameArgs(1), cancellationToken: token);
+        var byEmail = await connection.FindAccountName(
+            new FindAccountNameArgs("carol@example.com"),
+            cancellationToken: token
         );
 
-        byId.ShouldBe(new AccountName(1, "alice"));
-        byEmail.ShouldBe(new AccountName(3, "carol"));
+        byId.ShouldBe([new AccountName(1, "alice")]);
+        byEmail.ShouldBe([new AccountName(3, "carol")]);
     }
 
     [Fact]
-    public async Task QueryAsync_ListClosedBeforeWithANullParameter_ReadsEveryAccount()
+    public async Task ListClosedBefore_NullParameter_ReadsEveryAccount()
     {
         await using var connection = EndToEndSources.App(sqlServer);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var accounts = await connection.QueryAsync<ListClosedBeforeDto>(
-            Reporting.AccountReports.ListClosedBefore,
-            new ListClosedBeforeArgs(null)
+        var accounts = await connection.ListClosedBefore(
+            new ListClosedBeforeArgs(null),
+            cancellationToken: TestContext.Current.CancellationToken
         );
 
         accounts.ShouldBe([
@@ -126,14 +118,13 @@ public sealed class AccountQueryTests(SqlServerContainer sqlServer)
 
     // SQL Server takes a datetimeoffset at any offset: 2024-10-01 at +02:00 is still after bob's closing.
     [Fact]
-    public async Task QueryAsync_ListClosedBeforeADate_ReadsTheClosedAccount()
+    public async Task ListClosedBefore_ADate_ReadsTheClosedAccount()
     {
         await using var connection = EndToEndSources.App(sqlServer);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var accounts = await connection.QueryAsync<ListClosedBeforeDto>(
-            Reporting.AccountReports.ListClosedBefore,
-            new ListClosedBeforeArgs(new DateTimeOffset(2024, 10, 1, 0, 0, 0, TimeSpan.FromHours(2)))
+        var accounts = await connection.ListClosedBefore(
+            new ListClosedBeforeArgs(new DateTimeOffset(2024, 10, 1, 0, 0, 0, TimeSpan.FromHours(2))),
+            cancellationToken: TestContext.Current.CancellationToken
         );
 
         accounts.ShouldBe([new ListClosedBeforeDto(2, "bob", BobClosedAt)]);
@@ -141,14 +132,13 @@ public sealed class AccountQueryTests(SqlServerContainer sqlServer)
 
     // The 31 days up to 2024-03-01 take bob, opened on 2024-02-01, and carol, opened on that day, and not alice.
     [Fact]
-    public async Task QueryAsync_ListOpenedWithin_ReadsTheAccountsOfThoseDays()
+    public async Task ListOpenedWithin_ThirtyOneDays_ReadsTheAccountsOfThoseDays()
     {
         await using var connection = EndToEndSources.App(sqlServer);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var accounts = await connection.QueryAsync<ListOpenedWithinDto>(
-            Reporting.AccountReports.ListOpenedWithin,
-            new ListOpenedWithinArgs(31, new DateOnly(2024, 3, 1))
+        var accounts = await connection.ListOpenedWithin(
+            new ListOpenedWithinArgs(31, new DateOnly(2024, 3, 1)),
+            cancellationToken: TestContext.Current.CancellationToken
         );
 
         accounts.ShouldBe([
@@ -157,19 +147,22 @@ public sealed class AccountQueryTests(SqlServerContainer sqlServer)
         ]);
     }
 
+    // The second namespace's methods are in its own extension class, which this namespace does not import, so they
+    // are called as static methods.
     [Fact]
-    public async Task QuerySingleAsync_SecondNamespace_ReadsTheSameAccount()
+    public async Task GetAccount_SecondNamespace_ReadsTheSameAccount()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var account = await connection.QuerySingleAsync<Reporting.GetAccountDto>(
-            Reporting.AccountReports.GetAccount,
-            new Reporting.GetAccountArgs(3)
+        var account = await Reporting.AccountReportsExtensions.GetAccount(
+            connection,
+            new Reporting.GetAccountArgs(3),
+            cancellationToken: token
         );
-        var accounts = await connection.QueryAsync<Reporting.AccountsDto>(Reporting.AccountReports.ListAccounts);
+        var accounts = await Reporting.AccountReportsExtensions.ListAccounts(connection, cancellationToken: token);
 
-        account.ShouldBe(new Reporting.GetAccountDto("carol", 3, "carol@example.com"));
+        account.ShouldBe([new Reporting.GetAccountDto("carol", 3, "carol@example.com")]);
         accounts.ShouldBe(
             Accounts.Select(static account => new Reporting.AccountsDto(
                 account.Id,

@@ -13,7 +13,8 @@ namespace SqlSource.Tests.SqlServer.SqlClient61;
 // The type map on SqlClient 6.1, the oldest driver that is supported: the models the generator gives under it, and
 // both rows of all_types and of new_types read through Dapper.  The end-to-end project proves the same tables on
 // SqlClient 7.
-public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppContainer>
+[Collection(UsesApp.Name)]
+public sealed class AllTypesQueryTests(AppContainer app)
 {
     // Dapper's settings are the process's, so the snake_case columns are matched from before the first test.  The
     // queries give date back to the type map, a DateTime, so that no handler is needed.

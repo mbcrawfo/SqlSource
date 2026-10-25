@@ -14,14 +14,16 @@
         <SqlSourceDialect>mssql</SqlSourceDialect>
         <!-- The logical database that a query is described against, unless its file names another. -->
         <SqlSourceDatabase>app</SqlSourceDatabase>
-        <!-- What a query generates: its SQL and its models, which need an entry in the sidecar beside its file. -->
-        <SqlSourceOutput>Models</SqlSourceOutput>
+        <!-- What a query generates: its method and its models, which need an entry in the sidecar beside its file. -->
+        <SqlSourceOutput>CodeGen</SqlSourceOutput>
         <!-- The suffix of the model of a query's parameters. -->
         <SqlSourceInputModelSuffix>Args</SqlSourceInputModelSuffix>
         <!-- The kind of type that a query's input model is. -->
         <SqlSourceInputModelType>record</SqlSourceInputModelType>
         <!-- The C# type that date is read as, in place of the default of the type map. -->
         <SqlSourceTypeOverrides>date=System.DateOnly</SqlSourceTypeOverrides>
+        <!-- The collection type of a query's rows, where no attribute, metadata or marker sets one. -->
+        <SqlSourceCollectionType>IReadOnlyList</SqlSourceCollectionType>
     </PropertyGroup>
     <ItemGroup>
         <!-- The queries of billing: sealed class output models, the suffix Row, and date as a DateTime. -->
@@ -30,6 +32,11 @@
             SqlSourceOutputModelType="sealed class"
             SqlSourceOutputModelSuffix="Row"
             SqlSourceTypeOverrides="date=default"
+        />
+        <!-- One file of the collection types, whose rows are an ImmutableArray. -->
+        <AdditionalFiles
+            Update="EndToEnd/Queries/Collections/ByMetadata.sql"
+            SqlSourceCollectionType="ImmutableArray"
         />
         <!-- The realistic corpus: the database realistic, and the type map's own C# type for date. -->
         <AdditionalFiles
@@ -50,6 +57,7 @@
         <!-- The version the tool itself references: central pinning would otherwise hold it at the generator's. -->
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
         <PackageReference Include="Microsoft.Data.SqlClient" />
+        <PackageReference Include="Microsoft.SqlServer.Types" />
         <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
         <PackageReference Include="Shouldly" />
         <PackageReference Include="Testcontainers.MsSql" />

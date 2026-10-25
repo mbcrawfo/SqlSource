@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Microsoft.Data.SqlTypes;
 using Shouldly;
 using SqlSource.Testing.EndToEnd;
@@ -210,9 +211,6 @@ public sealed class ModelShapeTests
         );
         ModelNamed($"{ReportingNamespace}.ListAccountsDto").ShouldBeNull();
         ModelNamed($"{ReportingNamespace}.ListAccountsInTableOrderDto").ShouldBeNull();
-        Reporting.AccountReports.GetAccount.ShouldBe(
-            "SELECT name, id, email\nFROM dbo.accounts\nWHERE id = @accountId;"
-        );
     }
 
     [Fact]
@@ -268,6 +266,55 @@ public sealed class ModelShapeTests
             ("Kind", typeof(string), false),
             ("Email", typeof(Email), false)
         );
+
+    // SQL Server describes a parameter compared with a column of the alias type, or written to one, as the alias type,
+    // so the header's override gives the parameter its type too.
+    [Fact]
+    public void Build_HeaderOverride_MapsTheAliasTypesParameterToATypeOfTheProject()
+    {
+        ShouldBeModel(
+            typeof(FindAccountByEmailArgs),
+            $"{Namespace}.FindAccountByEmailArgs",
+            ModelShape.Record,
+            ("Email", typeof(Email), false)
+        );
+        ShouldBeModel(
+            typeof(AddAccountArgs),
+            $"{Namespace}.AddAccountArgs",
+            ModelShape.Record,
+            ("Name", typeof(string), false),
+            ("Email", typeof(Email), false),
+            ("OpenedOn", typeof(DateOnly), false)
+        );
+    }
+
+    // The alias type over bigint is a value type of the project, as a parameter, as a column of the table model of
+    // external_refs, which two queries read the whole of, and as a nullable column of a LEFT JOIN.
+    [Fact]
+    public void Build_HeaderOverrideOfAnAliasTypeOverBigint_MapsTheColumnAndTheParameterToAValueType()
+    {
+        ShouldBeModel(
+            typeof(GetExternalRefArgs),
+            $"{Namespace}.GetExternalRefArgs",
+            ModelShape.Record,
+            ("ExternalId", typeof(ExternalId), false)
+        );
+        ShouldBeModel(
+            typeof(ExternalRefsDto),
+            $"{Namespace}.ExternalRefsDto",
+            ModelShape.SealedRecord,
+            ("Id", typeof(int), false),
+            ("AccountId", typeof(int), false),
+            ("ExternalId", typeof(ExternalId), false)
+        );
+        ShouldBeModel(
+            typeof(ListAccountExternalIdsDto),
+            $"{Namespace}.ListAccountExternalIdsDto",
+            ModelShape.SealedRecord,
+            ("Id", typeof(int), false),
+            ("ExternalId", typeof(ExternalId?), true)
+        );
+    }
 
     [Fact]
     public void Build_HeaderOverride_MakesTimeATimeOnly() =>
@@ -374,12 +421,30 @@ public sealed class ModelShapeTests
             ("PaidAt", typeof(DateTime?), true)
         );
 
+    // A codegen query has a method and no constant: InvoiceQueries is left as it was declared, and its methods are in
+    // InvoiceQueriesExtensions.
     [Fact]
-    public void Build_InvoiceQueriesWithADirectLocation_HasTheConstantsOnTheType()
+    public void Build_CodeGenClaim_HasNoConstantsAndNoNestedClass()
     {
-        InvoiceQueries.ListInvoices.ShouldBe("SELECT *\nFROM billing.invoices\nORDER BY id;");
-        InvoiceQueries.GetInvoice.ShouldBe(
-            "SELECT id, number, amount, paid_at\nFROM billing.invoices\nWHERE id = @invoiceId;"
+        const BindingFlags Members = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
+
+        typeof(InvoiceQueries).GetFields(Members).ShouldBeEmpty();
+        typeof(InvoiceQueries).GetNestedTypes(Members).ShouldBeEmpty();
+        typeof(InvoiceQueriesExtensions)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Select(static method => method.Name)
+            .Order(StringComparer.Ordinal)
+            .ShouldBe(["GetInvoice", "ListInvoices"]);
+    }
+
+    // A claim at the output models with a direct location has the constants on the type, which the Dapper tests run.
+    [Fact]
+    public void Build_ModelsClaimWithADirectLocation_HasTheConstantsOnTheType()
+    {
+        AllTypesDapperQueries.ListAllTypes.ShouldBe("SELECT *\nFROM dbo.all_types\nORDER BY id;");
+        WriteDapperQueries.RenameAccount.ShouldBe(
+            "UPDATE dbo.accounts\nSET name = @name\nOUTPUT DELETED.name AS old_name, INSERTED.name AS new_name\n"
+                + "WHERE id = @accountId;"
         );
     }
 

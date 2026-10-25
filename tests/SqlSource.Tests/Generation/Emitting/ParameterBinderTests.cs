@@ -12,6 +12,8 @@ public sealed class ParameterBinderTests
     // A converter of a value type to a long.
     private static readonly Conversion ToLong = new("global::App.Ids.ToLong", "long", true, false, null, false);
 
+    // No parameter here has a described type, so SQL Server binds each by value; SqlServerBindingTests holds its
+    // binding by a described type, and PostgresParameterBinderTests PostgreSQL's binding.
     [Fact]
     public void For_SqlServer_WritesTheBindingByValue() =>
         Write(new MethodParameter("user_id", "UserId", "int", true, false))
