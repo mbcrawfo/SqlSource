@@ -20,6 +20,7 @@ internal static class SqlServerBinding
 {
     private const string SqlParameterType = "global::Microsoft.Data.SqlClient.SqlParameter";
     private const string SqlDbTypeText = "global::System.Data.SqlDbType.";
+    private const string DbNull = "global::System.DBNull.Value";
     private const string VectorNullStart = QueryMethodWriter.VectorType + ".CreateNull(";
 
     // Each base name's binding, matched ignoring case, as the server matches a type's name.
@@ -76,7 +77,7 @@ internal static class SqlServerBinding
         }
         else
         {
-            ParameterBinder.AppendValue(builder, parameters, bound, names, ParameterBinder.DbNull);
+            ParameterBinder.AppendValue(builder, parameters, bound, names, DbNull);
         }
 
         _ = builder.Append(";\n");

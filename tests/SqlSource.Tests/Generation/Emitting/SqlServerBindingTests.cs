@@ -15,7 +15,7 @@ namespace SqlSource.Tests.Generation.Emitting;
 
 public sealed class SqlServerBindingTests
 {
-    // The binding of a parameter that a method binds as its described type, which is not shown here.
+    // The binding by value alone of a parameter called name, nullable, that has no described type the binding can use.
     private const string ByValue = """
             var p0 = command.CreateParameter();
             p0.ParameterName = "name";
@@ -149,43 +149,47 @@ public sealed class SqlServerBindingTests
         binding.ShouldNotContain("if (");
     }
 
-    // A value longer than the described length is bound at max, so the server sees it whole where SqlClient would cut
-    // it; a fixed length type becomes its variable length type, since char(max) is no type.
+    // A value longer than the described length of a fixed-length type is bound at max of its variable-length type,
+    // since char(max) is no type, so the server sees it whole where SqlClient would cut it.
     [Theory]
     [InlineData("char(5)", 5, "Char", 5, "string", "VarChar")]
-    [InlineData("varchar(5)", 5, "VarChar", 5, "string", null)]
     [InlineData("nchar(5)", 10, "NChar", 5, "string", "NVarChar")]
     [InlineData("binary(4)", 4, "Binary", 4, "byte[]", "VarBinary")]
-    [InlineData("varbinary(4)", 4, "VarBinary", 4, "byte[]", null)]
     public void Append_FixedChar_RebindsAnOverLongValueAsVarCharMax(
         string name,
         int maxLength,
         string sqlDbType,
         int size,
         string valueType,
-        string? wider
-    )
-    {
-        var binding = Write(Described(TestSidecars.SqlServer(name, maxLength, 0)));
+        string wider
+    ) =>
+        ShouldBindAnOverLongValueAtMax(
+            Write(Described(TestSidecars.SqlServer(name, maxLength, 0))),
+            sqlDbType,
+            size,
+            valueType,
+            "        p0.SqlDbType = global::System.Data.SqlDbType." + wider + ";\n"
+        );
 
-        var sizeText = size.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        binding.ShouldContain(
-            "    p0.SqlDbType = global::System.Data.SqlDbType." + sqlDbType + ";\n    p0.Size = " + sizeText + ";\n"
+    // A value longer than the described length of a variable-length type is bound at max of the same type.
+    [Theory]
+    [InlineData("varchar(5)", 5, "VarChar", 5, "string")]
+    [InlineData("nvarchar(5)", 10, "NVarChar", 5, "string")]
+    [InlineData("varbinary(4)", 4, "VarBinary", 4, "byte[]")]
+    public void Append_BoundedVariableLength_BindsAnOverLongValueAtMax(
+        string name,
+        int maxLength,
+        string sqlDbType,
+        int size,
+        string valueType
+    ) =>
+        ShouldBindAnOverLongValueAtMax(
+            Write(Described(TestSidecars.SqlServer(name, maxLength, 0))),
+            sqlDbType,
+            size,
+            valueType,
+            string.Empty
         );
-        binding.ShouldContain(
-            "    if (p0.Value is "
-                + valueType
-                + " { Length: > "
-                + sizeText
-                + " })\n    {\n"
-                + (
-                    wider is null
-                        ? string.Empty
-                        : "        p0.SqlDbType = global::System.Data.SqlDbType." + wider + ";\n"
-                )
-                + "        p0.Size = -1;\n    }\n    command.Parameters.Add(p0);\n"
-        );
-    }
 
     [Fact]
     public void Append_Json_BindsNVarCharMax()
@@ -332,6 +336,31 @@ public sealed class SqlServerBindingTests
 
     [Fact]
     public void Append_PostgresType_BindsByValue() => Write(Described(TestSidecars.Postgres("text"))).ShouldBe(ByValue);
+
+    // The binding sets the type and the size, and then, for a value of the C# type longer than the size, these lines
+    // of the type and Size -1, just before the parameter is added.
+    private static void ShouldBindAnOverLongValueAtMax(
+        string binding,
+        string sqlDbType,
+        int size,
+        string valueType,
+        string typeLine
+    )
+    {
+        var sizeText = size.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        binding.ShouldContain(
+            "    p0.SqlDbType = global::System.Data.SqlDbType." + sqlDbType + ";\n    p0.Size = " + sizeText + ";\n"
+        );
+        binding.ShouldContain(
+            "    if (p0.Value is "
+                + valueType
+                + " { Length: > "
+                + sizeText
+                + " })\n    {\n"
+                + typeLine
+                + "        p0.Size = -1;\n    }\n    command.Parameters.Add(p0);\n"
+        );
+    }
 
     private static MethodParameter Described(SidecarType type) => new("name", "Name", false, true, Described: type);
 

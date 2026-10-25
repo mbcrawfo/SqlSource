@@ -17,11 +17,6 @@ internal abstract class ParameterBinder
     private static readonly ParameterBinder SqlServer = new SqlServerParameterBinder();
 
     /// <summary>
-    /// What a null of a parameter sends, but for a SQL Server vector's.
-    /// </summary>
-    internal const string DbNull = "global::System.DBNull.Value";
-
-    /// <summary>
     /// The binder of an engine.
     /// </summary>
     public static ParameterBinder For(DatabaseEngine engine) =>
@@ -80,7 +75,7 @@ internal abstract class ParameterBinder
             .Append(indent)
             .Append(parameter)
             .Append(".Value = ");
-        AppendValue(builder, parameters, bound, names, DbNull);
+        AppendValue(builder, parameters, bound, names, "global::System.DBNull.Value");
         _ = builder
             .Append(";\n")
             .Append(indent)
@@ -221,7 +216,7 @@ internal sealed class PostgresParameterBinder : ParameterBinder
 }
 
 /// <summary>
-/// Binds a parameter for Microsoft.Data.SqlClient, as its described type.
+/// Binds a parameter for Microsoft.Data.SqlClient.
 /// </summary>
 internal sealed class SqlServerParameterBinder : ParameterBinder
 {

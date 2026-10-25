@@ -7,10 +7,13 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
+using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 using static SqlSource.Testing.Generator.CachingScene;
 using static SqlSource.Testing.Generator.StepReasons;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -393,6 +396,44 @@ public sealed class CachingMethodTests
         MethodsOf(result, UserMethods).ShouldContain("GetUser(");
     }
 
+    // Under mssql a parameter is bound by the facets of its described type, which change no model's C#: an edit of
+    // the length of Users' parameter alone writes UserQueries' methods again, with the new Size.
+    [Fact]
+    public void Run_ParameterFacetsEdit_ReEmitsTheMethodsWithTheNewSize()
+    {
+        var users = new InMemoryAdditionalText(_scene.Users.Path, "-- name: GetUser\nSELECT 1 WHERE @name = N'a';\n");
+        var compilation = GeneratorHarness.CreateCompilation(
+            [new(UsersSourcePath, UserQueries()), new(OrdersSourcePath, TypeSource("App", "OrderQueries"))],
+            references: [SqlClientReferences.SqlClient7]
+        );
+        var usersSidecar = SqlServerSidecar(users, "GetUser", TestSidecars.SqlServer("nvarchar(50)", 100, 0));
+        var driver = GeneratorHarness
+            .CreateDriver(
+                [users, _scene.Orders, usersSidecar, SqlServerSidecar(_scene.Orders, "GetOrder", null)],
+                new TestOptionsProvider(OutputKind.CodeGen, null, "mssql")
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        MethodsOf(driver.GetRunResult(), UserMethods).ShouldContain("parameter.Size = 50;\n");
+
+        var result = Run(
+            driver.ReplaceAdditionalText(
+                usersSidecar,
+                SqlServerSidecar(users, "GetUser", TestSidecars.SqlServer("nvarchar(60)", 120, 0))
+            ),
+            compilation
+        );
+
+        result.Diagnostics.ShouldBeEmpty();
+        AllReasons(result, TrackingNames.TypeOutput)
+            .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
+        MethodReasons(result, TrackingNames.MethodOutput)
+            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+        var methods = MethodsOf(result, UserMethods);
+        methods.ShouldContain("parameter.Size = 60;\n");
+        methods.ShouldNotContain("parameter.Size = 50;\n");
+    }
+
     // The source of UserQueries, in the namespace App, with these arguments on its attribute and these members.
     private static string UserQueries(string? arguments = null, string members = "") =>
         TypeSource("App", "UserQueries", arguments, members);
@@ -413,6 +454,27 @@ public sealed class CachingMethodTests
     // The text of the file of a type's methods.
     private static string MethodsOf(GeneratorDriverRunResult result, string file) =>
         result.GeneratedTrees.Single(tree => tree.FilePath.EndsWith(file, StringComparison.Ordinal)).ToString();
+
+    // A current mssql sidecar of the file whose entry has one column, of int, and a parameter called name of this
+    // type when it is given.
+    private static InMemoryAdditionalText SqlServerSidecar(
+        InMemoryAdditionalText sqlFile,
+        string queryName,
+        SqlServerType? parameterType
+    )
+    {
+        var file = ToSqlFile(sqlFile);
+        var sidecar = Sidecars.Of(
+            file,
+            MethodRuns.SqlServerEntry(
+                file,
+                queryName,
+                parameterType is null ? [] : [TestSidecars.Parameter(0, "name", parameterType)],
+                [TestSidecars.Column(0, "value", TestSidecars.SqlServer())]
+            )
+        );
+        return new InMemoryAdditionalText(sidecar.Path, sidecar.Text);
+    }
 
     // Users with this line of SQL in place of SELECT 1;, and its sidecar, which the first run had, written for the new
     // hash.
