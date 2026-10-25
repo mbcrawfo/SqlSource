@@ -92,6 +92,31 @@ public sealed class ClrTypeNameTests
         "global::App.Pair<global::System.String?, global::App.Box<global::System.Decimal[]>>[]",
         "global::App.Pair<string?, global::App.Box<decimal[]>>[]"
     )]
+    [InlineData("global::System.Nullable<global::System.Int32>[]", "int?[]")]
+    [InlineData("global::App.Id<global::System.Nullable<global::System.Int64>>", "global::App.Id<long?>")]
+    [InlineData(
+        "global::App.Id<global::System.Nullable<global::App.UserId>>[]",
+        "global::App.Id<global::App.UserId?>[]"
+    )]
+    [InlineData("global::System.Nullable<global::App.UserId>[,][]", "global::App.UserId?[,][]")]
+    [InlineData("global::System.Nullable<global::System.Int64>", "global::System.Nullable<long>")]
+    [InlineData(
+        "global::App.Id<global::System.Nullable<global::System.Int64>?>",
+        "global::App.Id<global::System.Nullable<long>?>"
+    )]
+    [InlineData("global::System.Nullable<global::System.Int64>?[]", "global::System.Nullable<long>?[]")]
+    [InlineData(
+        "global::App.Id<global::System.Nullable<global::System.Int64[]>>",
+        "global::App.Id<global::System.Nullable<long[]>>"
+    )]
+    [InlineData(
+        "global::App.Id<global::System.Nullable<global::System.Nullable<global::System.Int64>>>",
+        "global::App.Id<global::System.Nullable<long?>>"
+    )]
+    [InlineData(
+        "global::App.Id<global::System.Nullable<int, int>>",
+        "global::App.Id<global::System.Nullable<int, int>>"
+    )]
     [InlineData("global::System.Guid", "global::System.Guid")]
     [InlineData("global::App.System.Int64", "global::App.System.Int64")]
     [InlineData("global::System.Int64.Inner", "global::System.Int64.Inner")]

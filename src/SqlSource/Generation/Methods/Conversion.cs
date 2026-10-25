@@ -20,8 +20,9 @@ namespace SqlSource.Generation.Methods;
 /// <paramref name="ElementText" /> and <paramref name="DatabaseText" /> an array of the converter's database side.
 /// </param>
 /// <param name="ElementText">
-/// The element of the property's type as the property writes it, for a conversion by element; null otherwise.  The
-/// converter takes or returns it without the <c>?</c> of a nullable element, <c>global::App.UserId</c> of
+/// The element of the property's type as a converter's types are written, <c>ClrTypeName.KeywordTextOf</c>, so that a
+/// <c>System.Nullable&lt;T&gt;</c> element is <c>T?</c>, for a conversion by element; null otherwise.  The converter
+/// takes or returns it without the <c>?</c> of a nullable element, <c>global::App.UserId</c> of
 /// <c>global::App.UserId?</c>.
 /// </param>
 /// <param name="ElementIsValueType">

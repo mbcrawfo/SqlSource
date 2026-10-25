@@ -68,8 +68,8 @@ internal static class ConversionPlanner
         }
 
         var decision = new Decision(isRead, engine, converters, subject, at, problems);
-        // Matched as a converter's types are written, a keyword's type by its keyword; the method writes the
-        // property's element as the property does.
+        // Matched as a converter's types are written, a keyword's type by its keyword and System.Nullable<T> as T?,
+        // which the element of a conversion by element keeps, so that a nullable element is seen as one.
         var text = ClrTypeName.KeywordTextOf(type.Text);
         var element = EdgeElementOf(text);
         if (database.Text is not { } databaseText)
@@ -125,7 +125,7 @@ internal static class ConversionPlanner
                     databaseText,
                     database.ElementIsValueType,
                     true,
-                    ElementOf(type.Text),
+                    ElementOf(text),
                     elementIsValueType,
                     byElement.WarningIds
                 );

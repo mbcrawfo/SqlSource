@@ -105,7 +105,7 @@ public sealed class ConverterMethodTests
                 public static Id<long> ToId(long value) => new(value);
 
                 [SqlSourceConverter]
-                public static long FromId(Id<long> id) => id.Value;
+                public static long FromId(Id<long> id) => (long)id.Value;
             }
         }
         """;
@@ -561,13 +561,16 @@ public sealed class ConverterMethodTests
 
     // A keyword type is one type by either name: an override that writes it by its framework name, inside a type
     // argument too, matches the converters that write it as the keyword, and the model keeps the name as written.
+    // So does System.Nullable<T>, which the converters write T?.
     [Theory]
-    [InlineData("App.Id<long>", "global::App.Id<long>")]
-    [InlineData("App.Id<System.Int64>", "global::App.Id<global::System.Int64>")]
-    [InlineData("global::App.Id<global::System.Int64>", "global::App.Id<global::System.Int64>")]
+    [InlineData("App.Id<long>", "global::App.Id<long>", "long")]
+    [InlineData("App.Id<System.Int64>", "global::App.Id<global::System.Int64>", "long")]
+    [InlineData("global::App.Id<global::System.Int64>", "global::App.Id<global::System.Int64>", "long")]
+    [InlineData("App.Id<System.Nullable<long>>", "global::App.Id<global::System.Nullable<long>>", "long?")]
     public void Run_OverrideThatNamesAKeywordTypeByItsFrameworkName_ConvertsAsTheKeyword(
         string written,
-        string property
+        string property,
+        string argument
     )
     {
         var file = new SqlFile(
@@ -585,7 +588,7 @@ public sealed class ConverterMethodTests
                     [Column("id", Catalog("int8"))]
                 ),
             ],
-            GenericIdSource
+            GenericIdSource.Replace("Id<long>", "Id<" + argument + ">", StringComparison.Ordinal)
         );
 
         run.ShouldBeClean();
@@ -596,7 +599,7 @@ public sealed class ConverterMethodTests
     }
 
     // An array whose element is written by the framework name is converted element by element, and the method writes
-    // the element as the override does.
+    // the element as the converters do.
     [Fact]
     public void Run_ArrayOfAnElementNamedByItsFrameworkName_ConvertsEachElement()
     {
@@ -614,7 +617,7 @@ public sealed class ConverterMethodTests
         run.ShouldBeClean();
         run.Sources[MethodRuns.MethodsFile]
             .ShouldContain(
-                "global::System.Array.ConvertAll<long?, global::App.Id<global::System.Int64>>("
+                "global::System.Array.ConvertAll<long?, global::App.Id<long>>("
                     + "reader.GetFieldValue<long?[]>(0), static element => element is { } item ? "
                     + "global::App.Ids.ToId(item) : "
             );
@@ -1149,9 +1152,11 @@ public sealed class ConverterMethodTests
     }
 
     // An override of the array to one of a nullable element, UserId?[], converts by the edges of UserId, and a NULL
-    // element stays null, the converter not called for it, either way.
-    [Fact]
-    public void Run_ArrayOverrideOfANullableValueElement_KeepsANullElement()
+    // element stays null, the converter not called for it, either way.  System.Nullable<UserId>[] is the same type.
+    [Theory]
+    [InlineData("App.UserId?[]")]
+    [InlineData("System.Nullable<App.UserId>[]")]
+    public void Run_ArrayOverrideOfANullableValueElement_KeepsANullElement(string written)
     {
         var userIds = ArrayOf(
             TestSidecars.Postgres(
@@ -1165,7 +1170,9 @@ public sealed class ConverterMethodTests
         );
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- type-override: public.user_id[]=App.UserId?[]\n-- name: FindIds\n"
+            "-- type-override: public.user_id[]="
+                + written
+                + "\n-- name: FindIds\n"
                 + "SELECT ids FROM teams WHERE ids = @ids;\n"
         );
 

@@ -94,8 +94,12 @@ internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> 
     /// <summary>
     /// The text that a converter's types are compared with: the <see cref="Text" /> of the type that
     /// <paramref name="text" /> writes, with the name in <c>System</c> of each keyword's type written as the keyword,
-    /// <c>global::App.Id&lt;long&gt;</c> of <c>global::App.Id&lt;global::System.Int64&gt;</c>, as a converter's types
-    /// are written.  A text with no <c>System.</c> in it, or one that is not a type, is given back as it is.
+    /// <c>global::App.Id&lt;long&gt;</c> of <c>global::App.Id&lt;global::System.Int64&gt;</c>, and each
+    /// <c>System.Nullable&lt;T&gt;</c> that is a type argument or an array's element written as <c>T?</c>,
+    /// <c>int?[]</c> of <c>global::System.Nullable&lt;global::System.Int32&gt;[]</c>, as a converter's types are
+    /// written.  A <c>System.Nullable&lt;T&gt;</c> that is the whole type, already has a <c>?</c>, or whose
+    /// <c>T</c> is an array or a nullable, which no property can have, keeps its name, so that the text is a type.
+    /// A text with no <c>System.</c> in it, or one that is not a type, is given back as it is.
     /// </summary>
     /// <param name="text">A type as <see cref="Text" /> writes it.</param>
     public static string KeywordTextOf(string text)
@@ -127,9 +131,18 @@ internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> 
         return true;
     }
 
-    // Writes the type; with keywords, a keyword's type named from System as the keyword.
+    // Writes the type; with keywords, a keyword's type named from System as the keyword, and an array of
+    // System.Nullable<T> as one of T?.
     private void Write(StringBuilder builder, bool keywords)
     {
+        if (keywords && Ranks.Count > 0 && !Ranks[0].NullableElement && NullableOf(this) is { } element)
+        {
+            element.Write(builder, keywords);
+            _ = builder.Append('?');
+            WriteRanks(builder);
+            return;
+        }
+
         if (Keyword is not null)
         {
             _ = builder.Append(Keyword);
@@ -152,10 +165,37 @@ internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> 
             }
         }
 
+        WriteRanks(builder);
+    }
+
+    private void WriteRanks(StringBuilder builder)
+    {
         foreach (var rank in Ranks)
         {
             _ = builder.Append(rank.NullableElement ? "?[" : "[").Append(',', rank.Dimensions - 1).Append(']');
         }
+    }
+
+    // The T of System.Nullable<T>, ranks aside, or null: of one argument without a ?, that is neither an array nor a
+    // System.Nullable<T> itself, so that T? is a type.
+    private static ClrTypeName? NullableOf(ClrTypeName type)
+    {
+        var parts = type.Parts;
+        if (
+            type.Keyword is not null
+            || parts.Count != 2
+            || parts[0].Arguments.Count > 0
+            || !parts[0].Identifier.Equals("System", StringComparison.Ordinal)
+            || !parts[1].Identifier.Equals("Nullable", StringComparison.Ordinal)
+            || parts[1].Arguments.Count != 1
+            || parts[1].Arguments[0].Nullable
+        )
+        {
+            return null;
+        }
+
+        var argument = parts[1].Arguments[0].Type;
+        return argument.Ranks.Count == 0 && NullableOf(argument) is null ? argument : null;
     }
 
     // The keyword of System.Int64 and the others, or null.
@@ -191,8 +231,21 @@ internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> 
                 _ = builder.Append(", ");
             }
 
-            part.Arguments[index].Type.Write(builder, keywords);
-            if (part.Arguments[index].Nullable)
+            var argument = part.Arguments[index];
+            if (
+                keywords
+                && !argument.Nullable
+                && argument.Type.Ranks.Count == 0
+                && NullableOf(argument.Type) is { } inner
+            )
+            {
+                inner.Write(builder, keywords);
+                _ = builder.Append('?');
+                continue;
+            }
+
+            argument.Type.Write(builder, keywords);
+            if (argument.Nullable)
             {
                 _ = builder.Append('?');
             }
