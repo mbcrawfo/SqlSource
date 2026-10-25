@@ -154,9 +154,7 @@ public sealed partial class AttributeSourceTests
         CSharpCompilation.Create(
             "AttributeText",
             [CSharpSyntaxTree.ParseText(AttributeSource.Text, new CSharpParseOptions(LanguageVersion.CSharp7_3))],
-            ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
-                .Split(Path.PathSeparator)
-                .Select(path => MetadataReference.CreateFromFile(path)),
+            References(),
             new CSharpCompilationOptions(RoslynOutputKind.DynamicallyLinkedLibrary)
         );
 
