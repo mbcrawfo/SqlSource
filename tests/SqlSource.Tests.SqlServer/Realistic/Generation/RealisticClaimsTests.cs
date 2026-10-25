@@ -36,6 +36,19 @@ public sealed class RealisticClaimsTests
     }
 
     [Fact]
+    public void Of_CaseWithModels_IsItsClassAtEachOutput()
+    {
+        var found = RealisticCases.Corpus.ReadNamed("category-tree-recursive");
+
+        RealisticClaims
+            .Of(RealisticCases.Corpus, found, RealisticClaims.ModelsOutput)
+            .TypeName.ShouldBe("CategoryTreeRecursiveQuery");
+        RealisticClaims
+            .Of(RealisticCases.Corpus, found, RealisticClaims.CodeGenOutput)
+            .TypeName.ShouldBe("CategoryTreeRecursiveMethod");
+    }
+
+    [Fact]
     public void Queries_EveryClaim_IsAtModels() =>
         RealisticClaims
             .Parse(File.ReadAllText(RealisticCases.Corpus.Queries))
