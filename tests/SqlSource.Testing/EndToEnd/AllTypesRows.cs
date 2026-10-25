@@ -174,6 +174,29 @@ internal static class AllTypesRows
         }
     }
 
+    // An input model of an insert into all_types, built by its constructor, with the values of a row read from the
+    // table, property by property by name, and the id of the new row.  A parameter of bit(1) has no length, so it is a
+    // BitArray where the column is a bool.
+    public static TArgs ArgsFrom<TArgs>(object row, int id)
+    {
+        var constructor = typeof(TArgs).GetConstructors().ShouldHaveSingleItem();
+        var arguments = constructor
+            .GetParameters()
+            .Select(parameter =>
+            {
+                var name = parameter.Name.ShouldNotBeNull();
+                if (name == "Id")
+                {
+                    return id;
+                }
+
+                var value = row.GetType().GetProperty(name).ShouldNotBeNull(name).GetValue(row);
+                return name == "Bit1Value" && value is bool bit ? new BitArray([bit]) : value;
+            })
+            .ToArray();
+        return (TArgs)constructor.Invoke(arguments);
+    }
+
     // The public properties of the row, which are those that the expectations name, no more and no fewer.
     private static PropertyInfo[] PropertiesOf(object row)
     {

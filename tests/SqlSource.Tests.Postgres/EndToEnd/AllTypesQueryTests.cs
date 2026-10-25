@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
@@ -115,7 +114,7 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
             row.Id == AllTypesRows.FullRowId
         );
         var rows = await connection.InsertAllTypes(
-            ArgsFrom<InsertAllTypesArgs>(full, InsertedId),
+            AllTypesRows.ArgsFrom<InsertAllTypesArgs>(full, InsertedId),
             transaction,
             cancellationToken: token
         );
@@ -161,7 +160,7 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
 
             var row = await connection.QuerySingleAsync<AllTypesDto>(
                 AllTypesSql.InsertAllTypes,
-                ArgsFrom<InsertAllTypesArgs>(full, InsertedId),
+                AllTypesRows.ArgsFrom<InsertAllTypesArgs>(full, InsertedId),
                 transaction
             );
 
@@ -234,25 +233,6 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
             .Concat(WriteSideLeftOut.Keys)
             .Order(StringComparer.Ordinal)
             .ShouldBe(columns.Order(StringComparer.Ordinal));
-    }
-
-    // An input model of an insert into all_types with the values of a row, property by property by name, and the id
-    // of the new row.  A parameter of bit(1) has no length, so it is a BitArray where the column is a bool.
-    internal static TArgs ArgsFrom<TArgs>(AllTypesDto row, int id)
-    {
-        var constructor = typeof(TArgs).GetConstructors().ShouldHaveSingleItem();
-        var arguments = constructor
-            .GetParameters()
-            .Select(parameter =>
-                parameter.Name switch
-                {
-                    nameof(AllTypesDto.Id) => id,
-                    nameof(AllTypesDto.Bit1Value) => row.Bit1Value is { } bit ? new BitArray([bit]) : null,
-                    _ => typeof(AllTypesDto).GetProperty(parameter.Name!).ShouldNotBeNull(parameter.Name).GetValue(row),
-                }
-            )
-            .ToArray();
-        return (TArgs)constructor.Invoke(arguments);
     }
 
     // The parameters of one column, as the input model has them, and the id of the row.

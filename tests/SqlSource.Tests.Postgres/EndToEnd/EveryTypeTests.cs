@@ -34,7 +34,7 @@ public sealed class EveryTypeTests(PostgresContainer postgres)
         );
 
         var rows = await connection.InsertEveryType(
-            AllTypesQueryTests.ArgsFrom<InsertEveryTypeArgs>(full, FullRowCopyId),
+            AllTypesRows.ArgsFrom<InsertEveryTypeArgs>(full, FullRowCopyId),
             transaction,
             cancellationToken: token
         );
@@ -59,7 +59,7 @@ public sealed class EveryTypeTests(PostgresContainer postgres)
         );
 
         var rows = await connection.InsertEveryType(
-            AllTypesQueryTests.ArgsFrom<InsertEveryTypeArgs>(nulls, NullRowCopyId),
+            AllTypesRows.ArgsFrom<InsertEveryTypeArgs>(nulls, NullRowCopyId),
             transaction,
             cancellationToken: token
         );
@@ -84,7 +84,7 @@ public sealed class EveryTypeTests(PostgresContainer postgres)
         var nulls = (await connection.ListAllTypes(transaction, cancellationToken: token)).Single(static row =>
             row.Id == AllTypesRows.NullRowId
         );
-        var arguments = AllTypesQueryTests.ArgsFrom<InsertEveryTypeArgs>(nulls, NullRowCopyId) with
+        var arguments = AllTypesRows.ArgsFrom<InsertEveryTypeArgs>(nulls, NullRowCopyId) with
         {
             VarcharValue = new string('x', VarcharLength + 1),
         };

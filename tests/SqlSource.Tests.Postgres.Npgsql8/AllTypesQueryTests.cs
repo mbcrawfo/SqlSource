@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
@@ -13,8 +12,9 @@ namespace SqlSource.Tests.Postgres.Npgsql8;
 
 // The type map on Npgsql 8, the oldest driver that is supported: the models the generator gives under it, both rows of
 // all_types read through ListAllTypes' method and through Dapper into AllTypesDto, and every column written through
-// InsertEveryType's method and read back, in a transaction that is rolled back.  The end-to-end project proves the same
-// table on Npgsql 10.  The data source maps nothing: all_types reads its enum as a string.
+// InsertEveryType's method and read back, and the columns that InsertAllTypes writes by its method, each in a
+// transaction that is rolled back.  The end-to-end project proves the same table on Npgsql 10.  The data source maps
+// nothing: all_types reads its enum as a string.
 public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppContainer>
 {
     private const int FullRowCopyId = 3;
@@ -68,12 +68,18 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
         var seeded = await connection.ListAllTypes(transaction, cancellationToken: token);
 
         var full = await connection.InsertEveryType(
-            ArgsFrom(seeded.Single(static row => row.Id == AllTypesRows.FullRowId), FullRowCopyId),
+            AllTypesRows.ArgsFrom<InsertEveryTypeParams>(
+                seeded.Single(static row => row.Id == AllTypesRows.FullRowId),
+                FullRowCopyId
+            ),
             transaction,
             cancellationToken: token
         );
         var nulls = await connection.InsertEveryType(
-            ArgsFrom(seeded.Single(static row => row.Id == AllTypesRows.NullRowId), NullRowCopyId),
+            AllTypesRows.ArgsFrom<InsertEveryTypeParams>(
+                seeded.Single(static row => row.Id == AllTypesRows.NullRowId),
+                NullRowCopyId
+            ),
             transaction,
             cancellationToken: token
         );
@@ -87,6 +93,37 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
         AllTypesRows.ShouldBeTheNullRow(read.Single(static row => row.Id == NullRowCopyId), NullRowCopyId);
     }
 
+    // The method of the query that the end-to-end project's Dapper write runs, whose parameters are not nullable, so
+    // that each is bound as a value of its type and never as null.  The columns it does not write are the properties of
+    // AllTypesDto that InsertAllTypesParams lacks, found by reflection, since this project has no list of its own.
+    [Fact]
+    public async Task InsertAllTypes_FullRow_ReturnsTheValuesWritten()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NpgsqlDataSource.Create(app.ConnectionString);
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+        var full = (await connection.ListAllTypes(transaction, cancellationToken: token)).Single(static row =>
+            row.Id == AllTypesRows.FullRowId
+        );
+
+        var rows = await connection.InsertAllTypes(
+            AllTypesRows.ArgsFrom<InsertAllTypesParams>(full, FullRowCopyId),
+            transaction,
+            cancellationToken: token
+        );
+        await transaction.RollbackAsync(token);
+
+        var written = typeof(InsertAllTypesParams).GetProperties().Select(static property => property.Name);
+        var notWritten = typeof(AllTypesDto)
+            .GetProperties()
+            .Select(static property => property.Name)
+            .Except(written, StringComparer.Ordinal)
+            .ToHashSet(StringComparer.Ordinal);
+        notWritten.ShouldNotBeEmpty();
+        AllTypesRows.ShouldBeTheFullRow(rows.ShouldHaveSingleItem(), FullRowCopyId, nullProperties: notWritten);
+    }
+
     [Fact]
     public async Task QueryAsync_ListAllTypes_ReadsBothRows()
     {
@@ -98,24 +135,5 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
         rows.Count.ShouldBe(2);
         AllTypesRows.ShouldBeTheFullRow(rows[0]);
         AllTypesRows.ShouldBeTheNullRow(rows[1]);
-    }
-
-    // The input model with the values of a row, property by property by name, and the id of the new row.  A parameter
-    // of bit(1) has no length, so it is a BitArray where the column is a bool.
-    private static InsertEveryTypeParams ArgsFrom(AllTypesDto row, int id)
-    {
-        var constructor = typeof(InsertEveryTypeParams).GetConstructors().ShouldHaveSingleItem();
-        var arguments = constructor
-            .GetParameters()
-            .Select(parameter =>
-                parameter.Name switch
-                {
-                    nameof(AllTypesDto.Id) => id,
-                    nameof(AllTypesDto.Bit1Value) => row.Bit1Value is { } bit ? new BitArray([bit]) : null,
-                    _ => typeof(AllTypesDto).GetProperty(parameter.Name!).ShouldNotBeNull(parameter.Name).GetValue(row),
-                }
-            )
-            .ToArray();
-        return (InsertEveryTypeParams)constructor.Invoke(arguments);
     }
 }

@@ -9,6 +9,9 @@ using System.Reflection;
 using NpgsqlTypes;
 using Shouldly;
 using SqlSource.Generation.Types;
+using SqlSource.Snapshot;
+using SqlSource.Snapshot.Reading;
+using SqlSource.Testing;
 using SqlSource.Testing.EndToEnd;
 using SqlSource.Tests.Postgres.EndToEnd.Types;
 using Xunit;
@@ -470,16 +473,26 @@ public sealed class ModelShapeTests
             .Keys.Concat(MapLeftOut.Keys)
             .Order(StringComparer.Ordinal)
             .ShouldBe(keys.Order(StringComparer.Ordinal));
+        // Each property exists, and the committed entry describes its parameter as the key's type, so that a key named
+        // to the wrong column fails.  Every key is the internal name of the type it maps, bit and varbit included,
+        // whose rule of length reads the parameter's internal name too: bit(1) and bit(8) are both bit.
+        var insertEveryType = EntryOf("AllTypes.sql", "InsertEveryType");
+        var echoCube = EntryOf("Cube.sql", EchoCube);
         foreach (var (key, written) in MapWritten)
         {
+            string parameter;
             if (written == EchoCube)
             {
                 _ = typeof(CubeQueriesExtensions).GetMethod(EchoCube).ShouldNotBeNull(key);
+                parameter = InternalNameOf(echoCube, "value");
             }
             else
             {
                 _ = typeof(InsertEveryTypeArgs).GetProperty(written).ShouldNotBeNull(key);
+                parameter = InternalNameOf(insertEveryType, char.ToLowerInvariant(written[0]) + written[1..]);
             }
+
+            parameter.ShouldBe(key, $"The parameter that writes {key}, {written}");
         }
     }
 
@@ -671,6 +684,29 @@ public sealed class ModelShapeTests
     private const string CastToText = "Npgsql reads it only by a cast to text.";
 
     private const string NoTable = "No table can hold it.";
+
+    // The committed entry of a query of EndToEnd/Queries/, read from the repository by the generator's reader.
+    private static SidecarEntry EntryOf(string file, string query)
+    {
+        var path = Path.Combine(
+            RepositoryRoot.Folder,
+            "tests",
+            "SqlSource.Tests.Postgres",
+            "EndToEnd",
+            "Queries",
+            file + ".json"
+        );
+        var sidecar = SidecarReader.Read(File.ReadAllText(path)).Sidecar.ShouldNotBeNull(path);
+        return sidecar.Find(query).ShouldNotBeNull(query);
+    }
+
+    // The internal name of the PostgreSQL type of a parameter of an entry, by its name.
+    private static string InternalNameOf(SidecarEntry entry, string parameter) =>
+        entry
+            .Parameters.SingleOrDefault(candidate => candidate.Name == parameter)
+            .ShouldNotBeNull(parameter)
+            .Type.ShouldBeOfType<PostgresType>(parameter)
+            .InternalName;
 
     private static Type? ModelNamed(string fullName) =>
         ModelReflection.ModelNamed(typeof(ModelShapeTests).Assembly, fullName);
