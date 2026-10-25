@@ -25,6 +25,7 @@ public sealed class ManifestTargetTests : IDisposable
         "SqlSourceOutputModelType",
         "SqlSourceCollectionType",
         "SqlSourceTypeOverrides",
+        "SqlSourceColumnTypes",
     ];
 
     // The settings that are properties of the project and never metadata of a file.
@@ -34,7 +35,7 @@ public sealed class ManifestTargetTests : IDisposable
 
     public void Dispose() => _fixtures.Dispose();
 
-    // The lines of one file: its File line and the eleven under it, with the values that are not empty.
+    // The lines of one file: its File line and the twelve under it, with the values that are not empty.
     private static string[] FileLines(string path, params (string Name, string Value)[] metadata) =>
         [
             "File=" + path,

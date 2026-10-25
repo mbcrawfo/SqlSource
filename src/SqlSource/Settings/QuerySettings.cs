@@ -1,3 +1,4 @@
+using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.TypeOverrides;
 
 namespace SqlSource.Settings;
@@ -47,7 +48,8 @@ internal readonly record struct QuerySettings(
     /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
     /// the attribute, then the metadata of the file's item, then the project's property, then the default.  The type
-    /// override is not among them: <see cref="ResolveTypeOverrides" /> gives it.
+    /// override and the column types are not among them: <see cref="ResolveTypeOverrides" /> and
+    /// <see cref="ResolveColumnTypes" /> give them.
     /// </summary>
     public static QuerySettings Resolve(
         SettingsLevel markers,
@@ -107,6 +109,22 @@ internal readonly record struct QuerySettings(
         engine == DatabaseEngine.SqlServer
             ? Merge(markers.SqlServerTypeOverrides, metadata.SqlServerTypeOverrides, property.SqlServerTypeOverrides)
             : Merge(markers.TypeOverrides, metadata.TypeOverrides, property.TypeOverrides);
+
+    /// <summary>
+    /// The column types of a query: the markers' over the metadata's over the property's, merged per key as
+    /// <see cref="ResolveTypeOverrides" /> merges the type override, and one list for both engines.  The markers' are
+    /// those of the file's header, by the column's source; a query's own <c>-- column:</c> markers name its result's
+    /// columns and are not among them.  Sorted by key, and empty when no level sets one.  It keeps its entries of
+    /// <c>default</c>, which <see cref="ColumnTypeMap.Find" /> weighs by their place, and is kept apart from
+    /// <see cref="Resolve" /> for the same reason as the type override.
+    /// </summary>
+    public static EquatableArray<ColumnType> ResolveColumnTypes(
+        SettingsLevel markers,
+        SettingsLevel metadata,
+        SettingsLevel property
+    ) =>
+        ColumnTypeMap.Over(markers.ColumnTypes, ColumnTypeMap.Over(metadata.ColumnTypes, property.ColumnTypes))
+        ?? EquatableArray<ColumnType>.Empty;
 
     /// <summary>
     /// The database of a query: the markers', then the metadata's, then the property's, else the name of the dialect,

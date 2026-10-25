@@ -55,6 +55,12 @@ internal static class MSBuildSettings
     public const string TypeOverridesName = "SqlSourceTypeOverrides";
 
     /// <summary>
+    /// The other setting that the generator reads and the tool does not, since it changes nothing that is described:
+    /// the keys of a manifest have none for it either.
+    /// </summary>
+    public const string ColumnTypesName = "SqlSourceColumnTypes";
+
+    /// <summary>
     /// The setting that is a property of the project and never metadata of a file, since it belongs to a type, whose
     /// queries can come from several files.  The tool does not read it either: it changes nothing that is described.
     /// </summary>
@@ -73,6 +79,7 @@ internal static class MSBuildSettings
         OutputModelTypeName,
         CollectionTypeName,
         TypeOverridesName,
+        ColumnTypesName,
         NestedClassName,
     ];
 
@@ -90,13 +97,13 @@ internal static class MSBuildSettings
 
     /// <summary>
     /// The keys of the properties in a project manifest, which the tool reads: with the database, and without the
-    /// type override and the nested class.
+    /// type override, the column types and the nested class.
     /// </summary>
     public static SettingKeys ManifestProperty { get; } = new(PropertyPrefix, SettingPlace.Property, isManifest: true);
 
     /// <summary>
-    /// The keys of a file's metadata in a project manifest: with the database, and without the type override and the
-    /// nested class.
+    /// The keys of a file's metadata in a project manifest: with the database, and without the type override, the
+    /// column types and the nested class.
     /// </summary>
     public static SettingKeys ManifestMetadata { get; } = new(MetadataPrefix, SettingPlace.Metadata, isManifest: true);
 
@@ -149,8 +156,8 @@ internal static class MSBuildSettings
 
     /// <summary>
     /// The keys of the settings under one prefix, built once.  The keys of a manifest are the tool's, and have the
-    /// database and not the type override; the compiler's have the type override and not the database.  Only the
-    /// compiler's keys of the properties have the nested class.
+    /// database and not the type override or the column types; the compiler's have those two and not the database.
+    /// Only the compiler's keys of the properties have the nested class.
     /// </summary>
     internal sealed class SettingKeys(string prefix, SettingPlace place, bool isManifest)
     {
@@ -162,7 +169,7 @@ internal static class MSBuildSettings
         /// <summary>The key of a setting, or null for one these keys have none for.</summary>
         public string? this[SettingId setting] =>
             (setting == SettingId.Database && !isManifest)
-            || (setting == SettingId.TypeOverrides && isManifest)
+            || ((setting is SettingId.TypeOverrides or SettingId.ColumnTypes) && isManifest)
             || (setting == SettingId.NestedClass && (isManifest || place != SettingPlace.Property))
                 ? null
                 : _keys[(int)setting];

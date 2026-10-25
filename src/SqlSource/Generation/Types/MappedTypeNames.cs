@@ -8,8 +8,8 @@ using SqlSource.Settings.TypeOverrides;
 namespace SqlSource.Generation.Types;
 
 /// <summary>
-/// The C# types that the type override names, at any level, and that the <c>-- param:</c> markers give, which the
-/// compilation is asked for.
+/// The C# types that the type override and the column types name, at any level, and that the <c>-- param:</c> markers
+/// give, which the compilation is asked for.
 /// </summary>
 internal static class MappedTypeNames
 {
@@ -57,6 +57,18 @@ internal static class MappedTypeNames
     {
         Add(names, level.TypeOverrides);
         Add(names, level.SqlServerTypeOverrides);
+        if (level.ColumnTypes is not { } columnTypes)
+        {
+            return;
+        }
+
+        foreach (var entry in columnTypes)
+        {
+            if (entry.Type is { } type)
+            {
+                _ = names.Add(type);
+            }
+        }
     }
 
     private static void Add(SortedSet<string> names, EquatableArray<TypeOverride>? overrides)

@@ -124,9 +124,12 @@ internal static class TypeOverrideGrammar
             : NotInBrackets + plain;
     }
 
-    // The key and the C# type of an entry, null for default, or false for a text with no = or a type that is not
-    // valid.  The key is not read here.
-    private static bool TrySplitEntry(
+    /// <summary>
+    /// The key and the C# type of an entry, null for <c>default</c>, or false for a text with no <c>=</c> outside
+    /// double quotes or a type that is not valid.  The key is not read here.  The column types' grammar splits its
+    /// entries of MSBuild with it too.
+    /// </summary>
+    internal static bool TrySplitEntry(
         ReadOnlySpan<char> text,
         bool spacesAroundEquals,
         out ReadOnlySpan<char> key,
@@ -320,9 +323,12 @@ internal static class TypeOverrideGrammar
         return -1;
     }
 
-    // The next run of text outside white space, where white space inside <>, [] or double quotes belongs to the run,
-    // and a bracket inside double quotes is not counted.  Only the key opens a double quote.  Empty at the end.
-    private static ReadOnlySpan<char> NextEntry(ref ReadOnlySpan<char> rest)
+    /// <summary>
+    /// The next entry of an MSBuild value, a run of text outside white space, where white space inside <c>&lt;&gt;</c>,
+    /// <c>[]</c> or double quotes belongs to the run, and a bracket inside double quotes is not counted.  Only the key
+    /// opens a double quote.  Empty at the end.  The column types' grammar reads its entries of MSBuild with it too.
+    /// </summary>
+    internal static ReadOnlySpan<char> NextEntry(ref ReadOnlySpan<char> rest)
     {
         var start = 0;
         while (start < rest.Length && char.IsWhiteSpace(rest[start]))

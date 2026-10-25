@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Settings;
+using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Testing.Generator;
 using Xunit;
@@ -144,6 +145,66 @@ public sealed class MSBuildSettingsTests
                         [GeneratorHarness.UsersPath] = new Dictionary<string, string>
                         {
                             ["SqlSourceTypeOverrides"] = "timestampz=int",
+                        },
+                    }
+                ).GetOptions(new InMemoryAdditionalText(GeneratorHarness.UsersPath, "")),
+                MSBuildSettings.ManifestMetadata
+            )
+            .ShouldBeNull();
+
+    [Fact]
+    public void ReadProject_ColumnTypes_AreReadAtTheProjectsPlaceWithTheirInvalidEntries()
+    {
+        var settings = ProjectSettings.Read(
+            Provider("SqlSourceColumnTypes", "users.id=MyApp.UserId id=MyApp.UserId").GlobalOptions
+        );
+
+        settings
+            .Level.ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([new ColumnType("users.id", "global::MyApp.UserId", SettingPlace.Property)]);
+        settings.Invalid.ShouldBe([new InvalidSetting("SqlSourceColumnTypes", "id=MyApp.UserId")]);
+    }
+
+    [Fact]
+    public void ReadFile_ColumnTypes_AreReadAtTheMetadatasPlace()
+    {
+        var settings = ReadFileMetadata(
+            new Dictionary<string, string> { ["SqlSourceColumnTypes"] = "posts.id=PostId" }
+        );
+
+        settings
+            .ShouldNotBeNull()
+            .Level.ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([new ColumnType("posts.id", "PostId", SettingPlace.Metadata)]);
+        settings.Invalid.ShouldBeEmpty();
+    }
+
+    // The tool does not read the column types either: they change nothing that is described.
+    [Fact]
+    public void ReadProject_ColumnTypesUnderTheKeysOfAManifest_AreNotRead()
+    {
+        var settings = ProjectSettings.Read(
+            Provider("SqlSourceColumnTypes", "users.id=UserId id=UserId").GlobalOptions,
+            MSBuildSettings.ManifestProperty
+        );
+
+        settings.Level.ShouldBeSameAs(SettingsLevel.None);
+        settings.Invalid.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReadFile_ColumnTypesUnderTheKeysOfAManifest_AreNotRead() =>
+        FileSettings
+            .Read(
+                GeneratorHarness.UsersPath,
+                new TestOptionsProvider(
+                    null,
+                    null,
+                    fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>>
+                    {
+                        [GeneratorHarness.UsersPath] = new Dictionary<string, string>
+                        {
+                            ["SqlSourceColumnTypes"] = "id=UserId",
                         },
                     }
                 ).GetOptions(new InMemoryAdditionalText(GeneratorHarness.UsersPath, "")),

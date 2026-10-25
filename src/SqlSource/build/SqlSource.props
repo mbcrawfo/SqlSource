@@ -30,9 +30,10 @@
         SqlSourceOutput says what is generated for a query.  SqlSourceInputModelSuffix, SqlSourceOutputModelSuffix,
         SqlSourceModelNamespace, SqlSourceInputModelType, SqlSourceOutputModelType and SqlSourceCollectionType say
         what the models of a query are called, where they are and what shape they have, and what a method returns
-        many rows in.  SqlSourceTypeOverrides maps database types to C# types, in entries separated by white space;
-        the tool does not read it.  SqlSourceNestedClass names the class that holds a type's generated members; it is a
-        property alone, never metadata, since it belongs to a type and not to a file, and the tool does not read it.
+        many rows in.  SqlSourceTypeOverrides maps database types to C# types, and SqlSourceColumnTypes the columns of
+        tables and views, in entries separated by white space; the tool reads neither.  SqlSourceNestedClass names the
+        class that holds a type's generated members; it is a property alone, never metadata, since it belongs to a type
+        and not to a file, and the tool does not read it.
         SqlSourceDatabase is trimmed and is not listed: the tool reads it, and the generator does not.
         None of this is under the condition above: a project that lists its own .sql files still needs it.
 
@@ -56,6 +57,7 @@
         <CompilerVisibleProperty Include="SqlSourceOutputModelType" />
         <CompilerVisibleProperty Include="SqlSourceCollectionType" />
         <CompilerVisibleProperty Include="SqlSourceTypeOverrides" />
+        <CompilerVisibleProperty Include="SqlSourceColumnTypes" />
         <CompilerVisibleProperty Include="SqlSourceNestedClass" />
         <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceDialect" />
         <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceGeneratorParameters" />
@@ -67,5 +69,6 @@
         <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceOutputModelType" />
         <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceCollectionType" />
         <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceTypeOverrides" />
+        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceColumnTypes" />
     </ItemGroup>
 </Project>

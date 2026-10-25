@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Shouldly;
 using SqlSource.Settings;
+using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.TypeOverrides;
 using Xunit;
 
@@ -284,9 +285,57 @@ public sealed class QuerySettingsTests
         merged.TypeOverrides.ShouldBeNull();
     }
 
+    // The column types merge per key as the type override does, one list for both engines.
+    [Fact]
+    public void ResolveColumnTypes_Levels_MergePerKeyAcrossTheLevels()
+    {
+        var property = Columns(
+            new ColumnType("posts.id", "PostId", SettingPlace.Property),
+            new ColumnType("users.id", "UserId", SettingPlace.Property)
+        );
+        var metadata = Columns(
+            new ColumnType("posts.id", null, SettingPlace.Metadata),
+            new ColumnType("auth.users.id", "AuthUserId", SettingPlace.Metadata)
+        );
+        var markers = Columns(new ColumnType("users.id", "global::App.UserId", SettingPlace.FileHeader));
+
+        QuerySettings
+            .ResolveColumnTypes(markers, metadata, property)
+            .ShouldBe([
+                new ColumnType("posts.id", null, SettingPlace.Metadata),
+                new ColumnType("users.id", "global::App.UserId", SettingPlace.FileHeader),
+                new ColumnType("auth.users.id", "AuthUserId", SettingPlace.Metadata),
+            ]);
+    }
+
+    [Fact]
+    public void ResolveColumnTypes_NoLevelSetsOne_IsEmpty() =>
+        QuerySettings.ResolveColumnTypes(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None).ShouldBeEmpty();
+
+    [Fact]
+    public void Over_ColumnTypes_MergePerKey()
+    {
+        var query = Columns(new ColumnType("users.id", null, SettingPlace.FileHeader));
+        var preamble = Columns(
+            new ColumnType("posts.id", "PostId", SettingPlace.FileHeader),
+            new ColumnType("users.id", "UserId", SettingPlace.FileHeader)
+        );
+
+        query
+            .Over(preamble)
+            .ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([
+                new ColumnType("posts.id", "PostId", SettingPlace.FileHeader),
+                new ColumnType("users.id", null, SettingPlace.FileHeader),
+            ]);
+    }
+
     private static EquatableArray<TypeOverride> Array(params TypeOverride[] entries) =>
         new(ImmutableArray.Create(entries));
 
     private static SettingsLevel Overrides(params TypeOverride[] entries) =>
         new() { TypeOverrides = new EquatableArray<TypeOverride>(ImmutableArray.Create(entries)) };
+
+    private static SettingsLevel Columns(params ColumnType[] entries) =>
+        new() { ColumnTypes = new EquatableArray<ColumnType>(ImmutableArray.Create(entries)) };
 }
