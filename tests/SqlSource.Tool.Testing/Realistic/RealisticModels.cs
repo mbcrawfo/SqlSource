@@ -85,7 +85,7 @@ internal sealed class RealisticModels(Assembly assembly, string @namespace, Data
     // writes on the class itself.  The class is the corpus's claim of the case, in the namespace of the models.
     public string SqlOf(RealisticCorpus corpus, RealisticCase found, SidecarEntry entry)
     {
-        var claim = RealisticClaims.Of(corpus, found);
+        var claim = RealisticClaims.Of(corpus, found, RealisticClaims.ModelsOutput);
         var type =
             assembly.GetType($"{@namespace}.{claim.TypeName}")
             ?? throw new InvalidOperationException($"The class {claim.TypeName} of {found} is not compiled");

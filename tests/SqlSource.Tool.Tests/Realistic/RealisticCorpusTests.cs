@@ -30,6 +30,7 @@ public sealed class RealisticCorpusTests
             File.Exists(corpus.Schema).ShouldBeTrue(corpus.Schema);
             File.Exists(corpus.Seed).ShouldBeTrue(corpus.Seed);
             File.Exists(corpus.Queries).ShouldBeTrue(corpus.Queries);
+            File.Exists(corpus.Methods).ShouldBeTrue(corpus.Methods);
         }
     }
 
