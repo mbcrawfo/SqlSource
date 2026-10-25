@@ -421,8 +421,9 @@ internal sealed class SqlMarkerScope(
         _ = _ignoredTokens.Add(name);
     }
 
-    // "@name [type] [null | not null] [-> CSharpType]".  The type is what stands between the name and those words, as
-    // written.  The C# type is a ClrTypeName, and never default, since no level below a query maps a parameter.
+    // "@name [type] [null | not null] [-> CSharpType]", the name ended by white space or by the arrow.  The type is
+    // what stands between the name and those words, as written.  The C# type is a ClrTypeName, and never default,
+    // since no level below a query maps a parameter.
     private void ReadParam(SqlMarker marker)
     {
         var start = marker.ValueSpan.Start;
@@ -437,7 +438,11 @@ internal sealed class SqlMarkerScope(
             start == end
             || text[start] != rules.ParameterPrefix
             || nameEnd == start + 1
-            || (nameEnd < end && !char.IsWhiteSpace(text[nameEnd]))
+            || (
+                nameEnd < end
+                && !char.IsWhiteSpace(text[nameEnd])
+                && !text.AsSpan(nameEnd, end - nameEnd).StartsWith("->".AsSpan(), StringComparison.Ordinal)
+            )
         )
         {
             AddInvalid(marker);

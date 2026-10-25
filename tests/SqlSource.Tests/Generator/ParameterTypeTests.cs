@@ -1,5 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
+using System;
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Snapshot;
@@ -36,6 +37,26 @@ public sealed class ParameterTypeTests
 
                 [SqlSourceConverter]
                 public static long ToDatabase(UserId id) => id.Value;
+            }
+        }
+        """;
+
+    // App.UserId, over int, with its converters, which an int8 cannot go through.
+    private const string IntIdSource = """
+        using SqlSource;
+
+        namespace App
+        {
+            [SqlSourceGenerate]
+            public partial class Sample;
+
+            public readonly record struct UserId(int Value)
+            {
+                [SqlSourceConverter]
+                public static UserId FromDatabase(int value) => new(value);
+
+                [SqlSourceConverter]
+                public static int ToDatabase(UserId id) => id.Value;
             }
         }
         """;
@@ -177,6 +198,83 @@ public sealed class ParameterTypeTests
             $"{id} {GeneratorHarness.UsersPath}(1,10)-(1,19): '@author' is mapped to '{type}' for parameter "
                 + $"'author', in {Place}, {reason}",
         ]);
+    }
+
+    // The entry names the parameter as the tool wrote it, and the marker's name is found ignoring case.
+    [Fact]
+    public void Run_ParamMarker_EntryNamesTheParameterInAnotherCase_GivesItsType()
+    {
+        var file = PostsFile("-- param: @author -> UserId\n");
+        var entry = Entry(file, "ListPosts", [Parameter("Author", Int8, false)], [Column("id")]);
+
+        var run = Run(UserIdSource, [file, Sidecars.Of(file, entry)]);
+
+        run.ShouldBeClean();
+        run.Sources[ParamsModel].ShouldContain("global::App.UserId Author");
+    }
+
+    // The model's error names what the marker mapped, as the typing's errors do.
+    [Fact]
+    public void Run_ParamMarker_TypeNotPublicInAPublicModel_IsSQLSRC251NamingTheParameter()
+    {
+        var source = UserIdSource.Replace(
+            "    public readonly record struct UserId",
+            "    internal readonly record struct Hidden(long Value);\n\n    public readonly record struct UserId",
+            StringComparison.Ordinal
+        );
+        var file = PostsFile("-- param: @author -> Hidden\n");
+
+        var run = Run(source, [file, Sidecars.Of(file, PostsEntry(file, nullable: false))]);
+
+        run.Diagnostics.ShouldHaveSingleItem()
+            .ShouldStartWith(
+                $"SQLSRC251 {GeneratorHarness.UsersPath}(1,10)-(1,19): '@author' is mapped to 'App.Hidden' for "
+                    + $"parameter 'author', in {Place}, and "
+            );
+    }
+
+    // A converter's message names the parameter's database type, an array's element's for an array.
+    [Theory]
+    [InlineData("postgres", "@author -> UserId", "parameter 'author'", "int8")]
+    [InlineData("postgres", "@ids -> UserId[]", "element of parameter 'ids'", "int8")]
+    [InlineData("mssql", "@author -> UserId", "parameter 'author'", "bigint")]
+    public void Run_ParamMarker_NoConverter_IsSQLSRC279NamingTheDatabaseType(
+        string dialect,
+        string marker,
+        string subject,
+        string key
+    )
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: ListPosts\n-- param: " + marker + "\nSELECT 1 WHERE @author = 1 OR @ids IS NULL;\n"
+        );
+        var int8 = dialect == "mssql" ? (SidecarType)TestSidecars.SqlServer("bigint", 8, 19) : Int8;
+        var int8s = dialect == "mssql" ? int8 : ArrayOf(Int8, "_int8");
+        SidecarParameter[] parameters =
+        [
+            TestSidecars.Parameter(0, "author", int8, false),
+            TestSidecars.Parameter(1, "ids", int8s, false),
+        ];
+        var entry =
+            dialect == "mssql"
+                ? MethodRuns.SqlServerEntry(file, "ListPosts", parameters, null)
+                : Entry(file, "ListPosts", parameters, null);
+
+        var run = MethodRuns.Run(
+            file,
+            [entry],
+            IntIdSource,
+            dialect == "mssql" ? [SqlClientReferences.SqlClient7] : null,
+            dialect
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem()
+            .ShouldBe(
+                $"SQLSRC279 {GeneratorHarness.UsersPath}(1,10)-(1,19): The {subject} has type 'App.UserId', whose "
+                    + "converters convert from and to 'int', and not from and to 'long', the type the database type "
+                    + $"'{key}' is read as.  Add a converter between 'App.UserId' and 'long'."
+            );
     }
 
     private static SqlFile PostsFile(string marker) =>

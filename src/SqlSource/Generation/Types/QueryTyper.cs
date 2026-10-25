@@ -169,7 +169,8 @@ internal static class QueryTyper
     /// <summary>
     /// The property type of a parameter or column whose C# type a marker or a setting chose, over the type override
     /// and the map, or null after its error is added.  The type keeps the base map's type of its database type beside
-    /// it, for its converters, as a type override's does.
+    /// it, for its converters, as a type override's does, the key of that database type as its <c>Key</c>, which a
+    /// converter's message names, and <paramref name="key" /> as its <c>Mapped</c>, which the model's message names.
     /// </summary>
     /// <param name="clrType">The C# type, as <c>ClrTypeName.Text</c> writes it.</param>
     /// <param name="place">Where it was chosen, as <c>SQLSRC250</c> to <c>SQLSRC252</c> name it.</param>
@@ -204,7 +205,8 @@ internal static class QueryTyper
                 mapping.WarningIds,
                 KeyOf(type),
                 place,
-                DatabaseTypeOf(type, typing)
+                DatabaseTypeOf(type, typing),
+                key
             );
         }
 

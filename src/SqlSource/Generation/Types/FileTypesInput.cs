@@ -23,7 +23,9 @@ namespace SqlSource.Generation.Types;
 /// <param name="SqlClientProbe">
 /// The Microsoft.Data.SqlClient the project references, which chooses the column of SQL Server's map.
 /// </param>
-/// <param name="MappedTypes">The C# types that the type override names at any level, resolved.</param>
+/// <param name="MappedTypes">
+/// The C# types that the type override names at any level, and that the <c>-- param:</c> markers give, resolved.
+/// </param>
 internal sealed record FileTypesInput(
     SidecarCheckResult Check,
     ParsedSqlFile? File,

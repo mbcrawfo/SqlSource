@@ -233,6 +233,7 @@ public sealed class SqlFileParserParameterTests
     // As people type it.
     [InlineData("-- param: @a\t->\tUserId  ", null, null, "UserId")]
     [InlineData("-- param: @a int4 ->UserId", "int4", null, "UserId")]
+    [InlineData("-- param: @a->UserId", null, null, "UserId")]
     [InlineData("-- param: @a NOT NULL -> global::UserId", null, false, "global::UserId")]
     // A -> inside quotes, or that does not stand after white space, is part of the type.
     [InlineData("-- param: @a \"odd -> name\" -> UserId", "\"odd -> name\"", null, "UserId")]

@@ -20,6 +20,11 @@ namespace SqlSource.Generation.Types;
 /// <paramref name="Place" /> is.  It changes no model's C#, so <c>ModelCollector.FindDifference</c> does not compare
 /// it.
 /// </param>
+/// <param name="Mapped">
+/// What the messages of <c>SQLSRC250</c> to <c>SQLSRC252</c> name as mapped when it is not <paramref name="Key" />:
+/// <c>@author</c> for a parameter whose <c>-- param:</c> marker chose its type.  Null for a type the override or the
+/// base map gave.  It changes no model's C# either, and is not compared.
+/// </param>
 internal sealed record PropertyType(
     string Text,
     bool IsValueType,
@@ -27,5 +32,6 @@ internal sealed record PropertyType(
     EquatableArray<string> WarningIds,
     string Key,
     string? Place,
-    DatabaseType? Database = null
+    DatabaseType? Database = null,
+    string? Mapped = null
 );
