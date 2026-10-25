@@ -80,6 +80,15 @@ SELECT id, name
 FROM dbo.accounts
 WHERE id = @accountId;
 
+-- name: GetFirstOfTwoAccounts -> one
+-- summary: Reads one account, then another: the first result set, the first account.
+SELECT id, name
+FROM dbo.accounts
+WHERE id = @firstId;
+SELECT id, name
+FROM dbo.accounts
+WHERE id = @secondId;
+
 -- name: MergeAccountStatuses -> rowcount
 -- summary: Sets the status of the accounts up to an id by MERGE, whose OUTPUT the count includes.
 MERGE dbo.accounts AS a

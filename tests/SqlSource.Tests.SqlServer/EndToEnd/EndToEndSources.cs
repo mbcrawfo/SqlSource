@@ -32,9 +32,10 @@ internal static class EndToEndSources
 
     public static SqlConnection Realistic(SqlServerContainer sqlServer) => new(sqlServer.RealisticConnectionString);
 
-    // Opens the connection, runs the write in a transaction and rolls it back, so that the seed is as it was.  The
+    // Opens the connection and runs the write in a transaction that is rolled back, so that the seed is as it was.  The
     // write gives the transaction to every call, since SqlClient refuses a command on a connection whose transaction it
-    // is not given.
+    // is not given.  Disposing the transaction rolls it back, and SqlClient skips one that the server has already
+    // ended, where a rollback of its own in a finally would throw and take the place of the write's exception.
     public static async Task RolledBackAsync(
         SqlConnection connection,
         Func<DbTransaction, Task> write,
@@ -43,13 +44,6 @@ internal static class EndToEndSources
     {
         await connection.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            await write(transaction);
-        }
-        finally
-        {
-            await transaction.RollbackAsync(cancellationToken);
-        }
+        await write(transaction);
     }
 }

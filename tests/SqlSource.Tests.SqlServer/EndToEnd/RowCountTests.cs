@@ -186,6 +186,20 @@ public sealed class RowCountTests(SqlServerContainer sqlServer)
         );
     }
 
+    // Each SELECT of the batch has a row of its own: the method reads the first and leaves the second.
+    [Fact]
+    public async Task GetFirstOfTwoAccounts_TwoSelects_ReadsTheFirstResultSet()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var account = await connection.GetFirstOfTwoAccounts(
+            new GetFirstOfTwoAccountsArgs(1, 2),
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        account.ShouldBe(new GetFirstOfTwoAccountsDto(1, "alice"));
+    }
+
     [Fact]
     public async Task MergeAccountStatuses_MergeWithOutput_CountsItsRows()
     {

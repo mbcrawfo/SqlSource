@@ -92,16 +92,7 @@ public sealed class WriteQueryTests(SqlServerContainer sqlServer)
         var token = TestContext.Current.CancellationToken;
         await using (var connection = EndToEndSources.App(sqlServer))
         {
-            await connection.OpenAsync(token);
-            await using var transaction = await connection.BeginTransactionAsync(token);
-            try
-            {
-                await write(connection, transaction);
-            }
-            finally
-            {
-                await transaction.RollbackAsync(token);
-            }
+            await EndToEndSources.RolledBackAsync(connection, transaction => write(connection, transaction), token);
         }
 
         await using var after = EndToEndSources.App(sqlServer);
