@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Methods;
@@ -14,8 +15,10 @@ namespace SqlSource.Generation.Emitting;
 /// with the <c>SqlDbType</c> of the type's base name and the size, precision or scale the type has, so that SqlClient
 /// infers nothing from the value.  A value longer than a bounded length is bound at <c>max</c> of its variable-length
 /// type, which SqlClient would otherwise cut, so the server sees it whole.  A decimal for a type of scale 0 is rounded
-/// to a whole number, which SqlClient would otherwise send at the value's own scale.  A parameter without a described
-/// SQL Server type, or of a type with no binding here, is bound by value.
+/// to a whole number, which SqlClient would otherwise send at the value's own scale.  A CLR type, <c>hierarchyid</c>,
+/// <c>geography</c>, <c>geometry</c> or a user's, is a <c>Udt</c> of the <c>UdtTypeName</c> its user type names,
+/// which SqlClient needs for every value but a null.  A parameter without a described SQL Server type, or of a type
+/// with no binding here, is bound by value.
 /// </summary>
 internal static class SqlServerBinding
 {
@@ -40,11 +43,7 @@ internal static class SqlServerBinding
         ConversionNames names
     )
     {
-        if (
-            bound.Described is not SqlServerType type
-            || !Rows.TryGetValue(SqlServerTypeMap.BaseName(type.Name), out var row)
-            || !TryReadFacets(type, row.Facet, out var facet)
-        )
+        if (bound.Described is not SqlServerType type || !TryFindRow(type, out var row, out var facet))
         {
             ParameterBinder.AppendByValue(builder, indent, command, parameter, parameters, bound, names);
             return;
@@ -69,16 +68,26 @@ internal static class SqlServerBinding
             AppendSqlDbType(builder, indent, parameter, sqlDbType);
         }
 
+        if (row.UdtTypeName is { } udtTypeName)
+        {
+            _ = builder
+                .Append(indent)
+                .Append(parameter)
+                .Append(".UdtTypeName = ")
+                .Append(SymbolDisplay.FormatLiteral(udtTypeName, quote: true))
+                .Append(";\n");
+        }
+
         AppendFacets(builder, indent, parameter, row.Facet, facet, type.Scale);
         _ = builder.Append(indent).Append(parameter).Append(".Value = ");
         if (row.Facet == Facet.Vector)
         {
             var nullText = VectorNullStart + facet.ToString(CultureInfo.InvariantCulture) + ")";
-            ParameterBinder.AppendValue(builder, parameters, bound, names, nullText);
+            ParameterBinder.AppendValueOrNull(builder, parameters, bound, names, nullText);
         }
         else
         {
-            ParameterBinder.AppendValue(builder, parameters, bound, names, DbNull);
+            ParameterBinder.AppendValueOrNull(builder, parameters, bound, names, DbNull);
         }
 
         _ = builder.Append(";\n");
@@ -101,6 +110,33 @@ internal static class SqlServerBinding
     /// </summary>
     internal static string? SqlDbTypeOf(string baseName) =>
         Rows.TryGetValue(baseName, out var row) ? row.SqlDbType : null;
+
+    // The binding of the type and the number its facets give.  A CLR type is bound by its user type, before its name
+    // is looked for, since a CLR type of a user may share a name with a system type that the server tells apart by its
+    // schema: dbo.Money is no money.  False for a type with no binding, or facets no SqlParameter can hold.
+    private static bool TryFindRow(SqlServerType type, out Row row, out int facet)
+    {
+        facet = 0;
+        if (type.UserType is { Name: { Length: > 0 } name, AssemblyQualifiedName.Length: > 0 } userType)
+        {
+            row = new Row("Udt", Facet.None, UdtTypeName: UdtTypeNameOf(userType.Schema, name));
+            return true;
+        }
+
+        return Rows.TryGetValue(SqlServerTypeMap.BaseName(type.Name), out row)
+            && TryReadFacets(type, row.Facet, out facet);
+    }
+
+    // The UdtTypeName of a CLR type: its bare name in sys, where hierarchyid, geography and geometry are, and
+    // schema.name otherwise.  SqlClient splits the name at each dot outside brackets and sends the parts, so a part
+    // that is not all letters, digits and underscores is put in brackets, a ] in it written twice.
+    private static string UdtTypeNameOf(string? schema, string name) =>
+        schema is null || SystemSchemas.IsSqlServer(schema) ? Part(name) : Part(schema) + "." + Part(name);
+
+    private static string Part(string part) =>
+        part.All(character => char.IsLetterOrDigit(character) || character == '_')
+            ? part
+            : "[" + part.Replace("]", "]]") + "]";
 
     // The number the binding takes from the type: the Size of a length, -1 for max; the precision, of a decimal, whose
     // scale is the type's; or the dimension of a vector.  False for one no SqlParameter can hold, which only a sidecar
@@ -290,6 +326,11 @@ internal static class SqlServerBinding
         rows.Add("datetimeoffset", new Row("DateTimeOffset", Facet.Scale7));
         rows.Add("json", new Row("NVarChar", Facet.Max));
         rows.Add("vector", new Row(null, Facet.Vector));
+        foreach (var name in new[] { "hierarchyid", "geography", "geometry" })
+        {
+            rows.Add(name, new Row("Udt", Facet.None, UdtTypeName: name));
+        }
+
         Add("Timestamp", "timestamp", "rowversion");
         Add("BigInt", "bigint");
         Add("Int", "int");
@@ -338,7 +379,13 @@ internal static class SqlServerBinding
     }
 
     // A base name's binding: the member of SqlDbType, null for vector; what else it sets; for a type with a length,
-    // the C# type of a value that can be longer than it; and the variable-length type that an over-long value of a
-    // fixed-length type is bound as.
-    private sealed record Row(string? SqlDbType, Facet Facet, string? ValueText = null, string? Wider = null);
+    // the C# type of a value that can be longer than it; the variable-length type that an over-long value of a
+    // fixed-length type is bound as; and the UdtTypeName of a CLR type.
+    private sealed record Row(
+        string? SqlDbType,
+        Facet Facet,
+        string? ValueText = null,
+        string? Wider = null,
+        string? UdtTypeName = null
+    );
 }

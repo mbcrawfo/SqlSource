@@ -189,7 +189,7 @@ The names are SQL Server's, which are the [type override's](settings.md#setting-
 | `uniqueidentifier` | `System.Guid` |
 | `sql_variant` | `object` |
 | `vector` | `Microsoft.Data.SqlTypes.SqlVector<float>`.  Without Microsoft.Data.SqlClient, SQLSRC269; with one older than 6.1, SQLSRC270 |
-| `hierarchyid`, `geography`, `geometry` | None: SQLSRC246.  Reference the package `Microsoft.SqlServer.Types` and map the type with the type override: `hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId`, `geography=Microsoft.SqlServer.Types.SqlGeography`, `geometry=Microsoft.SqlServer.Types.SqlGeometry` |
+| `hierarchyid`, `geography`, `geometry` | None: SQLSRC246.  Reference the package `Microsoft.SqlServer.Types` and map the type with the type override: `hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId`, `geography=Microsoft.SqlServer.Types.SqlGeography`, `geometry=Microsoft.SqlServer.Types.SqlGeometry`.  A query method then reads the column as that type, and sends the parameter as its SQL Server type |
 
 A type that the table does not name gets its C# type by what it is:
 
@@ -272,7 +272,8 @@ Each parameter is sent as the SQL Server type it was described with, with that t
 - **`vector`** is sent as its `SqlVector<float>`, whose length is its dimension, and a null as the null `vector` of the parameter's dimension.
 - **An alias type** is sent as its base type: a parameter of `dbo.Email`, made `FROM nvarchar(320)`, as an `nvarchar(320)`.
 - **A parameter that has a [converter](settings.md#converters)** is sent as its database type too: an `Email` whose converter returns a `string` is sent as that `nvarchar(320)`, and a converted string longer than that whole, as above.
-- **`hierarchyid`, `geography`, `geometry` and a CLR type**, which only a [type override](settings.md#setting-type-overrides) gives a C# type, are sent by their value, and Microsoft.Data.SqlClient chooses their type from it.
+- **`hierarchyid`, `geography`, `geometry` and a CLR type of your own assembly**, which only a [type override](settings.md#setting-type-overrides) gives a C# type, such as `Microsoft.SqlServer.Types.SqlGeography`, are sent as their SQL Server type, and a null as a `NULL` of it.  A CLR type is named by its schema: `Money` of the schema `dbo` is sent as `dbo.Money`.
+- **A type of a newer SQL Server**, which only a type override gives a C# type too, is sent by its value, and Microsoft.Data.SqlClient chooses its type from it.
 
 <a id="method-results"></a>
 

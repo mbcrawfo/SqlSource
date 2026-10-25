@@ -75,7 +75,7 @@ internal abstract class ParameterBinder
             .Append(indent)
             .Append(parameter)
             .Append(".Value = ");
-        AppendValue(builder, parameters, bound, names, "global::System.DBNull.Value");
+        AppendValueOrNull(builder, parameters, bound, names, "global::System.DBNull.Value");
         _ = builder
             .Append(";\n")
             .Append(indent)
@@ -89,7 +89,7 @@ internal abstract class ParameterBinder
     /// Appends the value that the parameter sends, the expression after <c>Value = </c>: the property's value, or the
     /// converter's result, with <paramref name="nullText" /> for a null of a property that can be one.
     /// </summary>
-    internal static void AppendValue(
+    internal static void AppendValueOrNull(
         StringBuilder builder,
         string parameters,
         MethodParameter bound,

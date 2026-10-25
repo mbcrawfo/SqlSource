@@ -29,6 +29,8 @@
 - **`AppendByValue` writes `DBNull.Value` for a null**, and a nullable `vector` needs `CreateNull(n)`.  Its value expression is extracted to `protected static void AppendValue(StringBuilder builder, string parameters, MethodParameter bound, ConversionNames names, string nullText)`; `AppendByValue` calls it with `global::System.DBNull.Value`, and its output is unchanged.
 - **`sysname` is a row of the map and a described name.**  It binds as `NVarChar` with `Size` 128, as `nvarchar(128)`.
 - **The cancellation during the read** is made deterministic by a column converter that cancels the token on the first row (Task 4), not by timing.
+- **The merge with 8.3 replaced `ModelProperty.Described` with 8.3's `QueryModels.ParameterTypes`**, from which `MethodPlanner` sets `MethodParameter.Described`; `ModelProperty` carries no described type, and the base class's `AppendValue` is `AppendValueOrNull`, apart from `PostgresParameterBinder`'s own `AppendValue`.
+- **`hierarchyid`, `geography`, `geometry` and a CLR type are bound**, which the spec left out of the epic: the owner chose, after review finding R1-F2, to bind each as a `Udt` whose `UdtTypeName` is its `userType`, since SqlClient refuses a value of one sent by its value alone.  `ClrTypeQueryTests` proves the three of `sys` through Microsoft.SqlServer.Types.
 
 ## Review Focus
 

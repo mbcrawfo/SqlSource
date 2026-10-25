@@ -57,6 +57,7 @@
         <!-- The version the tool itself references: central pinning would otherwise hold it at the generator's. -->
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
         <PackageReference Include="Microsoft.Data.SqlClient" />
+        <PackageReference Include="Microsoft.SqlServer.Types" />
         <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
         <PackageReference Include="Shouldly" />
         <PackageReference Include="Testcontainers.MsSql" />

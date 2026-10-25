@@ -93,23 +93,131 @@ public sealed class SqlServerBindingTests
         Write(Described(TestSidecars.SqlServer(name, 10, 10, 2)))
             .ShouldContain("    p0.SqlDbType = global::System.Data.SqlDbType." + sqlDbType + ";\n");
 
-    // Every SQL Server type the map reads, but the four that SqlClient binds by no SqlDbType, has one that SqlClient
+    // Every SQL Server type the map reads, but vector, which SqlClient binds by no SqlDbType, has one that SqlClient
     // has.
     [Fact]
     public void SqlDbTypeOf_EveryKeyOfTheMap_IsAMemberOfSqlDbType()
     {
-        string[] none = ["vector", "hierarchyid", "geography", "geometry"];
-        foreach (var key in SqlServerTypeMap.Keys.Where(key => !none.Contains(key)))
+        foreach (var key in SqlServerTypeMap.Keys.Where(key => key != "vector"))
         {
             var sqlDbType = SqlServerBinding.SqlDbTypeOf(key);
             _ = sqlDbType.ShouldNotBeNull(key);
             Enum.TryParse<SqlDbType>(sqlDbType, out _).ShouldBeTrue(key);
         }
 
-        foreach (var key in none)
-        {
-            SqlServerBinding.SqlDbTypeOf(key).ShouldBeNull(key);
-        }
+        SqlServerBinding.SqlDbTypeOf("vector").ShouldBeNull();
+    }
+
+    // SqlClient refuses a value of a CLR type without its UdtTypeName, so the type is a Udt of its name, with no
+    // facet, and a null is DBNull.Value, which the server takes for the type.
+    [Fact]
+    public void Append_NullableHierarchyId_SetsUdtAndItsTypeName() =>
+        Write(
+                new MethodParameter(
+                    "node",
+                    "Node",
+                    "global::Microsoft.SqlServer.Types.SqlHierarchyId",
+                    true,
+                    true,
+                    Described: TestSidecars.SqlServer(
+                        "hierarchyid",
+                        892,
+                        0,
+                        0,
+                        SystemClrType("hierarchyid", "SqlHierarchyId")
+                    )
+                )
+            )
+            .ShouldBe(
+                """
+                    var p0 = (global::Microsoft.Data.SqlClient.SqlParameter)command.CreateParameter();
+                    p0.ParameterName = "node";
+                    p0.SqlDbType = global::System.Data.SqlDbType.Udt;
+                    p0.UdtTypeName = "hierarchyid";
+                    p0.Value = (object?)parameters.Node ?? global::System.DBNull.Value;
+                    command.Parameters.Add(p0);
+
+                """
+            );
+
+    // Each CLR type of sys is a Udt of its name, with or without the user type the tool writes for it.
+    [Theory]
+    [InlineData("hierarchyid", "SqlHierarchyId", true, "hierarchyid")]
+    [InlineData("geography", "SqlGeography", true, "geography")]
+    [InlineData("geometry", "SqlGeometry", true, "geometry")]
+    [InlineData("geometry", "SqlGeometry", false, "geometry")]
+    [InlineData("Geography", "SqlGeography", false, "geography")]
+    public void Append_SystemClrType_IsAUdtOfItsName(string name, string clrName, bool hasUserType, string udtTypeName)
+    {
+        var userType = hasUserType ? SystemClrType(udtTypeName, clrName) : null;
+
+        var binding = Write(Described(TestSidecars.SqlServer(name, -1, 0, 0, userType)));
+
+        binding.ShouldContain(
+            "    p0.SqlDbType = global::System.Data.SqlDbType.Udt;\n"
+                + "    p0.UdtTypeName = \""
+                + udtTypeName
+                + "\";\n"
+                + "    p0.Value = "
+        );
+        binding.ShouldNotContain("Size");
+    }
+
+    // A CLR type of a user is a Udt of schema.name, a part in brackets when it holds more than letters, digits and
+    // underscores, and never a row of the system type its name shares: dbo.Money is no money.
+    [Theory]
+    [InlineData("dbo", "Money", "dbo.Money")]
+    [InlineData("app", "Point_2", "app.Point_2")]
+    [InlineData("my schema", "Odd.Type]", "[my schema].[Odd.Type]]]")]
+    [InlineData(null, "Money", "Money")]
+    public void Append_ClrTypeOfAUser_IsAUdtOfItsSchemaAndName(string? schema, string name, string udtTypeName)
+    {
+        var userType = new SqlServerUserType(schema, name, "App.Types." + name + ", App.Types");
+
+        var binding = Write(Described(TestSidecars.SqlServer(name, -1, 0, 0, userType)));
+
+        binding.ShouldContain(
+            "    p0.SqlDbType = global::System.Data.SqlDbType.Udt;\n"
+                + "    p0.UdtTypeName = "
+                + "\""
+                + udtTypeName
+                + "\";\n"
+                + "    p0.Value = (object?)parameters.Name ?? global::System.DBNull.Value;\n"
+                + "    command.Parameters.Add(p0);\n"
+        );
+        binding.ShouldNotContain("SqlDbType.Money");
+    }
+
+    // A converter's result is what is sent as the CLR type, and a null never reaches the converter.
+    [Fact]
+    public void Append_ConvertedClrType_SendsTheConvertedValueAsTheUdt()
+    {
+        var write = new Conversion(
+            "global::App.Paths.ToDatabase",
+            "global::Microsoft.SqlServer.Types.SqlHierarchyId",
+            true,
+            false,
+            null,
+            false
+        );
+
+        Write(
+                new MethodParameter(
+                    "path",
+                    "Path",
+                    "global::App.Path",
+                    false,
+                    true,
+                    write,
+                    TestSidecars.SqlServer("hierarchyid", 892, 0, 0, SystemClrType("hierarchyid", "SqlHierarchyId"))
+                )
+            )
+            .ShouldContain(
+                "    p0.UdtTypeName = \"hierarchyid\";\n"
+                    + "    p0.Value = parameters.Path is { } value ? (object)global::App.Paths.ToDatabase(value) : "
+                    + "global::System.DBNull.Value;\n"
+                    + "    command.Parameters.Add(p0);\n"
+            );
     }
 
     [Theory]
@@ -383,10 +491,11 @@ public sealed class SqlServerBindingTests
     public void Append_NoDescribedType_BindsByValue() =>
         Write(new MethodParameter("name", "Name", "string", false, true)).ShouldBe(ByValue);
 
-    // A type with no row of the binding, a type of another engine, a vector whose dimension cannot be read and facets
-    // no SqlParameter can hold, all from a sidecar edited by hand but for the first, are bound by value.
+    // A type with no row of the binding, as a type of a newer server, a type of another engine, a vector whose
+    // dimension cannot be read and facets no SqlParameter can hold, all from a sidecar edited by hand but for the
+    // first, are bound by value.
     [Theory]
-    [InlineData("hierarchyid", 892, 0, 0)]
+    [InlineData("newtype", 892, 0, 0)]
     [InlineData("vector", 20, 0, 0)]
     [InlineData("vector(x)", 20, 0, 0)]
     [InlineData("decimal(300,4)", 17, 300, 4)]
@@ -421,6 +530,16 @@ public sealed class SqlServerBindingTests
                 + "        p0.Size = -1;\n    }\n    command.Parameters.Add(p0);\n"
         );
     }
+
+    // The user type the tool writes for a CLR type of sys.
+    private static SqlServerUserType SystemClrType(string name, string clrName) =>
+        new(
+            "sys",
+            name,
+            "Microsoft.SqlServer.Types."
+                + clrName
+                + ", Microsoft.SqlServer.Types, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91"
+        );
 
     private static MethodParameter Described(SidecarType type) =>
         new("name", "Name", "string", false, true, Described: type);
