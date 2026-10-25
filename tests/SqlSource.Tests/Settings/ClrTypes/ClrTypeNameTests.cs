@@ -105,6 +105,11 @@ public sealed class ClrTypeNameTests
         "global::App.Id<global::System.Nullable<long>?>"
     )]
     [InlineData("global::System.Nullable<global::System.Int64>?[]", "global::System.Nullable<long>?[]")]
+    [InlineData("global::System.Nullable<global::System.Int64?>[]", "global::System.Nullable<long?>[]")]
+    [InlineData(
+        "global::App.Id<global::System.Nullable<global::System.Int64?>>",
+        "global::App.Id<global::System.Nullable<long?>>"
+    )]
     [InlineData(
         "global::App.Id<global::System.Nullable<global::System.Int64[]>>",
         "global::App.Id<global::System.Nullable<long[]>>"
