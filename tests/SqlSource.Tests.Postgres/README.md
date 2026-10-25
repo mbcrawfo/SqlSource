@@ -99,7 +99,7 @@ The queries are in `EndToEnd/Queries/`, each file claimed by a type under `EndTo
 | `AllTypes.sql` | `AllTypesQueries` | Every type of the type map, read by `SELECT *` into the default record, array columns included, written by an insert, and `timestamptz` given back to the map by a query's marker |
 | `Constants.sql` | `ConstantQueries` | The output `sql` by the file header, with no models and no sidecar |
 | `Billing/Invoices.sql` | `InvoiceQueries` | The database `billing` by `-- database:`, the model namespace by the file header, and the folder's metadata in the project: `sealed class` output models, the suffix `Row` and `timestamptz` as a `DateTime` |
-| `Notes.sql` | `NoteQueries` | The output `codegen` by the attribute, the type override of the enum to a C# enum and of the domain to a record struct, a `LEFT JOIN`, `-- column:`, and the marks `!` and `?` |
+| `Notes.sql` | `NoteQueries` | The output `models` by the attribute, until the methods are run here and it is `codegen` again, the type override of the enum to a C# enum and of the domain to a record struct, a `LEFT JOIN`, `-- column:`, and the marks `!` and `?` |
 | `Shapes.sql` | `ShapeQueries` | The shapes, a suffix and the model namespace by the attribute and by markers, `sort-input` and `sort-output`, a model of another namespace, and the settings of query methods, which are accepted and change nothing |
 
 Every query writes its parameters in camelCase, `@accountId`, so that its input model binds through Dapper as the manual's recipe says.

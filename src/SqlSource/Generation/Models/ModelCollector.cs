@@ -84,7 +84,8 @@ internal static class ModelCollector
             return new ModelSet(
                 EquatableArray<Model>.Empty,
                 EquatableArray<ModelPlace>.Empty,
-                EquatableArray<DiagnosticInfo>.Empty
+                EquatableArray<DiagnosticInfo>.Empty,
+                EquatableArray<ModelAssignment>.Empty
             );
         }
 
@@ -148,18 +149,21 @@ internal static class ModelCollector
             }
         }
 
-        var (models, places) = Models(emitted);
-        return new ModelSet(models, places, new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable()));
+        var (models, places, assignments) = Models(emitted);
+        return new ModelSet(models, places, new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable()), assignments);
     }
 
-    private static (EquatableArray<Model> Models, EquatableArray<ModelPlace> Places) Models(
-        List<(ModelRequest First, List<ModelRequest> Joined, bool IsPublic)> emitted
-    )
+    private static (
+        EquatableArray<Model> Models,
+        EquatableArray<ModelPlace> Places,
+        EquatableArray<ModelAssignment> Assignments
+    ) Models(List<(ModelRequest First, List<ModelRequest> Joined, bool IsPublic)> emitted)
     {
         var hintNames = emitted.Select(static model => HintName.ForModel(model.First.FullName)).ToImmutableArray();
         var ambiguous = HintName.FindAmbiguous(hintNames);
         var models = ImmutableArray.CreateBuilder<Model>(emitted.Count);
         var places = ImmutableArray.CreateBuilder<ModelPlace>(emitted.Count);
+        var assignments = new List<ModelAssignment>(emitted.Count);
         var text = new StringBuilder();
         for (var index = 0; index < emitted.Count; index++)
         {
@@ -185,13 +189,34 @@ internal static class ModelCollector
                     first.Source.ClaimingType
                 )
             );
+
+            var typeText = TypeTextOf(first);
+            foreach (var request in joined)
+            {
+                assignments.Add(
+                    new ModelAssignment(
+                        request.Source.ClaimingType,
+                        request.Source.NormalizedPath,
+                        request.Source.QueryIndex,
+                        request.Role,
+                        typeText,
+                        first.Kind
+                    )
+                );
+            }
         }
 
+        assignments.Sort(ModelAssignment.Order);
         return (
             new EquatableArray<Model>(models.MoveToImmutable()),
-            new EquatableArray<ModelPlace>(places.MoveToImmutable())
+            new EquatableArray<ModelPlace>(places.MoveToImmutable()),
+            new EquatableArray<ModelAssignment>(assignments.ToImmutableArray())
         );
     }
+
+    // The model as code names it from anywhere.
+    private static string TypeTextOf(ModelRequest first) =>
+        first.NamespaceText.Length == 0 ? "global::" + first.Name : "global::" + first.NamespaceText + "." + first.Name;
 
     // The first difference of the later request from the first, as SQLSRC257 words it, or null when they give one
     // model: the role, the kind, the sorting, the number of properties, then each property's name, type and
