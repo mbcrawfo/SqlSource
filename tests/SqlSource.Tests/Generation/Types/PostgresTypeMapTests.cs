@@ -423,6 +423,28 @@ public sealed class PostgresTypeMapTests
     public void KeyOf_Type_IsWrittenAsTheTypeOverrideReadsIt(string schema, string internalName, string key) =>
         PostgresTypeMap.KeyOf(TestSidecars.Postgres(schema: schema, internalName: internalName)).ShouldBe(key);
 
+    // A row under either driver's column, the rule of bits and of an enum, and an array of any of them.
+    [Theory]
+    [InlineData("long")]
+    [InlineData("string")]
+    [InlineData("bool")]
+    [InlineData(BitArray)]
+    [InlineData(DateOnly)]
+    [InlineData(DateTime)]
+    [InlineData("int[]")]
+    [InlineData("byte[]")]
+    [InlineData("global::NpgsqlTypes.NpgsqlRange<int>")]
+    [InlineData("global::NpgsqlTypes.NpgsqlRange<int>[]")]
+    [InlineData("global::NpgsqlTypes.NpgsqlCube")]
+    public void Gives_TypesOfTheMap_AreGiven(string text) => PostgresTypeMap.Gives(text).ShouldBeTrue();
+
+    [Theory]
+    [InlineData("global::MyApp.Email")]
+    [InlineData("global::MyApp.Email[]")]
+    [InlineData("global::System.Uri")]
+    [InlineData("int?")]
+    public void Gives_ForeignTypes_AreNot(string text) => PostgresTypeMap.Gives(text).ShouldBeFalse();
+
     // A cell is the C# type the mapping gives, or "!" and the kind of its failure.
     private static void ShouldMapTo(TypeMapping mapping, string expected, bool isValueType, string key)
     {

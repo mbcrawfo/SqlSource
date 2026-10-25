@@ -12,7 +12,9 @@ namespace SqlSource.Generation.Methods;
 
 /// <summary>
 /// Decides which queries of one type get a method, and what each method is written from, with the problems of those
-/// that cannot have one: <c>SQLSRC272</c>, <c>SQLSRC274</c> and <c>SQLSRC275</c>.
+/// that cannot have one: <c>SQLSRC272</c>, <c>SQLSRC274</c> and <c>SQLSRC275</c>, and, from
+/// <see cref="ConversionPlanner" />, <c>SQLSRC279</c>, <c>SQLSRC280</c>, and <c>SQLSRC277</c> and <c>SQLSRC278</c> for
+/// a converter of a referenced assembly.
 /// </summary>
 internal static class MethodPlanner
 {
@@ -173,7 +175,8 @@ internal static class MethodPlanner
     }
 
     // The plan of one query whose output is CodeGen, or null when it gets nothing and reports nothing here.  Every
-    // problem of SQLSRC272, SQLSRC275 and SQLSRC274 that the query has is reported, and any one leaves it no method.
+    // problem of SQLSRC272, SQLSRC275, SQLSRC274 and its converters that the query has is reported, and any one leaves
+    // it no method.
     private static Planned? Plan(
         MethodsInput input,
         string key,
@@ -217,12 +220,32 @@ internal static class MethodPlanner
         }
 
         // A query that gets no method takes no name, so it is compared with the other methods' only once it has one.
+        // Its models are read whatever its other problems, so that it gets every problem of its converters too.
         var planned = new Planned(problems, name, query.Name, query.NameLocation, null, false);
-        if (
-            problems.Count > 0
-            || !TryReadInput(input, key, file, queryIndex, query, models, out var methodInput)
-            || !TryReadOutput(input, key, file, queryIndex, settings, models, out var methodOutput)
-        )
+        var databaseEngine = SqlDescribableDialects.EngineOf(file.Dialect);
+        var hasInput = TryReadInput(
+            input,
+            key,
+            file,
+            queryIndex,
+            query,
+            models,
+            databaseEngine,
+            problems,
+            out var methodInput
+        );
+        var hasOutput = TryReadOutput(
+            input,
+            key,
+            file,
+            queryIndex,
+            settings,
+            models,
+            databaseEngine,
+            problems,
+            out var methodOutput
+        );
+        if (problems.Count > 0 || !hasInput || !hasOutput)
         {
             return planned;
         }
@@ -233,7 +256,7 @@ internal static class MethodPlanner
             TypeEmitter.GetSummaryXml(query, file.FileName),
             shape,
             settings.CollectionType,
-            SqlDescribableDialects.EngineOf(file.Dialect),
+            databaseEngine,
             settings.KeepComments ? query.KeptSegments ?? query.Segments : query.Segments,
             settings.ValidateTokens,
             methodInput,
@@ -288,8 +311,8 @@ internal static class MethodPlanner
                 ),
         ];
 
-    // The input model, or null when the query has no parameters.  False when it needs one and has none, or when its
-    // properties do not match its parameters, which is never thrown on.
+    // The input model, or null when the query has no parameters.  False when it needs one and has none, when its
+    // properties do not match its parameters, which is never thrown on, or when a parameter's converter blocks it.
     private static bool TryReadInput(
         MethodsInput input,
         string key,
@@ -297,6 +320,8 @@ internal static class MethodPlanner
         int queryIndex,
         SqlQuery query,
         QueryModels models,
+        DatabaseEngine engine,
+        List<DiagnosticInfo> problems,
         out MethodInput? methodInput
     )
     {
@@ -315,15 +340,28 @@ internal static class MethodPlanner
         }
 
         var parameters = ImmutableArray.CreateBuilder<MethodParameter>(properties.Count);
+        var isBlocked = false;
         for (var index = 0; index < properties.Count; index++)
         {
             var property = properties[index];
+            var write = ConversionPlanner.Plan(
+                property.Type,
+                false,
+                engine,
+                input.Converters,
+                property.Subject,
+                query.NameLocation,
+                problems,
+                out var blocked
+            );
+            isBlocked |= blocked;
             parameters.Add(
                 new MethodParameter(
                     query.Parameters[index].Name,
                     property.Name,
                     property.Type.IsValueType,
-                    property.IsNullable
+                    property.IsNullable,
+                    write
                 )
             );
         }
@@ -332,11 +370,11 @@ internal static class MethodPlanner
             model.TypeText,
             new EquatableArray<MethodParameter>(parameters.MoveToImmutable())
         );
-        return true;
+        return !isBlocked;
     }
 
-    // The output model, or null when the query's entry has no rows.  False when it needs one and has none, or when its
-    // columns' names do not match its properties.
+    // The output model, or null when the query's entry has no rows.  False when it needs one and has none, when its
+    // columns' names do not match its properties, or when a column's converter blocks it.
     private static bool TryReadOutput(
         MethodsInput input,
         string key,
@@ -344,6 +382,8 @@ internal static class MethodPlanner
         int queryIndex,
         QuerySettings settings,
         QueryModels models,
+        DatabaseEngine engine,
+        List<DiagnosticInfo> problems,
         out MethodOutput? methodOutput
     )
     {
@@ -364,10 +404,22 @@ internal static class MethodPlanner
         }
 
         var columns = ImmutableArray.CreateBuilder<MethodColumn>(properties.Count);
+        var isBlocked = false;
         for (var index = 0; index < properties.Count; index++)
         {
             var property = properties[index];
-            columns.Add(new MethodColumn(names[index], property.Name, property.Type.Text, property.IsNullable));
+            var read = ConversionPlanner.Plan(
+                property.Type,
+                true,
+                engine,
+                input.Converters,
+                property.Subject,
+                models.NameLocation,
+                problems,
+                out var blocked
+            );
+            isBlocked |= blocked;
+            columns.Add(new MethodColumn(names[index], property.Name, property.Type.Text, property.IsNullable, read));
         }
 
         methodOutput = new MethodOutput(
@@ -376,7 +428,7 @@ internal static class MethodPlanner
             new EquatableArray<MethodColumn>(columns.MoveToImmutable()),
             ConstructorOrder(properties, (settings.Parameters & GeneratorParameters.SortOutput) != 0)
         );
-        return true;
+        return !isBlocked;
     }
 
     // The ordinals in the order of the model's properties: by name, ordinally, when the model is sorted, as

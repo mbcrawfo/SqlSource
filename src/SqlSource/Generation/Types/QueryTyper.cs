@@ -155,19 +155,53 @@ internal static class QueryTyper
 
         if (mapping is { Kind: TypeMappingKind.Mapped, Text: { } text })
         {
+            // A type of the map has no place; one that an override chose has the base map's type beside it.
             return new PropertyType(
                 text,
                 mapping.IsValueType,
                 mapping.IsPublic,
                 mapping.WarningIds,
                 mapping.Key,
-                mapping.Detail
+                mapping.Detail,
+                mapping.Detail is null ? null : DatabaseTypeOf(type, typing)
             );
         }
 
         typing.Diagnostics.Add(Diagnose(mapping, MessageSubject.Of(owner, name), type.Name, typing, engine));
         return null;
     }
+
+    // What the base map alone reads the type as, with no lookup of the override at any level, and the element's value
+    // type for an array or a domain over one.
+    private static DatabaseType DatabaseTypeOf(SidecarType type, Typing typing)
+    {
+        if (type is SqlServerType sqlServer)
+        {
+            return DatabaseTypeOf(SqlServerTypeMap.Map(sqlServer, typing.SqlClientColumn, null), null);
+        }
+
+        var postgres = (PostgresType)type;
+        var array = postgres;
+        while (array.Kind.Equals(SidecarValues.Kind.Domain, StringComparison.Ordinal) && array.Base is { } baseType)
+        {
+            array = baseType;
+        }
+
+        var element =
+            array.Kind.Equals(SidecarValues.Kind.Array, StringComparison.Ordinal) && array.Element is { } item
+                ? PostgresTypeMap.Map(item, typing.Column)
+                : null;
+        return DatabaseTypeOf(PostgresTypeMap.Map(postgres, typing.Column), element);
+    }
+
+    private static DatabaseType DatabaseTypeOf(TypeMapping mapping, TypeMapping? element) =>
+        mapping is { Kind: TypeMappingKind.Mapped, Text: { } text }
+            ? new DatabaseType(
+                text,
+                mapping.IsValueType,
+                element is { Kind: TypeMappingKind.Mapped, IsValueType: true }
+            )
+            : new DatabaseType(null, false, false);
 
     // The failure's diagnostic.  NeedsDriver and Unreadable occur for both engines, and their helps name the engine's
     // driver and system schema; NeedsSqlServerTypes and NeedsNewerSqlClient are SQL Server's alone, and

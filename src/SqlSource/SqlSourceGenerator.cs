@@ -65,7 +65,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             settings.ProjectSettings,
             settings.ProjectLevel
         );
-        _ = FindConverters(context, typing.MappedTypeConverters);
+        var converters = FindConverters(context, typing.MappedTypeConverters);
         var models = CollectModels(context, typing.Files, typeQueries, settings.ProjectLevel);
         ReportDrivers(context, typing.NpgsqlProbe, typing.SqlClientProbe, sidecars.Needs, parsedFiles.Sorted);
         ReportProblems(context, sidecars.Checks, typing.FileTypes, models.FileModels, models.Models);
@@ -80,7 +80,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             models.ModelNames,
             claims.TypeMemberNames,
             typing.NpgsqlProbe,
-            typing.SqlClientProbe
+            typing.SqlClientProbe,
+            converters
         );
     }
 
@@ -755,7 +756,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<EquatableArray<string>> modelNames,
         IncrementalValueProvider<EquatableArray<TypeMemberNames>> typeMemberNames,
         IncrementalValueProvider<NpgsqlProbe> npgsqlProbe,
-        IncrementalValueProvider<SqlClientProbe> sqlClientProbe
+        IncrementalValueProvider<SqlClientProbe> sqlClientProbe,
+        IncrementalValueProvider<ConverterSet> converters
     )
     {
         // Whether each engine's driver allows its methods, which is the same value until a reference changes.
@@ -767,11 +769,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var assignments = models.Select(static (set, _) => set.Assignments);
 
         // Each type's own slice of what its methods need, which is equal until something of the type changes: its
-        // queries, its files' models, the models its queries got, its names or the drivers.
+        // queries, its files' models, the models its queries got, its names, the drivers or the converters of the
+        // types its overrides chose.
         var typeMethods = typeQueries
             .Combine(projectLevel)
             .Combine(allFileModels.Combine(assignments))
-            .Combine(typeMemberNames.Combine(drivers))
+            .Combine(typeMemberNames.Combine(drivers.Combine(converters)))
             .Select(
                 static (input, _) =>
                     MethodsInput.Gather(
@@ -780,7 +783,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                         input.Left.Right.Left,
                         input.Left.Right.Right,
                         input.Right.Left,
-                        input.Right.Right
+                        input.Right.Right.Left,
+                        input.Right.Right.Right
                     )
             )
             .WithTrackingName(TrackingNames.MethodsInput)

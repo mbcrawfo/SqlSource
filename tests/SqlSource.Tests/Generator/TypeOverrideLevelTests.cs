@@ -59,6 +59,16 @@ public sealed class TypeOverrideLevelTests
     // The warning ids of a C# type whose use gives none.
     private static readonly EquatableArray<string> NoWarnings = EquatableArray<string>.Empty;
 
+    // What the base map alone reads the database types of these tests as, which a type that an override chose
+    // carries: int4, timestamptz, text and an enum, and a composite, which it gives no C# type.
+    private static readonly DatabaseType IntBase = new("int", true, false);
+
+    private static readonly DatabaseType DateTimeBase = new("global::System.DateTime", true, false);
+
+    private static readonly DatabaseType StringBase = new("string", false, false);
+
+    private static readonly DatabaseType NoBase = new(null, false, false);
+
     private static readonly PostgresType Timestamptz = Catalog("timestamptz");
 
     // A key of timestamptz at each level below a default's, from the least specific, each as its level writes it.
@@ -154,8 +164,8 @@ public sealed class TypeOverrideLevelTests
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
             .ShouldBe([
-                new PropertyType("short", true, true, NoWarnings, "int4", "a -- type-override: marker of the query"),
-                new PropertyType(DateTimeOffset, true, true, NoWarnings, "timestamptz", ThePropertyPlace),
+                new PropertyType("short", true, true, NoWarnings, "int4", TheQueryPlace, IntBase),
+                new PropertyType(DateTimeOffset, true, true, NoWarnings, "timestamptz", ThePropertyPlace, DateTimeBase),
             ]);
     }
 
@@ -170,7 +180,7 @@ public sealed class TypeOverrideLevelTests
         var run = Run(settings.PropertyOf(Setting.TypeOverrides), (file, [Entry(file, "GetUser", Int4)]));
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("short", true, true, NoWarnings, "int4", place)]);
+        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("short", true, true, NoWarnings, "int4", place, IntBase)]);
     }
 
     // An entry for an array is written with its element's key and [], or with its name in the catalog, which is read
@@ -194,6 +204,8 @@ public sealed class TypeOverrideLevelTests
         );
         var (elementOverride, elementType) =
             element == "citext" ? ("citext=System.Uri", "global::System.Uri[]") : ("int4=long", "long[]");
+        var database =
+            element == "citext" ? new DatabaseType("string[]", false, false) : new DatabaseType("int[]", false, true);
 
         var ofTheArray = Run(overrides, (file, [Entry(file, "GetUser", array)]));
         var ofTheElement = Run(elementOverride, (file, [Entry(file, "GetUser", array)]));
@@ -207,11 +219,12 @@ public sealed class TypeOverrideLevelTests
                     true,
                     NoWarnings,
                     key,
-                    ThePropertyPlace
+                    ThePropertyPlace,
+                    database
                 ),
             ]);
         ColumnsOf(ofTheElement, "GetUser")
-            .ShouldBe([new PropertyType(elementType, false, true, NoWarnings, element, ThePropertyPlace)]);
+            .ShouldBe([new PropertyType(elementType, false, true, NoWarnings, element, ThePropertyPlace, database)]);
     }
 
     // _int4 and int4[] are one key, so the query's entry replaces the property's whichever spelling each has, and
@@ -447,11 +460,19 @@ public sealed class TypeOverrideLevelTests
         own.Diagnostics.ShouldBeEmpty();
         ColumnsOf(own, "GetUser")
             .ShouldBe([
-                new PropertyType("global::System.Guid", true, true, NoWarnings, "public.user_id", ThePropertyPlace),
-                new PropertyType("long", true, true, NoWarnings, "int4", ThePropertyPlace),
+                new PropertyType(
+                    "global::System.Guid",
+                    true,
+                    true,
+                    NoWarnings,
+                    "public.user_id",
+                    ThePropertyPlace,
+                    IntBase
+                ),
+                new PropertyType("long", true, true, NoWarnings, "int4", ThePropertyPlace, IntBase),
             ]);
         ColumnsOf(ofTheBase, "GetUser")
-            .ShouldBe([new PropertyType("long", true, true, NoWarnings, "int4", ThePropertyPlace)]);
+            .ShouldBe([new PropertyType("long", true, true, NoWarnings, "int4", ThePropertyPlace, IntBase)]);
     }
 
     [Fact]
@@ -487,8 +508,16 @@ public sealed class TypeOverrideLevelTests
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
             .ShouldBe([
-                new PropertyType("global::System.Guid", true, true, NoWarnings, "public.citext", ThePropertyPlace),
-                new PropertyType("global::System.Uri", false, true, NoWarnings, "citext", ThePropertyPlace),
+                new PropertyType(
+                    "global::System.Guid",
+                    true,
+                    true,
+                    NoWarnings,
+                    "public.citext",
+                    ThePropertyPlace,
+                    StringBase
+                ),
+                new PropertyType("global::System.Uri", false, true, NoWarnings, "citext", ThePropertyPlace, StringBase),
             ]);
     }
 
@@ -508,8 +537,24 @@ public sealed class TypeOverrideLevelTests
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
             .ShouldBe([
-                new PropertyType("global::System.Guid", true, true, NoWarnings, "public.Status", ThePropertyPlace),
-                new PropertyType("global::System.Uri", false, true, NoWarnings, "public.status", ThePropertyPlace),
+                new PropertyType(
+                    "global::System.Guid",
+                    true,
+                    true,
+                    NoWarnings,
+                    "public.Status",
+                    ThePropertyPlace,
+                    StringBase
+                ),
+                new PropertyType(
+                    "global::System.Uri",
+                    false,
+                    true,
+                    NoWarnings,
+                    "public.status",
+                    ThePropertyPlace,
+                    StringBase
+                ),
             ]);
     }
 
@@ -557,7 +602,8 @@ public sealed class TypeOverrideLevelTests
                     true,
                     NoWarnings,
                     "public.User_Status",
-                    "a -- type-override: marker of the query"
+                    "a -- type-override: marker of the query",
+                    StringBase
                 ),
             ]);
     }
@@ -598,8 +644,8 @@ public sealed class TypeOverrideLevelTests
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
             .ShouldBe([
-                new PropertyType("global::System.Guid", true, true, NoWarnings, QuotedKey, place),
-                new PropertyType("long", true, true, NoWarnings, "int4", place),
+                new PropertyType("global::System.Guid", true, true, NoWarnings, QuotedKey, place, NoBase),
+                new PropertyType("long", true, true, NoWarnings, "int4", place, IntBase),
             ]);
     }
 
@@ -619,7 +665,7 @@ public sealed class TypeOverrideLevelTests
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
-            .ShouldBe([new PropertyType("global::System.Guid", true, true, NoWarnings, QuotedKey, place)]);
+            .ShouldBe([new PropertyType("global::System.Guid", true, true, NoWarnings, QuotedKey, place, NoBase)]);
     }
 
     // Two markers of one header, whose keys differ by case, are two keys and not a repeat of one.
@@ -638,8 +684,8 @@ public sealed class TypeOverrideLevelTests
         const string Place = "a -- type-override: marker in the file header";
         ColumnsOf(run, "GetUser")
             .ShouldBe([
-                new PropertyType("global::System.Guid", true, true, NoWarnings, "public.Status", Place),
-                new PropertyType("global::System.Uri", false, true, NoWarnings, "public.status", Place),
+                new PropertyType("global::System.Guid", true, true, NoWarnings, "public.Status", Place, StringBase),
+                new PropertyType("global::System.Uri", false, true, NoWarnings, "public.status", Place, StringBase),
             ]);
     }
 
@@ -752,7 +798,7 @@ public sealed class TypeOverrideLevelTests
         var column = ColumnsOf(run, "GetUser").ShouldHaveSingleItem();
         column.WarningIds.ShouldBe(["CS0612", "CS0618"]);
         (column with { WarningIds = NoWarnings }).ShouldBe(
-            new PropertyType("global::MyApp.OldThing", false, true, NoWarnings, "int4", ThePropertyPlace)
+            new PropertyType("global::MyApp.OldThing", false, true, NoWarnings, "int4", ThePropertyPlace, IntBase)
         );
     }
 
@@ -772,7 +818,9 @@ public sealed class TypeOverrideLevelTests
 
         run.ShouldBeClean();
         ColumnsOf(run, "GetUser")
-            .ShouldBe([new PropertyType("global::MyApp.Inner", true, false, NoWarnings, "int4", ThePropertyPlace)]);
+            .ShouldBe([
+                new PropertyType("global::MyApp.Inner", true, false, NoWarnings, "int4", ThePropertyPlace, IntBase),
+            ]);
     }
 
     // The files with their sidecars, under the property's type override, or none.

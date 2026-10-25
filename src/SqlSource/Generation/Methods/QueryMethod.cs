@@ -47,7 +47,16 @@ internal sealed record MethodInput(string TypeText, EquatableArray<MethodParamet
 /// <param name="Property">The property's name.</param>
 /// <param name="IsValueType">Whether the property's type is a value type.</param>
 /// <param name="IsNullable">Whether the model calls the property nullable.</param>
-internal sealed record MethodParameter(string Name, string Property, bool IsValueType, bool IsNullable);
+/// <param name="Write">
+/// The converter the property's value is converted through before it is bound, or null for a value bound as it is.
+/// </param>
+internal sealed record MethodParameter(
+    string Name,
+    string Property,
+    bool IsValueType,
+    bool IsNullable,
+    Conversion? Write = null
+);
 
 /// <summary>
 /// The output model of a query's method.
@@ -78,4 +87,21 @@ internal sealed record MethodOutput(
 /// SqlClient gives <c>SqlVector&lt;float&gt;.Null</c> for a <c>NULL</c>.
 /// </param>
 /// <param name="IsNullable">Whether the model calls the property nullable.</param>
-internal sealed record MethodColumn(string Name, string Property, string TypeText, bool IsNullable);
+/// <param name="Read">
+/// The converter the value read is converted through into the property's type, or null for a value read as the
+/// property's type.
+/// </param>
+internal sealed record MethodColumn(
+    string Name,
+    string Property,
+    string TypeText,
+    bool IsNullable,
+    Conversion? Read = null
+)
+{
+    /// <summary>
+    /// The type the column is read as: the database side of <see cref="Read" />, or <see cref="TypeText" /> when it
+    /// has none.
+    /// </summary>
+    public string ReadText => Read?.DatabaseText ?? TypeText;
+}

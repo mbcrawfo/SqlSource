@@ -837,7 +837,8 @@ internal static class SqlDiagnostics
     );
 
     // {0} is the method as "App.Email.FromDatabase(string)", {1} its first fault, as "it is not static".  Reported at
-    // the method's name for a method of the project's source.
+    // the method's name for a method of the project's source, and at the query's name for one of a referenced
+    // assembly that the query's method would use.
     public static readonly DiagnosticDescriptor NotAConverter = new(
         id: "SQLSRC277",
         title: "Method marked as a converter is not one",
@@ -852,7 +853,7 @@ internal static class SqlDiagnostics
 
     // {0} and {1} are the two methods as "App.Email.FromDatabase(string)", {2} the type of their argument and {3} their
     // return type, as PostgresTypeMap.AsWritten writes them.  Reported at the name of each method of the project's
-    // source.
+    // source, and at the query's name for two of a referenced assembly that the query's method would use.
     public static readonly DiagnosticDescriptor DuplicateConverter = new(
         id: "SQLSRC278",
         title: "Two converters convert between the same types",
@@ -861,6 +862,38 @@ internal static class SqlDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         helpLinkUri: HelpLinkBase + "sqlsrc278",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the column or parameter, as "column 'id'", {1} its type as PostgresTypeMap.AsWritten writes it, {2} what
+    // its converters convert between, as "whose converters convert from and to 'int', and not from and to 'long', the
+    // type the database type 'int8' is read as", or, for a database type the base map gives no C# type, "which has
+    // converters, but the database type 'public.address' has no C# type to convert from", and {3} the help, as "Add a
+    // converter between 'MyApp.UserId' and 'long'".  Reported at the query's name.
+    public static readonly DiagnosticDescriptor ConverterTypeMismatch = new(
+        id: "SQLSRC279",
+        title: "Converters do not convert from the database type",
+        messageFormat: "The {0} has type '{1}', {2}.  {3}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc279",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the column or parameter, as "column 'email'", {1} its type, {2} "to" or "from", the direction of the
+    // converter it has, {3} the type the base map reads its database type as, {4} the other of "to" and "from", {5}
+    // "column" or "parameter", and {6} and {7} the argument and return types of the converter it needs.  The types are
+    // as PostgresTypeMap.AsWritten writes them.  Reported at the query's name.
+    public static readonly DiagnosticDescriptor ConverterDirectionMissing = new(
+        id: "SQLSRC280",
+        title: "Converter is missing for one direction",
+        messageFormat: "The {0} has type '{1}', which has a converter {2} '{3}' but none {4} it, which a {5} needs.  "
+            + "Add a static method marked [SqlSourceConverter] that takes '{6}' and returns '{7}'.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc280",
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
@@ -937,7 +970,9 @@ internal static class SqlDiagnostics
             TokenNamedAsAnArgument,
             ExtensionClassNameTaken,
             NotAConverter,
-            DuplicateConverter
+            DuplicateConverter,
+            ConverterTypeMismatch,
+            ConverterDirectionMissing
         );
 
     /// <summary>

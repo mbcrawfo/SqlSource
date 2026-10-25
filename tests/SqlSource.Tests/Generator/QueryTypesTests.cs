@@ -222,7 +222,8 @@ public sealed class QueryTypesTests
                     true,
                     NoWarnings,
                     "pg_class",
-                    "a -- type-override: marker in the file header"
+                    "a -- type-override: marker in the file header",
+                    new DatabaseType(null, false, false)
                 ),
             ]);
     }
@@ -436,7 +437,8 @@ public sealed class QueryTypesTests
                     true,
                     NoWarnings,
                     "\"my schema\".U&\"Order\\000AItem\"",
-                    "a -- type-override: marker in the file header"
+                    "a -- type-override: marker in the file header",
+                    new DatabaseType(null, false, false)
                 ),
             ]);
     }
@@ -588,7 +590,119 @@ public sealed class QueryTypesTests
         var run = Run([NpgsqlReferences.Npgsql10], file, Entry(file, "GetUser", [], [Column("tags", tags)]));
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run).ShouldBe([new PropertyType(expected, false, true, NoWarnings, key, place)]);
+        ColumnsOf(run)
+            .ShouldBe([
+                new PropertyType(
+                    expected,
+                    false,
+                    true,
+                    NoWarnings,
+                    key,
+                    place,
+                    place is null ? null : new DatabaseType("string[]", false, false)
+                ),
+            ]);
+    }
+
+    // The base map's type of an overridden column, as if no level of the override applied: a domain's base's, though
+    // the property maps it too, and an array's of its element's.  A composite has none, and a column the base map
+    // types has no override to convert.
+    [Fact]
+    public void Run_ColumnOfAnOverriddenType_HasItsBaseMapType()
+    {
+        const string TypesSource = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class Sample;
+            }
+
+            namespace MyApp
+            {
+                public readonly record struct Email(string Value);
+
+                public readonly record struct When(System.DateTimeOffset Value);
+
+                public readonly record struct UserId(long Value);
+
+                public sealed class Address;
+            }
+            """;
+        var email = DomainOf("email", Catalog("text"));
+        var userId = DomainOf("user_id", Catalog("int8"));
+        var address = TestSidecars.Postgres(
+            name: "address",
+            kind: SidecarValues.Kind.Composite,
+            schema: "public",
+            internalName: "address"
+        );
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: public.email=MyApp.Email\n"
+                + "-- type-override: public.moment=MyApp.When\n"
+                + "-- type-override: public.user_id=MyApp.UserId\n"
+                + "-- type-override: public.address=MyApp.Address\n"
+                + SqlTexts.GetUser
+        );
+        var entry = Entry(
+            file,
+            "GetUser",
+            [],
+            [
+                Column("email", email),
+                Column("moment", DomainOf("moment", Catalog("timestamptz"))),
+                Column("emails", ArrayOf(email)),
+                Column("user_ids", ArrayOf(userId)),
+                Column("address", address),
+                Column("created", Catalog("timestamptz")),
+            ]
+        );
+
+        var run = ModelRuns.Run(
+            TypesSource,
+            [file, Sidecars.Of(file, entry)],
+            new System.Collections.Generic.Dictionary<string, string?>
+            {
+                ["SqlSourceTypeOverrides"] = "timestamptz=System.DateTimeOffset",
+            },
+            [NpgsqlReferences.Npgsql10]
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        ColumnsOf(run)
+            .Select(column => column.Database)
+            .ShouldBe([
+                new DatabaseType("string", false, false),
+                new DatabaseType("global::System.DateTime", true, false),
+                new DatabaseType("string[]", false, false),
+                new DatabaseType("long[]", false, true),
+                new DatabaseType(null, false, false),
+                new DatabaseType("global::System.DateTime", true, false),
+            ]);
+        ColumnsOf(run)
+            .Select(column => column.Text)
+            .ShouldBe([
+                "global::MyApp.Email",
+                "global::MyApp.When",
+                "global::MyApp.Email[]",
+                "global::MyApp.UserId[]",
+                "global::MyApp.Address",
+                "global::System.DateTimeOffset",
+            ]);
+    }
+
+    [Fact]
+    public void Run_ColumnOfTheBaseMap_HasNoBaseMapTypeOfItsOwn()
+    {
+        var run = Run(
+            [NpgsqlReferences.Npgsql10],
+            GeneratorHarness.UsersFile,
+            Entry(GeneratorHarness.UsersFile, "GetUser", [], [Column("id", Catalog("int4"))])
+        );
+
+        ColumnsOf(run).ShouldHaveSingleItem().Database.ShouldBeNull();
     }
 
     private static MetadataReference[] Driver(string driver) =>
@@ -607,6 +721,24 @@ public sealed class QueryTypesTests
     private static SidecarParameter Parameter(string name, SidecarType? type) => TestSidecars.Parameter(0, name, type);
 
     private static SidecarColumn Column(string name, SidecarType type) => TestSidecars.Column(0, name, type);
+
+    private static PostgresType DomainOf(string internalName, PostgresType baseType) =>
+        TestSidecars.Postgres(
+            name: internalName,
+            kind: SidecarValues.Kind.Domain,
+            schema: "public",
+            internalName: internalName,
+            baseType: baseType
+        );
+
+    private static PostgresType ArrayOf(PostgresType element) =>
+        TestSidecars.Postgres(
+            name: element.Name + "[]",
+            kind: SidecarValues.Kind.Array,
+            schema: element.Schema,
+            internalName: "_" + element.InternalName,
+            element: element
+        );
 
     private static PostgresType Extension(string internalName) =>
         TestSidecars.Postgres(name: internalName, schema: "public", internalName: internalName);
