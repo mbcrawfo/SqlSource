@@ -161,7 +161,8 @@ public sealed class RunTimeArgumentTests(SqlServerContainer sqlServer)
         }
     }
 
-    // The connection is of a pool of its own, so that a cancel can find the session that the method opens.
+    // The connection is of a pool of its own, so that a cancel can find the session that the method opens, and the
+    // pool is cleared at the end, so that no idle session of it lingers.
     [Theory]
     [InlineData(Outcome.Returns)]
     [InlineData(Outcome.Throws)]
@@ -169,10 +170,16 @@ public sealed class RunTimeArgumentTests(SqlServerContainer sqlServer)
     public async Task ClosedConnection_AfterTheMethod_IsClosed(Outcome outcome)
     {
         await using var connection = OfItsOwnPool();
+        try
+        {
+            await CallAsync(connection, outcome, null);
 
-        await CallAsync(connection, outcome, null);
-
-        connection.State.ShouldBe(ConnectionState.Closed);
+            connection.State.ShouldBe(ConnectionState.Closed);
+        }
+        finally
+        {
+            SqlConnection.ClearPool(connection);
+        }
     }
 
     [Theory]
@@ -234,17 +241,29 @@ public sealed class RunTimeArgumentTests(SqlServerContainer sqlServer)
                 : $"s.program_name = N'{new SqlConnectionStringBuilder(connection.ConnectionString).ApplicationName}'";
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var call = connection.WaitFiveSeconds(transaction: transaction, cancellationToken: cancellation.Token);
+        bool endedFirst;
         try
         {
+            // The wait ends too when the call does, so that a call that fails at once is not waited for.
             await Eventually.TrueAsync(
-                async () => await sqlServer.ScalarAsync(WaitingInTheWaitFor(session)) is 1,
+                async () => call.IsCompleted || await sqlServer.ScalarAsync(WaitingInTheWaitFor(session)) is 1,
                 "The server never showed the method's session waiting in its WAITFOR."
             );
         }
         finally
         {
-            // A wait that was never seen is cancelled too, so that the call ends before the test does.
+            // However the wait ends, the call is cancelled and waited for, so that it ends before the test does and a
+            // failure of the wait is the one reported.
+            endedFirst = call.IsCompleted;
             await cancellation.CancelAsync();
+            await ((Task)call).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        }
+
+        if (endedFirst)
+        {
+            // A call that ended before its WAITFOR was seen reports its own failure.
+            _ = await call;
+            throw new ShouldAssertException("The method ended before the server showed its WAITFOR.");
         }
 
         var thrown = await Should.ThrowAsync<SqlException>(() => call);
