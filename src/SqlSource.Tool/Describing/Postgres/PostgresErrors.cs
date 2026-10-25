@@ -72,7 +72,7 @@ internal static class PostgresErrors
 
     public const string BindHelp =
         "Npgsql cannot send a value of this type; declare the parameter as text with -- param: and cast it to the "
-        + "type where it is used; a later version may let a project declare a conversion for the type";
+        + "type where it is used";
 
     public const string UnnamedHelp =
         "the type has no name that Npgsql can be given without ambiguity; rename the schema or the type, or declare "

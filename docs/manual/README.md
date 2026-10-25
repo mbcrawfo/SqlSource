@@ -19,6 +19,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | See what the generator writes, and where it goes | [The generator](generator.md#locations) |
 | Know which models a query gets, what they are named, and what their properties are | [Models](generator.md#models) |
 | Run a query with its generated method, and know what it returns and throws | [Query methods](generator.md#query-methods) |
+| Choose what a query method returns its rows in, where the methods go, or give them `Async` names | [Collection type](settings.md#setting-collection-type), [where the methods go](settings.md#setting-method-location), [generator parameters](settings.md#setting-generator-parameters) |
 | Run several queries in a transaction | [The recipe](recipes.md#queries-in-a-transaction) |
 | Use the queries with Dapper or ADO.NET | [The recipe](recipes.md#dapper-and-adonet) |
 | Read rows into the models with Dapper | [The recipe](recipes.md#models-through-dapper) |
@@ -53,7 +54,7 @@ SqlSource is in early development.  This table is the one list of what works in 
 | The `Output` setting | Available | [Output](settings.md#setting-output) |
 | The settings for models: model suffixes, namespace, shape and name, and the generator parameters `sort-input`, `sort-output` and `no-table-models` | Available | [All settings](settings.md#all-settings) |
 | The settings for query methods: collection type, `MethodLocation`, and the generator parameter `async-method-suffix` | Available | [All settings](settings.md#all-settings) |
-| `null` or `not null` in a `-- param:` marker | Available: `null` makes the parameter's property in the input model nullable | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
+| `null` or `not null` in a `-- param:` marker | Available | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | Result shapes (`-- name: GetUser -> one`) | Available | [Result shapes](sql-files.md#result-shapes) |
 | Describing queries with the `sqlsource` tool, sidecar files, and `--check` | Available | [The tool](tool.md) |
 | An error in the build for a query whose sidecar entry is missing or out of date | Available | [Sidecar files](tool.md#sidecar-files), [SQLSRC241](diagnostics.md#sqlsrc241), [SQLSRC244](diagnostics.md#sqlsrc244) |
@@ -65,10 +66,10 @@ SqlSource is in early development.  This table is the one list of what works in 
 | A column's nullability set by `!` or `?` at the end of its alias, or by a `-- column:` marker, which leaves the column's name alone for Dapper | Available | [Which properties can be null](generator.md#model-nullability), [the `-- column:` marker](generator.md#column-marker) |
 | Generated query methods, which run a query on a connection and read its rows into its models, and `UnexpectedRowCountException` | Available | [Query methods](generator.md#query-methods) |
 | Each parameter of a query method sent as the database type it was described with | Available | [How a parameter is sent](generator.md#method-parameters), [PostgreSQL](postgresql.md#query-methods), [SQL Server](sqlserver.md#method-parameters) |
-| Converters: methods of your own that turn a C# type of your choice into one the driver reads and sends, for the query methods | Available | [Converters](settings.md#converters), [the recipe](recipes.md#strongly-typed-id) |
+| Converters: methods of your own that convert between a C# type of your choice and one the driver reads and sends, for the query methods | Available | [Converters](settings.md#converters), [the recipe](recipes.md#strongly-typed-id) |
 | Library maps for the types of libraries such as NodaTime | Coming | Not documented until it is delivered |
 | Custom type mapping: the type override, `SqlSourceTypeOverrides` and `-- type-override:` | Available | [Type overrides](settings.md#setting-type-overrides); for a PostgreSQL type that cannot be sent as a parameter, see [SQLSRC232](diagnostics.md#sqlsrc232) |
-| Column types: a C# type for one column, by the column it is read from, with `SqlSourceColumnTypes` and `-- column:`, or by a query's `-- column:`, and for one parameter by `-- param: @id -> Type` | Available | [Column types](settings.md#setting-column-types), [giving a parameter a type](parameters-and-tokens.md#param-marker) |
+| Column types: a C# type for one column, by the column it is read from, with `SqlSourceColumnTypes` or a `-- column:` in the file header, or by a `-- column:` inside a query, and for one parameter by `-- param: @id -> Type` | Available | [Column types](settings.md#setting-column-types), [giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | C# types written by their short names, `UserId` for `MyApp.UserId`, wherever SqlSource takes a C# type | Available | [Type overrides](settings.md#setting-type-overrides) |
 | Build integration: the tool running in your build | Coming | Not documented until it is delivered; today you run the tool yourself: [install the tool](tool.md#install-the-tool) |
 | Bug-report bundles | Coming | Not documented until it is delivered; today attach a [log](tool.md#logs) |

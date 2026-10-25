@@ -74,10 +74,16 @@
           "ordinal": 2,
           "name": "email",
           "type": {
-            "name": "text",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "text"
+            "name": "public.email",
+            "kind": "domain",
+            "schema": "public",
+            "internalName": "email",
+            "base": {
+              "name": "text",
+              "kind": "base",
+              "schema": "pg_catalog",
+              "internalName": "text"
+            }
           },
           "nullable": false,
           "nullableSource": "catalog",

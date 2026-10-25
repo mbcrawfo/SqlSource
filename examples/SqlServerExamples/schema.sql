@@ -3,10 +3,15 @@
 -- tools/describe-end-to-end.sh in a database of its own before it describes the queries.  A change to it is followed
 -- by a run of that script, which writes the sidecars again.
 
+-- An email address, an alias type over nvarchar.  CodeGen/Users.sql maps it to the C# type EmailAddress.  A table
+-- can use the type only in a batch after the one that creates it, so GO ends this one.
+CREATE TYPE dbo.Email FROM nvarchar(200);
+GO
+
 CREATE TABLE users (
     id int IDENTITY PRIMARY KEY,
     name nvarchar(100) NOT NULL,
-    email nvarchar(200) NOT NULL,
+    email dbo.Email NOT NULL,
     created_at datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
 );
 

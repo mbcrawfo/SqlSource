@@ -1,0 +1,37 @@
+-- The queries of the users, at the default output, codegen, which StoreQueries calls.  The type override gives the
+-- domain email of the file the type EmailAddress, whose converters the methods call to read and send an email.
+-- type-override: public.email=EmailAddress
+
+-- name: FindUserByEmail -> one-optional
+-- summary: The user with an email address, or null.
+-- one-optional: the method returns the row, or null when there is none.  PostgreSQL gives a parameter compared with a
+-- domain column the domain's base type, text, so the marker declares @email as the domain, which the type override
+-- reaches.
+-- param: @email public.email
+SELECT id, name, email
+FROM users
+WHERE email = @email;
+
+-- name: ChangeUserEmail -> rowcount
+-- summary: Changes the email address of one user.
+-- rowcount: the method returns the count of rows updated.  A parameter written to a domain column has the domain's
+-- type, so @email is an EmailAddress with no marker.
+UPDATE users
+SET email = @email
+WHERE id = @userId;
+
+-- name: ListUsersNewestFirst
+-- summary: Every user, the newest first.
+-- A query that returns rows is many by default, and the marker gives its rows the collection type IReadOnlyList.
+-- collection-type: IReadOnlyList
+SELECT id, name, email
+FROM users
+ORDER BY created_at DESC, id;
+
+-- name: ListUsersSortedBy
+-- summary: Every user, in the order the caller chooses.
+-- The token orderBy is text that the caller's code chooses, never a user's; its default is the sample the tool
+-- describes the query with.
+SELECT id, name
+FROM users
+ORDER BY {{orderBy:name}};

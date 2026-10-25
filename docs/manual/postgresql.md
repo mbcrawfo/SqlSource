@@ -1,6 +1,6 @@
 # PostgreSQL
 
-SqlSource reads PostgreSQL files by the `postgres` [dialect](dialects.md), and the `sqlsource` tool can describe their queries: it asks your database what each query's parameters and columns are, and writes the answer to the query's [sidecar](tool.md#sidecar-files).  This page is about describing, about the C# types that a described query's columns and parameters get, and about the models built from them.  How SqlSource reads a PostgreSQL file, its comments and strings, is on [the dialects page](dialects.md).
+SqlSource reads PostgreSQL files by the `postgres` [dialect](dialects.md), and the `sqlsource` tool can describe their queries: it asks your database what each query's parameters and columns are, and writes the answer to the query's [sidecar](tool.md#sidecar-files).  This page is about describing, about the C# types that a described query's columns and parameters get, about the models built from them, and about the query methods that run them.  How SqlSource reads a PostgreSQL file, its comments and strings, is on [the dialects page](dialects.md).
 
 ```xml
 <PropertyGroup>
@@ -155,7 +155,7 @@ WHERE id = @id;
 
 Each column and each parameter of a described PostgreSQL query gets a C# type: the type that Npgsql reads a value of its PostgreSQL type as.  If `id` is a `bigint`, `placed_at` a `timestamp with time zone`, `total` a `numeric(12,2)`, `tags` a `text[]` and `born` a `date`, they are `long`, `System.DateTime`, `decimal`, `string[]`, and `System.DateTime` on Npgsql 8 and 9 or `System.DateOnly` on Npgsql 10; `@id` is a `long`.  Whether a column can be null is decided [above](#nullability), not by its type.
 
-The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for a type that Npgsql cannot read.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides): `timestamptz=System.DateTimeOffset`.  To give one column another, use a [column type](settings.md#setting-column-types), `users.id=MyApp.UserId`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method asks Npgsql for that type, so a type of yours that Npgsql does not read, such as an id or an `Email` over a domain, needs [converters](settings.md#converters) to and from the type of the table below.
+The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for a type that Npgsql cannot read.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides): `timestamptz=System.DateTimeOffset`.  To give one column another, use a [column type](settings.md#setting-column-types), `users.id=MyApp.UserId`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Npgsql does not read, such as an id or an `Email` over a domain, needs [converters](settings.md#converters) to and from the type of the table below.
 
 <a id="which-npgsql"></a>
 
@@ -166,7 +166,7 @@ A few types are read as another C# type by Npgsql 10 than by Npgsql 8 and 9, so 
 - **Npgsql 8, 9 or 10** gets the column of the table below for its version.  Updating Npgsql from 9 to 10 changes the C# types of `date`, `time`, `cidr`, `daterange` and `datemultirange`, as it changes what Npgsql reads.
 - **Npgsql older than 8** is [SQLSRC247](diagnostics.md#sqlsrc247).  Update it.
 - **Npgsql 11 or later** gets the types of Npgsql 10, with the information [SQLSRC248](diagnostics.md#sqlsrc248), since this version of SqlSource does not know a newer one.
-- **No Npgsql**, as in a library that holds the queries and leaves the driver to the application, gets every type that Npgsql 8, 9 and 10 read alike.  A type that they read differently, and a type of Npgsql's own `NpgsqlTypes` namespace, have no C# type without the driver: each is [SQLSRC249](diagnostics.md#sqlsrc249), unless the type override names it.  For the types that differ, the override says which Npgsql the application runs on: `date=System.DateOnly time=System.TimeOnly` for Npgsql 10.
+- **No Npgsql**, as in a library that holds the queries and leaves the driver to the application, gets every type that Npgsql 8, 9 and 10 read alike, and models alone: give its queries the output `models`, since a query method needs the driver ([SQLSRC273](diagnostics.md#sqlsrc273)).  A type that they read differently, and a type of Npgsql's own `NpgsqlTypes` namespace, have no C# type without the driver: each is [SQLSRC249](diagnostics.md#sqlsrc249), unless the type override names it.  For the types that differ, the override says which Npgsql the application runs on: `date=System.DateOnly time=System.TimeOnly` for Npgsql 10.
 
 <a id="type-table"></a>
 
@@ -230,10 +230,10 @@ The names are those of PostgreSQL's catalog, which are the [type override's](set
 
 ### What to know about some types
 
-- **`timestamptz`** is read as a `System.DateTime` whose `Kind` is `Utc`.  `timestamp`, and `date` on Npgsql 8 and 9, are read with the `Kind` `Unspecified`.  `infinity` and `-infinity` in a `timestamptz` are read as `DateTime.MaxValue` and `DateTime.MinValue`, with the `Kind` `Unspecified`.  To give a `timestamptz` the C# type `System.DateTimeOffset`, map it: `timestamptz=System.DateTimeOffset`.  Rows read through Dapper then also need a type handler: see [the recipe](recipes.md#dapper-with-postgresql).
+- **`timestamptz`** is read as a `System.DateTime` whose `Kind` is `Utc`.  `timestamp`, and `date` on Npgsql 8 and 9, are read with the `Kind` `Unspecified`.  `infinity` and `-infinity` in a `timestamptz` are read as `DateTime.MaxValue` and `DateTime.MinValue`, with the `Kind` `Unspecified`.  To give a `timestamptz` the C# type `System.DateTimeOffset`, map it: `timestamptz=System.DateTimeOffset`.  A query method reads and sends it with nothing more; rows read through Dapper need a type handler: see [the recipe](recipes.md#dapper-with-postgresql).
 - **`numeric`** values `NaN`, `Infinity` and `-Infinity` cannot be read as a `decimal`, and reading one throws.  Keep them out of the column, or cast it to `float8` in the query, which reads them as a `double`.
-- **An `interval` with months or years** cannot be read as a `System.TimeSpan`, and reading one throws.  Your own ADO.NET code can read it as an `NpgsqlTypes.NpgsqlInterval`, with `reader.GetFieldValue<NpgsqlInterval>(i)`.
-- **`inet`** is read as a `System.Net.IPAddress`, which drops the netmask.  Your own ADO.NET code can read it as an `NpgsqlTypes.NpgsqlInet`, which keeps it, with `reader.GetFieldValue<NpgsqlInet>(i)`.
+- **An `interval` with months or years** cannot be read as a `System.TimeSpan`, and reading one throws.  Map it, `interval=NpgsqlTypes.NpgsqlInterval`, or give one column that type with a [column type](settings.md#setting-column-types), and a query method reads and sends it as an `NpgsqlInterval`.
+- **`inet`** is read as a `System.Net.IPAddress`, which drops the netmask.  Map it, `inet=NpgsqlTypes.NpgsqlInet`, or give one column that type with a column type, and a query method reads and sends it as an `NpgsqlInet`, which keeps the netmask.
 - **`char(n)`**, `char(1)` included, is a `string`.  The `char` of the table is PostgreSQL's one-byte type, which is written `"char"` with its quotes.
 - **`bit(1)`** is a `bool`, and a `bit(1)[]` column a `bool[]`.  A parameter's type has no length, so a parameter of `bit(1)` is a `System.Collections.BitArray`.
 - **An array that holds a `NULL` element** needs a nullable element, `int?[]`, for an element of a value type, and the type override gives it: `int4[]=int?[]`.  Npgsql also refuses to read such an array under its default `Array Nullability Mode=Never`, so set `Array Nullability Mode=Always` or `PerInstance` in the application's connection string.  An array of a reference type, `text[]`, is read with its `NULL` elements whatever the mode; map `text[]=string?[]` to say that an element can be null.
@@ -273,17 +273,44 @@ A described PostgreSQL query gets the [models](generator.md#models) that every d
 
 ## Query methods
 
-Each described query whose output is `codegen` gets a method that runs it through Npgsql, on a `DbConnection` such as `NpgsqlConnection` or the one an `NpgsqlDataSource` gives: see [query methods](generator.md#query-methods).  The project references Npgsql 8.0 or later ([SQLSRC273](diagnostics.md#sqlsrc273), [SQLSRC247](diagnostics.md#sqlsrc247)).
+```sql postgres
+-- name: AddEvent -> one
+INSERT INTO events (kind, payload, happened_at)
+VALUES (@kind, @payload, @happenedAt)
+RETURNING id;
+```
 
-- **A column is read, and a parameter sent, as its property's C# type**, the one [the types](#type-map) give it, so a type that Npgsql reads and sends only once it is taught, an enum mapped to a C# enum or a plugin's type, needs the teaching on the data source, as `MapEnum<T>()`.  A type of yours that Npgsql never reads takes [converters](settings.md#converters) instead: the column is read as the type of [the table](#type-table), a domain as its base type, and converted, and the parameter's value is converted to that type and sent.  A column whose property cannot be null throws Npgsql's `InvalidCastException`, "Column 'name' is null.", when it holds a null.
-- **Each parameter is sent as the PostgreSQL type it was described with**, or the type its [`-- param:` marker](parameters-and-tokens.md#param-marker) declares, and not a type chosen from the C# type of its value.  A `string` for a `jsonb`, an `xml`, an `ltree` or an enum, a `uint` for an `oid`, a `decimal` for a `money` and a `DateTimeOffset` at any offset for a `timetz` each reach the server as that type, with no cast in the SQL.  A null is sent as a `NULL` of that type, so `@p IS NULL` works with no cast once the parameter has a type, from another use or a `-- param:` marker, as [above](#parameters).
-- **Every type that [the table](#type-table) gives a C# type is sent and read on Npgsql 8 as on Npgsql 10**, as the C# type of the version's column, and SqlSource is tested on both.  `cube`, which Npgsql 8 does not read, is sent and read on Npgsql 10.
-- **A `timestamptz` parameter takes a `DateTimeOffset` at offset 0, or a `DateTime` whose `Kind` is `Utc`**, and a `timestamp` parameter a `DateTime` of another `Kind`.  Npgsql 10 refuses any other with an `ArgumentException` before anything is sent, a `DateTimeOffset` at another offset, an `Unspecified` `DateTime` for a `timestamptz` and a `Utc` one for a `timestamp` alike, and nothing is converted in the session's time zone.  Send `value.ToUniversalTime()` to a `timestamptz`.
+```csharp
+AddEventDto added = await connection.AddEvent(
+    new AddEventParams("signup", """{"plan": "free"}""", DateTime.UtcNow),
+    transaction);
+```
+
+Each described query whose output is `codegen` gets a method that runs it through Npgsql, on a `DbConnection` such as `NpgsqlConnection` or the one an `NpgsqlDataSource` gives: see [query methods](generator.md#query-methods).  The project references Npgsql 8.0 or later ([SQLSRC273](diagnostics.md#sqlsrc273), [SQLSRC247](diagnostics.md#sqlsrc247)).  Above, `kind` is an enum `event_kind`, `payload` a `jsonb` and `happened_at` a `timestamptz`, so the method sends the `string` of `@kind` as an `event_kind`, that of `@payload` as a `jsonb` and the `DateTime` of `@happenedAt` as a `timestamptz`, with no cast in the SQL.
+
+<a id="method-parameters"></a>
+
+### How a parameter is sent
+
+Each parameter is sent as the PostgreSQL type it was described with, or the type its [`-- param:` marker](parameters-and-tokens.md#param-marker) declares, and never as a type chosen from the C# type of its value.  A `string` for a `jsonb`, an `xml`, an `ltree` or an enum, a `uint` for an `oid`, a `decimal` for a `money` and a `DateTimeOffset` at any offset for a `timetz` each reach the server as that type.  A null is sent as a `NULL` of that type, so `@p IS NULL` works with no cast once the parameter has a type, from another use or a `-- param:` marker, as [above](#parameters).  How a method names a parameter and sends a null is on [the generator page](generator.md#method-parameters).  For some types:
+
+- **A `timestamptz` parameter takes a `DateTimeOffset` at offset 0, or a `DateTime` whose `Kind` is `Utc`**, and a `timestamp` parameter a `DateTime` of another `Kind`.  Npgsql refuses any other with an `ArgumentException` before anything is sent, a `DateTimeOffset` at another offset, an `Unspecified` `DateTime` for a `timestamptz` and a `Utc` one for a `timestamp` alike, and nothing is converted in the session's time zone.  Send `value.ToUniversalTime()` to a `timestamptz`.
 - **A parameter declared as a domain is sent as the domain's base type**, so the domain's `CHECK` is not applied to it.  Compared with a column of the domain, a value that the domain refuses finds no row, and the server checks it only when it is written to such a column.
 - **A `string` longer than the `varchar(n)` column it is written to is refused by the server**, with `22001`, and never cut to fit.
+- **A parameter that has a [converter](settings.md#converters)** is converted to the type of [the table](#type-table), a domain's base type for a domain, and sent as its database type too.
+
+<a id="method-results"></a>
+
+### What a method reads and throws
+
+- **Give each method the transaction** of a connection that has one.  Npgsql runs a command in its connection's transaction even when the method is not given it, but Microsoft.Data.SqlClient does not, so code that passes it runs on both: see [the connection](generator.md#method-connection).
+- **A column is read as its property's C# type**, the one [the types](#type-map) give it, so a type that Npgsql reads only once it is taught, an enum mapped to a C# enum or a plugin's type, needs the teaching on the data source, as `MapEnum<T>()`.  A type of yours that Npgsql never reads takes [converters](settings.md#converters) instead: the column is read as the type of [the table](#type-table), a domain as its base type, and converted.
+- **Every type that [the table](#type-table) gives a C# type is sent and read on Npgsql 8, 9 and 10**, as the C# type of the version's column, and SqlSource is tested on Npgsql 8 and 10.  `cube`, which Npgsql 8 and 9 do not read, is sent and read on Npgsql 10.
+- **A column whose property cannot be null** throws Npgsql's `InvalidCastException`, "Column 'name' is null.", when it holds a null, before any converter is called.
 - **`rowcount` is `-1` for a `SELECT`**, and for a `WITH` whose last statement is a `SELECT`, though its `WITH` updates rows: see [what each shape returns](generator.md#method-shapes).
-- **A command that runs past its `commandTimeout` throws Npgsql's `NpgsqlException`**, whose inner exception is a `TimeoutException`.  A cancelled token throws `OperationCanceledException`, whether it was cancelled before the call or while the rows are read.
-- **The connection's commands must take Npgsql's own parameters**, which a connection that wraps Npgsql's may not: see [the generator's known issues](generator.md#known-issues).
+- **`commandTimeout`** that passes throws Npgsql's `NpgsqlException`, whose inner exception is a `TimeoutException`.
+- **A cancelled method throws `OperationCanceledException`**, whether the token was cancelled before the call, while the command runs or while the rows are read.
+- **The connection's commands must take Npgsql's own parameters**, as those of `NpgsqlConnection` do.  A connection that wraps Npgsql's and creates parameters of its own is a [known issue](generator.md#known-issues).
 
 <a id="known-issues"></a>
 
@@ -293,3 +320,4 @@ Each described query whose output is `codegen` gets a method that runs it throug
 - **An operator of your own on a system type can make describing fail.**  When a schema on the connection's search path has an operator such as `=` or `<>` defined on system types such as `oid`, `name` or `smallint[]`, the tool may report [SQLSRC225](diagnostics.md#sqlsrc225) for a query that did not change, or describe a column of a table as if it came from no table.  A schema before `pg_catalog` does it with an operator on the same types as one of PostgreSQL's own, and a schema after it with one on `oid` and `integer` or on two `smallint[]`.  Leave a schema that holds such an operator off the search path of the connection the tool uses.
 - **A query over a table with many partitions is slow to describe.**  The tool looks at every partition of a partitioned table, whatever the query's conditions, when it works out which columns can be null.  On a table of thousands of partitions each such query takes longer to describe, and the [log](tool.md#logs) of the run grows.  Only describing is slower; nothing else is affected.
 - **A function marked `IMMUTABLE` can run while a query is described.**  See [what describing does](#what-describing-does).
+- **A query method fails on a connection that wraps Npgsql's and creates parameters of its own.**  Give the method the `NpgsqlConnection` inside: see [the generator's known issues](generator.md#known-issues).

@@ -1,5 +1,5 @@
 -- The queries of the order lines, at the default output, codegen.  Each query gets its models and a method that runs
--- it, which OrderLineQueries calls.  The result shape after the name says what the method returns: many, every row,
+-- it, which StoreQueries calls.  The result shape after the name says what the method returns: many, every row,
 -- as an array of the output model.  The type override gives each numeric of the file the type Price, whose converters
 -- the method calls to read unit_price, and the project's column types give order_lines.order_id the type OrderId.
 -- type-override: numeric=PostgresExamples.CodeGen.Price
