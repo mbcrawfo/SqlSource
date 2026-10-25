@@ -160,8 +160,8 @@ public sealed class AllocationTests(PostgresContainer postgres)
         TestContext.Current.TestOutputHelper?.WriteLine(
             $"Per call: generated {perCall.Generated:F1} bytes, hand-written {perCall.HandWritten:F1} bytes, generated "
                 + $"beyond hand-written {perCall.GeneratedBeyondHandWritten:F1} bytes, the medians of {Pairs} pairs of "
-                + $"blocks of {CallsPerBlock} calls.  Each pair, generated: {PerCallOf(generatedBlocks)}; hand-written: "
-                + $"{PerCallOf(handWrittenBlocks)}."
+                + $"blocks of {CallsPerBlock} calls.  Each pair, generated: {PerCallOf(generatedBlocks)}; "
+                + $"hand-written: {PerCallOf(handWrittenBlocks)}."
         );
         return perCall;
     }
