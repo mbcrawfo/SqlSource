@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
-        The end-to-end read of all_types on Npgsql 8.0.9, the latest 8.0 release; 8.0 is the oldest version that is
-        supported.  A project of its own, since the end-to-end project gets Npgsql 10 through the tool it references.
+        The end-to-end write and read of all_types on Npgsql 8.0.9, the latest 8.0 release; 8.0 is the oldest version
+        that is supported: through the generated methods, and the read through Dapper.  A project of its own, since the
+        end-to-end project gets Npgsql 10 through the tool it references.
         The generator comes from a project reference, which does not bring the package's MSBuild files, so the real
         ones are imported here and at the end of this file.
     -->
@@ -14,8 +15,8 @@
         <WarningsNotAsErrors>$(WarningsNotAsErrors);SQLSRC240</WarningsNotAsErrors>
         <!-- The dialect of every query of the project. -->
         <SqlSourceDialect>postgres</SqlSourceDialect>
-        <!-- What a query generates: its SQL and its models, which need an entry in the sidecar beside its file. -->
-        <SqlSourceOutput>Models</SqlSourceOutput>
+        <!-- What a query generates: its method and its models, which need an entry in the sidecar beside its file. -->
+        <SqlSourceOutput>CodeGen</SqlSourceOutput>
     </PropertyGroup>
     <ItemGroup>
         <!-- The query and the sidecar of the end-to-end project, kept at their own paths for the generator. -->

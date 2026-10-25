@@ -1,6 +1,8 @@
--- The queries of the notes, claimed by NoteQueries.  The schema's enum and domain are read as C# types of the project.
+-- The queries of the notes, claimed by NoteQueries.  The schema's enum and domains are read as C# types of the project:
+-- the enum as a C# enum that the data source maps, and each domain through the converters of its type.
 -- type-override: public.note_kind = SqlSource.Tests.Postgres.EndToEnd.Types.NoteKind
 -- type-override: public.email = SqlSource.Tests.Postgres.EndToEnd.Types.Email
+-- type-override: public.note_ref = SqlSource.Tests.Postgres.EndToEnd.Types.NoteRef
 
 -- name: ListAccountNotes
 -- summary: Every account with its notes, and an account with none once, with NULL for the note.
@@ -39,4 +41,22 @@ ORDER BY a.id;
 SELECT n.kind, a.email
 FROM notes AS n
 JOIN accounts AS a ON a.id = n.account_id
+ORDER BY n.id;
+
+-- name: GetNoteByRef -> one
+-- summary: The note that a ref names, with its ref.
+-- A parameter compared with a column of a domain is described as the domain's base type, so the marker declares it as
+-- the domain, which the type override gives the type NoteRef.
+-- param: @ref public.note_ref
+SELECT n.id, n.ref, n.body
+FROM notes AS n
+WHERE n.ref = @ref;
+
+-- name: FindNotesByEmail
+-- summary: The notes of the account that an email names, with each note's ref, which may be NULL.
+-- param: @email public.email
+SELECT n.id, n.ref, a.email
+FROM notes AS n
+JOIN accounts AS a ON a.id = n.account_id
+WHERE a.email = @email
 ORDER BY n.id;

@@ -3,11 +3,12 @@ using Dapper;
 
 namespace SqlSource.Tests.Postgres.EndToEnd.Types;
 
-// The Dapper type handler of the record struct Email, which the schema's domain email is read as: Npgsql gives a
-// string, and Dapper fills a property of another type only through a handler.
+// The same code as the sample of docs/manual/recipes.md (#dapper-with-postgresql), in this repository's layout, for a
+// type of the project that has converters: a change to one is a change to the other.  It is internal, as Email is.
+// EndToEndSources registers it, and DapperRecipeTests reads and sends an Email through it.
 internal sealed class EmailHandler : SqlMapper.TypeHandler<Email>
 {
-    public override Email Parse(object value) => new((string)value);
+    public override Email Parse(object value) => Email.FromDatabase((string)value);
 
-    public override void SetValue(IDbDataParameter parameter, Email value) => parameter.Value = value.Value;
+    public override void SetValue(IDbDataParameter parameter, Email value) => parameter.Value = Email.ToDatabase(value);
 }

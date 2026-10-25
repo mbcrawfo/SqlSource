@@ -1,10 +1,11 @@
--- The queries of the shapes of models, claimed by ShapeQueries.
+-- The queries of the shapes of models, claimed by ShapeQueries.  SearchAccounts has its collection type by its marker,
+-- and the others by the attribute's.
 -- input-model-suffix: Filter
--- collection-type: IReadOnlyList
 
 -- name: SearchAccounts -> many
 -- summary: The accounts with a name like a pattern, or with an id.
 -- generator: sort-input
+-- collection-type: IReadOnlyList
 SELECT id, name
 FROM accounts
 WHERE name LIKE @name OR id = @accountId

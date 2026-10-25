@@ -429,22 +429,22 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     private const string InOverAPlainCount =
         "SELECT u.id IN (SELECT count(*) FROM orders o WHERE o.user_id = u.id) AS counted FROM users u";
 
-    // Before 18 the plan prints an IN over a plain count as (SubPlan n), the text of a scalar subquery.  The column is
+    // Before 17 the plan prints an IN over a plain count as (SubPlan n), the text of a scalar subquery.  The column is
     // a boolean, outside the families a scalar subquery is read in, so it stays unknown.
     [Fact]
     public async Task DescribeAsync_InOverAPlainCount_KeepsNoOrigin()
     {
-        Assert.SkipWhen(postgres.Major >= 18, "PostgreSQL 18 prints an IN as an ANY, which it answers.");
+        Assert.SkipWhen(postgres.Major >= 17, "PostgreSQL 17 and later print an IN as an ANY, which it answers.");
 
         (await AnswersAsync(InOverAPlainCount)).ShouldBe([UnknownNoOrigin]);
     }
 
-    // From 18 the plan prints the same IN as an ANY over the subplan's column, whose left side and count are both
+    // From 17 the plan prints the same IN as an ANY over the subplan's column, whose left side and count are both
     // not NULL, and it is answered.
     [Fact]
-    public async Task DescribeAsync_InOverAPlainCount_IsAnsweredOnEighteen()
+    public async Task DescribeAsync_InOverAPlainCount_IsAnsweredFromSeventeen()
     {
-        postgres.SkipBelow(18, "PostgreSQL before 18 prints an IN as (SubPlan n), which is unknown.");
+        postgres.SkipBelow(17, "PostgreSQL before 17 prints an IN as (SubPlan n), which is unknown.");
 
         (await AnswersAsync(InOverAPlainCount)).ShouldBe([NotNullExpression]);
     }
@@ -459,16 +459,16 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     public async Task DescribeAsync_ScalarSubqueryOfAMax_KeepsNoOrigin(string sql) =>
         (await AnswersAsync(sql)).ShouldBe([UnknownNoOrigin]);
 
-    // 18 prints EXISTS and the comparison of an IN as their own forms, and 14 prints the same (SubPlan n) for them
-    // and for a scalar subquery, so it is unknown there.
+    // 17 and later print EXISTS and the comparison of an IN as their own forms, and earlier majors print the same
+    // (SubPlan n) for them and for a scalar subquery, so it is unknown there.
     [Fact]
-    public async Task DescribeAsync_ExistsAndAny_AreAnsweredOnEighteen() =>
+    public async Task DescribeAsync_ExistsAndAny_AreAnsweredFromSeventeen() =>
         (
             await AnswersAsync(
                 "SELECT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id) AS has_orders, "
                     + "u.id IN (SELECT o.user_id FROM orders o) AS ordered FROM users u"
             )
-        ).ShouldBe(postgres.Major >= 18 ? [NotNullExpression, NotNullExpression] : [UnknownNoOrigin, UnknownNoOrigin]);
+        ).ShouldBe(postgres.Major >= 17 ? [NotNullExpression, NotNullExpression] : [UnknownNoOrigin, UnknownNoOrigin]);
 
     // An IN with a side that may be NULL is NULL for a row the comparison is unknown on.
     [Theory]
