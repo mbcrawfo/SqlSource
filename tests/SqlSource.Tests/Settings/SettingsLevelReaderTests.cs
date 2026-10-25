@@ -114,14 +114,14 @@ public sealed class SettingsLevelReaderTests
     public void Read_TypeOverrideThatIsNotValid_IsRecordedAndTheOthersApply()
     {
         var source = new FakeSource(
-            new Dictionary<SettingId, string> { [SettingId.TypeOverrides] = "int4=long timestampz=int int8=Guid" }
+            new Dictionary<SettingId, string> { [SettingId.TypeOverrides] = "int4=long timestampz=int int8=int?" }
         );
 
         SettingsLevelReader
             .Read(ref source)
             .TypeOverrides.ShouldNotBeNull()
             .ShouldBe([new TypeOverride("int4", "long", SettingPlace.Property)]);
-        source.Invalids.ShouldBe([(SettingId.TypeOverrides, "timestampz=int"), (SettingId.TypeOverrides, "int8=Guid")]);
+        source.Invalids.ShouldBe([(SettingId.TypeOverrides, "timestampz=int"), (SettingId.TypeOverrides, "int8=int?")]);
     }
 
     // An MSBuild value serves both engines: each entry is in the list of each engine that reads its key.

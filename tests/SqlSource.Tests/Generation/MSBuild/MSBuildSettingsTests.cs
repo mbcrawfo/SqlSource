@@ -107,14 +107,14 @@ public sealed class MSBuildSettingsTests
     public void ReadFile_TypeOverrides_AreReadAtTheMetadatasPlace()
     {
         var settings = ReadFileMetadata(
-            new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = "date=System.DateOnly int4=Guid" }
+            new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = "date=System.DateOnly int4=int?" }
         );
 
         settings
             .ShouldNotBeNull()
             .Level.TypeOverrides.ShouldNotBeNull()
             .ShouldBe([new TypeOverride("date", "global::System.DateOnly", SettingPlace.Metadata)]);
-        settings.Invalid.ShouldBe([new InvalidSetting("SqlSourceTypeOverrides", "int4=Guid")]);
+        settings.Invalid.ShouldBe([new InvalidSetting("SqlSourceTypeOverrides", "int4=int?")]);
     }
 
     // The tool does not read the type override, which changes nothing that is described: the keys of a manifest

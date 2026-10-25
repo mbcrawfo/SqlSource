@@ -6,16 +6,17 @@ using Microsoft.CodeAnalysis.CSharp;
 namespace SqlSource.Settings.ClrTypes;
 
 /// <summary>
-/// A C# type as the type override names it: a keyword, or a name qualified from the global namespace, with its type
-/// arguments and the ranks of an array.
+/// A C# type as the type override names it: a keyword, a name qualified from the global namespace, or a short name,
+/// with its type arguments and the ranks of an array.
 /// </summary>
 /// <remarks>
 /// <para>
 /// The grammar is <c>["global::"] name ("." name)* rank*</c> or <c>keyword rank*</c>, where a name is an identifier
 /// with optional type arguments, <c>&lt;arg ("," arg)*&gt;</c>, an argument is a type with an optional <c>?</c>, and
-/// a rank is <c>[</c>, commas and <c>]</c>, after an optional <c>?</c>.  A name of one part needs <c>global::</c>:
-/// the generator cannot see a file's usings.  The keywords are those of the built-in types that a property can have,
-/// <c>dynamic</c> and <c>void</c> not among them.
+/// a rank is <c>[</c>, commas and <c>]</c>, after an optional <c>?</c>.  A name of one part written without
+/// <c>global::</c> is a short name, <see cref="IsShort" />: the grammar cannot tell which type it is, since the
+/// generator cannot see a file's usings, and the compilation resolves it.  The keywords are those of the built-in
+/// types that a property can have, <c>dynamic</c> and <c>void</c> not among them.
 /// </para>
 /// <para>
 /// White space is allowed only inside <c>&lt;&gt;</c> and <c>[]</c>, where it means nothing.  A <c>?</c> at the end
@@ -26,7 +27,16 @@ namespace SqlSource.Settings.ClrTypes;
 /// <param name="Keyword">The keyword, such as <c>int</c>, or null for a name.</param>
 /// <param name="Parts">The parts of a name from the first, or empty for a keyword.</param>
 /// <param name="Ranks">The ranks of an array, in the order written, or empty.</param>
-internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> Parts, EquatableArray<ClrRank> Ranks)
+/// <param name="IsShort">
+/// True for a name of one part written without <c>global::</c>.  <c>UserId</c> and <c>global::UserId</c> are two
+/// names; a name of several parts is the same with or without <c>global::</c>.
+/// </param>
+internal sealed record ClrTypeName(
+    string? Keyword,
+    EquatableArray<ClrNamePart> Parts,
+    EquatableArray<ClrRank> Ranks,
+    bool IsShort = false
+)
 {
     private const string GlobalPrefix = "global::";
 
@@ -78,8 +88,9 @@ internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> 
     ];
 
     /// <summary>
-    /// The type as generated code writes it: <c>global::</c> before a name, a keyword bare, <c>, </c> between type
-    /// arguments, each <c>?</c> and rank as written, and no other white space.  Two texts of one type give one text.
+    /// The type as generated code writes it: <c>global::</c> before a name but a short one, which is bare, a keyword
+    /// bare, <c>, </c> between type arguments, each <c>?</c> and rank as written, and no other white space.  Two texts
+    /// of one type give one text.
     /// </summary>
     public string Text
     {
@@ -153,7 +164,11 @@ internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> 
         }
         else
         {
-            _ = builder.Append(GlobalPrefix);
+            if (!IsShort)
+            {
+                _ = builder.Append(GlobalPrefix);
+            }
+
             for (var index = 0; index < Parts.Count; index++)
             {
                 if (index > 0)
@@ -289,7 +304,7 @@ internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> 
             {
                 keyword = first;
             }
-            else if (ReadName(first, nesting) is { } name && (qualified || name.Length > 1))
+            else if (ReadName(first, nesting) is { } name && !IsDynamic(qualified, name))
             {
                 parts = name;
             }
@@ -299,9 +314,18 @@ internal sealed record ClrTypeName(string? Keyword, EquatableArray<ClrNamePart> 
             }
 
             return ReadRanks() is { } ranks
-                ? new ClrTypeName(keyword, new EquatableArray<ClrNamePart>(parts), new EquatableArray<ClrRank>(ranks))
+                ? new ClrTypeName(
+                    keyword,
+                    new EquatableArray<ClrNamePart>(parts),
+                    new EquatableArray<ClrRank>(ranks),
+                    IsShort: !qualified && keyword is null && parts.Length == 1
+                )
                 : null;
         }
+
+        // dynamic is no type of a property, and a short name must not make it one.
+        private static bool IsDynamic(bool qualified, ImmutableArray<ClrNamePart> name) =>
+            !qualified && name.Length == 1 && name[0].Identifier.Equals("dynamic", StringComparison.Ordinal);
 
         // name ("." name)*, after the first identifier.
         private ImmutableArray<ClrNamePart>? ReadName(string first, int nesting)

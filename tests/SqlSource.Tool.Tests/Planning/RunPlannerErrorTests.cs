@@ -170,7 +170,7 @@ public sealed class RunPlannerErrorTests : IDisposable
             "Q/One.sql",
             "SELECT 1;",
             ("SqlSourceCollectionType", "bag"),
-            ("SqlSourceTypeOverrides", "int4=Guid")
+            ("SqlSourceTypeOverrides", "int4=int?")
         );
 
         Plans.Result(project).Errors.ShouldBeEmpty();

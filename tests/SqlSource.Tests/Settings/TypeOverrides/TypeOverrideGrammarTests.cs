@@ -41,6 +41,12 @@ public sealed class TypeOverrideGrammarTests
         "global::System.Collections.Generic.List<int[,]?>"
     )]
     [InlineData("int4=global::App", "int4", "global::App")]
+    [InlineData("int4=UserId", "int4", "UserId")]
+    [InlineData(
+        "int4=System.Collections.Generic.List<UserId>",
+        "int4",
+        "global::System.Collections.Generic.List<UserId>"
+    )]
     [InlineData(
         "int4=System.Collections.Generic.List<System.Collections.Generic.List<global::System.Guid?>>",
         "int4",
@@ -155,9 +161,6 @@ public sealed class TypeOverrideGrammarTests
     [InlineData("int4=dynamic")]
     [InlineData("int4=void")]
     [InlineData("int4=int*")]
-    // Unqualified, and not a keyword: the generator cannot see a file's usings.
-    [InlineData("int4=Guid")]
-    [InlineData("int4=System.Collections.Generic.List<Guid>")]
     [InlineData("int4=System.Guid extra")]
     [InlineData("int4=System.Guid ")]
     [InlineData("int4=System.Collections.Generic.List<>")]
