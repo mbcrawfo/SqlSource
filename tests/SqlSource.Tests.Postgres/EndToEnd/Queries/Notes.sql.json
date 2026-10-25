@@ -319,6 +319,204 @@
           "computed": false
         }
       ]
+    },
+    "GetNoteByRef": {
+      "hash": "bcb871a9c07a0fda56d1fd1bd8fd47b8bcc463e90d6bb4001a276031f985e701",
+      "engine": "postgres",
+      "database": "app",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
+      "parameters": [
+        {
+          "name": "ref",
+          "ordinal": 0,
+          "type": {
+            "name": "public.note_ref",
+            "bindName": "public.note_ref",
+            "kind": "domain",
+            "schema": "public",
+            "internalName": "note_ref",
+            "base": {
+              "name": "bigint",
+              "kind": "base",
+              "schema": "pg_catalog",
+              "internalName": "int8"
+            }
+          },
+          "nullable": null,
+          "typeSource": "declared"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "ref",
+          "type": {
+            "name": "public.note_ref",
+            "kind": "domain",
+            "schema": "public",
+            "internalName": "note_ref",
+            "base": {
+              "name": "bigint",
+              "kind": "base",
+              "schema": "pg_catalog",
+              "internalName": "int8"
+            }
+          },
+          "nullable": true,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "ref"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type": {
+            "name": "text",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "text"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "body"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "FindNotesByEmail": {
+      "hash": "37c2aef1ec534fa3dcb0455043d79118ad1d8f75b8c0ebd4df08bf90c04c78e6",
+      "engine": "postgres",
+      "database": "app",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "several-tables",
+      "parameters": [
+        {
+          "name": "email",
+          "ordinal": 0,
+          "type": {
+            "name": "public.email",
+            "bindName": "public.email",
+            "kind": "domain",
+            "schema": "public",
+            "internalName": "email",
+            "base": {
+              "name": "text",
+              "kind": "base",
+              "schema": "pg_catalog",
+              "internalName": "text"
+            }
+          },
+          "nullable": null,
+          "typeSource": "declared"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "ref",
+          "type": {
+            "name": "public.note_ref",
+            "kind": "domain",
+            "schema": "public",
+            "internalName": "note_ref",
+            "base": {
+              "name": "bigint",
+              "kind": "base",
+              "schema": "pg_catalog",
+              "internalName": "int8"
+            }
+          },
+          "nullable": true,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "notes",
+            "column": "ref"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "email",
+          "type": {
+            "name": "public.email",
+            "kind": "domain",
+            "schema": "public",
+            "internalName": "email",
+            "base": {
+              "name": "text",
+              "kind": "base",
+              "schema": "pg_catalog",
+              "internalName": "text"
+            }
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "accounts",
+            "column": "email"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
     }
   }
 }

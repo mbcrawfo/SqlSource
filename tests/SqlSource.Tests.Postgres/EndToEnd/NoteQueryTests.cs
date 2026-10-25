@@ -1,24 +1,25 @@
-using System.Collections.Generic;
 using System.Threading.Tasks;
-using Dapper;
 using Shouldly;
 using SqlSource.Tests.Postgres.EndToEnd.Types;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.EndToEnd;
 
-// The queries of Queries/Notes.sql, run on the seed of "app" into their output models: the enum note_kind is read as
-// the C# enum NoteKind, which the data source maps, and the domain email as the record struct Email, by its handler.
+// The queries of Queries/Notes.sql, run on the seed of "app" through the methods that NoteQueries gets: the enum
+// note_kind is read as the C# enum NoteKind, which the data source maps, and the domains email and note_ref as the
+// record structs Email and NoteRef, through their converters, as columns and as parameters.  Half the tests give the
+// method an open connection and half a closed one, which the method opens.
 [Collection(UsesPostgres.Name)]
 public sealed class NoteQueryTests(PostgresContainer postgres)
 {
     [Fact]
-    public async Task QueryAsync_ListAccountNotesOfAnAccountWithNoNote_HasNulls()
+    public async Task ListAccountNotes_AnAccountWithNoNote_HasNulls()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = await source.OpenConnectionAsync(token);
 
-        var notes = await connection.QueryAsync<ListAccountNotesDto>(NoteQueries.ListAccountNotes);
+        var notes = await connection.ListAccountNotes(cancellationToken: token);
 
         notes.ShouldBe([
             new ListAccountNotesDto(1, "alice", 1, NoteKind.Call, "Asked for a larger plan."),
@@ -29,12 +30,13 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task QueryAsync_CountAccountNotes_ReadsTheCounts()
+    public async Task CountAccountNotes_EveryAccount_ReadsTheCounts()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = source.CreateConnection();
 
-        var counts = await connection.QueryAsync<CountAccountNotesDto>(NoteQueries.CountAccountNotes);
+        var counts = await connection.CountAccountNotes(cancellationToken: token);
 
         counts.ShouldBe([
             new CountAccountNotesDto(1, 2),
@@ -44,12 +46,13 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task QueryAsync_ListDisplayNames_ReadsTheNames()
+    public async Task ListDisplayNames_EveryAccount_ReadsTheNames()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = await source.OpenConnectionAsync(token);
 
-        var names = await connection.QueryAsync<ListDisplayNamesDto>(NoteQueries.ListDisplayNames);
+        var names = await connection.ListDisplayNames(cancellationToken: token);
 
         names.ShouldBe([
             new ListDisplayNamesDto(1, "Alice"),
@@ -58,13 +61,32 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
         ]);
     }
 
+    // The method reads by ordinal, so the marks, which stay in the columns' names, set the properties' nullability and
+    // nothing else.
     [Fact]
-    public async Task QueryAsync_ListNoteKinds_ReadsTheEnumAndTheDomain()
+    public async Task ListMarkedNames_EveryAccount_ReadsTheNames()
     {
+        var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        await using var connection = source.CreateConnection();
 
-        var kinds = await connection.QueryAsync<ListNoteKindsDto>(NoteQueries.ListNoteKinds);
+        var names = await connection.ListMarkedNames(cancellationToken: token);
+
+        names.ShouldBe([
+            new ListMarkedNamesDto(1, "Alice"),
+            new ListMarkedNamesDto(2, "Bob"),
+            new ListMarkedNamesDto(3, "Carol"),
+        ]);
+    }
+
+    [Fact]
+    public async Task ListNoteKinds_EveryNote_ReadsTheEnumAndTheDomain()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+
+        var kinds = await connection.ListNoteKinds(cancellationToken: token);
 
         kinds.ShouldBe([
             new ListNoteKindsDto(NoteKind.Call, new Email("alice@example.com")),
@@ -73,37 +95,57 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
         ]);
     }
 
-    // A mark stays in the column's name, which Dapper matches to no property: the marks are for a reader that reads by
-    // ordinal, as this one does.
+    // The parameter is sent as the long that ToDatabase returns, and the column read from the long that Npgsql gives,
+    // through FromDatabase.
     [Fact]
-    public async Task ExecuteReaderAsync_ListMarkedNames_ReadsByOrdinalIntoTheRecord()
+    public async Task GetNoteByRef_ARef_ReadsTheNote()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = source.CreateConnection();
+
+        var note = await connection.GetNoteByRef(
+            new GetNoteByRefArgs(new NoteRef(5_000_000_003)),
+            cancellationToken: token
+        );
+
+        note.ShouldBe(new GetNoteByRefDto(3, new NoteRef(5_000_000_003), "Closed the account on site."));
+    }
+
+    // The parameter is sent as the string that ToDatabase returns, and note 2's NULL ref is read as null, never given
+    // to FromDatabase.
+    [Fact]
+    public async Task FindNotesByEmail_Alice_ReadsHerNotes()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(token);
-        await using var command = connection.CreateCommand();
-        command.CommandText = NoteQueries.ListMarkedNames;
 
-        var names = new List<ListMarkedNamesDto>();
-        await using (var reader = await command.ExecuteReaderAsync(token))
-        {
-            reader.GetName(0).ShouldBe("id?");
-            reader.GetName(1).ShouldBe("initcap_name!");
-            while (await reader.ReadAsync(token))
-            {
-                names.Add(
-                    new ListMarkedNamesDto(
-                        await reader.GetFieldValueAsync<int?>(0, token),
-                        await reader.GetFieldValueAsync<string>(1, token)
-                    )
-                );
-            }
-        }
+        var notes = await connection.FindNotesByEmail(
+            new FindNotesByEmailArgs(new Email("alice@example.com")),
+            cancellationToken: token
+        );
 
-        names.ShouldBe([
-            new ListMarkedNamesDto(1, "Alice"),
-            new ListMarkedNamesDto(2, "Bob"),
-            new ListMarkedNamesDto(3, "Carol"),
+        notes.ShouldBe([
+            new FindNotesByEmailDto(1, new NoteRef(5_000_000_001), new Email("alice@example.com")),
+            new FindNotesByEmailDto(2, null, new Email("alice@example.com")),
         ]);
+    }
+
+    // The parameter is bound by the domain's name, and Npgsql sends a domain as its base type, so the domain's CHECK,
+    // which "nobody" fails, is never applied to it: the comparison finds no row, and nothing throws.
+    [Fact]
+    public async Task FindNotesByEmail_ValueTheDomainRefuses_FindsNoRow()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = source.CreateConnection();
+
+        var notes = await connection.FindNotesByEmail(
+            new FindNotesByEmailArgs(new Email("nobody")),
+            cancellationToken: token
+        );
+
+        notes.ShouldBeEmpty();
     }
 }

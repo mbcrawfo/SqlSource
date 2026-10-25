@@ -241,6 +241,27 @@ public sealed class ModelShapeTests
             ("Email", typeof(Email), false)
         );
 
+    // The domain over bigint is a value type of the project, so its nullable column is a NoteRef?, and the parameter
+    // that the marker declares as the domain is a NoteRef.
+    [Fact]
+    public void Build_HeaderOverrideOfADomain_MapsTheColumnAndTheParameterToAValueType()
+    {
+        ShouldBeModel(
+            typeof(GetNoteByRefArgs),
+            $"{Namespace}.GetNoteByRefArgs",
+            ModelShape.Record,
+            ("Ref", typeof(NoteRef), false)
+        );
+        ShouldBeModel(
+            typeof(GetNoteByRefDto),
+            $"{Namespace}.GetNoteByRefDto",
+            ModelShape.SealedRecord,
+            ("Id", typeof(int), false),
+            ("Ref", typeof(NoteRef?), true),
+            ("Body", typeof(string), false)
+        );
+    }
+
     [Fact]
     public void Build_SortInput_OrdersTheInputByName()
     {

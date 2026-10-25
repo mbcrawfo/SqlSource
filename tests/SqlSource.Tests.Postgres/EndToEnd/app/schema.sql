@@ -16,6 +16,9 @@ CREATE TYPE note_kind AS ENUM ('call', 'email', 'visit');
 
 CREATE DOMAIN email AS text CHECK (VALUE LIKE '%@%');
 
+-- The id that the queries read and send as a value type of the project, through its converters.
+CREATE DOMAIN note_ref AS bigint;
+
 -- A nullable column, a not null one, an identity, a generated column and a default.
 CREATE TABLE accounts (
     id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -27,13 +30,14 @@ CREATE TABLE accounts (
     name_length integer GENERATED ALWAYS AS (length(name)) STORED
 );
 
--- An account with no note gives a LEFT JOIN its NULLs.
+-- An account with no note gives a LEFT JOIN its NULLs, and a note with no ref a NULL of the domain.
 CREATE TABLE notes (
     id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     account_id integer NOT NULL REFERENCES accounts (id),
     kind note_kind NOT NULL,
     body text NOT NULL,
-    written_at timestamptz NOT NULL
+    written_at timestamptz NOT NULL,
+    ref note_ref
 );
 
 -- One nullable column for each type that the base map gives a C# type on both Npgsql 8 and Npgsql 10 and that
