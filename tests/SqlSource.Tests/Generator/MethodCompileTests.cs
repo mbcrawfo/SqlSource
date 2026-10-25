@@ -1,5 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
+using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
@@ -50,9 +51,58 @@ public sealed class MethodCompileTests
         -- name: ListFrom
         -- token: {{table:documents}}
         SELECT id FROM {{table}};
+        -- name: SaveEverything
+        INSERT INTO everything VALUES (
+            @a_char, @a_varchar, @a_nchar, @a_nvarchar, @a_sysname, @a_binary, @a_varbinary, @a_decimal, @a_numeric,
+            @a_datetime2, @a_time, @a_datetimeoffset, @a_json, @a_timestamp, @a_vector, @a_null_vector, @a_bigint,
+            @an_int, @a_smallint, @a_tinyint, @a_bit, @a_float, @a_real, @a_money, @a_smallmoney, @a_date,
+            @a_datetime, @a_smalldatetime, @a_uniqueidentifier, @a_text, @an_ntext, @an_xml, @an_image,
+            @a_sql_variant, @an_email);
 
         """
     );
+
+    // A parameter of each SQL Server type that a method binds as its type, by the name, length, precision and scale
+    // the server describes it with.  rowversion is left out: the server describes it as timestamp, and the map has no
+    // row of its own for it.
+    private static readonly (string Name, SqlServerType Type)[] EveryType =
+    [
+        ("a_char", TestSidecars.SqlServer("char(5)", 5, 0)),
+        ("a_varchar", TestSidecars.SqlServer("varchar(50)", 50, 0)),
+        ("a_nchar", TestSidecars.SqlServer("nchar(5)", 10, 0)),
+        ("a_nvarchar", TestSidecars.SqlServer("nvarchar(50)", 100, 0)),
+        ("a_sysname", TestSidecars.SqlServer("sysname", 256, 0)),
+        ("a_binary", TestSidecars.SqlServer("binary(4)", 4, 0)),
+        ("a_varbinary", TestSidecars.SqlServer("varbinary(max)", -1, 0)),
+        ("a_decimal", TestSidecars.SqlServer("decimal(12,4)", 9, 12, 4)),
+        ("a_numeric", TestSidecars.SqlServer("numeric(10,2)", 9, 10, 2)),
+        ("a_datetime2", TestSidecars.SqlServer("datetime2(3)", 7, 23, 3)),
+        ("a_time", TestSidecars.SqlServer("time(0)", 3, 8, 0)),
+        ("a_datetimeoffset", TestSidecars.SqlServer("datetimeoffset(7)", 10, 34, 7)),
+        ("a_json", TestSidecars.SqlServer("json", -1, 0)),
+        ("a_timestamp", TestSidecars.SqlServer("timestamp", 8, 0)),
+        ("a_vector", TestSidecars.SqlServer("vector(3)", 20, 0)),
+        ("a_null_vector", TestSidecars.SqlServer("vector(3)", 20, 0)),
+        ("a_bigint", TestSidecars.SqlServer("bigint", 8, 19)),
+        ("an_int", TestSidecars.SqlServer()),
+        ("a_smallint", TestSidecars.SqlServer("smallint", 2, 5)),
+        ("a_tinyint", TestSidecars.SqlServer("tinyint", 1, 3)),
+        ("a_bit", TestSidecars.SqlServer("bit", 1, 1)),
+        ("a_float", TestSidecars.SqlServer("float", 8, 53)),
+        ("a_real", TestSidecars.SqlServer("real", 4, 24)),
+        ("a_money", TestSidecars.SqlServer("money", 8, 19, 4)),
+        ("a_smallmoney", TestSidecars.SqlServer("smallmoney", 4, 10, 4)),
+        ("a_date", TestSidecars.SqlServer("date", 3, 10)),
+        ("a_datetime", TestSidecars.SqlServer("datetime", 8, 23, 3)),
+        ("a_smalldatetime", TestSidecars.SqlServer("smalldatetime", 4, 16)),
+        ("a_uniqueidentifier", TestSidecars.SqlServer("uniqueidentifier", 16, 0)),
+        ("a_text", TestSidecars.SqlServer("text", 16, 0)),
+        ("an_ntext", TestSidecars.SqlServer("ntext", 16, 0)),
+        ("an_xml", TestSidecars.SqlServer("xml", -1, 0)),
+        ("an_image", TestSidecars.SqlServer("image", 16, 0)),
+        ("a_sql_variant", TestSidecars.SqlServer("sql_variant", 8016, 0)),
+        ("an_email", TestSidecars.SqlServer("nvarchar(320)", 640, 0, 0, new SqlServerUserType("dbo", "Email", null))),
+    ];
 
     [Theory]
     [InlineData(8)]
@@ -147,6 +197,17 @@ public sealed class MethodCompileTests
                     [],
                     [TestSidecars.Column(0, "id", TestSidecars.SqlServer())]
                 ),
+                MethodRuns.SqlServerEntry(
+                    SqlServer,
+                    "SaveEverything",
+                    [
+                        .. EveryType.Select(
+                            (parameter, index) =>
+                                TestSidecars.Parameter(index, parameter.Name, parameter.Type, index % 2 == 1)
+                        ),
+                    ],
+                    null
+                ),
             ],
             references: [reference]
         );
@@ -163,5 +224,15 @@ public sealed class MethodCompileTests
         methods.ShouldContain("Task<int> RenameDocument(\n");
         methods.ShouldContain("return await command.ExecuteNonQueryAsync(");
         methods.ShouldContain(" ListFrom(\n");
+
+        // Each parameter is bound as its type, a vector's null as the null vector of its dimension.
+        methods.ShouldContain(" SaveEverything(\n");
+        methods.ShouldContain(
+            "var parameter = (global::Microsoft.Data.SqlClient.SqlParameter)command.CreateParameter();\n"
+        );
+        methods.ShouldContain("parameter.SqlDbType = global::System.Data.SqlDbType.DateTime2;\n");
+        methods.ShouldContain("parameter.Precision = 12;\n");
+        methods.ShouldContain("global::Microsoft.Data.SqlTypes.SqlVector<float>.CreateNull(3);\n");
+        methods.ShouldContain("if (parameter.Value is byte[] { Length: > 4 })\n");
     }
 }

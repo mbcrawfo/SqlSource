@@ -1,4 +1,5 @@
 using SqlSource.Generation.Types;
+using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Models;
 
@@ -14,11 +15,17 @@ namespace SqlSource.Generation.Models;
 /// Whether the column's PostgreSQL type is an array, or a domain whose base type is one.  Always false for a parameter.
 /// It changes no property's C#, so <c>ModelCollector.FindDifference</c> does not compare it.
 /// </param>
+/// <param name="Described">
+/// The parameter's type as the sidecar describes it, which a query's method binds it by; null for a column.  It
+/// changes no property's C#, so <c>ModelCollector.FindDifference</c> does not compare it, and two queries that share
+/// a model each bind by their own.
+/// </param>
 internal sealed record ModelProperty(
     string Name,
     PropertyType Type,
     bool IsNullable,
     string Documentation,
     string Subject,
-    bool IsArray
+    bool IsArray,
+    SidecarType? Described = null
 );

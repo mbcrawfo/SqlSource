@@ -1,6 +1,7 @@
 using SqlSource.Diagnostics;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Methods;
 
@@ -50,12 +51,17 @@ internal sealed record MethodInput(string TypeText, EquatableArray<MethodParamet
 /// <param name="Write">
 /// The converter the property's value is converted through before it is bound, or null for a value bound as it is.
 /// </param>
+/// <param name="Described">
+/// The parameter's type as the sidecar describes it, whose database type the binder of its engine binds it as, or
+/// null when it is bound by value alone.
+/// </param>
 internal sealed record MethodParameter(
     string Name,
     string Property,
     bool IsValueType,
     bool IsNullable,
-    Conversion? Write = null
+    Conversion? Write = null,
+    SidecarType? Described = null
 );
 
 /// <summary>

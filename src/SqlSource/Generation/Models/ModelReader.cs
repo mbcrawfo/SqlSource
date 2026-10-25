@@ -248,7 +248,8 @@ internal static class ModelReader
                     parameter.Nullable == true,
                     ParameterDocumentation(parameter, reading.Text),
                     MessageSubject.Of(MessageSubject.Parameter, parameter.Name),
-                    false
+                    false,
+                    parameter.Type
                 )
             );
         }

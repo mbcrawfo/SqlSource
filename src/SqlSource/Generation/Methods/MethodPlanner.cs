@@ -369,7 +369,8 @@ internal static class MethodPlanner
                     property.Name,
                     property.Type.IsValueType,
                     property.IsNullable,
-                    write
+                    write,
+                    property.Described
                 )
             );
         }
