@@ -194,6 +194,102 @@ public sealed class MethodConflictsTests
         conflicts.Diagnostics.Select(diagnostic => diagnostic.Descriptor.Id).ShouldBe(["SQLSRC276"]);
     }
 
+    // Three types claim one file, so their methods share the query's place: the two of one namespace clash, and the
+    // third, of another namespace, keeps its method.
+    [Fact]
+    public void DroppedOf_QueryOfThreeTypesWithAClashBetweenTwo_LeavesTheThirdItsMethod()
+    {
+        var first = Signature("App.First", "FirstExtensions", "Get");
+        var second = Signature("App.Second", "SecondExtensions", "Get");
+        var third = Signature("Other.Third", "ThirdExtensions", "Get", ns: "Other");
+
+        var conflicts = Find([first, second, third]);
+
+        conflicts.DroppedOf("App.First").ShouldBe([first.NameLocation]);
+        conflicts.DroppedOf("App.Second").ShouldBe([second.NameLocation]);
+        conflicts.DroppedOf("Other.Third").ShouldBeEmpty();
+    }
+
+    // Each of three methods of one class is dropped, and each names the first of the others.
+    [Fact]
+    public void Find_ThreeTypesOfOneExtensionClassWithOneName_DropsAllThreeWithSqlsrc274()
+    {
+        var conflicts = Find([
+            Signature("App.A.Queries", "QueriesExtensions", "Get", path: "a.sql"),
+            Signature("App.B.Queries", "QueriesExtensions", "Get", path: "b.sql"),
+            Signature("App.C.Queries", "QueriesExtensions", "Get", path: "c.sql"),
+        ]);
+
+        conflicts
+            .Dropped.Select(dropped => dropped.TypeKey)
+            .ShouldBe(["App.A.Queries", "App.B.Queries", "App.C.Queries"]);
+        Texts(conflicts)
+            .ShouldBe([
+                "SQLSRC274 a.sql: The method of the query 'Get' cannot be named 'Get', because the method of the "
+                    + "query 'Get' of 'App.B.Queries' has that name too, in the class 'App.QueriesExtensions'.  "
+                    + "Rename the query.",
+                "SQLSRC274 b.sql: The method of the query 'Get' cannot be named 'Get', because the method of the "
+                    + "query 'Get' of 'App.A.Queries' has that name too, in the class 'App.QueriesExtensions'.  "
+                    + "Rename the query.",
+                "SQLSRC274 c.sql: The method of the query 'Get' cannot be named 'Get', because the method of the "
+                    + "query 'Get' of 'App.A.Queries' has that name too, in the class 'App.QueriesExtensions'.  "
+                    + "Rename the query.",
+            ]);
+    }
+
+    // The name that the project has is the reason, and each type gets one diagnostic, not one for each reason.
+    [Fact]
+    public void Find_ExtensionClassTakenAndOfTwoAccessibilities_ReportsTheTakenNameOnceForEachType()
+    {
+        var conflicts = MethodConflicts.Find(
+            Sorted(
+                Signature("App.First.Queries", "QueriesExtensions", "GetA", attributePath: "First.cs"),
+                Signature(
+                    "App.Second.Queries",
+                    "QueriesExtensions",
+                    "GetB",
+                    isPublic: false,
+                    attributePath: "Second.cs"
+                )
+            ),
+            new EquatableArray<TakenName>([
+                new TakenName("App.QueriesExtensions", TakenReason.Type, "App.QueriesExtensions"),
+            ]),
+            EquatableArray<string>.Empty
+        );
+
+        conflicts.BlockedTypes.ShouldBe(["App.First.Queries", "App.Second.Queries"]);
+        Texts(conflicts)
+            .ShouldBe([
+                "SQLSRC276 First.cs: The query methods of 'App.First.Queries' cannot go into the extension class "
+                    + "'App.QueriesExtensions', because the project has a type of that name.  Rename the type or what "
+                    + "has the name, or set the attribute's MethodLocation to put the methods on the type.",
+                "SQLSRC276 Second.cs: The query methods of 'App.Second.Queries' cannot go into the extension class "
+                    + "'App.QueriesExtensions', because the project has a type of that name.  Rename the type or what "
+                    + "has the name, or set the attribute's MethodLocation to put the methods on the type.",
+            ]);
+    }
+
+    // A class of the global namespace has its own name as its full name.
+    [Fact]
+    public void Find_TwoTypesOfTheGlobalNamespaceWithOneName_NamesTheClassWithoutANamespace()
+    {
+        var conflicts = Find([
+            Signature("First.Queries", "QueriesExtensions", "Get", ns: "", path: "a.sql"),
+            Signature("Second.Queries", "QueriesExtensions", "Get", ns: "", path: "b.sql"),
+        ]);
+
+        Texts(conflicts)
+            .ShouldBe([
+                "SQLSRC274 a.sql: The method of the query 'Get' cannot be named 'Get', because the method of the "
+                    + "query 'Get' of 'Second.Queries' has that name too, in the class 'QueriesExtensions'.  Rename "
+                    + "the query.",
+                "SQLSRC274 b.sql: The method of the query 'Get' cannot be named 'Get', because the method of the "
+                    + "query 'Get' of 'First.Queries' has that name too, in the class 'QueriesExtensions'.  Rename "
+                    + "the query.",
+            ]);
+    }
+
     // The value does not depend on the order of the compilation's types.
     [Fact]
     public void Find_SignaturesInAnotherOrder_GiveAnEqualValue()

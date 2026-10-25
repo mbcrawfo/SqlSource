@@ -112,6 +112,40 @@ public sealed class MethodConflictTests
         run.Sources.Keys.ShouldNotContain("App.Second-Methods.g.cs");
     }
 
+    // Two types of one namespace that claim one file give each of its queries two methods of one signature: the query
+    // gets one SQLSRC274 for each type, each naming the other.
+    [Fact]
+    public void Run_TwoTypesOfOneNamespaceClaimingOneFile_IsSqlsrc274OnceForEachType()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class First;
+
+                [SqlSourceGenerate]
+                public partial class Second;
+            }
+            """;
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Get\nSELECT id FROM users;\n");
+
+        var run = MethodRuns.Run(file, [Entry(file, "Get", [], [Column("id")])], Source);
+
+        Problems(run)
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'Get', "
+                    + "because the method of the query 'Get' of 'App.First', in the class 'App.FirstExtensions' of the "
+                    + "same namespace, has that name and the same parameters.  Rename the query.",
+                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'Get', "
+                    + "because the method of the query 'Get' of 'App.Second', in the class 'App.SecondExtensions' of "
+                    + "the same namespace, has that name and the same parameters.  Rename the query.",
+            ]);
+        run.Sources.Keys.ShouldNotContain("App.First-Methods.g.cs");
+        run.Sources.Keys.ShouldNotContain("App.Second-Methods.g.cs");
+    }
+
     [Fact]
     public void Run_SameNameWithOtherParameters_InTwoExtensionClasses_Compiles()
     {
@@ -157,6 +191,32 @@ public sealed class MethodConflictTests
                     + "type.",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
+    // A type of the global namespace gives a class of the global namespace, which the project's type of its name takes.
+    [Fact]
+    public void Run_ExtensionClassOfTheGlobalNamespaceNamedAsAProjectType_IsSqlsrc276()
+    {
+        const string Source = """
+            using SqlSource;
+
+            [SqlSourceGenerate]
+            public partial class Sample;
+
+            public static class SampleExtensions;
+            """;
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Get\nSELECT id FROM users;\n");
+
+        var run = MethodRuns.Run(file, [Entry(file, "Get", [], [Column("id")])], Source);
+
+        Problems(run)
+            .ShouldBe([
+                "SQLSRC276 /app/Repo/Sample.cs(3,2)-(3,19): The query methods of 'Sample' cannot go into the "
+                    + "extension class 'SampleExtensions', because the project has a type of that name.  Rename the "
+                    + "type or what has the name, or set the attribute's MethodLocation to put the methods on the "
+                    + "type.",
+            ]);
+        run.Sources.Keys.ShouldNotContain("Sample-Methods.g.cs");
     }
 
     // The model is generated, and the class that would share its name, or that of the model's namespace, is not.
