@@ -168,8 +168,8 @@ public sealed class ConversionPlannerTests
         blocked.ShouldBeTrue();
         problems.ShouldBe([
             "SQLSRC279: The column 'address' has type 'MyApp.Address', which has converters, but the database type "
-                + "'public.address' has no C# type to convert from.  Remove the type override, or the converters of "
-                + "'MyApp.Address'.",
+                + "'public.address' has no C# type to convert from.  Choose a C# type without converters for it, or "
+                + "remove the converters of 'MyApp.Address'.",
         ]);
     }
 
@@ -186,8 +186,8 @@ public sealed class ConversionPlannerTests
         blocked.ShouldBeTrue();
         problems.ShouldBe([
             "SQLSRC279: The element of column 'addresses' has type 'MyApp.Email', which has converters, but the "
-                + "database type 'public.address' has no C# type to convert from.  Remove the type override, or the "
-                + "converters of 'MyApp.Email'.",
+                + "database type 'public.address' has no C# type to convert from.  Choose a C# type without converters "
+                + "for it, or remove the converters of 'MyApp.Email'.",
         ]);
     }
 

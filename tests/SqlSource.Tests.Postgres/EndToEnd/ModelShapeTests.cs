@@ -216,8 +216,8 @@ public sealed class ModelShapeTests
         );
 
     // accounts.id is an AccountId by the file's column types in the project, notes.account_id by the header's
-    // -- column: marker, the count by the query's, and the parameter by its -- param: marker, which names no database
-    // type.
+    // -- column: marker (pinned by Build_LeftJoin_MakesTheOptionalSideNullable), the count by the query's, and the
+    // parameter by its -- param: marker, which names no database type.
     [Fact]
     public void Build_ColumnTypesAndParamMarker_MapTheIdsAndTheCountToTypesOfTheProject()
     {

@@ -212,7 +212,8 @@ internal static class ConversionPlanner
         }
 
         // SQLSRC279 for a foreign type with converters, the property's or its element's, whose database type the base
-        // map gives no C# type.
+        // map gives no C# type.  Its help names no place, since a type override, a column type or a marker may have
+        // chosen the type.
         public void ReportNoBase(string type, string key) =>
             problems.Add(
                 DiagnosticInfo.Create(
@@ -221,7 +222,9 @@ internal static class ConversionPlanner
                     subject,
                     PostgresTypeMap.AsWritten(type),
                     "which has converters, but the database type '" + key + "' has no C# type to convert from",
-                    "Remove the type override, or the converters of '" + PostgresTypeMap.AsWritten(type) + "'"
+                    "Choose a C# type without converters for it, or remove the converters of '"
+                        + PostgresTypeMap.AsWritten(type)
+                        + "'"
                 )
             );
 

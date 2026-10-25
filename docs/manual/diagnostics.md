@@ -1165,7 +1165,7 @@ See: [Logs](tool.md#logs)
 | `the sidecar does not exist` | A query of the file needs an entry, and the file has no sidecar |
 | `the sidecar cannot be read`, or `the sidecar has format 2, and this tool writes 1` | The sidecar is no sidecar of this version of the tool.  A merge conflict in it is the usual cause of the first |
 | `the sidecar has no entry` | The query was added, or renamed, since the sidecar was written |
-| `the query has changed since it was described` | The SQL, a `-- param:` marker or the default of a token changed |
+| `the query has changed since it was described` | The SQL, the type or the nullability of a `-- param:` marker, or the default of a token changed |
 | `columns[2].nullable is true, and the database says false` | The database describes the query another way than the sidecar holds.  A change to the schema is the usual cause |
 | `database is "billing", and the project says "reports"` | The query belongs to another database, or another kind of database, than the one it was described against |
 | `the query is not in the file`, or `the query needs no entry` | The sidecar holds an entry for a query that was removed, or whose output is now `sql` |
@@ -1186,7 +1186,7 @@ See: [Logs](tool.md#logs)
 
 - **Columns and parameters are counted from 0**: `columns[2]` is the third column.
 - **Only the first difference of a query is named.**
-- **What is compared is what changes generated code**: the query as written (its SQL, its `-- param:` markers and its tokens' defaults), its database and the kind of that database, whether it returns rows and which table's rows they match, if any, and the name, position, type and nullability of each parameter and column.  The versions of the tool and of the server are not compared.
+- **What is compared is what changes generated code**: the query as written (its SQL, the types and nullability of its `-- param:` markers, and its tokens' defaults), its database and the kind of that database, whether it returns rows and which table's rows they match, if any, and the name, position, type and nullability of each parameter and column.  The versions of the tool and of the server are not compared.
 - **With `--database`**, an entry for a query that is no longer in the file, or that needs none, is reported, whatever its database, when `describe` with the same filters would rewrite the sidecar, which drops it.  A sidecar that such a `describe` leaves as it is, because another query of the file, of a database that `--database` does not name, has changed or was never described, keeps the entry, and the check does not report it.
 
 The tool exits with the code 2 when it reported this error and no other, so that a build can tell a sidecar that is out of date from a check that could not be made.  A query that could not be described has an error of its own, and the exit code is then 1.
@@ -1783,7 +1783,7 @@ See: [Dialects](dialects.md)
 
 **Entry is stale**
 
-The query has changed since its entry in the sidecar was written: its SQL, a `-- param:` marker or the default of one of its tokens.  A change to a comment alone does not count.  An entry that describes another version of the query could give it the wrong types, so it is not used.
+The query has changed since its entry in the sidecar was written: its SQL, the type or the nullability of a `-- param:` marker, or the default of one of its tokens.  A change to a comment alone does not count, and neither does a C# type after `->`.  An entry that describes another version of the query could give it the wrong types, so it is not used.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC244: The query 'GetUser' has changed since its entry was written.  Run 'sqlsource describe'.
@@ -2548,10 +2548,10 @@ Add a converter between the column's or parameter's type and the type the messag
 The error has a second form, when the column's or parameter's database type has no C# type that the driver reads it as, such as a composite type, `regclass` or a range of a subtype SqlSource does not know: such a type has nothing to convert from.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC279: The column 'address' has type 'App.Address', which has converters, but the database type 'public.address' has no C# type to convert from.  Remove the type override, or the converters of 'App.Address'.
+/work/App/Queries/Users.sql(1,10): error SQLSRC279: The column 'address' has type 'App.Address', which has converters, but the database type 'public.address' has no C# type to convert from.  Choose a C# type without converters for it, or remove the converters of 'App.Address'.
 ```
 
-For an array whose element type the type override chose, such as `email[]` under `public.email=App.Email`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
+For an array whose element type a type override, a column type or a marker chose, such as `email[]` under `public.email=App.Email` or `posts.tag_ids=TagId[]`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
 
 See: [Converters](settings.md#converters)
 

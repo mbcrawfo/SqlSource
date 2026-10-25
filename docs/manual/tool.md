@@ -125,7 +125,7 @@ The format of a sidecar is described by its JSON Schema, [`sidecar-v1.schema.jso
 `describe` describes only what changed.  A query whose sidecar entry is current is skipped, and is not sent to the database.  An entry stops being current when any of these change:
 
 - The query's SQL.  A change to a comment alone does not count.
-- A `-- param:` marker of the query, or the default of one of its tokens.
+- The type or the nullability of a `-- param:` marker of the query, or the default of one of its tokens.
 - The query's dialect, or its [logical database](#connections).
 - The version of the tool: a sidecar written by another version is described again whole.  Until it is, the build warns of it ([SQLSRC240](diagnostics.md#sqlsrc240)).
 
