@@ -47,7 +47,7 @@ public sealed class WriteQueryTests(SqlServerContainer sqlServer)
                         "Asked to reopen.",
                         new DateTime(2024, 10, 1, 9, 0, 0, DateTimeKind.Unspecified)
                     ),
-                    transaction,
+                    transaction: transaction,
                     cancellationToken: TestContext.Current.CancellationToken
                 );
 
@@ -62,7 +62,7 @@ public sealed class WriteQueryTests(SqlServerContainer sqlServer)
             {
                 var names = await connection.RenameAccount(
                     new RenameAccountArgs("caroline", 3),
-                    transaction,
+                    transaction: transaction,
                     cancellationToken: TestContext.Current.CancellationToken
                 );
 
@@ -77,7 +77,7 @@ public sealed class WriteQueryTests(SqlServerContainer sqlServer)
             {
                 var changes = await connection.MergeAccountStatus(
                     new MergeAccountStatusArgs(2, "active"),
-                    transaction,
+                    transaction: transaction,
                     cancellationToken: TestContext.Current.CancellationToken
                 );
 
