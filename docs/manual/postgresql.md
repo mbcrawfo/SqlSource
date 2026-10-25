@@ -130,7 +130,7 @@ SELECT c.id, initcap(c.name) AS "display_name!"
 FROM customers c;
 ```
 
-`initcap` is never null for a value that is not, though SqlSource treats it as possibly null: `"display_name!"` gives the property `DisplayName` the type `string` and not `string?`.  Write the alias in quotes, since `!` and `?` are not part of a plain name, and the mark is left out of the property's name.  A `!` is your word, and nothing checks it.  The mark stays in the column's name, which Dapper matches to the property's by name, so with Dapper write a `-- column:` marker and no mark:
+`initcap` is never null for a value that is not, though SqlSource treats it as possibly null: `"display_name!"` gives the property `DisplayName` the type `string` and not `string?`.  Write the alias in quotes, since `!` and `?` are not part of a plain name, and the mark is left out of the property's name.  A `!` is your word, and the build does not check it: a [query method](generator.md#reading-rows) throws when such a column is null after all.  The mark stays in the column's name, which Dapper matches to the property's by name, so with Dapper write a `-- column:` marker and no mark:
 
 ```sql postgres
 -- name: GetCustomerLabels

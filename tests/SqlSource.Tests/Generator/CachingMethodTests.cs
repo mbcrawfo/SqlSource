@@ -16,7 +16,8 @@ namespace SqlSource.Tests.Generator;
 
 // The caching of the methods: which types' methods an edit makes the generator write again.  Users is claimed by
 // UserQueries and Orders by OrderQueries, both in the namespace App and at CodeGen, so each type has one method, in its
-// extension class unless the test says otherwise.
+// extension class unless the test says otherwise.  One test adds AdminQueries, in the namespace App.Admin, which claims
+// Users too.
 public sealed class CachingMethodTests
 {
     private const string UserMethods = "App.UserQueries-Methods.g.cs";

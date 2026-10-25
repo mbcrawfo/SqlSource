@@ -413,7 +413,7 @@ The `sqlsource` tool does not read the property or the metadata, which change no
 ## Where the SQL goes
 
 ```csharp
-[SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+[SqlSourceGenerate(Output = GeneratorOutput.Models, SqlLocation = SqlLocation.Direct)]
 public static partial class UserQueries;
 ```
 
@@ -437,14 +437,14 @@ With `Nested`, a type that already has a member with the nested class's name is 
 ```
 
 ```csharp
-[SqlSourceGenerate(NestedClass = "Statements")]
+[SqlSourceGenerate(Output = GeneratorOutput.Models, NestedClass = "Statements")]
 public partial class UserRepository
 {
     public string Get() => Statements.GetUser;
 }
 ```
 
-Under `SqlLocation.Nested`, this names the private class that holds the type's members.  `NestedClass` on the attribute names it for one type, and the `SqlSourceNestedClass` property for every type of the project that does not set it.  Without either, the class is `Sql`.  The setting has no item metadata and no marker, since a type's queries can come from several files.
+Under `SqlLocation.Nested`, this names the private class that holds the type's members, those of its queries whose output is `sql` or `models`.  `NestedClass` on the attribute names it for one type, and the `SqlSourceNestedClass` property for every type of the project that does not set it.  Without either, the class is `Sql`.  The setting has no item metadata and no marker, since a type's queries can come from several files.
 
 The value is one C# identifier that is not a keyword: `Queries` is fine, and `class`, `My-Sql` or `App.Sql` is not.  A value that is not valid is [SQLSRC006](diagnostics.md#sqlsrc006) on the attribute, and [SQLSRC014](diagnostics.md#sqlsrc014) as the property.  Under `SqlLocation.Direct` there is no nested class, and the setting has no effect, even on the same attribute.
 

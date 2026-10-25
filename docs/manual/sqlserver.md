@@ -137,7 +137,7 @@ SELECT id, EOMONTH(placed_at) AS month_end
 FROM dbo.orders;
 ```
 
-If `placed_at` is `NOT NULL`, the last day of its month is never null, though SQL Server treats `EOMONTH` as possibly null: the marker gives the property `MonthEnd` the type `System.DateTime` and not `System.DateTime?`.  Nothing checks the marker.  An alias `AS [month_end!]` does the same without the marker, and the mark is left out of the property's name; it stays in the column's name, which Dapper matches to the property's by name, so with Dapper write the marker.  See [which properties can be null](generator.md#model-nullability) and [the `-- column:` marker](generator.md#column-marker).
+If `placed_at` is `NOT NULL`, the last day of its month is never null, though SQL Server treats `EOMONTH` as possibly null: the marker gives the property `MonthEnd` the type `System.DateTime` and not `System.DateTime?`.  The build does not check the marker: a [query method](generator.md#reading-rows) throws when such a column is null after all.  An alias `AS [month_end!]` does the same without the marker, and the mark is left out of the property's name; it stays in the column's name, which Dapper matches to the property's by name, so with Dapper write the marker.  See [which properties can be null](generator.md#model-nullability) and [the `-- column:` marker](generator.md#column-marker).
 
 <a id="types"></a>
 
@@ -204,7 +204,7 @@ A type that the table does not name gets its C# type by what it is:
 
 - **`timestamp`** is SQL Server's row version, which it also calls `rowversion`, and not a time, so it is a `byte[]`.  PostgreSQL's `timestamp` is a time: see [type overrides](settings.md#setting-type-overrides) for an entry in a project with both.
 - **`date` and `time`** are a `System.DateTime` and a `System.TimeSpan`, and never a `System.DateOnly` or a `System.TimeOnly`, on Microsoft.Data.SqlClient 6.1 and 7.
-- **`date`, `datetime`, `datetime2` and `smalldatetime`** are read as a `System.DateTime` whose `Kind` is `Unspecified`, and `datetimeoffset` keeps its offset.  Dapper sends a `DateTime` parameter as a `datetime`, to 1/300 of a second, so a `datetime2` loses digits unless it is sent as a `datetime2`: see [the recipe](recipes.md#dapper-with-sql-server).
+- **`date`, `datetime`, `datetime2` and `smalldatetime`** are read as a `System.DateTime` whose `Kind` is `Unspecified`, and `datetimeoffset` keeps its offset.  Dapper sends a `DateTime` parameter as a `datetime`, to 1/300 of a second, so a `datetime2` loses digits unless it is sent as a `datetime2`: see [the recipe](recipes.md#dapper-with-sql-server).  A query method sends it by its value too, as a `datetime`: see [the generator's known issues](generator.md#known-issues).
 - **`float(1)` to `float(24)`** are a `real` to SQL Server, so they are a `float` in C#.  `float(25)` to `float(53)`, and `float` without a length, are a `double`.
 - **`sql_variant`** is an `object`, whose value is the C# type of the value the row holds: an `int` for an `int`, a `string` for an `nvarchar`.
 - **`json`**, SQL Server 2025's type, is a `string`.

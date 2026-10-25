@@ -301,6 +301,9 @@ public sealed class SettingLevelTests
         run.Diagnostics.ShouldBe(markedDiagnostics);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
+
+        // The query has its constant or token method, so the comparison of the two files compares a member.
+        plain.Sources["App.Sample.g.cs"].ShouldMatch(@"public (const string Q = |static string Q\()");
         run.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
     }
 

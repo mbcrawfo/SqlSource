@@ -179,11 +179,11 @@ More: [output](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/setti
 
 Add the generator parameter `async-method-suffix`: `<SqlSourceGeneratorParameters>async-method-suffix</SqlSourceGeneratorParameters>` in the project file, and `GetUser`'s method is `GetUserAsync`.  It can also be given for one type, folder, file or query.  See [generator parameters](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-generator-parameters).
 
-### A query method throws `InvalidCastException`
+### A query method throws `InvalidCastException` or `SqlNullValueException`
 
-The driver could not read a column, or send a parameter, as its C# type.  Most often a [type override](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-type-overrides) names a type the driver was never taught, such as a C# enum for a PostgreSQL enum without Npgsql's `MapEnum<T>()` on the data source, or a type of your own: teach the driver the type, or map the database type to one it reads.  When the message is "Column 'name' is null.", the column held a null though its property cannot be null: give the column a nullable property, by its alias or a `-- column:` line, or keep the null out in the query.  A few types cannot be sent by their value yet: see [the known issues](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md#known-issues).
+The driver could not read a column, or send a parameter, as its C# type.  Most often a [type override](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-type-overrides) names a type the driver was never taught, such as a C# enum for a PostgreSQL enum without Npgsql's `MapEnum<T>()` on the data source, or a type of your own: teach the driver the type, or map the database type to one it reads.  When the message is "Column 'name' is null.", or, on SQL Server, the exception is Microsoft.Data.SqlClient's `SqlNullValueException`, "Data is Null.", the column held a null though its property cannot be null: give the column a nullable property, by its alias or a `-- column:` line, or keep the null out in the query.  A few types cannot be sent by their value: see [the known issues](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md#known-issues).
 
-> **Coming in a later release.**  A converter of your own will turn a type that the driver does not read into one that it does.  See [what works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today).
+> **Coming in a later release.**  A converter of your own will turn a type that the driver does not read into one that it does, and each parameter will be sent as its database type.  See [what works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today).
 
 ### How do I change the namespace of the models?
 
@@ -223,7 +223,7 @@ Each column and parameter of a PostgreSQL query whose output is `models` or `cod
 </PropertyGroup>
 ```
 
-Each property of a model has the type its database type maps to, and a query method asks the driver for that type, so it must be one the driver reads: see [the FAQ](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#a-query-method-throws-invalidcastexception).  An entry that is not written correctly, or whose key has no schema and is not a type SqlSource knows, is a build error, and so is a C# type that the project cannot find or use, at each query that uses it.  See [type overrides](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-type-overrides).
+Each property of a model has the type its database type maps to, and a query method asks the driver for that type, so it must be one the driver reads: see [the FAQ](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#a-query-method-throws-invalidcastexception-or-sqlnullvalueexception).  An entry that is not written correctly, or whose key has no schema and is not a type SqlSource knows, is a build error, and so is a C# type that the project cannot find or use, at each query that uses it.  See [type overrides](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-type-overrides).
 
 ## Where to next
 
