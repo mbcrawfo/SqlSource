@@ -1,7 +1,7 @@
 {
   "checkedFrom": {
     "major": 18,
-    "why": "only PostgreSQL 18 proves an EXISTS column never NULL, and the sidecar is written on 18"
+    "why": "PostgreSQL before 17 cannot prove an EXISTS column never NULL, and 18 is the first recorded major that does"
   },
   "columns": [
     { "name": "id", "nullable": false },

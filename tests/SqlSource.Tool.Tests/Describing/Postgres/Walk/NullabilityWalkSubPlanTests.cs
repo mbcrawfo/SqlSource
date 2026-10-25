@@ -46,7 +46,7 @@ public sealed class NullabilityWalkSubPlanTests
         AnswersOf(RunTyped(root, BuiltInTypes.Int4, BuiltInTypes.Int8)).ShouldBe([UnknownNoOrigin, NotNullExpression]);
     }
 
-    // On 14 a.id IN (SELECT count(*) ...) prints (SubPlan 1) too: its column is a boolean, which is no subquery's
+    // Before 17 a.id IN (SELECT count(*) ...) prints (SubPlan 1) too: its column is a boolean, which is no subquery's
     // value of a family.
     [Fact]
     public void Run_ScalarSubPlanOfABooleanColumn_KeepsNoOrigin() =>
@@ -149,7 +149,8 @@ public sealed class NullabilityWalkSubPlanTests
             .ShouldBe([UnknownNoOrigin, (nullable, nullable is null ? "no-origin" : "expression")]);
     }
 
-    // a.id IN (SELECT o.user_id FROM o), as 18 prints it, over a subplan that scans "o" for the column and o.user_id.
+    // a.id IN (SELECT o.user_id FROM o), as 17 and later print it, over a subplan that scans "o" for the column and
+    // o.user_id.
     private static WalkOutcome RunAny(string entry, string column) =>
         RunTyped(
             ScanOfA(entry, SubPlan("SubPlan 2", Scan("o", column, "o.user_id"))),
@@ -219,7 +220,7 @@ public sealed class NullabilityWalkSubPlanTests
         AnswersOf(outcome).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
     }
 
-    // EXISTS on 18 starts false and turns true at the subplan's first row.
+    // EXISTS, as 17 and later print it, starts false and turns true at the subplan's first row.
     [Fact]
     public void Run_ExistsOfASubPlan_IsAnswered() =>
         AnswersOf(

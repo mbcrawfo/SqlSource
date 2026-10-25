@@ -59,8 +59,8 @@ public sealed class CheckTests(PostgresContainer postgres)
         // A server that leaves cases out, by their minimumMajor or their checkedFrom, gets two runs, since a filtered
         // check compares only what it names: the realistic cases that it checks, each named by its query.sql, and
         // the other databases whole, named by --database alone, so that none of their queries goes unchecked.  Only
-        // such a server runs this path, PostgreSQL 14 today, which CI runs: a local run on the default image does not
-        // exercise it.
+        // such a server runs this path, every major below 18 today, of which CI runs 14: a local run on the default
+        // image does not exercise it.
         checkedHere.ShouldNotBeEmpty();
         var checkedEntries = CommittedEntries.Count(
             checkedHere.Select(static found => found.SidecarPath),
