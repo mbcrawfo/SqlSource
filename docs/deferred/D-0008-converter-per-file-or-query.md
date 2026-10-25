@@ -6,7 +6,7 @@
 
 ## Delivered instead
 
-A converter is an edge between two C# types for the whole project: [`ConverterSet`](../../src/SqlSource/Generation/Converters/ConverterSet.cs) holds one per pair of types and direction, a second in the project's source being `SQLSRC278`, and [`ConversionPlanner`](../../src/SqlSource/Generation/Methods/ConversionPlanner.cs) chooses by the property's type and the base map's type alone, whatever level of the override chose the property's type.  An entry's text after its C# type is still not valid: [`TypeOverrideGrammar`](../../src/SqlSource/Settings/TypeOverrides/TypeOverrideGrammar.cs) rejects it.  The manual's known issues of [settings](../manual/settings.md#known-issues) say that a type has one conversion in a project, and that a file or query that needs another gives the database type a C# type of its own.
+A converter is an edge between two C# types for the whole project: [`ConverterSet`](../../src/SqlSource/Generation/Converters/ConverterSet.cs) holds one per pair of types and direction, a second in the project's source being `SQLSRC278`, and [`ConversionPlanner`](../../src/SqlSource/Generation/Methods/ConversionPlanner.cs) chooses by the property's type and the base map's type alone, whatever chose the property's type: a level of the override, a column type or a `-- param:` or `-- column:` marker.  An entry's text after its C# type is still not valid: [`TypeOverrideGrammar`](../../src/SqlSource/Settings/TypeOverrides/TypeOverrideGrammar.cs) rejects it.  The manual's known issues of [settings](../manual/settings.md#known-issues) say that a type has one conversion in a project, and that a file or query that needs another gives the database type, or the column, a C# type of its own.
 
 ## Why deferred
 

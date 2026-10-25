@@ -205,9 +205,15 @@ Rules: [the connection](generator.md#method-connection), [the signature](generat
 
 ## Give an id a type of its own
 
+```xml
+<PropertyGroup>
+    <SqlSourceColumnTypes>customers.id=CustomerId orders.customer_id=CustomerId</SqlSourceColumnTypes>
+</PropertyGroup>
+```
+
 ```sql postgres
 -- name: GetCustomer -> one-optional
--- type-override: int8=MyApp.CustomerId
+-- param: @id -> CustomerId
 SELECT id, name FROM customers WHERE id = @id;
 ```
 
@@ -231,7 +237,9 @@ GetCustomerDto? customer = await connection.GetCustomer(new GetCustomerParams(cu
 // customer.Id and GetCustomerParams.Id are CustomerId
 ```
 
-The type override gives each `bigint` of the query the type `CustomerId`, so the method reads `id` as a `long` and passes it to `FromDatabase`, and sends the `long` that `ToDatabase` returns for `@id`.  On SQL Server the key is `bigint`: `-- type-override: bigint=MyApp.CustomerId`.  To give the type to one table's ids alone, make them a domain, `CREATE DOMAIN customer_id AS bigint`, map it, and declare each parameter compared with such an id as the domain, since PostgreSQL gives it the domain's base type, `bigint`, otherwise:
+The column types give the columns `customers.id` and `orders.customer_id` the type `CustomerId` in every query that reads them, and the `-- param:` marker gives it to `@id`, which is no column.  The method reads `id` as a `long` and passes it to `FromDatabase`, and sends the `long` that `ToDatabase` returns for `@id`.  The other `bigint` columns of the project keep their `long`, and the same lines work on SQL Server.  A column that is computed, such as `max(customer_id)`, is read from no table's column: give it the type with `-- column: latest_customer_id -> CustomerId` inside its query.
+
+Where the schema makes the ids a type of their own, a domain, `CREATE DOMAIN customer_id AS bigint`, or on SQL Server an alias type, map that type with the type override, and on PostgreSQL declare each parameter compared with such an id as the domain, since PostgreSQL gives it the domain's base type, `bigint`, otherwise:
 
 ```sql postgres
 -- name: GetCustomer -> one-optional
@@ -240,7 +248,7 @@ The type override gives each `bigint` of the query the type `CustomerId`, so the
 SELECT id, name FROM customers WHERE id = @id;
 ```
 
-Rules: [converters](settings.md#converters), [type overrides](settings.md#setting-type-overrides).
+Rules: [column types](settings.md#setting-column-types), [giving a parameter a type](parameters-and-tokens.md#param-marker), [converters](settings.md#converters), [type overrides](settings.md#setting-type-overrides).
 
 <a id="dapper-and-adonet"></a>
 

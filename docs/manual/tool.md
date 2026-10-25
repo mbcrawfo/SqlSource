@@ -109,7 +109,7 @@ To keep the sidecars current:
 
 | When | Run |
 |----|----|
-| You add, change, rename or remove a query, a `-- param:` marker or a token's default | `dotnet sqlsource describe` |
+| You add, change, rename or remove a query, the type or the nullability of a `-- param:` marker, or a token's default | `dotnet sqlsource describe` |
 | The schema of the database changes | `dotnet sqlsource describe --force`: see [after a schema change](#after-a-schema-change) |
 | You update the tool | `dotnet sqlsource describe`, which describes every query again |
 | On a build server, to catch a sidecar that someone forgot | `dotnet sqlsource describe --check`: see [check in CI](#check-in-ci) |

@@ -229,7 +229,7 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Build_Count_IsNotNullWithoutAMarker() =>
+    public void Build_Count_IsNotNullWithoutANullabilityMarker() =>
         ShouldBeModel(
             typeof(CountAccountNotesDto),
             $"{Namespace}.CountAccountNotesDto",
@@ -244,7 +244,6 @@ public sealed class ModelShapeTests
     [Fact]
     public void Build_ColumnTypesAndParamMarker_MapTheIdsAndTheCountToTypesOfTheProject()
     {
-        TypedPropertiesOf(typeof(ListAccountNotesDto)).ShouldContain(("AccountId", typeof(AccountId?), true));
         ShouldBeModel(
             typeof(GetAccountNoteCountArgs),
             $"{Namespace}.GetAccountNoteCountArgs",

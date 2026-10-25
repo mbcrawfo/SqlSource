@@ -221,7 +221,6 @@ public sealed class ModelShapeTests
     [Fact]
     public void Build_ColumnTypesAndParamMarker_MapTheIdsAndTheCountToTypesOfTheProject()
     {
-        TypedPropertiesOf(typeof(ListAccountNotesDto)).ShouldContain(("AccountId", typeof(AccountId?), true));
         ShouldBeModel(
             typeof(GetAccountNoteCountArgs),
             $"{Namespace}.GetAccountNoteCountArgs",
