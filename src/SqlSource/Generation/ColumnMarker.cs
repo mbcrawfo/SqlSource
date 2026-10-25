@@ -1,3 +1,4 @@
+using System;
 using SqlSource.Diagnostics;
 
 namespace SqlSource.Generation;
@@ -21,4 +22,19 @@ internal sealed record ColumnMarker(
     string? ClrType,
     bool ResetsType,
     LocationInfo Location
-);
+)
+{
+    /// <summary>
+    /// Whether the marker names <paramref name="column" />, a column's name as the tool wrote it: equal to it ignoring
+    /// case, or to it without its <c>!</c> or <c>?</c> mark.
+    /// </summary>
+    public bool Names(string column)
+    {
+        var length = column.Length - (column.Length > 0 && column[column.Length - 1] is '!' or '?' ? 1 : 0);
+        return string.Equals(column, Name, StringComparison.OrdinalIgnoreCase)
+            || (
+                Name.Length == length
+                && string.Compare(column, 0, Name, 0, length, StringComparison.OrdinalIgnoreCase) == 0
+            );
+    }
+}

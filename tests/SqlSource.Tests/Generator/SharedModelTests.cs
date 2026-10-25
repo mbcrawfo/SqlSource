@@ -182,6 +182,17 @@ public sealed class SharedModelTests
             "the property 'Id' is nullable there and not here"
         );
 
+    // A -- column: marker gives one query's column another C# type, so the two models differ in that property's type.
+    [Fact]
+    public void Run_TwoQueries_OneColumnTypedByAMarker_IsSQLSRC257() =>
+        ShouldBeSqlsrc257AtTheLaterMarker(
+            "",
+            "-- column: id -> long\n",
+            [Column("id")],
+            [Column("id")],
+            "the property 'Id' is 'long' here and 'int' there"
+        );
+
     // GetB has no marker, so its own name is where the error is.
     [Fact]
     public void Run_LaterQueryWithoutAMarker_IsSqlsrc257AtItsName()

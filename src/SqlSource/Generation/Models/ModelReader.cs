@@ -207,7 +207,7 @@ internal static class ModelReader
     {
         foreach (var marker in query.ColumnMarkers)
         {
-            var column = entry.Columns is { } columns ? FindColumn(columns, marker.Name) : null;
+            var column = entry.Columns is { } columns ? FindColumn(columns, marker) : null;
             if (column is null || (HasMark(column.Name) && marker.IsNullable is not null))
             {
                 reading.Diagnostics.Add(
@@ -223,21 +223,14 @@ internal static class ModelReader
         }
     }
 
-    // The first column the marker's name names, ignoring case, with its mark or without it, or null.
-    private static SidecarColumn? FindColumn(EquatableArray<SidecarColumn> columns, string name)
+    // The first column the marker names, ignoring case, with its mark or without it, or null.
+    private static SidecarColumn? FindColumn(EquatableArray<SidecarColumn> columns, ColumnMarker marker)
     {
-        foreach (var column in columns)
+        for (var index = 0; index < columns.Count; index++)
         {
-            var length = column.Name.Length - (HasMark(column.Name) ? 1 : 0);
-            if (
-                string.Equals(column.Name, name, StringComparison.OrdinalIgnoreCase)
-                || (
-                    name.Length == length
-                    && string.Compare(column.Name, 0, name, 0, length, StringComparison.OrdinalIgnoreCase) == 0
-                )
-            )
+            if (marker.Names(columns[index].Name))
             {
-                return column;
+                return columns[index];
             }
         }
 

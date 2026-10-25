@@ -479,15 +479,16 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (resolved, _) => resolved.Types)
             .WithTrackingName(TrackingNames.MappedTypes);
 
-        // The property's type override alone, so that a change to another property types no file again.
-        var projectTypeOverrides = projectLevel.Select(static (level, _) => FileTypesInput.TypeOverridesOf(level));
+        // The properties' type override and column types alone, so that a change to another property types no file
+        // again.
+        var projectTypeSettings = projectLevel.Select(static (level, _) => FileTypesInput.TypeSettingsOf(level));
 
         // The C# types of each claimed file's usable entries, a node for each file after its check, so that an edit to
         // one file or one sidecar types that file alone.  A file with no usable entry carries nothing to type.  Each
         // file keeps its input beside its types, so that the models read its entries without typing it again.
         var typedFiles = sidecarChecks.Then(each =>
             each.Combine(parsedFiles.Combine(filesSettings))
-                .Combine(projectTypeOverrides.Combine(npgsqlProbe.Combine(sqlClientProbe.Combine(mappedTypes))))
+                .Combine(projectTypeSettings.Combine(npgsqlProbe.Combine(sqlClientProbe.Combine(mappedTypes))))
                 .Select(
                     static (input, _) =>
                         FileTypesInput.Gather(

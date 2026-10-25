@@ -8,6 +8,7 @@ using SqlSource.Diagnostics;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Parsing;
 using SqlSource.Settings;
+using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 
@@ -15,15 +16,18 @@ namespace SqlSource.Generation.Types;
 
 /// <summary>
 /// Gives each parameter and column of a file's usable entries its C# type: for a parameter, the one its
-/// <c>-- param:</c> marker gives after <c>-&gt;</c>; else the type override's, from the most specific level that names
-/// its key; or else the base map of its engine's, under the column of the project's driver of that engine.
+/// <c>-- param:</c> marker gives after <c>-&gt;</c>; for a column, the one its query's <c>-- column:</c> marker gives
+/// after <c>-&gt;</c>, else the column types' for its source, from the most specific level that names it; else the
+/// type override's, from the most specific level that names its key; or else the base map of its engine's, under the
+/// column of the project's driver of that engine.
 /// </summary>
 /// <remarks>
 /// A query's parameters are typed before its columns, each in order, and its first failure is its one error, at its
 /// name: the query then has no types.  A type of PostgreSQL goes to <see cref="PostgresTypeMap" />, one of SQL Server
-/// to <see cref="SqlServerTypeMap" />.  The map of a query's type override is the entries of its file's engine, merged
-/// once for each distinct level of markers, since the queries without markers of their own share their file header's.
-/// An empty map, as in a project without the override, is not asked at all.
+/// to <see cref="SqlServerTypeMap" />.  The map of a query's type override is the entries of its file's engine, and its
+/// column types those of every level, each merged once for each distinct level of markers, since the queries without
+/// markers of their own share their file header's.  An empty map, as in a project without the override, is not asked
+/// at all.  A column's marker of <c>-&gt; default</c> skips the column types alone.
 /// </remarks>
 internal static class QueryTyper
 {
@@ -40,6 +44,9 @@ internal static class QueryTyper
 
     // The place of a parameter's C# type that its -- param: marker gives, as SQLSRC250 to SQLSRC252 name it.
     private const string ParamMarker = "the -- param: marker of the parameter";
+
+    // The place of a column's C# type that a -- column: marker of its query gives, by its name or by its source.
+    private const string QueryColumnMarker = "a -- column: marker of the query";
 
     /// <summary>The types of the file's queries whose entries are usable, and the errors of the others.</summary>
     public static FileTypes Type(FileTypesInput input)
@@ -58,7 +65,7 @@ internal static class QueryTyper
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
         var engine = SqlDescribableDialects.EngineOf(file.Dialect);
         var prefix = SqlDialectRules.For(new SqlDialectChoice(file.Dialect, SqlDialectOptions.None)).ParameterPrefix;
-        var lookups = new List<(SettingsLevel Markers, OverrideLookup? Lookup)>();
+        var levels = new List<(SettingsLevel Markers, LevelTypes Types)>();
         var next = 0;
         foreach (var entry in check.UsableEntries)
         {
@@ -71,16 +78,18 @@ internal static class QueryTyper
 
             next = at + 1;
             var query = file.Queries[at];
+            var level = LookupOf(query.Markers, input, engine, levels);
             var typing = new Typing(
                 input.NpgsqlProbe.Column,
                 input.SqlClientProbe.Column,
                 input.SqlClientProbe.VersionText,
-                LookupOf(query.Markers, input, engine, lookups),
+                level.Lookup,
+                level.ColumnTypes,
                 input.MappedTypes,
                 query.NameLocation,
                 diagnostics
             );
-            if (TypeQuery(entry, query.Parameters, prefix, typing) is { } types)
+            if (TypeQuery(entry, query, prefix, typing) is { } types)
             {
                 queries.Add(types);
             }
@@ -95,13 +104,9 @@ internal static class QueryTyper
 
     // The query's types, or null after its first failure is reported.  A parameter whose marker gives a C# type, found
     // by its name ignoring case, has that type, which the message of its failure names it by, with its prefix.
-    private static QueryTypes? TypeQuery(
-        SidecarEntry entry,
-        EquatableArray<SqlQueryParameter> declared,
-        char prefix,
-        Typing typing
-    )
+    private static QueryTypes? TypeQuery(SidecarEntry entry, SqlQuery query, char prefix, Typing typing)
     {
+        var declared = query.Parameters;
         var parameters = ImmutableArray.CreateBuilder<PropertyType>(entry.Parameters.Count);
         foreach (var parameter in entry.Parameters)
         {
@@ -133,7 +138,7 @@ internal static class QueryTyper
         var columns = ImmutableArray.CreateBuilder<PropertyType>(entryColumns.Count);
         foreach (var column in entryColumns)
         {
-            if (TypeOf(column.Type, MessageSubject.Column, column.Name, typing) is not { } type)
+            if (TypeColumn(column, query.ColumnMarkers, typing) is not { } type)
             {
                 return null;
             }
@@ -147,6 +152,75 @@ internal static class QueryTyper
             new EquatableArray<PropertyType>(columns.MoveToImmutable())
         );
     }
+
+    // A column's type: the one its query's marker gives, which the message of its failure names it by; else, unless
+    // that marker says -> default, the column types' entry for its source, which the message names by its key; else
+    // the type override's or the map's.
+    private static PropertyType? TypeColumn(SidecarColumn column, EquatableArray<ColumnMarker> markers, Typing typing)
+    {
+        var marker = TypeMarkerOf(markers, column.Name);
+        if (marker is { ClrType: { } marked })
+        {
+            return Chosen(
+                marked,
+                QueryColumnMarker,
+                marker.Name,
+                column.Type,
+                MessageSubject.Column,
+                column.Name,
+                typing
+            );
+        }
+
+        if (marker is null && SourceTypeOf(column, typing.ColumnTypes) is { Type: { } type } source)
+        {
+            return Chosen(
+                type,
+                ColumnTypePlaceOf(source.Place),
+                source.Key,
+                column.Type,
+                MessageSubject.Column,
+                column.Name,
+                typing
+            );
+        }
+
+        return TypeOf(column.Type, MessageSubject.Column, column.Name, typing);
+    }
+
+    // The query's -- column: marker of the column that gives it a C# type or -> default, or null.
+    private static ColumnMarker? TypeMarkerOf(EquatableArray<ColumnMarker> markers, string column)
+    {
+        for (var index = 0; index < markers.Count; index++)
+        {
+            var marker = markers[index];
+            if ((marker.ClrType is not null || marker.ResetsType) && marker.Names(column))
+            {
+                return marker;
+            }
+        }
+
+        return null;
+    }
+
+    // The column types' entry for the column's source, or null for a column without a table and a column of origin,
+    // which no key names, and for one whose winning entry is default.
+    private static ColumnType? SourceTypeOf(SidecarColumn column, EquatableArray<ColumnType> columnTypes) =>
+        columnTypes.Count > 0 && column.Origin is { Table: { } table, Column: { } source } origin
+            ? ColumnTypeMap.Find(columnTypes, origin.Schema, table, source)
+            : null;
+
+    // The place that wrote an entry of the column types, as SQLSRC250 to SQLSRC252 name it.  The attribute has no
+    // level for them.
+    private static string ColumnTypePlaceOf(SettingPlace place) =>
+        place switch
+        {
+            SettingPlace.Property => "the property " + MSBuildSettings.ColumnTypesName,
+            SettingPlace.Metadata => "the metadata " + MSBuildSettings.ColumnTypesName + " of the file",
+            SettingPlace.FileHeader => "a -- column: marker in the file header",
+            SettingPlace.Query => QueryColumnMarker,
+            SettingPlace.Attribute or _ => "the attribute",
+        };
 
     // The query's parameter of the name, ignoring case, when its marker gives it a C# type, or null.
     private static SqlQueryParameter? MarkedParameter(EquatableArray<SqlQueryParameter> declared, string name)
@@ -538,39 +612,48 @@ internal static class QueryTyper
             [subject, failure.Key, PostgresTypeMap.AsWritten(failure.Text ?? ""), failure.Detail ?? "", .. more]
         );
 
-    // The lookup of the type override for the markers, of the file's engine's entries, made once for each distinct
-    // level of markers, by reference: a query without markers of its own holds its file header's level.  None for an
-    // empty map.  A map of defaults alone is asked, since a default of an array's own key maps nothing and is
-    // reported.
-    private static OverrideLookup? LookupOf(
+    // The lookup of the type override for the markers, of the file's engine's entries, and the merged column types,
+    // made once for each distinct level of markers, by reference: a query without markers of its own holds its file
+    // header's level.  No lookup for an empty map.  A map of defaults alone is asked, since a default of an array's
+    // own key maps nothing and is reported.
+    private static LevelTypes LookupOf(
         SettingsLevel markers,
         FileTypesInput input,
         DatabaseEngine engine,
-        List<(SettingsLevel Markers, OverrideLookup? Lookup)> lookups
+        List<(SettingsLevel Markers, LevelTypes Types)> levels
     )
     {
-        foreach (var (level, lookup) in lookups)
+        foreach (var (level, types) in levels)
         {
             if (ReferenceEquals(level, markers))
             {
-                return lookup;
+                return types;
             }
         }
 
         var map = QuerySettings.ResolveTypeOverrides(markers, input.Metadata, input.Property, engine);
-        var made = map.Count > 0 ? new OverrideLookup(map, input.MappedTypes, engine) : null;
-        lookups.Add((markers, made));
+        var made = new LevelTypes(
+            map.Count > 0 ? new OverrideLookup(map, input.MappedTypes, engine) : null,
+            QuerySettings.ResolveColumnTypes(markers, input.Metadata, input.Property)
+        );
+        levels.Add((markers, made));
         return made;
     }
 
+    // What one level of markers gives the typing of its queries: the lookup of the type override, and the column
+    // types, empty when no level has any.
+    private readonly record struct LevelTypes(OverrideLookup? Lookup, EquatableArray<ColumnType> ColumnTypes);
+
     // What the typing of one query reads, and where its error goes.  SqlClientVersion is the probe's VersionText, for
-    // the message of a type that the project's SqlClient is too old for, and MappedTypes the compilation's answers for
-    // every C# type that a level or a marker chose.
+    // the message of a type that the project's SqlClient is too old for, ColumnTypes the merged column types of the
+    // query's level of markers, and MappedTypes the compilation's answers for every C# type that a level or a marker
+    // chose.
     private readonly record struct Typing(
         NpgsqlColumn Column,
         SqlClientColumn SqlClientColumn,
         string SqlClientVersion,
         OverrideLookup? Lookup,
+        EquatableArray<ColumnType> ColumnTypes,
         EquatableArray<MappedType> MappedTypes,
         LocationInfo Location,
         ImmutableArray<DiagnosticInfo>.Builder Diagnostics
