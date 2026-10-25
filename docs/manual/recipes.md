@@ -197,7 +197,7 @@ await connection.SetBalance(new SetBalanceParams(account.Balance - amount, accou
 await transaction.CommitAsync();
 ```
 
-Open the connection yourself: a query method leaves a connection that is open as it is, and opens and closes again only one that is closed.  Give every method the transaction.  Microsoft.Data.SqlClient refuses a command on a connection with a transaction that the command was not given, and Npgsql runs it in the transaction all the same.
+Open the connection yourself, and give every method the transaction: [the connection](generator.md#method-connection) says why.
 
 Rules: [the connection](generator.md#method-connection), [the signature](generator.md#method-signature), [result shapes](sql-files.md#result-shapes).
 
@@ -237,7 +237,7 @@ GetCustomerDto? customer = await connection.GetCustomer(new GetCustomerParams(cu
 // customer.Id and GetCustomerParams.Id are CustomerId
 ```
 
-The column types give the columns `customers.id` and `orders.customer_id` the type `CustomerId` in every query that reads them, and the `-- param:` marker gives it to `@id`, which is no column.  The method reads `id` as a `long` and passes it to `FromDatabase`, and sends the `long` that `ToDatabase` returns for `@id`.  The other `bigint` columns of the project keep their `long`, and the same lines work on SQL Server.  A column that is computed, such as `max(customer_id)`, is read from no table's column: give it the type with `-- column: latest_customer_id -> CustomerId` inside its query.
+The column types give the columns `customers.id` and `orders.customer_id` the type `CustomerId` in every query that reads them, and the `-- param:` marker gives it to `@id`, which is no column.  The other `bigint` columns of the project keep their `long`, and the same lines work on SQL Server.  A computed column, such as `max(customer_id)`, takes the type from a [`-- column:` marker](generator.md#column-marker) inside its query.
 
 Where the schema makes the ids a type of their own, a domain, `CREATE DOMAIN customer_id AS bigint`, or on SQL Server an alias type, map that type with the type override, and on PostgreSQL declare each parameter compared with such an id as the domain, since PostgreSQL gives it the domain's base type, `bigint`, otherwise:
 
@@ -396,6 +396,7 @@ Rules: [models](generator.md#models), [property names](generator.md#property-nam
   ```csharp
   SqlMapper.AddTypeHandler(new EmailHandler());
   ```
+
 - **A PostgreSQL enum mapped to a C# enum needs `MapEnum<T>()` on the data source.**  An enum read as a `string`, the default, needs nothing:
 
   ```csharp
@@ -560,6 +561,7 @@ connection.QueryAsync<ListCustomerOrdersSinceDto>(
   ```csharp
   SqlMapper.AddTypeHandler(new EmailHandler());
   ```
+
 - **On a connection with a transaction open, give every call the transaction.**  SqlClient refuses a command without it, with `InvalidOperationException`:
 
   ```csharp

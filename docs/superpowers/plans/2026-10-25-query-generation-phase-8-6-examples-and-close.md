@@ -25,6 +25,9 @@
 - **The spec's call against a strongly-typed id** ("an override of `int4` would reach every integer") is moot since 8.7: `OrderId` is a strongly-typed id by column types.  The examples keep `OrderId`.
 - **The class of `CodeGen/` is `OrderLineQueries`.**  It will claim user queries too, so it is renamed `StoreQueries` (namespace `<Project>.CodeGen`; `Models/` has its own `StoreQueries` in `<Project>.Models`, which gets no extension class).  The generated extension class becomes `StoreQueriesExtensions`.
 - **Implementation is native** (in this session), with read-only subagents for the documentation reading; the branch review is the independent check.
+- **Tasks 1 and 2 are one commit.**  Every commit must pass `./pre-commit-validation.sh` on its own tree, and this session has one worktree, so the two examples were validated and committed together.
+- **SQL Server's `schema.sql` needs `GO` after `CREATE TYPE`**: a table can use an alias type only in a batch after the one that creates it.  Both `sqlcmd` runs (Compose and the script) split at `GO`.
+- **One finding of the reading is the code's**: `SQLSRC232`'s help said "a later version may let a project declare a conversion for the type", which converters now answer otherwise; the clause is removed from `PostgresErrors.BindHelp`.  It is describer code, so `tests/SqlSource.Tests.Postgres` also runs on `postgres:14.24`.
 
 ## Names
 

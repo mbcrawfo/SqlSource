@@ -14,8 +14,6 @@ flowchart LR
     sidecar -->|checked and read| generator
 ```
 
-The generator builds the models and the query methods of the described queries from the sidecars.
-
 The rest of this page defines the words the manual uses.  Each is used in this one sense everywhere.
 
 <a id="glossary"></a>
@@ -48,7 +46,7 @@ The part of a `.sql` file before its first `-- name:` line.  It holds comments, 
 
 The tool's record of what the database said about each query's parameters and columns.  It is the file `Users.sql.json` beside `Users.sql`.  It is committed with the project, so that a build never needs a database, and it is never edited by hand: the tool writes it.  The build checks it, and reports a query that must be described and has no current entry in it.  See [sidecar files](tool.md#sidecar-files).
 
-The generator builds the [models](generator.md#models) of a query from its entry in the sidecar.
+The generator builds the [models](generator.md#models) and the [query method](#query-method) of a query from its entry in the sidecar.
 
 ### What a query gets
 
@@ -78,7 +76,7 @@ SqlSource uses the word "parameter" for three different things.  The manual alwa
 
 #### Query parameter
 
-A value you pass when you run a query, written in the SQL as `@` and a name: `@id` in `WHERE id = @id`.  SqlSource finds them and leaves them in the SQL exactly as written.  A `-- param:` marker gives one a type.  See [parameters and tokens](parameters-and-tokens.md).
+A value you pass when you run a query, written in the SQL as `@` and a name: `@id` in `WHERE id = @id`.  SqlSource finds them and leaves them in the SQL exactly as written.  A `-- param:` marker gives one its database type, whether it can be null, or a C# type of your choice.  See [parameters and tokens](parameters-and-tokens.md).
 
 <a id="generator-parameter"></a>
 

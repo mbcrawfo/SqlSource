@@ -125,7 +125,7 @@ If your SQL uses one of these constructs, check the generated SQL: hover over th
 
 ## Database support
 
-| Database | Dialect | Described today | Page |
+| Database | Dialect | Can be described | Page |
 |----|----|----|----|
 | PostgreSQL | `postgres` | Yes | [PostgreSQL](postgresql.md) |
 | SQL Server, Azure SQL | `mssql` | Yes | [SQL Server](sqlserver.md) |
@@ -138,7 +138,7 @@ If your SQL uses one of these constructs, check the generated SQL: hover over th
 
 Every dialect is read, and the queries of every `.sql` file whose output is `sql` or `models` get their constants and token methods whatever its database.  *Described* is something more: the `sqlsource` tool can ask the database about a query's parameters and columns and write the answer to a sidecar.  The tool decides by the dialect of the file, and asks only the databases marked Yes.  A database that merely shares a dialect with one of them, such as DuckDB with `postgres`, is read by that dialect's rules and cannot be described.  The tool still tries to describe a file read as `postgres` whose output is `models` or `codegen`, and the build asks for its entries, so give a DuckDB file the output `sql`: see [the output setting](settings.md#setting-output).
 
-A query that must be described and whose dialect has no database to ask, every row marked No, is [SQLSRC209](diagnostics.md#sqlsrc209), from the tool and in the build.  The default output is `codegen`, so a project that sets neither the dialect nor the output gets it for every file.  It goes away when the query's output is `sql`, which asks for the SQL alone and needs no database: see [the output setting](settings.md#setting-output).  Under the output `models` the query's constant or token method is generated either way; under `codegen` it gets no method.
+A query that must be described and whose dialect has no database to ask, every row marked No, is [SQLSRC209](diagnostics.md#sqlsrc209), from the tool and in the build.  The default output is `codegen`, so a project that sets neither the dialect nor the output gets it for every file.  It goes away when the query's output is `sql`, which asks for the SQL alone and needs no database: see [the output setting](settings.md#setting-output).  Under the output `models` the query's constant or token method is generated either way; under `codegen` it gets neither a method nor a constant.
 
 <a id="known-issues"></a>
 

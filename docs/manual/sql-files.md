@@ -24,10 +24,10 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | Marker | Purpose | File header | Inside a query | Documented in |
 |----|----|----|----|----|
 | `-- name:` | Starts a query and names it, with an optional result shape | no | starts one | [Queries and names](#queries-and-names) |
-| `-- summary:` | Documents the query's generated member, method and models | no | yes | [Summaries](#summaries) |
+| `-- summary:` | Documents the query's generated constant or method, and its models | no | yes | [Summaries](#summaries) |
 | `-- dialect:` | The dialect the file is read by, and its options.  The names and the reading rules are on [the dialects page](dialects.md) | yes | no | [Dialect](settings.md#setting-dialect) |
 | `-- generator:` | Generator parameters | yes | yes | [Generator parameters](settings.md#setting-generator-parameters) |
-| `-- param:` | Gives a query parameter its type, whether it can be null, and a C# type of your choice | no | yes | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
+| `-- param:` | Gives a query parameter its database type, whether it can be null, and, after `->`, a C# type of your choice: `-- param: @id int -> UserId` | no | yes | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | `-- token:` | Gives a token a default | no | yes | [Defaults](parameters-and-tokens.md#token-marker) |
 | `-- token-ignore:` | Keeps text that looks like a token as it is written | no | yes | [Text that looks like a token](parameters-and-tokens.md#token-ignore) |
 | `-- database:` | The logical database a query belongs to | yes | yes | [Database](settings.md#setting-database) |
@@ -38,7 +38,7 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | `-- input-model:`, `-- output-model:` | The name of one query's model | no | yes | [Name of one query's model](settings.md#setting-model-name) |
 | `-- collection-type:` | The type that a query's method returns many rows in | yes | yes | [Collection type](settings.md#setting-collection-type) |
 | `-- type-override:` | Gives a database type the C# type of your choice, one entry for each line | yes | yes | [Type overrides](settings.md#setting-type-overrides) |
-| `-- column:` | Inside a query, says whether one column of the query's result can be null, or gives it a C# type, for its property in the output model, and leaves the column's name alone.  In the file header, gives a column of a table or view a C# type in every query of the file, one entry for each line | yes | yes | [Setting a column's nullability or type with a marker](generator.md#column-marker), [column types](settings.md#setting-column-types) |
+| `-- column:` | Inside a query, says whether one column of the query's result can be null, `-- column: total not null`, or gives it a C# type after `->`, `-- column: total -> PostCount`, for its property in the output model, and leaves the column's name alone.  In the file header, gives a column of a table or view a C# type in every query of the file, `-- column: users.id -> UserId`, one entry for each line | yes | yes | [Setting a column's nullability or type with a marker](generator.md#column-marker), [column types](settings.md#setting-column-types) |
 
 A marker that is a setting links to its section of [the settings page](settings.md), which also says where else the setting can be given and which place wins.  A marker where its column says "no" is an error: see [markers in the wrong place](#markers-in-the-wrong-place).
 
@@ -153,7 +153,7 @@ Hover over a generated member to see the SQL it holds.  It is the SQL you wrote,
 - Optimizer hints are kept: `/*+ ... */` and `/*! ... */`, and where the dialect is theirs, MariaDB's `/*M! ... */` and Oracle's `--+ ...`.
 - Strings and quoted identifiers are copied exactly as written.  Where one starts and ends depends on the dialect: see [dialects](dialects.md).
 - Every line ending becomes `\n`, so the SQL does not depend on how the file was checked out.
-- A query parameter such as `@id` stays as written.  A token such as `{{table}}` is replaced when your code asks for the SQL: see [parameters and tokens](parameters-and-tokens.md).
+- A query parameter such as `@id` stays as written.  A token such as `{{table}}` is replaced when your code asks for the SQL, or when the query's method runs it: see [parameters and tokens](parameters-and-tokens.md).
 
 <a id="markers-in-the-wrong-place"></a>
 
@@ -187,7 +187,7 @@ Writing a marker twice in one place is fine when the value is the same, and the 
 
 A comment of yours that happens to start with one of the words and a colon, such as `-- summary: see the ticket`, is read as a marker.  Reword it.
 
-An error in how a `.sql` file is written, such as a marker in the wrong place, is reported at its line and column in that file, and the file produces no members until it is fixed.  An error about describing a query or about its sidecar leaves its members in place: see [diagnostics](diagnostics.md).
+An error in how a `.sql` file is written, such as a marker in the wrong place, is reported at its line and column in that file, and the file produces no members until it is fixed.  An error about describing a query or about its sidecar leaves the query without models: under the output `models` it keeps its constant or token method, and under `codegen` it gets no method until it is fixed.  See [which queries get a method](generator.md#which-methods) and [diagnostics](diagnostics.md).
 
 <a id="known-issues"></a>
 
