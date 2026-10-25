@@ -2494,9 +2494,9 @@ A method marked `[SqlSourceConverter]` must be a converter: a `static` method of
 
 Change the method so that it is a converter, or remove its `[SqlSourceConverter]` when it is not meant to be one.  The error is reported at the method's name, at an operator's symbol, or at the type that a conversion converts to.
 
-A converter declared in a referenced assembly, on a type that the type override names, is reported at the name of each query whose output is `codegen` and whose method would convert through it, since the project cannot change the method.  That query gets no method until the library is fixed, or until the project declares a converter of its own between the same two types, which is used instead of the library's.
+A converter declared in a referenced assembly, on a type that the type override names, is reported at the name of each query whose output is `codegen` and whose method would convert through it, since the project cannot change the method.  That query gets no method until the library is fixed, or until the project declares a converter of its own between the same two types, which is used instead of the library's.  The library's own build reports the error at the method, since the method is in the library's code.  A library's `internal` converter is seen only by a project that the library shows its internals to, so any other project neither uses it nor reports it.
 
-> **Coming in a later release.**  The generated query methods will call your converters to read and send a type that the type override names.  See [what works today](README.md#what-works-today).
+See: [Converters](settings.md#converters)
 
 ## SQLSRC278
 
@@ -2512,7 +2512,7 @@ Remove `[SqlSourceConverter]` from one of them, or remove the method.  The error
 
 Two such converters declared in referenced assemblies, on the types that the type override names, are reported at the name of each query whose output is `codegen` and whose method would convert through one of them, and that query gets no method.  Declare a converter of your own between the same two types, which is used instead of both.
 
-> **Coming in a later release.**  The generated query methods will call your converters to read and send a type that the type override names.  See [what works today](README.md#what-works-today).
+See: [Converters](settings.md#converters)
 
 ## SQLSRC279
 
@@ -2534,7 +2534,7 @@ The error has a second form, when the column's or parameter's database type has 
 
 For an array whose element type the type override chose, such as `email[]` under `public.email=App.Email`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
 
-> **Coming in a later release.**  The generated query methods will call your converters to read and send a type that the type override names.  See [what works today](README.md#what-works-today).
+See: [Converters](settings.md#converters)
 
 ## SQLSRC280
 
@@ -2548,4 +2548,4 @@ A type override gives a column or a parameter of a query whose output is `codege
 
 Add the converter that the message names, a static method marked `[SqlSourceConverter]` that takes the one type and returns the other, on the type itself or in a class of the project.  A method that takes a type and returns the same type serves both directions.  For an array whose elements are converted one by one, the message names the element of the column or parameter, and the converter to add is of the element's type.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
 
-> **Coming in a later release.**  The generated query methods will call your converters to read and send a type that the type override names.  See [what works today](README.md#what-works-today).
+See: [Converters](settings.md#converters)

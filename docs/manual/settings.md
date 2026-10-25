@@ -358,7 +358,7 @@ A type override gives a database type the C# type of your choice, in place of th
 
 In the example, every query of the project gets `timestamptz` as a `System.DateTimeOffset`, `public.user_status` as `MyApp.UserStatus`, and `int4[]` as a list.  The files under `Legacy/` get `date` as a `System.DateTime` too.  Every query of the `.sql` file gets `numeric` as a `double`, and `ListEvents` gets `timestamptz` from the type map, a `System.DateTime`, while it keeps the project's other entries.
 
-Each property of a generated [model](generator.md#models) has the C# type of its column or parameter, the type override's included.
+Each property of a generated [model](generator.md#models) has the C# type of its column or parameter, the type override's included.  A [query method](generator.md#query-methods) reads and sends a column or parameter as that type, through your [converters](#converters) when the type is one the driver does not know.
 
 **Four places, merged by type.**  The type override is the `SqlSourceTypeOverrides` property, the `SqlSourceTypeOverrides` metadata of a file's item, and the `-- type-override:` marker in the file header and inside a query.  It has no attribute property.  For each query the entries add up from the property, then the metadata, then the file header, then the query, and an entry for a type replaces the entry of a place below for that type alone.  It replaces the entry below for its key however that key is spelled, and its own spelling is the one kept: a query's `public."Status"=MyApp.Status` over the project's `public.Status=MyApp.Status` leaves a type `status`, which the project's entry mapped too, to the type map, since the quoted key maps `Status` alone.  So a query that needs one type otherwise names that type, and keeps the rest of the project's entries.  This is the exception to the rule that the most specific place wins whole: see [which place wins](#precedence).  `default` takes the type out of the entries of every place below, and a key with no entry anywhere has the type map's C# type.  Nothing removes every entry at once.
 
@@ -407,6 +407,60 @@ An entry that is not valid is [SQLSRC014](diagnostics.md#sqlsrc014), and the oth
 **In a marker**, a `-- type-override:` line holds one entry, with or without spaces around its `=`.  The lines of one place add up, one for each type.  Two lines that give one type two C# types in the file header, or inside one query, are [SQLSRC112](diagnostics.md#sqlsrc112); the types are compared by how they are named, so `int` and `System.Int32` are two, while `System.Int32` and `global::System.Int32` are one.  Its key is read by the file's dialect: a SQL Server type's name in an `mssql` file, and a PostgreSQL type's in a file of any other dialect, so `int4` in an `mssql` file, or `nvarchar` in a `postgres` one, is not valid.  A type of a schema of your own, `dbo.Email`, is read in either.  An entry that is not valid is [SQLSRC111](diagnostics.md#sqlsrc111).
 
 The `sqlsource` tool does not read the property or the metadata, which change nothing that is described.  A `-- type-override:` marker that is not valid is an error for the tool as for the build, and the tool describes no query of its file until it is fixed.
+
+<a id="converters"></a>
+
+### Converters
+
+```csharp
+using SqlSource;
+
+namespace MyApp;
+
+public readonly record struct Email(string Value)
+{
+    [SqlSourceConverter]
+    public static Email FromDatabase(string value) => new(value);
+
+    [SqlSourceConverter]
+    public static string ToDatabase(Email email) => email.Value;
+}
+```
+
+```sql postgres
+-- type-override: public.email=MyApp.Email
+
+-- name: FindUser -> one-optional
+SELECT id, email FROM users WHERE email = @email;
+```
+
+A type override names a C# type, and the driver reads and sends only the types it knows.  A converter is how a [query method](generator.md#query-methods) reads and sends a type of yours that the driver does not know: a `static` method marked `[SqlSourceConverter]` that takes one value and returns it converted.  Above, `email` is a domain over `text`, which Npgsql reads as a `string`.  The method of `FindUser` reads the column `email` as a `string` and gives it to `FromDatabase`, and gives the `Email` of `@email` to `ToDatabase` and sends the `string` it returns.  `SqlSourceConverterAttribute` is generated into your project, beside `[SqlSourceGenerate]`, in the namespace `SqlSource`.
+
+**A converter converts from its argument's type to its return type**, whatever its name.  A column needs the converter from the type the driver reads to its property's type, and a parameter the one back, so a query that has both, as `FindUser` does, needs both.  A query that needs the direction a type has no converter for, while the type has the other, is [SQLSRC280](diagnostics.md#sqlsrc280).  A method that takes and returns one type serves both directions: `System.DateTime AsUtc(System.DateTime value)` under `timestamp=System.DateTime` converts each `timestamp` as it is read and as it is sent.
+
+**The type the driver reads** is the C# type that the type table of [PostgreSQL](postgresql.md#type-table) or [SQL Server](sqlserver.md#type-table) gives the database type, under the version of the driver your project references, with no type override applied.  The converter takes or returns that type exactly:
+
+- **A domain or an alias type is read as its base type**: a converter of a domain over `text` takes and returns a `string`, and one of a domain over `timestamptz` a `System.DateTime`, even where `timestamptz=System.DateTimeOffset` is in effect.  An array is read as an array of its element's type, `string[]` for `email[]`.
+- **A converter of another type is not used.**  A type of yours whose converters are all of other types makes the query [SQLSRC279](diagnostics.md#sqlsrc279), which names the type to convert from and to.  A converter of an `int` never reads a `bigint` column, which the driver reads as a `long`: SqlSource never narrows or widens a value.
+- **The type can change with the driver.**  Npgsql 8 and 9 read a `date` as a `System.DateTime`, and Npgsql 10 as a `System.DateOnly`, as [which version of Npgsql](postgresql.md#which-npgsql) says.  So after an update of Npgsql, a type of yours that a type override gives a `date`, or another type that the update changes, can need converters of another type, and SQLSRC279 says which.
+- **A database type that the driver reads as no C# type**, a composite type or `regclass` for one, has nothing to convert from: a type override of it to a type that has converters is SQLSRC279.  Give a composite the type that the application's data source maps it to, with no converter.
+
+**Where a converter is found.**  SqlSource finds a converter in two places:
+
+- **in your project's own code**, in any type: on the type itself, as `Email`'s above, or in a class of conversions;
+- **on the type that the type override names**, when that type is declared in a referenced assembly, such as a library of your ids.  The library references SqlSource for the attribute, and its own build reports its converters' errors.
+
+A converter in any other type of a referenced assembly is not found.  When your project and a library's type both convert between the same two types, your project's converter is used, with no error, so that a project can replace a library's conversion.  A library's converter that is `internal` is seen only by a project that the library shows its internals to, with `InternalsVisibleTo`; any other project reads and sends the type as if it had no converter.  A library's converter that is not one is [SQLSRC277](diagnostics.md#sqlsrc277) at each query whose method would use it, since your project cannot change it.
+
+**A converter is a `static` method of one argument that returns a value**, `public` or `internal`, in a type that is not generic.  A method marked `[SqlSourceConverter]` that is not one is SQLSRC277, which lists each rule, in any project, whatever its output.  Its argument may be written with `?`, `Email?` or `string?`: it takes the type without the `?`, since it is never given null.  Its return type is never written with `?`.  A converter marked `[Obsolete]` as a warning is used, and the generated code turns the warning off; one marked `[Obsolete]` as an error is SQLSRC277.  Two converters between the same two types in one direction are [SQLSRC278](diagnostics.md#sqlsrc278), at both.
+
+**Null never reaches a converter.**  A column that holds a null gives its property null when the property can be null, and throws as any column does when it cannot: see [how a row is read](generator.md#reading-rows).  A parameter whose value is null is sent as the database's `NULL`.  So one pair of converters serves a property that can be null and one that cannot.
+
+**An array of PostgreSQL** whose element type the type override chose, as `email[]` under `public.email=MyApp.Email`, is converted element by element by the element's converters: a `MyApp.Email[]` column is read as a `string[]`, and each element given to `FromDatabase`.  A `NULL` element stays null, the converter not called for it, when the element is of a reference type or written with `?`, as under `public.user_id[]=MyApp.UserId?[]`.  A `NULL` element of a value type written without `?`, as a `MyApp.Email[]` holds, throws `InvalidCastException`, "Column 'emails' holds a null element.".  A type override of the array type itself to a type of yours, `public.email[]=MyApp.EmailList`, takes converters of its own, between `MyApp.EmailList` and `string[]`, and the element's are not used.
+
+**Converters apply only where a type override chose the type, and only in query methods.**  A column or parameter whose type the type table gives is never converted, so a converter between `System.DateTimeOffset` and a type of yours changes no `timetz` column.  A query whose output is `models` calls no converter, and gets none of their errors at its name; to read it through Dapper, see [the recipe](recipes.md#models-through-dapper).  A type override to a type the driver reads for some database type, such as `string`, `System.DateTimeOffset` or `System.DateOnly`, is read and sent as the driver does when no converter is between it and the type the driver reads.
+
+**Without a converter**, the query method asks the driver for the type override's type.  That is right for a type the driver was taught, a C# enum after Npgsql's `MapEnum<T>()` for one, a composite after `MapComposite<T>()` or a type of a plugin, and for a type it reads already, such as `System.DateTimeOffset` for a `timestamptz`.  A type of yours that the driver does not know, with no converter, throws the driver's `InvalidCastException` when the query runs.
 
 <a id="setting-sql-location"></a>
 
@@ -596,3 +650,18 @@ In a [type override](#setting-type-overrides), white space separates the entries
   Change the name, the path and the metadata to your own.  `BeforeTargets="SqlSourceTrimMetadataOfFiles"` is the line that matters.
 - **A type override's key cannot be written in brackets.**  T-SQL writes a name `[dbo].[Email]`, and a key written so is not valid: [SQLSRC014](diagnostics.md#sqlsrc014) in a property or metadata, and [SQLSRC111](diagnostics.md#sqlsrc111) in a marker.  Write `dbo.Email`, which matches the type's name in any case, or `"dbo"."Email"`, which matches its case exactly; the message shows both.  See [type overrides](#setting-type-overrides).
 - **A type override to a generic type can give its model a warning for a `?` inside a type argument.**  A type argument written with a `?` where a constraint forbids null is [SQLSRC252](diagnostics.md#sqlsrc252) at the query, but a `?` inside a type argument is not.  An override such as `MyApp.Names<System.Collections.Generic.List<string?>>`, where `Names<T>` requires `where T : System.Collections.Generic.IEnumerable<string>`, is accepted, and the generated model gets the compiler's warning CS8631.  Give the type arguments the nullability that the constraints ask for.  See [type overrides](#setting-type-overrides).
+- **A type made by Vogen or StronglyTypedId needs converters written for it.**  SqlSource converts a type only through methods marked `[SqlSourceConverter]`, and never through a type's `Value` property and its `From` method or constructor, so such a type with no converter is given to the driver as it is, which throws `InvalidCastException`.  Write the two converters in a class of your project, each calling the type's own members:
+
+  ```csharp
+  internal static class IdConversions
+  {
+      [SqlSourceConverter]
+      public static CustomerId ToCustomerId(long value) => CustomerId.From(value);
+
+      [SqlSourceConverter]
+      public static long FromCustomerId(CustomerId id) => id.Value;
+  }
+  ```
+
+  See [converters](#converters).
+- **A type has one conversion in a project.**  The converters between a C# type and the type the driver reads serve every query that the type override gives that C# type, and no file or query can choose others for the same two types.  To convert a database type another way in one file or query, give it there a C# type of its own, with its own converters.  See [converters](#converters).

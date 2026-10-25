@@ -255,6 +255,19 @@ The diagnostics are reported from the outputs of `SidecarCheck`, one for each ch
 
 The errors are reported from the outputs of `FileTypes`, one for each chain of [the fan-out by file](#the-fan-out-by-file), beside those of `SidecarCheck`, so that a change to the types alone reports no check again, and a check that is the same reports no type again.  `FileTypesInput` is gathered again for every file when one of its inputs changes, and `TypedFile` types again only a file whose input changed.  Each node follows its file's check, so a claimed file added or renamed types that file alone, and one removed types no other, as it checks no other.  `SQLSRC247` and `SQLSRC248` have no file: the output over `NpgsqlProbe` and `UsesPostgresEntries` reports them once for the project, and the output over `SqlClientProbe` and `UsesSqlServerEntries` does the same for `SQLSRC267` and `SQLSRC268`, as [how a problem travels](#how-a-problem-travels) says.
 
+### Converters
+
+A converter is a static method that a project marks `[SqlSourceConverter]`, an edge from its argument's type to its return type, which a query method calls to read or bind a type that an override chose.  [`Generation/Converters/`](../../src/SqlSource/Generation/Converters) holds the methods as data, and [`ConversionPlanner`](../../src/SqlSource/Generation/Methods/ConversionPlanner.cs) decides which one a column or parameter goes through.  What a user writes and sees is in the manual's [converters](../manual/settings.md#converters).  The steps, in the order the data flows:
+
+1. **The attribute.**  `AttributeSource.Text` declares `SqlSourceConverterAttribute`, `internal`, on methods, and not `[Conditional]`, so that it stays in a library's metadata, where a consumer matches the library's own copy by its full name, `AttributeSource.ConverterAttributeMetadataName`.
+2. **The project's converters.**  `ProjectConverters` is a `ForAttributeWithMetadataName` step, and `ConverterReader.Read` gives a [`Converter`](../../src/SqlSource/Generation/Converters/Converter.cs) for each marked method, local function or operator, of [`ConverterOrigin`](../../src/SqlSource/Generation/Converters/ConverterOrigin.cs) `Project`, at its name.  The reader compares nothing: it writes the two types as `ClrTypeName.Text` writes them, so that an edge is a pair of texts, and records the first fault, in the order `SQLSRC277` lists them, and the ids of the warnings a call gives.
+3. **The mapped types' converters.**  `MappedTypeResolver.Resolve` reads the marked methods of each named type of a referenced assembly that an override names with the same `ConverterReader.Read`, of origin `MappedType` and with no location, beside the `MappedType` records, as [the resolution of mapped types](#types) describes.  `MappedTypeConverters` hands them on alone, so that the models never read them.
+4. **The set.**  `Converters` is [`ConverterSet.Of`](../../src/SqlSource/Generation/Converters/ConverterSet.cs) of the two: the project's converters, each method once, then the mapped types' whose edge the project's do not have, so that a project replaces a library's conversion, sorted by `ConverterSet.Comparer`.  It gives `SQLSRC277` and `SQLSRC278` at the project's methods, which a `Select` of `Converters` reports in any project, whatever its output.  A method with a fault stays in the set as an edge, so that a query that would use it gets no method and no second error of its own.
+5. **The database side.**  `QueryTyper` gives each property whose type an override chose its `PropertyType.Database`, a [`DatabaseType`](../../src/SqlSource/Generation/Types/DatabaseType.cs): the base map's type of the database type under the project's driver with no lookup of the override, a domain's base's and an array's element's with `[]`, or no text for a type the base map gives none, as [types](#types) describes.  The models never compare it.
+6. **The slice.**  `MethodsInput.Gather` takes from the set, by `ConverterSet.Touching`, the converters of each such property's type and of its element, without their locations.  The set reaches the methods through this slice alone: no `TypeOutput` and no model reads a converter, so an edit to a converter plans and writes again only the methods of the types whose properties it touches, which `CachingConverterTests` pins.
+7. **The decision.**  `ConversionPlanner.Plan` gives a column or a parameter a [`Conversion`](../../src/SqlSource/Generation/Methods/Conversion.cs), or none for the driver's own route, and the query's `SQLSRC277` to `SQLSRC280`, by the order that [query methods](#query-methods) gives under its plan.
+8. **The code.**  `QueryMethodWriter` wraps a column's read in the converter's call, and `ParameterBinder` the bound value, null kept from the converter both ways and a PostgreSQL array converted by element, as [query methods](#query-methods) describes under reading a row and binding a parameter.  The file of methods disables the ids of the warnings of every converter it calls.
+
 ### Models
 
 [`Generation/Models/`](../../src/SqlSource/Generation/Models) gives each query of a claimed file the properties of its models, gathers what every type asks for by the models' full names, and decides which models are generated and what is reported.  [`ModelEmitter`](#a-models-file) writes each model's file.  What a user writes and gets, the names, the shapes and the rules of sharing, is in the manual's [Models](../manual/generator.md#models).
@@ -598,10 +611,6 @@ The reader follows the reader rules of the format design, [section 1.5](../super
 ### Library maps
 
 > **Not built yet.**  How the generator maps a described type to a type of a library such as NodaTime.  Delivered by phase 7 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
-
-### Converters
-
-> **Not built yet.**  How a query method converts a type override's C# type to and from the type the driver reads, with static methods that the project marks.  Delivered by sub-phase 8.2 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
 
 ### Typed binding
 
