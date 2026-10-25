@@ -36,6 +36,19 @@ public sealed class RealisticClaimsTests
     }
 
     [Fact]
+    public void Of_CaseWithModels_IsItsClassAtEachOutput()
+    {
+        var found = RealisticCases.Corpus.ReadNamed("cte-chain");
+
+        RealisticClaims
+            .Of(RealisticCases.Corpus, found, RealisticClaims.ModelsOutput)
+            .TypeName.ShouldBe("CteChainQuery");
+        RealisticClaims
+            .Of(RealisticCases.Corpus, found, RealisticClaims.CodeGenOutput)
+            .TypeName.ShouldBe("CteChainMethod");
+    }
+
+    [Fact]
     public void Queries_EveryClaim_IsAtModels() =>
         RealisticClaims
             .Parse(File.ReadAllText(RealisticCases.Corpus.Queries))

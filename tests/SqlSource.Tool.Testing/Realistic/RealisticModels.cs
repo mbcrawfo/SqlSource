@@ -12,10 +12,10 @@ using Xunit;
 
 namespace SqlSource.Tool.Testing.Realistic;
 
-// The models the generator writes for a case with models, found as it names them from the case's sidecar entry, in
-// the assembly and the namespace of an engine's project that hold the classes of its RealisticQueries.cs, named for
-// that engine.  The models are read from that assembly by reflection, never from the sidecar: a check of them can fail
-// where "describe --check" passes.
+// The models and the method the generator writes for a case with models, found as it names them from the case's
+// sidecar entry, in the assembly and the namespace of an engine's project that hold the classes of its
+// RealisticQueries.cs and RealisticMethods.cs, named for that engine.  The models are read from that assembly by
+// reflection, never from the sidecar: a check of them can fail where "describe --check" passes.
 internal sealed class RealisticModels(Assembly assembly, string @namespace, DatabaseEngine engine)
 {
     // The suffix of an input model: the project's SqlSourceInputModelSuffix.
@@ -23,6 +23,9 @@ internal sealed class RealisticModels(Assembly assembly, string @namespace, Data
 
     // The suffix of an output model: the default, which the project and the corpus leave unset.
     public const string OutputSuffix = QuerySettings.DefaultOutputModelSuffix;
+
+    // The suffix of the class that holds a claim's methods, as the generator names it after the claiming class.
+    private const string ExtensionsSuffix = "Extensions";
 
     // Skips a check of the models for a case that has none, with the reason: the describer refuses it, or the
     // generator does.
@@ -47,6 +50,19 @@ internal sealed class RealisticModels(Assembly assembly, string @namespace, Data
         SkipUnlessHasModels(found);
         found.SkipUnlessRunsOn(major);
         Assert.Skip($"{found} has a parameter that Dapper cannot send: {found.Dapper}.");
+    }
+
+    // Skips a case that the run through its generated method does not read, with the reason: it has no models, so no
+    // method, or the server does not run it.
+    public static void SkipUnlessReadThroughMethod(RealisticCase found, int major)
+    {
+        if (found.IsReadThroughMethodOn(major))
+        {
+            return;
+        }
+
+        SkipUnlessHasModels(found);
+        found.SkipUnlessRunsOn(major);
     }
 
     // The one entry of the case's sidecar, which holds the case's one query.
@@ -92,6 +108,23 @@ internal sealed class RealisticModels(Assembly assembly, string @namespace, Data
         return type.GetField(entry.Name, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)
                 ?.GetValue(null) as string
             ?? throw new InvalidOperationException($"The class {claim.TypeName} of {found} has no SQL {entry.Name}");
+    }
+
+    // The method the generator writes for the case's query, on the extension class of the corpus's claim of the case at
+    // CodeGen, in the namespace of the models.  It must have the generated signature for the entry's models, which
+    // RealisticCalls checks.
+    public MethodInfo MethodOf(RealisticCorpus corpus, RealisticCase found, SidecarEntry entry)
+    {
+        var claim = RealisticClaims.Of(corpus, found, RealisticClaims.CodeGenOutput);
+        var name = claim.TypeName + ExtensionsSuffix;
+        var type =
+            assembly.GetType($"{@namespace}.{name}")
+            ?? throw new InvalidOperationException($"The class {name} of {found} is not compiled");
+        var method =
+            type.GetMethod(entry.Name, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)
+            ?? throw new InvalidOperationException($"The class {name} of {found} has no method {entry.Name}");
+        RealisticCalls.CheckSignature(method, OutputModelOf(entry), InputModelOf(entry));
+        return method;
     }
 
     // The case's output model is as nullable as its truth, or wider: a column the truth says can be NULL has a property

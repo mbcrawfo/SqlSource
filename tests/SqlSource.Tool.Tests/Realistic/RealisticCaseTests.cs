@@ -6,8 +6,8 @@ using Xunit.Sdk;
 
 namespace SqlSource.Tool.Tests.Realistic;
 
-// What a case says of itself: the majors it runs on, the files of its folder, and whether --check and the run through
-// Dapper take it on a major.
+// What a case says of itself: the majors it runs on, the files of its folder, and whether --check, the run through
+// Dapper and the run through its method take it on a major.
 public sealed class RealisticCaseTests
 {
     [Theory]
@@ -57,6 +57,31 @@ public sealed class RealisticCaseTests
         var found = Case() with { Refusal = refusal, Models = models is null ? null : new ModelRefusal(models, "w") };
 
         RealisticTestCases.Postgres.RecordedMajors.ShouldAllBe(major => !found.IsReadThroughDapperOn(major));
+    }
+
+    // A case runs through its method whether or not Dapper can send its parameters, and is left out only where the
+    // server does not run it.
+    [Theory]
+    [InlineData(null, null, 14, true)]
+    [InlineData(null, "w", 14, true)]
+    [InlineData(17, null, 14, false)]
+    [InlineData(17, "w", 18, true)]
+    public void IsReadThroughMethodOn_CaseAndServer_IsWhetherTheRunReadsIt(
+        int? minimum,
+        string? dapper,
+        int major,
+        bool expected
+    ) => (Case() with { MinimumMajor = minimum, Dapper = dapper }).IsReadThroughMethodOn(major).ShouldBe(expected);
+
+    // A refused case has no method to call.
+    [Theory]
+    [InlineData("SQLSRC229", null)]
+    [InlineData(null, "SQLSRC255")]
+    public void IsReadThroughMethodOn_RefusedOrModelRefusedCase_IsNever(string? refusal, string? models)
+    {
+        var found = Case() with { Refusal = refusal, Models = models is null ? null : new ModelRefusal(models, "w") };
+
+        RealisticTestCases.Postgres.RecordedMajors.ShouldAllBe(major => !found.IsReadThroughMethodOn(major));
     }
 
     // A case whose sidecar an earlier major cannot describe as recorded is left out of --check there, and out of the

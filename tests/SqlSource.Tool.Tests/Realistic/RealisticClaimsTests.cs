@@ -7,8 +7,8 @@ namespace SqlSource.Tool.Tests.Realistic;
 
 // The reading of the claims of a corpus's RealisticQueries.cs and RealisticMethods.cs from their source: a class whose
 // attribute's Path names the query.sql of a folder of Cases claims that case at the member of GeneratorOutput its
-// Output names, and any other path or Output fails naming the class.  The corpus tests
-// that each engine's cases are claimed as they should be are in each engine's project.
+// Output names, and any other path or Output fails naming the class.  The corpus tests that each engine's cases are
+// claimed as they should be are in each engine's project.
 public sealed class RealisticClaimsTests
 {
     [Fact]
