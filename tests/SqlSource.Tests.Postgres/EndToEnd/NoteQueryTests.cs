@@ -1,3 +1,4 @@
+using System.Data;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tests.Postgres.EndToEnd.Types;
@@ -110,6 +111,23 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
         );
 
         note.ShouldBe(new GetNoteByRefDto(3, new NoteRef(5_000_000_003), "Closed the account on site."));
+    }
+
+    // The shape is one, so a ref that no note has throws, and the connection the method opened is closed again.
+    [Fact]
+    public async Task GetNoteByRef_NoMatchingRef_ThrowsUnexpectedRowCount()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = source.CreateConnection();
+
+        var exception = await Should.ThrowAsync<UnexpectedRowCountException>(() =>
+            connection.GetNoteByRef(new GetNoteByRefArgs(new NoteRef(1)), cancellationToken: token)
+        );
+
+        exception.QueryName.ShouldBe("GetNoteByRef");
+        exception.Message.ShouldBe("The query 'GetNoteByRef' returned no rows.");
+        connection.State.ShouldBe(ConnectionState.Closed);
     }
 
     // The parameter is sent as the string that ToDatabase returns, and note 2's NULL ref is read as null, never given
