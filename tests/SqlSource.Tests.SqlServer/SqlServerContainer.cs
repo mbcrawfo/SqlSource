@@ -37,12 +37,15 @@ public sealed class SqlServerContainer : IAsyncLifetime
     // The databases of the end-to-end tests, in the order they are built.
     public static IReadOnlyList<string> EndToEndDatabases { get; } = [AppDatabase, BillingDatabase];
 
-    // The build that SERVERPROPERTY('ProductVersion') reports on each image the tests run, the default and the floor,
-    // recorded when its tag was chosen.  Moving a tag changes its row; see tests/SqlSource.Tests.SqlServer/README.md.
+    // The build that SERVERPROPERTY('ProductVersion') reports on each image the tests run: the default, the floor and
+    // the images of the nightly run, newest first, recorded when its tag was chosen.  Moving a tag changes its row; see
+    // tests/SqlSource.Tests.SqlServer/README.md.
     public static IReadOnlyDictionary<string, string> ImageBuilds { get; } =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04"] = "17.0.5015.4",
+            ["mcr.microsoft.com/mssql/server:2022-CU27-GDR1-ubuntu-22.04"] = "16.0.4305.5",
+            ["mcr.microsoft.com/mssql/server:2019-CU32-GDR12-ubuntu-20.04"] = "15.0.4500.2",
             ["mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04"] = "14.0.3560.2",
         };
 

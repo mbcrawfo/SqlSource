@@ -20,7 +20,7 @@ The connection is given for the query's [logical database](tool.md#connections),
 ## Connecting
 
 - **The connection string is Npgsql's**: `Host=localhost;Database=app;Username=app;Password=...`, with the keywords of [Npgsql's documentation](https://www.npgsql.org/doc/connection-string-parameters.html).  A string that Npgsql cannot read, or a database that cannot be opened, is [SQLSRC224](diagnostics.md#sqlsrc224).
-- **PostgreSQL 14 and later are supported**, and SqlSource is tested on 14 and 18.  An older server is [SQLSRC235](diagnostics.md#sqlsrc235).
+- **PostgreSQL 14 and later are supported**, and SqlSource is tested on every major from 14 to 18.  An older server is [SQLSRC235](diagnostics.md#sqlsrc235).
 - **The tool needs your schema, not your data.**  A copy of the schema with no rows, such as a local database that your migrations created, is enough.
 - **Connect directly to the server, or through a pooler in session or transaction mode.**  The tool keeps one session open for each database and describes each query in several steps, in one transaction.  A pooler in session or transaction mode, such as PgBouncer's, keeps that transaction on one server connection.  A pooler in statement mode refuses the transaction, and `Multiplexing=true` shares connections between commands: either is [SQLSRC236](diagnostics.md#sqlsrc236).  Your application can still connect however it does.
 
