@@ -200,8 +200,8 @@ public sealed class NpgsqlProbeTests
     public void Run_NpgsqlBelowTheFloor_IsSqlsrc247Once()
     {
         const string Expected =
-            "SQLSRC247 (1,1)-(1,1): This project references Npgsql 7.0.0, and SqlSource needs Npgsql 8.0 or later.  "
-            + "No query method is generated until the package is updated.";
+            "SQLSRC247 (1,1)-(1,1): This project references Npgsql 7.0.0, and SqlSource needs Npgsql 8.0 or later, so "
+            + "no query method is generated.  Update the package.";
         var driver = NpgsqlReferences.Synthetic("7.0.0", slimBuilder: false, cube: false);
 
         var oneFile = Run(OutputKind.Models, [driver], UsersWithSidecar);
@@ -268,7 +268,7 @@ public sealed class NpgsqlProbeTests
 
         old.Diagnostics.ShouldBe([
             "SQLSRC247 (1,1)-(1,1): This project references Npgsql of an unknown version, and SqlSource needs Npgsql "
-                + "8.0 or later.  No query method is generated until the package is updated.",
+                + "8.0 or later, so no query method is generated.  Update the package.",
         ]);
         StepOutputs
             .Single<NpgsqlProbe>(old, TrackingNames.NpgsqlProbe)

@@ -515,8 +515,8 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor NpgsqlTooOld = new(
         id: "SQLSRC247",
         title: "Npgsql is older than 8.0",
-        messageFormat: "This project references Npgsql {0}, and SqlSource needs Npgsql 8.0 or later.  No query method "
-            + "is generated until the package is updated.",
+        messageFormat: "This project references Npgsql {0}, and SqlSource needs Npgsql 8.0 or later, so no query "
+            + "method is generated.  Update the package.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -717,7 +717,7 @@ internal static class SqlDiagnostics
         id: "SQLSRC267",
         title: "Microsoft.Data.SqlClient is older than 6.1",
         messageFormat: "This project references Microsoft.Data.SqlClient {0}, and SqlSource needs "
-            + "Microsoft.Data.SqlClient 6.1 or later.  No query method is generated until the package is updated.",
+            + "Microsoft.Data.SqlClient 6.1 or later, so no query method is generated.  Update the package.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

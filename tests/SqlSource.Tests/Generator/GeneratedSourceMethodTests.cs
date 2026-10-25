@@ -196,6 +196,9 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("wasClosed")]
     [InlineData("parameter")]
     [InlineData("App")]
+    [InlineData("commandScope")]
+    [InlineData("readerScope")]
+    [InlineData("value0")]
     public void Run_TokenWithAnAwkwardName_Compiles(string name)
     {
         var run = GeneratorHarness.Run(
@@ -263,6 +266,9 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("wasClosed")]
     [InlineData("parameter")]
     [InlineData("App")]
+    [InlineData("commandScope")]
+    [InlineData("readerScope")]
+    [InlineData("value0")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles(string name)
     {
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.CSharp12);

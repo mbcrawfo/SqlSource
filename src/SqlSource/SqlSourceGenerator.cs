@@ -746,7 +746,15 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (methods, _) => MethodEmitter.Emit(methods, EquatableArray<LocationInfo>.Empty, false))
             .WithTrackingName(TrackingNames.MethodOutput);
 
-        context.RegisterSourceOutput(typeMethods.Select(static (methods, _) => methods.Diagnostics), ReportAll);
+        // The problems of every type's methods together, each once: a file that two types claim gives both the same
+        // problems of its queries.
+        var methodDiagnostics = typeMethods
+            .Select(static (methods, _) => methods.Diagnostics)
+            .Collect()
+            .Select(static (diagnostics, _) => MethodPlanner.Distinct(diagnostics))
+            .WithTrackingName(TrackingNames.MethodDiagnostics);
+
+        context.RegisterSourceOutput(methodDiagnostics, ReportAll);
         context.RegisterSourceOutput(methodOutputs, AddMethods);
 
         // The engines of the project's CodeGen queries, which almost never change.

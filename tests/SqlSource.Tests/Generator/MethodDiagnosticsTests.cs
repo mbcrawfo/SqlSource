@@ -60,6 +60,55 @@ public sealed class MethodDiagnosticsTests
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
+    // Two types that claim one file plan its queries alike, and a problem is reported once.
+    [Fact]
+    public void Run_TwoTypesClaimingOneFile_ReportSqlsrc272Once()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class First;
+
+                [SqlSourceGenerate]
+                public partial class Second;
+            }
+            """;
+        var file = new SqlFile(Path, "-- name: SetName -> one\nUPDATE users SET name = 'x';\n");
+
+        var run = MethodRuns.Run(file, [Entry(file, "SetName", [], null)], Source);
+
+        Problems(run)
+            .ShouldBe([
+                "SQLSRC272 /app/Repo/Users.sql(1,10)-(1,17): The query 'SetName' has the shape 'one', and its "
+                    + "statement returns no rows.  Remove the shape, or write 'rowcount' or 'none'.",
+            ]);
+    }
+
+    // A query gets every problem it has, not only the first.
+    [Fact]
+    public void Run_ShapeThatNeedsRowsAndATokenNamedAsAFixedArgument_ReportsBoth()
+    {
+        var file = new SqlFile(
+            Path,
+            "-- name: SetName -> one\n-- token: {{transaction:users}}\nUPDATE {{transaction}} SET name = 'x';\n"
+        );
+
+        var run = MethodRuns.Run(file, [Entry(file, "SetName", [], null)]);
+
+        Problems(run)
+            .ShouldBe([
+                "SQLSRC272 /app/Repo/Users.sql(1,10)-(1,17): The query 'SetName' has the shape 'one', and its "
+                    + "statement returns no rows.  Remove the shape, or write 'rowcount' or 'none'.",
+                "SQLSRC275 /app/Repo/Users.sql(1,10)-(1,17): The token 'transaction' of the query 'SetName' has the "
+                    + "name of an argument that every query method has: connection, parameters, transaction, "
+                    + "commandTimeout or cancellationToken.  Rename the token.",
+            ]);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
     [Fact]
     public void Run_TokenNamedAsAFixedArgument_IsSqlsrc275()
     {
@@ -137,6 +186,74 @@ public sealed class MethodDiagnosticsTests
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,15): The method of the query 'Count' cannot be named 'Count', "
                     + "because 'Sample' has a member of that name.  Rename the query.",
+            ]);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
+    [Fact]
+    public void Run_QueryNamedAsTheTypeUnderPublic_IsSqlsrc274()
+    {
+        var file = new SqlFile(Path, "-- name: Sample\nSELECT id FROM users;\n");
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "Sample", [], [Column("id")])],
+            MethodRuns.SampleSource("MethodLocation = MethodLocation.Public")
+        );
+
+        Problems(run)
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,16): The method of the query 'Sample' cannot be named "
+                    + "'Sample', because it is the name of the type 'Sample' that holds the method.  Rename the query.",
+            ]);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
+    [Fact]
+    public void Run_QueryNamedAsATypeParameterUnderPublic_IsSqlsrc274()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(MethodLocation = MethodLocation.Public)]
+                public partial class Sample<TRow>;
+            }
+            """;
+        var file = new SqlFile(Path, "-- name: TRow\nSELECT id FROM users;\n");
+
+        var run = MethodRuns.Run(file, [Entry(file, "TRow", [], [Column("id")])], Source);
+
+        Problems(run)
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,14): The method of the query 'TRow' cannot be named 'TRow', "
+                    + "because 'Sample<TRow>' has a type parameter of that name.  Rename the query.",
+            ]);
+        run.Sources.Keys.ShouldNotContain("App.Sample-1-Methods.g.cs");
+    }
+
+    // Under SqlLocation.Nested the class that holds the constant of a query whose output is sql is a member of the
+    // type, and the method of Get under async-method-suffix would take its name.
+    [Fact]
+    public void Run_MethodNamedAsTheNestedClassUnderPublic_IsSqlsrc274()
+    {
+        var file = new SqlFile(
+            Path,
+            "-- name: Get\n-- generator: async-method-suffix\nSELECT id FROM users;\n"
+                + "-- name: Other\n-- output: sql\nSELECT 1;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "Get", [], [Column("id")])],
+            MethodRuns.SampleSource("MethodLocation = MethodLocation.Public, NestedClass = \"GetAsync\"")
+        );
+
+        Problems(run)
+            .ShouldBe([
+                "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'GetAsync', "
+                    + "because the class of the queries of 'Sample' has that name.  Rename the query.",
             ]);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }

@@ -64,6 +64,22 @@ internal static class MethodPlanner
         );
     }
 
+    /// <summary>
+    /// The problems of every type's methods, each once, by the place, the id and the text: two types that claim one
+    /// file plan its queries alike.  A problem that names the type stays one for each type.
+    /// </summary>
+    public static EquatableArray<DiagnosticInfo> Distinct(ImmutableArray<EquatableArray<DiagnosticInfo>> diagnostics) =>
+        new(
+            diagnostics
+                .SelectMany(static each => each)
+                .OrderBy(static diagnostic => diagnostic.Location.Path, StringComparer.Ordinal)
+                .ThenBy(static diagnostic => diagnostic.Location.Span.Start)
+                .ThenBy(static diagnostic => diagnostic.Descriptor.Id, StringComparer.Ordinal)
+                .ThenBy(static diagnostic => string.Join("\n", diagnostic.Arguments), StringComparer.Ordinal)
+                .Distinct()
+                .ToImmutableArray()
+        );
+
     private static CodeGenEngines Collect(
         MethodsInput input,
         string key,
@@ -156,7 +172,8 @@ internal static class MethodPlanner
         return names;
     }
 
-    // The plan of one query whose output is CodeGen, or null when it gets nothing and reports nothing here.
+    // The plan of one query whose output is CodeGen, or null when it gets nothing and reports nothing here.  Every
+    // problem of SQLSRC272, SQLSRC275 and SQLSRC274 that the query has is reported, and any one leaves it no method.
     private static Planned? Plan(
         MethodsInput input,
         string key,
@@ -175,10 +192,11 @@ internal static class MethodPlanner
             return null;
         }
 
+        var problems = new List<DiagnosticInfo>();
         var shape = query.Shape ?? (models.Output is null ? ResultShape.RowCount : ResultShape.Many);
         if ((shape is ResultShape.One or ResultShape.OneOptional or ResultShape.Many) && models.Output is null)
         {
-            return Planned.Problem(
+            problems.Add(
                 DiagnosticInfo.Create(
                     SqlDiagnostics.QueryShapeNeedsRows,
                     query.NameLocation,
@@ -188,28 +206,25 @@ internal static class MethodPlanner
             );
         }
 
-        var tokenProblems = FindTokenProblems(query);
-        if (tokenProblems.Count > 0)
-        {
-            return new Planned(tokenProblems, null, false);
-        }
-
-        if (!TryReadInput(input, key, file, queryIndex, query, models, out var methodInput))
-        {
-            return null;
-        }
-
-        if (!TryReadOutput(input, key, file, queryIndex, settings, models, out var methodOutput))
-        {
-            return null;
-        }
-
+        problems.AddRange(FindTokenProblems(query));
         var name = query.Name + ((settings.Parameters & GeneratorParameters.AsyncMethodSuffix) != 0 ? AsyncSuffix : "");
-        if (FindTakenReason(input, name, written) is { } reason)
+        var reason = FindTakenReason(input, name, written);
+        if (reason is not null)
         {
-            return Planned.Problem(
+            problems.Add(
                 DiagnosticInfo.Create(SqlDiagnostics.MethodNameTaken, query.NameLocation, query.Name, name, reason)
             );
+        }
+
+        // The query's name is compared with the other methods' unless something else takes it already.
+        var planned = new Planned(problems, name, query.Name, query.NameLocation, reason is null, null, false);
+        if (
+            problems.Count > 0
+            || !TryReadInput(input, key, file, queryIndex, query, models, out var methodInput)
+            || !TryReadOutput(input, key, file, queryIndex, settings, models, out var methodOutput)
+        )
+        {
+            return planned;
         }
 
         var method = new QueryMethod(
@@ -228,7 +243,7 @@ internal static class MethodPlanner
         var isUsable =
             (engine == CodeGenEngines.Postgres && input.Drivers.Postgres)
             || (engine == CodeGenEngines.SqlServer && input.Drivers.SqlServer);
-        return new Planned([], method, isUsable);
+        return planned with { Method = method, IsDriverUsable = isUsable };
     }
 
     // The query's models, matched by index and name as TypeModels matches them.  The models of a file are in the order
@@ -434,6 +449,17 @@ internal static class MethodPlanner
                 : null;
         }
 
+        var declaration = type.Types[type.Types.Count - 1];
+        if (string.Equals(name, type.Name, StringComparison.Ordinal))
+        {
+            return "it is the name of the type '" + type.Name + "' that holds the method";
+        }
+
+        if (HasTypeParameter(declaration.TypeParameters, name))
+        {
+            return "'" + type.Name + declaration.TypeParameters + "' has a type parameter of that name";
+        }
+
         if (SortedSearch.IndexOf(input.MemberNames, name, static member => member, StringComparer.Ordinal) >= 0)
         {
             return "'" + type.Name + "' has a member of that name";
@@ -451,8 +477,16 @@ internal static class MethodPlanner
             : null;
     }
 
-    // The planned queries in order: the problems of each, then, among the methods, SQLSRC274 at each of two or more of
-    // one name, and the rest when their driver allows them.
+    // Whether the type parameters as written, "<TKey, @TValue>", have the name, as a value.
+    private static bool HasTypeParameter(string typeParameters, string name) =>
+        typeParameters.Length > 2
+        && typeParameters
+            .Substring(1, typeParameters.Length - 2)
+            .Split(',')
+            .Any(parameter => string.Equals(parameter.Trim().TrimStart('@'), name, StringComparison.Ordinal));
+
+    // The planned queries in order: the problems of each, then SQLSRC274 at each of two or more whose names nothing
+    // else takes and are one, and the methods of the rest when their driver allows them.
     private static void AddPlanned(
         List<Planned> planned,
         ImmutableArray<QueryMethod>.Builder methods,
@@ -460,40 +494,34 @@ internal static class MethodPlanner
     )
     {
         var byName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
-        foreach (var method in planned.Select(static plan => plan.Method).OfType<QueryMethod>())
+        foreach (var plan in planned.Where(static plan => plan.IsComparedByName))
         {
-            if (!byName.TryGetValue(method.Name, out var queries))
+            if (!byName.TryGetValue(plan.Name, out var queries))
             {
                 queries = [];
-                byName.Add(method.Name, queries);
+                byName.Add(plan.Name, queries);
             }
 
-            queries.Add(method.QueryName);
+            queries.Add(plan.QueryName);
         }
 
         foreach (var plan in planned)
         {
             diagnostics.AddRange(plan.Problems);
-            if (plan.Method is not { } method)
+            if (plan.IsComparedByName && byName[plan.Name] is { Count: > 1 } queries)
             {
-                continue;
-            }
-
-            var queries = byName[method.Name];
-            if (queries.Count > 1)
-            {
-                var other = queries[0] == method.QueryName ? queries[1] : queries[0];
+                var other = queries[0] == plan.QueryName ? queries[1] : queries[0];
                 diagnostics.Add(
                     DiagnosticInfo.Create(
                         SqlDiagnostics.MethodNameTaken,
-                        method.NameLocation,
-                        method.QueryName,
-                        method.Name,
+                        plan.NameLocation,
+                        plan.QueryName,
+                        plan.Name,
                         "the method of the query '" + other + "' has that name too"
                     )
                 );
             }
-            else if (plan.IsDriverUsable)
+            else if (plan is { Method: { } method, IsDriverUsable: true })
             {
                 methods.Add(method);
             }
@@ -522,9 +550,15 @@ internal static class MethodPlanner
             ResultShape.RowCount or _ => "rowcount",
         };
 
-    // One query's problems, or its method with whether its driver allows it.
-    private sealed record Planned(List<DiagnosticInfo> Problems, QueryMethod? Method, bool IsDriverUsable)
-    {
-        public static Planned Problem(DiagnosticInfo problem) => new([problem], null, false);
-    }
+    // One query's problems, the name its method would have, whether that name is compared with the other methods',
+    // and its method, with whether its driver allows it, when it has no problem.
+    private sealed record Planned(
+        List<DiagnosticInfo> Problems,
+        string Name,
+        string QueryName,
+        LocationInfo NameLocation,
+        bool IsComparedByName,
+        QueryMethod? Method,
+        bool IsDriverUsable
+    );
 }
