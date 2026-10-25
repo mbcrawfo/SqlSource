@@ -8,9 +8,9 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 
 // The queries of Queries/Shapes.sql, run on the seed of "app" through the static methods that ShapeQueries gets under
 // MethodLocation.Public, with their class input models as the parameters, into their record and class output models,
-// each list an IReadOnlyList by the file's collection type.  Half the tests give the method an open connection and half
-// a closed one, which the method opens.  The tests read this project's own generated models, which the other engine's
-// project does not have, so they are not shared.
+// in an IReadOnlyList by the marker of SearchAccounts and in a List by the attribute for the others.  Half the tests
+// give the method an open connection and half a closed one, which the method opens.  The tests read this project's own
+// generated models, which the other engine's project does not have, so they are not shared.
 [Collection(UsesPostgres.Name)]
 public sealed class ShapeQueryTests(PostgresContainer postgres)
 {
@@ -39,29 +39,33 @@ public sealed class ShapeQueryTests(PostgresContainer postgres)
 
         var accounts = await ShapeQueries.ListAccountColumns(connection, cancellationToken: token);
 
-        accounts.ShouldBeEquivalentTo(
-            new[]
-            {
-                new ListAccountColumnsView
+        // The class has no equality of its own, so its elements are compared by their properties, apart from the
+        // collection they are in.
+        accounts
+            .ToArray()
+            .ShouldBeEquivalentTo(
+                new[]
                 {
-                    Id = 1,
-                    Name = "alice",
-                    Status = "active",
-                },
-                new ListAccountColumnsView
-                {
-                    Id = 2,
-                    Name = "bob",
-                    Status = "closed",
-                },
-                new ListAccountColumnsView
-                {
-                    Id = 3,
-                    Name = "carol",
-                    Status = "suspended",
-                },
-            }
-        );
+                    new ListAccountColumnsView
+                    {
+                        Id = 1,
+                        Name = "alice",
+                        Status = "active",
+                    },
+                    new ListAccountColumnsView
+                    {
+                        Id = 2,
+                        Name = "bob",
+                        Status = "closed",
+                    },
+                    new ListAccountColumnsView
+                    {
+                        Id = 3,
+                        Name = "carol",
+                        Status = "suspended",
+                    },
+                }
+            );
     }
 
     [Fact]

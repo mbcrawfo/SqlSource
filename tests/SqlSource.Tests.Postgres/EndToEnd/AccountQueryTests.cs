@@ -8,8 +8,8 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 
 // The queries of Queries/Accounts.sql, run on the seed of "app" through the methods that AccountQueries gets, with
 // their input models as the parameters, into their output models, and two of them through Reporting.AccountReports',
-// which are of a second namespace.  Every query is many, so each method returns an array.  Half the tests give the
-// method an open connection and half a closed one, which the method opens.
+// which are of a second namespace.  Every query is many, so each method returns an IReadOnlyList, the project's
+// collection type.  Half the tests give the method an open connection and half a closed one, which the method opens.
 [Collection(UsesPostgres.Name)]
 public sealed class AccountQueryTests(PostgresContainer postgres)
 {

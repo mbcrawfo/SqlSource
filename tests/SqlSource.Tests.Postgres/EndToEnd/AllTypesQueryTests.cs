@@ -93,7 +93,7 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
 
         var rows = await connection.ListAllTypes(cancellationToken: token);
 
-        rows.Length.ShouldBe(2);
+        rows.Count.ShouldBe(2);
         AllTypesRows.ShouldBeTheFullRow(rows[0]);
         AllTypesRows.ShouldBeTheNullRow(rows[1]);
     }

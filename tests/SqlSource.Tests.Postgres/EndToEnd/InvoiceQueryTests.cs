@@ -8,8 +8,9 @@ using Xunit;
 namespace SqlSource.Tests.Postgres.EndToEnd;
 
 // The queries of Queries/Billing/, run on the seed of the database "billing" through the methods that InvoiceQueries
-// gets, into their sealed class models, whose timestamptz is a DateTime by the folder's type override.  One test gives
-// the method an open connection and the other a closed one, which the method opens.
+// gets, into their sealed class models, whose timestamptz is a DateTime by the folder's type override, in an IList by
+// the folder's collection type.  One test gives the method an open connection and the other a closed one, which the
+// method opens.
 [Collection(UsesPostgres.Name)]
 public sealed class InvoiceQueryTests(PostgresContainer postgres)
 {
@@ -22,38 +23,42 @@ public sealed class InvoiceQueryTests(PostgresContainer postgres)
 
         var invoices = await connection.ListInvoices(cancellationToken: token);
 
-        invoices.ShouldBeEquivalentTo(
-            new[]
-            {
-                new BillingInvoicesRow
+        // The class has no equality of its own, so its elements are compared by their properties, apart from the
+        // collection they are in.
+        invoices
+            .ToArray()
+            .ShouldBeEquivalentTo(
+                new[]
                 {
-                    Id = 1,
-                    AccountId = 1,
-                    Number = "INV-0001",
-                    Amount = 120.50m,
-                    IssuedOn = new DateOnly(2024, 1, 15),
-                    PaidAt = new DateTime(2024, 1, 20, 10, 30, 0, DateTimeKind.Utc),
-                },
-                new BillingInvoicesRow
-                {
-                    Id = 2,
-                    AccountId = 1,
-                    Number = "INV-0002",
-                    Amount = 80.00m,
-                    IssuedOn = new DateOnly(2024, 2, 15),
-                    PaidAt = new DateTime(2024, 2, 18, 8, 15, 0, DateTimeKind.Utc),
-                },
-                new BillingInvoicesRow
-                {
-                    Id = 3,
-                    AccountId = 2,
-                    Number = "INV-0003",
-                    Amount = 45.25m,
-                    IssuedOn = new DateOnly(2024, 3, 15),
-                    PaidAt = null,
-                },
-            }
-        );
+                    new BillingInvoicesRow
+                    {
+                        Id = 1,
+                        AccountId = 1,
+                        Number = "INV-0001",
+                        Amount = 120.50m,
+                        IssuedOn = new DateOnly(2024, 1, 15),
+                        PaidAt = new DateTime(2024, 1, 20, 10, 30, 0, DateTimeKind.Utc),
+                    },
+                    new BillingInvoicesRow
+                    {
+                        Id = 2,
+                        AccountId = 1,
+                        Number = "INV-0002",
+                        Amount = 80.00m,
+                        IssuedOn = new DateOnly(2024, 2, 15),
+                        PaidAt = new DateTime(2024, 2, 18, 8, 15, 0, DateTimeKind.Utc),
+                    },
+                    new BillingInvoicesRow
+                    {
+                        Id = 3,
+                        AccountId = 2,
+                        Number = "INV-0003",
+                        Amount = 45.25m,
+                        IssuedOn = new DateOnly(2024, 3, 15),
+                        PaidAt = null,
+                    },
+                }
+            );
         invoices.Take(2).ShouldAllBe(static invoice => invoice.PaidAt!.Value.Kind == DateTimeKind.Utc);
     }
 
