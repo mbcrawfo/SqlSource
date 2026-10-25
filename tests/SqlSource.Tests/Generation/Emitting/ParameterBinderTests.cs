@@ -68,10 +68,54 @@ public sealed class ParameterBinderTests
         }
     }
 
+    // An array is converted element by element into the database's array, by a static lambda whose names are the
+    // method's; a null element of a reference type is sent as a null element.
+    [Theory]
+    [InlineData(
+        "long[]",
+        true,
+        true,
+        "global::System.Array.ConvertAll<global::App.Id, long>(v1, static e1 => global::App.Ids.ToDatabase(e1))"
+    )]
+    [InlineData(
+        "string[]",
+        false,
+        false,
+        "global::System.Array.ConvertAll<global::App.Id?, string?>(v1, "
+            + "static e1 => e1 is { } i1 ? global::App.Ids.ToDatabase(i1) : null)"
+    )]
+    public void Append_ArrayConvertedByElement_SendsTheConvertedArray(
+        string databaseText,
+        bool databaseIsValueType,
+        bool elementIsValueType,
+        string converted
+    )
+    {
+        var write = new Conversion(
+            "global::App.Ids.ToDatabase",
+            databaseText,
+            databaseIsValueType,
+            true,
+            "global::App.Id",
+            elementIsValueType
+        );
+        foreach (var engine in new[] { DatabaseEngine.PostgreSql, DatabaseEngine.SqlServer })
+        {
+            Write(engine, new MethodParameter("ids", "Ids", false, false, write), "v1")
+                .ShouldContain(
+                    "    p0.Value = parameters.Ids is { } v1 ? (object)"
+                        + converted
+                        + " : global::System.DBNull.Value;\n"
+                );
+        }
+    }
+
     private static string Write(DatabaseEngine engine, MethodParameter bound, string value = "value")
     {
         var builder = new StringBuilder();
-        ParameterBinder.For(engine).Append(builder, "    ", "command", "p0", "parameters", bound, value);
+        ParameterBinder
+            .For(engine)
+            .Append(builder, "    ", "command", "p0", "parameters", bound, new ConversionNames(value, "e1", "i1"));
         return builder.ToString();
     }
 }

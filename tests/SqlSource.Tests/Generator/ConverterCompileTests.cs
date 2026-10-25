@@ -13,13 +13,14 @@ namespace SqlSource.Tests.Generator;
 
 // The methods that read and bind through converters, compiled against each driver the generator supports, as
 // MethodCompileTests compiles those without: a column and a parameter converted from and to a value type and a
-// reference type, nullable and not, in a query of each shape, and on SqlClient a vector read and bound through one.
+// reference type, nullable and not, in a query of each shape, on PostgreSQL arrays converted element by element and as
+// a whole, and on SqlClient a vector read and bound through one.
 // The compilation reports every warning wave, so the converted code compiles with no error and no warning in what is
 // generated.  Each run is at CodeGen.
 public sealed class ConverterCompileTests
 {
     // UserId, a value type over a long; Email, a value type over a string; and Name, a reference type over a string.
-    // EXTRA holds the types of one engine.
+    // EXTRA holds the types of one engine.  Their arrays are converted element by element.
     private const string Source = """
         using SqlSource;
 
@@ -59,6 +60,28 @@ public sealed class ConverterCompileTests
         }
         """;
 
+    // Level, a reference type over an int, and Tags, a reference type over an array of strings, which is converted as
+    // a whole.
+    private const string PostgresTypes = """
+        public sealed record Level(int Value)
+            {
+                [SqlSourceConverter]
+                public static Level FromDatabase(int value) => new(value);
+
+                [SqlSourceConverter]
+                public static int ToDatabase(Level level) => level.Value;
+            }
+
+            public sealed record Tags(string[] Values)
+            {
+                [SqlSourceConverter]
+                public static Tags FromDatabase(string[] values) => new(values);
+
+                [SqlSourceConverter]
+                public static string[] ToDatabase(Tags tags) => tags.Values;
+            }
+        """;
+
     // A reference type over SqlClient's vector, a value type that reads a NULL as its Null.
     private const string Embedding = """
         public sealed record Embedding(float[] Values)
@@ -79,15 +102,20 @@ public sealed class ConverterCompileTests
         -- type-override: int8=App.UserId
         -- type-override: public.email=App.Email
         -- type-override: varchar=App.Name
+        -- type-override: int4=App.Level
+        -- type-override: text[]=App.Tags
         -- name: ListUsers
-        SELECT id, manager, email, contact, name, nickname FROM users
-        WHERE id = @id OR manager = @manager OR email = @email OR name = @name;
+        SELECT id, manager, email, contact, name, nickname, ids, emails, names, levels, tags FROM users
+        WHERE id = @id OR manager = @manager OR email = @email OR name = @name
+            OR ids = @ids OR emails = @emails OR names = @names OR levels = @levels OR tags = @tags;
         -- name: GetUser -> one
-        SELECT id, manager, email, contact, name, nickname FROM users
-        WHERE id = @id OR manager = @manager OR email = @email OR name = @name;
+        SELECT id, manager, email, contact, name, nickname, ids, emails, names, levels, tags FROM users
+        WHERE id = @id OR manager = @manager OR email = @email OR name = @name
+            OR ids = @ids OR emails = @emails OR names = @names OR levels = @levels OR tags = @tags;
         -- name: FindUser -> one-optional
-        SELECT id, manager, email, contact, name, nickname FROM users
-        WHERE id = @id OR manager = @manager OR email = @email OR name = @name;
+        SELECT id, manager, email, contact, name, nickname, ids, emails, names, levels, tags FROM users
+        WHERE id = @id OR manager = @manager OR email = @email OR name = @name
+            OR ids = @ids OR emails = @emails OR names = @names OR levels = @levels OR tags = @tags;
         -- name: RenameUser
         UPDATE users SET name = @name, email = @email, manager = @manager WHERE id = @id;
 
@@ -168,6 +196,11 @@ public sealed class ConverterCompileTests
             Parameter("manager", Int8, nullable: true),
             Parameter("email", EmailDomain, nullable: true),
             Parameter("name", Varchar, nullable: false),
+            Parameter("ids", ArrayOf(Int8, "_int8"), nullable: false),
+            Parameter("emails", ArrayOf(EmailDomain, "_email"), nullable: true),
+            Parameter("names", ArrayOf(Varchar, "_varchar"), nullable: false),
+            Parameter("levels", ArrayOf(Int4, "_int4"), nullable: true),
+            Parameter("tags", ArrayOf(Text, "_text"), nullable: false),
         ];
         SidecarColumn[] columns =
         [
@@ -177,6 +210,11 @@ public sealed class ConverterCompileTests
             Column("contact", EmailDomain, nullable: true),
             Column("name", Varchar),
             Column("nickname", Varchar, nullable: true),
+            Column("ids", ArrayOf(Int8, "_int8")),
+            Column("emails", ArrayOf(EmailDomain, "_email"), nullable: true),
+            Column("names", ArrayOf(Varchar, "_varchar")),
+            Column("levels", ArrayOf(Int4, "_int4"), nullable: true),
+            Column("tags", ArrayOf(Text, "_text")),
         ];
 
         var run = MethodRuns.Run(
@@ -187,7 +225,7 @@ public sealed class ConverterCompileTests
                 Entry(Postgres, "FindUser", parameters, columns),
                 Entry(Postgres, "RenameUser", [parameters[3], parameters[2], parameters[1], parameters[0]], null),
             ],
-            SourceWith(string.Empty),
+            SourceWith(PostgresTypes),
             references: [reference]
         );
 
@@ -201,6 +239,26 @@ public sealed class ConverterCompileTests
         methods.ShouldContain("global::App.Name.FromDatabase(reader.GetFieldValue<string>(5))");
         methods.ShouldContain("parameter.Value = global::App.UserId.ToDatabase(parameters.Id);\n");
         methods.ShouldContain("parameters.Name is { } value ? (object)global::App.Name.ToDatabase(value)");
+        methods.ShouldContain(
+            "global::System.Array.ConvertAll<long?, global::App.UserId>(reader.GetFieldValue<long?[]>(6), "
+        );
+        methods.ShouldContain(
+            "reader.IsDBNull(7) ? default(global::App.Email[]?) : "
+                + "global::System.Array.ConvertAll<string, global::App.Email>(reader.GetFieldValue<string[]>(7), "
+        );
+        methods.ShouldContain(
+            "global::System.Array.ConvertAll<string, global::App.Name>(reader.GetFieldValue<string[]>(8), "
+        );
+        methods.ShouldContain(
+            "reader.IsDBNull(9) ? default(global::App.Level[]?) : "
+                + "global::System.Array.ConvertAll<int?, global::App.Level>(reader.GetFieldValue<int?[]>(9), "
+        );
+        methods.ShouldContain("global::App.Tags.FromDatabase(reader.GetFieldValue<string[]>(10))");
+        methods.ShouldContain("(object)global::System.Array.ConvertAll<global::App.UserId, long>(value, ");
+        methods.ShouldContain("(object)global::System.Array.ConvertAll<global::App.Email, string>(value, ");
+        methods.ShouldContain("(object)global::System.Array.ConvertAll<global::App.Name?, string?>(value, ");
+        methods.ShouldContain("(object)global::System.Array.ConvertAll<global::App.Level?, int?>(value, ");
+        methods.ShouldContain("parameters.Tags is { } value ? (object)global::App.Tags.ToDatabase(value)");
     }
 
     private static void RunOnSqlClient(MetadataReference reference)

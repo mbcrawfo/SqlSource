@@ -199,6 +199,8 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("commandScope")]
     [InlineData("readerScope")]
     [InlineData("value0")]
+    [InlineData("element")]
+    [InlineData("item")]
     public void Run_TokenWithAnAwkwardName_Compiles(string name)
     {
         var run = GeneratorHarness.Run(
@@ -270,6 +272,8 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("commandScope")]
     [InlineData("readerScope")]
     [InlineData("value0")]
+    [InlineData("element")]
+    [InlineData("item")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles(string name)
     {
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.CSharp12);
@@ -279,6 +283,8 @@ public sealed class GeneratedSourceMethodTests
         methods.ShouldContain(" ProbeOne(\n");
         methods.ShouldContain("(object)global::App.UserId.ToDatabase(");
         methods.ShouldContain("global::App.UserId.FromDatabase(");
+        methods.ShouldContain("global::System.Array.ConvertAll<int?, global::App.UserId>(");
+        methods.ShouldContain("global::System.Array.ConvertAll<global::App.UserId, int>(");
     }
 
     [Fact]

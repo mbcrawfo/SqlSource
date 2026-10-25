@@ -329,6 +329,8 @@ public sealed class MethodWriterTests
     [InlineData("commandScope")]
     [InlineData("readerScope")]
     [InlineData("value0")]
+    [InlineData("element")]
+    [InlineData("item")]
     public void Run_TokenWithAnAwkwardName_CompilesOnTheNewestCSharp(string name)
     {
         var source = """
@@ -404,6 +406,8 @@ public sealed class MethodWriterTests
     [InlineData("commandScope")]
     [InlineData("readerScope")]
     [InlineData("value0")]
+    [InlineData("element")]
+    [InlineData("item")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_CompilesOnTheNewestCSharp(string name)
     {
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.Latest);
@@ -413,6 +417,8 @@ public sealed class MethodWriterTests
         methods.ShouldContain(" ProbeOne(\n");
         methods.ShouldContain("(object)global::App.UserId.ToDatabase(");
         methods.ShouldContain("global::App.UserId.FromDatabase(");
+        methods.ShouldContain("global::System.Array.ConvertAll<int?, global::App.UserId>(");
+        methods.ShouldContain("global::System.Array.ConvertAll<global::App.UserId, int>(");
     }
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);

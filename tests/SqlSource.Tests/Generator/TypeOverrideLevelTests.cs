@@ -864,16 +864,6 @@ public sealed class TypeOverrideLevelTests
             internalName: internalName
         );
 
-    // The array of the element, in its schema, under the name the database gives it.
-    private static PostgresType ArrayOf(PostgresType element, string internalName) =>
-        TestSidecars.Postgres(
-            name: element.Name + "[]",
-            kind: SidecarValues.Kind.Array,
-            schema: element.Schema,
-            internalName: internalName,
-            element: element
-        );
-
     // SQLSRC261 at the query GetUser of Users, for column c0 unless the subject is given, the entry's key, the place
     // that wrote it and the key to write.
     private static string ArrayEntryError(

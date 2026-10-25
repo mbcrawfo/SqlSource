@@ -111,6 +111,9 @@ public sealed class ConverterMethodTests
         baseType: Text
     );
 
+    // The array email[] of the domain email.
+    private static readonly PostgresType Emails = ArrayOf(Email, "_email");
+
     // The methods of FindEmail as 8.1 wrote them, which a project without converters keeps.  A line that ends in ↩
     // goes on in the next.
     private static readonly string FindEmailMethods = Joined(
@@ -721,6 +724,165 @@ public sealed class ConverterMethodTests
         );
         methods.ShouldContain("partial class Sample\n");
         methods.ShouldContain("reader.GetFieldValue<global::App.Email>(0)");
+    }
+
+    // An array whose element an override chose is read as the base map's array and converted element by element.  A
+    // NULL element of a value type cannot be converted, and the method's throw names the column, which Npgsql's does
+    // not.
+    [Fact]
+    public void Run_ArrayOfAnElementsOverride_ConvertsEachElement()
+    {
+        var run = RunEmailsColumn(Struct, nullable: false);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                "(global::System.Array.ConvertAll<string, global::App.Email>(reader.GetFieldValue<string[]>(0), "
+                    + "static element => element is { } item ? global::App.Email.FromDatabase(item) : "
+                    + "throw new global::System.InvalidCastException(\"Column 'emails' holds a null element.\")))"
+            );
+    }
+
+    // A NULL element of a reference type stays null, and the converter is not called for it.  The column can be null
+    // too, which is checked before the array is read.
+    [Fact]
+    public void Run_ArrayOfAReferenceElement_KeepsANullElement()
+    {
+        var run = RunEmailsColumn(Class, nullable: true);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                "(reader.IsDBNull(0) ? default(global::App.Email[]?) : "
+                    + "global::System.Array.ConvertAll<string, global::App.Email>(reader.GetFieldValue<string[]>(0), "
+                    + "static element => element is { } item ? global::App.Email.FromDatabase(item) : null!))"
+            );
+    }
+
+    // Npgsql refuses an array of a value type that holds a NULL, so the array is read with nullable elements and the
+    // method's own throw names the column.
+    [Fact]
+    public void Run_ArrayOfAValueTypeDatabaseElement_ReadsItNullable()
+    {
+        var userId = TestSidecars.Postgres(
+            name: "user_id",
+            kind: SidecarValues.Kind.Domain,
+            schema: "public",
+            internalName: "user_id",
+            baseType: Catalog("int8")
+        );
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: public.user_id=App.UserId\n-- name: GetIds\nSELECT ids FROM teams;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "GetIds", [], [Column("ids", ArrayOf(userId, "_user_id"))])],
+            AppSourceOf(Struct)
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                "(global::System.Array.ConvertAll<long?, global::App.UserId>(reader.GetFieldValue<long?[]>(0), "
+                    + "static element => element is { } item ? global::App.Conversions.ToUserId(item) : "
+                    + "throw new global::System.InvalidCastException(\"Column 'ids' holds a null element.\")))"
+            );
+    }
+
+    // Each element is converted before the array is bound; a NULL element of a reference type is sent as a NULL
+    // element.
+    [Theory]
+    [InlineData(
+        Struct,
+        "global::System.Array.ConvertAll<global::App.Email, string>(value, "
+            + "static element => global::App.Email.ToDatabase(element))"
+    )]
+    [InlineData(
+        Class,
+        "global::System.Array.ConvertAll<global::App.Email?, string?>(value, "
+            + "static element => element is { } item ? global::App.Email.ToDatabase(item) : null)"
+    )]
+    public void Run_ArrayParameter_ConvertsEachElement(string kind, string converted)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: public.email=App.Email\n-- name: DeleteUsers\n"
+                + "DELETE FROM users WHERE email = ANY(@emails);\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "DeleteUsers", [Parameter("emails", Emails, nullable: false)], null)],
+            AppSourceOf(kind)
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                "parameter.Value = parameters.Emails is { } value ? (object)"
+                    + converted
+                    + " : global::System.DBNull.Value;\n"
+            );
+    }
+
+    // An override of the array itself takes its own converter, between it and the base map's array, and the
+    // element's converters are not used.
+    [Fact]
+    public void Run_ArrayOverrideWithItsOwnConverter_ConvertsTheWhole()
+    {
+        var source = AppSourceOf(Struct)
+            .Replace(
+                "    public static class Conversions",
+                """
+                    public sealed record Emails(string[] Values)
+                    {
+                        [SqlSourceConverter]
+                        public static Emails FromDatabase(string[] values) => new(values);
+
+                        [SqlSourceConverter]
+                        public static string[] ToDatabase(Emails emails) => emails.Values;
+                    }
+
+                    public static class Conversions
+                """,
+                StringComparison.Ordinal
+            );
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: public.email=App.Email\n-- type-override: public.email[]=App.Emails\n"
+                + "-- name: FindEmails\nSELECT emails FROM teams WHERE emails = @emails;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "FindEmails", [Parameter("emails", Emails, nullable: false)], [Column("emails", Emails)])],
+            source
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("(global::App.Emails.FromDatabase(reader.GetFieldValue<string[]>(0)))");
+        methods.ShouldContain(
+            "parameter.Value = parameters.Emails is { } value ? (object)global::App.Emails.ToDatabase(value) : "
+                + "global::System.DBNull.Value;\n"
+        );
+        methods.ShouldNotContain("ConvertAll");
+        methods.ShouldNotContain("global::App.Email.");
+    }
+
+    private static GeneratorRun RunEmailsColumn(string kind, bool nullable)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: public.email=App.Email\n-- name: GetEmails\nSELECT emails FROM teams;\n"
+        );
+        return MethodRuns.Run(
+            file,
+            [Entry(file, "GetEmails", [], [Column("emails", Emails, nullable)])],
+            AppSourceOf(kind)
+        );
     }
 
     private static GeneratorRun RunEmailColumn(string kind, string? source = null)

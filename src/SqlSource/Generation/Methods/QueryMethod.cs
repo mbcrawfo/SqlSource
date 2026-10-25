@@ -95,12 +95,20 @@ internal sealed record MethodColumn(
 )
 {
     /// <summary>
-    /// The type the column is read as: the database side of a <see cref="Read" /> of the whole value, or
-    /// <see cref="TypeText" /> when it has none or converts by element, which is read as its property's type until
-    /// its emission is written.  A not-null column read as exactly
-    /// <see cref="Emitting.QueryMethodWriter.VectorType" />,
+    /// The type the column is read as: the database side of a <see cref="Read" /> of the whole value; for one by
+    /// element, the database's array with elements that can be null, <c>long?[]</c> when its element is a value
+    /// type, which Npgsql refuses to read as <c>long[]</c> when it holds a <c>NULL</c>, and the array as it is,
+    /// <c>string[]</c>, otherwise; or <see cref="TypeText" /> when it has no converter.  A not-null column read as
+    /// exactly <see cref="Emitting.QueryMethodWriter.VectorType" />,
     /// <c>global::Microsoft.Data.SqlTypes.SqlVector&lt;float&gt;</c>, is checked with <c>IsNull</c> after its read
     /// and before its converter, since SqlClient gives <c>SqlVector&lt;float&gt;.Null</c> for a <c>NULL</c>.
     /// </summary>
-    public string ReadText => Read is { IsByElement: false } read ? read.DatabaseText : TypeText;
+    public string ReadText =>
+        Read switch
+        {
+            null => TypeText,
+            { IsByElement: false } read => read.DatabaseText,
+            { DatabaseIsValueType: true } read => read.DatabaseElementText + "?[]",
+            var read => read.DatabaseText,
+        };
 }

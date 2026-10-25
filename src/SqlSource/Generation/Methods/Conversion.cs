@@ -36,4 +36,11 @@ internal sealed record Conversion(
     string? ElementText,
     bool ElementIsValueType,
     EquatableArray<string> WarningIds = default
-);
+)
+{
+    /// <summary>
+    /// The element of <see cref="DatabaseText" /> that the converter takes or returns, for a conversion by element,
+    /// <c>string</c> of <c>string[]</c>; null otherwise.
+    /// </summary>
+    public string? DatabaseElementText => IsByElement ? ConversionPlanner.ElementOf(DatabaseText) : null;
+}

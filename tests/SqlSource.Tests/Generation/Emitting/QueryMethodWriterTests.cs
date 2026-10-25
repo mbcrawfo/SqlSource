@@ -569,16 +569,41 @@ public sealed class QueryMethodWriterTests
         text.ShouldNotContain("(await, b)");
     }
 
-    // A conversion by element is not written yet: the column is read as its property's type, and ReadText says so.
-    [Fact]
-    public void Append_ColumnConvertedByElement_IsReadAsItsPropertysType()
+    // A conversion by element reads the base map's array, with nullable elements when they are of a value type, and
+    // converts each element; ReadText is the array it reads.
+    [Theory]
+    [InlineData(
+        "string[]",
+        false,
+        "string[]",
+        "global::System.Array.ConvertAll<string, global::App.Email>(reader.GetFieldValue<string[]>(0), "
+    )]
+    [InlineData(
+        "long[]",
+        true,
+        "long?[]",
+        "global::System.Array.ConvertAll<long?, global::App.Email>(reader.GetFieldValue<long?[]>(0), "
+    )]
+    public void Append_ColumnConvertedByElement_ReadsTheDatabasesArray(
+        string databaseText,
+        bool databaseIsValueType,
+        string readText,
+        string read
+    )
     {
         var column = new MethodColumn(
             "emails",
             "Emails",
             "global::App.Email[]",
             false,
-            new Conversion("global::App.Email.FromDatabase", "string[]", false, true, "global::App.Email", true)
+            new Conversion(
+                "global::App.Email.FromDatabase",
+                databaseText,
+                databaseIsValueType,
+                true,
+                "global::App.Email",
+                true
+            )
         );
 
         var text = Write(
@@ -592,9 +617,13 @@ public sealed class QueryMethodWriterTests
             }
         );
 
-        column.ReadText.ShouldBe("global::App.Email[]");
-        text.ShouldContain("new global::App.GetUserDto(reader.GetFieldValue<global::App.Email[]>(0))");
-        text.ShouldNotContain("FromDatabase");
+        column.ReadText.ShouldBe(readText);
+        text.ShouldContain(
+            "new global::App.GetUserDto("
+                + read
+                + "static element => element is { } item ? global::App.Email.FromDatabase(item) : "
+                + "throw new global::System.InvalidCastException(\"Column 'emails' holds a null element.\")))"
+        );
     }
 
     [Fact]

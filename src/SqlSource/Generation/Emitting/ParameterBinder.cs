@@ -31,9 +31,8 @@ internal abstract class ParameterBinder
     /// <param name="parameter">The name of the parameter's local.</param>
     /// <param name="parameters">The name of the argument that holds the input model.</param>
     /// <param name="bound">The parameter, and the property that gives its value.</param>
-    /// <param name="value">
-    /// The name of the pattern variable that holds the value of a converted parameter, which no argument and no local
-    /// of the method has; empty when the method has no converted parameter.
+    /// <param name="names">
+    /// The names of what a converted parameter's binding declares, which no argument and no local of the method has.
     /// </param>
     public abstract void Append(
         StringBuilder builder,
@@ -42,14 +41,14 @@ internal abstract class ParameterBinder
         string parameter,
         string parameters,
         MethodParameter bound,
-        string value
+        ConversionNames names
     );
 
     /// <summary>
     /// Appends the binding by value alone: the name, without the <c>@</c>, and the value, with nothing else set.  A
     /// nullable property, and any property of a reference type, which a caller can set to null all the same, sends
     /// <c>DBNull.Value</c> for null.  A property with a converter sends the converter's result, and the converter
-    /// never sees a null.
+    /// never sees a null; an array converted by element sends the array of each element's result.
     /// </summary>
     protected static void AppendByValue(
         StringBuilder builder,
@@ -58,7 +57,7 @@ internal abstract class ParameterBinder
         string parameter,
         string parameters,
         MethodParameter bound,
-        string value
+        ConversionNames names
     )
     {
         _ = builder
@@ -76,9 +75,9 @@ internal abstract class ParameterBinder
             .Append(indent)
             .Append(parameter)
             .Append(".Value = ");
-        if (bound.Write is { IsByElement: false } write)
+        if (bound.Write is { } write)
         {
-            AppendConverted(builder, parameters, bound, write, value);
+            AppendConverted(builder, parameters, bound, write, names);
         }
         else if (bound.IsNullable || !bound.IsValueType)
         {
@@ -104,32 +103,81 @@ internal abstract class ParameterBinder
     }
 
     // The converter of the property's value; a value that can be null is matched first, and null sends DBNull.Value.
-    // A conversion by element is not written yet, and such a parameter is bound as without a converter.
+    // An array converted by element, which is of a reference type and so matched too, sends the database's array.
     private static void AppendConverted(
         StringBuilder builder,
         string parameters,
         MethodParameter bound,
         Conversion write,
-        string value
+        ConversionNames names
     )
     {
-        if (bound.IsNullable || !bound.IsValueType)
+        if (!bound.IsNullable && bound.IsValueType)
         {
             _ = builder
+                .Append(write.Method)
+                .Append('(')
                 .Append(parameters)
                 .Append('.')
                 .Append(bound.Property)
-                .Append(" is { } ")
-                .Append(value)
-                .Append(" ? (object)")
-                .Append(write.Method)
-                .Append('(')
-                .Append(value)
-                .Append(") : global::System.DBNull.Value");
+                .Append(')');
             return;
         }
 
-        _ = builder.Append(write.Method).Append('(').Append(parameters).Append('.').Append(bound.Property).Append(')');
+        _ = builder
+            .Append(parameters)
+            .Append('.')
+            .Append(bound.Property)
+            .Append(" is { } ")
+            .Append(names.Value)
+            .Append(" ? (object)");
+        if (write.IsByElement)
+        {
+            AppendByElement(builder, write, names);
+        }
+        else
+        {
+            _ = builder.Append(write.Method).Append('(').Append(names.Value).Append(')');
+        }
+
+        _ = builder.Append(" : global::System.DBNull.Value");
+    }
+
+    // Array.ConvertAll of the value, by a static lambda that converts each element.  An element of a reference type
+    // can be null, and a null is sent as a NULL element, the converter not called for it.
+    private static void AppendByElement(StringBuilder builder, Conversion write, ConversionNames names)
+    {
+        var (element, database) = write.ElementIsValueType
+            ? (write.ElementText, write.DatabaseElementText)
+            : (write.ElementText + "?", write.DatabaseElementText + "?");
+        _ = builder
+            .Append("global::System.Array.ConvertAll<")
+            .Append(element)
+            .Append(", ")
+            .Append(database)
+            .Append(">(")
+            .Append(names.Value)
+            .Append(", static ")
+            .Append(names.Element)
+            .Append(" => ");
+        if (write.ElementIsValueType)
+        {
+            _ = builder.Append(write.Method).Append('(').Append(names.Element).Append(')');
+        }
+        else
+        {
+            _ = builder
+                .Append(names.Element)
+                .Append(" is { } ")
+                .Append(names.Item)
+                .Append(" ? ")
+                .Append(write.Method)
+                .Append('(')
+                .Append(names.Item)
+                .Append(") : null");
+        }
+
+        _ = builder.Append(')');
     }
 }
 
@@ -146,8 +194,8 @@ internal sealed class PostgresParameterBinder : ParameterBinder
         string parameter,
         string parameters,
         MethodParameter bound,
-        string value
-    ) => AppendByValue(builder, indent, command, parameter, parameters, bound, value);
+        ConversionNames names
+    ) => AppendByValue(builder, indent, command, parameter, parameters, bound, names);
 }
 
 /// <summary>
@@ -163,6 +211,6 @@ internal sealed class SqlServerParameterBinder : ParameterBinder
         string parameter,
         string parameters,
         MethodParameter bound,
-        string value
-    ) => AppendByValue(builder, indent, command, parameter, parameters, bound, value);
+        ConversionNames names
+    ) => AppendByValue(builder, indent, command, parameter, parameters, bound, names);
 }
