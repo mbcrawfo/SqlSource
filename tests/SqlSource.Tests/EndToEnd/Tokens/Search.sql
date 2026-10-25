@@ -13,3 +13,9 @@ ORDER BY {{table}}.id;
 -- name: Checked
 -- generator: default
 SELECT id FROM {{table}} WHERE {{filter}};
+
+-- name: Whole
+{{sql}}
+
+-- name: Eight
+SELECT {{a}}{{b}}, {{c}}, {{d}}, {{e}}, {{f}}, {{g}}, {{h}}, {{a}};

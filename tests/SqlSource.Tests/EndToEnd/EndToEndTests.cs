@@ -59,6 +59,15 @@ public sealed class EndToEndTests
             .Search("id, name", "users", "name LIKE @pattern")
             .ShouldBe("SELECT id, name\nFROM users\nWHERE name LIKE @pattern\nORDER BY users.id;");
 
+    [Fact]
+    public void NestedLocation_QueryThatIsOnlyAToken_ReturnsTheArgument() =>
+        TokenQueries.Whole("SELECT 1;").ShouldBe("SELECT 1;");
+
+    // Eight tokens are more than one tuple holds: the eighth is read from the nested tuple's Rest.
+    [Fact]
+    public void NestedLocation_QueryWithEightTokens_ReplacesEachInItsPlace() =>
+        TokenQueries.Eight("1", "2", "3", "4", "5", "6", "7", "8").ShouldBe("SELECT 12, 3, 4, 5, 6, 7, 8, 1;");
+
     // SqlSource.Tests.csproj sets SqlSourceGeneratorParameters to sort-input and no-token-validation, one on each
     // line, and Search has no list of its own.  That its method checks nothing shows the property reaching the
     // generator through the MSBuild files the package ships, trimmed and whole: cut at its first line break, the
