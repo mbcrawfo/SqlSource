@@ -25,6 +25,10 @@ namespace SqlSource.Generation.Methods;
 /// <param name="Methods">The methods, in the order of the type's files and of their queries.</param>
 /// <param name="Diagnostics">The problems of the methods, each at its query's name.</param>
 /// <param name="CodeGenEngines">The engines of the type's queries whose output is <c>CodeGen</c>.</param>
+/// <param name="WarningIds">
+/// The ids of the compiler's warnings that the methods give, which their file disables: of every converter they call
+/// and every property type they read or bind, an obsolete or experimental one, in ordinal order, each once.
+/// </param>
 internal sealed record TypeMethods(
     string TypeKey,
     string HintName,
@@ -37,7 +41,8 @@ internal sealed record TypeMethods(
     LocationInfo AttributeLocation,
     EquatableArray<QueryMethod> Methods,
     EquatableArray<DiagnosticInfo> Diagnostics,
-    CodeGenEngines CodeGenEngines
+    CodeGenEngines CodeGenEngines,
+    EquatableArray<string> WarningIds
 )
 {
     /// <summary>

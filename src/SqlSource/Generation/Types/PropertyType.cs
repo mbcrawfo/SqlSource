@@ -15,11 +15,17 @@ namespace SqlSource.Generation.Types;
 /// The place that wrote the type override's entry, as <c>SQLSRC250</c> to <c>SQLSRC252</c> word it, for a type the
 /// override names, or null for a type of the base map.
 /// </param>
+/// <param name="Database">
+/// What the base map reads the database type as, which a converter converts from and to, set exactly when
+/// <paramref name="Place" /> is.  It changes no model's C#, so <c>ModelCollector.FindDifference</c> does not compare
+/// it.
+/// </param>
 internal sealed record PropertyType(
     string Text,
     bool IsValueType,
     bool IsPublic,
     EquatableArray<string> WarningIds,
     string Key,
-    string? Place
+    string? Place,
+    DatabaseType? Database = null
 );

@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Models;
@@ -64,6 +65,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             settings.ProjectSettings,
             settings.ProjectLevel
         );
+        var converters = FindConverters(context, typing.MappedTypeConverters);
         var models = CollectModels(context, typing.Files, typeQueries, settings.ProjectLevel);
         ReportDrivers(context, typing.NpgsqlProbe, typing.SqlClientProbe, sidecars.Needs, parsedFiles.Sorted);
         ReportProblems(context, sidecars.Checks, typing.FileTypes, models.FileModels, models.Models);
@@ -78,7 +80,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             models.ModelNames,
             claims.TypeMemberNames,
             typing.NpgsqlProbe,
-            typing.SqlClientProbe
+            typing.SqlClientProbe,
+            converters
         );
     }
 
@@ -458,15 +461,21 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => MappedTypeNames.Collect(input.Left.Left, input.Left.Right, input.Right))
             .WithTrackingName(TrackingNames.MappedTypeNames);
 
-        // Those types resolved against the compilation.  Like the probe, it runs on every run, since the driver gives
-        // a new compilation each time: a few lookups for each name, and none without an override.  Its value is equal
-        // until a type appears or goes, so nothing after it runs again.
-        var mappedTypes = context
+        // Those types resolved against the compilation, with the converters declared on those of a referenced
+        // assembly.  Like the probe, it runs on every run, since the driver gives a new compilation each time: a few
+        // lookups for each name, and none without an override.  Its value is equal until a type or a converter appears,
+        // goes or changes, so nothing after it runs again.
+        var resolvedTypes = context
             .CompilationProvider.Combine(mappedTypeNames)
             .Select(
                 static (input, cancellationToken) =>
                     MappedTypeResolver.Resolve(input.Left, input.Right, cancellationToken)
             )
+            .WithTrackingName(TrackingNames.ResolvedTypes);
+
+        // The types alone, which the models read, so that a change to a library's converter types no file again.
+        var mappedTypes = resolvedTypes
+            .Select(static (resolved, _) => resolved.Types)
             .WithTrackingName(TrackingNames.MappedTypes);
 
         // The property's type override alone, so that a change to another property types no file again.
@@ -499,7 +508,42 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             each.Select(static (file, _) => file.Types).WithTrackingName(TrackingNames.FileTypes)
         );
 
-        return new TypedFiles(npgsqlProbe, sqlClientProbe, typedFiles, fileTypes);
+        // The converters of the mapped types of referenced assemblies alone, so that a change to a type that leaves
+        // them alone finds no converter again.
+        var mappedTypeConverters = resolvedTypes
+            .Select(static (resolved, _) => resolved.Converters)
+            .WithTrackingName(TrackingNames.MappedTypeConverters);
+
+        return new TypedFiles(npgsqlProbe, sqlClientProbe, typedFiles, fileTypes, mappedTypeConverters);
+    }
+
+    // The project's converters, from the methods of its source that carry the converter attribute and from the mapped
+    // types, with the problems of its methods reported, whatever the output.
+    private static IncrementalValueProvider<ConverterSet> FindConverters(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValueProvider<EquatableArray<Converter>> mappedTypeConverters
+    )
+    {
+        // An edit to a method's declaration reads that method again, and goes no further unless the converter changes.
+        var projectConverters = context
+            .SyntaxProvider.ForAttributeWithMetadataName(
+                AttributeSource.ConverterAttributeMetadataName,
+                static (node, _) => ConverterReader.IsCandidate(node),
+                ConverterReader.Read
+            )
+            .WithTrackingName(TrackingNames.ProjectConverters)
+            .Collect()
+            .Select(static (converters, _) => ConverterSet.Sort(converters));
+
+        var converters = projectConverters
+            .Combine(mappedTypeConverters)
+            .Select(static (input, _) => ConverterSet.Of(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.Converters);
+
+        // The problems alone, so that an edit that changes none of them reports nothing again.
+        context.RegisterSourceOutput(converters.Select(static (set, _) => set.Diagnostics), ReportAll);
+
+        return converters;
     }
 
     // Each file's models, and the models every type's requests come to, checked against each other and the project.
@@ -712,7 +756,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<EquatableArray<string>> modelNames,
         IncrementalValueProvider<EquatableArray<TypeMemberNames>> typeMemberNames,
         IncrementalValueProvider<NpgsqlProbe> npgsqlProbe,
-        IncrementalValueProvider<SqlClientProbe> sqlClientProbe
+        IncrementalValueProvider<SqlClientProbe> sqlClientProbe,
+        IncrementalValueProvider<ConverterSet> converters
     )
     {
         // Whether each engine's driver allows its methods, which is the same value until a reference changes.
@@ -724,11 +769,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var assignments = models.Select(static (set, _) => set.Assignments);
 
         // Each type's own slice of what its methods need, which is equal until something of the type changes: its
-        // queries, its files' models, the models its queries got, its names or the drivers.
+        // queries, its files' models, the models its queries got, its names, the drivers or the converters of the
+        // types its overrides chose.
         var typeMethods = typeQueries
             .Combine(projectLevel)
             .Combine(allFileModels.Combine(assignments))
-            .Combine(typeMemberNames.Combine(drivers))
+            .Combine(typeMemberNames.Combine(drivers.Combine(converters)))
             .Select(
                 static (input, _) =>
                     MethodsInput.Gather(
@@ -737,7 +783,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                         input.Left.Right.Left,
                         input.Left.Right.Right,
                         input.Right.Left,
-                        input.Right.Right
+                        input.Right.Right.Left,
+                        input.Right.Right.Right
                     )
             )
             .WithTrackingName(TrackingNames.MethodsInput)
@@ -1063,12 +1110,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         FileNodes<SidecarCheckResult> Checks
     );
 
-    // The drivers the project references, each claimed file typed, and its types alone.
+    // The drivers the project references, each claimed file typed, its types alone, and the converters of the mapped
+    // types.
     private readonly record struct TypedFiles(
         IncrementalValueProvider<NpgsqlProbe> NpgsqlProbe,
         IncrementalValueProvider<SqlClientProbe> SqlClientProbe,
         FileNodes<TypedFile> Files,
-        FileNodes<FileTypes> FileTypes
+        FileNodes<FileTypes> FileTypes,
+        IncrementalValueProvider<EquatableArray<Converter>> MappedTypeConverters
     );
 
     // Each file's models, every file's together, the models' full names, and the models to emit with the problems of

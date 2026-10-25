@@ -29,6 +29,10 @@ public sealed class AttributeConflictTests
     [InlineData("internal class Sample { object o = typeof(SqlSource.GeneratorOutput); }", "(1,53)-(1,68)")]
     [InlineData("internal class Sample { object o = SqlSource.GeneratorOutput.Sql; }", "(1,36)-(1,61)")]
     [InlineData("internal class Sample { object o = typeof(SqlSource.UnexpectedRowCountException); }", "(1,53)-(1,80)")]
+    [InlineData(
+        "internal static class C { [SqlSource.SqlSourceConverter] internal static int F(long v) => (int)v; }",
+        "(1,38)-(1,56)"
+    )]
     public async Task Build_UseOfAGeneratedType_IsAConflictOnlyWithoutThePackageAnalyzers(string source, string span)
     {
         var compilerAlone = await GeneratorHarness.BuildAsync(

@@ -199,6 +199,8 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("commandScope")]
     [InlineData("readerScope")]
     [InlineData("value0")]
+    [InlineData("element")]
+    [InlineData("item")]
     public void Run_TokenWithAnAwkwardName_Compiles(string name)
     {
         var run = GeneratorHarness.Run(
@@ -233,7 +235,10 @@ public sealed class GeneratedSourceMethodTests
     }
 
     // The same names as the token of a query's method, beside its parameters, its connection and its locals, under
-    // CodeGen: one method reads many rows, the other one.
+    // CodeGen: one method reads many rows, the other one, and each binds a parameter and reads a column through a
+    // converter, and an array element by element, so that value names the pattern variable of the binding and element
+    // and item the static lambdas' parameter and pattern variable too.  C# lets a lambda's names hide the token's
+    // argument, so the text is checked for them as well.
     [Theory]
     [InlineData("span")]
     [InlineData("state")]
@@ -269,12 +274,21 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("commandScope")]
     [InlineData("readerScope")]
     [InlineData("value0")]
+    [InlineData("element")]
+    [InlineData("item")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles(string name)
     {
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.CSharp12);
 
         run.ShouldBeClean();
-        run.Sources[MethodRuns.MethodsFile].ShouldContain(" ProbeOne(\n");
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(" ProbeOne(\n");
+        methods.ShouldContain("(object)global::App.UserId.ToDatabase(");
+        methods.ShouldContain("global::App.UserId.FromDatabase(");
+        methods.ShouldContain("global::System.Array.ConvertAll<int?, global::App.UserId>(");
+        methods.ShouldContain("global::System.Array.ConvertAll<global::App.UserId, int>(");
+        methods.ShouldNotContain("static " + name + " =>");
+        methods.ShouldNotContain("is { } " + name + " ?");
     }
 
     [Fact]

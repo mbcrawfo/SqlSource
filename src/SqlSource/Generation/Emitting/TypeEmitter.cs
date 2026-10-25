@@ -19,11 +19,13 @@ internal static class TypeEmitter
     // under SqlLocation.Direct a query can hide a member of a base class.  That is what was asked for, and the
     // compiler's request to add "new" (CS0108) is one that nobody can act on in generated code.  Neither is its
     // request to add "new" or "override" (CS0114) to a method that has the name and the parameters of an inherited
-    // virtual method.  A file of methods on the type starts the same way.
-    internal const string Header =
+    // virtual method.  A file of methods on the type starts with the same lines.
+    internal const string HeaderLines =
         GeneratedText.Header
-        + "#pragma warning disable CS0108, CS0114 // A query can have the name of an inherited member.\n"
-        + "\n";
+        + "#pragma warning disable CS0108, CS0114 // A query can have the name of an inherited member.\n";
+
+    // The lines, and the empty line after them.
+    internal const string Header = HeaderLines + "\n";
 
     /// <summary>
     /// Writes the file of <paramref name="input" />.

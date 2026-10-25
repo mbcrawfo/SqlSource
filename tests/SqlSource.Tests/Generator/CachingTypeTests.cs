@@ -175,7 +175,7 @@ public sealed class CachingTypeTests
 
         var result = Run(driver, WithMethodBodyEdited(compilation));
 
-        AllReasons(result, TrackingNames.MappedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.ResolvedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.FileTypesInput)
             .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         AllReasons(result, TrackingNames.FileTypes).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
@@ -187,9 +187,9 @@ public sealed class CachingTypeTests
     }
 
     // The property maps int4 to a type the project does not have, so Users, whose column is of int4, is SQLSRC250.
-    // A new file declares the type: its resolution changes, and Users is typed again without the error.  Every file
-    // with a usable entry carries the resolved types, so Orders, whose column is of text, is typed again too, and
-    // gives an equal value, which nothing after it reads again.
+    // A new file declares the type: its resolution changes, its converters, none, do not, and Users is typed again
+    // without the error.  Every file with a usable entry carries the resolved types, so Orders, whose column is of
+    // text, is typed again too, and gives an equal value, which nothing after it reads again.
     [Fact]
     public void Run_CSharpEditAddsTheMappedType_TypesTheFileThatUsesItAnew()
     {
@@ -220,6 +220,7 @@ public sealed class CachingTypeTests
         );
 
         AllReasons(result, TrackingNames.MappedTypes).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.MappedTypeConverters).ShouldBe([IncrementalStepRunReason.Unchanged]);
         Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>

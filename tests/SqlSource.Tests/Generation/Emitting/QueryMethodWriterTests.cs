@@ -569,6 +569,94 @@ public sealed class QueryMethodWriterTests
         text.ShouldNotContain("(await, b)");
     }
 
+    // A conversion by element reads the base map's array, with nullable elements when they are of a value type, and
+    // converts each element; ReadText is the array it reads.
+    [Theory]
+    [InlineData(
+        "string[]",
+        false,
+        "string[]",
+        "global::System.Array.ConvertAll<string, global::App.Email>(reader.GetFieldValue<string[]>(0), "
+    )]
+    [InlineData(
+        "long[]",
+        true,
+        "long?[]",
+        "global::System.Array.ConvertAll<long?, global::App.Email>(reader.GetFieldValue<long?[]>(0), "
+    )]
+    public void Append_ColumnConvertedByElement_ReadsTheDatabasesArray(
+        string databaseText,
+        bool databaseIsValueType,
+        string readText,
+        string read
+    )
+    {
+        var column = new MethodColumn(
+            "emails",
+            "Emails",
+            "global::App.Email[]",
+            false,
+            new Conversion(
+                "global::App.Email.FromDatabase",
+                databaseText,
+                databaseIsValueType,
+                true,
+                "global::App.Email",
+                true
+            )
+        );
+
+        var text = Write(
+            GetUser with
+            {
+                Output = GetUser.Output! with
+                {
+                    Columns = TestModels.Array(column),
+                    ConstructorOrder = TestModels.Array(0),
+                },
+            }
+        );
+
+        column.ReadText.ShouldBe(readText);
+        text.ShouldContain(
+            "new global::App.GetUserDto("
+                + read
+                + "static element => element is { } item ? global::App.Email.FromDatabase(item) : "
+                + "throw new global::System.InvalidCastException(\"Column 'emails' holds a null element.\")))"
+        );
+    }
+
+    // An element the property writes nullable keeps a NULL element as null, the converter not called for it.
+    [Fact]
+    public void Append_ColumnOfANullableElementConvertedByElement_KeepsANullElement()
+    {
+        var column = new MethodColumn(
+            "ids",
+            "Ids",
+            "global::App.UserId?[]",
+            false,
+            new Conversion("global::App.UserId.FromDatabase", "long[]", true, true, "global::App.UserId?", true)
+        );
+
+        var text = Write(
+            GetUser with
+            {
+                Output = GetUser.Output! with
+                {
+                    Columns = TestModels.Array(column),
+                    ConstructorOrder = TestModels.Array(0),
+                },
+            }
+        );
+
+        column.ReadText.ShouldBe("long?[]");
+        text.ShouldContain(
+            "new global::App.GetUserDto(global::System.Array.ConvertAll<long?, global::App.UserId?>("
+                + "reader.GetFieldValue<long?[]>(0), "
+                + "static element => element is { } item ? global::App.UserId.FromDatabase(item) : null))"
+        );
+    }
+
     [Fact]
     public void Append_SummaryOfTheQuery_IsTheMethodsSummary() =>
         Write(GetUser with { SummaryXml = "Finds a user by <c>id</c>,\nor none." })

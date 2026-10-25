@@ -83,23 +83,56 @@ internal static class MethodRuns
             columns: columns?.Select((column, ordinal) => column with { Ordinal = ordinal }).ToArray()
         );
 
-    // Two queries whose token has the name, beside a parameter: Probe reads many rows and ProbeOne one, each into a
-    // model of one column, so that the token sits beside every local a method can have.
+    // The source of RunTokenNamed: App.Sample, and App.UserId with its converters, which int4 is read and bound as.
+    private const string TokenSource = """
+        using SqlSource;
+
+        namespace App
+        {
+            [SqlSourceGenerate]
+            public partial class Sample;
+
+            public readonly record struct UserId(int Value)
+            {
+                [SqlSourceConverter]
+                public static UserId FromDatabase(int value) => new(value);
+
+                [SqlSourceConverter]
+                public static int ToDatabase(UserId id) => id.Value;
+            }
+        }
+        """;
+
+    // Two queries whose token has the name, beside a parameter that can be null and an array, each bound through a
+    // converter: Probe reads many rows and ProbeOne one, each into a model of a column read through a converter and
+    // an array read through it element by element, so that the token sits beside every local and every lambda's
+    // parameter a method can have.
     public static GeneratorRun RunTokenNamed(string token, LanguageVersion languageVersion)
     {
-        var body = "-- token: {{" + token + ":users}}\nSELECT id FROM {{" + token + "}} WHERE id = @id;\n";
+        var body =
+            "-- token: {{"
+            + token
+            + ":users}}\nSELECT id, ids FROM {{"
+            + token
+            + "}} WHERE id = @id OR id = ANY(@ids);\n";
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- name: Probe\n" + body + "-- name: ProbeOne -> one\n" + body
+            "-- type-override: int4=App.UserId\n-- name: Probe\n" + body + "-- name: ProbeOne -> one\n" + body
         );
-        SidecarParameter[] parameters = [ModelRuns.Parameter("id")];
-        SidecarColumn[] columns = [ModelRuns.Column("id")];
+        var ids = ModelRuns.ArrayOf(ModelRuns.Int4, "_int4");
+        SidecarParameter[] parameters =
+        [
+            ModelRuns.Parameter("id", nullable: true),
+            ModelRuns.Parameter("ids", ids, nullable: false),
+        ];
+        SidecarColumn[] columns = [ModelRuns.Column("id"), ModelRuns.Column("ids", ids)];
         return Run(
             file,
             [
                 ModelRuns.Entry(file, "Probe", parameters, columns),
                 ModelRuns.Entry(file, "ProbeOne", parameters, columns),
             ],
+            TokenSource,
             languageVersion: languageVersion
         );
     }

@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
+using Conversion = SqlSource.Generation.Methods.Conversion;
 
 namespace SqlSource.Generation.Emitting;
 
@@ -32,9 +34,9 @@ internal static class QueryMethodWriter
     private const string ExceptionType = "global::SqlSource.UnexpectedRowCountException";
 
     /// <summary>
-    /// The spelling of <see cref="MethodColumn.TypeText" /> that marks a column read as SqlClient's vector, which gives
-    /// <c>SqlVector&lt;float&gt;.Null</c> on a <c>NULL</c> instead of throwing: a not-null column of exactly this text
-    /// is read into a local and refused when it <c>IsNull</c>.
+    /// The spelling of <see cref="MethodColumn.ReadText" /> that marks a column read as SqlClient's vector, which gives
+    /// <c>SqlVector&lt;float&gt;.Null</c> on a <c>NULL</c> instead of throwing: a not-null column read as exactly this
+    /// text is read into a local and refused when it <c>IsNull</c>, before a converter sees it.
     /// </summary>
     internal const string VectorType = "global::Microsoft.Data.SqlTypes.SqlVector<float>";
 
@@ -65,6 +67,7 @@ internal static class QueryMethodWriter
         var arguments = GetArguments(tokens);
         var locals = new Locals(
             tokens,
+            method.Input,
             method.Shape is ResultShape.None or ResultShape.RowCount ? null : method.Output
         );
         var bodyIndent = indent + GeneratedText.Indent;
@@ -107,7 +110,8 @@ internal static class QueryMethodWriter
                     locals.Command,
                     locals.Parameter,
                     Parameters,
-                    parameter
+                    parameter,
+                    locals.ConversionNames
                 );
                 AppendEnd(builder, blockIndent);
                 _ = builder.Append('\n');
@@ -524,7 +528,7 @@ internal static class QueryMethodWriter
                 .Append(" = ")
                 .Append(locals.Reader)
                 .Append(".GetFieldValue<")
-                .Append(column.TypeText)
+                .Append(column.ReadText)
                 .Append(">(")
                 .Append(index.ToString(CultureInfo.InvariantCulture))
                 .Append(");\n");
@@ -569,16 +573,21 @@ internal static class QueryMethodWriter
     }
 
     // A not-null column by GetFieldValue<T> alone; a nullable one by IsDBNull first, and never by GetFieldValue<T?>,
-    // which SqlClient refuses on a NULL.
+    // which SqlClient refuses on a NULL.  A column with a converter is read as the converter's database side and
+    // passed to it, so that the converter never sees a NULL; an array converted by element is read as the database's
+    // array and each of its elements passed to it.
     private static void AppendColumn(StringBuilder builder, MethodOutput output, int ordinal, Locals locals)
     {
+        var column = output.Columns[ordinal];
+        var read = column.Read;
         if (locals.Values[ordinal] is { } value)
         {
-            _ = builder.Append(value);
+            _ = read is null
+                ? builder.Append(value)
+                : builder.Append(read.Method).Append('(').Append(value).Append(')');
             return;
         }
 
-        var column = output.Columns[ordinal];
         var ordinalText = ordinal.ToString(CultureInfo.InvariantCulture);
         if (column.IsNullable)
         {
@@ -591,25 +600,100 @@ internal static class QueryMethodWriter
                 .Append("?) : ");
         }
 
+        if (read is { IsByElement: true })
+        {
+            AppendByElement(builder, column, read, ordinalText, locals);
+            return;
+        }
+
+        if (read is not null)
+        {
+            _ = builder.Append(read.Method).Append('(');
+        }
+
+        AppendGetFieldValue(builder, column, ordinalText, locals);
+        if (read is not null)
+        {
+            _ = builder.Append(')');
+        }
+    }
+
+    // Array.ConvertAll of the database's array, by a static lambda that converts each element that is not null.  A
+    // NULL element of a value type throws, naming the column, which Npgsql's throw does not; one of a reference type,
+    // or of an element the property writes nullable, stays null.
+    private static void AppendByElement(
+        StringBuilder builder,
+        MethodColumn column,
+        Conversion read,
+        string ordinalText,
+        Locals locals
+    )
+    {
+        var names = locals.ConversionNames;
+        _ = builder
+            .Append("global::System.Array.ConvertAll<")
+            .Append(read.ReadElementText)
+            .Append(", ")
+            .Append(read.ElementText)
+            .Append(">(");
+        AppendGetFieldValue(builder, column, ordinalText, locals);
+        _ = builder
+            .Append(", static ")
+            .Append(names.Element)
+            .Append(" => ")
+            .Append(names.Element)
+            .Append(" is { } ")
+            .Append(names.Item)
+            .Append(" ? ")
+            .Append(read.Method)
+            .Append('(')
+            .Append(names.Item)
+            .Append(") : ");
+        if (read.ElementIsNullable)
+        {
+            _ = builder.Append("null");
+        }
+        else if (!read.ElementIsValueType)
+        {
+            _ = builder.Append("null!");
+        }
+        else
+        {
+            _ = builder
+                .Append("throw new global::System.InvalidCastException(")
+                .Append(SymbolDisplay.FormatLiteral("Column '" + column.Name + "' holds a null element.", quote: true))
+                .Append(')');
+        }
+
+        _ = builder.Append(')');
+    }
+
+    private static void AppendGetFieldValue(
+        StringBuilder builder,
+        MethodColumn column,
+        string ordinalText,
+        Locals locals
+    ) =>
         _ = builder
             .Append(locals.Reader)
             .Append(".GetFieldValue<")
-            .Append(column.TypeText)
+            .Append(column.ReadText)
             .Append(">(")
             .Append(ordinalText)
             .Append(')');
-    }
 
     private static void AppendIf(StringBuilder builder, string indent, string condition) =>
         _ = builder.Append(indent).Append("if (").Append(condition).Append(")\n").Append(indent).Append("{\n");
 
     private static void AppendEnd(StringBuilder builder, string indent) => _ = builder.Append(indent).Append("}\n");
 
-    // The names of the method's locals and of the lambda's parameters, none of which an argument has.  The locals
-    // that read rows are named only for a method that reads them, whose output is given.
+    // The names of the method's locals and of the lambdas' parameters, none of which an argument has.  The locals
+    // that read rows are named only for a method that reads them, whose output is given, the value of a converted
+    // parameter only for a method that has one, and the element of an array and its value only for a method that
+    // converts one by element.
     private sealed class Locals
     {
-        public Locals(List<string> tokens, MethodOutput? output)
+        public Locals(List<string> tokens, MethodInput? input, MethodOutput? output)
         {
             var names = new LocalNames(Seed(tokens));
             Sql = names.Take("sql");
@@ -617,6 +701,12 @@ internal static class QueryMethodWriter
             Command = names.Take("command");
             CommandScope = names.Take("commandScope");
             Parameter = names.Take("parameter");
+            var byElement = HasByElement(input, output);
+            ConversionNames = new ConversionNames(
+                HasWrite(input) ? names.Take("value") : string.Empty,
+                byElement ? names.Take("element") : string.Empty,
+                byElement ? names.Take("item") : string.Empty
+            );
             if (output is null)
             {
                 Reader = ReaderScope = Rows = Row = string.Empty;
@@ -632,7 +722,7 @@ internal static class QueryMethodWriter
                 for (var index = 0; index < output.Columns.Count; index++)
                 {
                     var column = output.Columns[index];
-                    if (!column.IsNullable && column.TypeText == VectorType)
+                    if (!column.IsNullable && column.ReadText == VectorType)
                     {
                         Values[index] = names.Take("value" + index.ToString(CultureInfo.InvariantCulture));
                     }
@@ -653,6 +743,11 @@ internal static class QueryMethodWriter
 
         public string Parameter { get; }
 
+        // The pattern variable that holds the value of a converted parameter in its binding, which is a block of its
+        // own, so that one name serves every parameter; and the parameter of the static lambda that converts an
+        // array's element, and the element that is not null, which no other lambda's parameter has.
+        public ConversionNames ConversionNames { get; }
+
         public string Reader { get; }
 
         public string ReaderScope { get; }
@@ -667,6 +762,13 @@ internal static class QueryMethodWriter
         public string Span { get; }
 
         public string State { get; }
+
+        private static bool HasWrite(MethodInput? input) =>
+            input is not null && input.Parameters.Any(static parameter => parameter.Write is not null);
+
+        private static bool HasByElement(MethodInput? input, MethodOutput? output) =>
+            (input is not null && input.Parameters.Any(static parameter => parameter.Write is { IsByElement: true }))
+            || (output is not null && output.Columns.Any(static column => column.Read is { IsByElement: true }));
 
         private static IEnumerable<string> Seed(List<string> tokens)
         {

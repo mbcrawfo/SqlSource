@@ -8,6 +8,7 @@ Short answers to "how do I...", each a sample you can copy and a link to the pag
 - [Check the sidecars in CI](#check-sidecars-in-ci)
 - [Describe again after a schema change](#after-a-migration)
 - [Run queries in a transaction](#queries-in-a-transaction)
+- [Give an id a type of its own](#strongly-typed-id)
 - [Use the queries with Dapper or your own ADO.NET code](#dapper-and-adonet)
 - [Run the models through Dapper](#models-through-dapper)
 - [Choose a table name at run time](#table-name-at-run-time)
@@ -200,6 +201,47 @@ Open the connection yourself: a query method leaves a connection that is open as
 
 Rules: [the connection](generator.md#method-connection), [the signature](generator.md#method-signature), [result shapes](sql-files.md#result-shapes).
 
+<a id="strongly-typed-id"></a>
+
+## Give an id a type of its own
+
+```sql postgres
+-- name: GetCustomer -> one-optional
+-- type-override: int8=MyApp.CustomerId
+SELECT id, name FROM customers WHERE id = @id;
+```
+
+```csharp
+using SqlSource;
+
+namespace MyApp;
+
+public readonly record struct CustomerId(long Value)
+{
+    [SqlSourceConverter]
+    public static CustomerId FromDatabase(long value) => new(value);
+
+    [SqlSourceConverter]
+    public static long ToDatabase(CustomerId id) => id.Value;
+}
+```
+
+```csharp
+GetCustomerDto? customer = await connection.GetCustomer(new GetCustomerParams(customerId));
+// customer.Id and GetCustomerParams.Id are CustomerId
+```
+
+The type override gives each `bigint` of the query the type `CustomerId`, so the method reads `id` as a `long` and passes it to `FromDatabase`, and sends the `long` that `ToDatabase` returns for `@id`.  On SQL Server the key is `bigint`: `-- type-override: bigint=MyApp.CustomerId`.  To give the type to one table's ids alone, make them a domain, `CREATE DOMAIN customer_id AS bigint`, map it, and declare each parameter compared with such an id as the domain, since PostgreSQL gives it the domain's base type, `bigint`, otherwise:
+
+```sql postgres
+-- name: GetCustomer -> one-optional
+-- type-override: public.customer_id=MyApp.CustomerId
+-- param: @id public.customer_id
+SELECT id, name FROM customers WHERE id = @id;
+```
+
+Rules: [converters](settings.md#converters), [type overrides](settings.md#setting-type-overrides).
+
 <a id="dapper-and-adonet"></a>
 
 ## Use the queries with Dapper or your own ADO.NET code
@@ -328,6 +370,24 @@ Rules: [models](generator.md#models), [property names](generator.md#property-nam
   ```
 
   A `DateTimeOffset` parameter is sent as a `timestamptz`, which takes an offset of 0 alone.  Another offset throws `ArgumentException`, so pass `value.ToUniversalTime()`.
+
+  A type of yours that has [converters](settings.md#converters) for the query methods needs no more than a handler that calls them, here for a domain over `text` mapped to `Email`, whose converters take and return a `string`:
+
+  ```csharp
+  using System.Data;
+  using Dapper;
+
+  public sealed class EmailHandler : SqlMapper.TypeHandler<Email>
+  {
+      public override Email Parse(object value) => Email.FromDatabase((string)value);
+
+      public override void SetValue(IDbDataParameter parameter, Email value) => parameter.Value = Email.ToDatabase(value);
+  }
+  ```
+
+  ```csharp
+  SqlMapper.AddTypeHandler(new EmailHandler());
+  ```
 - **A PostgreSQL enum mapped to a C# enum needs `MapEnum<T>()` on the data source.**  An enum read as a `string`, the default, needs nothing:
 
   ```csharp
@@ -474,6 +534,24 @@ connection.QueryAsync<ListCustomerOrdersSinceDto>(
   ```
 
   A `DateOnly` parameter is then sent as a `date`, and a `TimeOnly` as a `time`.
+
+  A type of yours that has [converters](settings.md#converters) for the query methods needs no more than a handler that calls them, here for an alias type over `nvarchar` mapped to `Email`, whose converters take and return a `string`:
+
+  ```csharp
+  using System.Data;
+  using Dapper;
+
+  public sealed class EmailHandler : SqlMapper.TypeHandler<Email>
+  {
+      public override Email Parse(object value) => Email.FromDatabase((string)value);
+
+      public override void SetValue(IDbDataParameter parameter, Email value) => parameter.Value = Email.ToDatabase(value);
+  }
+  ```
+
+  ```csharp
+  SqlMapper.AddTypeHandler(new EmailHandler());
+  ```
 - **On a connection with a transaction open, give every call the transaction.**  SqlClient refuses a command without it, with `InvalidOperationException`:
 
   ```csharp

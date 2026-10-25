@@ -21,6 +21,9 @@ internal static class SqlServerTypeMap
 
     private static readonly Dictionary<string, Row> Rows = BuildRows();
 
+    // Every C# type a row gives, as it writes it, and DateOnly and TimeOnly, for Gives.
+    private static readonly HashSet<string> Given = BuildGiven();
+
     /// <summary>The keys of the map: every type name it has a row for.</summary>
     public static IEnumerable<string> Keys => Rows.Keys;
 
@@ -88,6 +91,19 @@ internal static class SqlServerTypeMap
     }
 
     /// <summary>
+    /// Whether SqlClient reads <paramref name="text" /> for some type: a row's C# type exactly,
+    /// <c>System.DateOnly</c> or <c>System.TimeOnly</c>, or an array <c>X[]</c> of a type <c>X</c> it gives.  No row
+    /// gives those two, since <c>GetValue</c> boxes a <c>date</c> or <c>time</c> as a <c>DateTime</c> or a
+    /// <c>TimeSpan</c>, but <c>GetFieldValue&lt;T&gt;</c> reads them as either when asked, as the override
+    /// <c>date=System.DateOnly</c> asks, so a converter between one and another type must not make them foreign.  A
+    /// type it never gives, as <c>MyApp.Email</c> or a type of the package Microsoft.SqlServer.Types, is foreign,
+    /// which a converter is needed for.
+    /// </summary>
+    public static bool Gives(string text) =>
+        Given.Contains(text)
+        || (text.EndsWith("[]", StringComparison.Ordinal) && Gives(text.Substring(0, text.Length - 2)));
+
+    /// <summary>
     /// <paramref name="name" /> cut before its first <c>(</c>, which drops its facets: <c>nvarchar(50)</c> is
     /// <c>nvarchar</c>.
     /// </summary>
@@ -102,6 +118,24 @@ internal static class SqlServerTypeMap
         string.IsNullOrEmpty(type.UserType?.Name) ? null : type.UserType;
 
     private static bool IsSystemSchema(SqlServerUserType userType) => SystemSchemas.IsSqlServer(userType.Schema);
+
+    private static HashSet<string> BuildGiven()
+    {
+        var given = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "global::System.DateOnly",
+            "global::System.TimeOnly",
+        };
+        foreach (var row in Rows.Values)
+        {
+            if (row.Text is { } text)
+            {
+                _ = given.Add(text);
+            }
+        }
+
+        return given;
+    }
 
     private static Dictionary<string, Row> BuildRows()
     {

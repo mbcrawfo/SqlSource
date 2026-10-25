@@ -182,6 +182,15 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC275](#sqlsrc275) | Token is named as an argument of the method |
 | [SQLSRC276](#sqlsrc276) | Extension class name is taken |
 
+**Converters**
+
+| Id | Title |
+|----|----|
+| [SQLSRC277](#sqlsrc277) | Method marked as a converter is not one |
+| [SQLSRC278](#sqlsrc278) | Two converters convert between the same types |
+| [SQLSRC279](#sqlsrc279) | Converters do not convert from the database type |
+| [SQLSRC280](#sqlsrc280) | Converter is missing for one direction |
+
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 120 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
@@ -203,6 +212,8 @@ The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type overri
 The ids from `SQLSRC253` to `SQLSRC260` are reported by the build, about the [models](generator.md#models) of a query whose entry in its sidecar is current and whose columns and parameters all have a C# type, except `SQLSRC259` and `SQLSRC260`, which a query with a current entry gets whatever its C# types.  Each property of a model is named by the PascalCase of its column or parameter: `created_at` gives `CreatedAt`.  `SQLSRC253` to `SQLSRC255`, `SQLSRC256` for a name that a record or `object` has, `SQLSRC259` and `SQLSRC260` are about the query's own columns, parameters and markers: each is reported once for the query, however many types claim its file, at the query's name, or at its marker for `SQLSRC259` and `SQLSRC260`, and the query gets no models until it is fixed.  `SQLSRC257` and `SQLSRC258`, `SQLSRC256` for a property named as its model, and `SQLSRC251` for each property whose type is not public in a public model, are about a model, whose name and accessibility come from the types that claim its queries: `SQLSRC257` is reported at the later of two queries whose models differ, at its marker when it has one, and the others at the name of each query of the model, which is not generated until it is fixed.  A query gets every error it has; under the output `models` its constant or token method is still generated, and under `codegen` it gets no method until all are fixed.
 
 The ids from `SQLSRC272` to `SQLSRC276` are reported by the build, about the [method](generator.md#query-methods) of a query whose output is `codegen`.  `SQLSRC272`, `SQLSRC274` and `SQLSRC275` are reported at the query's name, once however many types claim its file, except a `SQLSRC274` whose cause is of one type, which each such type reports, and one for the methods of two types that clash, which each of the two queries gets.  A query of a file that two types of one namespace claim gives each type a method of one signature, so it gets one `SQLSRC274` for each type, each naming the other.  A query gets every one of them that it has, and no method until all are fixed; its models are still generated.  `SQLSRC273` has no file and line, and is reported once for the project and database.  `SQLSRC276` is about the extension class that holds a type's methods, and is reported at the type's `[SqlSourceGenerate]`, once for each type whose methods would go into the class.
+
+The ids from `SQLSRC277` to `SQLSRC280` are reported by the build, about converters, the methods marked `[SqlSourceConverter]`.  `SQLSRC277` and `SQLSRC278` are about the methods of the project's own code: at the method's name, whatever the output of the project, its types and its files, and whether a query uses the method or not.  A converter of a type that the type override names, declared in a referenced assembly, has no place in the project, so `SQLSRC277` and `SQLSRC278` are reported for it at the name of each query whose output is `codegen` and whose method would use it.  `SQLSRC279` and `SQLSRC280` are about a column or a parameter of a query whose output is `codegen`, whose C# type a type override chose, and whose type has converters that do not serve it.  Each of these at a query is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.  A project whose output is `models` uses no converter, and gets none of them at a query, and neither does a query whose database's driver the project does not reference, which [SQLSRC273](#sqlsrc273) is about.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
@@ -2457,3 +2468,85 @@ Two types of one accessibility that give one class share it, each writing a part
 Rename the type, or the type, namespace or model that has the class's name, or make the two types of one accessibility.  Or set `MethodLocation` on the attribute to `Public`, `Internal` or `Private`, which puts the methods on the type itself and needs no extension class.  The error is reported at the type's `[SqlSourceGenerate]`, once for each type whose methods would go into the class, and the type's models are still generated.
 
 See: [Query methods](generator.md#query-methods)
+
+## SQLSRC277
+
+**Method marked as a converter is not one**
+
+A method marked `[SqlSourceConverter]` must be a converter: a `static` method of one argument, declared in a type, that returns the argument converted to another type, as `public static Email FromDatabase(string value)` does.  The method is not one, and the message names it and the first of these that is wrong with it:
+
+- `it is a local function`: the method is declared inside another method.  Only a method declared in a type is a converter, and the attribute on a lambda is ignored.
+- `it is an operator`: the method is an operator, as `operator +`, or a conversion, as `implicit operator Email(string value)`, which the generated code cannot call by name.  Mark a static method that does the conversion instead; the operator can call it.
+- `it is not static`: the method is an instance method.
+- `it is abstract or virtual`: the method is a `static abstract` or `static virtual` member of an interface, which a call through the interface cannot reach.
+- `it is generic`: the method has type parameters of its own.
+- `it is in an extension block`: the method is declared inside an `extension` block, which the generated code cannot call it through.  Declare it in a class or a struct, as a member of the type it converts or of a static class.
+- `it is in a generic type`: the method is in a generic type, or in a type nested in one.
+- `it does not take exactly one argument`: the method has no argument, or more than one.
+- `its argument is ref, out, in, params or optional`: the argument has one of those modifiers, or a default value.
+- `it returns nothing`: the method returns `void`, `Task` or `ValueTask`, or `Task<T>` or `ValueTask<T>`.  A converter returns its result itself.
+- `its return type is annotated as nullable`: the method returns a type written with `?`, as `string?` or `int?`.  A converter's result is never null.  Its argument may be written with `?`, as `Email?` or `UserId?`: it converts the type without the `?`, and is never given null.
+- `this project cannot call it`: the method is `private`, `protected` or `private protected` (a `protected internal` method can be called), it is in a type that the project cannot reach, or it is in a `file` type, which code in another file of the project cannot name.
+- `it is marked [Obsolete] as an error`: the method, or a type it is in, has `[Obsolete]` with `true` as its second argument, so that no call of it compiles.  A method marked `[Obsolete]` as a warning is a converter.
+
+```console
+/work/App/Email.cs(5,18): error SQLSRC277: The method 'App.Email.FromDatabase(string)' is marked [SqlSourceConverter], but it is not static.  A converter is a static method of one argument that returns the converted value.
+```
+
+Change the method so that it is a converter, or remove its `[SqlSourceConverter]` when it is not meant to be one.  The error is reported at the method's name, at an operator's symbol, or at the type that a conversion converts to.
+
+A converter declared in a referenced assembly, on a type that the type override names, is reported at the name of each query whose output is `codegen` and whose method would convert through it, since the project cannot change the method.  That query gets no method until the library is fixed, or until the project declares a converter of its own between the same two types, which is used instead of the library's.  The library's own build reports the error at the method, since the method is in the library's code.  A library's converter is used only when the project can call it: when it is `public`, or `internal` in a library that gives the project its internals with `InternalsVisibleTo`.
+
+See: [Converters](settings.md#converters)
+
+## SQLSRC278
+
+**Two converters convert between the same types**
+
+Two methods of the project marked `[SqlSourceConverter]` take the same type and return the same type, so either could convert between the two.  The message names both methods and the two types.
+
+```console
+/work/App/Conversions.cs(8,25): error SQLSRC278: The converters 'App.Conversions.ToEmail(string)' and 'App.Email.FromDatabase(string)' both convert 'string' to 'App.Email'.  Keep one.
+```
+
+Remove `[SqlSourceConverter]` from one of them, or remove the method.  The error is reported at the name of each of the methods.  Two converters of opposite directions, one from `string` to `Email` and one from `Email` to `string`, are a pair and not this error, and a converter of a type to itself, as `DateTime` to `DateTime`, is one converter.  A method that has [SQLSRC277](#sqlsrc277) is not counted until it is fixed.  An argument written with `?` takes the type without it, since a converter is never given null, so `ToDatabase(Email? email)` and `ToDatabase(Email email)` both convert `Email` to `string`, and are this error together.
+
+Two such converters declared in referenced assemblies, on the types that the type override names, are reported at the name of each query whose output is `codegen` and whose method would convert through one of them, and that query gets no method.  Declare a converter of your own between the same two types, which is used instead of both.
+
+See: [Converters](settings.md#converters)
+
+## SQLSRC279
+
+**Converters do not convert from the database type**
+
+A type override gives a column or a parameter of a query whose output is `codegen` a C# type that the database's driver never reads, such as your own `Email` or `UserId`, and the project has converters of that type, but none between it and the C# type that the driver reads the column's database type as.  So no converter can read the column or send the parameter.  A converter of an `int` never reads a `bigint` column, which the driver reads as a `long`: SqlSource never narrows a value.  The message names the column or parameter, its type, the types its converters convert from and to, the type the driver reads, and the database type.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC279: The column 'id' has type 'App.UserId', whose converters convert from and to 'int', and not from and to 'long', the type the database type 'int8' is read as.  Add a converter between 'App.UserId' and 'long'.
+```
+
+Add a converter between the column's or parameter's type and the type the message names, in each direction the queries need: from it for a column, to it for a parameter.  Or change the converters you have to take and return that type, or map the column to another type.  The type the driver reads is the one it reads the database type as with no type override, a domain as its base type, so a converter of `MyApp.Email` over a domain of `text` converts from and to `string`.
+
+The error has a second form, when the column's or parameter's database type has no C# type that the driver reads it as, such as a composite type, `regclass` or a range of a subtype SqlSource does not know: such a type has nothing to convert from.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC279: The column 'address' has type 'App.Address', which has converters, but the database type 'public.address' has no C# type to convert from.  Remove the type override, or the converters of 'App.Address'.
+```
+
+For an array whose element type the type override chose, such as `email[]` under `public.email=App.Email`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
+
+See: [Converters](settings.md#converters)
+
+## SQLSRC280
+
+**Converter is missing for one direction**
+
+A type override gives a column or a parameter of a query whose output is `codegen` a C# type, and the project has a converter between that type and the C# type that the driver reads the column's database type as, but only in the other direction.  A column needs a converter from the type the driver reads, and a parameter one to it.  The message names the column or parameter, its type, the converter it has, and the method it needs.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC280: The column 'email' has type 'App.Email', which has a converter to 'string' but none from it, which a column needs.  Add a static method marked [SqlSourceConverter] that takes 'string' and returns 'App.Email'.
+```
+
+Add the converter that the message names, a static method marked `[SqlSourceConverter]` that takes the one type and returns the other, on the type itself or in a class of the project.  A method that takes a type and returns the same type serves both directions.  For an array whose elements are converted one by one, the message names the element of the column or parameter, and the converter to add is of the element's type.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
+
+See: [Converters](settings.md#converters)

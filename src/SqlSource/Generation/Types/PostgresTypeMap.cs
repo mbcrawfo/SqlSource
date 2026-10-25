@@ -27,6 +27,9 @@ internal static class PostgresTypeMap
 
     private static readonly Dictionary<string, Row> Rows = BuildRows();
 
+    // Every C# type a row gives, as it writes it, and those of the rules of bits and enums, for Gives.
+    private static readonly HashSet<string> Given = BuildGiven();
+
     /// <summary>The keys of the map: every type of <c>pg_catalog</c> it names, and the extensions' types.</summary>
     public static IEnumerable<string> Keys => Rows.Keys.Concat(BitKeys);
 
@@ -105,6 +108,16 @@ internal static class PostgresTypeMap
             ? TypeKeyText.WritePart(type.InternalName)
             : TypeKeyText.WritePart(type.Schema) + "." + TypeKeyText.WritePart(type.InternalName);
 
+    /// <summary>
+    /// Whether the map gives <paramref name="text" /> for some type, under any driver's column: a row's C# type
+    /// exactly, <c>bool</c> and <c>BitArray</c> for bits, <c>string</c> for an enum, or an array <c>X[]</c> of a type
+    /// <c>X</c> it gives.  A type it never gives, as <c>MyApp.Email</c> or <c>MyApp.Email[]</c>, is foreign, which a
+    /// converter is needed for.
+    /// </summary>
+    public static bool Gives(string text) =>
+        Given.Contains(text)
+        || (text.EndsWith("[]", StringComparison.Ordinal) && Gives(text.Substring(0, text.Length - 2)));
+
     /// <summary>A C# type as a user writes it in the type override, without <c>global::</c>.</summary>
     public static string AsWritten(string text) => text.Replace("global::", string.Empty);
 
@@ -130,6 +143,17 @@ internal static class PostgresTypeMap
                 Detail = element.Detail + "[]",
             }
             : element;
+    }
+
+    private static HashSet<string> BuildGiven()
+    {
+        var given = new HashSet<string>(StringComparer.Ordinal) { "bool", BitArray, StringKeyword };
+        foreach (var text in Rows.Values.SelectMany(static row => new[] { row.Npgsql8, row.Npgsql10 }).OfType<string>())
+        {
+            _ = given.Add(text);
+        }
+
+        return given;
     }
 
     private static Dictionary<string, Row> BuildRows()

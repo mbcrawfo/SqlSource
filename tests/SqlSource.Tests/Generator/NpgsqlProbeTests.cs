@@ -311,6 +311,7 @@ public sealed class NpgsqlProbeTests
         StepOutputs.Single<FileTypes>(run, TrackingNames.FileTypes).Queries.ShouldBeEmpty();
     }
 
+    // Without Npgsql the base map gives these types no C# type of their own, so a converter has none to convert from.
     [Theory]
     [MemberData(nameof(DifferingOverridden))]
     public void Run_TypeThatDiffersWithoutNpgsql_TakesTheOverridesType(
@@ -328,7 +329,15 @@ public sealed class NpgsqlProbeTests
             .Single<FileTypes>(run, TrackingNames.FileTypes)
             .Queries.ShouldHaveSingleItem()
             .Columns.ShouldBe([
-                new PropertyType(expected, isValueType, true, NoWarnings, key, "the property SqlSourceTypeOverrides"),
+                new PropertyType(
+                    expected,
+                    isValueType,
+                    true,
+                    NoWarnings,
+                    key,
+                    "the property SqlSourceTypeOverrides",
+                    new DatabaseType(null, false, false)
+                ),
             ]);
     }
 

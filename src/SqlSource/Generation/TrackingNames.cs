@@ -71,7 +71,15 @@ internal static class TrackingNames
 
     public const string MappedTypeNames = nameof(MappedTypeNames);
 
+    public const string ResolvedTypes = nameof(ResolvedTypes);
+
     public const string MappedTypes = nameof(MappedTypes);
+
+    public const string MappedTypeConverters = nameof(MappedTypeConverters);
+
+    public const string ProjectConverters = nameof(ProjectConverters);
+
+    public const string Converters = nameof(Converters);
 
     public const string FileTypesInput = nameof(FileTypesInput);
 

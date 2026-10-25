@@ -102,6 +102,16 @@ internal static class ModelRuns
     public static PostgresType Catalog(string internalName) =>
         TestSidecars.Postgres(name: internalName, internalName: internalName);
 
+    // The array of the element, in its schema, under the name the database gives it.
+    public static PostgresType ArrayOf(PostgresType element, string internalName) =>
+        TestSidecars.Postgres(
+            name: element.Name + "[]",
+            kind: SidecarValues.Kind.Array,
+            schema: element.Schema,
+            internalName: internalName,
+            element: element
+        );
+
     // The files of the models the generator added, by name.
     public static string[] ModelFiles(GeneratorRun run) =>
         [

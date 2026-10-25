@@ -7,13 +7,14 @@ using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using SqlSource.Generation.Converters;
 using SqlSource.Settings.ClrTypes;
 
 namespace SqlSource.Generation.Types;
 
 /// <summary>
 /// Resolves the C# types that the type override names against the compilation, and keeps of each what a model needs
-/// to know, never its symbol.
+/// to know, never its symbol, with the converters declared on those of a referenced assembly.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -38,17 +39,29 @@ namespace SqlSource.Generation.Types;
 /// The ids of the warnings that a use of each type of a name gives, and whether a pragma can turn them off, are
 /// <see cref="MappedTypeWarnings" />'s.
 /// </para>
+/// <para>
+/// The named type that a name found, an array's element type or a generic's constructed type, gives, when it is of a
+/// referenced assembly, each of its methods marked <c>[SqlSourceConverter]</c>, read by <see cref="ConverterReader" />
+/// with no location, its faults kept.  The attribute is matched by its name, since each assembly has its own internal
+/// copy.  A type of the project's own assembly gives none, since the attribute's step reads its methods, and a type
+/// that two names find gives its converters once.  A name that fails, or is a keyword, gives none.
+/// </para>
 /// </remarks>
 internal static class MappedTypeResolver
 {
     private const string SetsRequiredMembersAttributeFullName =
         "System.Diagnostics.CodeAnalysis.SetsRequiredMembersAttribute";
 
+    // The converter attribute's class without its namespace.
+    private const string ConverterAttributeName = "SqlSourceConverterAttribute";
+
     /// <summary>
-    /// One record for each of <paramref name="names" />, in the same order, and <see cref="EquatableArray{T}.Empty" />
-    /// at once for no names.  Never throws but for <paramref name="cancellationToken" />.
+    /// One record for each of <paramref name="names" />, in the same order, with the converters of their types of a
+    /// referenced assembly, in the order of <see cref="ConverterSet.Comparer" />, and
+    /// <see cref="ResolvedTypes.Empty" /> at once for no names.  Never throws but for
+    /// <paramref name="cancellationToken" />.
     /// </summary>
-    public static EquatableArray<MappedType> Resolve(
+    public static ResolvedTypes Resolve(
         Compilation compilation,
         EquatableArray<string> names,
         CancellationToken cancellationToken
@@ -56,12 +69,14 @@ internal static class MappedTypeResolver
     {
         if (names.Count == 0)
         {
-            return EquatableArray<MappedType>.Empty;
+            return ResolvedTypes.Empty;
         }
 
         var types = ImmutableArray.CreateBuilder<MappedType>(names.Count);
         var builder = new StringBuilder();
         var warningIds = new List<string>();
+        var read = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        ImmutableArray<Converter>.Builder? converters = null;
         foreach (var name in names)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -80,9 +95,21 @@ internal static class MappedTypeResolver
                         : EquatableArray<string>.Empty
                 )
             );
+
+            if (
+                found.Named is { } named
+                && !SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, compilation.Assembly)
+                && read.Add(named)
+            )
+            {
+                AddConverters(compilation, named, converters ??= ImmutableArray.CreateBuilder<Converter>());
+            }
         }
 
-        return new EquatableArray<MappedType>(types.MoveToImmutable());
+        return new ResolvedTypes(
+            new EquatableArray<MappedType>(types.MoveToImmutable()),
+            converters is null ? EquatableArray<Converter>.Empty : ConverterSet.Sort(converters.ToImmutable())
+        );
     }
 
     /// <summary>
@@ -94,6 +121,33 @@ internal static class MappedTypeResolver
         var at = SortedSearch.IndexOf(types, name, static type => type.Name, StringComparer.Ordinal);
         return at < 0 ? null : types[at];
     }
+
+    // Each method of the type marked [SqlSourceConverter], as a converter of a mapped type.
+    private static void AddConverters(
+        Compilation compilation,
+        INamedTypeSymbol type,
+        ImmutableArray<Converter>.Builder converters
+    )
+    {
+        foreach (var member in type.GetMembers())
+        {
+            if (member is IMethodSymbol method && IsMarkedAsAConverter(method))
+            {
+                converters.Add(ConverterReader.Read(method, compilation, ConverterOrigin.MappedType, location: null));
+            }
+        }
+    }
+
+    // The name alone first, so that the full name is made only for an attribute that can be the converter's.
+    private static bool IsMarkedAsAConverter(IMethodSymbol method) =>
+        method
+            .GetAttributes()
+            .Any(static attribute =>
+                attribute.AttributeClass is { Name: ConverterAttributeName } attributeClass
+                && attributeClass
+                    .ToDisplayString()
+                    .Equals(AttributeSource.ConverterAttributeMetadataName, StringComparison.Ordinal)
+            );
 
     // The resolution of the name, after the ids of the warnings a use of each of its types gives are added to
     // warningIds.
@@ -112,7 +166,8 @@ internal static class MappedTypeResolver
                 MappedTypeStatus.Found,
                 name.Ranks.Count == 0 && keyword is not ("string" or "object"),
                 true,
-                use == Use.Whole ? null : AsWritten(compilation, KeywordType(compilation, keyword), name, use)
+                use == Use.Whole ? null : AsWritten(compilation, KeywordType(compilation, keyword), name, use),
+                null
             );
         }
 
@@ -184,8 +239,13 @@ internal static class MappedTypeResolver
             return Resolution.Failed(status);
         }
 
-        var symbol = use == Use.Whole ? null : AsWritten(compilation, constructed, name, use);
-        return new Resolution(status, name.Ranks.Count == 0 && type.IsValueType, isPublic, symbol);
+        if (use == Use.Whole)
+        {
+            return new Resolution(status, name.Ranks.Count == 0 && type.IsValueType, isPublic, null, constructed);
+        }
+
+        var symbol = AsWritten(compilation, constructed, name, use);
+        return new Resolution(status, name.Ranks.Count == 0 && type.IsValueType, isPublic, symbol, null);
     }
 
     // The type of a keyword.
@@ -665,14 +725,16 @@ internal static class MappedTypeResolver
     }
 
     // Symbol is the type as a model writes it, for the name that has it as an argument, and null for the whole name or
-    // a failure.
+    // a failure.  Named is the named type the whole name found, without its ranks, whose converters the resolver reads,
+    // and null for an argument, a keyword or a failure.
     private readonly record struct Resolution(
         MappedTypeStatus Status,
         bool IsValueType,
         bool IsPublic,
-        ITypeSymbol? Symbol
+        ITypeSymbol? Symbol,
+        INamedTypeSymbol? Named
     )
     {
-        public static Resolution Failed(MappedTypeStatus status) => new(status, false, false, null);
+        public static Resolution Failed(MappedTypeStatus status) => new(status, false, false, null, null);
     }
 }

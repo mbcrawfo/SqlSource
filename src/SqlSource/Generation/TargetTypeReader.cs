@@ -16,7 +16,7 @@ namespace SqlSource.Generation;
 /// <summary>
 /// Reads a type marked with the generated attribute into a <see cref="TargetType" />.  It is one of the few steps that
 /// look at symbols and syntax, beside the check of the target framework, <c>NpgsqlProbe</c>, <c>SqlClientProbe</c>,
-/// <c>MappedTypeResolver</c> and <c>ModelNameChecker</c>; every step after them works on data.
+/// <c>MappedTypeResolver</c>, <c>ConverterReader</c> and <c>ModelNameChecker</c>; every step after them works on data.
 /// </summary>
 internal static class TargetTypeReader
 {
