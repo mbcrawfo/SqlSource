@@ -56,26 +56,35 @@ internal static class ConverterReader
     public const string LocalFunctionFault = "it is a local function";
 
     /// <summary>
-    /// Whether a node that carries the attribute is read: a method, or a local function, which is reported.  A lambda
-    /// is not.
+    /// Whether a node that carries the attribute is read: a method, or a local function or an operator, which is
+    /// reported.  A lambda is not.
     /// </summary>
-    public static bool IsCandidate(SyntaxNode node) => node is MethodDeclarationSyntax or LocalFunctionStatementSyntax;
+    public static bool IsCandidate(SyntaxNode node) =>
+        node
+            is MethodDeclarationSyntax
+                or LocalFunctionStatementSyntax
+                or OperatorDeclarationSyntax
+                or ConversionOperatorDeclarationSyntax;
 
     /// <summary>
-    /// Reads a method or local function of the project's source, the target of the attribute's step, located at its
-    /// name.
+    /// Reads a method, local function or operator of the project's source, the target of the attribute's step, located
+    /// at its name: an operator's token, or the type a conversion converts to.
     /// </summary>
     public static Converter Read(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var identifier = context.TargetNode is LocalFunctionStatementSyntax local
-            ? local.Identifier
-            : ((MethodDeclarationSyntax)context.TargetNode).Identifier;
+        var location = context.TargetNode switch
+        {
+            LocalFunctionStatementSyntax local => local.Identifier.GetLocation(),
+            OperatorDeclarationSyntax declaration => declaration.OperatorToken.GetLocation(),
+            ConversionOperatorDeclarationSyntax conversion => conversion.Type.GetLocation(),
+            _ => ((MethodDeclarationSyntax)context.TargetNode).Identifier.GetLocation(),
+        };
         return Read(
             (IMethodSymbol)context.TargetSymbol,
             context.SemanticModel.Compilation,
             ConverterOrigin.Project,
-            identifier.GetLocation()
+            location
         );
     }
 
@@ -135,6 +144,12 @@ internal static class ConverterReader
         if (method.MethodKind == MethodKind.LocalFunction)
         {
             return LocalFunctionFault;
+        }
+
+        // Generated code calls a converter by its name, which an operator does not have in C# (CS0571).
+        if (method.MethodKind is MethodKind.UserDefinedOperator or MethodKind.Conversion)
+        {
+            return "it is an operator";
         }
 
         if (!method.IsStatic)

@@ -128,6 +128,18 @@ public sealed class ConverterDiagnosticsTests
         "it is a local function"
     )]
     [InlineData(
+        "public readonly struct Wrapper",
+        "[SqlSourceConverter] public static implicit operator Wrapper(string value) => default;",
+        "App.Wrapper.implicit operator App.Wrapper(string)",
+        "it is an operator"
+    )]
+    [InlineData(
+        "public readonly struct Wrapper",
+        "[SqlSourceConverter] public static Wrapper operator -(Wrapper value) => value;",
+        "App.Wrapper.operator -(App.Wrapper)",
+        "it is an operator"
+    )]
+    [InlineData(
         "public interface IConversions",
         "[SqlSourceConverter] static abstract Email ToEmail(string value);",
         "App.IConversions.ToEmail(string)",

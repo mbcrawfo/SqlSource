@@ -227,8 +227,8 @@ public sealed class MappedTypeResolverTests
         """;
 
     // A library with the converter attribute, as the generator gives it to every project, on a type with converters,
-    // one without, one whose converter the project cannot call, one whose converter it cannot see, and one that is no
-    // mapped type.
+    // one without, one whose converter the project cannot call, one whose converter it cannot see, one whose converter
+    // is an operator, and one that is no mapped type.
     private const string LibrarySource = """
         namespace Lib
         {
@@ -257,6 +257,13 @@ public sealed class MappedTypeResolverTests
             {
                 [SqlSource.SqlSourceConverter]
                 internal static Hidden From(string v) => new();
+            }
+
+            // An operator, which generated code cannot call by name.
+            public readonly record struct Celsius(double Value)
+            {
+                [SqlSource.SqlSourceConverter]
+                public static implicit operator Celsius(double v) => new(v);
             }
 
             // A static class, which can be no property's type.
@@ -664,6 +671,22 @@ public sealed class MappedTypeResolverTests
         var converter = resolved.Converters.ShouldHaveSingleItem();
         converter.Method.ShouldBe("global::Lib.Locked.From");
         converter.Fault.ShouldBe("this project cannot call it");
+        converter.Origin.ShouldBe(ConverterOrigin.MappedType);
+        converter.Location.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Resolve_OperatorOfAReference_KeepsTheFault()
+    {
+        var resolved = MappedTypeResolver.Resolve(
+            ConvertingProject.Value,
+            Names("global::Lib.Celsius"),
+            TestContext.Current.CancellationToken
+        );
+
+        var converter = resolved.Converters.ShouldHaveSingleItem();
+        converter.DisplayName.ShouldBe("Lib.Celsius.implicit operator Lib.Celsius(double)");
+        converter.Fault.ShouldBe("it is an operator");
         converter.Origin.ShouldBe(ConverterOrigin.MappedType);
         converter.Location.ShouldBeNull();
     }

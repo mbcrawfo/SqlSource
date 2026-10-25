@@ -52,6 +52,9 @@ internal static class MappedTypeResolver
     private const string SetsRequiredMembersAttributeFullName =
         "System.Diagnostics.CodeAnalysis.SetsRequiredMembersAttribute";
 
+    // The converter attribute's class without its namespace.
+    private const string ConverterAttributeName = "SqlSourceConverterAttribute";
+
     /// <summary>
     /// One record for each of <paramref name="names" />, in the same order, with the converters of their types of a
     /// referenced assembly, in the order of <see cref="ConverterSet.Comparer" />, and
@@ -135,13 +138,15 @@ internal static class MappedTypeResolver
         }
     }
 
+    // The name alone first, so that the full name is made only for an attribute that can be the converter's.
     private static bool IsMarkedAsAConverter(IMethodSymbol method) =>
         method
             .GetAttributes()
             .Any(static attribute =>
-                attribute
-                    .AttributeClass?.ToDisplayString()
-                    .Equals(AttributeSource.ConverterAttributeMetadataName, StringComparison.Ordinal) == true
+                attribute.AttributeClass is { Name: ConverterAttributeName } attributeClass
+                && attributeClass
+                    .ToDisplayString()
+                    .Equals(AttributeSource.ConverterAttributeMetadataName, StringComparison.Ordinal)
             );
 
     // The resolution of the name, after the ids of the warnings a use of each of its types gives are added to

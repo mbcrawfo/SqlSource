@@ -2474,6 +2474,7 @@ See: [Query methods](generator.md#query-methods)
 A method marked `[SqlSourceConverter]` must be a converter: a `static` method of one argument, declared in a type, that returns the argument converted to another type, as `public static Email FromDatabase(string value)` does.  The method is not one, and the message names it and the first of these that is wrong with it:
 
 - `it is a local function`: the method is declared inside another method.  Only a method declared in a type is a converter, and the attribute on a lambda is ignored.
+- `it is an operator`: the method is an operator, as `operator +`, or a conversion, as `implicit operator Email(string value)`, which the generated code cannot call by name.  Mark a static method that does the conversion instead; the operator can call it.
 - `it is not static`: the method is an instance method.
 - `it is abstract or virtual`: the method is a `static abstract` or `static virtual` member of an interface, which a call through the interface cannot reach.
 - `it is generic`: the method has type parameters of its own.
@@ -2489,7 +2490,7 @@ A method marked `[SqlSourceConverter]` must be a converter: a `static` method of
 /work/App/Email.cs(5,18): error SQLSRC277: The method 'App.Email.FromDatabase(string)' is marked [SqlSourceConverter], but it is not static.  A converter is a static method of one argument that returns the converted value.
 ```
 
-Change the method so that it is a converter, or remove its `[SqlSourceConverter]` when it is not meant to be one.  The error is reported at the method's name.
+Change the method so that it is a converter, or remove its `[SqlSourceConverter]` when it is not meant to be one.  The error is reported at the method's name, at an operator's symbol, or at the type that a conversion converts to.
 
 > **Coming in a later release.**  The generated query methods will call your converters to read and send a type that the type override names.  See [what works today](README.md#what-works-today).
 

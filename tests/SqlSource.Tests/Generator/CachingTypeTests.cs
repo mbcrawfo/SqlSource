@@ -188,9 +188,8 @@ public sealed class CachingTypeTests
 
     // The property maps int4 to a type the project does not have, so Users, whose column is of int4, is SQLSRC250.
     // A new file declares the type: its resolution changes, its converters, none, do not, and Users is typed again
-    // without the error.  Every file
-    // with a usable entry carries the resolved types, so Orders, whose column is of text, is typed again too, and
-    // gives an equal value, which nothing after it reads again.
+    // without the error.  Every file with a usable entry carries the resolved types, so Orders, whose column is of
+    // text, is typed again too, and gives an equal value, which nothing after it reads again.
     [Fact]
     public void Run_CSharpEditAddsTheMappedType_TypesTheFileThatUsesItAnew()
     {
