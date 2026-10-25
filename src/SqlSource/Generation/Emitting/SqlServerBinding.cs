@@ -13,8 +13,9 @@ namespace SqlSource.Generation.Emitting;
 /// Writes the binding of a SQL Server parameter as its described type: the <c>SqlParameter</c> the command creates,
 /// with the <c>SqlDbType</c> of the type's base name and the size, precision or scale the type has, so that SqlClient
 /// infers nothing from the value.  A value longer than a bounded length is bound at <c>max</c> of its variable-length
-/// type, which SqlClient would otherwise cut, so the server sees it whole.  A parameter without a described SQL Server
-/// type, or of a type with no binding here, is bound by value.
+/// type, which SqlClient would otherwise cut, so the server sees it whole.  A decimal for a type of scale 0 is rounded
+/// to a whole number, which SqlClient would otherwise send at the value's own scale.  A parameter without a described
+/// SQL Server type, or of a type with no binding here, is bound by value.
 /// </summary>
 internal static class SqlServerBinding
 {
@@ -84,6 +85,11 @@ internal static class SqlServerBinding
         if (row.ValueText is { } valueText && facet > 0)
         {
             AppendOverLong(builder, indent, parameter, valueText, facet, row.Wider);
+        }
+
+        if (row.Facet == Facet.PrecisionAndScale && type.Scale == 0)
+        {
+            AppendRoundedToScale0(builder, indent, parameter);
         }
 
         _ = builder.Append(indent).Append(command).Append(".Parameters.Add(").Append(parameter).Append(");\n");
@@ -177,7 +183,8 @@ internal static class SqlServerBinding
                 AppendSet(builder, indent, parameter, "Size", -1);
                 break;
             case Facet.PrecisionAndScale:
-                // Both, since SqlClient takes the one not set from the value.
+                // Both, since SqlClient takes the one not set from the value; a Scale of 0 counts as not set, and the
+                // value is rounded to scale 0 after it is set.
                 AppendSet(builder, indent, parameter, "Precision", facet);
                 AppendSet(builder, indent, parameter, "Scale", scale);
                 break;
@@ -234,6 +241,28 @@ internal static class SqlServerBinding
         AppendSet(builder, inner, parameter, "Size", -1);
         _ = builder.Append(indent).Append("}\n");
     }
+
+    // SqlClient takes a Scale of 0 as not set and sends a decimal at its own scale: 12345.00 for a numeric(5,0) as a
+    // decimal(5,2), which it refuses as out of range, and 1.5 for a decimal(12,0) as a decimal(12,1), which a WHERE
+    // compares unrounded.  So the value is rounded half away from zero, as the server rounds it on an assignment, and
+    // its scale is 0.  The value sent is tested, so a converted parameter is rounded as converted.  The type pattern
+    // declares no variable, whose name could clash with a parameter of the method or a local of a converted value.
+    private static void AppendRoundedToScale0(StringBuilder builder, string indent, string parameter) =>
+        _ = builder
+            .Append(indent)
+            .Append("if (")
+            .Append(parameter)
+            .Append(".Value is decimal)\n")
+            .Append(indent)
+            .Append("{\n")
+            .Append(indent)
+            .Append(GeneratedText.Indent)
+            .Append(parameter)
+            .Append(".Value = decimal.Round((decimal)")
+            .Append(parameter)
+            .Append(".Value, global::System.MidpointRounding.AwayFromZero);\n")
+            .Append(indent)
+            .Append("}\n");
 
     private static Dictionary<string, Row> BuildRows()
     {
@@ -295,7 +324,7 @@ internal static class SqlServerBinding
         // Size, the length in characters, half the bytes, -1 for max.
         Characters,
 
-        // Precision and Scale, the type's.
+        // Precision and Scale, the type's, and for scale 0 the value rounded to a whole number.
         PrecisionAndScale,
 
         // Scale 7, whatever the type's.

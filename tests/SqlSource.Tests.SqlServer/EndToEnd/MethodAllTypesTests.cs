@@ -16,8 +16,9 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // with its facets.  The rows are row 1 and row 2 of the seed, as SqlServerAllTypesRows has them, written again as the
 // row InsertedId, and each write runs in a transaction that is rolled back.  The facets are proved at their edges: a
 // value longer than its column, by more than a trailing space or zero byte or by only that, more digits than a
-// datetime2(3) or a decimal(12,4) holds, in a write and in a WHERE, and a decimal outside its precision.  The
-// methods of NewTypes.sql need SQL Server 2025, and skip below it.
+// datetime2(3) or a decimal(12,4) holds, in a write and in a WHERE, a fraction of a decimal of scale 0, a decimal
+// outside its precision, and the null of a vector where the server takes no other NULL.  The methods of NewTypes.sql
+// need SQL Server 2025, and skip below it.
 [Collection(UsesSqlServer.Name)]
 public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
 {
@@ -33,6 +34,9 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
 
     // One longer than varbinary_value by a zero byte at its end.
     private static readonly byte[] EightBytesAndAZero = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+
+    // The probe of MeasureVectorDistance, along the first axis.
+    private static readonly float[] FirstAxis = [1f, 0f, 0f];
 
     [Fact]
     public async Task ListAllTypes_TheSeed_ReadsBothRows()
@@ -394,6 +398,50 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
         );
     }
 
+    // A decimal for a type of scale 0 is rounded to a whole number, half away from zero, before it is sent, as the
+    // server rounds it when it stores it.  SqlClient takes a Scale of 0 as not set and takes the value's, so unrounded
+    // 12345.00 would be a decimal(5,2) for the numeric(5,0), which it holds, and be refused as out of range.
+    [Theory]
+    [InlineData("12345.00", "12345")]
+    [InlineData("-12345.00", "-12345")]
+    [InlineData("1234.5", "1235")]
+    [InlineData("-1234.5", "-1235")]
+    public async Task WriteDecimalsOfScale0_ValueWithAFraction_IsStoredRounded(string given, string rounded)
+    {
+        var value = decimal.Parse(given, CultureInfo.InvariantCulture);
+        var expected = decimal.Parse(rounded, CultureInfo.InvariantCulture);
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var written = await connection.WriteDecimalsOfScale0(
+            new WriteDecimalsOfScale0Args(value, value),
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        written.ShouldBe(new WriteDecimalsOfScale0Dto(expected, expected));
+    }
+
+    // A WHERE compares the decimal(12,0) with the value rounded to scale 0, as the server would convert it: 1.5 finds
+    // the row that holds 2.  Unrounded, 1.5 would be a decimal(12,1), which the WHERE compares as it is, and finds
+    // nothing.
+    [Theory]
+    [InlineData("1.5", "2")]
+    [InlineData("-1.5", "-2")]
+    [InlineData("2.4", "2")]
+    [InlineData("-0.4", "0")]
+    public async Task FindDecimalOfScale0_ValueWithAFraction_FindsTheRowItRoundsTo(string given, string rounded)
+    {
+        var value = decimal.Parse(given, CultureInfo.InvariantCulture);
+        var expected = decimal.Parse(rounded, CultureInfo.InvariantCulture);
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var found = await connection.FindDecimalOfScale0(
+            new FindDecimalOfScale0Args(value),
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        found.ShouldBe([new FindDecimalOfScale0Dto(expected)]);
+    }
+
     // A decimal with more digits before the point than its decimal(12,4) holds is refused by SqlClient before it is
     // sent, where by value the server would report the overflow.
     [Fact]
@@ -478,7 +526,8 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
         );
     }
 
-    // A null vector is sent as the null of vector(3), which the column takes, where DBNull would be an nvarchar.
+    // The column takes a NULL of any type, the nvarchar that DBNull would be sent as too, so this proves the write
+    // and not the type of the null: MeasureVectorDistance_NullProbe_IsANullDistance proves that.
     [Fact]
     public async Task WriteNewTypes_BothColumnsNull_WritesTheNullRow()
     {
@@ -533,6 +582,38 @@ public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
         );
 
         thrown.Message.ShouldBe("Column 'v' is null.");
+    }
+
+    // A null probe is sent as the null of vector(3), so VECTOR_DISTANCE gives a NULL, where DBNull.Value, which
+    // SqlClient sends as an nvarchar(4000), would be refused by the server: it takes a NULL of no type but vector.
+    [Fact]
+    public async Task MeasureVectorDistance_NullProbe_IsANullDistance()
+    {
+        sqlServer.SkipBelow(17, "SQL Server before 2025 has no vector.");
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var measured = await connection.MeasureVectorDistance(
+            new MeasureVectorDistanceArgs(null, SqlServerAllTypesRows.FullRowId),
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        measured.ShouldBe(new MeasureVectorDistanceDto(null));
+    }
+
+    // The cosine distance from row 1's [1.5, -2.25, 0.5], of length 2.75, to [1, 0, 0] is 1 - 1.5 / 2.75, to the
+    // precision of a float, which the server computes in.
+    [Fact]
+    public async Task MeasureVectorDistance_Probe_IsTheDistance()
+    {
+        sqlServer.SkipBelow(17, "SQL Server before 2025 has no vector.");
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var measured = await connection.MeasureVectorDistance(
+            new MeasureVectorDistanceArgs(new SqlVector<float>(FirstAxis), SqlServerAllTypesRows.FullRowId),
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        measured.Distance.ShouldNotBeNull().ShouldBe(1 - (1.5 / 2.75), tolerance: 1e-6);
     }
 
     // Row 1 of the seed, read through the method in the write's transaction.

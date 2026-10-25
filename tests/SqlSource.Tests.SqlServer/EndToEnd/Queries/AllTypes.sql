@@ -118,6 +118,19 @@ FROM dbo.all_types
 WHERE decimal_value = @value
 ORDER BY id;
 
+-- name: WriteDecimalsOfScale0 -> one
+-- summary: Writes a value to a numeric(5,0) and one to a decimal(12,0), whose scale 0 the value is rounded to, and
+-- reads them back.
+DECLARE @written TABLE (numeric_value numeric(5,0) NULL, decimal_value decimal(12,0) NULL);
+INSERT INTO @written (numeric_value, decimal_value) VALUES (@numericValue, @decimalValue);
+SELECT numeric_value, decimal_value FROM @written;
+
+-- name: FindDecimalOfScale0
+-- summary: Finds 2, -2 or 0, held in a decimal(12,0), by a value with a fraction, which is rounded to scale 0.
+DECLARE @stored TABLE (value decimal(12,0) NOT NULL);
+INSERT INTO @stored (value) VALUES (2), (-2), (0);
+SELECT value FROM @stored WHERE value = @value;
+
 -- name: WriteDatetime2Of3 -> one
 -- summary: Writes a value to a datetime2(3), which the server rounds, and reads it back.
 DECLARE @written TABLE (value datetime2(3) NULL);

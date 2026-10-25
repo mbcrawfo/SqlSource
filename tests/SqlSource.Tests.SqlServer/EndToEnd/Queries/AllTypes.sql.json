@@ -2810,6 +2810,115 @@
         }
       ]
     },
+    "WriteDecimalsOfScale0": {
+      "hash": "9cc23604941b9fe082b93e2c77c83f661def7bf816f05d7f6a1ef14ffb5ade62",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "numericValue",
+          "ordinal": 0,
+          "type": {
+            "name": "numeric(5,0)",
+            "maxLength": 5,
+            "precision": 5,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        },
+        {
+          "name": "decimalValue",
+          "ordinal": 1,
+          "type": {
+            "name": "decimal(12,0)",
+            "maxLength": 9,
+            "precision": 12,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "numeric_value",
+          "type": {
+            "name": "numeric(5,0)",
+            "maxLength": 5,
+            "precision": 5,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "decimal_value",
+          "type": {
+            "name": "decimal(12,0)",
+            "maxLength": 9,
+            "precision": 12,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "FindDecimalOfScale0": {
+      "hash": "3a43e3bab2a1d400a67159d89fc6b68904913ff53d0b3b43e60443e105230f8a",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "value",
+          "ordinal": 0,
+          "type": {
+            "name": "decimal(12,0)",
+            "maxLength": 9,
+            "precision": 12,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "value",
+          "type": {
+            "name": "decimal(12,0)",
+            "maxLength": 9,
+            "precision": 12,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "WriteDatetime2Of3": {
       "hash": "8bed69a66396cdb2a5457e27bc46e5f1578260a2cfd6d135f23ea0cbcd25ab91",
       "engine": "mssql",

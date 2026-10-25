@@ -1,5 +1,6 @@
 using System;
 using System.Data;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using Shouldly;
@@ -119,6 +120,59 @@ public sealed class SqlServerBindingTests
 
         binding.ShouldContain("    p0.Precision = 12;\n    p0.Scale = 4;\n");
         binding.ShouldNotContain("Size");
+        binding.ShouldNotContain("Round");
+    }
+
+    // SqlClient takes a Scale of 0 as not set and takes the value's, so a decimal of scale 0 is rounded to a whole
+    // number, half away from zero, as the server rounds it, and the value sent has scale 0.
+    [Theory]
+    [InlineData("decimal(12,0)", 12)]
+    [InlineData("numeric(5,0)", 5)]
+    public void Append_DecimalOfScale0_RoundsTheValueToAWholeNumber(string name, int precision) =>
+        Write(Described(TestSidecars.SqlServer(name, 9, precision, 0)))
+            .ShouldBe(
+                $$"""
+                    var p0 = (global::Microsoft.Data.SqlClient.SqlParameter)command.CreateParameter();
+                    p0.ParameterName = "name";
+                    p0.SqlDbType = global::System.Data.SqlDbType.Decimal;
+                    p0.Precision = {{precision.ToString(CultureInfo.InvariantCulture)}};
+                    p0.Scale = 0;
+                    p0.Value = (object?)parameters.Name ?? global::System.DBNull.Value;
+                    if (p0.Value is decimal)
+                    {
+                        p0.Value = decimal.Round((decimal)p0.Value, global::System.MidpointRounding.AwayFromZero);
+                    }
+                    command.Parameters.Add(p0);
+
+                """
+            );
+
+    // The value sent is tested, so a converted parameter is rounded as converted.
+    [Fact]
+    public void Append_ConvertedDecimalOfScale0_RoundsTheConvertedValue()
+    {
+        var write = new Conversion("global::App.Cents.ToDatabase", "decimal", true, false, null, false);
+
+        Write(
+                new MethodParameter(
+                    "cents",
+                    "Cents",
+                    false,
+                    true,
+                    write,
+                    TestSidecars.SqlServer("decimal(12,0)", 9, 12, 0)
+                )
+            )
+            .ShouldContain(
+                "    p0.Value = parameters.Cents is { } value ? (object)global::App.Cents.ToDatabase(value) : "
+                    + "global::System.DBNull.Value;\n"
+                    + "    if (p0.Value is decimal)\n"
+                    + "    {\n"
+                    + "        p0.Value = decimal.Round((decimal)p0.Value, "
+                    + "global::System.MidpointRounding.AwayFromZero);\n"
+                    + "    }\n"
+                    + "    command.Parameters.Add(p0);\n"
+            );
     }
 
     // Scale 0 counts as not set in SqlClient, and one from 1 to 6 makes it truncate the value, so every scale is 7.
@@ -347,7 +401,7 @@ public sealed class SqlServerBindingTests
         string typeLine
     )
     {
-        var sizeText = size.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var sizeText = size.ToString(CultureInfo.InvariantCulture);
         binding.ShouldContain(
             "    p0.SqlDbType = global::System.Data.SqlDbType." + sqlDbType + ";\n    p0.Size = " + sizeText + ";\n"
         );

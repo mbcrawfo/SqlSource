@@ -250,6 +250,59 @@
           "computed": false
         }
       ]
+    },
+    "MeasureVectorDistance": {
+      "hash": "11bb1ecf0db1add29acd32689a76a94b62f12568709a2df9cde897cc34563be4",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "probe",
+          "ordinal": 0,
+          "type": {
+            "name": "vector(3)",
+            "maxLength": 20,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": true,
+          "typeSource": "declared"
+        },
+        {
+          "name": "id",
+          "ordinal": 1,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "distance",
+          "type": {
+            "name": "float",
+            "maxLength": 8,
+            "precision": 53,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": true
+        }
+      ]
     }
   }
 }
