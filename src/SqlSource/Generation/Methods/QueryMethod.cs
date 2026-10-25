@@ -1,6 +1,7 @@
 using SqlSource.Diagnostics;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Methods;
 
@@ -45,17 +46,24 @@ internal sealed record MethodInput(string TypeText, EquatableArray<MethodParamet
 /// </summary>
 /// <param name="Name">The parameter's name in the SQL, without the <c>@</c>.</param>
 /// <param name="Property">The property's name.</param>
+/// <param name="TypeText">The property's type without <c>?</c>, from <c>global::</c> or as a keyword.</param>
 /// <param name="IsValueType">Whether the property's type is a value type.</param>
 /// <param name="IsNullable">Whether the model calls the property nullable.</param>
 /// <param name="Write">
 /// The converter the property's value is converted through before it is bound, or null for a value bound as it is.
 /// </param>
+/// <param name="Described">
+/// The type the entry describes for the parameter, whose <see cref="SidecarType.BindName" /> the PostgreSQL binding
+/// sets, or null.
+/// </param>
 internal sealed record MethodParameter(
     string Name,
     string Property,
+    string TypeText,
     bool IsValueType,
     bool IsNullable,
-    Conversion? Write = null
+    Conversion? Write = null,
+    SidecarType? Described = null
 );
 
 /// <summary>

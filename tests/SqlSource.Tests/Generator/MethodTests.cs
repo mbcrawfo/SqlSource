@@ -24,7 +24,12 @@ public sealed class MethodTests
 
     private static readonly SidecarEntry[] UsersEntries =
     [
-        Entry(Users, "GetUser", [Parameter("id")], [Column("id"), Column("name", Text, nullable: true)]),
+        Entry(
+            Users,
+            "GetUser",
+            [Parameter("id", Int4 with { BindName = "integer" })],
+            [Column("id"), Column("name", Text, nullable: true)]
+        ),
     ];
 
     [Fact]
@@ -90,9 +95,10 @@ public sealed class MethodTests
                                     }
 
                                     {
-                                        var parameter = command.CreateParameter();
+                                        var parameter = new global::Npgsql.NpgsqlParameter<int>();
                                         parameter.ParameterName = "id";
-                                        parameter.Value = parameters.Id;
+                                        parameter.DataTypeName = "integer";
+                                        parameter.TypedValue = parameters.Id;
                                         command.Parameters.Add(parameter);
                                     }
 
@@ -551,6 +557,36 @@ public sealed class MethodTests
         run.ShouldBeClean();
         run.Sources[MethodRuns.MethodsFile].ShouldContain("reader.GetFieldValue<long>(0)");
         run.Sources["App.GetUserParams-Model.g.cs"].ShouldContain("(long Id)");
+    }
+
+    // A PostgreSQL parameter is a parameter of Npgsql of the type of the value bound, by the bindName the entry
+    // describes it by, as written: the database's type for a converted one.
+    [Theory]
+    [InlineData("base", "int", "integer")]
+    [InlineData("array", "int[]", "integer[]")]
+    [InlineData("enum", "string", "public.mood")]
+    [InlineData("domain", "string", "public.email")]
+    [InlineData("range", "global::NpgsqlTypes.NpgsqlRange<int>", "int4range")]
+    [InlineData("multirange", "global::NpgsqlTypes.NpgsqlRange<int>[]", "int4multirange")]
+    [InlineData("converted", "long", "bigint")]
+    public void Run_ParameterOfEachKind_BindsItsBindName(string kind, string bound, string bindName)
+    {
+        var type = Array.Find(MethodRuns.ParameterKinds, row => row.Kind == kind).Type;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            MethodRuns.KindsOverride + "-- name: CountUsers\nSELECT count(*) AS n FROM users WHERE x = @p;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "CountUsers", [Parameter("p", type, nullable: false)], [Column("n")])],
+            MethodRuns.KindsSource
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(" var parameter = new global::Npgsql.NpgsqlParameter<" + bound + ">();\n");
+        methods.ShouldContain(" parameter.DataTypeName = \"" + bindName + "\";\n");
     }
 
     [Fact]

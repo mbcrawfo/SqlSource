@@ -8,7 +8,9 @@ using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
@@ -25,6 +27,9 @@ public sealed class QueryMethodWriterTests
     private const string Continued = "\u21a9";
 
     // GetUser -> one-optional of the spec: one parameter, one token, a record of two columns.
+    // The type integer, as the entry of a parameter describes it.
+    private static readonly PostgresType Integer = TestSidecars.Postgres(bindName: "integer");
+
     private static readonly QueryMethod GetUser = new(
         "GetUser",
         "GetUser",
@@ -34,7 +39,10 @@ public sealed class QueryMethodWriterTests
         DatabaseEngine.PostgreSql,
         TestModels.Array(TestModels.Literal("SELECT id, name FROM users WHERE id = @id ORDER BY "), Token("orderBy")),
         true,
-        new MethodInput("global::App.GetUserParams", TestModels.Array(new MethodParameter("id", "Id", true, false))),
+        new MethodInput(
+            "global::App.GetUserParams",
+            TestModels.Array(new MethodParameter("id", "Id", "int", true, false, Described: Integer))
+        ),
         new MethodOutput(
             "global::App.GetUserDto",
             true,
@@ -119,9 +127,10 @@ public sealed class QueryMethodWriterTests
                                 }
 
                                 {
-                                    var parameter = command.CreateParameter();
+                                    var parameter = new global::Npgsql.NpgsqlParameter<int>();
                                     parameter.ParameterName = "id";
-                                    parameter.Value = parameters.Id;
+                                    parameter.DataTypeName = "integer";
+                                    parameter.TypedValue = parameters.Id;
                                     command.Parameters.Add(parameter);
                                 }
 
@@ -504,29 +513,38 @@ public sealed class QueryMethodWriterTests
         );
     }
 
+    // A null of a reference type is bound as the null of the parameter's type, as the property holds it.
     [Fact]
-    public void Append_NotNullReferenceParameter_SendsDbNullForNull() =>
+    public void Append_NotNullReferenceParameter_BindsItsValueAsItIs() =>
         Write(
                 GetUser with
                 {
                     Input = new MethodInput(
                         "global::App.GetUserParams",
                         TestModels.Array(
-                            new MethodParameter("id", "Id", true, false),
-                            new MethodParameter("name", "Name", false, false)
+                            new MethodParameter("id", "Id", "int", true, false, Described: Integer),
+                            new MethodParameter(
+                                "name",
+                                "Name",
+                                "string",
+                                false,
+                                false,
+                                Described: TestSidecars.Postgres(bindName: "text")
+                            )
                         )
                     ),
                 }
             )
             .ShouldContain(
-                "            parameter.Value = parameters.Id;\n"
+                "            parameter.TypedValue = parameters.Id;\n"
                     + "            command.Parameters.Add(parameter);\n"
                     + "        }\n"
                     + "\n"
                     + "        {\n"
-                    + "            var parameter = command.CreateParameter();\n"
+                    + "            var parameter = new global::Npgsql.NpgsqlParameter<string>();\n"
                     + "            parameter.ParameterName = \"name\";\n"
-                    + "            parameter.Value = (object?)parameters.Name ?? global::System.DBNull.Value;\n"
+                    + "            parameter.DataTypeName = \"text\";\n"
+                    + "            parameter.TypedValue = parameters.Name;\n"
                     + "            command.Parameters.Add(parameter);\n"
                     + "        }\n"
                     + "\n"
@@ -664,7 +682,7 @@ public sealed class QueryMethodWriterTests
 
     // Not required of this writer's tests, which compare text: the driver tests compile it.  Every shape, collection
     // type and placement, with names that could hide what the method writes, compiled together against the real
-    // System.Data and SqlClient's SqlVector.
+    // System.Data, Npgsql's parameter and SqlClient's SqlVector.
     [Fact]
     public void Append_EveryShapeAndCollectionType_Compiles()
     {
@@ -758,7 +776,7 @@ public sealed class QueryMethodWriterTests
 
         var compilation = GeneratorHarness.CreateCompilation(
             [new SourceFile("/app/Queries.cs", "#nullable enable\n" + builder)],
-            references: [SqlClientReferences.SqlClient7]
+            references: [NpgsqlReferences.Npgsql10, SqlClientReferences.SqlClient7]
         );
 
         compilation

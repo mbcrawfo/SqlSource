@@ -283,7 +283,7 @@ public sealed class GeneratedSourceMethodTests
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldContain(" ProbeOne(\n");
-        methods.ShouldContain("(object)global::App.UserId.ToDatabase(");
+        methods.ShouldContain(" ? global::App.UserId.ToDatabase(");
         methods.ShouldContain("global::App.UserId.FromDatabase(");
         methods.ShouldContain("global::System.Array.ConvertAll<int?, global::App.UserId>(");
         methods.ShouldContain("global::System.Array.ConvertAll<global::App.UserId, int>(");

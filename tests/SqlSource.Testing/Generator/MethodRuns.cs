@@ -137,6 +137,81 @@ internal static class MethodRuns
         );
     }
 
+    // The source of the runs of ParameterKinds: App.Sample, and App.UserId with its converters of long.
+    public const string KindsSource = """
+        using SqlSource;
+
+        namespace App
+        {
+            [SqlSourceGenerate]
+            public partial class Sample;
+
+            public readonly record struct UserId(long Value)
+            {
+                [SqlSourceConverter]
+                public static UserId FromDatabase(long value) => new(value);
+
+                [SqlSourceConverter]
+                public static long ToDatabase(UserId id) => id.Value;
+            }
+        }
+        """;
+
+    // The marker that converts the parameter "converted" of ParameterKinds, an int8, through App.UserId.
+    public const string KindsOverride = "-- type-override: int8=App.UserId\n";
+
+    // A parameter's type of each kind that PostgreSQL binds, by the name of its kind, with the bindName the tool writes
+    // for it: a base type, an array, an enum, a domain, a range, a multirange, and an int8 converted under
+    // KindsOverride.
+    public static readonly (string Kind, PostgresType Type)[] ParameterKinds =
+    [
+        ("base", ModelRuns.Int4 with { BindName = "integer" }),
+        ("array", ModelRuns.ArrayOf(ModelRuns.Int4, "_int4") with { BindName = "integer[]" }),
+        (
+            "enum",
+            TestSidecars.Postgres(
+                name: "mood",
+                kind: SidecarValues.Kind.Enum,
+                schema: "public",
+                internalName: "mood",
+                labels: ["happy", "sad"],
+                bindName: "public.mood"
+            )
+        ),
+        (
+            "domain",
+            TestSidecars.Postgres(
+                name: "email",
+                kind: SidecarValues.Kind.Domain,
+                schema: "public",
+                internalName: "email",
+                baseType: ModelRuns.Text,
+                bindName: "public.email"
+            )
+        ),
+        ("range", Int4Range with { BindName = "int4range" }),
+        (
+            "multirange",
+            TestSidecars.Postgres(
+                name: "int4multirange",
+                kind: SidecarValues.Kind.Multirange,
+                internalName: "int4multirange",
+                subtype: Int4Range,
+                bindName: "int4multirange"
+            )
+        ),
+        ("converted", ModelRuns.Catalog("int8") with { Name = "bigint", BindName = "bigint" }),
+    ];
+
+    // The type int4range, as a multirange nests it, without a bindName.
+    private static PostgresType Int4Range =>
+        TestSidecars.Postgres(
+            name: "int4range",
+            kind: SidecarValues.Kind.Range,
+            internalName: "int4range",
+            subtype: ModelRuns.Int4
+        );
+
     // The source of App.Sample with the attribute's arguments, such as MethodLocation = MethodLocation.Public.
     public static string SampleSource(string arguments) =>
         "using SqlSource;\n\nnamespace App\n{\n    [SqlSourceGenerate("
