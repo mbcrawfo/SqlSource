@@ -11,6 +11,7 @@ using SqlSource.Generation;
 using SqlSource.Settings;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
+using RoslynOutputKind = Microsoft.CodeAnalysis.OutputKind;
 
 namespace SqlSource.Tests.Generation;
 
@@ -99,7 +100,7 @@ public sealed partial class AttributeSourceTests
             ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
                 .Split(Path.PathSeparator)
                 .Select(path => MetadataReference.CreateFromFile(path)),
-            new CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary)
+            new CSharpCompilationOptions(RoslynOutputKind.DynamicallyLinkedLibrary)
         );
 
     [GeneratedRegex(@"internal (?:enum|sealed class) (?<name>\w+)")]
