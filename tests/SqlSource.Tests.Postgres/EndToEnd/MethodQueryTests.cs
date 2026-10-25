@@ -151,7 +151,7 @@ public sealed class MethodQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task ListAccountsWhere_DefaultFilter_ReadsTheAccount()
+    public async Task ListAccountsWhere_SampleFilter_ReadsTheAccount()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
