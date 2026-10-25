@@ -132,7 +132,7 @@ The queries are in `EndToEnd/Queries/`, each file claimed by a type under `EndTo
 | `Shapes.sql` | `ShapeQueries` | The shapes, a suffix and the model namespace by the attribute and by markers, `sort-input` and `sort-output`, a model of another namespace, and the settings of query methods, which are accepted and change nothing |
 | `Writes.sql` | `WriteQueries` | An `INSERT`, an `UPDATE` and a `MERGE`, each described by the rows of its `OUTPUT` |
 
-Every query writes its parameters in camelCase, `@accountId`, so that its input model binds through Dapper as the manual's recipe says.  No entry differs between SQL Server 2017 and 2025: a parameter that the two would type differently declares its type with `-- param:`, as `ListOpenedWithin` does.
+Every query writes its parameters in camelCase, `@accountId`, so that its input model binds through Dapper as the manual's recipe says.  No entry differs between the supported majors, which `CheckTests` runs on, 2017 and 2025 in CI and 2019 and 2022 every night: a parameter that two majors would type differently declares its type with `-- param:`, as `ListOpenedWithin` does.
 
 ### The tests
 
