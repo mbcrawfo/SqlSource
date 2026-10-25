@@ -4,6 +4,8 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Generation;
+using SqlSource.Generation.Emitting;
+using SqlSource.Generation.Methods;
 using SqlSource.Generation.Sidecars;
 using SqlSource.Generation.Types;
 using Xunit;
@@ -42,6 +44,17 @@ internal static class StepReasons
                 .Where(output => output.Reason == IncrementalStepRunReason.Removed)
                 .Select(output => HintNameOf(output.Value)),
         ];
+
+    // Why each type's methods ran at one of their steps, MethodsInput, TypeMethods or MethodOutput, by the name of the
+    // file of the type's methods, as App.UserQueries-Methods.g.cs.
+    public static Dictionary<string, IncrementalStepRunReason> MethodReasons(
+        GeneratorDriverRunResult result,
+        string step
+    ) => Outputs(result, step).ToDictionary(output => MethodsFileOf(output.Value), output => output.Reason);
+
+    // Why each type's file ran at TypeOutput, by the file's name, as App.UserQueries.g.cs.
+    public static Dictionary<string, IncrementalStepRunReason> TypeReasons(GeneratorDriverRunResult result) =>
+        Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName);
 
     // The types of the file of the path.
     public static FileTypes TypesOf(GeneratorDriverRunResult result, string path) =>
@@ -117,4 +130,13 @@ internal static class StepReasons
                 .SelectMany(run => run.Outputs)
                 .Select(output => output.Reason),
         ];
+
+    // A method output is its hint name and its source, as a model output is.
+    private static string MethodsFileOf(object value) =>
+        value switch
+        {
+            MethodsInput input => HintName.ForMethods(input.Type.HintName),
+            TypeMethods methods => methods.HintName,
+            _ => HintNameOf(value),
+        };
 }

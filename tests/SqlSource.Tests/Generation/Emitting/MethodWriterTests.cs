@@ -229,6 +229,15 @@ public sealed class MethodWriterTests
                 """
             );
 
+    // The token method is not asynchronous, so await is an identifier there as it is written.
+    [Fact]
+    public void Append_TokenNamedAwait_WritesItAsItIs() =>
+        Body(Token("await"), TestModels.Literal(";"))
+            .ShouldStartWith(
+                "public static string Q(string await)\n{\n    return string.Create(\n"
+                    + "        checked(1 + await.Length),\n        await,\n"
+            );
+
     [Fact]
     public void Append_OneTokenNamedState_ReadsTheStateByItsOtherName()
     {
@@ -309,6 +318,17 @@ public sealed class MethodWriterTests
     [InlineData("_")]
     [InlineData("from")]
     [InlineData("extension")]
+    [InlineData("sql")]
+    [InlineData("command")]
+    [InlineData("reader")]
+    [InlineData("rows")]
+    [InlineData("row")]
+    [InlineData("wasClosed")]
+    [InlineData("parameter")]
+    [InlineData("App")]
+    [InlineData("commandScope")]
+    [InlineData("readerScope")]
+    [InlineData("value0")]
     public void Run_TokenWithAnAwkwardName_CompilesOnTheNewestCSharp(string name)
     {
         var source = """
@@ -344,6 +364,52 @@ public sealed class MethodWriterTests
         );
 
         run.ShouldBeClean();
+    }
+
+    // The same names as the token of a query's method under CodeGen, at the newest C#, as
+    // Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles of GeneratedSourceMethodTests runs them at C# 12.
+    [Theory]
+    [InlineData("span")]
+    [InlineData("state")]
+    [InlineData("span1")]
+    [InlineData("Item1")]
+    [InlineData("Item2")]
+    [InlineData("Rest")]
+    [InlineData("System")]
+    [InlineData("String")]
+    [InlineData("ArgumentException")]
+    [InlineData("Sql")]
+    [InlineData("Sample")]
+    [InlineData("Probe")]
+    [InlineData("T")]
+    [InlineData("var")]
+    [InlineData("dynamic")]
+    [InlineData("await")]
+    [InlineData("nameof")]
+    [InlineData("global")]
+    [InlineData("value")]
+    [InlineData("scoped")]
+    [InlineData("field")]
+    [InlineData("_")]
+    [InlineData("from")]
+    [InlineData("extension")]
+    [InlineData("sql")]
+    [InlineData("command")]
+    [InlineData("reader")]
+    [InlineData("rows")]
+    [InlineData("row")]
+    [InlineData("wasClosed")]
+    [InlineData("parameter")]
+    [InlineData("App")]
+    [InlineData("commandScope")]
+    [InlineData("readerScope")]
+    [InlineData("value0")]
+    public void Run_TokenWithAnAwkwardNameInAQueryMethod_CompilesOnTheNewestCSharp(string name)
+    {
+        var run = MethodRuns.RunTokenNamed(name, LanguageVersion.Latest);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(" ProbeOne(\n");
     }
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);

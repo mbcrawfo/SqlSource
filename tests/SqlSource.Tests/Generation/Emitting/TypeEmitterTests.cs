@@ -285,6 +285,29 @@ public sealed class TypeEmitterTests
         source.ShouldNotContain("SELECT 2;");
     }
 
+    // A CodeGen query has no member in the type its member would go in, so its file is usable, and a query at sql of
+    // the file keeps its constant.
+    [Theory]
+    [InlineData(false, "Sql")]
+    [InlineData(true, "UserRepository")]
+    public void Emit_CodeGenQueryNamedLikeTheTypeItsMemberWouldGoIn_IsAllowed(bool direct, string name)
+    {
+        var output = Emit(
+            OutputKind.CodeGen,
+            TestModels.Type(placement: Placement(direct)),
+            File(
+                "A.sql",
+                TestModels.Query(name, "SELECT 1;"),
+                TestModels.Query("Other", "SELECT 2;", markers: new SettingsLevel { Output = OutputKind.Sql })
+            )
+        );
+
+        output.Diagnostics.ShouldBeEmpty();
+        var source = output.Source.ShouldNotBeNull();
+        source.ShouldContain("public const string Other = \"SELECT 2;\";");
+        source.ShouldNotContain("SELECT 1;");
+    }
+
     [Theory]
     [InlineData(false, "UserRepository")]
     [InlineData(true, "Sql")]
@@ -512,6 +535,132 @@ public sealed class TypeEmitterTests
                 {
                     private static class Sql
                     {
+                    }
+                }
+            }
+
+            """
+        );
+    }
+
+    // A CodeGen query's method takes the place of its constant, whether it gets one or not.
+    [Fact]
+    public void Emit_CodeGenQuery_WritesNoConstant()
+    {
+        var output = Emit(
+            OutputKind.CodeGen,
+            TestModels.Type(placement: MemberPlacement.Direct),
+            File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"))
+        );
+
+        output.Diagnostics.ShouldBeEmpty();
+        output.Source.ShouldBe(
+            $$"""
+            {{GeneratedFile.Header}}
+            namespace App
+            {
+                partial class UserRepository
+                {
+                }
+            }
+
+            """
+        );
+    }
+
+    [Fact]
+    public void Emit_CodeGenTokenQuery_WritesNoTokenMethod()
+    {
+        var output = Emit(
+            OutputKind.CodeGen,
+            TestModels.Type(placement: MemberPlacement.Direct),
+            File("Users.sql", TokenQuery("ListFrom"))
+        );
+
+        output.Diagnostics.ShouldBeEmpty();
+        output.Source.ShouldBe(
+            $$"""
+            {{GeneratedFile.Header}}
+            namespace App
+            {
+                partial class UserRepository
+                {
+                }
+            }
+
+            """
+        );
+    }
+
+    [Fact]
+    public void Emit_NestedTypeOfOnlyCodeGenQueries_WritesNoNestedClass()
+    {
+        var output = Emit(
+            OutputKind.CodeGen,
+            TestModels.Type(),
+            File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"), TokenQuery("ListFrom"))
+        );
+
+        output.Diagnostics.ShouldBeEmpty();
+        output.Source.ShouldBe(
+            $$"""
+            {{GeneratedFile.Header}}
+            namespace App
+            {
+                partial class UserRepository
+                {
+                }
+            }
+
+            """
+        );
+    }
+
+    // The project's output is CodeGen, and two queries' markers say Sql and Models.
+    [Fact]
+    public void Emit_MixedSqlModelsAndCodeGen_WritesTheSqlAndModelsConstantsAlone()
+    {
+        var output = Emit(
+            OutputKind.CodeGen,
+            TestModels.Type(),
+            File(
+                "Users.sql",
+                TestModels.Query("GetUser", "SELECT 1;"),
+                TestModels.Query("AsSql", "SELECT 2;", markers: new SettingsLevel { Output = OutputKind.Sql }),
+                TokenQuery("ListFrom"),
+                TestModels.Query("AsModels", "SELECT 3;", markers: new SettingsLevel { Output = OutputKind.Models })
+            )
+        );
+
+        output.Diagnostics.ShouldBeEmpty();
+        output.Source.ShouldBe(
+            $$"""
+            {{GeneratedFile.Header}}
+            namespace App
+            {
+                partial class UserRepository
+                {
+                    private static class Sql
+                    {
+                        /// <summary>
+                        /// The <c>AsSql</c> query from <c>Users.sql</c>.
+                        /// </summary>
+                        /// <remarks>
+                        /// <code>
+                        /// SELECT 2;
+                        /// </code>
+                        /// </remarks>
+                        public const string AsSql = "SELECT 2;";
+
+                        /// <summary>
+                        /// The <c>AsModels</c> query from <c>Users.sql</c>.
+                        /// </summary>
+                        /// <remarks>
+                        /// <code>
+                        /// SELECT 3;
+                        /// </code>
+                        /// </remarks>
+                        public const string AsModels = "SELECT 3;";
                     }
                 }
             }

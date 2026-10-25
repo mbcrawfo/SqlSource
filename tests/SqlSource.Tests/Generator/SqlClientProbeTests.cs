@@ -93,7 +93,7 @@ public sealed class SqlClientProbeTests
     {
         const string Expected =
             "SQLSRC267 (1,1)-(1,1): This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs "
-            + "Microsoft.Data.SqlClient 6.1 or later.  Update the package.";
+            + "Microsoft.Data.SqlClient 6.1 or later, so no query method is generated.  Update the package.";
 
         var oneFile = Run(OutputKind.Models, [SqlClientReferences.SqlClient60], UsersWithSidecar);
         var twoFiles = Run(OutputKind.Models, [SqlClientReferences.SqlClient60], BothWithSidecars);
@@ -172,11 +172,11 @@ public sealed class SqlClientProbeTests
     public void Run_BothDriversBelowTheirFloors_ReportsEachForItsEngine()
     {
         const string Npgsql =
-            "SQLSRC247 (1,1)-(1,1): This project references Npgsql 7.0.0, and SqlSource needs Npgsql 8.0 or later.  "
-            + "Update the package.";
+            "SQLSRC247 (1,1)-(1,1): This project references Npgsql 7.0.0, and SqlSource needs Npgsql 8.0 or later, so "
+            + "no query method is generated.  Update the package.";
         const string SqlClient =
             "SQLSRC267 (1,1)-(1,1): This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs "
-            + "Microsoft.Data.SqlClient 6.1 or later.  Update the package.";
+            + "Microsoft.Data.SqlClient 6.1 or later, so no query method is generated.  Update the package.";
         MetadataReference[] drivers =
         [
             NpgsqlReferences.Synthetic("7.0.0", slimBuilder: false, cube: false),
@@ -249,7 +249,8 @@ public sealed class SqlClientProbeTests
         DriverDiagnostics(old)
             .ShouldBe([
                 "SQLSRC267 (1,1)-(1,1): This project references Microsoft.Data.SqlClient of an unknown version, and "
-                    + "SqlSource needs Microsoft.Data.SqlClient 6.1 or later.  Update the package.",
+                    + "SqlSource needs Microsoft.Data.SqlClient 6.1 or later, so no query method is generated.  Update "
+                    + "the package.",
             ]);
         StepOutputs
             .Single<SqlClientProbe>(old, TrackingNames.SqlClientProbe)

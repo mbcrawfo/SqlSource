@@ -98,4 +98,26 @@ internal static class TrackingNames
     public const string FileModelSlots = nameof(FileModelSlots);
 
     public const string ModelOutput = nameof(ModelOutput);
+
+    public const string TypeMemberNames = nameof(TypeMemberNames);
+
+    public const string MethodDrivers = nameof(MethodDrivers);
+
+    public const string MethodsInput = nameof(MethodsInput);
+
+    public const string TypeMethods = nameof(TypeMethods);
+
+    public const string MethodSignatures = nameof(MethodSignatures);
+
+    public const string ExtensionClassNames = nameof(ExtensionClassNames);
+
+    public const string TakenExtensionClasses = nameof(TakenExtensionClasses);
+
+    public const string MethodConflicts = nameof(MethodConflicts);
+
+    public const string MethodOutput = nameof(MethodOutput);
+
+    public const string MethodDiagnostics = nameof(MethodDiagnostics);
+
+    public const string CodeGenEngines = nameof(CodeGenEngines);
 }

@@ -130,7 +130,7 @@ SELECT c.id, initcap(c.name) AS "display_name!"
 FROM customers c;
 ```
 
-`initcap` is never null for a value that is not, though SqlSource treats it as possibly null: `"display_name!"` gives the property `DisplayName` the type `string` and not `string?`.  Write the alias in quotes, since `!` and `?` are not part of a plain name, and the mark is left out of the property's name.  A `!` is your word, and nothing checks it.  The mark stays in the column's name, which Dapper matches to the property's by name, so with Dapper write a `-- column:` marker and no mark:
+`initcap` is never null for a value that is not, though SqlSource treats it as possibly null: `"display_name!"` gives the property `DisplayName` the type `string` and not `string?`.  Write the alias in quotes, since `!` and `?` are not part of a plain name, and the mark is left out of the property's name.  A `!` is your word, and the build does not check it: a [query method](generator.md#reading-rows) throws when such a column is null after all.  The mark stays in the column's name, which Dapper matches to the property's by name, so with Dapper write a `-- column:` marker and no mark:
 
 ```sql postgres
 -- name: GetCustomerLabels
@@ -272,7 +272,12 @@ A described PostgreSQL query gets the [models](generator.md#models) that every d
 
 ## Query methods
 
-> **Coming in a later release.**  The generator will write a method that runs each described PostgreSQL query through Npgsql and returns its rows.  See [what works today](README.md#what-works-today).
+Each described query whose output is `codegen` gets a method that runs it through Npgsql, on a `DbConnection` such as `NpgsqlConnection` or the one an `NpgsqlDataSource` gives: see [query methods](generator.md#query-methods).  The project references Npgsql 8.0 or later ([SQLSRC273](diagnostics.md#sqlsrc273), [SQLSRC247](diagnostics.md#sqlsrc247)).
+
+- **A column is read as its property's C# type**, the one [the types](#type-map) give it, so a type that Npgsql reads only once it is taught, an enum mapped to a C# enum or a plugin's type, needs the teaching on the data source, as `MapEnum<T>()`.  A column whose property cannot be null throws Npgsql's `InvalidCastException`, "Column 'name' is null.", when it holds a null.
+- **Each parameter is sent by its value**, so Npgsql chooses its type from the C# value, and a few types are sent as another or not at all: `json`, `jsonb`, an enum and the other types read as a `string`, the unsigned types, a `DateTimeOffset` with an offset, and a `DateTime` by its `Kind`.  The [generator's known issues](generator.md#known-issues) list them, with what to do.
+
+> **Coming in a later release.**  Each parameter will be sent as the PostgreSQL type it was described with, which ends the known issues of sending a parameter by its value.  See [what works today](README.md#what-works-today).
 
 <a id="known-issues"></a>
 

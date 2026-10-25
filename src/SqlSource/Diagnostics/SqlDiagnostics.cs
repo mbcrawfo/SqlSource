@@ -515,8 +515,8 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor NpgsqlTooOld = new(
         id: "SQLSRC247",
         title: "Npgsql is older than 8.0",
-        messageFormat: "This project references Npgsql {0}, and SqlSource needs Npgsql 8.0 or later.  Update the "
-            + "package.",
+        messageFormat: "This project references Npgsql {0}, and SqlSource needs Npgsql 8.0 or later, so no query "
+            + "method is generated.  Update the package.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -717,7 +717,7 @@ internal static class SqlDiagnostics
         id: "SQLSRC267",
         title: "Microsoft.Data.SqlClient is older than 6.1",
         messageFormat: "This project references Microsoft.Data.SqlClient {0}, and SqlSource needs "
-            + "Microsoft.Data.SqlClient 6.1 or later.  Update the package.",
+            + "Microsoft.Data.SqlClient 6.1 or later, so no query method is generated.  Update the package.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -766,6 +766,73 @@ internal static class SqlDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         helpLinkUri: HelpLinkBase + "sqlsrc270",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the query, {1} its shape as the name marker writes it: one, one-optional or many.
+    public static readonly DiagnosticDescriptor QueryShapeNeedsRows = new(
+        id: "SQLSRC272",
+        title: "Result shape needs rows",
+        messageFormat: "The query '{0}' has the shape '{1}', and its statement returns no rows.  Remove the shape, or "
+            + "write 'rowcount' or 'none'.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc272",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the database, PostgreSQL or SQL Server, and {1} its driver's package.  Reported with Location.None, once
+    // for the project and engine.
+    public static readonly DiagnosticDescriptor DriverNotReferenced = new(
+        id: "SQLSRC273",
+        title: "Driver is not referenced",
+        messageFormat: "A query for {0} has the output codegen, and this project does not reference {1}, which its "
+            + "method needs.  Reference {1}, or set the output to models.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc273",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the query, {1} the name its method would have, and {2} what takes the name, as "'Sample' has a member of
+    // that name".
+    public static readonly DiagnosticDescriptor MethodNameTaken = new(
+        id: "SQLSRC274",
+        title: "Method name is taken",
+        messageFormat: "The method of the query '{0}' cannot be named '{1}', because {2}.  Rename the query.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc274",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the token's name and {1} the query.
+    public static readonly DiagnosticDescriptor TokenNamedAsAnArgument = new(
+        id: "SQLSRC275",
+        title: "Token is named as an argument of the method",
+        messageFormat: "The token '{0}' of the query '{1}' has the name of an argument that every query method has: "
+            + "connection, parameters, transaction, commandTimeout or cancellationToken.  Rename the token.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc275",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the attributed type in full, {1} the extension class's full name, and {2} what stops the class, as "the
+    // project has a type of that name".  Reported at the type's attribute.
+    public static readonly DiagnosticDescriptor ExtensionClassNameTaken = new(
+        id: "SQLSRC276",
+        title: "Extension class name is taken",
+        messageFormat: "The query methods of '{0}' cannot go into the extension class '{1}', because {2}.  Rename the "
+            + "type or what has the name, or set the attribute's MethodLocation to put the methods on the type.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc276",
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
@@ -835,7 +902,12 @@ internal static class SqlDiagnostics
             SqlClientTooOld,
             SqlClientNewerThanKnown,
             TypeNeedsSqlClient,
-            TypeNeedsNewerSqlClient
+            TypeNeedsNewerSqlClient,
+            QueryShapeNeedsRows,
+            DriverNotReferenced,
+            MethodNameTaken,
+            TokenNamedAsAnArgument,
+            ExtensionClassNameTaken
         );
 
     /// <summary>

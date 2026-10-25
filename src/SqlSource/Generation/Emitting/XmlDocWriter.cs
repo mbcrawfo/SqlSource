@@ -52,6 +52,40 @@ internal static class XmlDocWriter
             .Append("}}</c>.</param>\n");
 
     /// <summary>
+    /// Appends the <c>param</c> of a parameter that the generator names, such as a query method's connection.
+    /// </summary>
+    /// <param name="builder">The source being built.</param>
+    /// <param name="indent">The whitespace that starts the line.</param>
+    /// <param name="name">The parameter's name.  An identifier, so it needs no escaping.</param>
+    /// <param name="descriptionXml">What the parameter is, as XML on one line.</param>
+    public static void AppendParam(StringBuilder builder, string indent, string name, string descriptionXml) =>
+        _ = builder
+            .Append(indent)
+            .Append(Prefix)
+            .Append(" <param name=\"")
+            .Append(name)
+            .Append("\">")
+            .Append(descriptionXml)
+            .Append("</param>\n");
+
+    /// <summary>
+    /// Appends an <c>exception</c>.
+    /// </summary>
+    /// <param name="builder">The source being built.</param>
+    /// <param name="indent">The whitespace that starts the line.</param>
+    /// <param name="cref">The exception's type, from <c>global::</c>.</param>
+    /// <param name="descriptionXml">When it is thrown, as XML on one line.</param>
+    public static void AppendException(StringBuilder builder, string indent, string cref, string descriptionXml) =>
+        _ = builder
+            .Append(indent)
+            .Append(Prefix)
+            .Append(" <exception cref=\"")
+            .Append(cref)
+            .Append("\">")
+            .Append(descriptionXml)
+            .Append("</exception>\n");
+
+    /// <summary>
     /// Appends XML as documentation comment lines, one for each of its lines, so that a line terminator in the text,
     /// which a quoted name of the database can hold, starts a new comment line instead of ending the comment.
     /// </summary>
@@ -66,7 +100,16 @@ internal static class XmlDocWriter
     /// <param name="builder">The source being built.</param>
     /// <param name="indent">The whitespace that starts the line.</param>
     public static void AppendReturns(StringBuilder builder, string indent) =>
-        AppendLine(builder, indent, "<returns>The SQL with each token replaced by its argument.</returns>");
+        AppendReturns(builder, indent, "The SQL with each token replaced by its argument.");
+
+    /// <summary>
+    /// Appends a <c>returns</c>.
+    /// </summary>
+    /// <param name="builder">The source being built.</param>
+    /// <param name="indent">The whitespace that starts the line.</param>
+    /// <param name="descriptionXml">What the member returns, as XML on one line.</param>
+    public static void AppendReturns(StringBuilder builder, string indent, string descriptionXml) =>
+        _ = builder.Append(indent).Append(Prefix).Append(" <returns>").Append(descriptionXml).Append("</returns>\n");
 
     /// <summary>
     /// Escapes plain text for use as XML content.  A character that XML 1.0 does not allow, such as a form feed or

@@ -24,25 +24,23 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | Marker | Purpose | File header | Inside a query | Documented in |
 |----|----|----|----|----|
 | `-- name:` | Starts a query and names it, with an optional result shape | no | starts one | [Queries and names](#queries-and-names) |
-| `-- summary:` | Documents the query's generated member and its models | no | yes | [Summaries](#summaries) |
+| `-- summary:` | Documents the query's generated member, method and models | no | yes | [Summaries](#summaries) |
 | `-- dialect:` | The dialect the file is read by, and its options.  The names and the reading rules are on [the dialects page](dialects.md) | yes | no | [Dialect](settings.md#setting-dialect) |
 | `-- generator:` | Generator parameters | yes | yes | [Generator parameters](settings.md#setting-generator-parameters) |
 | `-- param:` | Gives a query parameter its type and whether it can be null | no | yes | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | `-- token:` | Gives a token a default | no | yes | [Defaults](parameters-and-tokens.md#token-marker) |
 | `-- token-ignore:` | Keeps text that looks like a token as it is written | no | yes | [Text that looks like a token](parameters-and-tokens.md#token-ignore) |
 | `-- database:` | The logical database a query belongs to | yes | yes | [Database](settings.md#setting-database) |
-| `-- output:` | What is generated for a query: its SQL alone, or its models as well (`models` or `codegen`).  It also decides which queries must be described, by the tool and in the build's check of the sidecars | yes | yes | [Output](settings.md#setting-output) |
+| `-- output:` | What is generated for a query: its SQL alone (`sql`), its SQL and its models (`models`), or its models and a method that runs it (`codegen`).  It also decides which queries must be described, by the tool and in the build's check of the sidecars | yes | yes | [Output](settings.md#setting-output) |
 | `-- input-model-suffix:`, `-- output-model-suffix:` | What ends the name of a model | yes | no | [Suffix of a model's name](settings.md#setting-model-suffix) |
 | `-- model-namespace:` | The namespace of the models | yes | no | [Namespace of the models](settings.md#setting-model-namespace) |
 | `-- input-model-type:`, `-- output-model-type:` | The shape of a model | yes | yes | [Shape of a model](settings.md#setting-model-type) |
 | `-- input-model:`, `-- output-model:` | The name of one query's model | no | yes | [Name of one query's model](settings.md#setting-model-name) |
-| `-- collection-type:` | The type that holds many rows (no effect yet) | yes | yes | [Collection type](settings.md#setting-collection-type) |
+| `-- collection-type:` | The type that a query's method returns many rows in | yes | yes | [Collection type](settings.md#setting-collection-type) |
 | `-- type-override:` | Gives a database type the C# type of your choice, one entry for each line | yes | yes | [Type overrides](settings.md#setting-type-overrides) |
 | `-- column:` | Says whether one column of the query's result can be null, for its property in the output model, and leaves the column's name alone | no | yes | [Setting a column's nullability with a marker](generator.md#column-marker) |
 
-> **Coming in a later release.**  `-- collection-type:`, which has no effect yet, will say what a generated query method returns many rows in; today it is read and checked, and changes no generated code.  See [what works today](README.md#what-works-today).
-
-A marker that is a setting links to its section of [the settings page](settings.md), which also says where else the setting can be given, which place wins, and whether the setting has an effect today.  A marker where its column says "no" is an error: see [markers in the wrong place](#markers-in-the-wrong-place).
+A marker that is a setting links to its section of [the settings page](settings.md), which also says where else the setting can be given and which place wins.  A marker where its column says "no" is an error: see [markers in the wrong place](#markers-in-the-wrong-place).
 
 <a id="queries-and-names"></a>
 
@@ -61,7 +59,7 @@ A `-- name:` line begins a query.  The query runs to the next `-- name:` line or
 - The name is a C# identifier, and not a reserved keyword such as `class`.  Anything else is [SQLSRC103](diagnostics.md#sqlsrc103).  `get-user` is not a name.
 - Names are case-sensitive: `GetUser` and `getUser` are two queries.
 - A name is used once in a file ([SQLSRC104](diagnostics.md#sqlsrc104)), and once among all the files of one type ([SQLSRC008](diagnostics.md#sqlsrc008)).
-- A name is not the name of the type the members go in: the nested class, `Sql` unless [it is named otherwise](settings.md#setting-nested-class), or the type itself when the members go on it ([SQLSRC009](diagnostics.md#sqlsrc009)).  See [the generator](generator.md).
+- The name of a query whose output is `sql` or `models` is not the name of the type the members go in: the nested class, `Sql` unless [it is named otherwise](settings.md#setting-nested-class), or the type itself when the members go on it ([SQLSRC009](diagnostics.md#sqlsrc009)).  A query whose output is `codegen` has a method in place of the member, whose name is checked where [the methods go](generator.md#method-location).  See [the generator](generator.md).
 - The query has SQL in it.  A query that holds only comments and markers is [SQLSRC113](diagnostics.md#sqlsrc113).
 
 The marker may be followed by `->` and a result shape: see [result shapes](#result-shapes).  The name ends at the `->`.
@@ -73,19 +71,22 @@ The marker may be followed by `->` and a result shape: see [result shapes](#resu
 ```sql
 -- name: GetUser -> one-optional
 SELECT id, name FROM users WHERE id = @id;
+
+-- name: RenameUser -> none
+UPDATE users SET name = @name WHERE id = @id;
 ```
 
-> **Coming in a later release.**  A result shape will say what the method generated for a query returns.  See [what works today](README.md#what-works-today).
+A name can be followed by `->` and one of five shapes, which say what the [method](generator.md#query-methods) of a query whose output is `codegen` returns:
 
-A name can be followed by `->` and one of five shapes.  They are checked today and have no effect:
-
-| Shape | The method will return |
+| Shape | The method returns |
 |----|----|
-| `many` | Every row |
-| `one` | One row |
-| `one-optional` | One row, or nothing |
+| `many` | Every row, in the [collection type](settings.md#setting-collection-type), an array by default |
+| `one` | The one row, and throws when there are none or more than one |
+| `one-optional` | The one row, or null when there is none, and throws when there are more than one |
 | `none` | Nothing |
 | `rowcount` | The number of rows the statement affected |
+
+Without a shape, a query that returns rows is `many`, and one that returns none is `rowcount`.  `one`, `one-optional` and `many` on a query whose statement returns no rows are [SQLSRC272](diagnostics.md#sqlsrc272); `none` and `rowcount` go on any query.  [What each shape returns](generator.md#method-shapes) has the details.  A shape changes nothing under the output `sql` or `models`, and adding or changing one does not make the query's sidecar out of date.
 
 The case of a shape is ignored.  A word after `->` that is not one of the five, or no word at all, is [SQLSRC111](diagnostics.md#sqlsrc111).  Text after a name with no `->`, as in `-- name: Get User`, is read as part of the name and is [SQLSRC103](diagnostics.md#sqlsrc103).  A file with no `-- name:` line has no place to write a shape.
 

@@ -19,7 +19,7 @@ flowchart LR
     end
     sql --> generator["Generator"]
     attribute --> generator
-    generator --> code["Constants, token methods and models"]
+    generator --> code["Constants, token methods, models and query methods"]
     project -->|"dotnet msbuild runs SqlSourceWriteManifest"| manifest["Manifest"]
     manifest --> tool["sqlsource describe"]
     sql -->|"listed in the manifest"| tool
@@ -29,11 +29,11 @@ flowchart LR
     sidecar -->|"checked and read"| generator
 ```
 
-In a build, the compiler gives the generator the project's `.sql` files and their sidecars as additional files, its settings as MSBuild properties and item metadata, and the types that carry `[SqlSourceGenerate]`, an attribute the generator itself adds to the compilation.  The generator parses each file that a type claims and writes the type's file: a constant for each query, or a method for a query that has tokens.  It also reads the sidecar of each claimed file, and reports a query that needs an entry and has no current one, as [sidecars](generator.md#sidecars) describes.  From each entry that passed the checks it gives the query's parameters and columns their C# types, and writes the query's models, once for each full name across the project, as [models](generator.md#models) describes.
+In a build, the compiler gives the generator the project's `.sql` files and their sidecars as additional files, its settings as MSBuild properties and item metadata, and the types that carry `[SqlSourceGenerate]`, an attribute the generator itself adds to the compilation.  The generator parses each file that a type claims and writes the type's file: a constant for each query whose output is `Sql` or `Models`, or a method for such a query that has tokens.  It also reads the sidecar of each claimed file, and reports a query that needs an entry and has no current one, as [sidecars](generator.md#sidecars) describes.  From each entry that passed the checks it gives the query's parameters and columns their C# types, and writes the query's models, once for each full name across the project, as [models](generator.md#models) describes.  For each query whose output is `CodeGen` and that has what it needs, it writes a method that runs the query, in place of its constant, in a file of the type's methods, as [query methods](generator.md#query-methods) describes.
 
 Outside a build, `sqlsource describe` finds the run unit and evaluates its projects with `dotnet msbuild`, which runs `SqlSourceWriteManifest`.  It finds `[SqlSourceGenerate]` in a manifest's `Compile` files by syntax, with `AttributeReader`, and reads the manifest's `.sql` files that a type claims.  From those it plans the run with the generator's own code, asks each query's database through a describer, and writes a sidecar beside each `.sql` file.
 
-The models are the one part of the generated code that a sidecar decides: a type's own file, its constants and token methods, is the same with a sidecar or without one.
+The models and the query methods are the parts of the generated code that a sidecar decides: a type's own file, its constants and token methods, is the same with a sidecar or without one.
 
 ## Shared code
 

@@ -39,10 +39,9 @@ internal static class MethodWriter
         bool validate
     )
     {
-        var parameters = GetParameters(segments);
+        var parameters = GetTokens(segments);
         var bodyIndent = indent + GeneratedText.Indent;
         var argumentIndent = bodyIndent + GeneratedText.Indent;
-        var stepIndent = argumentIndent + GeneratedText.Indent;
         var span = GetUnusedName(SpanName, parameters);
         var state = GetUnusedName(StateName, parameters);
 
@@ -70,17 +69,49 @@ internal static class MethodWriter
             }
         }
 
-        _ = builder.Append(bodyIndent).Append("return string.Create(\n").Append(argumentIndent);
-        AppendLength(builder, segments, parameters);
+        _ = builder.Append(bodyIndent).Append("return ");
+        AppendCreate(builder, argumentIndent, bodyIndent, segments, parameters, parameters, span, state);
+        _ = builder.Append(";\n").Append(indent).Append("}\n");
+    }
+
+    /// <summary>
+    /// Appends the <c>string.Create(...)</c> expression that builds the SQL from the token arguments, without the
+    /// statement around it.  The token method returns it, and a query's method keeps it in a local.
+    /// </summary>
+    /// <param name="builder">The source being built.</param>
+    /// <param name="argumentIndent">The whitespace that starts each argument of <c>string.Create</c>.</param>
+    /// <param name="bodyIndent">The whitespace that starts the line of the closing parenthesis.</param>
+    /// <param name="segments">The query's SQL.  It holds at least one token.</param>
+    /// <param name="tokens">The token names, as <see cref="GetTokens" /> gives them.</param>
+    /// <param name="arguments">
+    /// How each token's argument is written, in the order of <paramref name="tokens" />: its name, or <c>@await</c>
+    /// in an asynchronous method, where <c>await</c> cannot be an identifier.
+    /// </param>
+    /// <param name="span">The name of the lambda's span, which no token has.</param>
+    /// <param name="state">The name of the lambda's state, which no token has.</param>
+    internal static void AppendCreate(
+        StringBuilder builder,
+        string argumentIndent,
+        string bodyIndent,
+        EquatableArray<SqlSegment> segments,
+        List<string> tokens,
+        List<string> arguments,
+        string span,
+        string state
+    )
+    {
+        var stepIndent = argumentIndent + GeneratedText.Indent;
+        _ = builder.Append("string.Create(\n").Append(argumentIndent);
+        AppendLength(builder, segments, tokens, arguments);
         _ = builder.Append(",\n").Append(argumentIndent);
-        if (parameters.Count == 1)
+        if (arguments.Count == 1)
         {
-            _ = builder.Append(parameters[0]);
+            _ = builder.Append(arguments[0]);
         }
         else
         {
             _ = builder.Append('(');
-            AppendList(builder, parameters, string.Empty);
+            AppendList(builder, arguments, string.Empty);
             _ = builder.Append(')');
         }
 
@@ -94,13 +125,15 @@ internal static class MethodWriter
             .Append(") =>\n")
             .Append(argumentIndent)
             .Append("{\n");
-        AppendSteps(builder, stepIndent, segments, parameters, span, state);
-        _ = builder.Append(argumentIndent).Append("}\n").Append(bodyIndent).Append(");\n").Append(indent).Append("}\n");
+        AppendSteps(builder, stepIndent, segments, tokens, span, state);
+        _ = builder.Append(argumentIndent).Append("}\n").Append(bodyIndent).Append(')');
     }
 
-    // One parameter for each distinct token name, in the order of first appearance.  A query has a handful of tokens,
-    // so a list that is searched is cheaper than a set.
-    private static List<string> GetParameters(EquatableArray<SqlSegment> segments)
+    /// <summary>
+    /// The distinct token names, in the order of their first appearance, which is the order of the arguments.  A query
+    /// has a handful of tokens, so a list that is searched is cheaper than a set.
+    /// </summary>
+    internal static List<string> GetTokens(EquatableArray<SqlSegment> segments)
     {
         var parameters = new List<string>();
         foreach (var segment in segments)
@@ -114,9 +147,17 @@ internal static class MethodWriter
         return parameters;
     }
 
-    // The SQL as the documentation shows it, with each token in its plain form.
-    private static string GetSql(EquatableArray<SqlSegment> segments)
+    /// <summary>
+    /// The SQL as the documentation shows it, with each token in its plain form.
+    /// </summary>
+    internal static string GetSql(EquatableArray<SqlSegment> segments)
     {
+        // Without a token the SQL is one literal segment, which needs no copy.
+        if (segments.Count == 1 && segments[0].Kind == SqlSegmentKind.Literal)
+        {
+            return segments[0].Text;
+        }
+
         var sql = new StringBuilder();
         foreach (var segment in segments)
         {
@@ -157,7 +198,8 @@ internal static class MethodWriter
     private static void AppendLength(
         StringBuilder builder,
         EquatableArray<SqlSegment> segments,
-        List<string> parameters
+        List<string> parameters,
+        List<string> arguments
     )
     {
         var literalLength = 0;
@@ -190,7 +232,7 @@ internal static class MethodWriter
         {
             _ = builder
                 .Append(literalLength > 0 || index > 0 ? " + " : string.Empty)
-                .Append(parameters[index])
+                .Append(arguments[index])
                 .Append(".Length");
             if (uses[index] > 1)
             {

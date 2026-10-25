@@ -175,7 +175,8 @@ public sealed class SqlDiagnosticsTests
     public void NpgsqlTooOld_Message_HoldsTheVersionAndTheFloor() =>
         Format(SqlDiagnostics.NpgsqlTooOld, "7.0.4")
             .ShouldBe(
-                "This project references Npgsql 7.0.4, and SqlSource needs Npgsql 8.0 or later.  Update the package."
+                "This project references Npgsql 7.0.4, and SqlSource needs Npgsql 8.0 or later, so no query method is "
+                    + "generated.  Update the package."
             );
 
     [Fact]
@@ -191,7 +192,7 @@ public sealed class SqlDiagnosticsTests
         Format(SqlDiagnostics.SqlClientTooOld, "6.0.5")
             .ShouldBe(
                 "This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs Microsoft.Data.SqlClient "
-                    + "6.1 or later.  Update the package."
+                    + "6.1 or later, so no query method is generated.  Update the package."
             );
 
     [Fact]

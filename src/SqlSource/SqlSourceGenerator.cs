@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Emitting;
+using SqlSource.Generation.Methods;
 using SqlSource.Generation.Models;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Generation.Paths;
@@ -68,6 +69,17 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         ReportProblems(context, sidecars.Checks, typing.FileTypes, models.FileModels, models.Models);
         RegisterModelSources(context, models.Models, parsedFiles.EachFile, claims.RepeatedPaths);
         RegisterTypeSources(context, typeQueries, settings.ProjectLevel);
+        RegisterMethodSources(
+            context,
+            typeQueries,
+            settings.ProjectLevel,
+            models.AllFileModels,
+            models.Models,
+            models.ModelNames,
+            claims.TypeMemberNames,
+            typing.NpgsqlProbe,
+            typing.SqlClientProbe
+        );
     }
 
     // The attribute's file, which every compilation gets before the pipeline runs.
@@ -167,6 +179,20 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (paths, _) => SqlPath.ToSortedSet(paths))
             .WithTrackingName(TrackingNames.CommentPaths);
 
+        // The names that each type whose methods go on itself already has, which its methods cannot take.  Almost
+        // always none, since the methods go into an extension class unless the attribute says otherwise.
+        var typeMemberNames = declaredTypes
+            .Where(static declared => declared.Type.MethodPlacement != MethodPlacement.ExtensionClass)
+            .Select(static (declared, _) => new TypeMemberNames(HintName.NameOf(declared.Type), declared.TakenNames))
+            .Collect()
+            .Select(
+                static (names, _) =>
+                    new EquatableArray<TypeMemberNames>(
+                        names.OrderBy(static names => names.TypeKey, StringComparer.Ordinal).ToImmutableArray()
+                    )
+            )
+            .WithTrackingName(TrackingNames.TypeMemberNames);
+
         // Reported for a file that a type claims only, as every other problem of a file is.
         context.RegisterSourceOutput(
             caseCollisions.Combine(claimedPaths),
@@ -183,7 +209,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         );
 
-        return new ClaimedFiles(sqlFiles, typeFiles, claimedPaths, commentPaths, repeatedPaths);
+        return new ClaimedFiles(sqlFiles, typeFiles, claimedPaths, commentPaths, repeatedPaths, typeMemberNames);
     }
 
     // What the project's properties and each file's metadata say.
@@ -536,7 +562,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => ModelCollector.Resolve(input.Left, input.Right))
             .WithTrackingName(TrackingNames.Models);
 
-        return new CollectedModels(fileModels, models);
+        return new CollectedModels(fileModels, allFileModels, modelNames, models);
     }
 
     // Whether the Npgsql and the Microsoft.Data.SqlClient the project references are too old or newer than known, each
@@ -675,6 +701,119 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
+    // The file of each type's methods, and their diagnostics, with the clashes across types and SQLSRC273 for each
+    // engine whose methods have no driver.
+    private static void RegisterMethodSources(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<TypeQueries> typeQueries,
+        IncrementalValueProvider<SettingsLevel> projectLevel,
+        IncrementalValueProvider<EquatableArray<FileModels>> allFileModels,
+        IncrementalValueProvider<ModelSet> models,
+        IncrementalValueProvider<EquatableArray<string>> modelNames,
+        IncrementalValueProvider<EquatableArray<TypeMemberNames>> typeMemberNames,
+        IncrementalValueProvider<NpgsqlProbe> npgsqlProbe,
+        IncrementalValueProvider<SqlClientProbe> sqlClientProbe
+    )
+    {
+        // Whether each engine's driver allows its methods, which is the same value until a reference changes.
+        var drivers = npgsqlProbe
+            .Combine(sqlClientProbe)
+            .Select(static (input, _) => MethodDrivers.Of(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.MethodDrivers);
+
+        var assignments = models.Select(static (set, _) => set.Assignments);
+
+        // Each type's own slice of what its methods need, which is equal until something of the type changes: its
+        // queries, its files' models, the models its queries got, its names or the drivers.
+        var typeMethods = typeQueries
+            .Combine(projectLevel)
+            .Combine(allFileModels.Combine(assignments))
+            .Combine(typeMemberNames.Combine(drivers))
+            .Select(
+                static (input, _) =>
+                    MethodsInput.Gather(
+                        input.Left.Left.Left,
+                        input.Left.Left.Right,
+                        input.Left.Right.Left,
+                        input.Left.Right.Right,
+                        input.Right.Left,
+                        input.Right.Right
+                    )
+            )
+            .WithTrackingName(TrackingNames.MethodsInput)
+            .Select(static (input, _) => MethodPlanner.Plan(input))
+            .WithTrackingName(TrackingNames.TypeMethods);
+
+        // Every type's methods as a call sees them, with the place of each query's name: an edit to a query's SQL that
+        // moves no query's name leaves them equal, and one that moves a later query's name runs the steps after them
+        // again, whose values stay equal when nothing clashes.
+        var signatures = typeMethods
+            .Select(static (methods, _) => MethodSignature.Of(methods))
+            .Collect()
+            .Select(static (each, _) => ToSortedSignatures(each))
+            .WithTrackingName(TrackingNames.MethodSignatures);
+
+        // The extension classes' full names, which almost never change.
+        var extensionClassNames = signatures
+            .Select(static (each, _) => ExtensionClassNamesOf(each))
+            .WithTrackingName(TrackingNames.ExtensionClassNames);
+
+        // Those names that the project has already, as a type or a namespace.  Like the lookup of the models' names, it
+        // runs on every run, since the driver gives a new compilation each time, and its value is equal until a type or
+        // a namespace of a name appears or goes.
+        var takenExtensionClasses = context
+            .CompilationProvider.Combine(extensionClassNames)
+            .Select(
+                static (input, cancellationToken) =>
+                    ModelNameChecker.FindTaken(input.Left, input.Right, cancellationToken)
+            )
+            .WithTrackingName(TrackingNames.TakenExtensionClasses);
+
+        // A step of its own, since it sees every type's methods at once: where the methods of two types are compared,
+        // and each extension class's name with the project's and the models'.
+        var conflicts = signatures
+            .Combine(takenExtensionClasses)
+            .Combine(modelNames)
+            .Select(static (input, _) => MethodConflicts.Find(input.Left.Left, input.Left.Right, input.Right))
+            .WithTrackingName(TrackingNames.MethodConflicts);
+
+        // Each type's file, from its own slice of the conflicts, so that a clash re-emits only the types it touches.
+        var methodOutputs = typeMethods
+            .Combine(conflicts)
+            .Select(
+                static (input, _) =>
+                    (
+                        Methods: input.Left,
+                        Dropped: input.Right.DroppedOf(input.Left.TypeKey),
+                        Blocked: input.Right.IsBlocked(input.Left.TypeKey)
+                    )
+            )
+            .Select(static (input, _) => MethodEmitter.Emit(input.Methods, input.Dropped, input.Blocked))
+            .WithTrackingName(TrackingNames.MethodOutput);
+
+        // The problems of every type's methods together, each once: a file that two types claim gives both the same
+        // problems of its queries.
+        var methodDiagnostics = typeMethods
+            .Select(static (methods, _) => methods.Diagnostics)
+            .Collect()
+            .Select(static (diagnostics, _) => MethodPlanner.Distinct(diagnostics))
+            .WithTrackingName(TrackingNames.MethodDiagnostics);
+
+        context.RegisterSourceOutput(methodDiagnostics, ReportAll);
+        context.RegisterSourceOutput(conflicts, ReportConflicts);
+        context.RegisterSourceOutput(methodOutputs, AddMethods);
+
+        // The engines of the project's CodeGen queries, which almost never change.
+        var codeGenEngines = typeMethods
+            .Select(static (methods, _) => methods.CodeGenEngines)
+            .Collect()
+            .Select(static (engines, _) => engines.Aggregate(CodeGenEngines.None, static (all, engine) => all | engine))
+            .WithTrackingName(TrackingNames.CodeGenEngines);
+
+        // Not located, and once for the project and engine, however many of its queries need the driver.
+        context.RegisterSourceOutput(codeGenEngines.Combine(npgsqlProbe.Combine(sqlClientProbe)), ReportMissingDrivers);
+    }
+
     private static void ReportChecks(SourceProductionContext output, SidecarCheckResult check) =>
         ReportAll(output, check.Diagnostics);
 
@@ -686,6 +825,43 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
     private static void AddModel(SourceProductionContext output, (string HintName, string Source) model) =>
         output.AddSource(model.HintName, SourceText.From(model.Source, Encoding.UTF8));
+
+    private static void ReportConflicts(SourceProductionContext output, MethodConflicts conflicts) =>
+        ReportAll(output, conflicts.Diagnostics);
+
+    private static void AddMethods(SourceProductionContext output, (string HintName, string? Source) methods)
+    {
+        if (methods.Source is not null)
+        {
+            output.AddSource(methods.HintName, SourceText.From(methods.Source, Encoding.UTF8));
+        }
+    }
+
+    // SQLSRC273 for each engine that a CodeGen query has and whose driver the project does not reference.
+    private static void ReportMissingDrivers(
+        SourceProductionContext output,
+        (CodeGenEngines Engines, (NpgsqlProbe Npgsql, SqlClientProbe SqlClient) Probes) input
+    )
+    {
+        if ((input.Engines & CodeGenEngines.Postgres) != 0 && !input.Probes.Npgsql.Referenced)
+        {
+            output.ReportDiagnostic(
+                Diagnostic.Create(SqlDiagnostics.DriverNotReferenced, Location.None, "PostgreSQL", "Npgsql")
+            );
+        }
+
+        if ((input.Engines & CodeGenEngines.SqlServer) != 0 && !input.Probes.SqlClient.Referenced)
+        {
+            output.ReportDiagnostic(
+                Diagnostic.Create(
+                    SqlDiagnostics.DriverNotReferenced,
+                    Location.None,
+                    "SQL Server",
+                    "Microsoft.Data.SqlClient"
+                )
+            );
+        }
+    }
 
     private static void ReportAll(SourceProductionContext output, EquatableArray<DiagnosticInfo> diagnostics)
     {
@@ -703,6 +879,29 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 .GroupBy(pathOf, SqlPath.Comparer)
                 .Select(static group => group.First())
                 .OrderBy(pathOf, SqlPath.Comparer)
+                .ToImmutableArray()
+        );
+
+    // Every type's signatures, by the type's key and then by name, so that the value does not depend on the order of
+    // the compilation's types.
+    private static EquatableArray<MethodSignature> ToSortedSignatures(
+        ImmutableArray<EquatableArray<MethodSignature>> each
+    ) =>
+        new(
+            each.SelectMany(static signatures => signatures)
+                .OrderBy(static signature => signature.TypeKey, StringComparer.Ordinal)
+                .ThenBy(static signature => signature.Name, StringComparer.Ordinal)
+                .ToImmutableArray()
+        );
+
+    // The distinct full names of the extension classes, in ordinal order.
+    private static EquatableArray<string> ExtensionClassNamesOf(EquatableArray<MethodSignature> signatures) =>
+        new(
+            signatures
+                .Where(static signature => signature.ExtensionClass is not null)
+                .Select(static signature => signature.ExtensionClassFullName!)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static name => name, StringComparer.Ordinal)
                 .ToImmutableArray()
         );
 
@@ -831,14 +1030,15 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<SettingsLevel> Level
     );
 
-    // The project's .sql files, each type with the files it claims, every claimed path, those that keep comments, and
-    // the paths the project lists more than once.
+    // The project's .sql files, each type with the files it claims, every claimed path, those that keep comments, the
+    // paths the project lists more than once, and the names of the types whose methods go on themselves.
     private readonly record struct ClaimedFiles(
         IncrementalValuesProvider<AdditionalText> SqlFiles,
         IncrementalValuesProvider<TypeFiles> ClaimingTypes,
         IncrementalValueProvider<EquatableArray<string>> ClaimedPaths,
         IncrementalValueProvider<EquatableArray<string>> CommentPaths,
-        IncrementalValueProvider<EquatableArray<string>> RepeatedPaths
+        IncrementalValueProvider<EquatableArray<string>> RepeatedPaths,
+        IncrementalValueProvider<EquatableArray<TypeMemberNames>> TypeMemberNames
     );
 
     // Each claimed file parsed, a node for each item of the project's list, and the files collected, one for each path
@@ -871,9 +1071,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         FileNodes<FileTypes> FileTypes
     );
 
-    // Each file's models, and the models to emit with the problems of the requests.
+    // Each file's models, every file's together, the models' full names, and the models to emit with the problems of
+    // the requests.
     private readonly record struct CollectedModels(
         FileNodes<FileModels> FileModels,
+        IncrementalValueProvider<EquatableArray<FileModels>> AllFileModels,
+        IncrementalValueProvider<EquatableArray<string>> ModelNames,
         IncrementalValueProvider<ModelSet> Models
     );
 

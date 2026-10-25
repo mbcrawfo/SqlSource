@@ -37,10 +37,10 @@ Each name links to its section, which gives its values and its rules.  **Written
 
 | Setting | Values | Written as | Status |
 |----|----|----|----|
-| [Output](#setting-output) | `sql`, `models`, `codegen`.  Default `codegen` | `SqlSourceOutput` property and metadata; `Output` on the attribute; `-- output:` in the file header and inside a query | Works today: it decides which queries the tool describes and the build checks against their sidecar, and `models` and `codegen` generate models; [no effect yet](README.md#what-works-today) for the method that `codegen` adds |
+| [Output](#setting-output) | `sql`, `models`, `codegen`.  Default `codegen` | `SqlSourceOutput` property and metadata; `Output` on the attribute; `-- output:` in the file header and inside a query | Works today |
 | [Database](#setting-database) | A name of letters, digits, `-`, `_` and `.`.  Default: the name of the file's dialect | `SqlSourceDatabase` property and metadata; `-- database:` in the file header and inside a query | Works today, for the tool alone |
 | [Dialect](#setting-dialect) | A dialect's name, with options for `mysql` and `mariadb`: see [the dialects page](dialects.md#choosing-a-dialect).  Default `ansi` | `SqlSourceDialect` property and metadata; `-- dialect:` in the file header | Works today |
-| [Generator parameters](#setting-generator-parameters) | Words separated by spaces: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `default`.  Default: none | `SqlSourceGeneratorParameters` property and metadata; `Parameters` on the attribute; `-- generator:` in the file header and inside a query | Works today for `keep-comments`, `no-token-validation`, `sort-input`, `sort-output` and `no-table-models`; [accepted; no effect yet](README.md#what-works-today) for `async-method-suffix` |
+| [Generator parameters](#setting-generator-parameters) | Words separated by spaces: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `default`.  Default: none | `SqlSourceGeneratorParameters` property and metadata; `Parameters` on the attribute; `-- generator:` in the file header and inside a query | Works today |
 | [Input and output model suffix](#setting-model-suffix) | Characters of a C# identifier.  Defaults `Params` and `Dto` | `SqlSourceInputModelSuffix`, `SqlSourceOutputModelSuffix` property and metadata; `InputModelSuffix`, `OutputModelSuffix` on the attribute; `-- input-model-suffix:`, `-- output-model-suffix:` in the file header | Works today |
 | [Model namespace](#setting-model-namespace) | A namespace.  Default: the namespace of the type | `SqlSourceModelNamespace` property and metadata; `ModelNamespace` on the attribute; `-- model-namespace:` in the file header | Works today |
 | [Input and output model type](#setting-model-type) | `record`, `sealed record`, `class`, `sealed class`.  Default `sealed record` | `SqlSourceInputModelType`, `SqlSourceOutputModelType` property and metadata; `InputModelType`, `OutputModelType` on the attribute; `-- input-model-type:`, `-- output-model-type:` in the file header and inside a query | Works today |
@@ -49,19 +49,10 @@ Each name links to its section, which gives its values and its rules.  **Written
 | [`SqlLocation`](#setting-sql-location) | `Nested`, `Direct`.  Default `Nested` | `SqlLocation` on the attribute | Works today |
 | [Nested class](#setting-nested-class) | A C# identifier that is not a keyword.  Default `Sql` | `SqlSourceNestedClass` property; `NestedClass` on the attribute | Works today |
 | [`Path`](#setting-path) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: that folder | `Path` on the attribute | Works today |
-
-### Settings for query methods
-
-These are read and checked today, and change no generated code until query methods arrive.
-
-| Setting | Values | Written as | Status |
-|----|----|----|----|
-| [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`: see [its section](#setting-collection-type).  Default `Array` | `SqlSourceCollectionType` property and metadata; `CollectionType` on the attribute; `-- collection-type:` in the file header and inside a query | [Accepted; no effect yet](README.md#what-works-today) |
-| [`MethodLocation`](#setting-method-location) | `ExtensionClass`, `Public`, `Internal`, `Private`.  Default `ExtensionClass` | `MethodLocation` on the attribute | [Accepted; no effect yet](README.md#what-works-today) |
+| [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`: see [its section](#setting-collection-type).  Default `Array` | `SqlSourceCollectionType` property and metadata; `CollectionType` on the attribute; `-- collection-type:` in the file header and inside a query | Works today |
+| [`MethodLocation`](#setting-method-location) | `ExtensionClass`, `Public`, `Internal`, `Private`.  Default `ExtensionClass` | `MethodLocation` on the attribute | Works today |
 
 A value from a list is matched ignoring case, hyphens and spaces, so `CodeGen`, `codegen` and `code-gen` are one value, and so are `SealedRecord` and `sealed record`.  On the attribute you write the member of the enum that the package adds to your project, as in `Output = GeneratorOutput.Sql`.
-
-"Accepted; no effect yet" means SqlSource checks the setting and reports an error for a value that is not valid, but the setting changes no generated code yet.  Query methods come in a later release.
 
 <a id="precedence"></a>
 
@@ -125,7 +116,7 @@ TRUNCATE TABLE audit_log;
 |----|----|
 | `sql` | Its SQL: a constant, or a method where the query has tokens |
 | `models` | Its SQL, and its [models](generator.md#models): types for its parameters and for a row of its result |
-| `codegen` | Its SQL, its models, and a method that runs the query, which comes in a later release |
+| `codegen` | Its models, and a [method](generator.md#query-methods) that runs the query, which holds its SQL in place of a constant |
 
 On the attribute: `[SqlSourceGenerate(Output = GeneratorOutput.Sql)]`.  As a marker it stands in the file header, for every query of the file, and inside a query.
 
@@ -133,9 +124,7 @@ On the attribute: `[SqlSourceGenerate(Output = GeneratorOutput.Sql)]`.  As a mar
 
 The tool can describe only some dialects: see [the database support table](dialects.md#database-support).  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets [SQLSRC209](diagnostics.md#sqlsrc209) for every file, in its build and from the tool.  Set the dialect and describe the queries, or set the output to `sql` for queries that want only their SQL.
 
-Every query gets its constant or token method whatever its output.  A query whose output is `models` or `codegen`, and whose entry in its sidecar is current, also gets its [models](generator.md#models); one whose output is `sql` gets none.
-
-> **Coming in a later release.**  `codegen` will also generate a method that runs the query; until then it gives what `models` gives.  See [what works today](README.md#what-works-today).
+A query whose output is `sql` or `models` gets its constant or token method.  A query whose output is `models` or `codegen`, and whose entry in its sidecar is current, also gets its [models](generator.md#models); one whose output is `sql` gets none.  A query whose output is `codegen` gets no constant and no token method: its [method](generator.md#query-methods) holds its SQL, and runs it, once the query has its models and the project references its database's driver.  A project that runs the SQL itself, through Dapper or its own ADO.NET code, sets `models`.
 
 <a id="setting-database"></a>
 
@@ -213,12 +202,10 @@ A [generator parameter](concepts.md#generator-parameter) is a word that changes 
 | `no-token-validation` | The method of a query with tokens does not check its arguments: see [validation](parameters-and-tokens.md#token-validation) | Works today |
 | `sort-input`, `sort-output` | The properties of the query's input model, or of its output model, are sorted by name: see [the order of the properties](generator.md#property-order) | Works today |
 | `no-table-models` | A query that reads a whole table gets a row model named after the query, not after the table: see [table models](generator.md#table-models) | Works today |
-| `async-method-suffix` | None yet | [Accepted; no effect yet](README.md#what-works-today) |
+| `async-method-suffix` | The name of a query's [method](generator.md#method-signature) ends with `Async`: `GetUserAsync` for `GetUser` | Works today |
 | `default` | The empty list: every default.  `default` must be the only word in its list, though it may be repeated | Works today |
 
 Words are matched ignoring case.
-
-> **Coming in a later release.**  `async-method-suffix` will end the names of the generated query methods with `Async`.  See [what works today](README.md#what-works-today).
 
 **A list replaces; it never adds.**  In the example, `Total` has the list `no-token-validation` and nothing else: it does not keep its comments, though the file header says `keep-comments`.  A query that wants both writes both, `-- generator: keep-comments no-token-validation`.  `-- generator: default` gives a query every default, whatever its file says.
 
@@ -322,11 +309,25 @@ SELECT id, name FROM users WHERE id = @id;
 SELECT id, name FROM users;
 ```
 
-The type a generated method will return many rows in.  The values are `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` and `IImmutableList`.  The default is `Array`.
+The type that the [method](generator.md#query-methods) of a query whose result shape is `many` returns its rows in.  The default is `Array`.  Above, `ListUsers` returns `Task<IReadOnlyList<ListUsersDto>>`.
+
+| Value | Returns | Holding |
+|----|----|----|
+| `Array` (the default) | `T[]` | An array |
+| `IEnumerable` | `IEnumerable<T>` | An array |
+| `IReadOnlyCollection` | `IReadOnlyCollection<T>` | An array |
+| `IReadOnlyList` | `IReadOnlyList<T>` | An array |
+| `ICollection` | `ICollection<T>` | A `List<T>` |
+| `IList` | `IList<T>` | A `List<T>` |
+| `List` | `List<T>` | A `List<T>` |
+| `ImmutableArray` | `ImmutableArray<T>` | An `ImmutableArray<T>` |
+| `ImmutableList` | `ImmutableList<T>` | An `ImmutableList<T>` |
+| `IImmutableList` | `IImmutableList<T>` | An `ImmutableList<T>` |
+
+`T` is the query's output model.  Every collection is filled before the method returns, `IEnumerable` included, so reading it runs no query.
 
 - It stands in the file header and inside a query.  It can also be item metadata, an MSBuild property, or `CollectionType = GeneratorCollectionType.IReadOnlyList` on the attribute.
-
-> **Coming in a later release.**  The collection type will say what a generated method returns many rows in.  Today the setting is read and checked, and changes no generated code.  See [what works today](README.md#what-works-today).
+- It changes nothing for a query whose shape is not `many`, and nothing under the output `sql` or `models`.
 
 <a id="setting-type-overrides"></a>
 
@@ -412,11 +413,11 @@ The `sqlsource` tool does not read the property or the metadata, which change no
 ## Where the SQL goes
 
 ```csharp
-[SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+[SqlSourceGenerate(Output = GeneratorOutput.Models, SqlLocation = SqlLocation.Direct)]
 public static partial class UserQueries;
 ```
 
-`SqlLocation` is a property of the attribute and nothing else.  It says where the members generated for the type's queries go.  Each member is a `const string`, or a static method when the query has tokens.
+`SqlLocation` is a property of the attribute and nothing else.  It says where the members generated for the type's queries whose output is `sql` or `models` go.  Each member is a `const string`, or a static method when the query has tokens.  A query whose output is `codegen` has a method in their place, which [`MethodLocation`](#setting-method-location) places.
 
 | `SqlLocation` | Generated members | Used as |
 |----|----|----|
@@ -436,14 +437,14 @@ With `Nested`, a type that already has a member with the nested class's name is 
 ```
 
 ```csharp
-[SqlSourceGenerate(NestedClass = "Statements")]
+[SqlSourceGenerate(Output = GeneratorOutput.Models, NestedClass = "Statements")]
 public partial class UserRepository
 {
     public string Get() => Statements.GetUser;
 }
 ```
 
-Under `SqlLocation.Nested`, this names the private class that holds the type's members.  `NestedClass` on the attribute names it for one type, and the `SqlSourceNestedClass` property for every type of the project that does not set it.  Without either, the class is `Sql`.  The setting has no item metadata and no marker, since a type's queries can come from several files.
+Under `SqlLocation.Nested`, this names the private class that holds the type's members, those of its queries whose output is `sql` or `models`.  `NestedClass` on the attribute names it for one type, and the `SqlSourceNestedClass` property for every type of the project that does not set it.  Without either, the class is `Sql`.  The setting has no item metadata and no marker, since a type's queries can come from several files.
 
 The value is one C# identifier that is not a keyword: `Queries` is fine, and `class`, `My-Sql` or `App.Sql` is not.  A value that is not valid is [SQLSRC006](diagnostics.md#sqlsrc006) on the attribute, and [SQLSRC014](diagnostics.md#sqlsrc014) as the property.  Under `SqlLocation.Direct` there is no nested class, and the setting has no effect, even on the same attribute.
 
@@ -456,18 +457,16 @@ The value is one C# identifier that is not a keyword: `Queries` is fine, and `cl
 internal static partial class UserQueries;
 ```
 
-`MethodLocation` is a property of the attribute and nothing else, as `SqlLocation` is.  It says where the methods that run the queries go.
+`MethodLocation` is a property of the attribute and nothing else, as `SqlLocation` is.  It says where the [methods](generator.md#query-methods) that run the type's queries, those whose output is `codegen`, go.
 
-| `MethodLocation` | The methods will be |
-|----|----|
-| `ExtensionClass` (the default) | In a generated static class beside the type, as extension methods of `DbConnection` |
-| `Public` | On the type, as public static methods |
-| `Internal` | On the type, as internal static methods |
-| `Private` | On the type, as private static methods |
+| `MethodLocation` | The methods are | Called as |
+|----|----|----|
+| `ExtensionClass` (the default) | In a generated static class beside the type, named after it with `Extensions` after it, as extension methods of `DbConnection` | `connection.GetUser(...)` |
+| `Public` | On the type, as public static methods | `UserQueries.GetUser(connection, ...)` |
+| `Internal` | On the type, as internal static methods | `UserQueries.GetUser(connection, ...)` |
+| `Private` | On the type, as private static methods | `GetUser(connection, ...)`, inside the type only |
 
-There is no property, item metadata or marker for it.  `SqlSourceMethodLocation` in a project file or `-- method-location:` in a `.sql` file is not read.
-
-> **Coming in a later release.**  The location will say where the methods that run the queries go.  Today the property is read and checked, and changes no generated code.  See [what works today](README.md#what-works-today).
+There is no property, item metadata or marker for it.  `SqlSourceMethodLocation` in a project file or `-- method-location:` in a `.sql` file is not read.  The class and its accessibility, and the names a method cannot have, are on [the generator page](generator.md#method-location).
 
 <a id="setting-path"></a>
 

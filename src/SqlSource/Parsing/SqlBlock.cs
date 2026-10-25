@@ -13,7 +13,7 @@ namespace SqlSource.Parsing;
 /// </param>
 /// <param name="Summary">The text of the block's <c>-- summary:</c> markers, or null when it has none.</param>
 /// <param name="Shape">
-/// The shape the name marker gives, or null when it gives none.  It has no effect yet.
+/// The shape the name marker gives, or null when it gives none, which a query's method returns.
 /// </param>
 /// <param name="Segments">The SQL without comments, split into literal text and tokens.  Never empty.</param>
 /// <param name="KeptSegments">

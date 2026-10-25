@@ -4,6 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
+using SqlSource.Generation;
+using SqlSource.Generation.Models;
+using SqlSource.Settings;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using Xunit;
@@ -660,6 +663,53 @@ public sealed class SharedModelTests
         run.ShouldBeClean();
         run.Sources["App.GetUserDto-Model.g.cs"]
             .ShouldContain("    internal sealed record GetUserDto(global::MyApp.Inner Id);\n");
+    }
+
+    // The models step names each query's model for the methods, and each query's entry gives its column names.
+    [Fact]
+    public void Run_TableModelOfTwoQueries_IsAssignedToEach()
+    {
+        var a = new SqlFile(APath, "-- name: GetA\nSELECT id, name FROM users;\n");
+        var b = new SqlFile(BPath, "-- name: GetB\nSELECT id, name FROM users;\n");
+        var table = new SidecarTable("public", "users");
+        SidecarColumn[] columns = [Column("id"), Column("name", Text)];
+        var run = Run(
+            Source,
+            [
+                a,
+                Sidecars.Of(a, Entry(a, "GetA", [], columns, table)),
+                b,
+                Sidecars.Of(b, Entry(b, "GetB", [], columns, table)),
+            ]
+        );
+
+        run.ShouldBeClean();
+        var assignments = StepOutputs.Single<ModelSet>(run, TrackingNames.Models).Assignments;
+        var files = StepOutputs.Of<FileModels>(run, TrackingNames.FileModels);
+        files.Length.ShouldBe(2);
+        assignments.Count.ShouldBe(2);
+        foreach (var file in files)
+        {
+            var query = file.Queries.ShouldHaveSingleItem();
+            query.ColumnNames.ShouldBe(columns.Select(column => column.Name));
+            var assignment = assignments
+                .Where(item => item.NormalizedPath == file.NormalizedPath)
+                .ShouldHaveSingleItem();
+            assignment.ClaimingType.ShouldBe("App.Sample");
+            assignment.QueryIndex.ShouldBe(query.Index);
+            assignment.Role.ShouldBe(ModelRole.Output);
+            assignment.TypeText.ShouldBe("global::App.UsersDto");
+            assignment.Kind.ShouldBe(ModelKind.SealedRecord);
+        }
+    }
+
+    [Fact]
+    public void Run_QueryWithoutRows_HasNoColumnNames()
+    {
+        var run = Run(Users, Entry(Users, "GetUser", [Parameter("id")], null));
+
+        run.ShouldBeClean();
+        ModelsOf(run).Queries.ShouldHaveSingleItem().ColumnNames.ShouldBeNull();
     }
 
     // GetA in A and GetB in B, each with the -- output-model: marker of the name, then the markers given.

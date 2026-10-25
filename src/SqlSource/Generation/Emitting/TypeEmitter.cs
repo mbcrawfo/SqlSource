@@ -19,8 +19,8 @@ internal static class TypeEmitter
     // under SqlLocation.Direct a query can hide a member of a base class.  That is what was asked for, and the
     // compiler's request to add "new" (CS0108) is one that nobody can act on in generated code.  Neither is its
     // request to add "new" or "override" (CS0114) to a method that has the name and the parameters of an inherited
-    // virtual method.
-    private const string Header =
+    // virtual method.  A file of methods on the type starts the same way.
+    internal const string Header =
         GeneratedText.Header
         + "#pragma warning disable CS0108, CS0114 // A query can have the name of an inherited member.\n"
         + "\n";
@@ -39,17 +39,18 @@ internal static class TypeEmitter
         }
 
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
-        var members = SelectMembers(type, input.Files, input.FileSettings, property, diagnostics);
+        var members = SelectMembers(type, input.Files, input.FileSettings, property, diagnostics, out var hasCodeGen);
         return new TypeOutput(
             input.HintName,
-            Write(type, members, property),
+            Write(type, members, hasCodeGen),
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable())
         );
     }
 
     /// <summary>
     /// Which of the type's files it can use.  A file contributes all of its queries or none: one that has a query
-    /// with a name that cannot be used here (<c>SQLSRC008</c>, <c>SQLSRC009</c>), or a query that keeps its comments
+    /// with a name that cannot be used here (<c>SQLSRC008</c>, or <c>SQLSRC009</c> for a query whose output is not
+    /// <see cref="OutputKind.CodeGen" />), or a query that keeps its comments
     /// here and has an error in the form with them (<see cref="SqlQuery.KeptErrors" />), is left out, with its
     /// diagnostics when <paramref name="diagnostics" /> is given.
     /// </summary>
@@ -77,7 +78,13 @@ internal static class TypeEmitter
             var isUsable = true;
             foreach (var query in file.Queries)
             {
-                if (string.Equals(query.Name, containingTypeName, StringComparison.Ordinal))
+                // A CodeGen query has no member in the type that contains the others, and the methods' planner judges
+                // its method's name.  The settings are resolved only for a query of that name, which is rare.
+                if (
+                    string.Equals(query.Name, containingTypeName, StringComparison.Ordinal)
+                    && QuerySettings.Resolve(query.Markers, type.Settings, fileSettings[index], property).Output
+                        != OutputKind.CodeGen
+                )
                 {
                     diagnostics?.Add(
                         DiagnosticInfo.Create(
@@ -129,17 +136,21 @@ internal static class TypeEmitter
         return usable;
     }
 
-    // The queries of the files the type can use, each with what the metadata of its file's item says.
-    private static List<(SqlQuery Query, string FileName, SettingsLevel Metadata)> SelectMembers(
+    // The queries of the files the type can use that get a member here, each with its file's name and its settings.  A
+    // query whose output is CodeGen gets none, whether it gets a method or not: the method, in a file of its own, takes
+    // the place of its constant.  hasCodeGen says whether one was left out so.
+    private static List<(SqlQuery Query, string FileName, QuerySettings Settings)> SelectMembers(
         TargetType type,
         EquatableArray<ParsedSqlFile> files,
         EquatableArray<SettingsLevel> fileSettings,
         SettingsLevel property,
-        ImmutableArray<DiagnosticInfo>.Builder diagnostics
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics,
+        out bool hasCodeGen
     )
     {
         var usable = FindUsableFiles(type, files, fileSettings, property, diagnostics);
-        var members = new List<(SqlQuery Query, string FileName, SettingsLevel Metadata)>();
+        var members = new List<(SqlQuery Query, string FileName, QuerySettings Settings)>();
+        hasCodeGen = false;
         for (var index = 0; index < files.Count; index++)
         {
             if (!usable[index])
@@ -150,17 +161,28 @@ internal static class TypeEmitter
             var file = files[index];
             foreach (var query in file.Queries)
             {
-                members.Add((query, file.FileName, fileSettings[index]));
+                var settings = QuerySettings.Resolve(query.Markers, type.Settings, fileSettings[index], property);
+                if (settings.Output == OutputKind.CodeGen)
+                {
+                    hasCodeGen = true;
+                }
+                else
+                {
+                    members.Add((query, file.FileName, settings));
+                }
             }
         }
 
         return members;
     }
 
+    // Under SqlLocation.Nested the nested class is not written when the type's usable queries are all CodeGen, so
+    // that a method may have its name, as the methods' planner expects.  A type with no usable query at all keeps it
+    // empty, so that a reference to it reports the missing member and not a missing type.
     private static string Write(
         TargetType type,
-        List<(SqlQuery Query, string FileName, SettingsLevel Metadata)> members,
-        SettingsLevel property
+        List<(SqlQuery Query, string FileName, QuerySettings Settings)> members,
+        bool hasCodeGen
     )
     {
         var builder = new StringBuilder(Header);
@@ -179,7 +201,7 @@ internal static class TypeEmitter
             );
         }
 
-        if (type.Placement == MemberPlacement.Nested)
+        if (type.Placement == MemberPlacement.Nested && (members.Count > 0 || !hasCodeGen))
         {
             Open(builder, depth++, "private static class " + type.NestedClass);
         }
@@ -192,9 +214,8 @@ internal static class TypeEmitter
                 _ = builder.Append('\n');
             }
 
-            var (query, fileName, metadata) = members[index];
+            var (query, fileName, settings) = members[index];
             var summaryXml = GetSummaryXml(query, fileName);
-            var settings = QuerySettings.Resolve(query.Markers, type.Settings, metadata, property);
 
             // The member is built from the form that is emitted.  A form that was not built is the other one.
             var segments = settings.KeepComments ? query.KeptSegments ?? query.Segments : query.Segments;
@@ -237,16 +258,22 @@ internal static class TypeEmitter
         return false;
     }
 
-    private static string GetSummaryXml(SqlQuery query, string fileName) =>
+    /// <summary>
+    /// The summary of a query's member, as escaped XML: its <c>-- summary:</c> text, or a sentence that names the query
+    /// and its file.
+    /// </summary>
+    internal static string GetSummaryXml(SqlQuery query, string fileName) =>
         query.Summary is null
             ? "The <c>" + query.Name + "</c> query from <c>" + XmlDocWriter.Escape(fileName) + "</c>."
             : XmlDocWriter.Escape(query.Summary);
 
-    private static void Open(StringBuilder builder, int depth, string header)
+    /// <summary>Opens a block at the depth: its header, and a brace on the next line.</summary>
+    internal static void Open(StringBuilder builder, int depth, string header)
     {
         var indent = GetIndent(depth);
         _ = builder.Append(indent).Append(header).Append('\n').Append(indent).Append("{\n");
     }
 
-    private static string GetIndent(int depth) => string.Concat(Enumerable.Repeat(GeneratedText.Indent, depth));
+    /// <summary>The indentation of the depth.</summary>
+    internal static string GetIndent(int depth) => string.Concat(Enumerable.Repeat(GeneratedText.Indent, depth));
 }

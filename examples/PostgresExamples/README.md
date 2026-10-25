@@ -10,10 +10,10 @@ A small project that uses SqlSource with PostgreSQL and Dapper: what you write, 
 | [`docker-compose.yml`](docker-compose.yml) | Starts PostgreSQL with that schema |
 | [`Sql/`](Sql) | The output `sql`: `CountUsers` as a constant, and `CountRows` as a method that fills in a [token](../../docs/manual/parameters-and-tokens.md#tokens), in a nested class that the attribute [names](../../docs/manual/settings.md#setting-nested-class) `Counts`.  They are not described, so they have no sidecar and need no connection |
 | [`Models/`](Models) | The output `models`: each query gets a model of its parameters and one of its rows.  `GetOrder` has a nullable column and a `timestamptz` read as a `DateTimeOffset` by the project's [type override](../../docs/manual/settings.md#setting-type-overrides); `ListOrderTotals` has a sum that the tool shows is never null, `CountShippedOrders` has a count that the tool shows is never null, and `ListUserDisplayNames` makes a column not null with a [`-- column:` marker](../../docs/manual/generator.md#column-marker); `GetOrderTags` has an array column, read into the default record; `GetUser` is `SELECT *`, so its rows are the [table's model](../../docs/manual/generator.md#table-models), `UsersDto` |
-| [`CodeGen/`](CodeGen) | The default output, `codegen`, with a [result shape](../../docs/manual/sql-files.md#result-shapes) after the query's name.  It gives what `models` gives until the methods that run the queries arrive |
+| [`CodeGen/`](CodeGen) | The default output, `codegen`: `ListOrderLines` gets its models and a method that runs it, an extension method of the connection, which returns every row by the [result shape](../../docs/manual/sql-files.md#result-shapes) after the query's name, `many` |
 | [`DapperSetup.cs`](DapperSetup.cs), [`UtcDateTimeOffsetHandler.cs`](UtcDateTimeOffsetHandler.cs) | What Dapper needs once, before the first query: see [the recipe](../../docs/manual/recipes.md#dapper-with-postgresql) |
 
-Each folder's `.sql` files belong to the one class beside them, whose `[SqlSourceGenerate]` attribute sets the folder's output, and whose methods run the generated SQL through Dapper into the generated models.  The queries write their parameters in camelCase, `@orderId`, which Dapper binds to the property `OrderId` of the input model.  Nothing here runs: the project compiles, so a model that changes shape breaks its build.
+Each folder's `.sql` files belong to the one class beside them, whose `[SqlSourceGenerate]` attribute sets the folder's output, and whose methods run the queries: in `Sql/` and `Models/` the generated SQL through Dapper, into the generated models, and in `CodeGen/` the generated method.  The queries write their parameters in camelCase, `@orderId`: in `Models/` Dapper binds it to the property `OrderId` of the input model, and in `CodeGen/` the generated method binds it from that property itself.  Nothing here runs: the project compiles, so a model that changes shape breaks its build.
 
 ## Your own project
 
@@ -70,10 +70,10 @@ Open [`Models/Orders.sql.json`](Models/Orders.sql.json).  It is the tool's recor
 dotnet build
 ```
 
-Your IDE shows the generated code among the project's dependencies, under its analyzers or source generators, and goes to it from a use such as `Sql.GetOrder` or `GetOrderDto`.  To write it to disk, build with `EmitCompilerGeneratedFiles`:
+Your IDE shows the generated code among the project's dependencies, under its analyzers or source generators, and goes to it from a use such as `Sql.GetOrder`, `GetOrderDto` or `ListOrderLines`.  To write it to disk, build with `EmitCompilerGeneratedFiles`:
 
 ```bash
 dotnet build -p:EmitCompilerGeneratedFiles=true
 ```
 
-The files are under `obj/Debug/net10.0/generated/`: one for each class, with the SQL of its queries, one for each model, and one with the attribute and its enums.  `GetOrderDto`, for instance, is a record with the properties `Id`, `Status`, `PlacedAt`, `ShippedAt` and `CustomerName`.  See [the generator](../../docs/manual/generator.md).
+The files are under `obj/Debug/net10.0/generated/`: one for each class, with the SQL of its queries whose output is `sql` or `models`, one with the methods of `OrderLineQueries`, in the class `OrderLineQueriesExtensions`, one for each model, and one with the attribute, its enums and the exception a method throws.  `GetOrderDto`, for instance, is a record with the properties `Id`, `Status`, `PlacedAt`, `ShippedAt` and `CustomerName`.  See [the generator](../../docs/manual/generator.md).

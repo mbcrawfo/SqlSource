@@ -17,6 +17,8 @@ internal static class HintName
 
     private const string ModelExtension = "-Model" + Extension;
 
+    private const string MethodsExtension = "-Methods" + Extension;
+
     /// <summary>
     /// The namespace and each type name joined with dots.  A generic type's name is followed by its arity, so that
     /// <c>Repository</c> and <c>Repository&lt;T&gt;</c> get different names.  Every character is one a hint name may
@@ -55,6 +57,15 @@ internal static class HintName
     /// </summary>
     /// <param name="fullName">The model's full name, from identifier values.</param>
     public static string ForModel(string fullName) => fullName + ModelExtension;
+
+    /// <summary>
+    /// The name of the file of a type's methods: the name of the type's file with <c>-Methods.g.cs</c> in place of
+    /// <c>.g.cs</c>.  It is unique, ignoring case, as the type's is, and no model's file can have it, since a model's
+    /// name ends in <c>-Model.g.cs</c>.
+    /// </summary>
+    /// <param name="typeHintName">The name of the type's file, which ends in <c>.g.cs</c>.</param>
+    public static string ForMethods(string typeHintName) =>
+        typeHintName.Substring(0, typeHintName.Length - Extension.Length) + MethodsExtension;
 
     /// <summary>
     /// The names that are equal, ignoring case, to another name or to the name of the generated attribute's file.

@@ -1,11 +1,17 @@
 using System;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Settings;
 using Xunit;
+using OutputKind = SqlSource.Settings.OutputKind;
+using RoslynOutputKind = Microsoft.CodeAnalysis.OutputKind;
 
 namespace SqlSource.Tests.Generation;
 
@@ -55,6 +61,47 @@ public sealed partial class AttributeSourceTests
 
         AttributeSource.GeneratedTypes.ShouldBe(declared, ignoreOrder: true);
     }
+
+    // The file goes into every project that references the package, so a project on an older language gets it too.
+    [Fact]
+    public void Text_CompiledAsCSharp73_DeclaresUnexpectedRowCountException()
+    {
+        var compilation = CompileText();
+
+        compilation.GetDiagnostics(TestContext.Current.CancellationToken).ShouldBeEmpty();
+        var exception = compilation
+            .GetTypeByMetadataName(AttributeSource.UnexpectedRowCountMetadataName)
+            .ShouldNotBeNull();
+        exception.BaseType!.ToDisplayString().ShouldBe("System.InvalidOperationException");
+    }
+
+    [Theory]
+    [InlineData(false, "The query 'GetUser' returned no rows.")]
+    [InlineData(true, "The query 'GetUser' returned more than one row.")]
+    public void UnexpectedRowCountException_Created_NamesTheQueryAndWhatWentWrong(bool moreThanOne, string message)
+    {
+        using var image = new MemoryStream();
+        CompileText().Emit(image, cancellationToken: TestContext.Current.CancellationToken).Success.ShouldBeTrue();
+        var type = Assembly
+            .Load(image.ToArray())
+            .GetType(AttributeSource.UnexpectedRowCountMetadataName)
+            .ShouldNotBeNull();
+
+        var exception = (InvalidOperationException)Activator.CreateInstance(type, "GetUser", moreThanOne)!;
+
+        exception.Message.ShouldBe(message);
+        type.GetProperty("QueryName")!.GetValue(exception).ShouldBe("GetUser");
+    }
+
+    private static CSharpCompilation CompileText() =>
+        CSharpCompilation.Create(
+            "AttributeText",
+            [CSharpSyntaxTree.ParseText(AttributeSource.Text, new CSharpParseOptions(LanguageVersion.CSharp7_3))],
+            ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+                .Split(Path.PathSeparator)
+                .Select(path => MetadataReference.CreateFromFile(path)),
+            new CSharpCompilationOptions(RoslynOutputKind.DynamicallyLinkedLibrary)
+        );
 
     [GeneratedRegex(@"internal (?:enum|sealed class) (?<name>\w+)")]
     private static partial Regex Declaration();

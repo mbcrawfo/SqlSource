@@ -1,6 +1,6 @@
 # Concepts
 
-SqlSource reads the queries you keep in `.sql` files.  The **generator**, in the `SqlSource` package, runs inside the compiler whenever you build the project, and turns each query into C# code: a string constant, or a method where the query has tokens, and for a described query its models, a type for its parameters and a type for its rows.  The **tool**, in the `SqlSource.Tool` package, connects to your database, asks it what each query's parameters and columns are, and writes the answer into a **sidecar** file beside the `.sql` file.  You commit the sidecar with the project, and the generator reads it during the build, so that the build needs no database.  A query whose [output](#output) is `models` or `codegen`, the default, must be described: the build reports an error for one that has no current entry in its sidecar.  A query whose output is `sql` needs neither the tool nor a sidecar.
+SqlSource reads the queries you keep in `.sql` files.  The **generator**, in the `SqlSource` package, runs inside the compiler whenever you build the project, and turns each query into C# code: for a described query its models, a type for its parameters and a type for its rows, and by default a method that runs it; or a string constant, or a method where the query has tokens, that holds its SQL for your own code to run.  The **tool**, in the `SqlSource.Tool` package, connects to your database, asks it what each query's parameters and columns are, and writes the answer into a **sidecar** file beside the `.sql` file.  You commit the sidecar with the project, and the generator reads it during the build, so that the build needs no database.  A query whose [output](#output) is `models` or `codegen`, the default, must be described: the build reports an error for one that has no current entry in its sidecar.  A query whose output is `sql` needs neither the tool nor a sidecar.
 
 ```mermaid
 flowchart LR
@@ -14,7 +14,7 @@ flowchart LR
     sidecar -->|checked and read| generator
 ```
 
-> **Coming in a later release.**  The generator will build query methods from the sidecars.  See [what works today](README.md#what-works-today).
+The generator builds the models and the query methods of the described queries from the sidecars.
 
 The rest of this page defines the words the manual uses.  Each is used in this one sense everywhere.
 
@@ -56,7 +56,13 @@ The generator builds the [models](generator.md#models) of a query from its entry
 
 #### Output
 
-The setting that says how much SqlSource produces for a query: its SQL alone, [models](generator.md#models) as well, or models and a query method, which comes in a later release.  It also decides which queries must be described: the ones the tool describes, and the ones the build checks against their sidecar.  See [the output setting](settings.md#setting-output).
+The setting that says what SqlSource produces for a query: its SQL alone, its SQL and its [models](generator.md#models), or its models and a [query method](#query-method), the default.  It also decides which queries must be described: the ones the tool describes, and the ones the build checks against their sidecar.  See [the output setting](settings.md#setting-output).
+
+<a id="query-method"></a>
+
+#### Query method
+
+What a described query whose [output](#output) is `codegen` becomes: an asynchronous method that opens a connection when it is closed, sends the query's parameters, runs it and reads its rows into its models.  It holds the query's SQL, in place of a constant or a token method.  See [query methods](generator.md#query-methods).
 
 <a id="token-method"></a>
 

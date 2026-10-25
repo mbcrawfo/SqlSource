@@ -20,6 +20,10 @@ namespace SqlSource.Generation.Models;
 /// The properties of the output model, one for each column of the entry, in order, or null when its statement returns
 /// no rows.  Empty for rows of no column.
 /// </param>
+/// <param name="ColumnNames">
+/// The name of each column of the entry as the server returned it, in order, or null when <paramref name="Output" />
+/// is.
+/// </param>
 /// <param name="Table">The table whose column list the rows are, as the entry says, or null.</param>
 internal sealed record QueryModels(
     string Name,
@@ -30,5 +34,6 @@ internal sealed record QueryModels(
     ModelMarker? OutputMarker,
     EquatableArray<ModelProperty>? Input,
     EquatableArray<ModelProperty>? Output,
+    EquatableArray<string>? ColumnNames,
     SidecarTable? Table
 );

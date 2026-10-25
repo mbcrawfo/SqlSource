@@ -129,9 +129,11 @@ internal static class ModelReader
         EquatableArray<ModelProperty>? input =
             entry.Parameters.Count == 0 ? null : ReadParameters(entry.Parameters, types.Parameters, query, reading);
         EquatableArray<ModelProperty>? output = null;
+        EquatableArray<string>? columnNames = null;
         if (entry.Columns is { } columns && types.Columns is { } columnTypes)
         {
             output = ReadColumns(columns, columnTypes, query, reading);
+            columnNames = NamesOf(columns);
         }
         else
         {
@@ -151,8 +153,20 @@ internal static class ModelReader
                 query.OutputModel,
                 input,
                 output,
+                columnNames,
                 entry.MatchesTable
             );
+    }
+
+    private static EquatableArray<string> NamesOf(EquatableArray<SidecarColumn> columns)
+    {
+        var names = ImmutableArray.CreateBuilder<string>(columns.Count);
+        foreach (var column in columns)
+        {
+            names.Add(column.Name);
+        }
+
+        return new EquatableArray<string>(names.MoveToImmutable());
     }
 
     // SQLSRC259, at the marker, when the query has an -- output-model: marker and its entry has no rows.

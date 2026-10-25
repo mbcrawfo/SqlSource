@@ -148,7 +148,8 @@ public sealed class ModelsByFileTests
         new(
             TestModels.Array([.. models.Select(model => model.Model)]),
             TestModels.Array([.. models.Select(model => model.Place)]),
-            TestModels.Array<DiagnosticInfo>()
+            TestModels.Array<DiagnosticInfo>(),
+            TestModels.Array<ModelAssignment>()
         );
 
     private static ModelPlace Place(string path, int queryIndex, ModelRole role, string claimingType = "App.Repo") =>

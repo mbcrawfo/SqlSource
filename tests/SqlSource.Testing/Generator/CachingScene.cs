@@ -24,32 +24,18 @@ internal sealed class CachingScene
 {
     public const string UsersSourcePath = "/app/Users/UserQueries.cs";
 
-    public const string UsersSource = """
-        using SqlSource;
+    public const string OrdersSourcePath = "/app/Orders/OrderQueries.cs";
 
-        namespace App.Users;
-
-        [SqlSourceGenerate]
-        public partial class UserQueries
-        {
-            public static string Get() => Sql.GetUser;
-        }
-        """;
+    public static readonly string UsersSource = TypeSource(
+        "App.Users",
+        "UserQueries",
+        members: "    public static string Get() => Sql.GetUser;\n"
+    );
 
     public static readonly SourceFile[] Sources =
     [
         new(UsersSourcePath, UsersSource),
-        new(
-            "/app/Orders/OrderQueries.cs",
-            """
-            using SqlSource;
-
-            namespace App.Orders;
-
-            [SqlSourceGenerate]
-            public partial class OrderQueries;
-            """
-        ),
+        new(OrdersSourcePath, TypeSource("App.Orders", "OrderQueries")),
     ];
 
     public InMemoryAdditionalText Users { get; } = new("/app/Users/Users.sql", SqlTexts.GetUser);
@@ -105,6 +91,69 @@ internal sealed class CachingScene
         driver.GetRunResult().Diagnostics.ShouldBeEmpty();
         return driver;
     }
+
+    // The source of an attributed type in the namespace, with these arguments on its attribute when they are given
+    // and these members, each a line of its own.  A type with no members has no body.
+    public static string TypeSource(
+        string namespaceName,
+        string typeName,
+        string? arguments = null,
+        string members = ""
+    ) =>
+        "using SqlSource;\n\nnamespace "
+        + namespaceName
+        + ";\n\n[SqlSourceGenerate"
+        + (arguments is null ? string.Empty : "(" + arguments + ")")
+        + "]\npublic partial class "
+        + typeName
+        + (members.Length == 0 ? ";\n" : "\n{\n" + members + "}\n");
+
+    // The two types of the tests of the methods with these sources, which put both in the namespace App, so that a
+    // method of each can clash, and read no constant, since a query at CodeGen has none.  OrderQueries is the plain
+    // type of App unless its source is given.
+    public static CSharpCompilation MethodsCompilation(string usersSource, string? ordersSource = null) =>
+        GeneratorHarness.CreateCompilation(
+            [
+                new(UsersSourcePath, usersSource),
+                new(OrdersSourcePath, ordersSource ?? TypeSource("App", "OrderQueries")),
+            ],
+            references: [NpgsqlReferences.Npgsql10]
+        );
+
+    // Both types at CodeGen under postgres, with Users and Orders, each with a current sidecar whose entry has one
+    // column, of int4, so that each type has one method, in its extension class.  A sidecar given is used in place of
+    // the one of its file.
+    public GeneratorDriver FirstRunOfMethods(Compilation compilation, params InMemoryAdditionalText[] given)
+    {
+        var sidecars = new List<InMemoryAdditionalText>
+        {
+            TypedSidecar(Users, "GetUser", "int4"),
+            TypedSidecar(Orders, "GetOrder", "int4"),
+        };
+        foreach (var sidecar in given)
+        {
+            _ = sidecars.RemoveAll(other => other.Path == sidecar.Path);
+            sidecars.Add(sidecar);
+        }
+
+        var driver = GeneratorHarness
+            .CreateDriver([Users, Orders, .. sidecars], new TestOptionsProvider(OutputKind.CodeGen, null, "postgres"))
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        return driver;
+    }
+
+    // The compilation with this source of UserQueries in place of the one it has.
+    public static Compilation WithUserQueries(Compilation compilation, string source) =>
+        compilation.ReplaceSyntaxTree(
+            compilation.SyntaxTrees.Single(tree => tree.FilePath == UsersSourcePath),
+            CSharpSyntaxTree.ParseText(
+                source,
+                GeneratorHarness.ParseOptions,
+                UsersSourcePath,
+                cancellationToken: TestContext.Current.CancellationToken
+            )
+        );
 
     public GeneratorDriver FirstRun(OutputKind? output, Compilation compilation) =>
         FirstRun(compilation, Users, new TestOptionsProvider(output, null));
