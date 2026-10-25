@@ -23,6 +23,8 @@ internal static class AttributeSource
 
     public const string UnexpectedRowCountMetadataName = "SqlSource.UnexpectedRowCountException";
 
+    public const string ConverterAttributeMetadataName = "SqlSource.SqlSourceConverterAttribute";
+
     public const string PathProperty = "Path";
 
     public const string LocationProperty = "SqlLocation";
@@ -60,11 +62,13 @@ internal static class AttributeSource
             ModelTypeMetadataName,
             CollectionTypeMetadataName,
             MethodLocationMetadataName,
-            UnexpectedRowCountMetadataName
+            UnexpectedRowCountMetadataName,
+            ConverterAttributeMetadataName
         );
 
     // Only an attribute class can be [Conditional], so the enums stay in the consumer's assembly.  The attribute
-    // itself is not applied in metadata unless the consumer defines SQLSOURCE_ATTRIBUTES.
+    // itself is not applied in metadata unless the consumer defines SQLSOURCE_ATTRIBUTES.  SqlSourceConverterAttribute
+    // is not [Conditional]: a library's converters are found in its metadata by the projects that reference it.
     //
     // This file goes into every project that references the package, including one that targets a framework older
     // than .NET 8 and so compiles as C# 7.3.  It therefore uses nothing newer: no "#nullable" and no "string?".  Such
@@ -254,6 +258,18 @@ internal static class AttributeSource
                 /// The name of the query.
                 /// </summary>
                 public string QueryName { get; }
+            }
+
+            /// <summary>
+            /// Marks a static method of one argument as a conversion from its argument's type to its return type, which
+            /// the generated query methods call to read a column into a property of the return type or to bind a
+            /// parameter of that type from the argument's.  It is not conditional, unlike
+            /// <see cref="SqlSourceGenerateAttribute" />: a project that references a library finds the library's
+            /// converters in its metadata, so the attribute has to stay there.
+            /// </summary>
+            [global::System.AttributeUsage(global::System.AttributeTargets.Method)]
+            internal sealed class SqlSourceConverterAttribute : global::System.Attribute
+            {
             }
 
             /// <summary>

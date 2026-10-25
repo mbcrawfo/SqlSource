@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -92,6 +93,62 @@ public sealed partial class AttributeSourceTests
         exception.Message.ShouldBe(message);
         type.GetProperty("QueryName")!.GetValue(exception).ShouldBe("GetUser");
     }
+
+    // A library's converters have to be found from the project that references it, so the attribute stays in metadata.
+    [Fact]
+    public void Text_ConverterAttribute_TargetsMethodsAndIsNotConditional()
+    {
+        var compilation = CompileText();
+
+        compilation.GetDiagnostics(TestContext.Current.CancellationToken).ShouldBeEmpty();
+        var attribute = compilation
+            .GetTypeByMetadataName(AttributeSource.ConverterAttributeMetadataName)
+            .ShouldNotBeNull();
+        attribute.DeclaredAccessibility.ShouldBe(Accessibility.Internal);
+        attribute.IsSealed.ShouldBeTrue();
+        attribute.BaseType!.ToDisplayString().ShouldBe("System.Attribute");
+        var usage = attribute.GetAttributes().Single(a => a.AttributeClass!.Name == "AttributeUsageAttribute");
+        usage.ConstructorArguments.Single().Value.ShouldBe((int)AttributeTargets.Method);
+        attribute.GetAttributes().ShouldNotContain(a => a.AttributeClass!.Name == "ConditionalAttribute");
+    }
+
+    [Fact]
+    public void Text_ConverterAttributeOnAMethod_StaysInMetadata()
+    {
+        var library = CompileLibrary(
+            "Library",
+            AttributeSource.Text,
+            "public static class C { [SqlSource.SqlSourceConverter] public static int F(long v) => (int)v; }"
+        );
+        using var image = new MemoryStream();
+        library.Emit(image, cancellationToken: TestContext.Current.CancellationToken).Success.ShouldBeTrue();
+        image.Position = 0;
+        var consumer = CSharpCompilation.Create(
+            "Consumer",
+            references: References().Append(MetadataReference.CreateFromImage(image.ToArray())),
+            options: new CSharpCompilationOptions(RoslynOutputKind.DynamicallyLinkedLibrary)
+        );
+
+        var method = consumer.GetTypeByMetadataName("C")!.GetMembers("F").OfType<IMethodSymbol>().Single();
+
+        method
+            .GetAttributes()
+            .Select(attribute => attribute.AttributeClass!.ToDisplayString())
+            .ShouldBe(["SqlSource.SqlSourceConverterAttribute"]);
+    }
+
+    private static CSharpCompilation CompileLibrary(string name, params string[] sources) =>
+        CSharpCompilation.Create(
+            name,
+            sources.Select(source => CSharpSyntaxTree.ParseText(source)),
+            References(),
+            new CSharpCompilationOptions(RoslynOutputKind.DynamicallyLinkedLibrary)
+        );
+
+    private static IEnumerable<MetadataReference> References() =>
+        ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+            .Split(Path.PathSeparator)
+            .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path));
 
     private static CSharpCompilation CompileText() =>
         CSharpCompilation.Create(

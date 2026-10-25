@@ -2,7 +2,7 @@
 
 ## Problem
 
-The generator adds `SqlSourceGenerateAttribute`, `SqlLocation`, `GeneratorOutput`, `GeneratorModelType`, `GeneratorCollectionType`, `MethodLocation` and `UnexpectedRowCountException` to every project that references it, as internal types in the namespace `SqlSource`; see [`AttributeSource`](../../src/SqlSource/Generation/AttributeSource.cs).  When project A uses SqlSource and declares `InternalsVisibleTo` for project B, and B uses SqlSource too, B sees two copies of each type: its own and A's.  The compiler picks B's own and reports warning CS0436 at every use of one of them in B's code.
+The generator adds `SqlSourceGenerateAttribute`, `SqlLocation`, `GeneratorOutput`, `GeneratorModelType`, `GeneratorCollectionType`, `MethodLocation`, `UnexpectedRowCountException` and `SqlSourceConverterAttribute` to every project that references it, as internal types in the namespace `SqlSource`; see [`AttributeSource`](../../src/SqlSource/Generation/AttributeSource.cs).  When project A uses SqlSource and declares `InternalsVisibleTo` for project B, and B uses SqlSource too, B sees two copies of each type: its own and A's.  The compiler picks B's own and reports warning CS0436 at every use of one of them in B's code.
 
 The two copies of `UnexpectedRowCountException` are two types, so the conflict also has an effect that no warning shows: a `catch (UnexpectedRowCountException)` in B binds to B's copy, and does not catch the exception that a generated method of A throws, which is A's.  B catches `InvalidOperationException`, from which both derive, as the manual's [query methods](../manual/generator.md#unexpected-row-count) say.
 
