@@ -419,6 +419,8 @@ public sealed class MethodWriterTests
         methods.ShouldContain("global::App.UserId.FromDatabase(");
         methods.ShouldContain("global::System.Array.ConvertAll<int?, global::App.UserId>(");
         methods.ShouldContain("global::System.Array.ConvertAll<global::App.UserId, int>(");
+        methods.ShouldNotContain("static " + name + " =>");
+        methods.ShouldNotContain("is { } " + name + " ?");
     }
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);

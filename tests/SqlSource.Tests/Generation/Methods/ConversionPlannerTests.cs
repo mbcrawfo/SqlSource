@@ -274,6 +274,64 @@ public sealed class ConversionPlannerTests
         ]);
     }
 
+    // An element the override writes nullable, UserId? or Email?, is converted by the edges of the type without its ?,
+    // and the conversion keeps the element as the property writes it.
+    [Theory]
+    [InlineData(UserId + "?", "long", true, true)]
+    [InlineData(Email + "?", "string", false, false)]
+    public void Plan_ArrayOfANullableElement_UsesTheEdgesOfTheElementWithoutItsQuestionMark(
+        string element,
+        string databaseElement,
+        bool databaseIsValueType,
+        bool elementIsValueType
+    )
+    {
+        var type = Overridden(
+            element + "[]",
+            false,
+            "public.ids[]",
+            databaseElement + "[]",
+            false,
+            elementIsValueType: databaseIsValueType
+        );
+        var bare = element[..^1];
+        var converters = Of(
+            Project("global::MyApp.Ids.From", databaseElement, databaseIsValueType, bare, elementIsValueType),
+            Project("global::MyApp.Ids.To", bare, elementIsValueType, databaseElement, databaseIsValueType)
+        );
+
+        foreach (var (isRead, method) in new[] { (true, "global::MyApp.Ids.From"), (false, "global::MyApp.Ids.To") })
+        {
+            var (conversion, problems, blocked) = Plan(type, isRead, converters);
+
+            conversion.ShouldBe(
+                new Conversion(method, databaseElement + "[]", databaseIsValueType, true, element, elementIsValueType)
+            );
+            conversion!.ElementIsNullable.ShouldBeTrue();
+            problems.ShouldBeEmpty();
+            blocked.ShouldBeFalse();
+        }
+    }
+
+    // A nullable element is decided as the type without its ?, so converters of another type are SQLSRC279 for it,
+    // and not a read as the driver reads it.
+    [Fact]
+    public void Plan_ArrayOfANullableElementWithConvertersOfAnotherType_ReportsSQLSRC279()
+    {
+        var type = Overridden(UserId + "?[]", false, "public.user_id[]", "long[]", false, elementIsValueType: true);
+        var converters = Of(Project("global::MyApp.Ids.ToUserId", "int", true, UserId, true));
+
+        var (conversion, problems, blocked) = Plan(type, isRead: true, converters, "column 'ids'");
+
+        conversion.ShouldBeNull();
+        blocked.ShouldBeTrue();
+        problems.ShouldBe([
+            "SQLSRC279: The element of column 'ids' has type 'MyApp.UserId', whose converters convert from and to "
+                + "'int', and not from and to 'long', the type the database type 'public.user_id' is read as.  Add a "
+                + "converter between 'MyApp.UserId' and 'long'.",
+        ]);
+    }
+
     // An override of the array to a type with its own converter takes that one, not the element's.
     [Fact]
     public void Plan_ArrayOverrideWithItsOwnEdge_DoesNotUseTheElements()

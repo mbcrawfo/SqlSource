@@ -108,7 +108,6 @@ internal sealed record MethodColumn(
         {
             null => TypeText,
             { IsByElement: false } read => read.DatabaseText,
-            { DatabaseIsValueType: true } read => read.DatabaseElementText + "?[]",
-            var read => read.DatabaseText,
+            var read => read.ReadElementText + "[]",
         };
 }

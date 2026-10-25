@@ -619,8 +619,8 @@ internal static class QueryMethodWriter
     }
 
     // Array.ConvertAll of the database's array, by a static lambda that converts each element that is not null.  A
-    // NULL element of a value type throws, naming the column, which Npgsql's throw does not; one of a reference type
-    // stays null.
+    // NULL element of a value type throws, naming the column, which Npgsql's throw does not; one of a reference type,
+    // or of an element the property writes nullable, stays null.
     private static void AppendByElement(
         StringBuilder builder,
         MethodColumn column,
@@ -630,11 +630,9 @@ internal static class QueryMethodWriter
     )
     {
         var names = locals.ConversionNames;
-        // The element of the array read, Y? or Y.
-        var readText = column.ReadText;
         _ = builder
             .Append("global::System.Array.ConvertAll<")
-            .Append(readText, 0, readText.Length - 2)
+            .Append(read.ReadElementText)
             .Append(", ")
             .Append(read.ElementText)
             .Append(">(");
@@ -651,12 +649,22 @@ internal static class QueryMethodWriter
             .Append('(')
             .Append(names.Item)
             .Append(") : ");
-        _ = read.ElementIsValueType
-            ? builder
+        if (read.ElementIsNullable)
+        {
+            _ = builder.Append("null");
+        }
+        else if (!read.ElementIsValueType)
+        {
+            _ = builder.Append("null!");
+        }
+        else
+        {
+            _ = builder
                 .Append("throw new global::System.InvalidCastException(")
                 .Append(SymbolDisplay.FormatLiteral("Column '" + column.Name + "' holds a null element.", quote: true))
-                .Append(')')
-            : builder.Append("null!");
+                .Append(')');
+        }
+
         _ = builder.Append(')');
     }
 

@@ -872,6 +872,46 @@ public sealed class ConverterMethodTests
         methods.ShouldNotContain("global::App.Email.");
     }
 
+    // An override of the array to one of a nullable element, UserId?[], converts by the edges of UserId, and a NULL
+    // element stays null, the converter not called for it, either way.
+    [Fact]
+    public void Run_ArrayOverrideOfANullableValueElement_KeepsANullElement()
+    {
+        var userIds = ArrayOf(
+            TestSidecars.Postgres(
+                name: "user_id",
+                kind: SidecarValues.Kind.Domain,
+                schema: "public",
+                internalName: "user_id",
+                baseType: Catalog("int8")
+            ),
+            "_user_id"
+        );
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: public.user_id[]=App.UserId?[]\n-- name: FindIds\n"
+                + "SELECT ids FROM teams WHERE ids = @ids;\n"
+        );
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "FindIds", [Parameter("ids", userIds, nullable: false)], [Column("ids", userIds)])],
+            AppSourceOf(Struct)
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(
+            "(global::System.Array.ConvertAll<long?, global::App.UserId?>(reader.GetFieldValue<long?[]>(0), "
+                + "static element => element is { } item ? global::App.Conversions.ToUserId(item) : null))"
+        );
+        methods.ShouldContain(
+            "parameter.Value = parameters.Ids is { } value ? (object)global::System.Array.ConvertAll<"
+                + "global::App.UserId?, long?>(value, static element => element is { } item ? "
+                + "global::App.Conversions.FromUserId(item) : null) : global::System.DBNull.Value;\n"
+        );
+    }
+
     private static GeneratorRun RunEmailsColumn(string kind, bool nullable)
     {
         var file = new SqlFile(

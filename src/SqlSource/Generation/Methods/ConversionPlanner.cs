@@ -17,9 +17,9 @@ namespace SqlSource.Generation.Methods;
 /// A converter is an edge from its argument's type to its return type.  For a property of type <c>T</c> whose database
 /// type the base map reads as <c>B</c>, a column needs the edge <c>B → T</c>, a parameter <c>T → B</c>.  An array
 /// <c>X[]</c> over <c>Y[]</c> that no converter touches is converted element by element, by the edges of <c>X</c>
-/// and <c>Y</c>.  A type the base map gives, as <c>DateTimeOffset</c>, is never an error, so that a converter between
-/// it and another type does not touch the columns the override reads as it.  Anything else is read and bound as the
-/// driver reads and binds the type.
+/// and <c>Y</c>, and so is <c>X?[]</c>.  A type the base map gives, as <c>DateTimeOffset</c>, is never an error, so
+/// that a converter between it and another type does not touch the columns the override reads as it.  Anything else
+/// is read and bound as the driver reads and binds the type.
 /// </remarks>
 internal static class ConversionPlanner
 {
@@ -68,7 +68,7 @@ internal static class ConversionPlanner
 
         var decision = new Decision(isRead, engine, converters, subject, at, problems);
         var text = type.Text;
-        var element = ElementOf(text);
+        var element = EdgeElementOf(text);
         if (database.Text is not { } databaseText)
         {
             // A foreign type with converters, else a foreign element with them, which the message names.
@@ -122,7 +122,7 @@ internal static class ConversionPlanner
                     databaseText,
                     database.ElementIsValueType,
                     true,
-                    element,
+                    ElementOf(text),
                     elementIsValueType,
                     byElement.WarningIds
                 );
@@ -141,6 +141,19 @@ internal static class ConversionPlanner
     /// </summary>
     public static string? ElementOf(string text) =>
         text.EndsWith("[]", StringComparison.Ordinal) ? text.Substring(0, text.Length - 2) : null;
+
+    /// <summary>
+    /// The element of an array's C# type whose edges convert it element by element, or null: the element without the
+    /// <c>?</c> it is written nullable with, <c>global::App.UserId</c> of <c>global::App.UserId?[]</c>, since a
+    /// converter never sees a null.
+    /// </summary>
+    public static string? EdgeElementOf(string text)
+    {
+        var element = ElementOf(text);
+        return element is not null && element.EndsWith("?", StringComparison.Ordinal)
+            ? element.Substring(0, element.Length - 1)
+            : element;
+    }
 
     // The key of an array's element: an entry of the array is keyed by its element's key with [], and the override of
     // the element gives the element's key itself.

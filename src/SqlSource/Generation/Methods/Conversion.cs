@@ -1,3 +1,5 @@
+using System;
+
 namespace SqlSource.Generation.Methods;
 
 /// <summary>
@@ -18,11 +20,13 @@ namespace SqlSource.Generation.Methods;
 /// <paramref name="ElementText" /> and <paramref name="DatabaseText" /> an array of the converter's database side.
 /// </param>
 /// <param name="ElementText">
-/// The element of the property's type, which the converter takes or returns, for a conversion by element; null
-/// otherwise.
+/// The element of the property's type as the property writes it, for a conversion by element; null otherwise.  The
+/// converter takes or returns it without the <c>?</c> of a nullable element, <c>global::App.UserId</c> of
+/// <c>global::App.UserId?</c>.
 /// </param>
 /// <param name="ElementIsValueType">
-/// Whether <paramref name="ElementText" /> is a value type, for a conversion by element; false otherwise.
+/// Whether the element that the converter takes or returns is a value type, for a conversion by element; false
+/// otherwise.
 /// </param>
 /// <param name="WarningIds">
 /// The ids of the compiler's warnings that a call of the converter gives, which the file of its method disables, in
@@ -43,4 +47,18 @@ internal sealed record Conversion(
     /// <c>string</c> of <c>string[]</c>; null otherwise.
     /// </summary>
     public string? DatabaseElementText => IsByElement ? ConversionPlanner.ElementOf(DatabaseText) : null;
+
+    /// <summary>
+    /// The element of the array that a column converted by element is read as: <c>long?</c> of <c>long[]</c> when
+    /// the database's element is a value type, since Npgsql refuses to read an array that holds a <c>NULL</c> as
+    /// <c>long[]</c>, and <c>string</c> of <c>string[]</c> otherwise; null when not by element.
+    /// </summary>
+    public string? ReadElementText =>
+        DatabaseIsValueType && DatabaseElementText is { } element ? element + "?" : DatabaseElementText;
+
+    /// <summary>
+    /// Whether the property's element is written nullable, <c>global::App.UserId?</c> or <c>global::App.Name?</c>,
+    /// for a conversion by element: a <c>NULL</c> element then stays null both ways, the converter not called for it.
+    /// </summary>
+    public bool ElementIsNullable => ElementText is { } element && element.EndsWith("?", StringComparison.Ordinal);
 }

@@ -69,22 +69,33 @@ public sealed class ParameterBinderTests
     }
 
     // An array is converted element by element into the database's array, by a static lambda whose names are the
-    // method's; a null element of a reference type is sent as a null element.
+    // method's; a null element of a reference type, or of an element written nullable, is sent as a null element.
     [Theory]
     [InlineData(
+        "global::App.Id",
         "long[]",
         true,
         true,
         "global::System.Array.ConvertAll<global::App.Id, long>(v1, static e1 => global::App.Ids.ToDatabase(e1))"
     )]
     [InlineData(
+        "global::App.Id",
         "string[]",
         false,
         false,
         "global::System.Array.ConvertAll<global::App.Id?, string?>(v1, "
             + "static e1 => e1 is { } i1 ? global::App.Ids.ToDatabase(i1) : null)"
     )]
+    [InlineData(
+        "global::App.Id?",
+        "long[]",
+        true,
+        true,
+        "global::System.Array.ConvertAll<global::App.Id?, long?>(v1, "
+            + "static e1 => e1 is { } i1 ? global::App.Ids.ToDatabase(i1) : null)"
+    )]
     public void Append_ArrayConvertedByElement_SendsTheConvertedArray(
+        string elementText,
         string databaseText,
         bool databaseIsValueType,
         bool elementIsValueType,
@@ -96,7 +107,7 @@ public sealed class ParameterBinderTests
             databaseText,
             databaseIsValueType,
             true,
-            "global::App.Id",
+            elementText,
             elementIsValueType
         );
         foreach (var engine in new[] { DatabaseEngine.PostgreSql, DatabaseEngine.SqlServer })

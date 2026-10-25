@@ -626,6 +626,37 @@ public sealed class QueryMethodWriterTests
         );
     }
 
+    // An element the property writes nullable keeps a NULL element as null, the converter not called for it.
+    [Fact]
+    public void Append_ColumnOfANullableElementConvertedByElement_KeepsANullElement()
+    {
+        var column = new MethodColumn(
+            "ids",
+            "Ids",
+            "global::App.UserId?[]",
+            false,
+            new Conversion("global::App.UserId.FromDatabase", "long[]", true, true, "global::App.UserId?", true)
+        );
+
+        var text = Write(
+            GetUser with
+            {
+                Output = GetUser.Output! with
+                {
+                    Columns = TestModels.Array(column),
+                    ConstructorOrder = TestModels.Array(0),
+                },
+            }
+        );
+
+        column.ReadText.ShouldBe("long?[]");
+        text.ShouldContain(
+            "new global::App.GetUserDto(global::System.Array.ConvertAll<long?, global::App.UserId?>("
+                + "reader.GetFieldValue<long?[]>(0), "
+                + "static element => element is { } item ? global::App.UserId.FromDatabase(item) : null))"
+        );
+    }
+
     [Fact]
     public void Append_SummaryOfTheQuery_IsTheMethodsSummary() =>
         Write(GetUser with { SummaryXml = "Finds a user by <c>id</c>,\nor none." })

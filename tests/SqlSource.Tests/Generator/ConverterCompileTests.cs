@@ -13,8 +13,8 @@ namespace SqlSource.Tests.Generator;
 
 // The methods that read and bind through converters, compiled against each driver the generator supports, as
 // MethodCompileTests compiles those without: a column and a parameter converted from and to a value type and a
-// reference type, nullable and not, in a query of each shape, on PostgreSQL arrays converted element by element and as
-// a whole, and on SqlClient a vector read and bound through one.
+// reference type, nullable and not, in a query of each shape, on PostgreSQL arrays converted element by element, of
+// elements written nullable too, and as a whole, and on SqlClient a vector read and bound through one.
 // The compilation reports every warning wave, so the converted code compiles with no error and no warning in what is
 // generated.  Each run is at CodeGen.
 public sealed class ConverterCompileTests
@@ -104,18 +104,26 @@ public sealed class ConverterCompileTests
         -- type-override: varchar=App.Name
         -- type-override: int4=App.Level
         -- type-override: text[]=App.Tags
+        -- type-override: public.user_id[]=App.UserId?[]
+        -- type-override: bpchar[]=App.Name?[]
         -- name: ListUsers
-        SELECT id, manager, email, contact, name, nickname, ids, emails, names, levels, tags FROM users
+        SELECT id, manager, email, contact, name, nickname, ids, emails, names, levels, tags, managers, aliases
+        FROM users
         WHERE id = @id OR manager = @manager OR email = @email OR name = @name
-            OR ids = @ids OR emails = @emails OR names = @names OR levels = @levels OR tags = @tags;
+            OR ids = @ids OR emails = @emails OR names = @names OR levels = @levels OR tags = @tags
+            OR managers = @managers OR aliases = @aliases;
         -- name: GetUser -> one
-        SELECT id, manager, email, contact, name, nickname, ids, emails, names, levels, tags FROM users
+        SELECT id, manager, email, contact, name, nickname, ids, emails, names, levels, tags, managers, aliases
+        FROM users
         WHERE id = @id OR manager = @manager OR email = @email OR name = @name
-            OR ids = @ids OR emails = @emails OR names = @names OR levels = @levels OR tags = @tags;
+            OR ids = @ids OR emails = @emails OR names = @names OR levels = @levels OR tags = @tags
+            OR managers = @managers OR aliases = @aliases;
         -- name: FindUser -> one-optional
-        SELECT id, manager, email, contact, name, nickname, ids, emails, names, levels, tags FROM users
+        SELECT id, manager, email, contact, name, nickname, ids, emails, names, levels, tags, managers, aliases
+        FROM users
         WHERE id = @id OR manager = @manager OR email = @email OR name = @name
-            OR ids = @ids OR emails = @emails OR names = @names OR levels = @levels OR tags = @tags;
+            OR ids = @ids OR emails = @emails OR names = @names OR levels = @levels OR tags = @tags
+            OR managers = @managers OR aliases = @aliases;
         -- name: RenameUser
         UPDATE users SET name = @name, email = @email, manager = @manager WHERE id = @id;
 
@@ -150,6 +158,18 @@ public sealed class ConverterCompileTests
     private static readonly PostgresType Int8 = Catalog("int8");
 
     private static readonly PostgresType Varchar = Catalog("varchar");
+
+    // The array of the domain user_id over int8, which the override reads as UserId?[].
+    private static readonly PostgresType UserIds = ArrayOf(
+        TestSidecars.Postgres(
+            name: "user_id",
+            kind: SidecarValues.Kind.Domain,
+            schema: "public",
+            internalName: "user_id",
+            baseType: Catalog("int8")
+        ),
+        "_user_id"
+    );
 
     // The domain email over text.
     private static readonly PostgresType EmailDomain = TestSidecars.Postgres(
@@ -201,6 +221,8 @@ public sealed class ConverterCompileTests
             Parameter("names", ArrayOf(Varchar, "_varchar"), nullable: false),
             Parameter("levels", ArrayOf(Int4, "_int4"), nullable: true),
             Parameter("tags", ArrayOf(Text, "_text"), nullable: false),
+            Parameter("managers", UserIds, nullable: false),
+            Parameter("aliases", ArrayOf(Catalog("bpchar"), "_bpchar"), nullable: true),
         ];
         SidecarColumn[] columns =
         [
@@ -215,6 +237,8 @@ public sealed class ConverterCompileTests
             Column("names", ArrayOf(Varchar, "_varchar")),
             Column("levels", ArrayOf(Int4, "_int4"), nullable: true),
             Column("tags", ArrayOf(Text, "_text")),
+            Column("managers", UserIds),
+            Column("aliases", ArrayOf(Catalog("bpchar"), "_bpchar"), nullable: true),
         ];
 
         var run = MethodRuns.Run(
@@ -259,6 +283,15 @@ public sealed class ConverterCompileTests
         methods.ShouldContain("(object)global::System.Array.ConvertAll<global::App.Name?, string?>(value, ");
         methods.ShouldContain("(object)global::System.Array.ConvertAll<global::App.Level?, int?>(value, ");
         methods.ShouldContain("parameters.Tags is { } value ? (object)global::App.Tags.ToDatabase(value)");
+        methods.ShouldContain(
+            "global::System.Array.ConvertAll<long?, global::App.UserId?>(reader.GetFieldValue<long?[]>(11), "
+        );
+        methods.ShouldContain(
+            "reader.IsDBNull(12) ? default(global::App.Name?[]?) : "
+                + "global::System.Array.ConvertAll<string, global::App.Name?>(reader.GetFieldValue<string[]>(12), "
+        );
+        methods.ShouldContain("(object)global::System.Array.ConvertAll<global::App.UserId?, long?>(value, ");
+        methods.ShouldContain("(object)global::System.Array.ConvertAll<global::App.Name?, string?>(value, ");
     }
 
     private static void RunOnSqlClient(MetadataReference reference)

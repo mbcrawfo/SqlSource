@@ -143,13 +143,14 @@ internal abstract class ParameterBinder
         _ = builder.Append(" : global::System.DBNull.Value");
     }
 
-    // Array.ConvertAll of the value, by a static lambda that converts each element.  An element of a reference type
-    // can be null, and a null is sent as a NULL element, the converter not called for it.
+    // Array.ConvertAll of the value, by a static lambda that converts each element.  An element of a reference type,
+    // or one the property writes nullable, can be null, and a null is sent as a NULL element, the converter not called
+    // for it; the result's element is then nullable, of any database element, unlike the element a column is read as.
     private static void AppendByElement(StringBuilder builder, Conversion write, ConversionNames names)
     {
-        var (element, database) = write.ElementIsValueType
-            ? (write.ElementText, write.DatabaseElementText)
-            : (write.ElementText + "?", write.DatabaseElementText + "?");
+        var canBeNull = write.ElementIsNullable || !write.ElementIsValueType;
+        var element = canBeNull && !write.ElementIsNullable ? write.ElementText + "?" : write.ElementText;
+        var database = canBeNull ? write.DatabaseElementText + "?" : write.DatabaseElementText;
         _ = builder
             .Append("global::System.Array.ConvertAll<")
             .Append(element)
@@ -160,7 +161,7 @@ internal abstract class ParameterBinder
             .Append(", static ")
             .Append(names.Element)
             .Append(" => ");
-        if (write.ElementIsValueType)
+        if (!canBeNull)
         {
             _ = builder.Append(write.Method).Append('(').Append(names.Element).Append(')');
         }

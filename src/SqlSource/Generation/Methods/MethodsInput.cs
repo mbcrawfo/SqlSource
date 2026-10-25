@@ -123,7 +123,7 @@ internal sealed record MethodsInput(
         foreach (var text in texts)
         {
             AddEach(converters.Touching(text), ref found);
-            if (ConversionPlanner.ElementOf(text) is { } element)
+            if (ConversionPlanner.EdgeElementOf(text) is { } element)
             {
                 AddEach(converters.Touching(element), ref found);
             }
