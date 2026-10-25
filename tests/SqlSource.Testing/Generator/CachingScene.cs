@@ -125,9 +125,22 @@ internal sealed class CachingScene
     // the one of its file.
     public GeneratorDriver FirstRunOfMethods(Compilation compilation, params InMemoryAdditionalText[] given)
     {
+        var driver = FirstRunOfMethodsWith(compilation, Users, given);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        return driver;
+    }
+
+    // The same with this file in place of Users, its sidecar written for it, and the run's diagnostics left to the
+    // test.
+    public GeneratorDriver FirstRunOfMethodsWith(
+        Compilation compilation,
+        InMemoryAdditionalText users,
+        params InMemoryAdditionalText[] given
+    )
+    {
         var sidecars = new List<InMemoryAdditionalText>
         {
-            TypedSidecar(Users, "GetUser", "int4"),
+            TypedSidecar(users, "GetUser", "int4"),
             TypedSidecar(Orders, "GetOrder", "int4"),
         };
         foreach (var sidecar in given)
@@ -136,11 +149,9 @@ internal sealed class CachingScene
             sidecars.Add(sidecar);
         }
 
-        var driver = GeneratorHarness
-            .CreateDriver([Users, Orders, .. sidecars], new TestOptionsProvider(OutputKind.CodeGen, null, "postgres"))
+        return GeneratorHarness
+            .CreateDriver([users, Orders, .. sidecars], new TestOptionsProvider(OutputKind.CodeGen, null, "postgres"))
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
-        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
-        return driver;
     }
 
     // The compilation with this source of UserQueries in place of the one it has.
