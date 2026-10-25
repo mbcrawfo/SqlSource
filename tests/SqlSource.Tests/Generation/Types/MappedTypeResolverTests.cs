@@ -4,6 +4,8 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
+using SqlSource.Generation;
+using SqlSource.Generation.Converters;
 using SqlSource.Generation.Types;
 using SqlSource.Testing.Generator;
 using Xunit;
@@ -224,7 +226,72 @@ public sealed class MappedTypeResolverTests
         }
         """;
 
+    // A library with the converter attribute, as the generator gives it to every project, on a type with converters,
+    // one without, one whose converter the project cannot call, one whose converter it cannot see, and one that is no
+    // mapped type.
+    private const string LibrarySource = """
+        namespace Lib
+        {
+            public readonly record struct Email(string Value)
+            {
+                [SqlSource.SqlSourceConverter]
+                public static Email From(string v) => new(v);
+
+                [SqlSource.SqlSourceConverter]
+                public static string To(Email e) => e.Value;
+            }
+
+            public sealed class Plain
+            {
+                public static Plain Make(string v) => new();
+            }
+
+            public class Locked
+            {
+                [SqlSource.SqlSourceConverter]
+                protected static Locked From(string v) => new();
+            }
+
+            // The compiler does not read the internal members of a reference that shows the project none.
+            public sealed class Hidden
+            {
+                [SqlSource.SqlSourceConverter]
+                internal static Hidden From(string v) => new();
+            }
+
+            // A static class, which can be no property's type.
+            public static class Conversions
+            {
+                [SqlSource.SqlSourceConverter]
+                public static Email ToEmail(int v) => new(v.ToString());
+            }
+        }
+        """;
+
+    // A converter of the project's own source, which the attribute's step reads and the resolver leaves alone.
+    private const string ConvertingSource = """
+        namespace MyApp
+        {
+            public readonly record struct Phone(string Value)
+            {
+                [SqlSource.SqlSourceConverter]
+                public static Phone From(string v) => new(v);
+            }
+        }
+        """;
+
     private static readonly EquatableArray<string> NoWarnings = EquatableArray<string>.Empty;
+
+    // A project with the converter attribute and a converter of its own, and the library as a reference.
+    private static readonly Lazy<CSharpCompilation> ConvertingProject = new(() =>
+        GeneratorHarness.CreateCompilation(
+            [
+                new SourceFile("/app/SqlSourceGenerateAttribute.g.cs", AttributeSource.Text),
+                new SourceFile("/app/MyApp.cs", ConvertingSource),
+            ],
+            references: [GeneratorHarness.CreateReference(OutputKind.Sql, "Lib", LibrarySource)]
+        )
+    );
 
     // The project, with four references: two that share names, public in both, public in one alone, or internal in
     // both, the first of which also has a name of the project; one that shows the project its internals; and one
@@ -358,7 +425,7 @@ public sealed class MappedTypeResolverTests
         string warningIds
     )
     {
-        var types = MappedTypeResolver.Resolve(Project.Value, Names(name), TestContext.Current.CancellationToken);
+        var types = MappedTypeResolver.Resolve(Project.Value, Names(name), TestContext.Current.CancellationToken).Types;
 
         types
             .ShouldHaveSingleItem()
@@ -458,7 +525,7 @@ public sealed class MappedTypeResolverTests
     [InlineData("global::MyApp.ValueBox<int?[]>", false)]
     public void Resolve_GenericName_IsFoundWhenItsArgumentsMeetTheConstraints(string name, bool meets)
     {
-        var types = MappedTypeResolver.Resolve(Project.Value, Names(name), TestContext.Current.CancellationToken);
+        var types = MappedTypeResolver.Resolve(Project.Value, Names(name), TestContext.Current.CancellationToken).Types;
 
         var reports = CompilerReports(name);
         if (meets)
@@ -497,7 +564,7 @@ public sealed class MappedTypeResolverTests
     )]
     public void Resolve_NameWithTwoFailures_GivesTheFirstInTheOrderOfTheStatuses(string name, string status)
     {
-        var types = MappedTypeResolver.Resolve(Project.Value, Names(name), TestContext.Current.CancellationToken);
+        var types = MappedTypeResolver.Resolve(Project.Value, Names(name), TestContext.Current.CancellationToken).Types;
 
         types.ShouldHaveSingleItem().Status.ShouldBe(Enum.Parse<MappedTypeStatus>(status));
     }
@@ -507,7 +574,7 @@ public sealed class MappedTypeResolverTests
     {
         var names = Names("global::MyApp.Missing", "global::MyApp.UserId", "int");
 
-        var types = MappedTypeResolver.Resolve(Project.Value, names, TestContext.Current.CancellationToken);
+        var types = MappedTypeResolver.Resolve(Project.Value, names, TestContext.Current.CancellationToken).Types;
 
         types.ShouldBe([
             new MappedType("global::MyApp.Missing", MappedTypeStatus.NotFound, false, false, NoWarnings),
@@ -520,33 +587,147 @@ public sealed class MappedTypeResolverTests
     }
 
     [Fact]
-    public void Resolve_NoNames_GivesNoTypes()
+    public void Resolve_NoNames_GivesEmpty()
     {
-        var types = MappedTypeResolver.Resolve(
+        var resolved = MappedTypeResolver.Resolve(
             Project.Value,
             EquatableArray<string>.Empty,
             TestContext.Current.CancellationToken
         );
 
-        types.ShouldBeEmpty();
+        resolved.Types.ShouldBeEmpty();
+        resolved.Converters.ShouldBeEmpty();
     }
 
     [Fact]
     public void Resolve_TextThatIsNoType_IsNotFound()
     {
-        var types = MappedTypeResolver.Resolve(
-            Project.Value,
-            Names("not a type"),
-            TestContext.Current.CancellationToken
-        );
+        var types = MappedTypeResolver
+            .Resolve(Project.Value, Names("not a type"), TestContext.Current.CancellationToken)
+            .Types;
 
         types.ShouldHaveSingleItem().Status.ShouldBe(MappedTypeStatus.NotFound);
     }
 
     [Fact]
+    public void Resolve_TypeOfAReferenceWithConverters_GivesThem()
+    {
+        var resolved = MappedTypeResolver.Resolve(
+            ConvertingProject.Value,
+            Names("global::Lib.Email"),
+            TestContext.Current.CancellationToken
+        );
+
+        resolved.Types.ShouldHaveSingleItem().Status.ShouldBe(MappedTypeStatus.Found);
+        resolved.Converters.ShouldBe(EmailConverters);
+        resolved.Converters.ShouldAllBe(converter =>
+            converter.Origin == ConverterOrigin.MappedType && converter.Location == null
+        );
+        resolved.Converters[1].Method.ShouldBe("global::Lib.Email.From");
+    }
+
+    [Fact]
+    public void Resolve_ArrayOfSuchAType_GivesTheElementsConverters()
+    {
+        var resolved = MappedTypeResolver.Resolve(
+            ConvertingProject.Value,
+            Names("global::Lib.Email[]"),
+            TestContext.Current.CancellationToken
+        );
+
+        resolved.Types.ShouldHaveSingleItem().Status.ShouldBe(MappedTypeStatus.Found);
+        resolved.Converters.ShouldBe(EmailConverters);
+    }
+
+    [Fact]
+    public void Resolve_TypeNamedTwice_GivesItsConvertersOnce()
+    {
+        var resolved = MappedTypeResolver.Resolve(
+            ConvertingProject.Value,
+            Names("global::Lib.Email", "global::Lib.Email[]"),
+            TestContext.Current.CancellationToken
+        );
+
+        resolved.Types.Count.ShouldBe(2);
+        resolved.Converters.ShouldBe(EmailConverters);
+    }
+
+    [Fact]
+    public void Resolve_ConverterOfAReferenceWithAFault_KeepsTheFault()
+    {
+        var resolved = MappedTypeResolver.Resolve(
+            ConvertingProject.Value,
+            Names("global::Lib.Locked"),
+            TestContext.Current.CancellationToken
+        );
+
+        var converter = resolved.Converters.ShouldHaveSingleItem();
+        converter.Method.ShouldBe("global::Lib.Locked.From");
+        converter.Fault.ShouldBe("this project cannot call it");
+        converter.Origin.ShouldBe(ConverterOrigin.MappedType);
+        converter.Location.ShouldBeNull();
+    }
+
+    // An internal member of a reference without InternalsVisibleTo is not in the compilation at all, as in a build.
+    [Fact]
+    public void Resolve_InternalConverterOfAReference_IsNotSeen()
+    {
+        var resolved = MappedTypeResolver.Resolve(
+            ConvertingProject.Value,
+            Names("global::Lib.Hidden"),
+            TestContext.Current.CancellationToken
+        );
+
+        resolved.Types.ShouldHaveSingleItem().Status.ShouldBe(MappedTypeStatus.Found);
+        resolved.Converters.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Resolve_TypeOfTheProject_GivesNoConverters()
+    {
+        var resolved = MappedTypeResolver.Resolve(
+            ConvertingProject.Value,
+            Names("global::MyApp.Phone"),
+            TestContext.Current.CancellationToken
+        );
+
+        resolved.Types.ShouldHaveSingleItem().Status.ShouldBe(MappedTypeStatus.Found);
+        resolved.Converters.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Resolve_TypeWithoutConverters_GivesNone()
+    {
+        var resolved = MappedTypeResolver.Resolve(
+            ConvertingProject.Value,
+            Names("global::Lib.Plain", "global::System.Uri", "int"),
+            TestContext.Current.CancellationToken
+        );
+
+        resolved.Types.Count.ShouldBe(3);
+        resolved.Converters.ShouldBeEmpty();
+    }
+
+    // A name that fails gives no converters, though its type has some.
+    [Fact]
+    public void Resolve_NameThatFails_GivesNoConverters()
+    {
+        var resolved = MappedTypeResolver.Resolve(
+            ConvertingProject.Value,
+            Names("global::Lib.Conversions"),
+            TestContext.Current.CancellationToken
+        );
+
+        resolved.Types.ShouldHaveSingleItem().Status.ShouldBe(MappedTypeStatus.NotAPropertyType);
+        resolved.Converters.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Find_NameNotResolved_GivesNull()
     {
-        var types = MappedTypeResolver.Resolve(Project.Value, Names("int"), TestContext.Current.CancellationToken);
+        var types = MappedTypeResolver
+            .Resolve(Project.Value, Names("int"), TestContext.Current.CancellationToken)
+            .Types;
 
         MappedTypeResolver.Find(types, "long").ShouldBeNull();
         MappedTypeResolver.Find(EquatableArray<MappedType>.Empty, "int").ShouldBeNull();
@@ -582,6 +763,35 @@ public sealed class MappedTypeResolverTests
                 .Select(static diagnostic => diagnostic.ToString()),
         ];
     }
+
+    // The two converters of Lib.Email, in the order of ConverterSet: by argument, then by return type.
+    private static readonly Converter[] EmailConverters =
+    [
+        new(
+            "global::Lib.Email.To",
+            "Lib.Email.To(Lib.Email)",
+            "global::Lib.Email",
+            true,
+            "string",
+            false,
+            NoWarnings,
+            null,
+            ConverterOrigin.MappedType,
+            null
+        ),
+        new(
+            "global::Lib.Email.From",
+            "Lib.Email.From(string)",
+            "string",
+            false,
+            "global::Lib.Email",
+            true,
+            NoWarnings,
+            null,
+            ConverterOrigin.MappedType,
+            null
+        ),
+    ];
 
     private static EquatableArray<string> Names(params string[] names) => new(ImmutableArray.Create(names));
 }

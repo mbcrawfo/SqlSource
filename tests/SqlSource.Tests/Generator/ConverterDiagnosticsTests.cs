@@ -1,5 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
+using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using SqlSource.Generation;
@@ -462,6 +463,61 @@ public sealed class ConverterDiagnosticsTests
             .Converters.ShouldHaveSingleItem();
         converter.ArgumentText.ShouldBe("global::System.DateTime");
         converter.ReturnText.ShouldBe("global::System.DateTime");
+    }
+
+    // A converter of the project's source of an edge that a converter of a referenced mapped type has too replaces
+    // that one, with no SQLSRC278, and the mapped type's other converter is kept.
+    [Fact]
+    public void Run_ProjectConverterOfAnEdgeAReferenceHas_ReportsNothing()
+    {
+        var library = GeneratorHarness.CreateReference(
+            OutputKind.Sql,
+            "Lib",
+            """
+            namespace Lib;
+
+            public readonly record struct Email(string Value)
+            {
+                [SqlSource.SqlSourceConverter]
+                public static Email From(string v) => new(v);
+
+                [SqlSource.SqlSourceConverter]
+                public static string To(Email e) => e.Value;
+            }
+            """
+        );
+
+        var run = GeneratorHarness.Run(
+            OutputKind.Models,
+            [
+                new SourceFile(
+                    GeneratorHarness.SourcePath,
+                    """
+                    using SqlSource;
+
+                    namespace App;
+
+                    public static class Conversions
+                    {
+                        [SqlSourceConverter]
+                        public static Lib.Email ToEmail(string value) => new(value);
+                    }
+                    """
+                ),
+            ],
+            [],
+            references: [library],
+            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "text=Lib.Email" }
+        );
+
+        run.ShouldBeClean();
+        StepOutputs
+            .Single<ConverterSet>(run, TrackingNames.Converters)
+            .Converters.Select(converter => (converter.Method, converter.Origin))
+            .ShouldBe([
+                ("global::Lib.Email.To", ConverterOrigin.MappedType),
+                ("global::App.Conversions.ToEmail", ConverterOrigin.Project),
+            ]);
     }
 
     // The converters are found whatever the output, so a CodeGen project without a query gets the error too.

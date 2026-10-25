@@ -460,15 +460,21 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => MappedTypeNames.Collect(input.Left.Left, input.Left.Right, input.Right))
             .WithTrackingName(TrackingNames.MappedTypeNames);
 
-        // Those types resolved against the compilation.  Like the probe, it runs on every run, since the driver gives
-        // a new compilation each time: a few lookups for each name, and none without an override.  Its value is equal
-        // until a type appears or goes, so nothing after it runs again.
-        var mappedTypes = context
+        // Those types resolved against the compilation, with the converters declared on those of a referenced
+        // assembly.  Like the probe, it runs on every run, since the driver gives a new compilation each time: a few
+        // lookups for each name, and none without an override.  Its value is equal until a type or a converter appears,
+        // goes or changes, so nothing after it runs again.
+        var resolvedTypes = context
             .CompilationProvider.Combine(mappedTypeNames)
             .Select(
                 static (input, cancellationToken) =>
                     MappedTypeResolver.Resolve(input.Left, input.Right, cancellationToken)
             )
+            .WithTrackingName(TrackingNames.ResolvedTypes);
+
+        // The types alone, which the models read, so that a change to a library's converter types no file again.
+        var mappedTypes = resolvedTypes
+            .Select(static (resolved, _) => resolved.Types)
             .WithTrackingName(TrackingNames.MappedTypes);
 
         // The property's type override alone, so that a change to another property types no file again.
@@ -501,8 +507,11 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             each.Select(static (file, _) => file.Types).WithTrackingName(TrackingNames.FileTypes)
         );
 
-        // The converters of the mapped types of referenced assemblies, none until they are read.
-        var mappedTypeConverters = mappedTypes.Select(static (_, _) => EquatableArray<Converter>.Empty);
+        // The converters of the mapped types of referenced assemblies alone, so that a change to a type that leaves
+        // them alone finds no converter again.
+        var mappedTypeConverters = resolvedTypes
+            .Select(static (resolved, _) => resolved.Converters)
+            .WithTrackingName(TrackingNames.MappedTypeConverters);
 
         return new TypedFiles(npgsqlProbe, sqlClientProbe, typedFiles, fileTypes, mappedTypeConverters);
     }

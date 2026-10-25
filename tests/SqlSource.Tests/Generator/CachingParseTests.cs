@@ -78,7 +78,7 @@ public sealed class CachingParseTests
         AllReasons(result, TrackingNames.SupportedFramework).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.NpgsqlProbe).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.SqlClientProbe).ShouldBe([IncrementalStepRunReason.Unchanged]);
-        AllReasons(result, TrackingNames.MappedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.ResolvedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
         string[] steps =
         [
             TrackingNames.TargetTypes,
