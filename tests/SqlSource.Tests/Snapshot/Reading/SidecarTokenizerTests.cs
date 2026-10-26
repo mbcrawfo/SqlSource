@@ -75,6 +75,32 @@ public sealed class SidecarTokenizerTests
         tokens.Next().Kind.ShouldBe(SidecarTokenKind.End);
     }
 
+    [Fact]
+    public void Next_CommentsInLenientMode_AreSkippedAsWhiteSpace() =>
+        Tokens("// a\n/* b */ 1 /* c\n d */ // e", lenient: true).ShouldBe(["Number:1"]);
+
+    [Theory]
+    [InlineData("/ 1")]
+    [InlineData("// a\n1")]
+    public void Next_CommentInStrictMode_IsInvalidAtTheSlash(string text) =>
+        new SidecarTokenizer(text).Next().ShouldBe(new SidecarToken(SidecarTokenKind.Invalid, new TextSpan(0, 1)));
+
+    [Fact]
+    public void Next_BlockCommentNotClosed_IsInvalidAtTheEnd()
+    {
+        var tokens = new SidecarTokenizer("1 /* a", lenient: true);
+
+        tokens.Next().Kind.ShouldBe(SidecarTokenKind.Number);
+        tokens.Next().ShouldBe(new SidecarToken(SidecarTokenKind.Invalid, new TextSpan(6, 0)));
+        tokens.Next().Kind.ShouldBe(SidecarTokenKind.End);
+    }
+
+    [Fact]
+    public void Next_SlashThatStartsNoComment_IsInvalidAtTheSlash() =>
+        new SidecarTokenizer("/x", lenient: true)
+            .Next()
+            .ShouldBe(new SidecarToken(SidecarTokenKind.Invalid, new TextSpan(0, 1)));
+
     [Theory]
     [InlineData("\"\"", "")]
     [InlineData("\"abc\"", "abc")]
@@ -231,6 +257,45 @@ public sealed class SidecarTokenizerTests
     }
 
     [Theory]
+    [InlineData( /*lang=json*/
+        "{\"a\":1,}"
+    )]
+    [InlineData("[1,]")]
+    [InlineData( /*lang=json*/
+        "{\"a\":[1,2,],}"
+    )]
+    public void TrySkipValue_TrailingCommaInLenientMode_IsAccepted(string json)
+    {
+        var tokens = new SidecarTokenizer(json, lenient: true);
+
+        tokens.TrySkipValue(tokens.Next(), 0, out _).ShouldBeTrue();
+
+        tokens.Position.ShouldBe(json.Length);
+    }
+
+    [Fact]
+    public void TrySkipValue_TrailingCommaInStrictMode_IsTheClosingBracket()
+    {
+        var tokens = new SidecarTokenizer("[1,]");
+
+        tokens.TrySkipValue(tokens.Next(), 0, out var error).ShouldBeFalse();
+
+        error.ShouldBe(new TextSpan(3, 1));
+    }
+
+    [Theory]
+    [InlineData("{,}")]
+    [InlineData("[,]")]
+    public void TrySkipValue_CommaAloneInLenientMode_IsInvalid(string json)
+    {
+        var tokens = new SidecarTokenizer(json, lenient: true);
+
+        tokens.TrySkipValue(tokens.Next(), 0, out var error).ShouldBeFalse();
+
+        error.ShouldBe(new TextSpan(1, 1));
+    }
+
+    [Theory]
     [InlineData('[', ']', "")]
     [InlineData('{', '}', "\"a\":")]
     public void TrySkipValue_SixtyFourLevels_IsRead(char open, char close, string key)
@@ -304,9 +369,9 @@ public sealed class SidecarTokenizerTests
         return text.Append(close, levels).ToString();
     }
 
-    private static List<string> Tokens(string text)
+    private static List<string> Tokens(string text, bool lenient = false)
     {
-        var tokens = new SidecarTokenizer(text);
+        var tokens = new SidecarTokenizer(text, lenient: lenient);
         var found = new List<string>();
         for (var token = tokens.Next(); token.Kind != SidecarTokenKind.End; token = tokens.Next())
         {
