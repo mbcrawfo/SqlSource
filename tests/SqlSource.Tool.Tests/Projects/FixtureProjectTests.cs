@@ -59,7 +59,14 @@ public sealed class FixtureProjectTests : IDisposable
         manifest.TargetFramework.ShouldBe("net10.0");
         manifest.LangVersion.ShouldBe("14.0");
         manifest.DefineConstants.ShouldContain("NET8_0_OR_GREATER");
-        manifest.Properties.ShouldHaveSingleItem().ShouldBe(new("SqlSourceDialect", "postgres"));
+        // Besides its one setting, the folders of the build, which are the machine's and no setting.
+        manifest
+            .Properties.Where(pair => pair.Key != "SqlSourceBuildFolders")
+            .ShouldHaveSingleItem()
+            .ShouldBe(new("SqlSourceDialect", "postgres"));
+        manifest
+            .Properties["SqlSourceBuildFolders"]
+            .ShouldContain(Path.Combine(folder, "obj") + Path.DirectorySeparatorChar);
         var file = manifest.Files.ShouldHaveSingleItem();
         file.Path.ShouldBe(Path.Combine(folder, "Queries", "Users.sql"));
         file.Metadata.ShouldHaveSingleItem().ShouldBe(new("SqlSourceDatabase", "billing"));
