@@ -71,7 +71,7 @@ Plain data and the readers of values.  See [settings](../../docs/architecture/ge
 
 ## `SettingsFiles/`
 
-The reader of a settings file, `sqlsource.json`.  See [the settings file](../../docs/superpowers/specs/2026-10-25-settings-files-design.md#the-settings-file).
+The reader of a settings file, `sqlsource.json`.  See [settings files](../../docs/architecture/generator.md#settings-files).
 
 - **The reader never throws, and bounds nesting by `SidecarTokenizer.MaxDepth`.**  A user writes the file, and an exception in the generator costs every type its generated code.
 - **Never hand the walk of `SettingsFileReader` a text the grammar pass has not passed.**  The walk trusts the grammar, as `SidecarCursor` does; `SettingsFileReaderRobustnessTests` holds the two together.
