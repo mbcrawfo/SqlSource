@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Shouldly;
 using SqlSource.Generation.Chains;
+using SqlSource.Generation.Paths;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Chains;
@@ -116,6 +117,24 @@ public sealed class BuildFoldersTests
 
     [Fact]
     public void Contains_NoFolder_IsFalse() => BuildFolders.None.Contains("repo/obj/x.cs").ShouldBeFalse();
+
+    [Fact]
+    public void ReachingPaths_PathsUnderAFolder_AreLeftOut() =>
+        BuildFolders
+            .Of("|/repo/App/obj/|")
+            .ReachingPaths(["/repo/App/A.cs", "/repo/App/obj/G.cs", "/repo/App/objects/B.cs"])
+            .ShouldBe([SqlPath.Normalize("/repo/App/A.cs"), SqlPath.Normalize("/repo/App/objects/B.cs")]);
+
+    // The test driver sets no base folder for generated files, so the attribute's path is relative.
+    [Fact]
+    public void ReachingPaths_PathThatIsNotRooted_IsLeftOut() =>
+        BuildFolders
+            .None.ReachingPaths(["Gen/Attribute.g.cs", "/repo/A.cs"])
+            .ShouldBe([SqlPath.Normalize("/repo/A.cs")]);
+
+    [Fact]
+    public void ReachingPaths_PathsWithBackslashes_AreNormalised() =>
+        BuildFolders.None.ReachingPaths([@"C:\repo\A.cs"]).ShouldBe([SqlPath.Normalize(@"C:\repo\A.cs")]);
 
     private static BuildFolders Of(params string[] folders) => new(TestModels.Array(folders));
 

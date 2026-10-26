@@ -293,7 +293,9 @@ public sealed class ManifestTargetTests : IDisposable
     }
 
     // The folder of the project holds a semicolon, "%41" that MSBuild would read as "A", an equals sign, a quote and
-    // an accented letter, and the value is escaped twice over: the targets, and the compiler's cut at a semicolon.
+    // an accented letter.  The target escapes the folder's %, |, # and ;, and the manifest line then writes the
+    // property through Escape, which WriteLinesToFile undoes, so the line holds the target's escapes and BuildFolders
+    // decodes them.
     [Fact]
     public async Task Manifest_BuildFoldersOfAnOddPath_DecodeToTheRealFolders()
     {

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -82,6 +83,24 @@ internal sealed record BuildFolders(EquatableArray<string> Folders)
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// The paths that reach a settings file, normalised, in the order given: each that is rooted, by
+    /// <see cref="SqlPath.IsRooted" />, that normalises, and that is under none of the folders.  A path that is not
+    /// rooted names no place to look for a settings file, and one under a folder is the build's file and not the
+    /// project's.
+    /// </summary>
+    /// <param name="compilePaths">The paths of the C# files, as the compiler gives them.</param>
+    public IEnumerable<string> ReachingPaths(IEnumerable<string> compilePaths)
+    {
+        foreach (var path in compilePaths)
+        {
+            if (SqlPath.IsRooted(path) && SqlPath.Normalize(path) is { } normalized && !Contains(normalized))
+            {
+                yield return normalized;
+            }
+        }
     }
 
     // A folder whose normalised path is empty would be the root, which holds every path.
