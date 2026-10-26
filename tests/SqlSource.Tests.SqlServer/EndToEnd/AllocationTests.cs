@@ -22,11 +22,11 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // RowBufferByHand of tests/SqlSource.Testing, the same buffer by hand; and SearchAccountsUnpooled, a copy of the query
 // under no-array-pool, which reads them into a List, against a hand-written method that does the same.  The copy is a
 // query of its own because SearchAccounts' own list of generator parameters, sort-input, replaces the list of any
-// claim's attribute.  In each pair the two make the same calls, so any object that the generated method allocates on
-// each call and the hand-written one does not fails the test.  The two are compared by the commonest difference of
-// pairs of calls, one of each method, which CallAllocations explains.  GC.GetTotalAllocatedBytes(true) counts every
-// thread, where the driver completes the continuations of an asynchronous call, so the test runs in
-// MeasuresAllocations, alone and on a server of its own.
+// claim's attribute, and UnpooledCopyTests holds its SQL to SearchAccounts'.  In each pair the two make the same
+// calls, so any object that the generated method allocates on each call and the hand-written one does not fails the
+// test.  The two are compared by the commonest difference of pairs of calls, one of each method, which CallAllocations
+// explains.  GC.GetTotalAllocatedBytes(true) counts every thread, where the driver completes the continuations of an
+// asynchronous call, so the test runs in MeasuresAllocations, alone and on a server of its own.
 [Collection(MeasuresAllocations.Name)]
 public sealed class AllocationTests(SqlServerContainer sqlServer)
 {
