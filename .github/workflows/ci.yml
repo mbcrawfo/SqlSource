@@ -1,4 +1,4 @@
-# Checks, builds, tests and packs every pull request to main and every push to main.
+# Checks, builds, tests and packs every pull request to main or an integration/* branch, and every push to one.
 # coverage-comment.yml runs after this workflow and finds it by its name.
 name: CI
 
@@ -6,14 +6,16 @@ on:
   pull_request:
     branches:
       - main
+      - integration/**
   push:
     branches:
       - main
+      - integration/**
 
 permissions:
   contents: read
 
-# A newer run for the same pull request cancels the older one.  Runs on main are never cancelled.
+# A newer run for the same pull request cancels the older one.  Pushes are never cancelled.
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true

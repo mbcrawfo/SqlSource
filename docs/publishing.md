@@ -11,7 +11,7 @@ A release is two packages: `SqlSource`, the generator, and `SqlSource.Tool`, the
 | Build | Package version | Assembly and file version |
 |----|----|----|
 | Pull request | `0.1.0-pr-42.123` | `0.1.0.123` |
-| `main` | `0.1.0-beta.123` | `0.1.0.123` |
+| `main` or an `integration/*` branch | `0.1.0-beta.123` | `0.1.0.123` |
 | Tag `v0.1.0` | `0.1.0` | `0.1.0.<run>` |
 | Local | `0.1.0-dev` | `0.1.0.0` |
 

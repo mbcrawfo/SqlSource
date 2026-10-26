@@ -6,7 +6,7 @@ The GitHub Actions workflows of the repository.  [`CONTRIBUTING.md`](../../CONTR
 
 | Workflow | Runs on | Does |
 |----|----|----|
-| `ci.yml` | Pull requests to `main`, pushes to `main` | Calls `build.yml` and ends with the `ci` job |
+| `ci.yml` | Pull requests to `main` or an `integration/*` branch, pushes to them | Calls `build.yml` and ends with the `ci` job |
 | `build.yml` | Called by `ci.yml` and `publish.yml` | Seven jobs that start at once and need none of the others: `Lint`, the Docker-only checks; two halves of `format.sh --check`, `style` with `csharpier` and `analyzers`; a `Release` build and the tests with coverage, the two PostgreSQL projects and the two SQL Server projects on their default images among them; the tests of `tests/SqlSource.Tests.Postgres` alone again on PostgreSQL 14, and of `tests/SqlSource.Tests.SqlServer` alone again on SQL Server 2017, one job each; and `dotnet pack` of the two packages with the three package checks |
 | `publish.yml` | `v*` tags, manual runs on `main` | Calls `build.yml`, pushes the two packages to nuget.org, and creates a GitHub release for a tag |
 | `coverage-comment.yml` | A successful `ci.yml` run for a pull request | Posts the coverage report as a comment on the pull request, or updates the comment it posted before |
