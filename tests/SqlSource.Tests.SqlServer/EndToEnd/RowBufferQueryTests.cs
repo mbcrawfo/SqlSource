@@ -17,30 +17,52 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 [Collection(UsesSqlServer.Name)]
 public sealed class RowBufferQueryTests(SqlServerContainer sqlServer)
 {
-    private static readonly string[] Collections = ["Array", "IEnumerable", "IReadOnlyCollection", "IReadOnlyList"];
-
-    private static readonly int[] Counts = [0, 1, 16, 17, 1024, 1025, 3000];
-
-    public static TheoryData<string, int> CollectionsAndCounts
-    {
-        get
-        {
-            var data = new TheoryData<string, int>();
-            foreach (var collection in Collections)
-            {
-                foreach (var count in Counts)
-                {
-                    data.Add(collection, count);
-                }
-            }
-
-            return data;
-        }
-    }
+    public static TheoryData<int> Counts => [0, 1, 16, 17, 1024, 1025, 3000];
 
     [Theory]
-    [MemberData(nameof(CollectionsAndCounts))]
-    public async Task NumbersAs_EachCount_ReturnsOneToTheCountInAnArray(string collection, int count)
+    [MemberData(nameof(Counts))]
+    public Task NumbersAsArray_EachCount_ReturnsOneToTheCountAsItsNoPoolTwinDoes(int count) =>
+        ShouldReadOneToTheCountAsync(
+            count,
+            (connection, token) => Rows(connection.NumbersAsArray(new(count), cancellationToken: token)),
+            (connection, token) => Rows(connection.NumbersNoPoolAsArray(new(count), cancellationToken: token))
+        );
+
+    [Theory]
+    [MemberData(nameof(Counts))]
+    public Task NumbersAsIEnumerable_EachCount_ReturnsOneToTheCountAsItsNoPoolTwinDoes(int count) =>
+        ShouldReadOneToTheCountAsync(
+            count,
+            (connection, token) => connection.NumbersAsIEnumerable(new(count), cancellationToken: token),
+            (connection, token) => connection.NumbersNoPoolAsIEnumerable(new(count), cancellationToken: token)
+        );
+
+    [Theory]
+    [MemberData(nameof(Counts))]
+    public Task NumbersAsIReadOnlyCollection_EachCount_ReturnsOneToTheCountAsItsNoPoolTwinDoes(int count) =>
+        ShouldReadOneToTheCountAsync(
+            count,
+            (connection, token) => Rows(connection.NumbersAsIReadOnlyCollection(new(count), cancellationToken: token)),
+            (connection, token) =>
+                Rows(connection.NumbersNoPoolAsIReadOnlyCollection(new(count), cancellationToken: token))
+        );
+
+    [Theory]
+    [MemberData(nameof(Counts))]
+    public Task NumbersAsIReadOnlyList_EachCount_ReturnsOneToTheCountAsItsNoPoolTwinDoes(int count) =>
+        ShouldReadOneToTheCountAsync(
+            count,
+            (connection, token) => Rows(connection.NumbersAsIReadOnlyList(new(count), cancellationToken: token)),
+            (connection, token) => Rows(connection.NumbersNoPoolAsIReadOnlyList(new(count), cancellationToken: token))
+        );
+
+    // Reads the rows through the pooled method and its twin under no-array-pool, on one connection: each an array of
+    // the numbers from 1 to the count, in order.
+    private async Task ShouldReadOneToTheCountAsync(
+        int count,
+        Func<SqlConnection, CancellationToken, Task<IEnumerable<CountedNumber>>> pooled,
+        Func<SqlConnection, CancellationToken, Task<IEnumerable<CountedNumber>>> unpooled
+    )
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
@@ -51,41 +73,14 @@ public sealed class RowBufferQueryTests(SqlServerContainer sqlServer)
 
         var expected = Enumerable.Range(1, count).Select(n => new CountedNumber(n)).ToArray();
 
-        var pooled = await ReadAsync(connection, collection, pooled: true, count, token);
-        var unpooled = await ReadAsync(connection, collection, pooled: false, count, token);
+        var pooledRows = await pooled(connection, token);
+        var unpooledRows = await unpooled(connection, token);
 
-        pooled.ShouldBeOfType<CountedNumber[]>().ShouldBe(expected);
-        unpooled.ShouldBeOfType<CountedNumber[]>().ShouldBe(pooled);
+        pooledRows.ShouldBeOfType<CountedNumber[]>().ShouldBe(expected);
+        unpooledRows.ShouldBeOfType<CountedNumber[]>().ShouldBe(pooledRows);
     }
 
-    // The method of a collection type, read through the pool or under no-array-pool.
-    private static Task<IEnumerable<CountedNumber>> ReadAsync(
-        SqlConnection connection,
-        string collection,
-        bool pooled,
-        int count,
-        CancellationToken token
-    ) =>
-        (collection, pooled) switch
-        {
-            ("Array", true) => Rows(connection.NumbersAsArray(new(count), cancellationToken: token)),
-            ("IEnumerable", true) => connection.NumbersAsIEnumerable(new(count), cancellationToken: token),
-            ("IReadOnlyCollection", true) => Rows(
-                connection.NumbersAsIReadOnlyCollection(new(count), cancellationToken: token)
-            ),
-            ("IReadOnlyList", true) => Rows(connection.NumbersAsIReadOnlyList(new(count), cancellationToken: token)),
-            ("Array", false) => Rows(connection.NumbersNoPoolAsArray(new(count), cancellationToken: token)),
-            ("IEnumerable", false) => connection.NumbersNoPoolAsIEnumerable(new(count), cancellationToken: token),
-            ("IReadOnlyCollection", false) => Rows(
-                connection.NumbersNoPoolAsIReadOnlyCollection(new(count), cancellationToken: token)
-            ),
-            ("IReadOnlyList", false) => Rows(
-                connection.NumbersNoPoolAsIReadOnlyList(new(count), cancellationToken: token)
-            ),
-            _ => throw new ArgumentOutOfRangeException(nameof(collection), collection, null),
-        };
-
-    // The rows of a method that declares another type, as the IEnumerable that the selector returns.
+    // The rows of a method that declares another type, as the IEnumerable that the readers return.
     private static async Task<IEnumerable<CountedNumber>> Rows<T>(Task<T> rows)
         where T : IEnumerable<CountedNumber> => await rows;
 }

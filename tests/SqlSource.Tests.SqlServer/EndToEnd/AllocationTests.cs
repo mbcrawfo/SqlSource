@@ -95,7 +95,7 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task SearchAccounts_ManyCallsUnderNoArrayPool_AllocatesNoMoreThanByHand(bool open)
+    public async Task SearchAccountsUnpooled_ManyCalls_AllocatesNoMoreThanByHand(bool open)
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
