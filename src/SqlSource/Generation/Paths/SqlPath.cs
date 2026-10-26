@@ -30,6 +30,8 @@ internal static class SqlPath
 
     private static readonly char[] Separators = [Separator, '\\'];
 
+    private static bool IsAsciiLetter(char c) => c is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z');
+
     /// <summary>
     /// Compares two normalised paths.  Its order is that of <see cref="Comparison" />.
     /// </summary>
@@ -73,6 +75,14 @@ internal static class SqlPath
     /// </summary>
     public static EquatableArray<string> ToSortedSet(IEnumerable<string> paths) =>
         new(paths.Distinct(Comparer).OrderBy(static path => path, Comparer).ToImmutableArray());
+
+    /// <summary>
+    /// Whether <paramref name="path" /> starts at a root: at a separator, either one, or at an ASCII drive letter and
+    /// <c>:</c>.  Read from the text alone, the same on every operating system.
+    /// </summary>
+    public static bool IsRooted(string path) =>
+        path.Length > 0
+        && (Array.IndexOf(Separators, path[0]) >= 0 || (path.Length > 1 && path[1] == ':' && IsAsciiLetter(path[0])));
 
     /// <summary>
     /// Returns <paramref name="path" /> with <c>/</c> as its only separator, without empty and <c>.</c> segments,

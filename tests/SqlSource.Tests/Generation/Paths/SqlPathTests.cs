@@ -37,6 +37,28 @@ public sealed class SqlPathTests
     public void Normalize_DotDotWithNothingBeforeIt_IsNull(string path) => SqlPath.Normalize(path).ShouldBeNull();
 
     [Theory]
+    [InlineData(GeneratorHarness.UsersPath)]
+    [InlineData("/")]
+    [InlineData("\\app\\Users.sql")]
+    [InlineData("\\\\server\\share\\Users.sql")]
+    [InlineData("C:\\app\\Users.sql")]
+    [InlineData("c:/app/Users.sql")]
+    [InlineData("Z:")]
+    public void IsRooted_PathFromARoot_IsTrue(string path) => SqlPath.IsRooted(path).ShouldBeTrue();
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("app/Users.sql")]
+    [InlineData("Other.Gen/Other.Gen.Generator/Extra.g.cs")]
+    [InlineData("./app/Users.sql")]
+    [InlineData("../app/Users.sql")]
+    [InlineData("C")]
+    [InlineData("1:/app/Users.sql")]
+    [InlineData("é:/app/Users.sql")]
+    [InlineData("app:/Users.sql")]
+    public void IsRooted_RelativePath_IsFalse(string path) => SqlPath.IsRooted(path).ShouldBeFalse();
+
+    [Theory]
     [InlineData("app/Repo", "Users.sql", GeneratorHarness.UsersNormalizedPath)]
     [InlineData("app/Repo", "Queries\\Users.sql", "app/Repo/Queries/Users.sql")]
     [InlineData("app/Repo", "../Queries", "app/Queries")]

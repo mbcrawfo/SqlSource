@@ -571,7 +571,7 @@ public sealed class SettingsFileTests
     }
 
     // Every item is under /app, whose file ends each chain, so no chain reaches the file at the root.  The attribute's
-    // file, which the compiler adds at a path of its own, is no item.
+    // file, which the compiler adds at a path that is not rooted, is no item.
     [Fact]
     public void Run_FileAboveARoot_IsNotReported()
     {
@@ -583,6 +583,33 @@ public sealed class SettingsFileTests
                 """{"root": true}"""
             ),
             new SqlFile(QueryPath, Query)
+        );
+
+        run.ShouldBeClean();
+    }
+
+    // A tree whose path is not rooted, as another generator's file is where the compiler sets no folder for generated
+    // files, is no C# file of the project, so its chain reaches nothing, not even the file at the root.
+    [Fact]
+    public void Run_TreeOfAnotherGenerator_ReachesNoSettingsFile()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [
+                new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null)),
+                new SourceFile(
+                    "Other.Gen/Other.Gen.Generator/Extra.g.cs",
+                    "namespace Other;\n\ninternal static class Extra;\n"
+                ),
+            ],
+            [
+                GeneratorHarness.SettingsFile("/sqlsource.json", "{"),
+                GeneratorHarness.SettingsFile(
+                    FartherSettingsPath, /*lang=json,strict*/
+                    """{"root": true}"""
+                ),
+                new SqlFile(QueryPath, Query),
+            ]
         );
 
         run.ShouldBeClean();
@@ -608,7 +635,7 @@ public sealed class SettingsFileTests
         run.Diagnostics[1].ShouldStartWith("SQLSRC015 /app/sqlsource.json(1,");
     }
 
-    // The C# file declares no type, and no .sql file is in its folder.
+    // The C# file declares no type, only an attribute of the assembly, and no .sql file is in its folder.
     [Fact]
     public void Run_FileReachedOnlyByACSharpFile_IsReported()
     {
@@ -616,7 +643,10 @@ public sealed class SettingsFileTests
             OutputKind.Sql,
             [
                 new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null)),
-                new SourceFile("/app/Code/Helpers.cs", "namespace App;\n\ninternal static class Helpers;\n"),
+                new SourceFile(
+                    "/app/Code/Helpers.cs",
+                    "[assembly: System.Reflection.AssemblyMetadata(\"Helpers\", \"none\")]\n"
+                ),
             ],
             [
                 GeneratorHarness.SettingsFile(

@@ -33,13 +33,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
     private const string FloorMember = "ThrowIfNullOrWhiteSpace";
 
-    private const char Separator = '/';
-
-    // The end of the normalised path the compiler gives the attribute's file: the folder named after this generator's
-    // type, which is below one named after its assembly, and the file's name.
-    private static readonly string AttributePathEnd =
-        Separator + typeof(SqlSourceGenerator).FullName + Separator + AttributeSource.HintName;
-
     /// <inheritdoc />
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -1165,18 +1158,15 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 compilation.SyntaxTrees.Select(static tree => tree.FilePath).ToImmutableArray()
             );
 
-    // Each path of a C# file of the project that normalises, normalised when it is read.  The compiler adds the
-    // attribute's file, which RegisterAttribute gives, to the compilation before the pipeline runs, and it is no file
-    // of the project: its path is the compiler's, in folders named after the generator that no item is in.  A file
-    // that another generator adds the same way is not told apart (TD-0079).
+    // Each rooted path of the compilation's trees, normalised when it is read.  The compiler gives a Compile item its
+    // full path, and a generator's post-initialization file, the attribute's among them, a relative path of the
+    // generator's assembly, type and hint name where it sets no folder for generated files, so a path that is not
+    // rooted is no C# file of the project and reaches nothing.
     private static IEnumerable<string> NormalizedCompilePaths(EquatableArray<string> paths)
     {
         foreach (var path in paths)
         {
-            if (
-                SqlPath.Normalize(path) is { } normalized
-                && !normalized.EndsWith(AttributePathEnd, StringComparison.Ordinal)
-            )
+            if (SqlPath.IsRooted(path) && SqlPath.Normalize(path) is { } normalized)
             {
                 yield return normalized;
             }
