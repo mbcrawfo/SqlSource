@@ -66,8 +66,15 @@ internal sealed class RunSettingsFiles
         ImmutableArray<ToolDiagnostic>.Builder errors
     )
     {
-        // Add is false for a folder that was reported before, which is then left out.
-        var unreported = set.FilesIn(set.Reached(reachingPaths)).Where(file => _reported.Add(file.NormalizedFolder));
-        errors.AddRange(unreported.SelectMany(static file => file.Diagnostics).Select(ToolDiagnostic.From));
+        foreach (var file in set.FilesIn(set.Reached(reachingPaths)))
+        {
+            // Add is false for a folder that was reported before, which is then left out.
+            if (!_reported.Add(file.NormalizedFolder))
+            {
+                continue;
+            }
+
+            errors.AddRange(file.Diagnostics.Select(ToolDiagnostic.From));
+        }
     }
 }

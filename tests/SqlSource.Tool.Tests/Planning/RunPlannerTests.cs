@@ -465,6 +465,219 @@ public sealed class RunPlannerTests : IDisposable
         file.Dialect.ToString().ShouldBe(expected);
     }
 
+    // The settings files of the chain: sqlsource.json files apply to their folder and below.  A project that sets
+    // nothing of its own gets its dialect from the chain, where the project of the other tests has a property.
+    private TestProject Chained(string? dialect = null)
+    {
+        var project = new TestProject(_folder);
+        if (dialect is not null)
+        {
+            project.Properties["SqlSourceDialect"] = dialect;
+        }
+
+        _ = project.AddSource("Queries.cs", Plans.Type);
+        return project;
+    }
+
+    private static PlannedFile OnlyFile(TestProject project) => Plans.Result(project).Plan.Files.ShouldHaveSingleItem();
+
+    [Fact]
+    public void Plan_DialectOfTheChain_IsTheFilesDialect()
+    {
+        var project = Chained();
+        _ = project.AddSettings(
+            "sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "postgres"}"""
+        );
+        _ = project.AddSql("Q.sql", "SELECT 1;");
+
+        OnlyFile(project).Dialect.ShouldBe(SqlDialect.PostgreSql);
+    }
+
+    [Fact]
+    public void Plan_NearerFilesDialect_WinsOverTheFarther()
+    {
+        var project = Chained();
+        _ = project.AddSettings(
+            "sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "ansi"}"""
+        );
+        _ = project.AddSettings(
+            "Queries/sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "mssql"}"""
+        );
+        _ = project.AddSource("Queries/Repository.cs", Plans.TypeNamed("Repository"));
+        _ = project.AddSql("Queries/Q.sql", "SELECT 1;");
+
+        OnlyFile(project).Dialect.ShouldBe(SqlDialect.SqlServer);
+    }
+
+    [Fact]
+    public void Plan_HeaderMarkersDialect_WinsOverTheChain()
+    {
+        var project = Chained();
+        _ = project.AddSettings(
+            "sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "mssql"}"""
+        );
+        _ = project.AddSql("Q.sql", "-- dialect: postgres\nSELECT 1;");
+
+        OnlyFile(project).Dialect.ShouldBe(SqlDialect.PostgreSql);
+    }
+
+    [Fact]
+    public void Plan_ChainsDialect_WinsOverMetadataAndProperty()
+    {
+        var project = Chained("sqlite");
+        _ = project.AddSettings(
+            "sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "postgres"}"""
+        );
+        _ = project.AddSql("Q.sql", "SELECT 1;", ("SqlSourceDialect", "mysql"));
+
+        var result = Plans.Result(project);
+
+        result.Errors.ShouldBeEmpty();
+        result.Plan.Files.ShouldHaveSingleItem().Dialect.ShouldBe(SqlDialect.PostgreSql);
+    }
+
+    // A value of the metadata that is not valid is the build's SQLSRC011 still, whatever the chain says.
+    [Fact]
+    public void Plan_InvalidDialectOfTheMetadata_IsStillSqlsrc011BesideAChain()
+    {
+        var project = Chained();
+        _ = project.AddSettings(
+            "sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "postgres"}"""
+        );
+        _ = project.AddSql("Q.sql", "SELECT 1;", ("SqlSourceDialect", "nope"));
+
+        var result = Plans.Result(project);
+
+        result.Errors.ShouldHaveSingleItem().Descriptor.ShouldBe(SqlDiagnostics.InvalidDialect);
+        result.Plan.Files.ShouldHaveSingleItem().Dialect.ShouldBe(SqlDialect.PostgreSql);
+    }
+
+    [Fact]
+    public void Plan_RootFile_StopsTheChain()
+    {
+        var project = Chained();
+        project.ListSettings(
+            _folder.WriteFile(
+                "sqlsource.json", /*lang=json,strict*/
+                """{"database": "far"}"""
+            )
+        );
+        _ = project.AddSettings(
+            "sqlsource.json", /*lang=json,strict*/
+            """{"root": true, "dialect": "postgres"}"""
+        );
+        _ = project.AddSql("Q.sql", "SELECT 1;");
+
+        var query = OnlyFile(project).Queries.ShouldHaveSingleItem();
+
+        query.Database.ShouldBe("postgres");
+    }
+
+    [Theory]
+    [InlineData("sql", false)]
+    [InlineData(null, true)]
+    public void Plan_OutputOfTheChain_DecidesWhetherAQueryNeedsAnEntry(string? chain, bool needsEntry)
+    {
+        var project = Postgres();
+        project.Properties["SqlSourceOutput"] = "models";
+        if (chain is not null)
+        {
+            _ = project.AddSettings("sqlsource.json", $$"""{"output": "{{chain}}"}""");
+        }
+
+        _ = project.AddSource("Queries.cs", Plans.Type);
+        _ = project.AddSql("Q.sql", "SELECT 1;");
+
+        OnlyFile(project).Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBe(needsEntry);
+    }
+
+    [Fact]
+    public void Plan_AttributesOutput_WinsOverTheChain()
+    {
+        var project = Postgres();
+        _ = project.AddSettings(
+            "sqlsource.json", /*lang=json,strict*/
+            """{"output": "sql"}"""
+        );
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Output = SqlSource.GeneratorOutput.Models"));
+        _ = project.AddSql("Q.sql", "SELECT 1;");
+
+        OnlyFile(project).Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Plan_DatabaseOfTheChain_IsTheQuerysDatabase()
+    {
+        var project = Postgres();
+        project.Properties["SqlSourceDatabase"] = "property";
+        _ = project.AddSettings(
+            "sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "postgres", "database": "billing"}"""
+        );
+        _ = project.AddSource("Queries.cs", Plans.Type);
+        _ = project.AddSql(
+            "Q.sql",
+            "-- name: One\nSELECT 1;\n\n-- name: Two\n-- database: other\nSELECT 2;\n",
+            ("SqlSourceDatabase", "metadata")
+        );
+
+        OnlyFile(project).Queries.Select(query => query.Database).ShouldBe(["billing", "other"]);
+    }
+
+    // The two projects see one file: the chain of each is that of the file in its own project's set, and the file
+    // needs what either needs.
+    [Fact]
+    public void Plan_FileClaimedByTwoProjects_TakesEachProjectsChainForItsOutput()
+    {
+        var first = Plans.Postgres(_folder, "A");
+        _ = first.AddSettings(
+            "sqlsource.json", /*lang=json,strict*/
+            """{"output": "sql"}"""
+        );
+        var shared = first.AddSql("One.sql", "SELECT 1;");
+        var second = Postgres("B");
+        second.Properties["SqlSourceOutput"] = "models";
+        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../A\""));
+        second.ListSql(shared);
+
+        var file = Plans.Result(first, second).Plan.Files.ShouldHaveSingleItem();
+
+        file.ProjectPath.ShouldBe(first.ProjectPath);
+        file.Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBeTrue();
+    }
+
+    // The second project lists the settings file and the first does not, so only the second's claim has a chain: the
+    // owner's chain is not the one of every claim.
+    [Fact]
+    public void Plan_FileClaimedByTwoProjects_TakesTheChainOfAProjectThatIsNotTheOwner()
+    {
+        var settings = _folder.WriteFile(
+            "Shared/sqlsource.json", /*lang=json,strict*/
+            """{"output": "models"}"""
+        );
+        var shared = _folder.WriteFile("Shared/One.sql", "SELECT 1;");
+        var first = Postgres("A");
+        first.Properties["SqlSourceOutput"] = "sql";
+        _ = first.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../Shared\""));
+        first.ListSql(shared);
+        var second = Postgres("B");
+        second.Properties["SqlSourceOutput"] = "sql";
+        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../Shared\""));
+        second.ListSql(shared);
+        second.ListSettings(settings);
+
+        var file = Plans.Result(first, second).Plan.Files.ShouldHaveSingleItem();
+
+        file.ProjectPath.ShouldBe(first.ProjectPath);
+        file.Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBeTrue();
+    }
+
     [Fact]
     public void Plan_RunThatWasCancelled_Throws()
     {

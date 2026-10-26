@@ -451,6 +451,10 @@ public sealed class SettingsFileSetTests
         set.FilesIn(EquatableArray<string>.Empty).ShouldBeEmpty();
     }
 
+    [Fact]
+    public void FilesIn_EmptySet_IsNoFileForAnyFolder() =>
+        SettingsFileSet.Empty.FilesIn(new EquatableArray<string>(["app", "app/Queries"])).ShouldBeEmpty();
+
     private static SettingsFileSet Set(params (string Path, string Text)[] files) =>
         SettingsFileSet.Of(
             files.Select(static file =>

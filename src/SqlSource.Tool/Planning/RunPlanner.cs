@@ -113,15 +113,19 @@ internal static class RunPlanner
             }
 
             var text = new SqlFileText(listed[path].Path);
+            var metadata = ReadMetadata(text, listed[path], invalid);
+            // The chain of the file's folder in this project's settings files, as the generator finds it.
+            var chain = settingsFileSet.ChainOf(path);
             claimed.Add(
                 new ClaimedFile(
                     manifest.ProjectPath,
                     path,
                     text,
-                    ReadMetadata(text, listed[path], invalid),
+                    metadata,
                     dialect,
                     settings.Level,
-                    settingsFileSet,
+                    chain,
+                    FileLevel.Resolve(metadata, path, chain)?.Level ?? SettingsLevel.None,
                     fileClaims.Levels,
                     fileClaims.Types
                 )
@@ -209,13 +213,14 @@ internal static class RunPlanner
         return FileOf(work, parsed.Dialect, state, new EquatableArray<PlannedQuery>(queries.MoveToImmutable()));
     }
 
-    // Parses a claimed file with the dialect of the project it is planned under.  Comments are never wanted: the
-    // hash comes from the SQL without them.
+    // Parses a claimed file with its dialect: its header marker, else the chain's, else its metadata's, else that of
+    // the project it is planned under.  Comments are never wanted: the hash comes from the SQL without them.
     private static ParsedSqlFile Parse(ClaimedFile owner, CancellationToken cancellationToken)
     {
         var input = FileParseInput.Resolve(
             owner.Metadata,
-            SettingsChain.None,
+            owner.NormalizedPath,
+            owner.Chain,
             owner.ProjectDialect,
             projectKeepsComments: false,
             EquatableArray<string>.Empty
@@ -288,7 +293,7 @@ internal static class RunPlanner
             NeedsEntry: true,
             QuerySettings.ResolveDatabase(
                 query.Markers,
-                owner.Metadata.Settings?.Level ?? SettingsLevel.None,
+                owner.Level,
                 owner.Property,
                 SqlDialectName.Canonical(dialect)
             ),
@@ -333,16 +338,16 @@ internal static class RunPlanner
         );
 
     // The output resolves for each type and query, and a file needs what any type that claims it needs: the
-    // greatest over every claim of every project, each with the metadata and the property of its own project.
+    // greatest over every claim of every project, each with the chain, the metadata and the property of its own
+    // project.
     private static OutputKind GreatestOutput(SqlQuery query, FileWork work)
     {
         var greatest = OutputKind.Sql;
         foreach (var claimant in work.Claimants)
         {
-            var metadata = claimant.Metadata.Settings?.Level ?? SettingsLevel.None;
             foreach (var claim in claimant.Claims)
             {
-                var output = QuerySettings.Resolve(query.Markers, claim, metadata, claimant.Property).Output;
+                var output = QuerySettings.Resolve(query.Markers, claim, claimant.Level, claimant.Property).Output;
                 if (output > greatest)
                 {
                     greatest = output;
@@ -529,7 +534,8 @@ internal static class RunPlanner
         public List<TypeClaim> Types { get; } = [];
     }
 
-    // One claimed file as one project sees it.
+    // One claimed file as one project sees it.  Chain is that of the file's folder in the project's settings files, and
+    // Level the chain's over the metadata's, as the generator's FileLevel gives it.
     private sealed record ClaimedFile(
         string ProjectPath,
         string NormalizedPath,
@@ -537,7 +543,8 @@ internal static class RunPlanner
         FileMetadata Metadata,
         DialectSetting ProjectDialect,
         SettingsLevel Property,
-        SettingsFileSet SettingsFiles,
+        SettingsChain Chain,
+        SettingsLevel Level,
         List<SettingsLevel> Claims,
         List<TypeClaim> Types
     );
