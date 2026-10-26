@@ -13,26 +13,27 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.EndToEnd;
 
-// A generated method allocates no more for each call than a hand-written ADO.NET method of the same calls, written as
-// the manual's recipe for your own code writes one and as a careful developer would: it honours the same contract,
-// opening a closed connection and closing it again in a finally, setting the transaction and, when given, the timeout,
-// and passing the token; it binds the parameter as the generated method does, an NpgsqlParameter<int> named without
-// its '@' and with its DataTypeName, since binding by the described type is decided and its cost is the driver's on
-// both sides; and it reads each column by its ordinal with GetFieldValue into the same model, and the rows into an
-// array, the collection the method returns.  Both run on the same open connection of one data source, with the same
-// token, and ConfigureAwait(false) on each await.  GC.GetTotalAllocatedBytes counts every thread, since an awaited
-// continuation runs where the driver completes it, so the class is in MeasuresAllocations, which runs alone on a
-// container of its own.  That keeps other tests out of the count, but not the process's own background work, which
-// the measure leaves out by comparing the methods in pairs of blocks.
+// A generated method allocates no more for each call than a hand-written ADO.NET method, written as the manual's
+// recipe for your own code writes one and as a careful developer would: it honours the same contract, opening a closed
+// connection and closing it again in a finally, setting the transaction and, when given, the timeout, and passing the
+// token; it binds the parameter as the generated method does, an NpgsqlParameter<int> named without its '@' and with
+// its DataTypeName, since binding by the described type is decided and its cost is the driver's on both sides; and it
+// reads each column by its ordinal with GetFieldValue into the same model, and the rows into a List that it copies to
+// an array, the collection the method returns.  The generated method reads its rows through its pooled row buffer
+// instead, which allocates less than the List, so it stays within the margin.  Both run on the same open connection
+// of one data source, with the same token, and ConfigureAwait(false) on each await.  GC.GetTotalAllocatedBytes counts
+// every thread, since an awaited continuation runs where the driver completes it, so the class is in
+// MeasuresAllocations, which runs alone on a container of its own.  That keeps other tests out of the count, but not
+// the process's own background work, which the measure leaves out by comparing the methods in pairs of blocks.
 [Collection(MeasuresAllocations.Name)]
 public sealed class AllocationTests(PostgresContainer postgres)
 {
     // The bytes for each call that the generated method may allocate beyond the hand-written one.  A call of these
-    // queries allocated about 1.7 to 2.7 KB here when this was set, and the two methods of the same calls differed by
-    // the size of their async state machines alone, within about 25 bytes a call either way over a run; a boxed value
-    // is 24 bytes.  The binding's own cost, the driver's for each parameter and its DataTypeName, is in both sides
-    // alike.  So an extra boxed value, array or closure on each call shows, a few of them exceed the margin, and noise
-    // does not.  Never above 128.
+    // queries allocated about 1.7 to 2.7 KB here when this was set, and the two methods, which then both read the rows
+    // into a List, differed by the size of their async state machines alone, within about 25 bytes a call either way
+    // over a run; a boxed value is 24 bytes.  The binding's own cost, the driver's for each parameter and its
+    // DataTypeName, is in both sides alike.  So an extra boxed value, array or closure on each call shows, a few of
+    // them exceed the margin, and noise does not.  Never above 128.
     private const double MarginInBytesPerCall = 64;
 
     // The first calls pay for one-off work: JIT compilation, static initialisers, the pools of the driver and of the
