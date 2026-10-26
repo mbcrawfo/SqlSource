@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
@@ -11,7 +10,6 @@ using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
-using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Testing;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
@@ -247,7 +245,7 @@ public sealed class GeneratorParityTests : IDisposable
         var run = GeneratorHarness.Run(output, [source], listed, dialect: dialect);
         var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
 
-        // Each side is compared by its message, as MessageOf says.
+        // Each side is compared by its message, as Reported.MessageOf says.
         var expected = InOrder(
             run.Result.Diagnostics.Where(IsCompared)
                 .Select(diagnostic =>
@@ -261,10 +259,7 @@ public sealed class GeneratorParityTests : IDisposable
                     );
                 })
         );
-        var actual = InOrder(
-            plan.Errors.Where(error => IsCompared(error.Descriptor))
-                .Select(error => new Reported(error.Descriptor.Id, error.Path, error.Position, MessageOf(error)))
-        );
+        var actual = InOrder(plan.Errors.Where(error => IsCompared(error.Descriptor)).Select(Reported.Of));
 
         actual.ShouldBe(expected);
         // A case in which neither reports an error would prove nothing, and each case has one of the two ids.
@@ -321,7 +316,7 @@ public sealed class GeneratorParityTests : IDisposable
             .Select(diagnostic => (diagnostic.Id, Message: diagnostic.GetMessage(CultureInfo.InvariantCulture)))
             .ToArray();
         var actual = plan
-            .Errors.Select(error => (error.Descriptor.Id, Message: MessageOf(error)))
+            .Errors.Select(error => (error.Descriptor.Id, Message: Reported.MessageOf(error)))
             .Where(error => IsInvalidValue(error.Id, error.Message))
             .ToArray();
 
@@ -341,15 +336,6 @@ public sealed class GeneratorParityTests : IDisposable
         id == SqlDiagnostics.InvalidDialect.Id
         || (
             id == SqlDiagnostics.InvalidSettingValue.Id && message.EndsWith("SqlSourceOutput", StringComparison.Ordinal)
-        );
-
-    // A diagnostic of the compiler keeps its arguments to itself, so a tool error is compared by its message: the
-    // descriptor's format with the error's arguments.
-    private static string MessageOf(ToolDiagnostic error) =>
-        string.Format(
-            CultureInfo.InvariantCulture,
-            error.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
-            [.. error.Arguments]
         );
 
     private static bool IsCompared(Diagnostic diagnostic) => IsCompared(diagnostic.Descriptor);
@@ -424,9 +410,6 @@ public sealed class GeneratorParityTests : IDisposable
     // One type as each side sees it: the file and the line of its attribute, what the attribute sets, and the .sql
     // files it claims, in member order.
     private sealed record Claimed(string SourcePath, int Line, string? Path, string? Output, string Files);
-
-    // One error as either side reports it: the id, the file, where in it, counted from zero, and the message.
-    private sealed record Reported(string Id, string? Path, LinePosition? Position, string Message);
 
     private sealed record ErrorCase(string Dialect, OutputKind Output, (string Path, string Text)[] SqlFiles);
 

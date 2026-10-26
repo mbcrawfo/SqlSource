@@ -22,7 +22,9 @@ namespace SqlSource.Tool.Planning;
 /// The plan must agree with the generator on which type claims which file with which output, so every rule here is
 /// the generator's own code: <c>PathResolver</c>, <c>MSBuildSettings</c>, <c>DialectSetting</c>,
 /// <c>FileParseInput</c>, <c>SqlFileReader</c>, <c>QuerySettings</c> and <c>SqlQueryHash</c>.  The order of the
-/// errors for values that are not valid is the generator's too: both sides take it from <c>InvalidValues</c>.
+/// errors for values that are not valid is the generator's too: both sides take it from <c>InvalidValues</c>.  The
+/// settings files are read by the generator's <c>ListedSettingsFile</c> and <c>SettingsFileSet</c>, through
+/// <see cref="RunSettingsFiles" />, and the compile paths that reach one are <c>BuildFolders</c>'.
 /// <c>GeneratorParityTests</c> holds the two together.
 /// </remarks>
 internal static class RunPlanner
@@ -34,6 +36,7 @@ internal static class RunPlanner
     )
     {
         var errors = ImmutableArray.CreateBuilder<ToolDiagnostic>();
+        var settingsFiles = new RunSettingsFiles();
         var unclaimed = ImmutableArray.CreateBuilder<int>(manifests.Length);
 
         // A file that two projects claim is planned once, under the first.
@@ -41,7 +44,7 @@ internal static class RunPlanner
         var byPath = new Dictionary<string, FileWork>(SqlPath.Comparer);
         foreach (var manifest in manifests)
         {
-            var (claimedFiles, unclaimedCount) = ReadProject(manifest, errors, cancellationToken);
+            var (claimedFiles, unclaimedCount) = ReadProject(manifest, settingsFiles, errors, cancellationToken);
             unclaimed.Add(unclaimedCount);
             foreach (var claimed in claimedFiles)
             {
@@ -76,9 +79,11 @@ internal static class RunPlanner
 
     // The claimed files of one project, in the order of their paths, each with the settings of this project, and the
     // number of its listed files that no type of it claims.  The errors of the project are added: SQLSRC208, then
-    // SQLSRC011, then SQLSRC014.
+    // SQLSRC011, then SQLSRC014, then the problems of the settings files that its .sql files and C# files reach, as
+    // the generator reports them, of each file once in the run.
     private static (List<ClaimedFile> Claimed, int Unclaimed) ReadProject(
         ProjectManifest manifest,
+        RunSettingsFiles settingsFiles,
         ImmutableArray<ToolDiagnostic>.Builder errors,
         CancellationToken cancellationToken
     )
@@ -94,6 +99,7 @@ internal static class RunPlanner
         invalid.AddDialect(dialect.InvalidValue);
         AddSettings(invalid, settings.Invalid);
 
+        var settingsFileSet = settingsFiles.Of(manifest, cancellationToken);
         var listed = ListedFiles.Read(manifest);
         var claimsOf = ClaimsByFile(claims.Claims, listed);
 
@@ -115,6 +121,7 @@ internal static class RunPlanner
                     ReadMetadata(text, listed[path], invalid),
                     dialect,
                     settings.Level,
+                    settingsFileSet,
                     fileClaims.Levels,
                     fileClaims.Types
                 )
@@ -122,6 +129,12 @@ internal static class RunPlanner
         }
 
         AddInvalid(errors, manifest.ProjectPath, invalid);
+        // Every listed .sql file reaches, claimed or not, as every C# file does that is not the build's.
+        settingsFiles.AddProblems(
+            settingsFileSet,
+            listed.Paths.Concat(BuildFolders.Read(options).ReachingPaths(manifest.CompileFiles)),
+            errors
+        );
         return (claimed, listed.Paths.Count - claimed.Count);
     }
 
@@ -524,6 +537,7 @@ internal static class RunPlanner
         FileMetadata Metadata,
         DialectSetting ProjectDialect,
         SettingsLevel Property,
+        SettingsFileSet SettingsFiles,
         List<SettingsLevel> Claims,
         List<TypeClaim> Types
     );

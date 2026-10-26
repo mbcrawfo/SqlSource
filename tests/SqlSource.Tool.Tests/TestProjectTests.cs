@@ -30,6 +30,22 @@ public sealed class TestProjectTests
         file.Metadata["SqlSourceDatabase"].ShouldBe("billing");
     }
 
+    // The package's target writes the settings files after the .sql files and before the C# files.
+    [Fact]
+    public void ManifestText_ProjectWithASettingsFile_ListsItBetweenTheSqlAndCompileFiles()
+    {
+        using var folder = new TempFolder();
+        var project = new TestProject(folder);
+        var source = project.AddSource("Queries.cs", "internal static partial class Queries;");
+        var sql = project.AddSql("Queries/Users.sql", "SELECT 1;");
+        var settings = project.AddSettings("sqlsource.json", "{}");
+
+        var text = project.ManifestText();
+
+        text.ShouldContain($"File={sql}\nSettings={settings}\nCompile={source}\n");
+        project.Manifest().SettingsFiles.ShouldBe([settings]);
+    }
+
     [Fact]
     public void ProjectPath_EmptyDirectory_IsInTheFolderItself()
     {

@@ -6,8 +6,8 @@ using SqlSource.Tool.Projects;
 
 namespace SqlSource.Tool.Testing;
 
-// A project in a temporary folder: C# and .sql files on the disk, and the manifest that the package's target would
-// write for them, built here.  A test of the plan gives RunPlanner the manifest; a test of the command gives the
+// A project in a temporary folder: C#, .sql and settings files on the disk, and the manifest that the package's target
+// would write for them, built here.  A test of the plan gives RunPlanner the manifest; a test of the command gives the
 // runner the project, and the two runs of "dotnet msbuild" are answered from it.
 internal sealed class TestProject
 {
@@ -15,6 +15,7 @@ internal sealed class TestProject
     private readonly string _directory;
     private readonly List<string> _compile = [];
     private readonly List<(string Path, (string Name, string Value)[] Metadata)> _sql = [];
+    private readonly List<string> _settings = [];
 
     public TestProject(TempFolder folder, string name = "App", string? directory = null)
     {
@@ -64,6 +65,18 @@ internal sealed class TestProject
     public void ListSql(string fullPath, params (string Name, string Value)[] metadata) =>
         _sql.Add((fullPath, metadata));
 
+    // A settings file on the disk that the project lists, as the build lists one above a .sql file or a C# file.
+    public string AddSettings(string relativePath, string json)
+    {
+        var path = _folder.WriteFile(Relative(relativePath), json);
+        _settings.Add(path);
+        return path;
+    }
+
+    // A settings file that the project lists and this helper does not write: one above the project, or one that is
+    // gone.
+    public void ListSettings(string fullPath) => _settings.Add(fullPath);
+
     public string ManifestText()
     {
         var text = new StringBuilder();
@@ -84,6 +97,11 @@ internal sealed class TestProject
             {
                 _ = text.Append("File.").Append(name).Append('=').Append(value).Append('\n');
             }
+        }
+
+        foreach (var path in _settings)
+        {
+            _ = text.Append("Settings=").Append(path).Append('\n');
         }
 
         foreach (var path in _compile)
