@@ -144,7 +144,7 @@ internal static class SettingsFileReader
             }
         }
 
-        private SettingsFileValue ReadSetting(string key, SidecarToken first)
+        private SettingsFileValue? ReadSetting(string key, SidecarToken first)
         {
             if (first.Kind == SidecarTokenKind.ArrayStart)
             {
@@ -193,15 +193,18 @@ internal static class SettingsFileReader
             );
         }
 
-        // An element that is not a string is reported and left out.
-        private SettingsFileValue ReadArray(string key)
+        // An element that is not a string is reported and left out.  An array whose every element is left out is not
+        // the empty list but sets nothing, since a wrong JSON type never sets a setting; [] stays the empty list.
+        private SettingsFileValue? ReadArray(string key)
         {
             var (elements, spans) = (new List<string>(), new List<TextSpan>());
+            var wrongTypes = 0;
             while (NextElement(out var element))
             {
                 if (element.Kind != SidecarTokenKind.String)
                 {
                     WrongType(element, key);
+                    wrongTypes++;
                     continue;
                 }
 
@@ -209,7 +212,7 @@ internal static class SettingsFileReader
                 spans.Add(element.Span);
             }
 
-            return SettingsFileValue.Array(elements, spans);
+            return elements.Count == 0 && wrongTypes > 0 ? null : SettingsFileValue.Array(elements, spans);
         }
 
         // A member whose value is not a string is reported and left out.  Two members with one key are both kept: the

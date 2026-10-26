@@ -1,4 +1,6 @@
+using System;
 using System.Linq;
+using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.SettingsFiles;
@@ -57,4 +59,31 @@ public sealed class SettingsFileReaderRobustnessTests
         file.Root.ShouldBeNull();
         file.Errors.ShouldHaveSingleItem().Kind.ShouldBe(SettingsFileErrorKind.InvalidJson);
     }
+
+    // The object is the first level, so 63 brackets under a key, or 62 inside an element of generatorParameters,
+    // reach the limit exactly.  Pass one passes them, and the walk skips them and reads what comes after.
+    [Fact]
+    public void Read_ValueNestedToTheLimit_IsSkippedAndTheMembersAfterItAreRead()
+    {
+        var unknown = "{\"bogus\": " + Nested(63) + ", \"output\": \"models\"}";
+        var element =
+            "{\"generatorParameters\": [\"keep-comments\", "
+            + Nested(62)
+            + ", \"sort-input\"], \"output\": \"models\"}";
+
+        var underUnknown = SettingsFileReader.Read(unknown, Place);
+        var asElement = SettingsFileReader.Read(element, Place);
+
+        underUnknown.Root.ShouldBe(false);
+        underUnknown.Level.Output.ShouldBe(OutputKind.Models);
+        underUnknown.Errors.ShouldHaveSingleItem().Kind.ShouldBe(SettingsFileErrorKind.UnknownKey);
+        asElement.Root.ShouldBe(false);
+        asElement.Level.Output.ShouldBe(OutputKind.Models);
+        asElement.Level.Parameters.ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.SortInput);
+        var wrongType = asElement.Errors.ShouldHaveSingleItem();
+        wrongType.Kind.ShouldBe(SettingsFileErrorKind.WrongType);
+        wrongType.Span.ShouldBe(new TextSpan(element.IndexOf("[[", StringComparison.Ordinal), 124));
+    }
+
+    private static string Nested(int depth) => new string('[', depth) + new string(']', depth);
 }

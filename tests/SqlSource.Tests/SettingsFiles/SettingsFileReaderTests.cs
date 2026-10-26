@@ -357,6 +357,30 @@ public sealed class SettingsFileReaderTests
         ]);
     }
 
+    // A wrong JSON type never sets a setting: an array whose every element is of the wrong type sets nothing, as an
+    // object of wrong-type members does.  [] is still the empty list: Read_GeneratorParameters_FollowTheElementRules.
+    [Theory]
+    [InlineData("generatorParameters", "[1]")]
+    [InlineData("generatorParameters", "[1, {}]")]
+    [InlineData(
+        "typeOverrides", /*lang=json,strict*/
+        "{\"int4\": 1}"
+    )]
+    [InlineData(
+        "columnTypes", /*lang=json,strict*/
+        "{\"users.id\": [], \"posts.id\": null}"
+    )]
+    public void Read_ListOfOnlyWrongTypes_SetsNothing(string key, string value)
+    {
+        var text = $$"""{"{{key}}": {{value}}}""";
+
+        var file = SettingsFileReader.Read(text, Place);
+
+        file.Level.ShouldBeSameAs(SettingsLevel.None);
+        file.Errors.ShouldNotBeEmpty();
+        file.Errors.ShouldAllBe(error => error.Kind == SettingsFileErrorKind.WrongType && error.Setting == key);
+    }
+
     [Fact]
     public void Read_TypeOverrideMembers_AreReportedByTheirSpansAndCarryThePlace()
     {
