@@ -90,9 +90,9 @@ internal static class TargetTypeReader
     }
 
     // A nested class, or a method on the type, cannot share its name with a member of the type, with the type itself
-    // or with one of the type's parameters.  The nested class's name is not known until the project's property joins,
-    // so every one of them is kept, sorted, for NestedClassCheck and for the methods' check.  MemberNames leaves out
-    // the nested types.
+    // or with one of the type's parameters.  The nested class's name is not known until the settings files and the
+    // project's property join, so every one of them is kept, sorted, for NestedClassCheck and for the methods' check.
+    // MemberNames leaves out the nested types.
     private static EquatableArray<string> GetTakenNames(INamedTypeSymbol symbol) =>
         new(
             symbol

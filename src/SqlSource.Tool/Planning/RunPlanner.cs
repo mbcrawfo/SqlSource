@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Generation.Chains;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Generation.Paths;
 using SqlSource.Parsing;
@@ -201,6 +202,7 @@ internal static class RunPlanner
     {
         var input = FileParseInput.Resolve(
             owner.Metadata,
+            SettingsChain.None,
             owner.ProjectDialect,
             projectKeepsComments: false,
             EquatableArray<string>.Empty

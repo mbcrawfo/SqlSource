@@ -14,24 +14,34 @@ namespace SqlSource.Generation.Types;
 internal static class MappedTypeNames
 {
     /// <summary>
-    /// The distinct types of every entry of the property, of each file's metadata and of the markers of every query,
-    /// and of each query's parameters and result's columns, in ordinal order.  An entry of <c>default</c> names none.
+    /// The distinct types of every entry of the property, of each file's level and of the markers of every query, and
+    /// of each query's parameters and result's columns, in ordinal order.  A file's level is the chain of its folder
+    /// over its metadata.  An entry of <c>default</c> names none.
     /// </summary>
     /// <remarks>
-    /// A query's markers are over its file header's, so the header's entries are read through its queries.  A list
-    /// of the names alone, which an edit that leaves them as they were gives again, equal.
+    /// A query's markers are over its file header's, so the header's entries are read through its queries.  The files
+    /// of a folder without metadata share their chain's level, and are sorted by path, so a level read for the file
+    /// before is not read again.  A list of the names alone, which an edit that leaves them as they were gives again,
+    /// equal.
     /// </remarks>
     public static EquatableArray<string> Collect(
         ProjectSettings project,
-        EquatableArray<FileSettings> files,
+        EquatableArray<FileLevel> files,
         EquatableArray<ParsedSqlFile> parsed
     )
     {
         var names = new SortedSet<string>(StringComparer.Ordinal);
         Add(names, project.Level);
-        foreach (var file in files)
+        SettingsLevel? previous = null;
+        for (var i = 0; i < files.Count; i++)
         {
-            Add(names, file.Level);
+            var level = files[i].Level;
+            if (!ReferenceEquals(level, previous))
+            {
+                Add(names, level);
+            }
+
+            previous = level;
         }
 
         foreach (var file in parsed)

@@ -10,6 +10,7 @@ Each page is in this folder.
 |----|----|----|
 | `src/SqlSource`, its root | `generator.md` | `## The pipeline` |
 | `src/SqlSource/Generation`, with `Converters/`, `Models/`, `Paths/`, `Sidecars/` and `Types/` | `generator.md` | `## The pipeline`; `### Converters` for `Converters/` |
+| `src/SqlSource/Generation/Chains` | `generator.md` | `#### The chains` and `#### Which files are checked`, under `### Settings files` |
 | `src/SqlSource/Generation/MSBuild` | `generator.md` | `## Settings` |
 | `src/SqlSource/Generation/Emitting` | `generator.md` | `## Emitting` |
 | `src/SqlSource/Generation/Methods` | `generator.md` | `### Query methods`, under `## Emitting` |

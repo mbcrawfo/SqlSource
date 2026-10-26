@@ -37,6 +37,28 @@ public sealed class SqlPathTests
     public void Normalize_DotDotWithNothingBeforeIt_IsNull(string path) => SqlPath.Normalize(path).ShouldBeNull();
 
     [Theory]
+    [InlineData(GeneratorHarness.UsersPath)]
+    [InlineData("/")]
+    [InlineData("\\app\\Users.sql")]
+    [InlineData("\\\\server\\share\\Users.sql")]
+    [InlineData("C:\\app\\Users.sql")]
+    [InlineData("c:/app/Users.sql")]
+    [InlineData("Z:")]
+    public void IsRooted_PathFromARoot_IsTrue(string path) => SqlPath.IsRooted(path).ShouldBeTrue();
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("app/Users.sql")]
+    [InlineData("Other.Gen/Other.Gen.Generator/Extra.g.cs")]
+    [InlineData("./app/Users.sql")]
+    [InlineData("../app/Users.sql")]
+    [InlineData("C")]
+    [InlineData("1:/app/Users.sql")]
+    [InlineData("é:/app/Users.sql")]
+    [InlineData("app:/Users.sql")]
+    public void IsRooted_RelativePath_IsFalse(string path) => SqlPath.IsRooted(path).ShouldBeFalse();
+
+    [Theory]
     [InlineData("app/Repo", "Users.sql", GeneratorHarness.UsersNormalizedPath)]
     [InlineData("app/Repo", "Queries\\Users.sql", "app/Repo/Queries/Users.sql")]
     [InlineData("app/Repo", "../Queries", "app/Queries")]
@@ -148,6 +170,26 @@ public sealed class SqlPathTests
     }
 
     [Fact]
+    public void IndexOf_FolderOfAPath_FindsItInTheOrderOfTheComparer()
+    {
+        // '-' sorts before the separator, and a letter that is not ASCII after every ASCII one, ignoring its case.
+        string[] folders = ["", "app", "app-tests", "app/Queries", "Zed", "Äpp", "äpp/Queries"];
+        var sorted = TestModels.Array([
+            .. folders
+                .Distinct(SqlPath.Comparer)
+                .OrderBy(folder => folder, SqlPath.Comparer)
+                .Select(folder => new Item(folder)),
+        ]);
+        const string Path = "ÄPP/QUERIES/a.sql";
+
+        SqlPath.IndexOf(sorted, Path, "ÄPP/QUERIES".Length, static item => item.Path).ShouldBe(sorted.Count - 1);
+        SqlPath.IndexOf(sorted, Path, "ÄPP".Length, static item => item.Path).ShouldBe(sorted.Count - 2);
+        SqlPath.IndexOf(sorted, Path, 0, static item => item.Path).ShouldBe(0);
+        SqlPath.IndexOf(sorted, "app/Queries/a.sql", "app/Queries".Length, static item => item.Path).ShouldBe(3);
+        SqlPath.IndexOf(sorted, "app/Queries/a.sql", "app/Q".Length, static item => item.Path).ShouldBe(-1);
+    }
+
+    [Fact]
     public void FindRepeated_PathListedOnce_IsEmpty() =>
         FindRepeated(["app/A.sql", "app/b.sql"], ["app/A.sql", "app/b.sql"]).ShouldBeEmpty();
 
@@ -165,6 +207,26 @@ public sealed class SqlPathTests
 
     private static EquatableArray<string> FindRepeated(string[] files, string[] sortedPaths) =>
         SqlPath.FindRepeated([.. files.Select(path => SqlFilePath.Create(path)!)], TestModels.Array(sortedPaths));
+
+    [Theory]
+    [InlineData("repo/obj/App.AssemblyInfo.cs", "repo/obj")]
+    [InlineData("repo/obj/Debug/net10.0/App.AssemblyInfo.cs", "repo/obj")]
+    [InlineData("REPO/Obj/x.cs", "repo/obj")]
+    [InlineData("C:/repo/obj/x.cs", "C:/repo/obj")]
+    [InlineData("repo/x.cs", "")]
+    public void IsInFolder_PathUnderTheFolder_IsTrue(string path, string folder) =>
+        SqlPath.IsInFolder(path, folder).ShouldBeTrue();
+
+    [Theory]
+    [InlineData("repo/objx/x.cs", "repo/obj")]
+    [InlineData("repo/obj-old/x.cs", "repo/obj")]
+    [InlineData("repo/obj.cs", "repo/obj")]
+    [InlineData("repo/obj", "repo/obj")]
+    [InlineData("repo/x.cs", "repo/obj")]
+    [InlineData("other/repo/obj/x.cs", "repo/obj")]
+    [InlineData("rep", "repo/obj")]
+    public void IsInFolder_PathBesideOrAboveTheFolder_IsFalse(string path, string folder) =>
+        SqlPath.IsInFolder(path, folder).ShouldBeFalse();
 
     [Theory]
     [InlineData("app/Repo", "app/Repo/a.sql", "app/Repo/Count.sql", GeneratorHarness.UsersNormalizedPath)]

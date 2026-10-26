@@ -11,9 +11,9 @@ The props do four things.
 - They set `SqlSourceImported` to `true`, with no condition.  The tool asks a project for this property, and for nothing else, to tell whether it uses SqlSource.  It is in the props because they reach a project whether the package came from NuGet or its files are imported by path.  A project that was never restored has no props of a package, and so no marker.
 - They add `SqlSource.AfterSdk.targets` to `AfterMicrosoftNETSdkTargets`, the list of files the SDK imports last, keeping the list's value.
 - They add every `.sql` file under the project's folder as an `AdditionalFiles` item, the only way a source generator sees a file, unless the project sets `SqlSourceIncludeFiles` to `false`.  The item comes before the project's content, so a project can remove files from it.  The same condition and the same excludes give the compiler every `.sql.json` file too, a `.sql` file's sidecar, which the generator reads; a project that sets `SqlSourceIncludeFiles` to `false` lists its sidecars itself.  Items are evaluated after every property, so `DefaultItemExcludes` already holds the output and intermediate folders, whatever the project sets them to.
-- They list the twelve settings that the generator reads as `CompilerVisibleProperty` items, and eleven of them as `CompilerVisibleItemMetadata` of `SqlSourceSettingsFile`: all but `SqlSourceNestedClass`, which is a property alone.  A generator sees only the properties and metadata that are listed.  None of these is under the condition of `SqlSourceIncludeFiles`, since a project that lists its own `.sql` files still needs them.  `SqlSourceDatabase` is not listed: the tool reads it and the generator does not, as [the tool runs the same code](generator.md#the-tool-runs-the-same-code) explains.  `SqlSourceTypeOverrides` and `SqlSourceColumnTypes` are the other way round: listed, and not read by the tool.
+- They list the twelve settings that the generator reads as `CompilerVisibleProperty` items, and eleven of them as `CompilerVisibleItemMetadata` of `SqlSourceSettingsFile`: all but `SqlSourceNestedClass`, which is a property alone.  A generator sees only the properties and metadata that are listed.  None of these is under the condition of `SqlSourceIncludeFiles`, since a project that lists its own `.sql` files still needs them.  `SqlSourceDatabase` is not listed: the tool reads it and the generator does not, as [the tool runs the same code](generator.md#the-tool-runs-the-same-code) explains.  `SqlSourceTypeOverrides` and `SqlSourceColumnTypes` are the other way round: listed, and not read by the tool.  They also list `SqlSourceBuildFolders`, which is no setting: the targets set it, as [the build's folders](#the-builds-folders) says.
 
-The targets hold five targets of a build.  Three hook `GenerateMSBuildEditorConfigFileCore`, the target of the SDK that writes the file the compiler reads the properties and metadata from; the search for settings files and the tracking of additional files hook `CoreCompile` from `SqlSource.AfterSdk.targets`, or `GenerateMSBuildEditorConfigFileCore` where that file is not imported.  They also hold `SqlSourceWriteManifest`, which no build runs, the `PropertyGroup` that lists what it depends on, an `ItemGroup` that nests each sidecar under its `.sql` file and keeps it out of the output and publish folders, and an `ItemGroup` that keeps the settings files out of them too.  An arrow means "runs before":
+The targets hold six targets of a build.  Four hook `GenerateMSBuildEditorConfigFileCore`, the target of the SDK that writes the file the compiler reads the properties and metadata from; the search for settings files and the tracking of additional files hook `CoreCompile` from `SqlSource.AfterSdk.targets`, or `GenerateMSBuildEditorConfigFileCore` where that file is not imported.  They also hold `SqlSourceWriteManifest`, which no build runs, the `PropertyGroup` that lists what it depends on, an `ItemGroup` that nests each sidecar under its `.sql` file and keeps it out of the output and publish folders, and an `ItemGroup` that keeps the settings files out of them too.  An arrow means "runs before":
 
 ```mermaid
 flowchart LR
@@ -21,6 +21,7 @@ flowchart LR
     trimMetadata["SqlSourceTrimMetadataOfFiles"] --> collect["SqlSourceCollectSettingsFiles"]
     trimMetadata --> sdk
     collect --> sdk
+    folders["SqlSourceFindBuildFolders"] --> sdk
     trimMetadata --> find["SqlSourceFindSettingsFiles"]
     find --> track["SqlSourceTrackAdditionalFiles"]
     track --> late["SqlSourceSettingsFilesBeforeCompile (SqlSource.AfterSdk.targets)"]
@@ -31,7 +32,7 @@ flowchart LR
     defines["AddImplicitDefineConstants (SDK)"] -.->|"with a TargetFramework"| manifest
 ```
 
-The two trims are described under [Trimming](#trimming), the search under [finding the settings files](#finding-the-settings-files), and the manifest target under [The manifest](#the-manifest).
+The two trims are described under [Trimming](#trimming), the search under [finding the settings files](#finding-the-settings-files), the folders under [the build's folders](#the-builds-folders), and the manifest target under [The manifest](#the-manifest).
 
 ### Nesting a sidecar
 
@@ -54,6 +55,12 @@ The search depends on `SqlSourceTrimMetadataOfFiles`, the target that the manual
 ### Keeping the settings files out of the output
 
 The last `ItemGroup` at the root of the targets sets `CopyToOutputDirectory` and `CopyToPublishDirectory` to `Never` on every `Content` item named `sqlsource.json`, as the nesting group does for a sidecar, since the Web SDK lists a `.json` file as `Content` and copies it.  It is in the targets and not in the props: NuGet imports a package's props from `Microsoft.Common.props`, before the Web SDK adds its `Content` items, and `Update` changes only the items already listed.  The last stage of [`check-package-install.sh`](../../tools/README.md#check-package-installsh) publishes a web project that has one, and fails when it is copied.
+
+### The build's folders
+
+`SqlSourceFindBuildFolders` sets `SqlSourceBuildFolders` to the folders the build writes C# files and its outputs into: `BaseIntermediateOutputPath`, `IntermediateOutputPath`, `BaseOutputPath`, `OutDir` and, when `EmitCompilerGeneratedFiles` is `true`, `CompilerGeneratedFilesOutputPath`, in that order, each after a `|`, made against `MSBuildProjectDirectory` by `$([MSBuild]::NormalizeDirectory(...))`, which ends it with a separator.  A default Debug build gives `|/repo/App/obj/|/repo/App/obj/Debug/net10.0/|/repo/App/bin/|/repo/App/bin/Debug/net10.0/`.  The props show the property to the compiler, and the generator leaves a C# file under any of the folders out of the chains that decide which settings files are checked, so that the SDK's own files in `obj`, and the files of the generators, reach no settings file above the project's root file wherever the project puts them ([which files are checked](generator.md#which-files-are-checked)).  A folder that has no value is left out, since `NormalizeDirectory` would make it the project's own folder.  The target first empties the property and then sets it, so it holds the build's folders whatever the project wrote: it is no setting.  It runs in a target, before `GenerateMSBuildEditorConfigFileCore`, as the trims do, since every property of the SDK and of the artifacts layout is set by then, while `Directory.Build.targets`, which is imported after the package's targets, could still change one where they are imported.
+
+The compiler reads a value up to its first `#` or `;`, and `|` parts the folders, so the target escapes each folder's `%`, `|`, `#` and `;` as `%25`, `%7C`, `%23` and `%3B`, `%` first, with `Replace`, and `BuildFolders.Of` decodes them.  MSBuild reads `%XX` in a project file as the character it stands for, so each escape is written with its `%` as `%25`, `%2523` for `%23`: a real build of a project under `/repo/hash#repo` with `UseArtifactsOutput` gives `|/repo/hash%23repo/artifacts/obj/App/|/repo/hash%23repo/artifacts/obj/App/debug/|...`.  The manifest does not carry the property.
 
 ### `SqlSourceSettingsFile`
 

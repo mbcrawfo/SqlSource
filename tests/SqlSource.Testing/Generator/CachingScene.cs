@@ -178,6 +178,19 @@ internal sealed class CachingScene
         return driver;
     }
 
+    // Both types at Sql, with Users, Orders and these settings files.
+    public GeneratorDriver FirstRunWithSettingsFiles(
+        Compilation compilation,
+        params InMemoryAdditionalText[] settingsFiles
+    )
+    {
+        var driver = GeneratorHarness
+            .CreateDriver([Users, Orders, .. settingsFiles], new TestOptionsProvider(OutputKind.Sql, null))
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        return driver;
+    }
+
     // Both types at Models under postgres, and each file with its current sidecar.
     public GeneratorDriver FirstRunWithSidecars(Compilation compilation)
     {

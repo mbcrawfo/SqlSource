@@ -15,7 +15,7 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // The caching of the settings: what a change to the generator parameters, the dialect or keep-comments, at each level
-// that gives it, makes the generator parse and emit again.
+// that gives it, and to a setting of stage two in a settings file, makes the generator parse and emit again.
 public sealed class CachingOptionsTests
 {
     private readonly CachingScene _scene = new();
@@ -434,5 +434,96 @@ public sealed class CachingOptionsTests
             .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("UserQueries.g.cs", StringComparison.Ordinal))
             .ToString()
             .ShouldContain("SELECT 1; -- c");
+    }
+
+    // The edited file's folder holds one type's file, whose level changes, and its query loses its constant to the
+    // method of codegen.  The other file has a level from the file above both folders, which is resolved again and
+    // comes out equal: the step named FileLevel is the one after the filter of nulls, which reports such a value as
+    // taken from the previous run.  No file is parsed: the output is no part of what a parse depends on.
+    [Fact]
+    public void Run_SettingsFileOutputChanged_EmitsTheTypesOfItsFolderAndParsesNoFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var settings = new InMemoryAdditionalText(
+            "/app/Users/sqlsource.json", /*lang=json,strict*/
+            """{"output":"sql"}"""
+        );
+        var above = new InMemoryAdditionalText(
+            "/app/sqlsource.json", /*lang=json,strict*/
+            """{"inputModelSuffix":"In"}"""
+        );
+        var driver = _scene.FirstRunWithSettingsFiles(compilation, settings, above);
+
+        var edited = new InMemoryAdditionalText(
+            settings.Path, /*lang=json,strict*/
+            """{"output":"codegen"}"""
+        );
+        var result = Run(driver.ReplaceAdditionalText(settings, edited), compilation);
+
+        Reasons<FileLevel>(result, TrackingNames.FileLevel, level => level.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.FileLevels).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.ParsedFile)
+            .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
+        Reasons<TypeQueries>(result, TrackingNames.TypeQueries, type => type.HintName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Users.UserQueries.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.OrderQueries.g.cs"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Users.UserQueries.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.OrderQueries.g.cs"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+    }
+
+    // The class is named again for every type, from the new set, and only the type in the edited folder gets another
+    // name.  No file is parsed.
+    [Fact]
+    public void Run_SettingsFileNestedClassChanged_ChecksOnlyTheTypesOfItsFolder()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var settings = new InMemoryAdditionalText(
+            "/app/Users/sqlsource.json", /*lang=json,strict*/
+            """{"nestedClass":"Queries"}"""
+        );
+        var driver = _scene.FirstRunWithSettingsFiles(compilation, settings);
+
+        var edited = new InMemoryAdditionalText(
+            settings.Path, /*lang=json,strict*/
+            """{"nestedClass":"Statements"}"""
+        );
+        var result = Run(driver.ReplaceAdditionalText(settings, edited), compilation);
+
+        Reasons<TargetType>(result, TrackingNames.NestedClassCheck, type => type.Name)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["UserQueries"] = IncrementalStepRunReason.Modified,
+                    ["OrderQueries"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.ParsedFile)
+            .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
+        result
+            .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("UserQueries.g.cs", StringComparison.Ordinal))
+            .ToString()
+            .ShouldContain("private static class Statements\n");
     }
 }

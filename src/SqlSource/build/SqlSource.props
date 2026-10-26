@@ -47,6 +47,8 @@
         class that holds a type's generated members; it is a property alone, never metadata, since it belongs to a type
         and not to a file, and the tool does not read it.
         SqlSourceDatabase is trimmed and is not listed: the tool reads it, and the generator does not.
+        SqlSourceBuildFolders is no setting: SqlSource.targets sets it to the folders the build writes C# files and its
+        outputs into, and a C# file under one, such as one the SDK writes into obj, reaches no settings file.
         None of this is under the condition above: a project that lists its own .sql files still needs it.
 
         The metadata is listed for SqlSourceSettingsFile and not for AdditionalFiles.  The SDK writes a section for
@@ -71,6 +73,7 @@
         <CompilerVisibleProperty Include="SqlSourceTypeOverrides" />
         <CompilerVisibleProperty Include="SqlSourceColumnTypes" />
         <CompilerVisibleProperty Include="SqlSourceNestedClass" />
+        <CompilerVisibleProperty Include="SqlSourceBuildFolders" />
         <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceDialect" />
         <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceGeneratorParameters" />
         <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceOutput" />
