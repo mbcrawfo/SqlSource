@@ -159,10 +159,29 @@ internal static class GeneratorHarness
 
     // Another assembly that the generator ran on too, compiled and ready to reference.  With InternalsVisibleTo for
     // "TestAssembly" in its source, it is what a test project sees of the project it tests.
-    public static MetadataReference CreateReference(OutputKind? output, string assemblyName, string source)
+    public static MetadataReference CreateReference(OutputKind? output, string assemblyName, string source) =>
+        CreateProject(output, assemblyName, source).reference;
+
+    // The same with the .sql files the generator reads, the references and the dialect of the project, and the code the
+    // generator gave it by name.
+    public static (MetadataReference reference, IReadOnlyDictionary<string, string> sources) CreateProject(
+        OutputKind? output,
+        string assemblyName,
+        string source,
+        SqlFile[]? sqlFiles = null,
+        MetadataReference[]? references = null,
+        string? dialect = null
+    )
     {
-        var compilation = CreateCompilation([new SourceFile("/other/Other.cs", source)], assemblyName: assemblyName);
-        _ = CreateDriver([], new TestOptionsProvider(output, null))
+        var compilation = CreateCompilation(
+            [new SourceFile("/other/Other.cs", source)],
+            references: references,
+            assemblyName: assemblyName
+        );
+        var driver = CreateDriver(
+                (sqlFiles ?? []).Select(file => file.ToAdditionalText()),
+                new TestOptionsProvider(output, null, dialect)
+            )
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
                 out var updated,
@@ -172,7 +191,16 @@ internal static class GeneratorHarness
 
         using var image = new MemoryStream();
         updated.Emit(image, cancellationToken: TestContext.Current.CancellationToken).Success.ShouldBeTrue();
-        return MetadataReference.CreateFromImage(image.ToArray());
+        return (
+            MetadataReference.CreateFromImage(image.ToArray()),
+            driver
+                .GetRunResult()
+                .Results.Single()
+                .GeneratedSources.ToDictionary(
+                    generated => generated.HintName,
+                    generated => generated.SourceText.ToString()
+                )
+        );
     }
 
     // The compiler's warnings and errors for the source together with the generated code, as a build of the project
@@ -184,7 +212,8 @@ internal static class GeneratorHarness
         SqlFile[] sqlFiles,
         MetadataReference[] references,
         bool warningsAsErrors = false,
-        bool packageAnalyzers = true
+        bool packageAnalyzers = true,
+        string? dialect = null
     )
     {
         var compilation = CreateCompilation([new SourceFile(SourcePath, source)], references: references);
@@ -195,7 +224,10 @@ internal static class GeneratorHarness
             );
         }
 
-        _ = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()), new TestOptionsProvider(output, null))
+        _ = CreateDriver(
+                sqlFiles.Select(file => file.ToAdditionalText()),
+                new TestOptionsProvider(output, null, dialect)
+            )
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
                 out var updated,

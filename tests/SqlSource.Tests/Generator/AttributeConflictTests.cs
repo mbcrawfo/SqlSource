@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Testing.Generator;
 using Xunit;
+using static SqlSource.Testing.Generator.ModelRuns;
 using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
@@ -220,6 +221,49 @@ public sealed class AttributeConflictTests
         var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, source, [], [other]);
 
         Places(build).ShouldHaveSingleItem().ShouldStartWith("CS0436 ");
+    }
+
+    // Both projects generate App.SqlSourceRowBuffer, as a type private to the methods file, so that neither sees the
+    // other's.  A buffer that other code could name would be a CS0436 here, which the package does not hide for it.
+    // The queries have different names, so that their models are not a conflict of their own.  What is left is the
+    // attribute's, which the package hides.
+    [Fact]
+    public async Task Build_TwoProjectsSharingInternalsWithPooledMethods_HaveNoConflict()
+    {
+        const string Source =
+            "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate]\ninternal partial class Sample;\n";
+        const string OtherSource =
+            "using SqlSource;\n"
+            + InternalsVisible
+            + "namespace App { [SqlSourceGenerate] public partial class Sample; }";
+        var otherFile = new SqlFile("/other/Users.sql", "-- name: ListUsers\nSELECT id, name FROM users;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListOthers\nSELECT id, name FROM users;\n");
+        var columns = new[] { Column("id"), Column("name", Text, nullable: true) };
+        var (reference, sources) = GeneratorHarness.CreateProject(
+            OutputKind.CodeGen,
+            "Other",
+            OtherSource,
+            [otherFile, Sidecars.Of(otherFile, Entry(otherFile, "ListUsers", [], columns))],
+            [NpgsqlReferences.Npgsql10],
+            "postgres"
+        );
+        var entry = Entry(file, "ListOthers", [], columns);
+
+        var build = await GeneratorHarness.BuildAsync(
+            OutputKind.CodeGen,
+            Source,
+            [file, Sidecars.Of(file, entry)],
+            [reference, NpgsqlReferences.Npgsql10],
+            packageAnalyzers: false,
+            dialect: "postgres"
+        );
+
+        Places(build).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(5,2)-(5,19)"]);
+        sources[MethodRuns.MethodsFile].ShouldContain("file struct SqlSourceRowBuffer<T>\n");
+        MethodRuns
+            .Run(file, [entry], Source)
+            .Sources[MethodRuns.MethodsFile]
+            .ShouldContain("file struct SqlSourceRowBuffer<T>\n");
     }
 
     // The other project, compiled with the generator: it holds the attribute and the enums too.
