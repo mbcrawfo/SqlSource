@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
@@ -75,7 +76,7 @@ public sealed class SettingsFileDiagnosticsTests
     [Fact]
     public void Create_InvalidDialect_EndsWithTheAcceptedNames() =>
         Message(Error(SettingsFileErrorKind.InvalidValue, SettingsFileKeys.Dialect, "pgsql"))
-            .ShouldBe("'pgsql' is not a valid value of dialect.  dialect takes " + SqlDialectName.Accepted);
+            .ShouldBe("'pgsql' is not a valid value of dialect.  'dialect' takes " + SqlDialectName.Accepted + ".");
 
     [Fact]
     public void Create_InvalidValueOfAnotherSetting_HasNoHelp() =>
@@ -91,8 +92,8 @@ public sealed class SettingsFileDiagnosticsTests
 
         Message(SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text)))
             .ShouldBe(
-                "'Default' is not a valid value of generatorParameters.  default is the empty list and stands alone: "
-                    + "write [] for it"
+                "'Default' is not a valid value of generatorParameters.  'default' is the empty list and stands "
+                    + "alone: write [] for it."
             );
     }
 
@@ -138,6 +139,34 @@ public sealed class SettingsFileDiagnosticsTests
     [InlineData(SettingsFileKeys.ColumnTypes, "an object whose values are strings")]
     public void Create_WrongType_NamesTheTypeTheKeyTakes(string key, string type) =>
         Message(Error(SettingsFileErrorKind.WrongType, key, null)).ShouldBe($"'{key}' takes {type}");
+
+    // A blank string sets nothing for a key that takes one, but a member whose key or type is blank is reported, as
+    // the section of SQLSRC019 says.
+    [Fact]
+    public void Create_MemberWithABlankKeyOrType_IsReported()
+    {
+        const string Text = /*lang=json,strict*/
+            """
+            { "typeOverrides": { " ": "int", "int4": "" }, "columnTypes": { "users.id": " " }, "output": " " }
+            """;
+
+        var errors = SettingsFileReader.Read(Text, SettingPlace.Metadata).Errors;
+
+        errors
+            .Select(error => Message(SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text))))
+            .ShouldBe([
+                "': int' is not a valid value of typeOverrides",
+                "'int4: ' is not a valid value of typeOverrides",
+                "'users.id: ' is not a valid value of columnTypes",
+            ]);
+    }
+
+    // The reader names a key of the table for every value of the wrong type; any other error still gets a message.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("outptu")]
+    public void Create_WrongTypeOfNoKey_SaysAnotherJsonType(string? setting) =>
+        Message(Error(SettingsFileErrorKind.WrongType, setting, null)).ShouldBe($"'{setting}' takes another JSON type");
 
     [Fact]
     public void Create_InvalidJson_NamesTheDepthLimit()

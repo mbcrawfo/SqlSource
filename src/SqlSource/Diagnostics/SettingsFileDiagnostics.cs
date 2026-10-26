@@ -16,7 +16,10 @@ namespace SqlSource.Diagnostics;
 internal static class SettingsFileDiagnostics
 {
     private const string GeneratorParametersDefaultHelp =
-        ".  default is the empty list and stands alone: write [] for it";
+        ".  'default' is the empty list and stands alone: write [] for it.";
+
+    // What SQLSRC018 says a key takes when the error names no key of the table, which the reader never gives.
+    private const string OtherType = "another JSON type";
 
     private static readonly string InvalidJsonReason =
         "the text is not JSON, or nests deeper than "
@@ -61,14 +64,14 @@ internal static class SettingsFileDiagnostics
                 SqlDiagnostics.SettingsFileWrongType,
                 location,
                 setting,
-                TypeNameOf(SettingsFileKeys.TypeOf(setting))
+                SettingsFileKeys.All.Contains(setting) ? TypeNameOf(SettingsFileKeys.TypeOf(setting)) : OtherType
             ),
             SettingsFileErrorKind.InvalidValue => DiagnosticInfo.Create(
                 SqlDiagnostics.SettingsFileInvalidValue,
                 location,
                 error.Other is { } type ? argument + ": " + type : argument,
                 setting,
-                HelpOf(error)
+                HelpOf(error, argument)
             ),
             SettingsFileErrorKind.RepeatedKey => DiagnosticInfo.Create(
                 SqlDiagnostics.SettingsFileRepeatedKey,
@@ -94,17 +97,15 @@ internal static class SettingsFileDiagnostics
             SettingsFileValueType.Boolean => "true or false",
             SettingsFileValueType.ArrayOfStrings => "an array of strings",
             SettingsFileValueType.ObjectOfStrings => "an object whose values are strings",
-            _ => "a value of type " + ((int)type).ToString(CultureInfo.InvariantCulture),
+            _ => OtherType,
         };
 
     // The end of SQLSRC019's message, after the setting: the names of the dialects, why default stands alone, or the
     // forms of a type override's key that is written in brackets.  Empty for every other value.
-    private static string HelpOf(SettingsFileError error)
-    {
-        var argument = error.Argument ?? string.Empty;
-        return error.Setting switch
+    private static string HelpOf(SettingsFileError error, string argument) =>
+        error.Setting switch
         {
-            SettingsFileKeys.Dialect => ".  dialect takes " + SqlDialectName.Accepted,
+            SettingsFileKeys.Dialect => ".  'dialect' takes " + SqlDialectName.Accepted + ".",
             SettingsFileKeys.GeneratorParameters when GeneratorParameterList.IsDefault(argument.AsSpan()) =>
                 GeneratorParametersDefaultHelp,
             SettingsFileKeys.TypeOverrides when error.Other is not null => TypeOverrideGrammar.BracketHelp(
@@ -112,5 +113,4 @@ internal static class SettingsFileDiagnostics
             ),
             _ => string.Empty,
         };
-    }
 }
