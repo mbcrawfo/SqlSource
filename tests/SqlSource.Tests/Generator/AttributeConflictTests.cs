@@ -249,7 +249,7 @@ public sealed class AttributeConflictTests
         );
         var entry = Entry(file, "ListOthers", [], columns);
 
-        var build = await GeneratorHarness.BuildAsync(
+        var (diagnostics, builtSources) = await GeneratorHarness.BuildProjectAsync(
             OutputKind.CodeGen,
             Source,
             [file, Sidecars.Of(file, entry)],
@@ -258,12 +258,9 @@ public sealed class AttributeConflictTests
             dialect: "postgres"
         );
 
-        Places(build).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(5,2)-(5,19)"]);
+        Places(diagnostics).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(5,2)-(5,19)"]);
         sources[MethodRuns.MethodsFile].ShouldContain("file struct SqlSourceRowBuffer<T>\n");
-        MethodRuns
-            .Run(file, [entry], Source)
-            .Sources[MethodRuns.MethodsFile]
-            .ShouldContain("file struct SqlSourceRowBuffer<T>\n");
+        builtSources[MethodRuns.MethodsFile].ShouldContain("file struct SqlSourceRowBuffer<T>\n");
     }
 
     // The other project, compiled with the generator: it holds the attribute and the enums too.

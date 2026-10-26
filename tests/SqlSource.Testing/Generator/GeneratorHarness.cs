@@ -160,11 +160,11 @@ internal static class GeneratorHarness
     // Another assembly that the generator ran on too, compiled and ready to reference.  With InternalsVisibleTo for
     // "TestAssembly" in its source, it is what a test project sees of the project it tests.
     public static MetadataReference CreateReference(OutputKind? output, string assemblyName, string source) =>
-        CreateProject(output, assemblyName, source).reference;
+        CreateProject(output, assemblyName, source).Reference;
 
     // The same with the .sql files the generator reads, the references and the dialect of the project, and the code the
     // generator gave it by name.
-    public static (MetadataReference reference, IReadOnlyDictionary<string, string> sources) CreateProject(
+    public static (MetadataReference Reference, IReadOnlyDictionary<string, string> Sources) CreateProject(
         OutputKind? output,
         string assemblyName,
         string source,
@@ -191,22 +191,39 @@ internal static class GeneratorHarness
 
         using var image = new MemoryStream();
         updated.Emit(image, cancellationToken: TestContext.Current.CancellationToken).Success.ShouldBeTrue();
-        return (
-            MetadataReference.CreateFromImage(image.ToArray()),
-            driver
-                .GetRunResult()
-                .Results.Single()
-                .GeneratedSources.ToDictionary(
-                    generated => generated.HintName,
-                    generated => generated.SourceText.ToString()
-                )
-        );
+        return (MetadataReference.CreateFromImage(image.ToArray()), SourcesOf(driver));
     }
 
     // The compiler's warnings and errors for the source together with the generated code, as a build of the project
     // reports them: after the analyzers that the package brings have run.  Without them it is what the compiler
     // reports on its own.
     public static async Task<IReadOnlyList<string>> BuildAsync(
+        OutputKind? output,
+        string source,
+        SqlFile[] sqlFiles,
+        MetadataReference[] references,
+        bool warningsAsErrors = false,
+        bool packageAnalyzers = true,
+        string? dialect = null
+    )
+    {
+        var (diagnostics, _) = await BuildProjectAsync(
+            output,
+            source,
+            sqlFiles,
+            references,
+            warningsAsErrors,
+            packageAnalyzers,
+            dialect
+        );
+        return diagnostics;
+    }
+
+    // The same, with the code the generator gave the project by name.
+    public static async Task<(
+        IReadOnlyList<string> Diagnostics,
+        IReadOnlyDictionary<string, string> Sources
+    )> BuildProjectAsync(
         OutputKind? output,
         string source,
         SqlFile[] sqlFiles,
@@ -224,7 +241,7 @@ internal static class GeneratorHarness
             );
         }
 
-        _ = CreateDriver(
+        var driver = CreateDriver(
                 sqlFiles.Select(file => file.ToAdditionalText()),
                 new TestOptionsProvider(output, null, dialect)
             )
@@ -241,8 +258,21 @@ internal static class GeneratorHarness
                 .GetAllDiagnosticsAsync(TestContext.Current.CancellationToken)
             : updated.GetDiagnostics(TestContext.Current.CancellationToken);
 
-        return [.. diagnostics.Where(diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning).Select(Format)];
+        return (
+            [.. diagnostics.Where(diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning).Select(Format)],
+            SourcesOf(driver)
+        );
     }
+
+    // The code the generator gave, by name.
+    private static Dictionary<string, string> SourcesOf(GeneratorDriver driver) =>
+        driver
+            .GetRunResult()
+            .Results.Single()
+            .GeneratedSources.ToDictionary(
+                generated => generated.HintName,
+                generated => generated.SourceText.ToString()
+            );
 
     // "SQLSRC001 /app/Repo/Sample.cs(3,14)-(3,20): message", with lines and columns counted from one as an IDE
     // shows them.
