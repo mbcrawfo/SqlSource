@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Shouldly;
+using SqlSource.Testing.EndToEnd;
 using SqlSource.Tests.SqlServer.EndToEnd.Shapes;
 using Xunit;
 
@@ -15,12 +15,11 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // The bytes that a generated method allocates for each call, against a hand-written ADO.NET method:
 // ShapeQueries.SearchAccounts, with two parameters and three rows of the seed of "app".  The hand-written method makes
 // the generated method's calls, one by one: the open/close rule of the methods, the command and its arguments, the
-// binding of each parameter and the reads of each column.  It returns the same rows in the same collection, an
-// IReadOnlyList with an array behind it, which it builds as hand-written code does, by copying a List, since the count
-// of the rows is not known until they are read.  The generated method reads its rows through its pooled row buffer
-// instead, which allocates less than the List, so it stays within the margin.  GC.GetTotalAllocatedBytes(true) counts
-// every thread, where the driver completes the continuations of an asynchronous call, so the test runs in
-// MeasuresAllocations, alone and on a server of its own.
+// binding of each parameter, the reads of each column, and the same rows in the same collection, an IReadOnlyList with
+// an array behind it, which it can only build by copying a List, since the count of the rows is not known until they
+// are read.  The two are compared by the commonest difference of pairs of calls, one of each method, which
+// CallAllocations explains.  GC.GetTotalAllocatedBytes(true) counts every thread, where the driver completes the
+// continuations of an asynchronous call, so the test runs in MeasuresAllocations, alone and on a server of its own.
 [Collection(MeasuresAllocations.Name)]
 public sealed class AllocationTests(SqlServerContainer sqlServer)
 {
@@ -29,33 +28,26 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
         "SELECT id, name\nFROM dbo.accounts\nWHERE name LIKE @name OR id = @accountId\nORDER BY id;";
 
     // The first calls pay for one-off work: JIT compilation, the driver's static state, the pool's connection and the
-    // server's plan of the query.  Fifty of each were enough on both images when the counts were set: the blocks after
+    // server's plan of the query.  Fifty of each were enough on both images when the counts were set: the calls after
     // them fell no further.
     private const int WarmUpCalls = 50;
 
-    // Twenty pairs of blocks of fifty calls, one block of each method, alternated so that the two see the same state
-    // of the process.  A call allocated about 6.7 KB on an open connection and 7.2 KB on a closed one, on SQL Server
-    // 2025 and 2017 alike when the counts were set, and the median of the differences of the pairs, when both methods
-    // read the rows into a List, was within 6 bytes of zero; a run of the test takes some seconds.
-    private const int Pairs = 20;
+    // The measured pairs of calls.  A call allocated about 6.2 to 6.7 KB on an open connection and 6.6 to 7.1 KB on a
+    // closed one, on SQL Server 2025 and 2017 alike when the count was set, and more than four pairs in five differed
+    // by the commonest difference; a run of the test takes some seconds.
+    private const int Pairs = 500;
 
-    private const int CallsPerBlock = 50;
-
-    // The bytes a call of the generated method may allocate over the hand-written one's, by the median of the
-    // differences of the pairs of blocks: each block of the generated method less the block of the hand-written one
-    // measured beside it.  A pair shares the state of the process, so a drift of the run, such as a pool or a buffer
-    // that grows, or a server that answers at another pace, which changes how many of the driver's awaits complete
-    // asynchronously, cancels within the pair, where the medians of each method's blocks taken apart would carry it
-    // into one of them.  The median leaves out a pair that another thread's allocation landed in, such as the pool's
-    // timer, which a total would spread over every call.  The margin is below the 24 bytes of the smallest object of a
+    // The bytes a call of the generated method may allocate over the hand-written one's, by the commonest difference of
+    // a pair.  It was 0 on both connections and both images when this was set, and it does not move with the driver's
+    // share of a call or with another thread's work.  The margin is below the 24 bytes of the smallest object of a
     // 64-bit process, so that any object the generated method allocates for each call and the hand-written does not
-    // fails the test, and above the noise of the median, 6 bytes when it was set.  Lower it if the noise allows; never
-    // raise it to make a change pass.
-    private const double MarginInBytesPerCall = 16;
+    // fails the test, and an extra object did, at 24 bytes.  It lets the generated method's state machine hold up to
+    // two more fields of 8 bytes than the hand-written one's.  Never raise it to make a change pass.
+    private const long MarginInBytesPerCall = 16;
 
     // A call allocates its command, its parameters, its reader and its rows: some kilobytes on the drivers that the
-    // project runs.  A median below this measured nothing.
-    private const double LeastBytesPerCall = 1024;
+    // project runs.  A call below this measured nothing.
+    private const long LeastBytesPerCall = 1024;
 
     // A closed connection is opened and closed again by each call; an open one is left open.
     [Theory]
@@ -72,82 +64,25 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
 
         // "%o%" matches bob and carol, and the id alice.
         var filter = new SearchAccountsFilter { Name = "%o%", AccountId = 1 };
-        var generatedRows = await CallAsync(generated: true, connection, filter, token);
+        var generatedRows = await ShapeQueries.SearchAccounts(connection, filter, cancellationToken: token);
         generatedRows.ShouldBe([
             new SearchAccountsView(1, "alice"),
             new SearchAccountsView(2, "bob"),
             new SearchAccountsView(3, "carol"),
         ]);
-        (await CallAsync(generated: false, connection, filter, token)).ShouldBe(generatedRows);
+        (await SearchAccountsByHandAsync(connection, filter, cancellationToken: token)).ShouldBe(generatedRows);
 
-        _ = await AllocatedPerCallAsync(generated: true, connection, filter, WarmUpCalls, token);
-        _ = await AllocatedPerCallAsync(generated: false, connection, filter, WarmUpCalls, token);
-
-        var generatedBlocks = new List<double>();
-        var byHandBlocks = new List<double>();
-        var differences = new List<double>();
-        for (var pair = 0; pair < Pairs; pair++)
-        {
-            // Each method goes first in every other pair.
-            var generatedFirst = pair % 2 == 0;
-            var perCall = new Dictionary<bool, double>();
-            foreach (var generated in new[] { generatedFirst, !generatedFirst })
-            {
-                perCall[generated] = await AllocatedPerCallAsync(generated, connection, filter, CallsPerBlock, token);
-            }
-
-            generatedBlocks.Add(perCall[true]);
-            byHandBlocks.Add(perCall[false]);
-            differences.Add(perCall[true] - perCall[false]);
-        }
-
-        var generatedPerCall = Median(generatedBlocks);
-        var byHandPerCall = Median(byHandBlocks);
-        var differencePerCall = Median(differences);
-        TestContext.Current.TestOutputHelper?.WriteLine(
-            $"Bytes per call: generated {generatedPerCall:F1}, by hand {byHandPerCall:F1}, "
-                + $"difference of the pairs {differencePerCall:F1}."
+        var pairs = await CallAllocations.MeasureAsync(
+            () => ShapeQueries.SearchAccounts(connection, filter, cancellationToken: token),
+            () => SearchAccountsByHandAsync(connection, filter, cancellationToken: token),
+            WarmUpCalls,
+            Pairs
         );
+        TestContext.Current.TestOutputHelper?.WriteLine($"SearchAccounts, of {Pairs} pairs of calls, {pairs}.");
 
-        byHandPerCall.ShouldBeGreaterThan(LeastBytesPerCall);
-        generatedPerCall.ShouldBeGreaterThan(LeastBytesPerCall);
-        differencePerCall.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
-    }
-
-    // The bytes that every thread allocated for each of the calls of one method.
-    private static async Task<double> AllocatedPerCallAsync(
-        bool generated,
-        DbConnection connection,
-        SearchAccountsFilter filter,
-        int calls,
-        CancellationToken cancellationToken
-    )
-    {
-        var before = GC.GetTotalAllocatedBytes(precise: true);
-        for (var call = 0; call < calls; call++)
-        {
-            _ = await CallAsync(generated, connection, filter, cancellationToken);
-        }
-
-        return (GC.GetTotalAllocatedBytes(precise: true) - before) / (double)calls;
-    }
-
-    // One call of either method, through the same path, so that the path costs the two the same.
-    private static Task<IReadOnlyList<SearchAccountsView>> CallAsync(
-        bool generated,
-        DbConnection connection,
-        SearchAccountsFilter filter,
-        CancellationToken cancellationToken
-    ) =>
-        generated
-            ? ShapeQueries.SearchAccounts(connection, filter, cancellationToken: cancellationToken)
-            : SearchAccountsByHandAsync(connection, filter, cancellationToken: cancellationToken);
-
-    private static double Median(List<double> blocks)
-    {
-        var sorted = blocks.Order().ToArray();
-        var middle = sorted.Length / 2;
-        return sorted.Length % 2 == 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
+        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
+        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
+        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     // SearchAccounts by hand: the arguments of the generated method, and its calls, with the rows in a List.
