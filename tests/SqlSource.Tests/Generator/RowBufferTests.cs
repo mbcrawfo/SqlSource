@@ -85,7 +85,8 @@ public sealed class RowBufferTests
         methods.ShouldNotContain("SqlSourceRowBuffer");
     }
 
-    // One of each pooled type in one file: the struct is written once, and its members all compile for every row type.
+    // One of each pooled type in one file: the struct is written once, and every member of it, ToList and
+    // ToImmutableArray among them, compiles beside a method of each pooled type.
     [Fact]
     public void Run_MethodOfEveryPooledType_CompilesWithOneBufferAndNoWarning()
     {

@@ -300,6 +300,8 @@ internal static class QueryMethodWriter
             {
                 CollectionKind.List or CollectionKind.IList or CollectionKind.ICollection => ".ToList()",
                 CollectionKind.ImmutableArray => ".ToImmutableArray()",
+                // The two immutable lists never reach this switch, since RowBuffer.IsUsedBy leaves them out; they are
+                // named so that the switch lists every member.
                 CollectionKind.Array
                 or CollectionKind.IEnumerable
                 or CollectionKind.IReadOnlyCollection
