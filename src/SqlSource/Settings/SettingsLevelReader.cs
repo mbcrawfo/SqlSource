@@ -8,8 +8,8 @@ namespace SqlSource.Settings;
 /// <summary>
 /// Reads a <see cref="SettingsLevel" /> from a source that is not a marker.  This is the one place that says which
 /// members such a level has, what makes a text, a list of generator parameters, a type override and a column type
-/// valid, and that a text which is empty or white space is not set.  A choice is decoded by its source, which alone
-/// knows how one is written.
+/// valid, in each form a source writes them, and that a text which is empty or white space is not set.  A choice is
+/// decoded by its source, which alone knows how one is written.
 /// </summary>
 internal static class SettingsLevelReader
 {
@@ -45,10 +45,19 @@ internal static class SettingsLevelReader
         return level.Equals(SettingsLevel.None) ? SettingsLevel.None : level;
     }
 
-    // A word that is no generator parameter is recorded, and the other words apply.
+    // A word that is no generator parameter is recorded, and the other words apply.  The elements of an array win over
+    // a text; an array with no word is the empty list, which is set.
     private static GeneratorParameters? ReadParameters<TSource>(ref TSource source)
         where TSource : struct, ISettingSource
     {
+        if (source.Elements(SettingId.Parameters) is { } elements)
+        {
+            var indexes = new List<int>();
+            var fromElements = GeneratorParameterList.ReadElements(elements, indexes);
+            ReportParts(ref source, SettingId.Parameters, indexes);
+            return fromElements;
+        }
+
         if (source.Text(SettingId.Parameters) is not { } list || string.IsNullOrWhiteSpace(list))
         {
             return null;
@@ -64,8 +73,9 @@ internal static class SettingsLevelReader
         return parameters;
     }
 
-    // An entry that is not valid is recorded as written, and the other entries apply.  The value serves both engines:
-    // PostgreSQL's entries are returned and SQL Server's given in sqlServer.  A list with no valid entry is not set.
+    // An entry that is not valid is recorded, as written or by its index, and the other entries apply.  The members of
+    // an object win over a text.  The value serves both engines: PostgreSQL's entries are returned and SQL Server's
+    // given in sqlServer.  A list with no valid entry is not set.
     private static EquatableArray<TypeOverride>? ReadTypeOverrides<TSource>(
         ref TSource source,
         out EquatableArray<TypeOverride>? sqlServer
@@ -73,40 +83,83 @@ internal static class SettingsLevelReader
         where TSource : struct, ISettingSource
     {
         sqlServer = null;
-        if (source.Text(SettingId.TypeOverrides) is not { } list || string.IsNullOrWhiteSpace(list))
+        TypeOverrideLists overrides;
+        if (source.Members(SettingId.TypeOverrides) is { } members)
+        {
+            var (indexes, repeated) = (new List<int>(), new List<(int Index, int First)>());
+            overrides = TypeOverrideGrammar.ReadMembers(members, source.Place, indexes, repeated);
+            ReportParts(ref source, SettingId.TypeOverrides, indexes, repeated);
+        }
+        else if (source.Text(SettingId.TypeOverrides) is { } list && !string.IsNullOrWhiteSpace(list))
+        {
+            var entries = new List<string>();
+            overrides = TypeOverrideGrammar.ReadList(list, source.Place, entries);
+            foreach (var entry in entries)
+            {
+                source.Invalid(SettingId.TypeOverrides, entry);
+            }
+        }
+        else
         {
             return null;
-        }
-
-        var entries = new List<string>();
-        var overrides = TypeOverrideGrammar.ReadList(list, source.Place, entries);
-        foreach (var entry in entries)
-        {
-            source.Invalid(SettingId.TypeOverrides, entry);
         }
 
         sqlServer = overrides.SqlServer.Count == 0 ? null : overrides.SqlServer;
         return overrides.PostgreSql.Count == 0 ? null : overrides.PostgreSql;
     }
 
-    // An entry that is not valid is recorded as written, and the other entries apply.  A list with no valid entry is
-    // not set.
+    // An entry that is not valid is recorded, as written or by its index, and the other entries apply.  The members of
+    // an object win over a text.  A list with no valid entry is not set.
     private static EquatableArray<ColumnType>? ReadColumnTypes<TSource>(ref TSource source)
         where TSource : struct, ISettingSource
     {
-        if (source.Text(SettingId.ColumnTypes) is not { } list || string.IsNullOrWhiteSpace(list))
+        EquatableArray<ColumnType> columnTypes;
+        if (source.Members(SettingId.ColumnTypes) is { } members)
+        {
+            var (indexes, repeated) = (new List<int>(), new List<(int Index, int First)>());
+            columnTypes = ColumnTypeGrammar.ReadMembers(members, source.Place, indexes, repeated);
+            ReportParts(ref source, SettingId.ColumnTypes, indexes, repeated);
+        }
+        else if (source.Text(SettingId.ColumnTypes) is { } list && !string.IsNullOrWhiteSpace(list))
+        {
+            var invalid = new List<string>();
+            columnTypes = ColumnTypeGrammar.ReadList(list, source.Place, invalid);
+            foreach (var entry in invalid)
+            {
+                source.Invalid(SettingId.ColumnTypes, entry);
+            }
+        }
+        else
         {
             return null;
         }
 
-        var invalid = new List<string>();
-        var columnTypes = ColumnTypeGrammar.ReadList(list, source.Place, invalid);
-        foreach (var entry in invalid)
+        return columnTypes.Count == 0 ? null : columnTypes;
+    }
+
+    // Gives the source the elements or members that are not valid, then those whose key is repeated.
+    private static void ReportParts<TSource>(
+        ref TSource source,
+        SettingId setting,
+        List<int> invalid,
+        List<(int Index, int First)>? repeated = null
+    )
+        where TSource : struct, ISettingSource
+    {
+        foreach (var index in invalid)
         {
-            source.Invalid(SettingId.ColumnTypes, entry);
+            source.InvalidPart(setting, index);
         }
 
-        return columnTypes.Count == 0 ? null : columnTypes;
+        if (repeated is null)
+        {
+            return;
+        }
+
+        foreach (var (index, first) in repeated)
+        {
+            source.RepeatedKey(setting, index, first);
+        }
     }
 
     private static string? ReadText<TSource>(ref TSource source, SettingId setting, Validator isValid)

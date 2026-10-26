@@ -91,6 +91,96 @@ public sealed class ColumnTypeGrammarTests
     public void ReadList_Nothing_IsEmpty() =>
         ColumnTypeGrammar.ReadList("  ", SettingPlace.Property, []).ShouldBeEmpty();
 
+    [Fact]
+    public void ReadMembers_Members_AreEntriesInTheOrderOfTheMapAtThePlace()
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        ColumnTypeGrammar
+            .ReadMembers(
+                [new("users.id", "UserId"), new("public.posts.created_by", "UserId")],
+                SettingPlace.Metadata,
+                invalid,
+                repeated
+            )
+            .ShouldBe([
+                new ColumnType("public.posts.created_by", "UserId", SettingPlace.Metadata),
+                new ColumnType("users.id", "UserId", SettingPlace.Metadata),
+            ]);
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBeEmpty();
+    }
+
+    // A member is a key and a type, each trimmed, and the type default ignoring case.
+    [Theory]
+    [InlineData("users.id", "default", null)]
+    [InlineData(" users.id\t", " DEFAULT ", null)]
+    [InlineData(" users.id ", " MyApp.UserId ", "global::MyApp.UserId")]
+    public void ReadMembers_WhiteSpaceAroundTheKeyAndTheType_IsTrimmed(string key, string type, string? expected)
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        ColumnTypeGrammar
+            .ReadMembers([new(key, type)], SettingPlace.Metadata, invalid, repeated)
+            .ShouldBe([new ColumnType("users.id", expected, SettingPlace.Metadata)]);
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBeEmpty();
+    }
+
+    // A member whose key is no column's source, or whose type is not valid or empty, is named by its index, and the
+    // others apply.
+    [Theory]
+    [InlineData("id", "X")]
+    [InlineData("a.b.c.d", "X")]
+    [InlineData("users.id", "int?")]
+    [InlineData("users.id", "")]
+    [InlineData("users.id", " ")]
+    [InlineData("", "X")]
+    public void ReadMembers_MemberThatIsNotValid_IsItsIndexAndTheOthersApply(string key, string type)
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        ColumnTypeGrammar
+            .ReadMembers([new("posts.id", "PostId"), new(key, type)], SettingPlace.Metadata, invalid, repeated)
+            .ShouldBe([new ColumnType("posts.id", "PostId", SettingPlace.Metadata)]);
+        invalid.ShouldBe([1]);
+        repeated.ShouldBeEmpty();
+    }
+
+    // One key is the map's identity: a quoted and a plain spelling of one text, and one text twice.  The first member
+    // applies.
+    [Theory]
+    [InlineData("users.id", "\"users\".id")]
+    [InlineData("users.id", "users.id")]
+    public void ReadMembers_TwoMembersOfOneKey_TheSecondIsRepeatedAndTheFirstApplies(string first, string second)
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        ColumnTypeGrammar
+            .ReadMembers(
+                [new(first, "A"), new("posts.id", "PostId"), new(second, "B")],
+                SettingPlace.Metadata,
+                invalid,
+                repeated
+            )
+            .ShouldBe([
+                new ColumnType("posts.id", "PostId", SettingPlace.Metadata),
+                new ColumnType("users.id", "A", SettingPlace.Metadata),
+            ]);
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBe([(2, 0)]);
+    }
+
+    [Fact]
+    public void ReadMembers_NoMember_IsEmpty()
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        ColumnTypeGrammar.ReadMembers([], SettingPlace.Metadata, invalid, repeated).ShouldBeEmpty();
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("posts.id -> PostId", "posts.id", "PostId")]
     [InlineData("posts.id->PostId", "posts.id", "PostId")]

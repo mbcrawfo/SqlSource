@@ -17,7 +17,11 @@ internal static class SqlDialectName
     /// </summary>
     public const string Accepted = "ansi, mssql, postgres, cockroachdb, mysql, mariadb, sqlite and oracle";
 
-    private static readonly (string Name, SqlDialect Dialect)[] Names =
+    /// <summary>
+    /// Each name and alias, with its dialect: the first name of a dialect is its canonical one.  The schema of a
+    /// settings file repeats them in its pattern, and a test compares the two.
+    /// </summary>
+    internal static readonly (string Name, SqlDialect Dialect)[] Names =
     [
         ("ansi", SqlDialect.Ansi),
         ("mssql", SqlDialect.SqlServer),
@@ -33,8 +37,11 @@ internal static class SqlDialectName
         ("oracle", SqlDialect.Oracle),
     ];
 
-    // An option is also accepted as the server spells its SQL mode, with underscores.
-    private static readonly (string Name, SqlDialectOptions Option)[] Options =
+    /// <summary>
+    /// Each name of an option, with the option.  An option is also accepted as the server spells its SQL mode, with
+    /// underscores.  The schema of a settings file repeats them in its pattern, and a test compares the two.
+    /// </summary>
+    internal static readonly (string Name, SqlDialectOptions Option)[] Options =
     [
         ("ansi-quotes", SqlDialectOptions.AnsiQuotes),
         ("ansi_quotes", SqlDialectOptions.AnsiQuotes),
@@ -94,7 +101,8 @@ internal static class SqlDialectName
         return true;
     }
 
-    private static SqlDialectOptions OptionsOf(SqlDialect dialect) =>
+    /// <summary>The options that <paramref name="dialect" /> takes; none for a dialect that takes none.</summary>
+    internal static SqlDialectOptions OptionsOf(SqlDialect dialect) =>
         dialect is SqlDialect.MySql or SqlDialect.MariaDb
             ? SqlDialectOptions.AnsiQuotes | SqlDialectOptions.NoBackslashEscapes
             : SqlDialectOptions.None;

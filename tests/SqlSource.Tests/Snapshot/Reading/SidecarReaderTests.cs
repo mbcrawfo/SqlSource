@@ -737,6 +737,22 @@ public sealed class SidecarReaderTests
         result.Error.ShouldBe(new SidecarError(SidecarErrorKind.InvalidJson, new TextSpan(start, length), null));
     }
 
+    // The settings files read comments and trailing commas; a sidecar is strict JSON.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Read_FileWithACommentOrATrailingComma_IsInvalidJson(bool comment)
+    {
+        var text = SidecarExamples.Read(SidecarExamples.Users);
+        var at = comment ? text.IndexOf('{', StringComparison.Ordinal) + 1 : text.LastIndexOf('}');
+        var changed = text.Insert(at, comment ? "// c\n" : ",");
+
+        var result = SidecarReader.Read(changed);
+
+        result.Sidecar.ShouldBeNull();
+        result.Error.ShouldNotBeNull().Kind.ShouldBe(SidecarErrorKind.InvalidJson);
+    }
+
     // The first object is level 1, so an unknown key may hold 63 arrays, each inside the one before.
     [Theory]
     [InlineData(63, true)]

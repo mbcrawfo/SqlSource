@@ -166,6 +166,72 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor SettingsFileNotAnObject = new(
+        id: "SQLSRC015",
+        title: "Settings file is not a JSON object",
+        messageFormat: "This settings file is not one JSON object: {0}",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc015",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SettingsFileUnknownKey = new(
+        id: "SQLSRC016",
+        title: "Settings file key is not known",
+        messageFormat: "'{0}' is not a key of a settings file",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc016",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SettingsFileDuplicateKey = new(
+        id: "SQLSRC017",
+        title: "Settings file key is written twice",
+        messageFormat: "'{0}' is written twice in this settings file, and the first applies",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc017",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SettingsFileWrongType = new(
+        id: "SQLSRC018",
+        title: "Settings file value has the wrong type",
+        messageFormat: "'{0}' takes {1}",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc018",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SettingsFileInvalidValue = new(
+        id: "SQLSRC019",
+        title: "Settings file value is not valid",
+        messageFormat: "'{0}' is not a valid value of {1}{2}",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc019",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SettingsFileRepeatedKey = new(
+        id: "SQLSRC020",
+        title: "Settings file entry repeats a key",
+        messageFormat: "'{0}' is the same key as '{1}' in {2}, and the first applies",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc020",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor UnterminatedQuote = new(
         id: "SQLSRC101",
         title: "Quote is not closed",
@@ -921,6 +987,12 @@ internal static class SqlDiagnostics
             UnsupportedLanguageVersion,
             PathDiffersOnlyByCase,
             InvalidSettingValue,
+            SettingsFileNotAnObject,
+            SettingsFileUnknownKey,
+            SettingsFileDuplicateKey,
+            SettingsFileWrongType,
+            SettingsFileInvalidValue,
+            SettingsFileRepeatedKey,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,

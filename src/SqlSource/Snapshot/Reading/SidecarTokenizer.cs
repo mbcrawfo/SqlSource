@@ -5,12 +5,17 @@ using Microsoft.CodeAnalysis.Text;
 namespace SqlSource.Snapshot.Reading;
 
 /// <summary>
-/// Reads the tokens of a sidecar's JSON and checks the grammar of a value.  It allocates nothing: a token is a span,
-/// and a string is created only by <see cref="GetString" />.
+/// Reads the tokens of a JSON text and checks the grammar of a value.  A sidecar is strict JSON; a settings file is
+/// read in the lenient mode, which also skips comments and accepts a trailing comma.  It allocates nothing: a token
+/// is a span, and a string is created only by <see cref="GetString" />.
 /// </summary>
 /// <param name="text">The text.</param>
 /// <param name="position">The offset to start at.</param>
-internal struct SidecarTokenizer(string text, int position = 0)
+/// <param name="lenient">
+/// Whether to skip <c>//</c> and <c>/* */</c> comments as white space and to accept one comma before the bracket that
+/// closes a container with a member.  Only the reader of a settings file sets it.
+/// </param>
+internal struct SidecarTokenizer(string text, int position = 0, bool lenient = false)
 {
     /// <summary>
     /// How deep a text may nest.  The readers above are recursive, so the limit is what keeps a file of ten thousand
@@ -76,12 +81,27 @@ internal struct SidecarTokenizer(string text, int position = 0)
         return true;
     }
 
-    /// <summary>Reads the next token, after any white space.</summary>
+    /// <summary>Reads the next token, after any white space and, in the lenient mode, any comment.</summary>
     public SidecarToken Next()
     {
-        while (Position < text.Length && (text[Position] is ' ' or '\t' or '\n' or '\r'))
+        while (Position < text.Length)
         {
-            Position++;
+            var character = text[Position];
+            if (character is ' ' or '\t' or '\n' or '\r')
+            {
+                Position++;
+            }
+            else if (lenient && character == '/')
+            {
+                if (!TrySkipComment(out var invalid))
+                {
+                    return invalid;
+                }
+            }
+            else
+            {
+                break;
+            }
         }
 
         if (Position >= text.Length)
@@ -267,6 +287,10 @@ internal struct SidecarTokenizer(string text, int position = 0)
             }
 
             token = Next();
+            if (lenient && token.Kind == SidecarTokenKind.ObjectEnd)
+            {
+                return true;
+            }
         }
     }
 
@@ -298,7 +322,44 @@ internal struct SidecarTokenizer(string text, int position = 0)
             }
 
             token = Next();
+            if (lenient && token.Kind == SidecarTokenKind.ArrayEnd)
+            {
+                return true;
+            }
         }
+    }
+
+    // Skips the comment that starts at Position, with its slash.  A slash that starts no comment, and a block comment
+    // with no end, are the invalid token.  A line comment ends before its line break, which is white space.
+    private bool TrySkipComment(out SidecarToken invalid)
+    {
+        invalid = default;
+        if (IsAt(Position + 1, '/'))
+        {
+            Position += 2;
+            while (Position < text.Length && text[Position] is not ('\n' or '\r'))
+            {
+                Position++;
+            }
+
+            return true;
+        }
+
+        if (!IsAt(Position + 1, '*'))
+        {
+            invalid = InvalidAt(Position);
+            return false;
+        }
+
+        var end = text.IndexOf("*/", Position + 2, StringComparison.Ordinal);
+        if (end < 0)
+        {
+            invalid = InvalidAt(text.Length);
+            return false;
+        }
+
+        Position = end + 2;
+        return true;
     }
 
     private SidecarToken Punctuation(SidecarTokenKind kind)
