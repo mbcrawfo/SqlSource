@@ -281,6 +281,29 @@ public sealed class DescribeRunTests : IDisposable
         _scene.Describer.Opened.ShouldBeEmpty();
     }
 
+    // The plan reported SQLSRC016 for a settings file that the .sql file reaches, at its line and column.  The queries
+    // are described all the same, and the exit code is 1.
+    [Fact]
+    public async Task Run_SettingsFileWithAnError_IsReportedAtItsPlaceAndFailsTheRun()
+    {
+        var settings = _scene.Project.AddSettings(
+            "sqlsource.json", /*lang=json,strict*/
+            "{\n  \"Dialect\": \"postgres\"\n}"
+        );
+
+        var result = await _scene.DescribeAsync();
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "postgres (postgres): 2 described, 0 skipped, 0 failed\n",
+                $"{settings}(2,3): error SQLSRC016: 'Dialect' is not a key of a settings file\n"
+                    + Expected.See("SQLSRC016")
+                    + DescribeScene.RunAgain
+            )
+        );
+    }
+
     // A database that no query of the run can be described for is none that the variable could be meant for.
     [Fact]
     public async Task Run_VariableWithNoNameAndASecondDatabaseThatCannotBeDescribed_IsUsedForTheOneThatCan()
