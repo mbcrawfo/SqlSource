@@ -1,6 +1,6 @@
 # The MSBuild files and the manifest
 
-How [`build/SqlSource.props`](../../src/SqlSource/build/SqlSource.props) and [`build/SqlSource.targets`](../../src/SqlSource/build/SqlSource.targets) hand a project's `.sql` files and settings to the compiler, and how the target `SqlSourceWriteManifest` writes the [manifest](README.md#manifest) for the `sqlsource` tool.  What a user writes in MSBuild is in the manual, [which `.sql` files are included](../manual/settings.md#which-sql-files-are-included) and [values written in MSBuild](../manual/settings.md#values-written-in-msbuild).  The terms are the [glossary's](README.md#glossary).
+How [`build/SqlSource.props`](../../src/SqlSource/build/SqlSource.props) and [`build/SqlSource.targets`](../../src/SqlSource/build/SqlSource.targets) hand a project's `.sql` files, settings and settings files to the compiler, and how the target `SqlSourceWriteManifest` writes the [manifest](README.md#manifest) for the `sqlsource` tool.  What a user writes in MSBuild is in the manual, [which `.sql` files are included](../manual/settings.md#which-sql-files-are-included) and [values written in MSBuild](../manual/settings.md#values-written-in-msbuild).  The terms are the [glossary's](README.md#glossary).
 
 ## What the props and targets do
 
@@ -12,7 +12,7 @@ The props do three things.
 - They add every `.sql` file under the project's folder as an `AdditionalFiles` item, the only way a source generator sees a file, unless the project sets `SqlSourceIncludeFiles` to `false`.  The item comes before the project's content, so a project can remove files from it.  The same condition and the same excludes give the compiler every `.sql.json` file too, a `.sql` file's sidecar, which the generator reads; a project that sets `SqlSourceIncludeFiles` to `false` lists its sidecars itself.  Items are evaluated after every property, so `DefaultItemExcludes` already holds the output and intermediate folders, whatever the project sets them to.
 - They list the twelve settings that the generator reads as `CompilerVisibleProperty` items, and eleven of them as `CompilerVisibleItemMetadata` of `SqlSourceSettingsFile`: all but `SqlSourceNestedClass`, which is a property alone.  A generator sees only the properties and metadata that are listed.  None of these is under the condition of `SqlSourceIncludeFiles`, since a project that lists its own `.sql` files still needs them.  `SqlSourceDatabase` is not listed: the tool reads it and the generator does not, as [the tool runs the same code](generator.md#the-tool-runs-the-same-code) explains.  `SqlSourceTypeOverrides` and `SqlSourceColumnTypes` are the other way round: listed, and not read by the tool.
 
-The targets hold four targets of a build, which all hook `GenerateMSBuildEditorConfigFileCore`, the target of the SDK that writes the file the compiler reads the properties and metadata from.  They also hold `SqlSourceWriteManifest`, which no build runs, the `PropertyGroup` that lists what it depends on, and an `ItemGroup` that nests each sidecar under its `.sql` file and keeps it out of the output and publish folders.  An arrow means "runs before":
+The targets hold five targets of a build, which all hook `GenerateMSBuildEditorConfigFileCore`, the target of the SDK that writes the file the compiler reads the properties and metadata from.  They also hold `SqlSourceWriteManifest`, which no build runs, the `PropertyGroup` that lists what it depends on, an `ItemGroup` that nests each sidecar under its `.sql` file and keeps it out of the output and publish folders, and an `ItemGroup` that keeps the settings files out of them too.  An arrow means "runs before":
 
 ```mermaid
 flowchart LR
@@ -20,19 +20,37 @@ flowchart LR
     trimMetadata["SqlSourceTrimMetadataOfFiles"] --> collect["SqlSourceCollectSettingsFiles"]
     trimMetadata --> sdk
     collect --> sdk
-    track["SqlSourceTrackAdditionalFiles"] --> sdk
+    trimMetadata --> find["SqlSourceFindSettingsFiles"]
+    find --> sdk
+    find --> track["SqlSourceTrackAdditionalFiles"]
+    track --> sdk
     trimProperties --> manifest["SqlSourceWriteManifest (run by the tool)"]
     trimMetadata --> manifest
+    find --> manifest
     defines["AddImplicitDefineConstants (SDK)"] -.->|"with a TargetFramework"| manifest
 ```
 
-The two trims are described under [Trimming](#trimming), and the manifest target under [The manifest](#the-manifest).
+The two trims are described under [Trimming](#trimming), the search under [finding the settings files](#finding-the-settings-files), and the manifest target under [The manifest](#the-manifest).
 
 ### Nesting a sidecar
 
 The `ItemGroup` sets `DependentUpon="%(Filename)"` on every `**/*.sql.json` item, with `Update`, so that an IDE can show `Users.sql.json` under `Users.sql`.  `Update` changes the items that are listed and adds none.  It is on `AdditionalFiles`, on `None`, the item type under which the SDK lists every file of the project, and on `Content`, under which the Web SDK lists a `.json` file in place of `None`, since an IDE may nest on any of them.  The IDEs nest from evaluated items, so the group is outside every target.  It is in the targets and not in the props, so that it also reaches a sidecar that a project lists itself when `SqlSourceIncludeFiles` is `false`.  `SqlSourceWriteManifest` lists `.sql` files alone, so the manifest does not change.
 
 The `Content` item also sets `CopyToOutputDirectory` and `CopyToPublishDirectory` to `Never`.  A sidecar is an input of the generator and nothing else, and the Web SDK copies its `Content`, a `.json` file among it, to the output folder and to what `dotnet publish` writes.  The targets are imported after the project's content, so `Never` wins over the Web SDK and over the project file; a web project that wants its sidecars copied sets the metadata again in its `Directory.Build.targets`, which the SDK imports after the targets of a package.  The `None` item keeps the project's copy metadata: the SDK copies a `None` file only when the project asks, as `tests/SqlSource.Tests` does for the examples of the sidecar format.  A `.sql` file is `None` in the SDK and in the Web SDK, so it needs nothing.  The last stage of [`check-package-install.sh`](../../tools/README.md#check-package-installsh) publishes a web project and fails when either file is copied.
+
+### Finding the settings files
+
+A settings file, `sqlsource.json`, applies to its folder and every folder below it, and a generator cannot read the disk, so every one that can apply to a `.sql` file or to a type must be an `AdditionalFiles` item.  `SqlSourceFindSettingsFiles` finds them the way the SDK finds `.editorconfig` files in `Roslyn/Microsoft.Managed.Core.targets`: every folder above a `.sql` item of `AdditionalFiles` or a `Compile` item, to the top of the drive, by `GetPathsOfAllDirectoriesAbove()`, each made a full path and distinct, combined with `sqlsource.json`, and kept where the file exists.  The step through `FullPath` and `Distinct` is the SDK's too: `GetPathsOfAllDirectoriesAbove()` can give one folder twice for a file linked with a relative path (msbuild issue 4392).  A folder that holds no `.sql` or C# file, and has none below it, is not searched, so a settings file there applies to nothing.  The search is not under `SqlSourceIncludeFiles`: a project that lists its own `.sql` files still gets its settings.  `Exists()` asks the file system, so where names are compared ignoring case, as on macOS and Windows, a `SqlSource.json` is found under the path `sqlsource.json`, as the SDK's search finds an `.EditorConfig`.
+
+The target adds each file it finds as an `AdditionalFiles` item, unless the project lists it already: the comparison is of full paths, since a project may list the file by a relative one, and the compiler is given none twice.  Each item it adds is `Visible="false"`.  An IDE lists the items of a project as evaluated, never one a target adds, so the metadata is for one that might; a settings file in the project's folder is listed anyway, as `None`, or as `Content` in the Web SDK.
+
+It runs before `GenerateMSBuildEditorConfigFileCore`, and not where the targets are imported, so that a `.sql` file a target adds is searched above too.  It depends on `SqlSourceTrimMetadataOfFiles`, the target that the manual tells such a target to hook, so that the target runs first, in a build and before the manifest.  A design-time build of an IDE runs it, since that build runs `Compile` with the compiler skipped, and the compiler's arguments then hold every file found: `SettingsFileSearchTests` in `tests/SqlSource.Tool.Tests/Projects/` holds it.
+
+`SqlSourceTrackAdditionalFiles` depends on it, so that a settings file added, deleted or moved changes the hash, and the next build compiles again.
+
+### Keeping the settings files out of the output
+
+The last `ItemGroup` at the root of the targets sets `CopyToOutputDirectory` and `CopyToPublishDirectory` to `Never` on every `Content` item named `sqlsource.json`, as the nesting group does for a sidecar, since the Web SDK lists a `.json` file as `Content` and copies it.  It is in the targets and not in the props: NuGet imports a package's props from `Microsoft.Common.props`, before the Web SDK adds its `Content` items, and `Update` changes only the items already listed.  The last stage of [`check-package-install.sh`](../../tools/README.md#check-package-installsh) publishes a web project that has one, and fails when it is copied.
 
 ### `SqlSourceSettingsFile`
 
@@ -44,7 +62,7 @@ The compiler finds the metadata of a file by its path, so the generator still re
 
 ### Tracking additional files
 
-`SqlSourceTrackAdditionalFiles` makes the build after a `.sql` file is deleted, renamed or moved compile again.  A file that is gone has no timestamp to compare, and the SDK's own record of what the compiler was given does not hold `AdditionalFiles`.  So the target writes a hash of the list of `AdditionalFiles` to a file under the intermediate folder, and names that file as a `CustomAdditionalCompileInputs` item, the item the SDK reads for more inputs of the compiler.  It writes the file only when the hash changes, so a build with the same files does not compile for it.
+`SqlSourceTrackAdditionalFiles` makes the build after a `.sql` file or a settings file is deleted, renamed or moved compile again.  A file that is gone has no timestamp to compare, and the SDK's own record of what the compiler was given does not hold `AdditionalFiles`.  So the target writes a hash of the list of `AdditionalFiles` to a file under the intermediate folder, and names that file as a `CustomAdditionalCompileInputs` item, the item the SDK reads for more inputs of the compiler.  It writes the file only when the hash changes, so a build with the same files does not compile for it.  It depends on [the search](#finding-the-settings-files), so that the list holds the settings files.
 
 ## Trimming
 
@@ -63,9 +81,10 @@ One target is out of their reach: one that hooks `GenerateMSBuildEditorConfigFil
 
 `SqlSourceWriteManifest` writes what the compiler is given, for the `sqlsource` tool, which runs it by name with `dotnet msbuild` and names the file to write with `SqlSourceManifestFile`.  How the tool runs it and uses what it reads is on [the tool's page](tool.md#evaluating-a-project).
 
-The target hooks nothing: it has no `BeforeTargets`, no `AfterTargets` and no condition.  A hook would make every build write the manifest, and a condition would make a run of the tool find no file.  So nothing of a build runs before it but what it depends on, which is the property `SqlSourceManifestDependsOn`.  That property is set in a `PropertyGroup` at the root of the targets file, because a target's `DependsOnTargets` is read before the target runs.  The only elements of the file that are not targets are that group and the [nesting of the sidecars](#nesting-a-sidecar), and the one condition outside a target is on the second line of that group.
+The target hooks nothing: it has no `BeforeTargets`, no `AfterTargets` and no condition.  A hook would make every build write the manifest, and a condition would make a run of the tool find no file.  So nothing of a build runs before it but what it depends on, which is the property `SqlSourceManifestDependsOn`.  That property is set in a `PropertyGroup` at the root of the targets file, because a target's `DependsOnTargets` is read before the target runs.  The only elements of the file that are not targets are that group, the [nesting of the sidecars](#nesting-a-sidecar) and the [group of the settings files](#keeping-the-settings-files-out-of-the-output), and the one condition outside a target is on the second line of that group.
 
 - The two trims make the manifest hold trimmed values, and make a target of the project that hooks `SqlSourceTrimMetadataOfFiles` to add a `.sql` file run first.
+- [The search](#finding-the-settings-files) adds the settings files to the `AdditionalFiles` items.
 - `AddImplicitDefineConstants`, when the project has a `TargetFramework`, adds the constants of the framework, `NET10_0` and `NET8_0_OR_GREATER` among them, which the SDK otherwise adds only on the way to a compile.  A project that is not of the SDK has no `TargetFramework` and no such target.
 
 Without `SqlSourceManifestFile` the target writes to `$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.manifest`, and adds that file to `FileWrites`, which tells `dotnet clean` of it only once a build runs the target.  A file the tool named is the tool's to delete.  Either way the file is written only when its text changes.
@@ -81,7 +100,8 @@ The file is lines of `key=value`, and the key ends at the first `=`.  The target
 3. `TargetFramework=`, `LangVersion=` and `DefineConstants=`, three properties of the SDK.
 4. `Property.<Name>=` for each of the thirteen properties of the package, empty when it is not set.
 5. For each `AdditionalFiles` item whose extension is `.sql`, compared ignoring case, in the order of the items: `File=` and its full path, then `File.<Name>=` for each of the twelve metadata.
-6. `Compile=` and the full path of each `Compile` item.
+6. `Settings=` and the full path of each `AdditionalFiles` item named `sqlsource.json`, compared ignoring case, once each: those the search added and any the project lists itself, so that the tool reads exactly the settings files the compiler is given.
+7. `Compile=` and the full path of each `Compile` item.
 
 Three things keep each value on its own line:
 
@@ -93,20 +113,20 @@ Three things keep each value on its own line:
 
 ### Reading it
 
-[`ManifestReader.Read`](../../src/SqlSource.Tool/Projects/ManifestReader.cs) gives a `ProjectManifest`, with a `ManifestFile` for each `.sql` file, or the reason the text is not a manifest.
+[`ManifestReader.Read`](../../src/SqlSource.Tool/Projects/ManifestReader.cs) gives a `ProjectManifest`, with a `ManifestFile` for each `.sql` file and the paths of the `Settings` lines in `SettingsFiles`, or the reason the text is not a manifest.
 
 - The first line must be `SqlSourceManifest=1`.  A manifest of another version is not read at all, and the reason says that the package and the tool are out of step; the tool reports it as [SQLSRC206](../manual/diagnostics.md#sqlsrc206).  A byte order mark before it is passed over, and a line may end with `\r\n` as well as `\n`.
 - A key the reader does not know is passed over, and so is an empty line: both are how a later package adds to the format.  A name under `Property.` or `File.` is kept by its name, whatever it is, and only the names the generator's readers ask for are ever looked up.
 - A value is the rest of the line as it is.  An empty value of a property or a metadata is one that is not set, and is left out.
 - `DefineConstants` is split at `;`, `,`, a space and a tab, which is where the compiler separates constants.
-- The reader needs the version line first, and reads a `File.` line as belonging to the nearest `File` line above it.  It keeps the `File` and `Compile` lines in their order, which is the order of the items, and the tool relies on it for a file listed twice: [`Planning/ListedFiles.cs`](../../src/SqlSource.Tool/Planning/ListedFiles.cs) takes the metadata of the last of its items that has any, as a build does.
+- The reader needs the version line first, and reads a `File.` line as belonging to the nearest `File` line above it.  It keeps the `File`, `Settings` and `Compile` lines in their order, which is the order of the items, and the tool relies on it for a file listed twice: [`Planning/ListedFiles.cs`](../../src/SqlSource.Tool/Planning/ListedFiles.cs) takes the metadata of the last of its items that has any, as a build does.
 - An empty text, a line without `=`, a `File.` line before any `File` line, and a manifest that names no project are not manifests.
 
-So an addition to the format keeps its version: a new key, and a new name under `Property.` or `File.`, are passed over or never looked up by a tool that does not know them.  A change to what an existing key means, or to how a line is read, would be misread by such a tool without a word, so it raises the version, and then a reader of another version reads nothing and says why.
+So an addition to the format keeps its version, as `Settings` did: a new key, and a new name under `Property.` or `File.`, are passed over or never looked up by a tool that does not know them.  A change to what an existing key means, or to how a line is read, would be misread by such a tool without a word, so it raises the version, and then a reader of another version reads nothing and says why.
 
 ## Known limits
 
-- **The manifest misses a `.sql` file or a `Compile` item that a hook of the build adds**, since the tool runs the target by name and no build has run its hooks.  A target that hooks `SqlSourceTrimMetadataOfFiles` is the exception.  [TD-0025](../tech-debt/TD-0025-manifest-misses-a-file-that-a-build-hook-adds.md).
+- **The manifest misses a `.sql` file or a `Compile` item that a hook of the build adds**, and a settings file that only such a file reaches, since the tool runs the target by name and no build has run its hooks.  A target that hooks `SqlSourceTrimMetadataOfFiles` is the exception.  [TD-0025](../tech-debt/TD-0025-manifest-misses-a-file-that-a-build-hook-adds.md).
 - **A project with several target frameworks has the first one's manifest alone**, because the tool passes that framework as `TargetFramework`.  [TD-0026](../tech-debt/TD-0026-manifest-of-a-multi-targeted-project-is-the-first-frameworks.md).
 - **The target depends on `AddImplicitDefineConstants`, a target of the SDK, by name**, which is no contract of the SDK.  [TD-0027](../tech-debt/TD-0027-manifest-target-depends-on-a-target-of-the-sdk.md).
 

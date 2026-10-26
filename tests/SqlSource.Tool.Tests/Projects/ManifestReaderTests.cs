@@ -8,7 +8,8 @@ namespace SqlSource.Tool.Tests.Projects;
 public sealed class ManifestReaderTests
 {
     // The example of docs/superpowers/specs/2026-10-09-query-generation-phase-2-3-project-manifest-design.md, grown
-    // to a line for every setting of the project and of its first file, a second file and a second Compile item.
+    // to a line for every setting of the project and of its first file, a second file, two settings files and a second
+    // Compile item.
     private const string Example = """
         SqlSourceManifest=1
         Project=/work/src/App/App.csproj
@@ -41,6 +42,8 @@ public sealed class ManifestReaderTests
         File=/work/src/App/Queries/Orders.sql
         File.SqlSourceDialect=mysql, no-backslash-escapes
         File.SqlSourceDatabase=
+        Settings=/work/src/sqlsource.json
+        Settings=/work/src/App/sqlsource.json
         Compile=/work/src/App/UserRepository.cs
         Compile=/work/src/App/Program.cs
 
@@ -84,6 +87,7 @@ public sealed class ManifestReaderTests
             .Files[1]
             .Metadata.ShouldHaveSingleItem()
             .ShouldBe(new("SqlSourceDialect", "mysql, no-backslash-escapes"));
+        manifest.SettingsFiles.ShouldBe(["/work/src/sqlsource.json", "/work/src/App/sqlsource.json"]);
         manifest.CompileFiles.ShouldBe(["/work/src/App/UserRepository.cs", "/work/src/App/Program.cs"]);
     }
 
@@ -97,8 +101,24 @@ public sealed class ManifestReaderTests
         manifest.DefineConstants.ShouldBeEmpty();
         manifest.Properties.ShouldBeEmpty();
         manifest.Files.ShouldBeEmpty();
+        manifest.SettingsFiles.ShouldBeEmpty();
         manifest.CompileFiles.ShouldBeEmpty();
     }
+
+    // A path is the rest of the line, as a File or a Compile line's is.
+    [Fact]
+    public void Read_SettingsLine_IsThePathAsItIs() =>
+        Read("SqlSourceManifest=1\nProject=p\nSettings=/work/a=b/ sqlsource.json\nSettings=/work/sqlsource.json")
+            .SettingsFiles.ShouldBe(["/work/a=b/ sqlsource.json", "/work/sqlsource.json"]);
+
+    // A Settings line between the lines of a file does not part the file from its metadata: the metadata belongs to
+    // the File line above it.
+    [Fact]
+    public void Read_SettingsLineAmongTheLinesOfAFile_KeepsTheMetadataWithTheFile() =>
+        Read("SqlSourceManifest=1\nProject=p\nFile=a.sql\nSettings=s.json\nFile.SqlSourceDialect=mssql")
+            .Files.ShouldHaveSingleItem()
+            .Metadata["SqlSourceDialect"]
+            .ShouldBe("mssql");
 
     [Fact]
     public void Read_ValueThatHoldsAnEqualsSign_IsTheRestOfTheLine()

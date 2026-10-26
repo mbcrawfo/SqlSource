@@ -213,6 +213,36 @@ public sealed class ManifestTargetTests : IDisposable
             ]);
     }
 
+    // Every sqlsource.json above a .sql file or a Compile item, to the top of the drive, and none in a folder that
+    // holds neither: above the project, in its folder and below, beside a .sql file linked from outside the folder,
+    // beside a C# file, and beside a .sql file that a target adds from the hook the package names.  The project
+    // lists the one above it itself, by a relative path, and it is listed once.  The lines come after the File lines
+    // and before the Compile lines.
+    [Fact]
+    public async Task WriteManifest_SettingsFilesAboveTheFiles_AreListedBetweenTheSqlFilesAndTheCompileFiles()
+    {
+        var project = _fixtures.Copy("SettingsFiles", "App/App.csproj");
+        var fixture = Path.GetDirectoryName(Path.GetDirectoryName(project))!;
+
+        var lines = await _fixtures.WriteManifestAsync(project);
+
+        lines
+            .Where(line => line.StartsWith("Settings=", StringComparison.Ordinal))
+            .ShouldBe(
+                [
+                    .. SettingsFileSearchTests.Found.Select(file =>
+                        "Settings=" + Path.Combine(fixture, file.Replace('/', Path.DirectorySeparatorChar))
+                    ),
+                ],
+                ignoreOrder: true
+            );
+        var settings = Array.FindIndex(lines, line => line.StartsWith("Settings=", StringComparison.Ordinal));
+        settings.ShouldBe(Array.FindLastIndex(lines, line => line.StartsWith("File", StringComparison.Ordinal)) + 1);
+        Array
+            .FindLastIndex(lines, line => line.StartsWith("Settings=", StringComparison.Ordinal))
+            .ShouldBe(Array.FindIndex(lines, line => line.StartsWith("Compile=", StringComparison.Ordinal)) - 1);
+    }
+
     // MSBuild splits a list at a semicolon and reads "%41" as "A".  A path is none of its lists.
     [Fact]
     public async Task WriteManifest_PathsWithCharactersThatMSBuildReads_AreListedWhole()
@@ -224,6 +254,7 @@ public sealed class ManifestTargetTests : IDisposable
         var lines = await _fixtures.WriteManifestAsync(project);
 
         lines.ShouldContain("File=" + Path.Combine(folder, "a;b=c%41 'é.sql"));
+        lines.ShouldContain("Settings=" + Path.Combine(folder, "sqlsource.json"));
         lines.ShouldContain("Compile=" + Path.Combine(folder, "a;b=c%41 'é.cs"));
     }
 

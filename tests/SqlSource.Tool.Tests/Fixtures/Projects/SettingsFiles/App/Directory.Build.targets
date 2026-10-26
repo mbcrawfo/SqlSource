@@ -1,0 +1,14 @@
+<Project>
+    <!--
+        A target that adds a .sql file while it runs.  It hooks the target the package names, so it runs before the
+        search for settings files, and the settings file beside the .sql file is found.
+    -->
+    <ItemGroup>
+        <AdditionalFiles Remove="Generated/Late.sql" />
+    </ItemGroup>
+    <Target Name="AddSqlFile" BeforeTargets="SqlSourceTrimMetadataOfFiles">
+        <ItemGroup>
+            <AdditionalFiles Include="Generated/Late.sql" />
+        </ItemGroup>
+    </Target>
+</Project>

@@ -41,7 +41,7 @@ The script then asks the project what the `sqlsource` tool asks one.  `SqlSource
 
 It then deletes a `.sql` file the project uses and builds again, and fails unless that build reports the missing member: an incremental build must notice that a file is gone.
 
-Last, it writes a web project, of `Microsoft.NET.Sdk.Web`, that references the package and has a `.sql` file and its sidecar, publishes it, and fails when either file is in its `bin` folder or in what `dotnet publish` wrote.  The Web SDK copies a `.json` file to both unless the package says otherwise, and the consumer, of the plain SDK, copies neither.  The project claims no file, so the sidecar can be empty.  Without an argument the script packs first, as the other does.
+Last, it writes a web project, of `Microsoft.NET.Sdk.Web`, that references the package and has a `.sql` file, its sidecar and a settings file, `sqlsource.json`, publishes it, and fails when any of them is in its `bin` folder or in what `dotnet publish` wrote.  The Web SDK copies a `.json` file to both unless the package says otherwise, and the consumer, of the plain SDK, copies none.  The project claims no file, so the sidecar can be empty, and the settings file sets nothing.  Without an argument the script packs first, as the other does.
 
 ### `check-tool-install.sh`
 

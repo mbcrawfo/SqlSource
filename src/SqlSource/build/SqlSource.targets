@@ -127,12 +127,54 @@
     </Target>
     <!-- editorconfig-checker-enable -->
     <!--
+        Finds the settings files: every sqlsource.json in the folder of a .sql file or of a Compile item, or in a folder
+        above it, to the top of the drive, as the SDK finds .editorconfig files.  A generator cannot read the disk, so
+        each is given to the compiler as an AdditionalFiles item.  The SDK's step through FullPath and Distinct is
+        here for the same reason as there: GetPathsOfAllDirectoriesAbove can give one folder twice for a file linked
+        with a relative path (msbuild issue 4392).  A file that the project lists itself is not added again, so that
+        the compiler is given none twice; the comparison is of full paths, since the project may list it by another.
+
+        It runs before GenerateMSBuildEditorConfigFileCore, and not where this file is imported, so that a .sql file
+        that a target adds is searched above too.  It depends on SqlSourceTrimMetadataOfFiles, so that a target that
+        hooks it to add a .sql file runs first, here and before the manifest.  An IDE lists the items of a project as
+        evaluated, never one that a target adds, so Visible="false" is only for one that might; a settings file in
+        the project's folder is listed anyway, as None or Content.
+
+        The chain of item functions is one attribute, and cannot be wrapped, so the check of the line length is off
+        for the target.
+    -->
+    <!-- editorconfig-checker-disable -->
+    <Target
+        Name="SqlSourceFindSettingsFiles"
+        BeforeTargets="GenerateMSBuildEditorConfigFileCore"
+        DependsOnTargets="SqlSourceTrimMetadataOfFiles"
+    >
+        <ItemGroup>
+            <SqlSourceSettingsSearchStart Include="@(AdditionalFiles)" Condition="'%(Extension)' == '.sql'" />
+            <SqlSourceSettingsSearchStart Include="@(Compile)" />
+            <SqlSourceSettingsSearchFolder Include="@(SqlSourceSettingsSearchStart->GetPathsOfAllDirectoriesAbove())" />
+            <SqlSourceSettingsFileFound Include="@(SqlSourceSettingsSearchFolder->'%(FullPath)'->Distinct()->Combine('sqlsource.json')->Exists())" />
+            <AdditionalFiles
+                Include="@(SqlSourceSettingsFileFound)"
+                Exclude="@(AdditionalFiles->'%(FullPath)')"
+                Visible="false"
+            />
+        </ItemGroup>
+    </Target>
+    <!-- editorconfig-checker-enable -->
+    <!--
         Makes the build after a .sql file is deleted, renamed or moved compile again.  A file that is gone has no
         timestamp to compare, and the SDK's own record of what the compiler was given does not hold AdditionalFiles.
         CustomAdditionalCompileInputs is the item the SDK reads for more inputs of the compiler.  The file holds a hash
         of the list and is written only when the hash changes, so a build with the same files does not compile for it.
+        It depends on the search, so that a settings file that is added, deleted or moved changes the hash too: MSBuild
+        does not promise an order for two targets that hook the same one.
     -->
-    <Target Name="SqlSourceTrackAdditionalFiles" BeforeTargets="GenerateMSBuildEditorConfigFileCore">
+    <Target
+        Name="SqlSourceTrackAdditionalFiles"
+        BeforeTargets="GenerateMSBuildEditorConfigFileCore"
+        DependsOnTargets="SqlSourceFindSettingsFiles"
+    >
         <PropertyGroup>
             <SqlSourceFilesCache>$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.cache</SqlSourceFilesCache>
         </PropertyGroup>
@@ -152,20 +194,26 @@
     </Target>
     <!--
         What SqlSourceWriteManifest depends on.  A target's DependsOnTargets is read before the target runs, so the
-        list is a property and is set here, where the file is imported: this and the nesting below are the elements of
-        the file that are not a target, and the second line here holds the one condition outside a target.  The trims
-        make the manifest hold trimmed values, and make a target of a project that hooks SqlSourceTrimMetadataOfFiles
-        to add a .sql file run first.
+        list is a property and is set here, where the file is imported: this, the nesting below and the group of the
+        settings files are the elements of the file that are not a target, and the second line here holds the one
+        condition outside a target.  The trims make the manifest hold trimmed values, and make a target of a project
+        that hooks SqlSourceTrimMetadataOfFiles to add a .sql file run first.  The search gives the manifest the
+        settings files that it adds to what the compiler is given.
 
         AddImplicitDefineConstants is a target of the SDK and not a contract: TD-0027.  It adds the constants of the
         framework, NET10_0 and NET8_0_OR_GREATER among them, which the SDK otherwise adds only on the way to a
         compile.  A project that is not of the SDK has no TargetFramework and no such target.
+
+        The first line is long, and a property as written is on one line: white space around the value would be part
+        of it.  So the check of the line length is off for the group.
     -->
+    <!-- editorconfig-checker-disable -->
     <PropertyGroup>
-        <SqlSourceManifestDependsOn>SqlSourceTrimProperties;SqlSourceTrimMetadataOfFiles</SqlSourceManifestDependsOn>
+        <SqlSourceManifestDependsOn>SqlSourceTrimProperties;SqlSourceTrimMetadataOfFiles;SqlSourceFindSettingsFiles</SqlSourceManifestDependsOn>
         <SqlSourceManifestDependsOn Condition="'$(TargetFramework)' != ''"
             >$(SqlSourceManifestDependsOn);AddImplicitDefineConstants</SqlSourceManifestDependsOn>
     </PropertyGroup>
+    <!-- editorconfig-checker-enable -->
     <!--
         Nests a sidecar under its .sql file in the solution explorer of an IDE, Users.sql.json under Users.sql, and
         keeps it out of the output and publish folders.  The IDEs nest from the evaluated items, so this is outside
@@ -190,10 +238,19 @@
         />
     </ItemGroup>
     <!--
+        Keeps a settings file out of the output and publish folders, as the nesting above keeps a sidecar: it is an
+        input of the generator alone, and the Web SDK lists a .json file under Content, which it copies.  It is here
+        and not in the props because NuGet imports the props before the Web SDK adds its Content, and an Update
+        changes only the items that are already listed.
+    -->
+    <ItemGroup>
+        <Content Update="**/sqlsource.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
+    </ItemGroup>
+    <!--
         Writes the project manifest: what the compiler is given, for the sqlsource tool, which runs this target by
         name.  It hooks nothing on purpose, so no build runs it, and nothing of a build runs before it but the two
-        trims and, for a project of the SDK, AddImplicitDefineConstants: a .sql file that a target adds is in the
-        manifest only when that target hooks SqlSourceTrimMetadataOfFiles.  TD-0025.
+        trims, the search for settings files and, for a project of the SDK, AddImplicitDefineConstants: a .sql file
+        that a target adds is in the manifest only when that target hooks SqlSourceTrimMetadataOfFiles.  TD-0025.
 
         The file is lines of key=value, and its format is a contract with the tool: the rules are in
         src/SqlSource/AGENTS.md, and the reasons in docs/architecture/msbuild-and-manifest.md.  The tool names the
@@ -207,6 +264,10 @@
         the metadata of a file stays under its File line whatever the order of the items is; the path and the
         metadata come from the item and are not split.  A setting of the package that is added is a line here, and
         one in each of the two lists of the trims.
+
+        A Settings line is written for every AdditionalFiles item named sqlsource.json, the ones the search added and
+        any the project lists itself, so that the tool reads exactly the settings files the compiler is given.  Each
+        is written once, by its full path, since the project may list a file by a relative path too.
     -->
     <!-- editorconfig-checker-disable -->
     <Target Name="SqlSourceWriteManifest" DependsOnTargets="$(SqlSourceManifestDependsOn)">
@@ -236,6 +297,11 @@
             <SqlSourceManifestLine Include="Property.SqlSourceNestedClass=$([MSBuild]::Escape($(SqlSourceNestedClass)))" />
             <SqlSourceManifestSqlFile Include="@(AdditionalFiles)" Condition="'%(Extension)' == '.sql'" />
             <SqlSourceManifestLine Include="@(SqlSourceManifestSqlFile->'File=%(FullPath)%0aFile.SqlSourceDialect=%(SqlSourceDialect)%0aFile.SqlSourceDatabase=%(SqlSourceDatabase)%0aFile.SqlSourceOutput=%(SqlSourceOutput)%0aFile.SqlSourceGeneratorParameters=%(SqlSourceGeneratorParameters)%0aFile.SqlSourceInputModelSuffix=%(SqlSourceInputModelSuffix)%0aFile.SqlSourceOutputModelSuffix=%(SqlSourceOutputModelSuffix)%0aFile.SqlSourceModelNamespace=%(SqlSourceModelNamespace)%0aFile.SqlSourceInputModelType=%(SqlSourceInputModelType)%0aFile.SqlSourceOutputModelType=%(SqlSourceOutputModelType)%0aFile.SqlSourceCollectionType=%(SqlSourceCollectionType)%0aFile.SqlSourceTypeOverrides=%(SqlSourceTypeOverrides)%0aFile.SqlSourceColumnTypes=%(SqlSourceColumnTypes)')" />
+            <SqlSourceManifestSettingsFile
+                Include="@(AdditionalFiles)"
+                Condition="'%(Filename)%(Extension)' == 'sqlsource.json'"
+            />
+            <SqlSourceManifestLine Include="@(SqlSourceManifestSettingsFile->'%(FullPath)'->Distinct()->'Settings=%(Identity)')" />
             <SqlSourceManifestLine Include="@(Compile->'Compile=%(FullPath)')" />
         </ItemGroup>
         <WriteLinesToFile

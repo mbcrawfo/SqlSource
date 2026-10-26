@@ -42,6 +42,7 @@ internal static class ManifestReader
         var constants = "";
         var properties = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
         var files = new List<(string Path, ImmutableDictionary<string, string>.Builder Metadata)>();
+        var settingsFiles = ImmutableArray.CreateBuilder<string>();
         var compileFiles = ImmutableArray.CreateBuilder<string>();
 
         var number = 0;
@@ -108,6 +109,9 @@ internal static class ManifestReader
                     case "File":
                         files.Add((value, ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal)));
                         break;
+                    case "Settings":
+                        settingsFiles.Add(value);
+                        break;
                     case "Compile":
                         compileFiles.Add(value);
                         break;
@@ -143,6 +147,7 @@ internal static class ManifestReader
                 ],
                 Properties = properties.ToImmutable(),
                 Files = [.. files.ConvertAll(static file => new ManifestFile(file.Path, file.Metadata.ToImmutable()))],
+                SettingsFiles = settingsFiles.ToImmutable(),
                 CompileFiles = compileFiles.ToImmutable(),
             }
         );
