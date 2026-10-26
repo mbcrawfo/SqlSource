@@ -39,6 +39,7 @@ public sealed class QueryMethodWriterTests
         DatabaseEngine.PostgreSql,
         TestModels.Array(TestModels.Literal("SELECT id, name FROM users WHERE id = @id ORDER BY "), Token("orderBy")),
         true,
+        true,
         new MethodInput(
             "global::App.GetUserParams",
             TestModels.Array(new MethodParameter("id", "Id", "int", true, false, Described: Integer))

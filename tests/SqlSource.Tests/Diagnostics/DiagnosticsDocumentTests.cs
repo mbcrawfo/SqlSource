@@ -68,6 +68,7 @@ public sealed class DiagnosticsDocumentTests
             "sort-output",
             "no-table-models",
             "async-method-suffix",
+            "no-array-pool",
             "default",
         ];
         var section = string.Join('\n', Sections().Single(section => section.Id == "SQLSRC109").Body);

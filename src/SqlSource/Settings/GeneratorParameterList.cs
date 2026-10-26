@@ -33,6 +33,7 @@ internal static class GeneratorParameterList
         ("sort-output", GeneratorParameters.SortOutput),
         ("no-table-models", GeneratorParameters.NoTableModels),
         ("async-method-suffix", GeneratorParameters.AsyncMethodSuffix),
+        ("no-array-pool", GeneratorParameters.NoArrayPool),
     ];
 
     /// <summary>Finds a parameter by its name, ignoring case.</summary>
