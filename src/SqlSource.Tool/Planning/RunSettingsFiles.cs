@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Threading;
 using SqlSource.Generation.Chains;
 using SqlSource.Generation.Paths;
@@ -65,22 +66,8 @@ internal sealed class RunSettingsFiles
         ImmutableArray<ToolDiagnostic>.Builder errors
     )
     {
-        // The reached folders are in the order of the set's files, so one walk of both finds them.
-        var reached = set.Reached(reachingPaths);
-        var next = 0;
-        foreach (var file in set.Files)
-        {
-            if (next < reached.Count && SqlPath.Comparer.Equals(reached[next], file.NormalizedFolder))
-            {
-                next++;
-                if (_reported.Add(file.NormalizedFolder))
-                {
-                    foreach (var diagnostic in file.Diagnostics)
-                    {
-                        errors.Add(ToolDiagnostic.From(diagnostic));
-                    }
-                }
-            }
-        }
+        // Add is false for a folder that was reported before, which is then left out.
+        var unreported = set.FilesIn(set.Reached(reachingPaths)).Where(file => _reported.Add(file.NormalizedFolder));
+        errors.AddRange(unreported.SelectMany(static file => file.Diagnostics).Select(ToolDiagnostic.From));
     }
 }

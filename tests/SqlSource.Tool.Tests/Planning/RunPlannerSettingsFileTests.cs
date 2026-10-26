@@ -125,14 +125,19 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
     {
         var project = Plans.Postgres(_folder);
         project.ListSettings(_folder.WriteFile("sqlsource.json", "{ nope"));
-        _ = project.AddSettings(
+        // The root file is reached, and its own problem is reported.
+        var root = project.AddSettings(
             "sqlsource.json", /*lang=json,strict*/
-            """{"root": true}"""
+            """{"root": true, "unknown": 1}"""
         );
 
         var result = Plans.Result(project);
 
-        result.Errors.ShouldBeEmpty();
+        result
+            .Errors.Select(Reported.Of)
+            .ShouldBe([
+                new Reported("SQLSRC016", root, new LinePosition(0, 15), "'unknown' is not a key of a settings file"),
+            ]);
     }
 
     [Fact]
@@ -211,9 +216,13 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
 
         var result = Plans.Result(project);
 
-        result
-            .Errors.Select(error => (error.Descriptor.Id, error.Path))
-            .ShouldBe([("SQLSRC016", farther), ("SQLSRC015", nearer)]);
+        result.Errors.Count.ShouldBe(2);
+        Reported
+            .Of(result.Errors[0])
+            .ShouldBe(
+                new Reported("SQLSRC016", farther, new LinePosition(0, 1), "'unknown' is not a key of a settings file")
+            );
+        (result.Errors[1].Descriptor.Id, result.Errors[1].Path).ShouldBe(("SQLSRC015", nearer));
     }
 
     [Fact]
@@ -226,10 +235,20 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
             "obj/sqlsource.json", /*lang=json,strict*/
             """{"unknown": 1}"""
         );
+        // A C# file beside the build's folder still reaches the file of its own folder.
+        _ = project.AddSource("Code/Repository.cs", "internal sealed class Repository;");
+        var reached = project.AddSettings(
+            "Code/sqlsource.json", /*lang=json,strict*/
+            """{"reached": 1}"""
+        );
 
         var result = Plans.Result(project);
 
-        result.Errors.ShouldBeEmpty();
+        result
+            .Errors.Select(Reported.Of)
+            .ShouldBe([
+                new Reported("SQLSRC016", reached, new LinePosition(0, 1), "'reached' is not a key of a settings file"),
+            ]);
     }
 
     [Fact]

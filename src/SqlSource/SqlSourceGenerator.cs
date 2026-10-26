@@ -285,20 +285,13 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             )
             .WithTrackingName(TrackingNames.ReachedSettingsFiles);
 
-        // The reached folders are in the order of the set's files, so one walk of both finds them.
         context.RegisterSourceOutput(
             settingsFiles.Combine(reachedSettingsFiles),
             static (output, input) =>
             {
-                var reached = input.Right;
-                var next = 0;
-                foreach (var file in input.Left.Files)
+                foreach (var file in input.Left.FilesIn(input.Right))
                 {
-                    if (next < reached.Count && SqlPath.Comparer.Equals(reached[next], file.NormalizedFolder))
-                    {
-                        next++;
-                        ReportAll(output, file.Diagnostics);
-                    }
+                    ReportAll(output, file.Diagnostics);
                 }
             }
         );

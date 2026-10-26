@@ -425,6 +425,32 @@ public sealed class SettingsFileSetTests
         set.Reached([QueryPath]).ShouldBe(["", "app"]);
     }
 
+    [Fact]
+    public void FilesIn_FoldersThatAreReached_AreTheirFilesInTheOrderOfTheSet()
+    {
+        var set = Set(
+            ("/c/sqlsource.json", "{}"),
+            (
+                "/a/b/sqlsource.json", /*lang=json,strict*/
+                """{"root": true}"""
+            ),
+            ("/b/sqlsource.json", "{}"),
+            ("/a/sqlsource.json", "{}")
+        );
+
+        set.FilesIn(set.Reached(["c/y.sql", "a/b/x.sql"]))
+            .Select(static file => file.Path)
+            .ShouldBe(["/a/b/sqlsource.json", "/c/sqlsource.json"]);
+    }
+
+    [Fact]
+    public void FilesIn_NoFolder_IsNoFile()
+    {
+        var set = Set(("/a/sqlsource.json", "{}"));
+
+        set.FilesIn(EquatableArray<string>.Empty).ShouldBeEmpty();
+    }
+
     private static SettingsFileSet Set(params (string Path, string Text)[] files) =>
         SettingsFileSet.Of(
             files.Select(static file =>
