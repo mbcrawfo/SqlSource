@@ -1159,9 +1159,10 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             );
 
     // Each rooted path of the compilation's trees, normalised when it is read.  The compiler gives a Compile item its
-    // full path, and a generator's post-initialization file, the attribute's among them, a relative path of the
-    // generator's assembly, type and hint name where it sets no folder for generated files, so a path that is not
-    // rooted is no C# file of the project and reaches nothing.
+    // full path, and a generator's post-initialization file, the attribute's among them, a path of the generator's
+    // assembly, type and hint name under its base folder for generated files.  In a build that is the output folder, so
+    // the path is rooted and its chain is that of the SDK's own Compile items in obj; where the compiler sets no base
+    // folder, as the test driver does, the path is relative, and a path that is not rooted reaches nothing.
     private static IEnumerable<string> NormalizedCompilePaths(EquatableArray<string> paths)
     {
         foreach (var path in paths)

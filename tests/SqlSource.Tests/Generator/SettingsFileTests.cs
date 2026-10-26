@@ -10,6 +10,7 @@ using SqlSource.Settings;
 using SqlSource.Snapshot;
 using SqlSource.Testing;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 using static SqlSource.Testing.Generator.ModelRuns;
 
@@ -364,26 +365,41 @@ public sealed class SettingsFileTests
         type.ShouldNotContain("ThrowIfNullOrWhiteSpace");
     }
 
-    // Within one place an exact key beats a plain one; the nearer file is the more specific place.
+    // Within one place a key equal to the type's exactly beats a plain one that matches it ignoring case; the nearer
+    // file is the more specific place.  The two are different keys, so both reach the lookup and only the places
+    // decide.
     [Fact]
     public void Run_TypeOverridePlainKeyInANearerFile_BeatsAnExactKeyInAFartherOne()
     {
-        var run = RunInt4(
-            null,
-            GeneratorHarness.SettingsFile(
-                FartherSettingsPath, /*lang=json,strict*/
-                """{"typeOverrides":{"pg_catalog.int4":"long"}}"""
-            ),
-            GeneratorHarness.SettingsFile(
-                SettingsPath, /*lang=json,strict*/
-                """{"typeOverrides":{"int4":"short"}}"""
-            )
+        var file = new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser);
+        var status = TestSidecars.Postgres(
+            name: "Status",
+            kind: SidecarValues.Kind.Enum,
+            schema: "public",
+            internalName: "Status",
+            labels: ["new", "old"]
+        );
+        var run = ModelRuns.Run(
+            Source,
+            [
+                GeneratorHarness.SettingsFile(
+                    FartherSettingsPath, /*lang=json,strict*/
+                    """{"typeOverrides":{"public.\"Status\"":"System.Guid"}}"""
+                ),
+                GeneratorHarness.SettingsFile(
+                    SettingsPath, /*lang=json,strict*/
+                    """{"typeOverrides":{"public.status":"System.Uri"}}"""
+                ),
+                file,
+                Sidecars.Of(file, Entry(file, "GetUser", [], [Column("c0", status)])),
+            ]
         );
 
         run.ShouldBeClean();
         var column = ColumnOf(run);
-        column.Text.ShouldBe("short");
+        column.Text.ShouldBe("global::System.Uri");
         column.Place.ShouldBe("the typeOverrides of the settings file " + SettingsPath);
+        column.Key.ShouldBe("public.status");
     }
 
     [Fact]
@@ -714,7 +730,11 @@ public sealed class SettingsFileTests
             new SqlFile(QueryPath, Query)
         );
 
-        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC016 /app/Repo/sqlsource.json(1,");
+        // The message whole: the last file's path differs from the first's only by case, which ShouldStartWith ignores,
+        // so its key, other, tells the two apart.
+        run.Diagnostics.ShouldBe([
+            "SQLSRC016 /app/Repo/sqlsource.json(1,2)-(1,9): 'bogus' is not a key of a settings file",
+        ]);
     }
 
     // Only a file named sqlsource.json exactly is a settings file, so this one neither sets the dialect nor is
