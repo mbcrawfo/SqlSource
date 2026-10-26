@@ -235,40 +235,205 @@ public sealed class SettingsLevelReaderTests
     }
 
     [Fact]
+    public void Read_ParametersAsElements_WinOverTheText()
+    {
+        var source = new FakeSource(
+            new Dictionary<SettingId, string> { [SettingId.Parameters] = "keep-comments" },
+            elements: new Dictionary<SettingId, string[]> { [SettingId.Parameters] = [" sort-input "] }
+        );
+
+        SettingsLevelReader.Read(ref source).Parameters.ShouldBe(GeneratorParameters.SortInput);
+        source.Asked.ShouldNotContain("Text(Parameters)");
+    }
+
+    // An array with no word is the empty list, which is set, as default is.
+    [Fact]
+    public void Read_ParametersAsNoElement_AreTheEmptyList()
+    {
+        var source = new FakeSource([], elements: new Dictionary<SettingId, string[]> { [SettingId.Parameters] = [] });
+
+        SettingsLevelReader.Read(ref source).Parameters.ShouldBe(GeneratorParameters.None);
+        source.InvalidParts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Read_ParametersAsElementsWithAnUnknownWord_NameItsIndexAndTheOthersApply()
+    {
+        var source = new FakeSource(
+            [],
+            elements: new Dictionary<SettingId, string[]> { [SettingId.Parameters] = ["keep-comments", "bogus"] }
+        );
+
+        SettingsLevelReader.Read(ref source).Parameters.ShouldBe(GeneratorParameters.KeepComments);
+        source.InvalidParts.ShouldBe([(SettingId.Parameters, 1)]);
+        source.Invalids.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Read_ParametersAsElementsOfUnknownWordsAlone_AreNotSet()
+    {
+        var source = new FakeSource(
+            [],
+            elements: new Dictionary<SettingId, string[]> { [SettingId.Parameters] = ["bogus"] }
+        );
+
+        SettingsLevelReader.Read(ref source).ShouldBeSameAs(SettingsLevel.None);
+        source.InvalidParts.ShouldBe([(SettingId.Parameters, 0)]);
+    }
+
+    // The members win over the text.  integer is PostgreSQL's int4, which the first member put, so it goes in neither
+    // list, SQL Server's int included.
+    [Fact]
+    public void Read_TypeOverridesAsMembers_AreSetAndEachProblemIsNamedByItsIndex()
+    {
+        var source = new FakeSource(
+            new Dictionary<SettingId, string> { [SettingId.TypeOverrides] = "int8=long" },
+            SettingPlace.Metadata,
+            members: new Dictionary<SettingId, KeyValuePair<string, string>[]>
+            {
+                [SettingId.TypeOverrides] =
+                [
+                    new("int4", "long"),
+                    new("timestampz", "int"),
+                    new("integer", "MyApp.X"),
+                    new("nvarchar", "string"),
+                ],
+            }
+        );
+
+        var level = SettingsLevelReader.Read(ref source);
+
+        level.TypeOverrides.ShouldNotBeNull().ShouldBe([new TypeOverride("int4", "long", SettingPlace.Metadata)]);
+        level
+            .SqlServerTypeOverrides.ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("nvarchar", "string", SettingPlace.Metadata)]);
+        source.InvalidParts.ShouldBe([(SettingId.TypeOverrides, 1)]);
+        source.RepeatedKeys.ShouldBe([(SettingId.TypeOverrides, 2, 0)]);
+        source.Asked.ShouldNotContain("Text(TypeOverrides)");
+    }
+
+    [Fact]
+    public void Read_ColumnTypesAsMembers_AreSetAndEachProblemIsNamedByItsIndex()
+    {
+        var source = new FakeSource(
+            new Dictionary<SettingId, string> { [SettingId.ColumnTypes] = "posts.id=PostId" },
+            SettingPlace.Metadata,
+            members: new Dictionary<SettingId, KeyValuePair<string, string>[]>
+            {
+                [SettingId.ColumnTypes] = [new("id", "X"), new("users.id", "UserId"), new("\"users\".id", "Y")],
+            }
+        );
+
+        SettingsLevelReader
+            .Read(ref source)
+            .ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([new ColumnType("users.id", "UserId", SettingPlace.Metadata)]);
+        source.InvalidParts.ShouldBe([(SettingId.ColumnTypes, 0)]);
+        source.RepeatedKeys.ShouldBe([(SettingId.ColumnTypes, 2, 1)]);
+        source.Asked.ShouldNotContain("Text(ColumnTypes)");
+    }
+
+    // An object with no valid member sets nothing, as a text with no valid entry does.
+    [Theory]
+    [InlineData("TypeOverrides")]
+    [InlineData("ColumnTypes")]
+    public void Read_MembersThatAreNoneValid_AreNotSet(string setting)
+    {
+        var id = Enum.Parse<SettingId>(setting);
+        var empty = new FakeSource(
+            [],
+            members: new Dictionary<SettingId, KeyValuePair<string, string>[]> { [id] = [] }
+        );
+        var invalid = new FakeSource(
+            [],
+            members: new Dictionary<SettingId, KeyValuePair<string, string>[]> { [id] = [new("id", "")] }
+        );
+
+        SettingsLevelReader.Read(ref empty).ShouldBeSameAs(SettingsLevel.None);
+        empty.InvalidParts.ShouldBeEmpty();
+        SettingsLevelReader.Read(ref invalid).ShouldBeSameAs(SettingsLevel.None);
+        invalid.InvalidParts.ShouldBe([(id, 0)]);
+    }
+
+    // A list's array or object form is asked for before its text.
+    [Fact]
     public void Read_EverySetting_IsAskedForInTheOrderOfTheEnum()
     {
         var source = new FakeSource([]);
 
         _ = SettingsLevelReader.Read(ref source);
 
-        source.Asked.ShouldBe(Enum.GetValues<SettingId>());
+        source.Asked.ShouldBe([
+            "Elements(Parameters)",
+            "Text(Parameters)",
+            "Choice(Output)",
+            "Text(Database)",
+            "Text(InputModelSuffix)",
+            "Text(OutputModelSuffix)",
+            "Text(ModelNamespace)",
+            "Choice(InputModelType)",
+            "Choice(OutputModelType)",
+            "Choice(CollectionType)",
+            "Members(TypeOverrides)",
+            "Text(TypeOverrides)",
+            "Members(ColumnTypes)",
+            "Text(ColumnTypes)",
+            "Text(NestedClass)",
+        ]);
     }
 
     private static string? TextOf(SettingsLevel level, SettingId setting) => Texts[setting](level);
 
-    // A source over a dictionary.  A choice is written as the member's name.
-    private struct FakeSource(Dictionary<SettingId, string> texts, SettingPlace place = SettingPlace.Property)
-        : ISettingSource
+    // A source over dictionaries: the texts, and the elements and members of the settings that have them.  A choice is
+    // written as the member's name.
+    private struct FakeSource(
+        Dictionary<SettingId, string> texts,
+        SettingPlace place = SettingPlace.Property,
+        Dictionary<SettingId, string[]>? elements = null,
+        Dictionary<SettingId, KeyValuePair<string, string>[]>? members = null
+    ) : ISettingSource
     {
         public readonly SettingPlace Place => place;
 
         public List<(SettingId Setting, string Value)> Invalids { get; } = [];
 
-        public List<SettingId> Asked { get; } = [];
+        public List<(SettingId Setting, int Index)> InvalidParts { get; } = [];
+
+        public List<(SettingId Setting, int Index, int First)> RepeatedKeys { get; } = [];
+
+        // Each call, as the method and the setting.
+        public List<string> Asked { get; } = [];
 
         public readonly string? Text(SettingId setting)
         {
-            Asked.Add(setting);
+            Asked.Add($"Text({setting})");
             return texts.TryGetValue(setting, out var text) ? text : null;
+        }
+
+        public readonly IReadOnlyList<string>? Elements(SettingId setting)
+        {
+            Asked.Add($"Elements({setting})");
+            return elements is not null && elements.TryGetValue(setting, out var written) ? written : null;
+        }
+
+        public readonly IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting)
+        {
+            Asked.Add($"Members({setting})");
+            return members is not null && members.TryGetValue(setting, out var written) ? written : null;
         }
 
         public readonly T? Choice<T>(SettingId setting)
             where T : struct, Enum
         {
-            Asked.Add(setting);
+            Asked.Add($"Choice({setting})");
             return texts.TryGetValue(setting, out var text) && Enum.TryParse<T>(text, out var choice) ? choice : null;
         }
 
         public readonly void Invalid(SettingId setting, string value) => Invalids.Add((setting, value));
+
+        public readonly void InvalidPart(SettingId setting, int index) => InvalidParts.Add((setting, index));
+
+        public readonly void RepeatedKey(SettingId setting, int index, int first) =>
+            RepeatedKeys.Add((setting, index, first));
     }
 }

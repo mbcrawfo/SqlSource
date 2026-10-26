@@ -4,8 +4,8 @@ using System.Collections.Generic;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// The names of the generator parameters, and a list of them as a property, the metadata of an item or the
-/// attribute writes it.  This is the only place the names are known.
+/// The names of the generator parameters, and a list of them as a property, the metadata of an item, the attribute
+/// or a settings file writes it.  This is the only place the names are known.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -110,6 +110,61 @@ internal static class GeneratorParameterList
         invalid.Clear();
         invalid.Add(whole.ToString());
         return null;
+    }
+
+    /// <summary>
+    /// Reads a list written as an array, as a settings file writes it, each element one word.  An element is trimmed,
+    /// and one that is empty or white space is skipped.  No word at all is the empty list, which the level then gives,
+    /// and so is <c>default</c> alone or repeated.  The index of a word that is no parameter is added to
+    /// <paramref name="invalid" /> and the other words apply; null when every word is one.  <c>default</c> beside
+    /// another word gives null, with the index of each <c>default</c> and each word that is no parameter added, in
+    /// order: an array has a position for each element, so each is reported on its own.
+    /// </summary>
+    public static GeneratorParameters? ReadElements(IReadOnlyList<string> elements, List<int> invalid)
+    {
+        var start = invalid.Count;
+        GeneratorParameters? parameters = null;
+        var hasDefault = false;
+        var hasOther = false;
+        for (var index = 0; index < elements.Count; index++)
+        {
+            var word = elements[index].AsSpan().Trim();
+            if (word.IsEmpty)
+            {
+                continue;
+            }
+
+            if (IsDefault(word))
+            {
+                // Named only if a word beside it makes the list invalid, and taken out again below otherwise.
+                hasDefault = true;
+                invalid.Add(index);
+            }
+            else if (TryFind(word, out var parameter))
+            {
+                hasOther = true;
+                parameters = (parameters ?? GeneratorParameters.None) | parameter;
+            }
+            else
+            {
+                hasOther = true;
+                invalid.Add(index);
+            }
+        }
+
+        if (!hasDefault)
+        {
+            return hasOther ? parameters : GeneratorParameters.None;
+        }
+
+        if (hasOther)
+        {
+            return null;
+        }
+
+        // default alone: every index added is a default's.
+        invalid.RemoveRange(start, invalid.Count - start);
+        return GeneratorParameters.None;
     }
 
     /// <summary>Walks the words of a text.  <see cref="Start" /> is an offset into that text.</summary>
