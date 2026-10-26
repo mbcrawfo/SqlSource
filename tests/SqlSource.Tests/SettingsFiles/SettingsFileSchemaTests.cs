@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Json.Schema;
 using Shouldly;
 using SqlSource.Parsing;
@@ -34,6 +35,18 @@ public sealed class SettingsFileSchemaTests
     };
 
     public static TheoryData<string> Keys => [.. SettingsFileKeys.All];
+
+    // Each key whose value is the name of a member of an enum, read by SettingValue.TryReadChoice, with the enum.
+    public static TheoryData<string, Type> ChoiceKeys =>
+        new()
+        {
+            { SettingsFileKeys.Output, typeof(OutputKind) },
+            { SettingsFileKeys.InputModelType, typeof(ModelKind) },
+            { SettingsFileKeys.OutputModelType, typeof(ModelKind) },
+            { SettingsFileKeys.CollectionType, typeof(CollectionKind) },
+        };
+
+    public static TheoryData<string> MapKeys => [SettingsFileKeys.TypeOverrides, SettingsFileKeys.ColumnTypes];
 
     [Fact]
     public void Schema_Properties_AreTheKeysOfTheReader() =>
@@ -69,11 +82,37 @@ public sealed class SettingsFileSchemaTests
         }
     }
 
+    // Each anyOf is a list for completion and a pattern, which Choices and Pattern read by their places.
+    [Fact]
+    public void Schema_AnyOf_IsOnTheChoicesTheDialectAndTheParametersAlone()
+    {
+        var withAnyOf = Properties
+            .EnumerateObject()
+            .SelectMany(property =>
+                new[] { (Path: property.Name, Schema: property.Value) }.Concat(
+                    property.Value.TryGetProperty("items", out var items)
+                        ? [(Path: property.Name + "/items", Schema: items)]
+                        : []
+                )
+            )
+            .Where(place => place.Schema.TryGetProperty("anyOf", out _))
+            .ToArray();
+
+        withAnyOf
+            .Select(place => place.Path)
+            .ShouldBe(
+                [
+                    .. ChoiceKeys.Select(row => row.Data.Item1),
+                    SettingsFileKeys.Dialect,
+                    SettingsFileKeys.GeneratorParameters + "/items",
+                ],
+                ignoreOrder: true
+            );
+        withAnyOf.ShouldAllBe(place => place.Schema.GetProperty("anyOf").GetArrayLength() == 2);
+    }
+
     [Theory]
-    [InlineData(SettingsFileKeys.Output, typeof(OutputKind))]
-    [InlineData(SettingsFileKeys.InputModelType, typeof(ModelKind))]
-    [InlineData(SettingsFileKeys.OutputModelType, typeof(ModelKind))]
-    [InlineData(SettingsFileKeys.CollectionType, typeof(CollectionKind))]
+    [MemberData(nameof(ChoiceKeys))]
     public void Schema_EnumOfAChoice_NamesEveryMemberOnce(string key, Type choice)
     {
         var read = Choices(Properties.GetProperty(key)).Select(name => ReadChoice(choice, name)).ToArray();
@@ -88,16 +127,14 @@ public sealed class SettingsFileSchemaTests
     {
         var names = Choices(Properties.GetProperty(SettingsFileKeys.GeneratorParameters).GetProperty("items"));
 
-        names.Count(name => GeneratorParameterList.IsDefault(name)).ShouldBe(1);
-        var parameters = names
-            .Where(name => !GeneratorParameterList.IsDefault(name))
-            .Select(name =>
-                GeneratorParameterList.TryFind(name, out var parameter) ? parameter : (GeneratorParameters?)null
-            )
-            .ToArray();
-        parameters.ShouldAllBe(parameter => parameter != null);
+        // One name for each parameter: an alias added to the list fails here, and is a choice for the schema to make.
+        var parameters = GeneratorParameterList.Names.Select(name => name.Parameter).ToArray();
         parameters.ShouldBeUnique();
-        parameters.ShouldBe(EveryParameter().Select(parameter => (GeneratorParameters?)parameter), ignoreOrder: true);
+        parameters.ShouldBe(
+            Enum.GetValues<GeneratorParameters>().Where(parameter => parameter != GeneratorParameters.None),
+            ignoreOrder: true
+        );
+        names.ShouldBe([.. GeneratorParameterList.Names.Select(name => name.Name), GeneratorParameterList.Default]);
     }
 
     [Fact]
@@ -115,10 +152,7 @@ public sealed class SettingsFileSchemaTests
     }
 
     [Theory]
-    [InlineData(SettingsFileKeys.Output, typeof(OutputKind))]
-    [InlineData(SettingsFileKeys.InputModelType, typeof(ModelKind))]
-    [InlineData(SettingsFileKeys.OutputModelType, typeof(ModelKind))]
-    [InlineData(SettingsFileKeys.CollectionType, typeof(CollectionKind))]
+    [MemberData(nameof(ChoiceKeys))]
     public void Schema_PatternOfAChoice_IsGeneratedFromItsEnum(string key, Type choice)
     {
         // TryReadChoice reads the names of Enum.GetNames, ignoring hyphens, spaces and tabs anywhere.
@@ -132,18 +166,46 @@ public sealed class SettingsFileSchemaTests
     [Fact]
     public void Schema_PatternOfGeneratorParameters_IsGeneratedFromTheParameters()
     {
-        // The name of a parameter is its member's name in kebab case, which TryFind is held to here.
-        var names = EveryParameter().Select(parameter => KebabCase(parameter.ToString())).ToArray();
-        foreach (var (name, parameter) in names.Zip(EveryParameter()))
-        {
-            GeneratorParameterList.TryFind(name, out var found).ShouldBeTrue(name);
-            found.ShouldBe(parameter);
-        }
-
-        var expected =
-            @"^\s*(?:" + string.Join("|", names.Append(GeneratorParameterList.Default).Select(CaseFree)) + @")?\s*$";
+        var names = GeneratorParameterList
+            .Names.Select(name => name.Name)
+            .Append(GeneratorParameterList.Default)
+            .Select(CaseFree);
+        var expected = @"^\s*(?:" + string.Join("|", names) + @")?\s*$";
 
         Pattern(Properties.GetProperty(SettingsFileKeys.GeneratorParameters).GetProperty("items")).ShouldBe(expected);
+    }
+
+    // default stands alone: a list that holds it and a parameter is not valid, whatever else it holds.
+    [Fact]
+    public void Schema_DefaultBesideAParameter_IsGeneratedFromTheParameters()
+    {
+        var both = Properties
+            .GetProperty(SettingsFileKeys.GeneratorParameters)
+            .GetProperty("not")
+            .GetProperty("allOf")
+            .EnumerateArray()
+            .Select(branch => branch.GetProperty("contains"))
+            .ToArray();
+        var parameters = GeneratorParameterList.Names.Select(name => CaseFree(name.Name));
+
+        both.Length.ShouldBe(2);
+        both.ShouldAllBe(contains => contains.GetProperty("type").GetString() == "string");
+        both[0]
+            .GetProperty("pattern")
+            .GetString()
+            .ShouldBe(@"^\s*" + CaseFree(GeneratorParameterList.Default) + @"\s*$");
+        both[1].GetProperty("pattern").GetString().ShouldBe(@"^\s*(?:" + string.Join("|", parameters) + @")\s*$");
+    }
+
+    // A member whose key or type is empty or white space is not valid: the reader trims both.
+    [Theory]
+    [MemberData(nameof(MapKeys))]
+    public void Schema_KeyAndTypeOfAMap_NeedACharacterThatIsNotWhiteSpace(string key)
+    {
+        var property = Properties.GetProperty(key);
+
+        property.GetProperty("propertyNames").GetProperty("pattern").GetString().ShouldBe(@"\S");
+        property.GetProperty("additionalProperties").GetProperty("pattern").GetString().ShouldBe(@"\S");
     }
 
     [Fact]
@@ -202,6 +264,11 @@ public sealed class SettingsFileSchemaTests
     [InlineData(SettingsFileKeys.Dialect, "\"tsql\"")]
     [InlineData(SettingsFileKeys.Dialect, "\"  \"")]
     [InlineData(SettingsFileKeys.GeneratorParameters, "[\"  Keep-Comments \", \"\"]")]
+    [InlineData(SettingsFileKeys.Output, "\"\\tcode-gen\\n\"")]
+    [InlineData(SettingsFileKeys.Dialect, "\"mysql\\t,\\tansi-quotes\"")]
+    [InlineData(SettingsFileKeys.Dialect, "\"mysql , ansi-quotes\"")]
+    [InlineData(SettingsFileKeys.GeneratorParameters, "[\"default\", \"\"]")]
+    [InlineData(SettingsFileKeys.GeneratorParameters, "[\"default\", \"default\"]")]
     public void Schema_SpellingTheReaderAccepts_IsValid(string key, string value)
     {
         var text = $$"""{"{{key}}": {{value}}}""";
@@ -247,6 +314,27 @@ public sealed class SettingsFileSchemaTests
     [InlineData( /*lang=json,strict*/
         """{"output": null}"""
     )]
+    [InlineData( /*lang=json,strict*/
+        """{"dialect": "mysql,,ansi-quotes"}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"generatorParameters": ["default", "keep-comments"]}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"generatorParameters": ["Sort-Input", "", " DEFAULT "]}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"typeOverrides": {"int4": ""}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"typeOverrides": {" ": "int"}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"columnTypes": {"users.id": " \t"}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"columnTypes": {"": "UserId"}}"""
+    )]
     public void Schema_FileTheReaderRejects_IsNotValid(string text)
     {
         Errors(text).ShouldNotBeEmpty();
@@ -273,27 +361,13 @@ public sealed class SettingsFileSchemaTests
     private static string? Pattern(JsonElement property) =>
         property.GetProperty("anyOf")[1].GetProperty("pattern").GetString();
 
-    // A letter as a class of both its cases, and any other character as itself.
+    // A letter as a class of both its cases, and any other character as itself, escaped.
     private static string CaseFree(char character) =>
         char.IsLetter(character)
             ? $"[{char.ToLowerInvariant(character)}{char.ToUpperInvariant(character)}]"
-            : character.ToString();
+            : Regex.Escape(character.ToString());
 
     private static string CaseFree(string name) => string.Concat(name.Select(CaseFree));
-
-    private static string KebabCase(string name) =>
-        string.Concat(
-            name.Select(
-                (character, index) =>
-                    char.IsUpper(character) && index > 0
-                        ? "-" + char.ToLowerInvariant(character)
-                        : char.ToLowerInvariant(character).ToString()
-            )
-        );
-
-    // Every parameter, in the order of its declaration.
-    private static GeneratorParameters[] EveryParameter() =>
-        [.. Enum.GetValues<GeneratorParameters>().Where(parameter => parameter != GeneratorParameters.None)];
 
     private static object? ReadChoice(Type choice, string value) =>
         choice switch

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json",
   "title": "SqlSource settings file, version 1",
-  "description": "A sqlsource.json file, which sets SqlSource's settings for the .sql files of its folder and the folders below it. This schema is for editors: it checks the keys, the JSON type of each value, and the values of the choices and of the dialect. The texts of the other settings are checked when SqlSource reads the file. The file may hold // and /* */ comments and trailing commas.",
+  "description": "A sqlsource.json file, which sets SqlSource's settings for the .sql files of its folder and the folders below it. This schema is for editors: it checks the keys, the JSON type of each value, and the values of the choices and of the dialect. The texts of the other settings are checked when SqlSource reads the file. An empty or white-space string as the value of a key, or as an element of generatorParameters, sets nothing. The file may hold // and /* */ comments and trailing commas.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -43,7 +43,7 @@
       ]
     },
     "generatorParameters": {
-      "description": "The generator parameters, one word for each element. `[]` or `[\"default\"]` is the empty list, every default.",
+      "description": "The generator parameters, one word for each element. `[]` or `[\"default\"]` is the empty list, every default, and `default` stands alone: beside another parameter it is not valid.",
       "type": "array",
       "items": {
         "type": "string",
@@ -53,6 +53,22 @@
           },
           {
             "pattern": "^\\s*(?:[kK][eE][eE][pP]-[cC][oO][mM][mM][eE][nN][tT][sS]|[nN][oO]-[tT][oO][kK][eE][nN]-[vV][aA][lL][iI][dD][aA][tT][iI][oO][nN]|[sS][oO][rR][tT]-[iI][nN][pP][uU][tT]|[sS][oO][rR][tT]-[oO][uU][tT][pP][uU][tT]|[nN][oO]-[tT][aA][bB][lL][eE]-[mM][oO][dD][eE][lL][sS]|[aA][sS][yY][nN][cC]-[mM][eE][tT][hH][oO][dD]-[sS][uU][fF][fF][iI][xX]|[dD][eE][fF][aA][uU][lL][tT])?\\s*$"
+          }
+        ]
+      },
+      "not": {
+        "allOf": [
+          {
+            "contains": {
+              "type": "string",
+              "pattern": "^\\s*[dD][eE][fF][aA][uU][lL][tT]\\s*$"
+            }
+          },
+          {
+            "contains": {
+              "type": "string",
+              "pattern": "^\\s*(?:[kK][eE][eE][pP]-[cC][oO][mM][mM][eE][nN][tT][sS]|[nN][oO]-[tT][oO][kK][eE][nN]-[vV][aA][lL][iI][dD][aA][tT][iI][oO][nN]|[sS][oO][rR][tT]-[iI][nN][pP][uU][tT]|[sS][oO][rR][tT]-[oO][uU][tT][pP][uU][tT]|[nN][oO]-[tT][aA][bB][lL][eE]-[mM][oO][dD][eE][lL][sS]|[aA][sS][yY][nN][cC]-[mM][eE][tT][hH][oO][dD]-[sS][uU][fF][fF][iI][xX])\\s*$"
+            }
           }
         ]
       }
@@ -109,14 +125,22 @@
       "description": "Database types and the C# type each gets, or `default`, as `\"timestamptz\": \"System.DateTimeOffset\"`.",
       "type": "object",
       "additionalProperties": {
-        "type": "string"
+        "type": "string",
+        "pattern": "\\S"
+      },
+      "propertyNames": {
+        "pattern": "\\S"
       }
     },
     "columnTypes": {
       "description": "Columns of a table or view, `table.column` or `schema.table.column`, and the C# type each gets, or `default`, as `\"users.id\": \"UserId\"`.",
       "type": "object",
       "additionalProperties": {
-        "type": "string"
+        "type": "string",
+        "pattern": "\\S"
+      },
+      "propertyNames": {
+        "pattern": "\\S"
       }
     },
     "nestedClass": {

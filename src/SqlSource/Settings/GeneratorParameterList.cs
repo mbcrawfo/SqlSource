@@ -25,7 +25,11 @@ internal static class GeneratorParameterList
     /// <summary>The word that stands for the empty list.</summary>
     public const string Default = "default";
 
-    private static readonly (string Name, GeneratorParameters Parameter)[] Names =
+    /// <summary>
+    /// Each name of a parameter, with the parameter.  The schema of a settings file repeats them in its list and its
+    /// patterns, and a test compares the two.
+    /// </summary>
+    internal static readonly (string Name, GeneratorParameters Parameter)[] Names =
     [
         ("keep-comments", GeneratorParameters.KeepComments),
         ("no-token-validation", GeneratorParameters.NoTokenValidation),
