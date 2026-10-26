@@ -68,8 +68,9 @@ internal sealed record SettingsLevel
     public EquatableArray<ColumnType>? ColumnTypes { get; init; }
 
     /// <summary>
-    /// The name of the class that holds a type's members in <see cref="MemberPlacement.Nested" /> placement.  Only the
-    /// attribute and the property give it, since a type's queries can come from several files.
+    /// The name of the class that holds a type's members in <see cref="MemberPlacement.Nested" /> placement.  The
+    /// attribute, the chain of the folder of the type's C# file and the property give it; no <c>.sql</c> file's level
+    /// does, since a type's queries can come from several files.
     /// </summary>
     public string? NestedClass { get; init; }
 

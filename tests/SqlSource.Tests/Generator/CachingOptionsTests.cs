@@ -437,8 +437,9 @@ public sealed class CachingOptionsTests
     }
 
     // The edited file's folder holds one type's file, whose level changes, and its query loses its constant to the
-    // method of codegen.  The other file's level is resolved again and comes out equal, and no file is parsed: the
-    // output is no part of what a parse depends on.
+    // method of codegen.  The other file has a level from the file above both folders, which is resolved again and
+    // comes out equal: the step named FileLevel is the one after the filter of nulls, which reports such a value as
+    // taken from the previous run.  No file is parsed: the output is no part of what a parse depends on.
     [Fact]
     public void Run_SettingsFileOutputChanged_EmitsTheTypesOfItsFolderAndParsesNoFile()
     {
@@ -447,7 +448,11 @@ public sealed class CachingOptionsTests
             "/app/Users/sqlsource.json", /*lang=json,strict*/
             """{"output":"sql"}"""
         );
-        var driver = _scene.FirstRunWithSettingsFiles(compilation, settings);
+        var above = new InMemoryAdditionalText(
+            "/app/sqlsource.json", /*lang=json,strict*/
+            """{"inputModelSuffix":"In"}"""
+        );
+        var driver = _scene.FirstRunWithSettingsFiles(compilation, settings, above);
 
         var edited = new InMemoryAdditionalText(
             settings.Path, /*lang=json,strict*/
@@ -460,7 +465,9 @@ public sealed class CachingOptionsTests
                 new Dictionary<string, IncrementalStepRunReason>
                 {
                     ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
-                }
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
             );
         AllReasons(result, TrackingNames.FileLevels).ShouldBe([IncrementalStepRunReason.Modified]);
         AllReasons(result, TrackingNames.ParsedFile)
