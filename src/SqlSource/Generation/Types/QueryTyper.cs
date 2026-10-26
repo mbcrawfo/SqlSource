@@ -633,10 +633,10 @@ internal static class QueryTyper
             }
         }
 
-        var map = QuerySettings.ResolveTypeOverrides(markers, input.Metadata, input.Property, engine);
+        var map = QuerySettings.ResolveTypeOverrides(markers, input.Level, input.Property, engine);
         var made = new LevelTypes(
             map.Count > 0 ? new OverrideLookup(map, input.MappedTypes, engine) : null,
-            QuerySettings.ResolveColumnTypes(markers, input.Metadata, input.Property)
+            QuerySettings.ResolveColumnTypes(markers, input.Level, input.Property)
         );
         levels.Add((markers, made));
         return made;

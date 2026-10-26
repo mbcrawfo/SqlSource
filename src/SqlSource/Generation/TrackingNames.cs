@@ -45,6 +45,10 @@ internal static class TrackingNames
 
     public const string FilesSettings = nameof(FilesSettings);
 
+    public const string FileLevel = nameof(FileLevel);
+
+    public const string FileLevels = nameof(FileLevels);
+
     public const string AmbiguousHintNames = nameof(AmbiguousHintNames);
 
     public const string TypeQueries = nameof(TypeQueries);

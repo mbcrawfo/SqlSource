@@ -1,4 +1,3 @@
-using SqlSource.Generation.MSBuild;
 using SqlSource.Generation.Paths;
 using SqlSource.Generation.Sidecars;
 using SqlSource.Settings;
@@ -15,8 +14,9 @@ namespace SqlSource.Generation.Types;
 /// The parsed file, or null when no entry of it is usable.  Such a file carries nothing else but the probes, since it
 /// has nothing to type.
 /// </param>
-/// <param name="Metadata">
-/// The type override and the column types of the metadata of the file's item, as a level that says nothing else.
+/// <param name="Level">
+/// The type override and the column types of the file's level, the chain of its folder over the metadata of its item,
+/// as a level that says nothing else.
 /// </param>
 /// <param name="Property">
 /// The type override and the column types of the project's properties, as a level that says nothing else.
@@ -32,7 +32,7 @@ namespace SqlSource.Generation.Types;
 internal sealed record FileTypesInput(
     SidecarCheckResult Check,
     ParsedSqlFile? File,
-    SettingsLevel Metadata,
+    SettingsLevel Level,
     SettingsLevel Property,
     NpgsqlProbe NpgsqlProbe,
     SqlClientProbe SqlClientProbe,
@@ -40,14 +40,14 @@ internal sealed record FileTypesInput(
 )
 {
     /// <summary>
-    /// Finds the parsed file and the metadata of <paramref name="check" />'s file.  Both lists are sorted by
+    /// Finds the parsed file and the level of <paramref name="check" />'s file.  Both lists are sorted by
     /// <see cref="SqlPath.Comparer" />.  <paramref name="property" /> is the properties' type override and column types
     /// alone, as <see cref="TypeSettingsOf" /> gives them.
     /// </summary>
     public static FileTypesInput Gather(
         SidecarCheckResult check,
         EquatableArray<ParsedSqlFile> files,
-        EquatableArray<FileSettings> filesSettings,
+        EquatableArray<FileLevel> fileLevels,
         SettingsLevel property,
         NpgsqlProbe npgsqlProbe,
         SqlClientProbe sqlClientProbe,
@@ -71,11 +71,11 @@ internal sealed record FileTypesInput(
             );
         }
 
-        var settingsIndex = SqlPath.IndexOf(filesSettings, check.NormalizedPath, static file => file.NormalizedPath);
+        var levelIndex = SqlPath.IndexOf(fileLevels, check.NormalizedPath, static file => file.NormalizedPath);
         return new FileTypesInput(
             check,
             files[fileIndex],
-            settingsIndex < 0 ? SettingsLevel.None : TypeSettingsOf(filesSettings[settingsIndex].Level),
+            levelIndex < 0 ? SettingsLevel.None : TypeSettingsOf(fileLevels[levelIndex].Level),
             property,
             npgsqlProbe,
             sqlClientProbe,

@@ -100,6 +100,8 @@ public sealed class CachingParseTests
             TrackingNames.ParsedFiles,
             TrackingNames.FileSettings,
             TrackingNames.FilesSettings,
+            TrackingNames.FileLevel,
+            TrackingNames.FileLevels,
             TrackingNames.TypeQueries,
             TrackingNames.TypeOutput,
             TrackingNames.SidecarInput,

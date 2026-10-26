@@ -20,14 +20,14 @@ public sealed class MappedTypeNamesTests
     {
         var names = MappedTypeNames.Collect(
             new ProjectSettings(SettingsLevel.None, EquatableArray<InvalidSetting>.Empty),
-            EquatableArray<FileSettings>.Empty,
+            EquatableArray<FileLevel>.Empty,
             TestModels.Array(Read(SqlTexts.GetUser))
         );
 
         names.ShouldBeEmpty();
     }
 
-    // The property, a file's metadata, a file's header and a query each name a type.  The header's reaches both
+    // The property, a file's level, a file's header and a query each name a type.  The header's reaches both
     // queries, so it is met twice and given once.  An entry of default names none.
     [Fact]
     public void Collect_EveryLevel_GivesEachTypeOnceInOrdinalOrder()
@@ -40,10 +40,9 @@ public sealed class MappedTypeNamesTests
             EquatableArray<InvalidSetting>.Empty
         );
         var files = TestModels.Array(
-            new FileSettings(
+            new FileLevel(
                 GeneratorHarness.UsersNormalizedPath,
-                Level(new TypeOverride("text", "global::MyApp.Name", SettingPlace.Metadata)),
-                EquatableArray<InvalidSetting>.Empty
+                Level(new TypeOverride("text", "global::MyApp.Name", SettingPlace.Metadata))
             )
         );
         var parsed = TestModels.Array(
@@ -59,7 +58,7 @@ public sealed class MappedTypeNamesTests
         names.ShouldBe(["global::MyApp.Header", "global::MyApp.Name", "global::System.Decimal", "long"]);
     }
 
-    // The column types name types at the property and the metadata, beside the type override's.
+    // The column types name types at the property and a file's level, beside the type override's.
     [Fact]
     public void Collect_ColumnTypes_GiveTheirTypes()
     {
@@ -75,21 +74,49 @@ public sealed class MappedTypeNamesTests
             EquatableArray<InvalidSetting>.Empty
         );
         var files = TestModels.Array(
-            new FileSettings(
+            new FileLevel(
                 GeneratorHarness.UsersNormalizedPath,
                 new SettingsLevel
                 {
                     ColumnTypes = TestModels.Array(
                         new ColumnType("users.id", "global::MyApp.UserId", SettingPlace.Metadata)
                     ),
-                },
-                EquatableArray<InvalidSetting>.Empty
+                }
             )
         );
 
         var names = MappedTypeNames.Collect(project, files, TestModels.Array(Read(SqlTexts.GetUser)));
 
         names.ShouldBe(["UserId", "global::MyApp.UserId", "long"]);
+    }
+
+    // A settings file's level is the level of every file in its folder, and its types are named once.  A file's level
+    // is its chain over its metadata, so a file with metadata adds its own.
+    [Fact]
+    public void Collect_FilesOfOneChain_GiveItsTypesOnce()
+    {
+        var chain = new SettingsLevel
+        {
+            TypeOverrides = TestModels.Array(
+                new TypeOverride("int4", "long", SettingPlace.OfSettingsFile("/app/Repo/sqlsource.json", 2))
+            ),
+        };
+        var files = TestModels.Array(
+            new FileLevel("app/Repo/A.sql", chain),
+            new FileLevel(
+                "app/Repo/B.sql",
+                chain.Over(Level(new TypeOverride("text", "global::MyApp.Name", SettingPlace.Metadata)))
+            ),
+            new FileLevel("app/Repo/C.sql", chain)
+        );
+
+        var names = MappedTypeNames.Collect(
+            new ProjectSettings(SettingsLevel.None, EquatableArray<InvalidSetting>.Empty),
+            files,
+            TestModels.Array(Read(SqlTexts.GetUser))
+        );
+
+        names.ShouldBe(["global::MyApp.Name", "long"]);
     }
 
     // A file header's -- column: is a column type of its queries' markers, and a query's names its result's column.
@@ -106,7 +133,7 @@ public sealed class MappedTypeNamesTests
 
         var names = MappedTypeNames.Collect(
             new ProjectSettings(SettingsLevel.None, EquatableArray<InvalidSetting>.Empty),
-            EquatableArray<FileSettings>.Empty,
+            EquatableArray<FileLevel>.Empty,
             parsed
         );
 

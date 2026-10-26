@@ -119,11 +119,11 @@ public sealed class QuerySettingsTests
             OutputModelType = ModelKind.Class,
             CollectionType = CollectionKind.List,
         };
-        var metadata = new SettingsLevel { OutputModelSuffix = "Row", ModelNamespace = "M" };
+        var file = new SettingsLevel { OutputModelSuffix = "Row", ModelNamespace = "M" };
         var attribute = new SettingsLevel { ModelNamespace = "A", InputModelType = ModelKind.Record };
         var markers = new SettingsLevel { CollectionType = CollectionKind.IReadOnlyList };
 
-        var settings = QuerySettings.Resolve(markers, attribute, metadata, property);
+        var settings = QuerySettings.Resolve(markers, attribute, file, property);
 
         settings.InputModelSuffix.ShouldBe("In");
         settings.OutputModelSuffix.ShouldBe("Row");
@@ -143,14 +143,14 @@ public sealed class QuerySettingsTests
             new TypeOverride("text", "string", SettingPlace.Property),
             new TypeOverride("timestamptz", "global::System.DateTimeOffset", SettingPlace.Property)
         );
-        var metadata = Overrides(
+        var file = Overrides(
             new TypeOverride("int4", "int", SettingPlace.Metadata),
             new TypeOverride("text", null, SettingPlace.Metadata)
         );
         var markers = Overrides(new TypeOverride("timestamptz", "global::System.DateTime", SettingPlace.Query));
 
         QuerySettings
-            .ResolveTypeOverrides(markers, metadata, property, DatabaseEngine.PostgreSql)
+            .ResolveTypeOverrides(markers, file, property, DatabaseEngine.PostgreSql)
             .ShouldBe([
                 new TypeOverride("int4", "int", SettingPlace.Metadata),
                 new TypeOverride("text", null, SettingPlace.Metadata),
@@ -171,31 +171,35 @@ public sealed class QuerySettingsTests
     [InlineData(null, null, null, "postgres")]
     public void ResolveDatabase_EachLevel_WinsOverTheLevelsBelowIt(
         string? markers,
-        string? metadata,
+        string? file,
         string? property,
         string expected
     ) =>
         QuerySettings
             .ResolveDatabase(
                 new SettingsLevel { Database = markers },
-                new SettingsLevel { Database = metadata },
+                new SettingsLevel { Database = file },
                 new SettingsLevel { Database = property },
                 "postgres"
             )
             .ShouldBe(expected);
 
     [Theory]
-    [InlineData("Statements", "Queries", "Statements")]
-    [InlineData(null, "Queries", "Queries")]
-    [InlineData(null, null, "Sql")]
-    public void ResolveNestedClass_TheAttribute_WinsOverTheProperty(
+    [InlineData("Statements", "Queries", "Members", "Statements")]
+    [InlineData("Statements", null, "Members", "Statements")]
+    [InlineData(null, "Queries", "Members", "Queries")]
+    [InlineData(null, null, "Members", "Members")]
+    [InlineData(null, null, null, "Sql")]
+    public void ResolveNestedClass_TheAttribute_WinsOverTheChainOverTheProperty(
         string? attribute,
+        string? chain,
         string? property,
         string expected
     ) =>
         QuerySettings
             .ResolveNestedClass(
                 new SettingsLevel { NestedClass = attribute },
+                new SettingsLevel { NestedClass = chain },
                 new SettingsLevel { NestedClass = property }
             )
             .ShouldBe(expected);
@@ -239,7 +243,7 @@ public sealed class QuerySettingsTests
                 new TypeOverride("nvarchar", "string", SettingPlace.Property)
             ),
         };
-        var metadata = new SettingsLevel
+        var file = new SettingsLevel
         {
             SqlServerTypeOverrides = Array(new TypeOverride("int", "short", SettingPlace.Metadata)),
         };
@@ -249,13 +253,13 @@ public sealed class QuerySettingsTests
         };
 
         QuerySettings
-            .ResolveTypeOverrides(markers, metadata, property, DatabaseEngine.SqlServer)
+            .ResolveTypeOverrides(markers, file, property, DatabaseEngine.SqlServer)
             .ShouldBe([
                 new TypeOverride("int", "short", SettingPlace.Metadata),
                 new TypeOverride("nvarchar", null, SettingPlace.Query),
             ]);
         QuerySettings
-            .ResolveTypeOverrides(markers, metadata, property, DatabaseEngine.PostgreSql)
+            .ResolveTypeOverrides(markers, file, property, DatabaseEngine.PostgreSql)
             .ShouldBe([new TypeOverride("int4", "long", SettingPlace.Property)]);
     }
 
@@ -293,14 +297,14 @@ public sealed class QuerySettingsTests
             new ColumnType("posts.id", "PostId", SettingPlace.Property),
             new ColumnType("users.id", "UserId", SettingPlace.Property)
         );
-        var metadata = Columns(
+        var file = Columns(
             new ColumnType("posts.id", null, SettingPlace.Metadata),
             new ColumnType("auth.users.id", "AuthUserId", SettingPlace.Metadata)
         );
         var markers = Columns(new ColumnType("users.id", "global::App.UserId", SettingPlace.FileHeader));
 
         QuerySettings
-            .ResolveColumnTypes(markers, metadata, property)
+            .ResolveColumnTypes(markers, file, property)
             .ShouldBe([
                 new ColumnType("posts.id", null, SettingPlace.Metadata),
                 new ColumnType("users.id", "global::App.UserId", SettingPlace.FileHeader),

@@ -47,107 +47,114 @@ internal readonly record struct QuerySettings(
 
     /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
-    /// the attribute, then the metadata of the file's item, then the project's property, then the default.  The type
-    /// override and the column types are not among them: <see cref="ResolveTypeOverrides" /> and
-    /// <see cref="ResolveColumnTypes" /> give them.
+    /// the attribute, then the file's level, then the project's property, then the default.  The file's level is the
+    /// chain of its folder over the metadata of its item, so the nearest settings file that has a setting gives it
+    /// before the metadata does.  The type override and the column types are not among them:
+    /// <see cref="ResolveTypeOverrides" /> and <see cref="ResolveColumnTypes" /> give them.
     /// </summary>
     public static QuerySettings Resolve(
         SettingsLevel markers,
         SettingsLevel attribute,
-        SettingsLevel metadata,
+        SettingsLevel file,
         SettingsLevel property
     ) =>
         new(
             markers.Parameters
                 ?? attribute.Parameters
-                ?? metadata.Parameters
+                ?? file.Parameters
                 ?? property.Parameters
                 ?? GeneratorParameters.None,
-            markers.Output ?? attribute.Output ?? metadata.Output ?? property.Output ?? OutputKind.CodeGen,
+            markers.Output ?? attribute.Output ?? file.Output ?? property.Output ?? OutputKind.CodeGen,
             markers.InputModelSuffix
                 ?? attribute.InputModelSuffix
-                ?? metadata.InputModelSuffix
+                ?? file.InputModelSuffix
                 ?? property.InputModelSuffix
                 ?? DefaultInputModelSuffix,
             markers.OutputModelSuffix
                 ?? attribute.OutputModelSuffix
-                ?? metadata.OutputModelSuffix
+                ?? file.OutputModelSuffix
                 ?? property.OutputModelSuffix
                 ?? DefaultOutputModelSuffix,
-            markers.ModelNamespace ?? attribute.ModelNamespace ?? metadata.ModelNamespace ?? property.ModelNamespace,
+            markers.ModelNamespace ?? attribute.ModelNamespace ?? file.ModelNamespace ?? property.ModelNamespace,
             markers.InputModelType
                 ?? attribute.InputModelType
-                ?? metadata.InputModelType
+                ?? file.InputModelType
                 ?? property.InputModelType
                 ?? ModelKind.SealedRecord,
             markers.OutputModelType
                 ?? attribute.OutputModelType
-                ?? metadata.OutputModelType
+                ?? file.OutputModelType
                 ?? property.OutputModelType
                 ?? ModelKind.SealedRecord,
             markers.CollectionType
                 ?? attribute.CollectionType
-                ?? metadata.CollectionType
+                ?? file.CollectionType
                 ?? property.CollectionType
                 ?? CollectionKind.Array
         );
 
     /// <summary>
     /// The type override of a query on <paramref name="engine" />: the precedence of the type override, which has no
-    /// attribute level and merges per key, the markers over the metadata over the property, each level's entries of
-    /// that engine.  Sorted by key, and empty when no level sets one.  It keeps its entries of <c>default</c>, which
-    /// <see cref="TypeOverrideMap.Find" /> weighs by their place against the entries of other keys that match a type.
-    /// It is kept apart from <see cref="Resolve" />, which runs for each query and each type that claims its file, so
-    /// that a caller that needs it computes it once for each distinct level of markers.
+    /// attribute level and merges per key, the markers over the file's level over the property, each level's entries
+    /// of that engine.  The file's level is the chain of its folder over the metadata of its item, merged per key the
+    /// same way.  Sorted by key, and empty when no level sets one.  It keeps its entries of <c>default</c>, which
+    /// <see cref="TypeOverrideMap.Find" /> weighs by their place against the entries of other keys that match a type,
+    /// a nearer settings file's place above a farther one's.  It is kept apart from <see cref="Resolve" />, which runs
+    /// for each query and each type that claims its file, so that a caller that needs it computes it once for each
+    /// distinct level of markers.
     /// </summary>
     public static EquatableArray<TypeOverride> ResolveTypeOverrides(
         SettingsLevel markers,
-        SettingsLevel metadata,
+        SettingsLevel file,
         SettingsLevel property,
         DatabaseEngine engine
     ) =>
         engine == DatabaseEngine.SqlServer
-            ? Merge(markers.SqlServerTypeOverrides, metadata.SqlServerTypeOverrides, property.SqlServerTypeOverrides)
-            : Merge(markers.TypeOverrides, metadata.TypeOverrides, property.TypeOverrides);
+            ? Merge(markers.SqlServerTypeOverrides, file.SqlServerTypeOverrides, property.SqlServerTypeOverrides)
+            : Merge(markers.TypeOverrides, file.TypeOverrides, property.TypeOverrides);
 
     /// <summary>
-    /// The column types of a query: the markers' over the metadata's over the property's, merged per key as
-    /// <see cref="ResolveTypeOverrides" /> merges the type override, and one list for both engines.  The markers' are
-    /// those of the file's header, by the column's source; a query's own <c>-- column:</c> markers name its result's
-    /// columns and are not among them.  Sorted by key, and empty when no level sets one.  It keeps its entries of
-    /// <c>default</c>, which <see cref="ColumnTypeMap.Find" /> weighs by their place, and is kept apart from
-    /// <see cref="Resolve" /> for the same reason as the type override.
+    /// The column types of a query: the markers' over the file's level's over the property's, merged per key as
+    /// <see cref="ResolveTypeOverrides" /> merges the type override, and one list for both engines.  The file's level
+    /// is the chain of its folder over the metadata of its item.  The markers' are those of the file's header, by the
+    /// column's source; a query's own <c>-- column:</c> markers name its result's columns and are not among them.
+    /// Sorted by key, and empty when no level sets one.  It keeps its entries of <c>default</c>, which
+    /// <see cref="ColumnTypeMap.Find" /> weighs by their place, and is kept apart from <see cref="Resolve" /> for the
+    /// same reason as the type override.
     /// </summary>
     public static EquatableArray<ColumnType> ResolveColumnTypes(
         SettingsLevel markers,
-        SettingsLevel metadata,
+        SettingsLevel file,
         SettingsLevel property
     ) =>
-        ColumnTypeMap.Over(markers.ColumnTypes, ColumnTypeMap.Over(metadata.ColumnTypes, property.ColumnTypes))
+        ColumnTypeMap.Over(markers.ColumnTypes, ColumnTypeMap.Over(file.ColumnTypes, property.ColumnTypes))
         ?? EquatableArray<ColumnType>.Empty;
 
     /// <summary>
-    /// The database of a query: the markers', then the metadata's, then the property's, else the name of the dialect,
-    /// which the caller gives since <c>Settings/</c> does not use <c>Parsing/</c>.  The attribute has no level for
-    /// it, so it is kept apart from <see cref="Resolve" />, as <see cref="ResolveTypeOverrides" /> is.
+    /// The database of a query: the markers', then the file's level's, then the property's, else the name of the
+    /// dialect, which the caller gives since <c>Settings/</c> does not use <c>Parsing/</c>.  The file's level is the
+    /// chain of its folder over the metadata of its item.  The attribute has no level for it, so it is kept apart from
+    /// <see cref="Resolve" />, as <see cref="ResolveTypeOverrides" /> is.
     /// </summary>
     public static string ResolveDatabase(
         SettingsLevel markers,
-        SettingsLevel metadata,
+        SettingsLevel file,
         SettingsLevel property,
         string dialectName
-    ) => markers.Database ?? metadata.Database ?? property.Database ?? dialectName;
+    ) => markers.Database ?? file.Database ?? property.Database ?? dialectName;
 
     /// <summary>
-    /// The name of a type's nested class: the attribute's, then the property's, else the default.  It belongs to the
-    /// type and not to a query, so it has no marker or metadata level and is kept apart from <see cref="Resolve" />.
+    /// The name of a type's nested class: the attribute's, then the chain's, then the property's, else the default.
+    /// The chain is that of the folder of the type's C# file.  The class belongs to the type and not to a query, so it
+    /// has no marker or metadata level, and no <c>.sql</c> file's chain decides it; it is kept apart from
+    /// <see cref="Resolve" />.
     /// </summary>
-    public static string ResolveNestedClass(SettingsLevel attribute, SettingsLevel property) =>
-        attribute.NestedClass ?? property.NestedClass ?? DefaultNestedClass;
+    public static string ResolveNestedClass(SettingsLevel attribute, SettingsLevel chain, SettingsLevel property) =>
+        attribute.NestedClass ?? chain.NestedClass ?? property.NestedClass ?? DefaultNestedClass;
 
     private static EquatableArray<TypeOverride> Merge(
         EquatableArray<TypeOverride>? markers,
-        EquatableArray<TypeOverride>? metadata,
+        EquatableArray<TypeOverride>? file,
         EquatableArray<TypeOverride>? property
-    ) => TypeOverrideMap.Over(markers, TypeOverrideMap.Over(metadata, property)) ?? EquatableArray<TypeOverride>.Empty;
+    ) => TypeOverrideMap.Over(markers, TypeOverrideMap.Over(file, property)) ?? EquatableArray<TypeOverride>.Empty;
 }
