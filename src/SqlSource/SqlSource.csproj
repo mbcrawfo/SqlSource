@@ -42,6 +42,8 @@
         <!-- NuGet imports build/<package id>.props and .targets into every project that references the package. -->
         <None Include="build/SqlSource.props" Pack="true" PackagePath="build" />
         <None Include="build/SqlSource.targets" Pack="true" PackagePath="build" />
+        <!-- SqlSource.props has the SDK import this one after its own targets. -->
+        <None Include="build/SqlSource.AfterSdk.targets" Pack="true" PackagePath="build" />
         <None
             Include="$(OutputPath)$(AssemblyName).dll"
             Pack="true"

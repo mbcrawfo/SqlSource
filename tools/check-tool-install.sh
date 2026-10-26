@@ -130,12 +130,13 @@ fi
 # A project of one mssql query, and a connection to the port 1 of this machine, which refuses at once.  The tool loads
 # SqlClient to connect, and its copy for the platform must be the one it loads: the copy outside runtimes/ throws
 # PlatformNotSupportedException at the first use, which the tool reports as SQLSRC224 with another text.  The project
-# imports SqlSource.props and .targets, copied from src/SqlSource/build/ with the repository's global.json beside it,
-# and is never restored.
+# imports SqlSource.props and .targets, copied from src/SqlSource/build/ with SqlSource.AfterSdk.targets, which the
+# props have the SDK import, and the repository's global.json beside them, and is never restored.
 mssql="$work/mssql"
 mkdir -p "$mssql/build" "$mssql/App"
 cp "$repo_root/global.json" "$mssql/"
-cp "$repo_root/src/SqlSource/build/SqlSource.props" "$repo_root/src/SqlSource/build/SqlSource.targets" "$mssql/build/"
+cp "$repo_root/src/SqlSource/build/SqlSource.props" "$repo_root/src/SqlSource/build/SqlSource.targets" \
+    "$repo_root/src/SqlSource/build/SqlSource.AfterSdk.targets" "$mssql/build/"
 cat >"$mssql/App/App.csproj" <<'PROJECT'
 <Project Sdk="Microsoft.NET.Sdk">
     <Import Project="../build/SqlSource.props" />

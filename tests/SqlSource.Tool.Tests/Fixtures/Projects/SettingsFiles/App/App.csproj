@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        Settings files in the project's folder and below it, above it, beside a .sql file it links from outside its
+        folder, beside a C# file, and beside a .sql file that Directory.Build.targets adds.  The project lists the one
+        above it itself, by a relative path.  The package's files are one folder further up than for the other
+        fixtures, since the project is in a folder of the fixture.
+    -->
+    <Import Project="../../build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+    <ItemGroup>
+        <AdditionalFiles Include="../Shared/Linked.sql" Link="Queries/Linked.sql" />
+        <AdditionalFiles Include="../sqlsource.json" />
+    </ItemGroup>
+    <Import Project="../../build/SqlSource.targets" />
+</Project>

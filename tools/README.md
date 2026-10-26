@@ -23,7 +23,7 @@ The three package checks look at what `dotnet pack SqlSource.slnx --output artif
 tools/check-package.sh artifacts/packages
 ```
 
-This checks what the two packages hold.  `SqlSource`: the generator under `analyzers/`, `build/SqlSource.props` and `build/SqlSource.targets`, the readme, and nothing under `lib/`.  `SqlSource.Tool`: the tool under `tools/net8.0/any/` with the generator's assembly, Roslyn, the library that reads a solution, Npgsql and Microsoft.Data.SqlClient beside it, SqlClient's copies for Unix and Windows and its native SNI for Windows under `runtimes/`, `DotnetToolSettings.xml`, the readme, which is `src/SqlSource.Tool/README.md`, and no documentation file of an assembly.  It fails when the two have different versions.  Without an argument it packs both into a temporary folder first.
+This checks what the two packages hold.  `SqlSource`: the generator under `analyzers/`, `build/SqlSource.props`, `build/SqlSource.targets` and `build/SqlSource.AfterSdk.targets`, the readme, and nothing under `lib/`.  `SqlSource.Tool`: the tool under `tools/net8.0/any/` with the generator's assembly, Roslyn, the library that reads a solution, Npgsql and Microsoft.Data.SqlClient beside it, SqlClient's copies for Unix and Windows and its native SNI for Windows under `runtimes/`, `DotnetToolSettings.xml`, the readme, which is `src/SqlSource.Tool/README.md`, and no documentation file of an assembly.  It fails when the two have different versions.  Without an argument it packs both into a temporary folder first.
 
 ### `check-package-install.sh`
 
@@ -41,7 +41,7 @@ The script then asks the project what the `sqlsource` tool asks one.  `SqlSource
 
 It then deletes a `.sql` file the project uses and builds again, and fails unless that build reports the missing member: an incremental build must notice that a file is gone.
 
-Last, it writes a web project, of `Microsoft.NET.Sdk.Web`, that references the package and has a `.sql` file and its sidecar, publishes it, and fails when either file is in its `bin` folder or in what `dotnet publish` wrote.  The Web SDK copies a `.json` file to both unless the package says otherwise, and the consumer, of the plain SDK, copies neither.  The project claims no file, so the sidecar can be empty.  Without an argument the script packs first, as the other does.
+Last, it writes a web project, of `Microsoft.NET.Sdk.Web`, that references the package and has a `.sql` file, its sidecar and a settings file, `sqlsource.json`, publishes it, and fails when any of them is in its `bin` folder or in what `dotnet publish` wrote.  The Web SDK copies a `.json` file to both unless the package says otherwise, and the consumer, of the plain SDK, copies none.  The project claims no file, so the sidecar can be empty, and the settings file sets nothing.  Without an argument the script packs first, as the other does.
 
 ### `check-tool-install.sh`
 

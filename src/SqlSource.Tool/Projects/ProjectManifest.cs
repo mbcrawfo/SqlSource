@@ -28,6 +28,12 @@ internal sealed class ProjectManifest
     /// <summary>The <c>.sql</c> files of the project, in the order of its items.</summary>
     public required ImmutableArray<ManifestFile> Files { get; init; }
 
+    /// <summary>
+    /// The full paths of the settings files the compiler is given, each <c>sqlsource.json</c> above a <c>.sql</c> file
+    /// or a <c>Compile</c> item and any the project lists itself, once each, in the order of the manifest.
+    /// </summary>
+    public required ImmutableArray<string> SettingsFiles { get; init; }
+
     /// <summary>The full paths of the project's <c>Compile</c> items.</summary>
     public required ImmutableArray<string> CompileFiles { get; init; }
 }

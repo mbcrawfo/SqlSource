@@ -1,0 +1,5 @@
+{
+    // Above the project: found for every file of it, and listed by the project itself too.
+    "root": true,
+    "dialect": "postgres",
+}

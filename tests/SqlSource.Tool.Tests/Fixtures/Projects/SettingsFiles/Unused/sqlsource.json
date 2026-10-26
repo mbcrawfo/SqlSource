@@ -1,0 +1,4 @@
+{
+    // No .sql or C# file is in this folder or below it, so the search never reaches it.
+    "dialect": "mysql"
+}

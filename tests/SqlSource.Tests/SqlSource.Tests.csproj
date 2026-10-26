@@ -82,6 +82,11 @@
             Link="build/SqlSource.targets"
             CopyToOutputDirectory="PreserveNewest"
         />
+        <None
+            Include="../../src/SqlSource/build/SqlSource.AfterSdk.targets"
+            Link="build/SqlSource.AfterSdk.targets"
+            CopyToOutputDirectory="PreserveNewest"
+        />
         <!--
             EndToEnd/EndToEndTests.cs reads the file that the build writes for the compiler of this project.  The SDK
             writes it before it compiles, and the copy to the output folder comes after.

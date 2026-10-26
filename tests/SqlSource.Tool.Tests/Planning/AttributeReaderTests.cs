@@ -33,6 +33,7 @@ public sealed class AttributeReaderTests : IDisposable
             DefineConstants = [.. constants],
             Properties = [],
             Files = [],
+            SettingsFiles = [],
             CompileFiles = [.. compile],
         };
 
