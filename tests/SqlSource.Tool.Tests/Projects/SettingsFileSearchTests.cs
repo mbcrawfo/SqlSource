@@ -32,7 +32,7 @@ public sealed class SettingsFileSearchTests : IDisposable
     public void Dispose() => _fixtures.Dispose();
 
     [Fact]
-    public async Task DesignTimeBuild_GivesTheCompilerEverySettingsFileOnce()
+    public async Task Compile_DesignTimeBuild_GivesTheCompilerEverySettingsFileOnce()
     {
         var project = _fixtures.Copy("SettingsFiles", "App/App.csproj");
         var folder = Path.GetDirectoryName(project)!;

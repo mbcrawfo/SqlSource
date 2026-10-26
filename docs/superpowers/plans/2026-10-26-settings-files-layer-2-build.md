@@ -89,7 +89,7 @@ A design-time build runs the target and passes its items to the compiler: `dotne
   - `WriteManifest_SettingsFilesAboveTheFiles_AreListedBetweenTheSqlFilesAndTheCompileFiles` (copy `SettingsFiles`, project `App/App.csproj`): the `Settings=` lines are the six files other than `Unused/`, each once, as a set; every `Settings=` line is after the last `File=` line and before the first `Compile=` line.
   - `WriteManifest_PathsWithCharactersThatMSBuildReads_AreListedWhole` also expects `Settings=` + the odd folder's file.
   - `WriteManifest_ProjectWithOneFramework_HoldsWhatTheCompilerIsGiven` keeps its exact list (no settings file).
-  - `SettingsFileSearchTests.DesignTimeBuild_GivesTheCompilerEverySettingsFileOnce`: runs `-restore -t:Compile` with the design-time properties of Verify first and `-getItem:CscCommandLineArgs`, and asserts the `/additionalfile:` arguments that end in `sqlsource.json`, as full paths, are the same six, each once.
+  - `SettingsFileSearchTests.Compile_DesignTimeBuild_GivesTheCompilerEverySettingsFileOnce`: runs `-restore -t:Compile` with the design-time properties of Verify first and `-getItem:CscCommandLineArgs`, and asserts the `/additionalfile:` arguments that end in `sqlsource.json`, as full paths, are the same six, each once.
 - [ ] **Step 2: Run** `dotnet test --project tests/SqlSource.Tool.Tests -- --filter-class "*ManifestTargetTests" --filter-class "*SettingsFileSearchTests"`; expected PASS with Task 1 in place.
 - [ ] **Step 3: Commit.**
 
