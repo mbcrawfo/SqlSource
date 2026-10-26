@@ -31,9 +31,9 @@ public sealed class BuildFoldersTests
     [Fact]
     public void Read_NoProperty_IsNone() => BuildFolders.Read(new Options([])).ShouldBeSameAs(BuildFolders.None);
 
-    // MSBuild's NormalizeDirectory ends a full path with a separator.  The compiler cuts a value at a # or a ;, so
-    // /repo/App#1/obj/ arrives as /repo/App and /repo/a/#b/obj/ as /repo/a/; the targets give no value for such a
-    // folder, and a value that is not a rooted folder names none here either.
+    // MSBuild's NormalizeDirectory ends a full path with a separator.  The compiler cuts a value at a # or a ;, so an
+    // unescaped /repo/App#1/obj/ would arrive as /repo/App; the targets escape both, and a value that is not a rooted
+    // folder, a raw cut value among them, names none here.
     [Theory]
     [InlineData("")]
     [InlineData("/repo/App")]
@@ -43,6 +43,27 @@ public sealed class BuildFoldersTests
     [InlineData("/../")]
     public void Of_ValueThatIsNoFullFolder_NamesNoFolder(string value) =>
         BuildFolders.Of(value, value).ShouldBeSameAs(BuildFolders.None);
+
+    // The targets write %, # and ; as %25, %23 and %3B, % first, so that the compiler does not cut the value.  A folder
+    // named with a literal %23 is written %2523, and is decoded to %23, not to #.
+    [Theory]
+    [InlineData("/repo/My%23App/artifacts/obj/App/", "repo/My#App/artifacts/obj/App")]
+    [InlineData("/repo/a%3Bb/obj/", "repo/a;b/obj")]
+    [InlineData("/repo/a%2523b/obj/", "repo/a%23b/obj")]
+    [InlineData("/repo/100%25/obj/", "repo/100%/obj")]
+    [InlineData("/repo/a%23%3B%25b/obj/", "repo/a#;%b/obj")]
+    [InlineData(@"C:\repo\a%23b\obj\", "C:/repo/a#b/obj")]
+    public void Of_EscapedFolder_IsDecodedToTheRealFolder(string value, string expected) =>
+        BuildFolders.Of(value, value).ShouldBe(new BuildFolders(expected, expected));
+
+    // Only the three escapes the targets write are decoded; any other % stays as it is.
+    [Theory]
+    [InlineData("/repo/a%zzb/obj/", "repo/a%zzb/obj")]
+    [InlineData("/repo/a%20b/obj/", "repo/a%20b/obj")]
+    [InlineData("/repo/a%3/obj/", "repo/a%3/obj")]
+    [InlineData("/repo/a%/obj/", "repo/a%/obj")]
+    public void Of_OtherPercentSign_IsKept(string value, string expected) =>
+        BuildFolders.Of(value, null).ShouldBe(new BuildFolders(expected, null));
 
     [Fact]
     public void Of_OneFolder_KeepsIt()

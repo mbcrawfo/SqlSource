@@ -238,11 +238,13 @@ public sealed partial class BuildFileTests
 
     // A C# file under the folders the build writes into is the build's, and reaches no settings file.  Each folder is
     // the full path of the SDK's base folder, made against the project's folder, with the separator that
-    // NormalizeDirectory ends it with.  The compiler reads a value up to its first # or ;, so a folder whose path holds
-    // either is given as empty, as is one the project has no value for, which would be the project's own folder.  The
-    // generator spells the names in BuildFolders, and SettingsFileTests runs it on them.
+    // NormalizeDirectory ends it with.  The compiler reads a value up to its first # or ;, so the folder's %, # and ;
+    // are escaped as %25, %23 and %3B, % first, which BuildFolders decodes; MSBuild reads %XX in the file as the
+    // character it stands for, so each escape is written with its % as %25.  A folder whose base folder has no value
+    // is given as empty, since it would be the project's own folder.  The generator spells the names in BuildFolders,
+    // and SettingsFileTests runs it on them.
     [Fact]
-    public void Targets_BuildFolders_AreTheFullPathsOfTheBaseFoldersOrEmpty()
+    public void Targets_BuildFolders_AreTheEscapedFullPathsOfTheBaseFoldersOrEmpty()
     {
         var target = Target(BuildFoldersTarget);
 
@@ -262,25 +264,10 @@ public sealed partial class BuildFileTests
                 (line.Name.LocalName, line.Value, line.Attribute("Condition")?.Value, line.Attributes().Count())
             )
             .ShouldBe([
-                (
-                    "SqlSourceIntermediateFolder",
-                    "$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseIntermediateOutputPath)))",
-                    null,
-                    0
-                ),
-                (
-                    "SqlSourceOutputFolder",
-                    "$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseOutputPath)))",
-                    null,
-                    0
-                ),
-                (
-                    "SqlSourceIntermediateFolder",
-                    "",
-                    EmptyWhen("BaseIntermediateOutputPath", "SqlSourceIntermediateFolder"),
-                    1
-                ),
-                ("SqlSourceOutputFolder", "", EmptyWhen("BaseOutputPath", "SqlSourceOutputFolder"), 1),
+                ("SqlSourceIntermediateFolder", Escaped("BaseIntermediateOutputPath"), null, 0),
+                ("SqlSourceOutputFolder", Escaped("BaseOutputPath"), null, 0),
+                ("SqlSourceIntermediateFolder", "", "'$(BaseIntermediateOutputPath)' == ''", 1),
+                ("SqlSourceOutputFolder", "", "'$(BaseOutputPath)' == ''", 1),
             ]);
         lines.Select(line => line.Name.LocalName).Distinct().ShouldBe(BuildFolders);
     }
@@ -680,9 +667,11 @@ public sealed partial class BuildFileTests
 
     private static XElement Manifest() => Target(ManifestTarget);
 
-    // The condition that empties a folder: its base folder has no value, or its full path holds a # or a ;.
-    private static string EmptyWhen(string baseFolder, string folder) =>
-        $"'$({baseFolder})' == '' or $({folder}.Contains('#')) or $({folder}.Contains(';'))";
+    // The full path of a base folder, with its %, # and ; escaped for the compiler, each % of an escape written %25 for
+    // MSBuild.
+    private static string Escaped(string baseFolder) =>
+        $"$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $({baseFolder})).Replace('%', '%2525')"
+        + ".Replace('#', '%2523').Replace(';', '%253B'))";
 
     private static XElement Target(string name) =>
         Targets.Descendants("Target").Single(target => target.Attribute("Name")!.Value == name);

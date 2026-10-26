@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Generation.Paths;
@@ -31,10 +32,11 @@ internal sealed record BuildFolders(string? IntermediateFolder, string? OutputFo
         Of(Value(globalOptions, IntermediateFolderName), Value(globalOptions, OutputFolderName));
 
     /// <summary>
-    /// The folders of two values as the build gives them, each a full path with a separator at its end.  A value that
-    /// is not, such as one the compiler cut at a <c>#</c> or a <c>;</c>, names no folder, so that it never leaves out
-    /// a path beside or above the folder it was cut from.  The targets give no value for such a folder, so this is a
-    /// second guard.
+    /// The folders of two values as the build gives them, each a full path with a separator at its end, its <c>%</c>,
+    /// <c>#</c> and <c>;</c> written <c>%25</c>, <c>%23</c> and <c>%3B</c>, which this decodes.  The targets escape
+    /// them because the compiler cuts a value at its first <c>#</c> or <c>;</c>.  A value that is not a full path with
+    /// a separator at its end, such as a raw path cut inside a segment, names no folder, so that it never leaves out a
+    /// path beside the folder it was cut from.
     /// </summary>
     public static BuildFolders Of(string? intermediateFolder, string? outputFolder)
     {
@@ -59,7 +61,46 @@ internal sealed record BuildFolders(string? IntermediateFolder, string? OutputFo
         value is { Length: > 0 }
         && SqlPath.IsRooted(value)
         && value[value.Length - 1] is '/' or '\\'
-        && SqlPath.Normalize(value) is { Length: > 0 } normalized
+        && SqlPath.Normalize(Unescape(value)) is { Length: > 0 } normalized
             ? normalized
             : null;
+
+    // The value with %25, %23 and %3B, or %3b, made the character each stands for, in one pass, so that %2523
+    // is %23.  Any other % is kept.  A value without a % is returned as it is.
+    private static string Unescape(string value)
+    {
+        var start = value.IndexOf('%');
+        if (start < 0)
+        {
+            return value;
+        }
+
+        var unescaped = new StringBuilder(value.Length);
+        _ = unescaped.Append(value, 0, start);
+        var i = start;
+        while (i < value.Length)
+        {
+            if (value[i] == '%' && i + 2 < value.Length && Escaped(value[i + 1], value[i + 2]) is { } character)
+            {
+                _ = unescaped.Append(character);
+                i += 3;
+            }
+            else
+            {
+                _ = unescaped.Append(value[i]);
+                i++;
+            }
+        }
+
+        return unescaped.ToString();
+    }
+
+    private static char? Escaped(char first, char second) =>
+        (first, second) switch
+        {
+            ('2', '5') => '%',
+            ('2', '3') => '#',
+            ('3', 'B' or 'b') => ';',
+            _ => null,
+        };
 }

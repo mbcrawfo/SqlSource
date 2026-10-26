@@ -682,7 +682,38 @@ public sealed class SettingsFileTests
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC015 /repo/sqlsource.json(1,");
     }
 
-    // The compiler cuts a value at a # or a ;, so a folder /repo/App#1/obj/ would arrive as /repo/App.  A value that
+    // The targets escape a folder's # and ;, at which the compiler would cut the value, and the generator decodes them,
+    // so a project under /repo/My#App keeps its build's files out.
+    [Fact]
+    public void Run_CompileItemUnderAnEscapedIntermediateFolder_ReachesNoSettingsFile()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [
+                new SourceFile("/repo/My#App/App/Sample.cs", GeneratorHarness.SampleSource(null)),
+                new SourceFile(
+                    "/repo/My#App/artifacts/obj/App/debug/App.AssemblyInfo.cs",
+                    "[assembly: System.Reflection.AssemblyMetadata(\"Built\", \"yes\")]\n"
+                ),
+            ],
+            [
+                GeneratorHarness.SettingsFile("/repo/sqlsource.json", "{"),
+                GeneratorHarness.SettingsFile(
+                    "/repo/My#App/App/sqlsource.json", /*lang=json,strict*/
+                    """{"root": true}"""
+                ),
+                new SqlFile("/repo/My#App/App/Q.sql", Query),
+            ],
+            properties: new Dictionary<string, string?>
+            {
+                ["SqlSourceIntermediateFolder"] = "/repo/My%23App/artifacts/obj/App/",
+            }
+        );
+
+        run.ShouldBeClean();
+    }
+
+    // A value the compiler cut at a # or a ;, as an unescaped /repo/App#1/obj/ would arrive, /repo/App.  A value that
     // does not end with a separator is no folder of the build, so the project's own C# file still reaches its folder's
     // file.
     [Fact]

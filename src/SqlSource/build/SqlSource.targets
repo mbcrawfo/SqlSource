@@ -134,19 +134,20 @@
         chain would climb past its root file.  It runs before the file the compiler reads is written, as the trims do,
         when every property of the SDK and of the artifacts layout is set.
 
-        The compiler reads a value up to its first # or ;, so a folder whose path holds either would arrive cut short,
-        naming a folder above the real one or beside it.  Such a folder is given as empty, and its C# files are read as
-        the project's: TD-0079.  So is one whose base folder has no value, which would be the project's own folder.
+        The compiler reads a value up to its first # or ;, so each folder is written with its %, # and ; escaped as %25,
+        %23 and %3B, % first, which the generator decodes.  MSBuild reads %XX in a project file as the character it
+        stands for, so each escape is written with its % as %25: %2525, %2523 and %253B.  A folder whose base folder
+        has no value is given as empty, since it would be the project's own folder.
 
         The expressions are long, and a property as written is on one line, so the check of the line length is off.
     -->
     <!-- editorconfig-checker-disable -->
     <Target Name="SqlSourceFindBuildFolders" BeforeTargets="GenerateMSBuildEditorConfigFileCore">
         <PropertyGroup>
-            <SqlSourceIntermediateFolder>$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseIntermediateOutputPath)))</SqlSourceIntermediateFolder>
-            <SqlSourceOutputFolder>$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseOutputPath)))</SqlSourceOutputFolder>
-            <SqlSourceIntermediateFolder Condition="'$(BaseIntermediateOutputPath)' == '' or $(SqlSourceIntermediateFolder.Contains('#')) or $(SqlSourceIntermediateFolder.Contains(';'))" />
-            <SqlSourceOutputFolder Condition="'$(BaseOutputPath)' == '' or $(SqlSourceOutputFolder.Contains('#')) or $(SqlSourceOutputFolder.Contains(';'))" />
+            <SqlSourceIntermediateFolder>$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseIntermediateOutputPath)).Replace('%', '%2525').Replace('#', '%2523').Replace(';', '%253B'))</SqlSourceIntermediateFolder>
+            <SqlSourceOutputFolder>$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseOutputPath)).Replace('%', '%2525').Replace('#', '%2523').Replace(';', '%253B'))</SqlSourceOutputFolder>
+            <SqlSourceIntermediateFolder Condition="'$(BaseIntermediateOutputPath)' == ''" />
+            <SqlSourceOutputFolder Condition="'$(BaseOutputPath)' == ''" />
         </PropertyGroup>
     </Target>
     <!-- editorconfig-checker-enable -->
