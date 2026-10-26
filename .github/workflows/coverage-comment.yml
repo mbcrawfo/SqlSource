@@ -44,12 +44,13 @@ jobs:
         run: |
           # The pull request comes from the event, not from the artifact, which could name any pull request.
           # The run's event lists no pull requests when the head is a fork, so it is looked up by its head.
-          # CI runs only for pull requests to main.  One whose head has moved on gets its comment from a newer run.
+          # CI runs only for pull requests to main or an integration/* branch.  One whose head has moved on gets its
+          # comment from a newer run.
           pr_numbers="$(
               gh api --method GET "repos/$REPO/pulls" --paginate \
                   --raw-field state=open --raw-field "head=$HEAD_OWNER:$HEAD_BRANCH" --jq '
                   .[]
-                  | select(.base.ref == "main")
+                  | select(.base.ref == "main" or (.base.ref | startswith("integration/")))
                   | select(.head.sha == env.HEAD_SHA)
                   | .number'
           )"
