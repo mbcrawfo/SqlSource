@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
+using SqlSource.Testing;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
@@ -17,6 +21,18 @@ public sealed class RowBufferTests
         Shape = ResultShape.Many,
         Collection = CollectionKind.Array,
     };
+
+    // The hand-written copy of the buffer that the allocation tests of both end-to-end projects read their rows into,
+    // and its declaration, in place of the generated one's.
+    private static readonly string HandWrittenCopy = Path.Combine(
+        RepositoryRoot.Folder,
+        "tests",
+        "SqlSource.Testing",
+        "EndToEnd",
+        "RowBufferByHand.cs"
+    );
+
+    private const string HandWrittenDeclaration = "internal struct RowBufferByHand<T>\n";
 
     private static readonly HashSet<CollectionKind> Pooled =
     [
@@ -104,6 +120,28 @@ public sealed class RowBufferTests
         RowBuffer
             .TypeTextFor(Methods(MethodPlacement.Public, "SqlSourceRowBuffer"))
             .ShouldBe("global::App.SqlSourceRowBufferOfRows");
+
+    // The copy is the generated buffer, from its declaration to its last brace, but its name and its modifier, and at
+    // the depth of a file-scoped namespace, so that the hand-written methods of the allocation tests read their rows
+    // as the generated methods do.  A change to the generated buffer changes the copy with it.
+    [Fact]
+    public void Append_HandWrittenCopyOfTheAllocationTests_IsTheGeneratedBufferButItsNameModifierAndDepth()
+    {
+        var copy = File.ReadAllText(HandWrittenCopy).ReplaceLineEndings("\n");
+        var start = copy.IndexOf(HandWrittenDeclaration, StringComparison.Ordinal);
+        var end = copy.IndexOf("\n}\n", start, StringComparison.Ordinal);
+        start.ShouldBeGreaterThanOrEqualTo(0);
+        end.ShouldBeGreaterThan(start);
+
+        var generated = GeneratedFile.RowBuffer;
+        var generatedStruct = generated[generated.IndexOf("    file struct ", StringComparison.Ordinal)..]
+            .Split('\n')
+            .Select(static line => line.StartsWith("    ", StringComparison.Ordinal) ? line[4..] : line);
+
+        string.Join('\n', generatedStruct)
+            .Replace("file struct SqlSourceRowBuffer<T>\n", HandWrittenDeclaration, StringComparison.Ordinal)
+            .ShouldBe(copy[start..(end + 3)]);
+    }
 
     // The methods of App.<name>, and of the types nested in it, under the placement.
     private static TypeMethods Methods(MethodPlacement placement, string name, params TypeDeclaration[] nested) =>
