@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
+using System.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 using SqlSource.Testing;
-using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
@@ -133,13 +132,12 @@ public sealed class RowBufferTests
         start.ShouldBeGreaterThanOrEqualTo(0);
         end.ShouldBeGreaterThan(start);
 
-        var generated = GeneratedFile.RowBuffer;
-        var generatedStruct = generated[generated.IndexOf("    file struct ", StringComparison.Ordinal)..]
-            .Split('\n')
-            .Select(static line => line.StartsWith("    ", StringComparison.Ordinal) ? line[4..] : line);
+        var builder = new StringBuilder();
+        RowBuffer.Append(builder, string.Empty, "RowBufferByHand");
+        var generated = builder.ToString();
 
-        string.Join('\n', generatedStruct)
-            .Replace("file struct SqlSourceRowBuffer<T>\n", HandWrittenDeclaration, StringComparison.Ordinal)
+        generated[generated.IndexOf("file struct ", StringComparison.Ordinal)..]
+            .Replace("file struct RowBufferByHand<T>\n", HandWrittenDeclaration, StringComparison.Ordinal)
             .ShouldBe(copy[start..(end + 3)]);
     }
 
