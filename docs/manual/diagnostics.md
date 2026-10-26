@@ -573,7 +573,7 @@ See: [Settings](settings.md)
 
 **Settings file entry repeats a key**
 
-Two members of `typeOverrides`, or two of `columnTypes`, have one key.  Two keys are one when they name one type or one column, however each is written: `integer` and `int4` name one PostgreSQL type, and `"users".id` and `users.id` one column.  The first member applies, and the second is reported at its key; the message quotes both keys and names the setting.
+Two members of `typeOverrides`, or two of `columnTypes`, have one key.  Two keys are one when they are the same once their quotes and escapes are read and their aliases resolved: `integer` and `int4` name one PostgreSQL type, `"users".id` and `users.id` one column, and an unqualified built-in type name is one in any case, so `timestamptz` and `TIMESTAMPTZ` are one key.  Keys that differ only in the case of a plain part of a qualified name are two keys and nothing is reported: `users.id` and `Users.ID`, or `dbo.Email` and `DBO.EMAIL`, both apply, and a type or column whose name matches one of them exactly takes that one.  The first member of two that are one applies, and the second is reported at its key; the message quotes both keys and names the setting.
 
 ```jsonc
 {

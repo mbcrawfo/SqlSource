@@ -250,6 +250,17 @@ public sealed class SettingsFileSchemaTests
             .ShouldBe("https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json");
     }
 
+    // JsonSchema.Net ignores these two keywords; VS Code opens a .json file as strict JSON, and with them it accepts
+    // the comments and trailing commas the reader allows.
+    [Fact]
+    public void Schema_Root_AllowsCommentsAndTrailingCommas()
+    {
+        using var schema = JsonDocument.Parse(SchemaText);
+
+        schema.RootElement.GetProperty("allowComments").GetBoolean().ShouldBeTrue();
+        schema.RootElement.GetProperty("allowTrailingCommas").GetBoolean().ShouldBeTrue();
+    }
+
     [Fact]
     public void Schema_DesignsExample_IsValid() => Errors(SettingsFileReaderTests.DesignsExample).ShouldBeEmpty();
 

@@ -2,8 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json",
   "title": "SqlSource settings file, version 1",
-  "description": "A sqlsource.json file, which sets SqlSource's settings for the .sql files of its folder and the folders below it. This schema is for editors: it checks the keys, the JSON type of each value, and the values of the choices and of the dialect. The texts of the other settings are checked when SqlSource reads the file. An empty or white-space string as the value of a key, or as an element of generatorParameters, sets nothing. The file may hold // and /* */ comments and trailing commas.",
+  "description": "A sqlsource.json file, which sets SqlSource's settings for the .sql files of its folder and the folders below it. This schema is for editors: it checks the keys, the JSON type of each value, and the values of the choices and of the dialect. The texts of the other settings are checked when SqlSource reads the file. An empty or white-space string as the value of a key, or as an element of generatorParameters, sets nothing. The file may hold // and /* */ comments and trailing commas, which `allowComments` and `allowTrailingCommas` tell VS Code to accept.",
   "type": "object",
+  "allowComments": true,
+  "allowTrailingCommas": true,
   "additionalProperties": false,
   "properties": {
     "$schema": {

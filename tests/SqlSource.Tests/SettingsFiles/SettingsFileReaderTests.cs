@@ -298,6 +298,7 @@ public sealed class SettingsFileReaderTests
     [InlineData("database", " a b ")]
     [InlineData("dialect", "sqlserver2")]
     [InlineData("dialect", "ansi,ansi-quotes")]
+    [InlineData("dialect", " pgsql ")]
     [InlineData("collectionType", " lists ")]
     public void Read_ValueThatIsNotValid_IsInvalidValueAndSetsNothing(string key, string value)
     {
