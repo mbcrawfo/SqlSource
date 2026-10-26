@@ -1,6 +1,6 @@
 # Diagnostics
 
-Every problem SqlSource finds is an error, and none can be turned off or made a warning, except two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `codegen` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
+Every problem SqlSource finds is an error, and none can be turned off or made a warning, except two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `codegen` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  An error in a settings file, `sqlsource.json`, is reported at its line and column in that file.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
 
 **Project and attribute**
 
@@ -19,6 +19,17 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC012](#sqlsrc012) | Language version is not supported |
 | [SQLSRC013](#sqlsrc013) | SQL file paths differ only by case |
 | [SQLSRC014](#sqlsrc014) | MSBuild setting is not valid |
+
+**Settings files**
+
+| Id | Title |
+|----|----|
+| [SQLSRC015](#sqlsrc015) | Settings file is not a JSON object |
+| [SQLSRC016](#sqlsrc016) | Settings file key is not known |
+| [SQLSRC017](#sqlsrc017) | Settings file key is written twice |
+| [SQLSRC018](#sqlsrc018) | Settings file value has the wrong type |
+| [SQLSRC019](#sqlsrc019) | Settings file value is not valid |
+| [SQLSRC020](#sqlsrc020) | Settings file entry repeats a key |
 
 **`.sql` files**
 
@@ -441,6 +452,145 @@ The rules are in [type overrides](settings.md#setting-type-overrides).
 The compiler hands a generator only the part of a value before the first `;` or `#`.
 
 See: [A value that is wrong](settings.md#a-value-that-is-wrong)
+
+## SQLSRC015
+
+**Settings file is not a JSON object**
+
+A settings file, `sqlsource.json`, holds one JSON object, and this one does not: its text is not JSON, or it is JSON whose top level is an array, a string or another value that is not an object.  The message says which.  The JSON of a settings file may have `//` and `/* */` comments, and a comma after the last member of an object or the last element of an array; anything else that JSON does not allow is this error, a missing comma or a key without quotes among them, and so is a value nested more than 64 levels deep.  The error is at the first character that breaks the JSON, or at the end of a file that is cut short; for a top level that is not an object, it is at the whole value.
+
+```jsonc
+{
+    // A comma is missing after "models".
+    "output": "models"
+    "dialect": "postgres",
+}
+```
+
+Correct the JSON.  While it is wrong the file gives nothing: none of its settings applies, and neither does its `root`.
+
+See: [Settings](settings.md)
+
+## SQLSRC016
+
+**Settings file key is not known**
+
+A key of the top-level object of a settings file is not one of its keys.  Keys are matched exactly, case included, so `Dialect` is reported.  The message quotes the key, and the error is at it.
+
+```jsonc
+{
+    "Dialect": "postgres",
+    "outptu": "models",
+}
+```
+
+The keys are `$schema`, `root`, `dialect`, `database`, `output`, `generatorParameters`, `inputModelSuffix`, `outputModelSuffix`, `modelNamespace`, `inputModelType`, `outputModelType`, `collectionType`, `typeOverrides`, `columnTypes` and `nestedClass`.  Correct the key, or remove the member.  While it is wrong its value is not read, and the other members still apply.
+
+See: [Settings](settings.md)
+
+## SQLSRC017
+
+**Settings file key is written twice**
+
+A key is written twice in the top-level object of a settings file.  The first member applies, and each later one is reported at its key, whatever its value.
+
+```jsonc
+{
+    "output": "models",
+    "dialect": "postgres",
+    "output": "codegen",
+}
+```
+
+Remove one of the two members, and keep the value you want.
+
+See: [Settings](settings.md)
+
+## SQLSRC018
+
+**Settings file value has the wrong type**
+
+A value of a settings file is not of the JSON type its key takes.  `root` takes `true` or `false`, `generatorParameters` an array of strings, `typeOverrides` and `columnTypes` an object whose values are strings, and every other key a string.  `null` is of the wrong type for every key.  The message names the key and what it takes, and the error is at the value.
+
+```jsonc
+{
+    "root": "true",
+    "output": null,
+    "generatorParameters": ["keep-comments", 1],
+    "typeOverrides": {
+        "int4": "int",
+        "int8": false,
+    },
+}
+```
+
+Write the value as its key takes it: `"root": true`, `"generatorParameters": ["keep-comments"]`.  While a value is of the wrong type its setting is not set by the file.  An element of `generatorParameters`, or a member of `typeOverrides` or `columnTypes`, of the wrong type is reported on its own and left out, and the others still apply; an array none of whose elements is a string sets nothing.  To leave a setting unset, remove its member: an empty string, or one of white space, also sets nothing for a key that takes a string, and is not an error.
+
+See: [Settings](settings.md)
+
+## SQLSRC019
+
+**Settings file value is not valid**
+
+A value of a settings file is of the JSON type its key takes, but its setting does not take it.  The message quotes the value, trimmed, and names the key; for a member of `typeOverrides` or `columnTypes` it quotes the member as `key: type`.  The error is at the string, or for a member from its key to its value.
+
+```jsonc
+{
+    "dialect": "pgsql",
+    "output": "model",
+    "generatorParameters": ["keep-comments", "keep-coments"],
+    "typeOverrides": {
+        "[dbo].[Email]": "MyApp.Email",
+        "int4": "int?",
+    },
+    "columnTypes": {
+        "id": "MyApp.UserId",
+    },
+}
+```
+
+Correct the value, or remove it.  While it is wrong the setting is not set by this file, so a farther settings file or the default applies.  In `generatorParameters`, `typeOverrides` and `columnTypes` each element or member that is not valid is reported on its own, and the others still apply, with one exception: `default` beside another generator parameter makes the whole list not set, and each `default` is reported.  For a key that takes a string, a value that is empty or white space sets nothing and is not an error, and such an element of `generatorParameters` is skipped; a member of `typeOverrides` or `columnTypes` whose key or type is empty or white space is reported.
+
+`dialect` takes a dialect's name, `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` or `oracle`, in any case, by the names and with the options of [SQLSRC011](#sqlsrc011), as in `"mysql,ansi-quotes"`.
+
+`output` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `inputModelType` and `outputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `collectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`, all matched in the same way.  `inputModelSuffix` and `outputModelSuffix` take characters that can be part of an identifier, `modelNamespace` takes a namespace such as `App.Models`, and `nestedClass` takes one identifier that is not a keyword.  `database` takes one word of letters, digits, `-`, `_` and `.`.
+
+`generatorParameters` takes one generator parameter in each element: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix` or `default`, in any case.  `[]` is the empty list, which gives every default, and so is `["default"]`; beside another word `default` is reported, and the message says to write `[]`.
+
+`typeOverrides` takes members `"key": "type"`, and the key and the type of each are trimmed:
+
+- **The key is a type's one-word name**, `timestamptz` and not `timestamp with time zone`, `float8` and not `double precision`; every built-in type has one.  A type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`: a name without one must be a type SqlSource knows, so `user_status` and the misspelling `timestampz` are reported.  A value serves PostgreSQL and SQL Server alike, so a name of either one's types, `int4` or `nvarchar`, is not reported.  A schema or a name may be in double quotes, each written `\"` in JSON, as in `"\"my schema\".\"order-status\""`, and a part may be in `U&"..."` with escapes, an escape that is not valid making the member not valid.
+- **A key is not written in brackets.**  `"[dbo].[Email]"` is reported, and the message shows the forms that are read: `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly and is written `"\"dbo\".\"Email\""` as a JSON key.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
+- **The C# type is a keyword, a full name or a short name**, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end: `"int4": "int"` and not `"int4": "int?"`.  It may also be `default`.
+
+The rules are in [type overrides](settings.md#setting-type-overrides).
+
+`columnTypes` takes members `"key": "type"`, trimmed in the same way.  Its key is the column a value is read from, `table.column` or `schema.table.column`, each part plain or in double quotes, so `id`, of one part, is reported, and so are a key of four parts, a key in brackets and a key with `[]`.  Its C# type is read as a type override's is, or is `default`.  The rules are in [column types](settings.md#setting-column-types).
+
+See: [Settings](settings.md)
+
+## SQLSRC020
+
+**Settings file entry repeats a key**
+
+Two members of `typeOverrides`, or two of `columnTypes`, have one key.  Two keys are one when they are the same once their quotes and escapes are read and their aliases resolved: `integer` and `int4` name one PostgreSQL type, `"users".id` and `users.id` one column, and an unqualified built-in type name is one in any case, so `timestamptz` and `TIMESTAMPTZ` are one key.  Keys that differ only in the case of a plain part of a qualified name are two keys and nothing is reported: `users.id` and `Users.ID`, or `dbo.Email` and `DBO.EMAIL`, both apply, and a type or column whose name matches one of them exactly takes that one.  The first member of two that are one applies, and the second is reported at its key; the message quotes both keys and names the setting.
+
+```jsonc
+{
+    "typeOverrides": {
+        "integer": "long",
+        "int4": "int",
+    },
+    "columnTypes": {
+        "users.id": "MyApp.UserId",
+        "\"users\".id": "UserId",
+    },
+}
+```
+
+Remove one of the two members, and keep the C# type you want.
+
+See: [Settings](settings.md)
 
 ## SQLSRC101
 

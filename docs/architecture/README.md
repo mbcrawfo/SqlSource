@@ -87,7 +87,7 @@ The one solution or project that a `describe` run is on, a `RunUnit`.  `RunUnitF
 
 ### Settings level
 
-A `SettingsLevel`: what one source says about the settings, whether the markers of a query and its file, a type's attribute, the metadata of a file's item or the project's properties.  `QuerySettings.Resolve` puts the levels together, the most specific first.
+A `SettingsLevel`: what one source says about the settings, whether the markers of a query and its file, a type's attribute, the metadata of a file's item, the project's properties or a settings file.  `QuerySettings.Resolve` puts the levels together, the most specific first.
 
 ### Sidecar
 
@@ -95,7 +95,7 @@ The `<file>.sql.json` file that `sqlsource describe` writes beside a `.sql` file
 
 ## Reading guide
 
-- [The generator](generator.md): the incremental pipeline and its steps, how the settings are read and resolved in two stages, how a `.sql` file is parsed, how each claimed file's sidecar is read and checked, the C# types, the converters and the models of a query, what is written for a type and for a model, how diagnostics travel, and the sidecar model the assembly holds.
+- [The generator](generator.md): the incremental pipeline and its steps, how the settings are read and resolved in two stages, how a settings file is read, how a `.sql` file is parsed, how each claimed file's sidecar is read and checked, the C# types, the converters and the models of a query, what is written for a type and for a model, how diagnostics travel, and the sidecar model the assembly holds.
 - [The MSBuild files and the manifest](msbuild-and-manifest.md): what the props and targets hand the compiler, how they trim each value, and the manifest, whose format is the contract between the package and the tool, with its known limits.
 - [The tool](tool.md): how `sqlsource` reads a command line and ends a run, the steps of a `describe` run from the run unit to the sidecars, what each folder does and uses of the generator, and how a run reports and logs.
 - [The PostgreSQL describer](postgres-describer.md): the contract every describer implements, the exchange its calls go through and how a capture is recorded and replayed, then how the PostgreSQL describer describes one query, builds its parameters and columns, matches a table and chooses each error, and why no query can make it run a statement.

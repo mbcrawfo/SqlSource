@@ -520,6 +520,168 @@ public sealed class TypeOverrideGrammarTests
         invalid.ShouldBe(["[dbo].[Email]=MyApp.Email"]);
     }
 
+    [Fact]
+    public void ReadMembers_Members_AreEntriesInTheOrderOfTheMapAtThePlace()
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        var lists = TypeOverrideGrammar.ReadMembers(
+            [new("timestamptz", "default"), new("int4", "long"), new("public.\"Email\"", "MyApp.Email")],
+            SettingPlace.Metadata,
+            invalid,
+            repeated
+        );
+
+        lists.PostgreSql.ShouldBe([
+            new TypeOverride("int4", "long", SettingPlace.Metadata),
+            new TypeOverride("public.\"Email\"", "global::MyApp.Email", SettingPlace.Metadata),
+            new TypeOverride("timestamptz", null, SettingPlace.Metadata),
+        ]);
+        lists.SqlServer.ShouldBe([new TypeOverride("public.\"Email\"", "global::MyApp.Email", SettingPlace.Metadata)]);
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReadMembers_KeyThatOneEngineReads_IsInItsListAlone()
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        var lists = TypeOverrideGrammar.ReadMembers(
+            [new("nvarchar", "string")],
+            SettingPlace.Metadata,
+            invalid,
+            repeated
+        );
+
+        lists.PostgreSql.ShouldBeEmpty();
+        lists.SqlServer.ShouldBe([new TypeOverride("nvarchar", "string", SettingPlace.Metadata)]);
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBeEmpty();
+    }
+
+    // A member is a key and a type, each trimmed, and the type default ignoring case.
+    [Theory]
+    [InlineData(" int4 ", " long ", "long")]
+    [InlineData("\tint4", "DEFAULT ", null)]
+    public void ReadMembers_WhiteSpaceAroundTheKeyAndTheType_IsTrimmed(string key, string type, string? expected)
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        TypeOverrideGrammar
+            .ReadMembers([new(key, type)], SettingPlace.Metadata, invalid, repeated)
+            .PostgreSql.ShouldBe([new TypeOverride("int4", expected, SettingPlace.Metadata)]);
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBeEmpty();
+    }
+
+    // A member neither engine reads, or whose type is not valid or empty, is named by its index, and the others apply.
+    [Theory]
+    [InlineData("int4", "int?")]
+    [InlineData("[dbo].[Email]", "X")]
+    [InlineData("int4", "")]
+    [InlineData("int4", " \t ")]
+    [InlineData("int4", "int4=long")]
+    [InlineData("", "long")]
+    [InlineData("int4=long", "long")]
+    public void ReadMembers_MemberThatIsNotValid_IsItsIndexAndTheOthersApply(string key, string type)
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        TypeOverrideGrammar
+            .ReadMembers([new("int8", "long"), new(key, type)], SettingPlace.Metadata, invalid, repeated)
+            .PostgreSql.ShouldBe([new TypeOverride("int8", "long", SettingPlace.Metadata)]);
+        invalid.ShouldBe([1]);
+        repeated.ShouldBeEmpty();
+    }
+
+    // One key is the map's identity: an alias and its name, a quoted and a plain spelling of one text, and one text
+    // twice.  The first member applies.
+    [Theory]
+    [InlineData("integer", "int4", "int4")]
+    [InlineData("int4", "int4", "int4")]
+    [InlineData("public.status", "public.\"status\"", "public.status")]
+    public void ReadMembers_TwoMembersOfOneKey_TheSecondIsRepeatedAndTheFirstApplies(
+        string first,
+        string second,
+        string key
+    )
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        TypeOverrideGrammar
+            .ReadMembers([new(first, "long"), new(second, "int")], SettingPlace.Metadata, invalid, repeated)
+            .PostgreSql.ShouldBe([new TypeOverride(key, "long", SettingPlace.Metadata)]);
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBe([(1, 0)]);
+    }
+
+    // int4 is PostgreSQL's alone and int is read by both, as int4 and int: the second member's key is repeated in
+    // PostgreSQL's list, so it goes in SQL Server's neither.
+    [Fact]
+    public void ReadMembers_KeyRepeatedInPostgreSqlsList_IsInNeither()
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        var lists = TypeOverrideGrammar.ReadMembers(
+            [new("int4", "long"), new("int", "MyApp.X")],
+            SettingPlace.Metadata,
+            invalid,
+            repeated
+        );
+
+        lists.PostgreSql.ShouldBe([new TypeOverride("int4", "long", SettingPlace.Metadata)]);
+        lists.SqlServer.ShouldBeEmpty();
+        repeated.ShouldBe([(1, 0)]);
+    }
+
+    // rowversion is SQL Server's timestamp alone, and timestamp is read by both.
+    [Fact]
+    public void ReadMembers_KeyRepeatedInSqlServersList_IsInNeither()
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        var lists = TypeOverrideGrammar.ReadMembers(
+            [new("rowversion", "byte[]"), new("timestamp", "MyApp.X")],
+            SettingPlace.Metadata,
+            invalid,
+            repeated
+        );
+
+        lists.PostgreSql.ShouldBeEmpty();
+        lists.SqlServer.ShouldBe([new TypeOverride("timestamp", "byte[]", SettingPlace.Metadata)]);
+        repeated.ShouldBe([(1, 0)]);
+    }
+
+    // integer is SQL Server's int, which the first member put, and PostgreSQL's int4, which the second put.
+    [Fact]
+    public void ReadMembers_KeyRepeatedInEachListByTwoMembers_NamesTheEarlier()
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        _ = TypeOverrideGrammar.ReadMembers(
+            [new("sys.int", "long"), new("int4", "long"), new("integer", "MyApp.X")],
+            SettingPlace.Metadata,
+            invalid,
+            repeated
+        );
+
+        repeated.ShouldBe([(2, 0)]);
+    }
+
+    [Fact]
+    public void ReadMembers_NoMember_IsEmpty()
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        var lists = TypeOverrideGrammar.ReadMembers([], SettingPlace.Metadata, invalid, repeated);
+
+        lists.PostgreSql.ShouldBeEmpty();
+        lists.SqlServer.ShouldBeEmpty();
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBeEmpty();
+    }
+
     // A key written in brackets, as T-SQL writes a name, gets the forms that are read: plain, which matches ignoring
     // case, and quoted, which matches it exactly.  A part that cannot be plain has the quoted form alone.
     [Theory]

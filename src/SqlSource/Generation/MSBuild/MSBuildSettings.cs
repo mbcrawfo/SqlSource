@@ -133,6 +133,11 @@ internal static class MSBuildSettings
         public readonly string? Text(SettingId setting) =>
             keys[setting] is { } key && options.TryGetValue(key, out var value) ? value : null;
 
+        // MSBuild writes every setting as text.
+        public readonly IReadOnlyList<string>? Elements(SettingId setting) => null;
+
+        public readonly IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting) => null;
+
         public T? Choice<T>(SettingId setting)
             where T : struct, Enum
         {
@@ -152,6 +157,10 @@ internal static class MSBuildSettings
 
         public void Invalid(SettingId setting, string value) =>
             (InvalidSettings ??= []).Add(new InvalidSetting(NameOf(setting), value));
+
+        public readonly void InvalidPart(SettingId setting, int index) { }
+
+        public readonly void RepeatedKey(SettingId setting, int index, int first) { }
     }
 
     /// <summary>

@@ -8,17 +8,18 @@ using SqlSource.Settings.ClrTypes;
 namespace SqlSource.Settings.TypeOverrides;
 
 /// <summary>
-/// Reads the type override, in an MSBuild value and in a <c>-- type-override:</c> marker alike.  An entry is
-/// <c>key=type</c>, where the key is one that an engine reads, by <see cref="TypeKeys.TryNormalizePostgres" /> for
-/// PostgreSQL and <see cref="TypeKeys.TryNormalizeSqlServer" /> for SQL Server, and the type one that
+/// Reads the type override, in an MSBuild value, in the members of an object of a settings file and in a
+/// <c>-- type-override:</c> marker alike.  An entry is <c>key=type</c>, or a member of an object, where the key is one
+/// that an engine reads, by <see cref="TypeKeys.TryNormalizePostgres" /> for PostgreSQL and
+/// <see cref="TypeKeys.TryNormalizeSqlServer" /> for SQL Server, and the type one that
 /// <see cref="ClrTypeName.TryParse" /> reads, or <c>default</c>, ignoring case, which takes the key out of the map.
 /// </summary>
 /// <remarks>
 /// An MSBuild value is a list of entries separated by white space, line breaks included, outside <c>&lt;&gt;</c>,
-/// <c>[]</c> and double quotes, and serves both engines.  A marker holds one entry, with white space allowed around its
-/// <c>=</c>, and is read by its file's engine.  The <c>=</c> of an entry is the first one outside double quotes.  A
-/// quoted part of a key may be written <c>U&amp;"..."</c>, with escapes such as <c>\000A</c> for a line break; it keeps
-/// <c>""</c> for a quote, so the quotes of a key still pair, and <see cref="TypeKeys" /> reads it.
+/// <c>[]</c> and double quotes, and serves both engines, as an object does.  A marker holds one entry, with white space
+/// allowed around its <c>=</c>, and is read by its file's engine.  The <c>=</c> of an entry is the first one outside
+/// double quotes.  A quoted part of a key may be written <c>U&amp;"..."</c>, with escapes such as <c>\000A</c> for a
+/// line break; it keeps <c>""</c> for a quote, so the quotes of a key still pair, and <see cref="TypeKeys" /> reads it.
 /// </remarks>
 internal static class TypeOverrideGrammar
 {
@@ -99,6 +100,66 @@ internal static class TypeOverrideGrammar
     }
 
     /// <summary>
+    /// Reads the members of an object, as a settings file writes the type override, which serves both engines as an
+    /// MSBuild value does.  A member's key and type are trimmed, and each entry goes in the list of each engine that
+    /// reads its key.  The index of a member that neither engine reads, or whose type is not valid or is empty, is
+    /// added to <paramref name="invalid" />.  A member whose key either list already has, by the identity of
+    /// <see cref="TypeOverrideMap" />, goes in neither, and is added to <paramref name="repeated" /> with the index of
+    /// the earlier member that put the key: of two members for one key, the first wins.  The other members apply.
+    /// Each list is in the order of <see cref="TypeOverrideMap" />, and empty when it has no entry.
+    /// </summary>
+    public static TypeOverrideLists ReadMembers(
+        IReadOnlyList<KeyValuePair<string, string>> members,
+        SettingPlace place,
+        List<int> invalid,
+        List<(int Index, int First)> repeated
+    )
+    {
+        // Beside each list, the index of the member that put each of its entries.
+        var (postgreSql, postgreSqlMembers) = (new List<TypeOverride>(), new List<int>());
+        var (sqlServer, sqlServerMembers) = (new List<TypeOverride>(), new List<int>());
+        for (var index = 0; index < members.Count; index++)
+        {
+            if (
+                !TryReadType(members[index].Value.AsSpan().Trim(), out var type)
+                || !TypeKeys.TryNormalizeEach(
+                    members[index].Key.AsSpan().Trim(),
+                    out var postgreSqlKey,
+                    out var sqlServerKey
+                )
+            )
+            {
+                invalid.Add(index);
+                continue;
+            }
+
+            var postgreSqlAt = postgreSqlKey is null ? (int?)null : TypeOverrideMap.IndexOf(postgreSql, postgreSqlKey);
+            var sqlServerAt = sqlServerKey is null ? (int?)null : TypeOverrideMap.IndexOf(sqlServer, sqlServerKey);
+            var first = Math.Min(MemberAt(postgreSqlMembers, postgreSqlAt), MemberAt(sqlServerMembers, sqlServerAt));
+            if (first != int.MaxValue)
+            {
+                repeated.Add((index, first));
+                continue;
+            }
+
+            // Neither list has the key, so each search gave the complement of where it goes.
+            if (postgreSqlAt is { } postgreSqlGap)
+            {
+                postgreSql.Insert(~postgreSqlGap, new TypeOverride(postgreSqlKey!, type, place));
+                postgreSqlMembers.Insert(~postgreSqlGap, index);
+            }
+
+            if (sqlServerAt is { } sqlServerGap)
+            {
+                sqlServer.Insert(~sqlServerGap, new TypeOverride(sqlServerKey!, type, place));
+                sqlServerMembers.Insert(~sqlServerGap, index);
+            }
+        }
+
+        return new TypeOverrideLists(ToArray(postgreSql), ToArray(sqlServer));
+    }
+
+    /// <summary>
     /// The help of an entry whose key is written in brackets, as T-SQL writes a name, to end the message that says it
     /// is not valid: the key in the forms that are read.  A qualified key has two, plain, which matches ignoring case,
     /// and quoted, which matches it exactly: <c>[dbo].[Email]=X</c> gives <c>dbo.Email</c> and
@@ -152,6 +213,17 @@ internal static class TypeOverrideGrammar
             written = written.TrimStart();
         }
 
+        return TryReadType(written, out type);
+    }
+
+    /// <summary>
+    /// The C# type of an entry as written, its text by <see cref="ClrTypeName.Text" />, or null for <c>default</c>
+    /// ignoring case.  False for a type that is not valid, an empty one included.  The column types read theirs with
+    /// it too.
+    /// </summary>
+    internal static bool TryReadType(ReadOnlySpan<char> written, out string? type)
+    {
+        type = null;
         if (written.Equals(Default.AsSpan(), StringComparison.OrdinalIgnoreCase))
         {
             return true;
@@ -175,6 +247,10 @@ internal static class TypeOverrideGrammar
         entries is null
             ? EquatableArray<TypeOverride>.Empty
             : new EquatableArray<TypeOverride>(entries.ToImmutableArray());
+
+    // The index of the member that put the entry at a list's index, from the list of members beside it, or
+    // int.MaxValue when the key is not in the list (a complement) or the engine does not read it (null).
+    private static int MemberAt(List<int> members, int? at) => at is >= 0 ? members[at.Value] : int.MaxValue;
 
     // The key at the start of an entry, written with at least one part in brackets, in the plain form, null when a
     // bracketed part cannot be plain, and in the quoted form.  A part in brackets, in which ]] is a ], is written as

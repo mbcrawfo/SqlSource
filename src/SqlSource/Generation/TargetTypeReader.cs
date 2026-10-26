@@ -198,6 +198,11 @@ internal static class TargetTypeReader
                 ? written
                 : null;
 
+        // The attribute writes every setting as text or as a choice.
+        public IReadOnlyList<string>? Elements(SettingId setting) => null;
+
+        public IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting) => null;
+
         public T? Choice<T>(SettingId setting)
             where T : struct, Enum => PropertyOf(setting) is { } property ? Choice<T>(property) : null;
 
@@ -228,6 +233,10 @@ internal static class TargetTypeReader
                 Report(property, value);
             }
         }
+
+        public void InvalidPart(SettingId setting, int index) { }
+
+        public void RepeatedKey(SettingId setting, int index, int first) { }
 
         private void Report(string property, string value) =>
             diagnostics.Add(

@@ -18,6 +18,12 @@ SQLSRC011 | SqlSource | Error | SqlSourceDialect is not valid
 SQLSRC012 | SqlSource | Error | Language version is not supported
 SQLSRC013 | SqlSource | Error | SQL file paths differ only by case
 SQLSRC014 | SqlSource | Error | MSBuild setting is not valid
+SQLSRC015 | SqlSource | Error | Settings file is not a JSON object
+SQLSRC016 | SqlSource | Error | Settings file key is not known
+SQLSRC017 | SqlSource | Error | Settings file key is written twice
+SQLSRC018 | SqlSource | Error | Settings file value has the wrong type
+SQLSRC019 | SqlSource | Error | Settings file value is not valid
+SQLSRC020 | SqlSource | Error | Settings file entry repeats a key
 SQLSRC101 | SqlSource | Error | Quote is not closed
 SQLSRC102 | SqlSource | Error | Comment is not closed
 SQLSRC103 | SqlSource | Error | Query name is not valid
