@@ -54,6 +54,12 @@ public sealed class SettingsFileTests
     // layout, outside the project's folder /repo/App.
     private const string ArtifactsAssemblyInfo = "/repo/artifacts/obj/App/debug/App.AssemblyInfo.cs";
 
+    // What the targets give a project in /repo/App whose IntermediateOutputPath is /repo/build/obj/Debug/, whose OutDir
+    // is /repo/out/Debug/, and which writes the compiler's generated files to /repo/gen/: the base folders, the
+    // intermediate folder, the output folder and the folder of the generated files, each after a |.
+    private const string AllFoldersOfTheBuild =
+        "|/repo/App/obj/|/repo/build/obj/Debug/|/repo/App/bin/|/repo/out/Debug/|/repo/gen/";
+
     // App.UserId and App.OtherId, over long, beside the type that claims the files.
     private const string IdsSource = """
         using SqlSource;
@@ -321,6 +327,28 @@ public sealed class SettingsFileTests
 
         run.ShouldBeClean();
         ModelFiles(run).ShouldBe(["App.GetUserNear-Model.g.cs", "App.GetUserRow-Model.g.cs"]);
+    }
+
+    // A root file that sets nothing else still hides the file above: its dialect does not parse the query, and its
+    // output, codegen, which would need an entry for the query, does not apply.
+    [Fact]
+    public void Run_RootFileThatSaysNothingElse_HidesTheFilesAbove()
+    {
+        var run = Run(
+            null,
+            GeneratorHarness.SettingsFile(
+                FartherSettingsPath, /*lang=json,strict*/
+                """{"output":"codegen","dialect":"postgres"}"""
+            ),
+            GeneratorHarness.SettingsFile(
+                SettingsPath, /*lang=json,strict*/
+                """{"root":true}"""
+            ),
+            new SqlFile(QueryPath, Query)
+        );
+
+        run.ShouldBeClean();
+        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + NotPostgres + "\";");
     }
 
     // The root file's own settings apply, and the file above it is not read.
@@ -644,7 +672,7 @@ public sealed class SettingsFileTests
     {
         var run = RunOutsideTheProject(
             ArtifactsAssemblyInfo,
-            new Dictionary<string, string?> { ["SqlSourceIntermediateFolder"] = "/repo/artifacts/obj/App/" }
+            new Dictionary<string, string?> { ["SqlSourceBuildFolders"] = "/repo/artifacts/obj/App/" }
         );
 
         run.ShouldBeClean();
@@ -655,10 +683,50 @@ public sealed class SettingsFileTests
     {
         var run = RunOutsideTheProject(
             "/repo/artifacts/bin/App/debug/Extra.cs",
-            new Dictionary<string, string?> { ["SqlSourceOutputFolder"] = "/repo/artifacts/bin/App/" }
+            new Dictionary<string, string?> { ["SqlSourceBuildFolders"] = "/repo/artifacts/bin/App/" }
         );
 
         run.ShouldBeClean();
+    }
+
+    // Each folder the build writes C# trees or its outputs into, outside the project: IntermediateOutputPath moved out
+    // of obj, where the SDK's items and the compiler's own output are, OutDir, and the folder the compiler writes its
+    // generated files to under EmitCompilerGeneratedFiles, where it roots their trees.  The property is what the
+    // targets give for such a project, the base folders being in the project.
+    [Theory]
+    [InlineData("/repo/build/obj/Debug/App.AssemblyInfo.cs")]
+    [InlineData("/repo/build/obj/Debug/SqlSource/SqlSource.SqlSourceGenerator/SqlSourceGenerateAttribute.g.cs")]
+    [InlineData("/repo/out/Debug/Extra.cs")]
+    [InlineData("/repo/gen/SqlSource/SqlSource.SqlSourceGenerator/SqlSourceGenerateAttribute.g.cs")]
+    public void Run_CompileItemUnderAFolderOfTheBuildOutsideTheProject_ReachesNoSettingsFile(string compilePath)
+    {
+        var run = RunOutsideTheProject(
+            compilePath,
+            new Dictionary<string, string?> { ["SqlSourceBuildFolders"] = AllFoldersOfTheBuild }
+        );
+
+        run.ShouldBeClean();
+    }
+
+    // The same, with the folder that holds the tree left out of the property: the tree reaches the file above the root.
+    [Theory]
+    [InlineData("/repo/build/obj/Debug/App.AssemblyInfo.cs", "|/repo/build/obj/Debug/")]
+    [InlineData("/repo/out/Debug/Extra.cs", "|/repo/out/Debug/")]
+    [InlineData("/repo/gen/SqlSource/SqlSource.SqlSourceGenerator/SqlSourceGenerateAttribute.g.cs", "|/repo/gen/")]
+    public void Run_CompileItemUnderAFolderTheBuildDoesNotGive_ReachesTheFileAboveTheRoot(
+        string compilePath,
+        string folder
+    )
+    {
+        var run = RunOutsideTheProject(
+            compilePath,
+            new Dictionary<string, string?>
+            {
+                ["SqlSourceBuildFolders"] = AllFoldersOfTheBuild.Replace(folder, "", StringComparison.Ordinal),
+            }
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC015 /repo/sqlsource.json(1,");
     }
 
     // The same project without the build's folders: the SDK's item reaches the file above the project's root.
@@ -676,7 +744,7 @@ public sealed class SettingsFileTests
     {
         var run = RunOutsideTheProject(
             "/repo/artifacts/objx/App/debug/App.AssemblyInfo.cs",
-            new Dictionary<string, string?> { ["SqlSourceIntermediateFolder"] = "/repo/artifacts/obj/" }
+            new Dictionary<string, string?> { ["SqlSourceBuildFolders"] = "/repo/artifacts/obj/" }
         );
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC015 /repo/sqlsource.json(1,");
@@ -706,7 +774,7 @@ public sealed class SettingsFileTests
             ],
             properties: new Dictionary<string, string?>
             {
-                ["SqlSourceIntermediateFolder"] = "/repo/My%23App/artifacts/obj/App/",
+                ["SqlSourceBuildFolders"] = "/repo/My%23App/artifacts/obj/App/",
             }
         );
 
@@ -735,7 +803,7 @@ public sealed class SettingsFileTests
                 ),
                 new SqlFile("/repo/App/Q.sql", Query),
             ],
-            properties: new Dictionary<string, string?> { ["SqlSourceIntermediateFolder"] = "/repo/App" }
+            properties: new Dictionary<string, string?> { ["SqlSourceBuildFolders"] = "/repo/App" }
         );
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC016 /repo/App/Code/sqlsource.json(1,");
@@ -758,7 +826,7 @@ public sealed class SettingsFileTests
                 new SqlFile("/repo/App/Q.sql", Query),
                 new SqlFile("/repo/artifacts/obj/App/Generated.sql", Query),
             ],
-            properties: new Dictionary<string, string?> { ["SqlSourceIntermediateFolder"] = "/repo/artifacts/obj/App/" }
+            properties: new Dictionary<string, string?> { ["SqlSourceBuildFolders"] = "/repo/artifacts/obj/App/" }
         );
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC015 /repo/sqlsource.json(1,");

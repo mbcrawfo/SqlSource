@@ -135,7 +135,7 @@ public sealed class CachingSettingsFileTests
                 new TestOptionsProvider(
                     OutputKind.Sql,
                     null,
-                    properties: new Dictionary<string, string?> { ["SqlSourceIntermediateFolder"] = "/app/obj/" }
+                    properties: new Dictionary<string, string?> { ["SqlSourceBuildFolders"] = "/app/obj/" }
                 )
             ),
             compilation

@@ -127,27 +127,39 @@
     </Target>
     <!-- editorconfig-checker-enable -->
     <!--
-        Gives the generator the folders the build writes into, BaseIntermediateOutputPath and BaseOutputPath, each a
-        full path, made against the project's folder with a separator at its end.  A C# file under either, such as an
-        AssemblyInfo the SDK writes into obj, or another generator's file, is the build's and reaches no settings file,
-        wherever the project puts obj and bin: with UseArtifactsOutput they are outside the project's folder, and their
-        chain would climb past its root file.  It runs before the file the compiler reads is written, as the trims do,
-        when every property of the SDK and of the artifacts layout is set.
+        Gives the generator SqlSourceBuildFolders, the folders the build writes C# files and its outputs into, each a
+        full path made against the project's folder with a separator at its end, and each after a |:
+        BaseIntermediateOutputPath, IntermediateOutputPath, where the SDK writes its own C# files, such as the
+        AssemblyInfo, and the compiler its output, under which it roots the files of every generator, BaseOutputPath,
+        OutDir, and CompilerGeneratedFilesOutputPath when EmitCompilerGeneratedFiles is true, where the compiler roots
+        the generated files instead.  A C# file under any of them is the build's and reaches no settings file, wherever
+        the project puts them: with UseArtifactsOutput, or a folder moved out of the project's, their chain would climb
+        past its root file.  It runs before the file the compiler reads is written, as the trims do, when every
+        property of the SDK and of the artifacts layout is set, and it sets the property whatever the project wrote.
+        A folder that has no value is left out, since it would be the project's own folder.
 
-        The compiler reads a value up to its first # or ;, so each folder is written with its %, # and ; escaped as %25,
-        %23 and %3B, % first, which the generator decodes.  MSBuild reads %XX in a project file as the character it
-        stands for, so each escape is written with its % as %25: %2525, %2523 and %253B.  A folder whose base folder
-        has no value is given as empty, since it would be the project's own folder.
+        The compiler reads a value up to its first # or ;, and the folders are parted by |, so each folder is written
+        with its %, |, # and ; escaped as %25, %7C, %23 and %3B, % first, which the generator decodes.  MSBuild reads
+        %XX in a project file as the character it stands for, so each escape is written with its % as %25: %2525,
+        %257C, %2523 and %253B.
 
         The expressions are long, and a property as written is on one line, so the check of the line length is off.
     -->
     <!-- editorconfig-checker-disable -->
     <Target Name="SqlSourceFindBuildFolders" BeforeTargets="GenerateMSBuildEditorConfigFileCore">
         <PropertyGroup>
-            <SqlSourceIntermediateFolder>$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseIntermediateOutputPath)).Replace('%', '%2525').Replace('#', '%2523').Replace(';', '%253B'))</SqlSourceIntermediateFolder>
-            <SqlSourceOutputFolder>$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseOutputPath)).Replace('%', '%2525').Replace('#', '%2523').Replace(';', '%253B'))</SqlSourceOutputFolder>
-            <SqlSourceIntermediateFolder Condition="'$(BaseIntermediateOutputPath)' == ''" />
-            <SqlSourceOutputFolder Condition="'$(BaseOutputPath)' == ''" />
+            <SqlSourceBuildFolders />
+            <SqlSourceBuildFolders Condition="'$(BaseIntermediateOutputPath)' != ''"
+                >$(SqlSourceBuildFolders)|$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseIntermediateOutputPath)).Replace('%', '%2525').Replace('|', '%257C').Replace('#', '%2523').Replace(';', '%253B'))</SqlSourceBuildFolders>
+            <SqlSourceBuildFolders Condition="'$(IntermediateOutputPath)' != ''"
+                >$(SqlSourceBuildFolders)|$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(IntermediateOutputPath)).Replace('%', '%2525').Replace('|', '%257C').Replace('#', '%2523').Replace(';', '%253B'))</SqlSourceBuildFolders>
+            <SqlSourceBuildFolders Condition="'$(BaseOutputPath)' != ''"
+                >$(SqlSourceBuildFolders)|$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseOutputPath)).Replace('%', '%2525').Replace('|', '%257C').Replace('#', '%2523').Replace(';', '%253B'))</SqlSourceBuildFolders>
+            <SqlSourceBuildFolders Condition="'$(OutDir)' != ''"
+                >$(SqlSourceBuildFolders)|$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(OutDir)).Replace('%', '%2525').Replace('|', '%257C').Replace('#', '%2523').Replace(';', '%253B'))</SqlSourceBuildFolders>
+            <SqlSourceBuildFolders
+                Condition="'$(EmitCompilerGeneratedFiles)' == 'true' and '$(CompilerGeneratedFilesOutputPath)' != ''"
+                >$(SqlSourceBuildFolders)|$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(CompilerGeneratedFilesOutputPath)).Replace('%', '%2525').Replace('|', '%257C').Replace('#', '%2523').Replace(';', '%253B'))</SqlSourceBuildFolders>
         </PropertyGroup>
     </Target>
     <!-- editorconfig-checker-enable -->

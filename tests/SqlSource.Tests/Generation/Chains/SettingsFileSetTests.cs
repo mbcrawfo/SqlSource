@@ -61,6 +61,25 @@ public sealed class SettingsFileSetTests
         chain.Level.InputModelSuffix.ShouldBeNull();
     }
 
+    // A root file that sets nothing else ends the chain with nothing: the file above gives its folder neither the
+    // output nor the dialect, and the folder shares the chain of a folder with no file.
+    [Fact]
+    public void ChainOf_RootFileThatSaysNothingElse_EndsTheChainWithNone()
+    {
+        var set = Set(
+            (
+                App, /*lang=json,strict*/
+                """{"output": "sql", "dialect": "postgres"}"""
+            ),
+            (
+                Queries, /*lang=json,strict*/
+                """{"root": true}"""
+            )
+        );
+
+        set.ChainOf("app/Queries/a.sql").ShouldBeSameAs(SettingsChain.None);
+    }
+
     [Fact]
     public void ChainOf_FileThatIsNotJson_IsPassedThrough()
     {

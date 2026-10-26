@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SqlSource.Generation.MSBuild;
@@ -6,88 +7,115 @@ using SqlSource.Generation.Paths;
 namespace SqlSource.Generation.Chains;
 
 /// <summary>
-/// The folders a build writes into, the project's intermediate and output folders, whose files are the build's and
-/// not the project's: a compile path under either reaches no settings file.  The generator reads them from the
-/// compiler's options with <see cref="Read" />, and the <c>sqlsource</c> tool can read them from a manifest's
-/// properties the same way.
+/// The folders a build writes C# trees and its outputs into, whose files are the build's and not the project's: a
+/// compile path under any of them reaches no settings file.  The generator reads them from the compiler's options
+/// with <see cref="Read" />, and the <c>sqlsource</c> tool can read them from a manifest's properties the same way.
 /// </summary>
-/// <param name="IntermediateFolder">The normalised intermediate folder, or null when the build gives none.</param>
-/// <param name="OutputFolder">The normalised output folder, or null when the build gives none.</param>
-internal sealed record BuildFolders(string? IntermediateFolder, string? OutputFolder)
+/// <param name="Folders">The normalised folders, in the order the build gives them.</param>
+internal sealed record BuildFolders(EquatableArray<string> Folders)
 {
     /// <summary>
-    /// The property that holds the full path of the project's <c>BaseIntermediateOutputPath</c>, which
-    /// <c>build/SqlSource.targets</c> sets and <c>build/SqlSource.props</c> shows to the compiler.
+    /// The property that holds the folders, which <c>build/SqlSource.targets</c> sets and <c>build/SqlSource.props</c>
+    /// shows to the compiler: the full paths of <c>BaseIntermediateOutputPath</c>, <c>IntermediateOutputPath</c>,
+    /// <c>BaseOutputPath</c>, <c>OutDir</c> and, when the compiler writes its generated files,
+    /// <c>CompilerGeneratedFilesOutputPath</c>, escaped and joined by <c>|</c>.
     /// </summary>
-    public const string IntermediateFolderName = "SqlSourceIntermediateFolder";
+    public const string PropertyName = "SqlSourceBuildFolders";
 
-    /// <summary>The property that holds the full path of the project's <c>BaseOutputPath</c>.</summary>
-    public const string OutputFolderName = "SqlSourceOutputFolder";
+    private const char Delimiter = '|';
 
     /// <summary>A build that gives no folder, which leaves no compile path out.</summary>
-    public static BuildFolders None { get; } = new(null, null);
+    public static BuildFolders None { get; } = new(EquatableArray<string>.Empty);
 
-    /// <summary>The folders of the project's properties in <paramref name="globalOptions" />.</summary>
+    /// <summary>The folders of the project's property in <paramref name="globalOptions" />.</summary>
     public static BuildFolders Read(AnalyzerConfigOptions globalOptions) =>
-        Of(Value(globalOptions, IntermediateFolderName), Value(globalOptions, OutputFolderName));
+        Of(globalOptions.TryGetValue(MSBuildSettings.PropertyPrefix + PropertyName, out var value) ? value : null);
 
     /// <summary>
-    /// The folders of two values as the build gives them, each a full path with a separator at its end, its <c>%</c>,
-    /// <c>#</c> and <c>;</c> written <c>%25</c>, <c>%23</c> and <c>%3B</c>, which this decodes.  The targets escape
-    /// them because the compiler cuts a value at its first <c>#</c> or <c>;</c>.  A value that is not a full path with
-    /// a separator at its end, such as a raw path cut inside a segment, names no folder, so that it never leaves out a
-    /// path beside the folder it was cut from.
+    /// The folders of the property as the build gives it: entries joined by <c>|</c>, each a full path with a
+    /// separator at its end, its <c>%</c>, <c>|</c>, <c>#</c> and <c>;</c> written <c>%25</c>, <c>%7C</c>,
+    /// <c>%23</c> and <c>%3B</c>, which this decodes.  The targets escape them because the compiler cuts a value at its
+    /// first <c>#</c> or <c>;</c>, and <c>|</c> parts the entries.  An empty entry is left out, and so is one that is
+    /// not a full path with a separator at its end, such as a raw path cut inside a segment, so that it never leaves
+    /// out a path beside the folder it was cut from; the other entries still apply.
     /// </summary>
-    public static BuildFolders Of(string? intermediateFolder, string? outputFolder)
+    public static BuildFolders Of(string? value)
     {
-        var intermediate = FolderOf(intermediateFolder);
-        var output = FolderOf(outputFolder);
-        return intermediate is null && output is null ? None : new BuildFolders(intermediate, output);
+        if (string.IsNullOrEmpty(value))
+        {
+            return None;
+        }
+
+        ImmutableArray<string>.Builder? folders = null;
+        var start = 0;
+        while (start <= value!.Length)
+        {
+            var end = value.IndexOf(Delimiter, start);
+            if (end < 0)
+            {
+                end = value.Length;
+            }
+
+            if (FolderOf(value.Substring(start, end - start)) is { } folder)
+            {
+                (folders ??= ImmutableArray.CreateBuilder<string>()).Add(folder);
+            }
+
+            start = end + 1;
+        }
+
+        return folders is null ? None : new BuildFolders(new EquatableArray<string>(folders.ToImmutable()));
     }
 
     /// <summary>
-    /// Whether <paramref name="normalizedPath" /> is under either folder, segment by segment, by
-    /// <see cref="SqlPath.IsInFolder" />.
+    /// Whether <paramref name="normalizedPath" /> is under any of the folders, segment by segment, by
+    /// <see cref="SqlPath.IsInFolder" />.  The build gives a handful, so each is tested.
     /// </summary>
-    public bool Contains(string normalizedPath) =>
-        (IntermediateFolder is not null && SqlPath.IsInFolder(normalizedPath, IntermediateFolder))
-        || (OutputFolder is not null && SqlPath.IsInFolder(normalizedPath, OutputFolder));
+    public bool Contains(string normalizedPath)
+    {
+        for (var i = 0; i < Folders.Count; i++)
+        {
+            if (SqlPath.IsInFolder(normalizedPath, Folders[i]))
+            {
+                return true;
+            }
+        }
 
-    private static string? Value(AnalyzerConfigOptions globalOptions, string name) =>
-        globalOptions.TryGetValue(MSBuildSettings.PropertyPrefix + name, out var value) ? value : null;
+        return false;
+    }
 
     // A folder whose normalised path is empty would be the root, which holds every path.
-    private static string? FolderOf(string? value) =>
-        value is { Length: > 0 }
-        && SqlPath.IsRooted(value)
-        && value[value.Length - 1] is '/' or '\\'
-        && SqlPath.Normalize(Unescape(value)) is { Length: > 0 } normalized
+    private static string? FolderOf(string entry) =>
+        entry.Length > 0
+        && SqlPath.IsRooted(entry)
+        && entry[entry.Length - 1] is '/' or '\\'
+        && SqlPath.Normalize(Unescape(entry)) is { Length: > 0 } normalized
             ? normalized
             : null;
 
-    // The value with %25, %23 and %3B, or %3b, made the character each stands for, in one pass, so that %2523
-    // is %23.  Any other % is kept.  A value without a % is returned as it is.
-    private static string Unescape(string value)
+    // The entry with %25, %7C, %23 and %3B, in either case, made the character each stands for, in one pass, so that
+    // %2523 is %23.  Any other % is kept.  An entry without a % is returned as it is.
+    private static string Unescape(string entry)
     {
-        var start = value.IndexOf('%');
+        var start = entry.IndexOf('%');
         if (start < 0)
         {
-            return value;
+            return entry;
         }
 
-        var unescaped = new StringBuilder(value.Length);
-        _ = unescaped.Append(value, 0, start);
+        var unescaped = new StringBuilder(entry.Length);
+        _ = unescaped.Append(entry, 0, start);
         var i = start;
-        while (i < value.Length)
+        while (i < entry.Length)
         {
-            if (value[i] == '%' && i + 2 < value.Length && Escaped(value[i + 1], value[i + 2]) is { } character)
+            if (entry[i] == '%' && i + 2 < entry.Length && Escaped(entry[i + 1], entry[i + 2]) is { } character)
             {
                 _ = unescaped.Append(character);
                 i += 3;
             }
             else
             {
-                _ = unescaped.Append(value[i]);
+                _ = unescaped.Append(entry[i]);
                 i++;
             }
         }
@@ -99,6 +127,7 @@ internal sealed record BuildFolders(string? IntermediateFolder, string? OutputFo
         (first, second) switch
         {
             ('2', '5') => '%',
+            ('7', 'C' or 'c') => '|',
             ('2', '3') => '#',
             ('3', 'B' or 'b') => ';',
             _ => null,
