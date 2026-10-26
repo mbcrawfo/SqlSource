@@ -69,6 +69,16 @@ Plain data and the readers of values.  See [settings](../../docs/architecture/ge
 - **`OutputKind`, `MemberPlacement`, `ModelKind`, `CollectionKind` and `MethodPlacement` keep the numbers of the attribute's enums.**  `tests/SqlSource.Tests/Generation/AttributeSourceTests.cs` compares each pair.
 - **A value from a fixed list is read by `SettingValue.TryReadChoice`**, from the names of an enum's members, so renaming a member changes what a user may write.
 
+## `SettingsFiles/`
+
+The reader of a settings file, `sqlsource.json`.  See [the settings file](../../docs/superpowers/specs/2026-10-25-settings-files-design.md#the-settings-file).
+
+- **The reader never throws, and bounds nesting by `SidecarTokenizer.MaxDepth`.**  A user writes the file, and an exception in the generator costs every type its generated code.
+- **Never hand the walk of `SettingsFileReader` a text the grammar pass has not passed.**  The walk trusts the grammar, as `SidecarCursor` does; `SettingsFileReaderRobustnessTests` holds the two together.
+- **It may use `Settings/`, the tokenizer of `Snapshot/Reading/` and `Parsing/SqlDialectName.cs`, and nothing of `Generation/` or `Diagnostics/`.**  Its errors are data with a `TextSpan`, so that the build and the tool can each report them.
+- **Whether a value is valid is `SettingsLevelReader`'s, never the reader's own**, and the dialect's is `SqlDialectName`'s.  A file then accepts what MSBuild accepts; `SettingsFileSource` only turns what is rejected into errors at their spans.
+- **A new key is a constant of `SettingsFileKeys`, a row of its `All` and of `TypeOf`, a property of `schemas/settings-v1.schema.json`, and, for a new kind of error, a case of `SettingsFileDiagnostics`.**  The schema accepts what the reader accepts and no more.
+
 ## Diagnostics
 
 The generator's are in `Diagnostics/SqlDiagnostics.cs`, and the errors of the `sqlsource` tool that are not the generator's own in `Diagnostics/ToolDiagnostics.cs`, two of which, `SQLSRC209` and `SQLSRC210`, the generator reports too.  See [diagnostics](../../docs/architecture/generator.md#diagnostics).
