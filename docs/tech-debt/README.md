@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0079`
+Next id: `TD-0080`
 
 ## Active items
 
@@ -38,6 +38,7 @@ Next id: `TD-0079`
 | [TD-0076](TD-0076-what-the-first-refusal-of-a-declared-type-says.md) | Open | 2026-10-23 | Low | PostgreSQL's first refusal of a `-- param:` type says only that it is not a type name, where SQL Server's says what was found, and SQL Server's refuses a name that holds a combining mark, a letter number or a format character after its first character, which the server takes |
 | [TD-0077](TD-0077-describer-catalog-sql-takes-a-users-operators.md) | Open | 2026-10-23 | Low | The SQL of the PostgreSQL describer's catalog calls runs under the user's `search_path` and writes its operators without `pg_catalog`, so a user's operator on a system type before `pg_catalog`, or after it for a comparison of no exact operator of `pg_catalog`'s, changes what the catalog answers |
 | [TD-0078](TD-0078-datatypename-is-resolved-on-every-call.md) | Open | 2026-10-25 | Low | A generated PostgreSQL method sets each parameter's `DataTypeName` to the sidecar's display name, `integer`, which Npgsql resolves on every call at about 115 bytes per parameter, where the canonical internal name, `pg_catalog.int4`, costs about 22 to 58 |
+| [TD-0079](TD-0079-build-folder-with-a-hash-or-semicolon-reaches-settings-files.md) | Open | 2026-10-26 | Low | A project whose `obj` or `bin` is outside its folder, and whose full path holds `#` or `;`, has its build files reach the settings files above its `"root": true`, so a broken one there fails its build: the compiler would cut the folder at that character, and the build gives none |
 
 ## Columns
 

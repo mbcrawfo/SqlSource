@@ -209,6 +209,26 @@ public sealed class SqlPathTests
         SqlPath.FindRepeated([.. files.Select(path => SqlFilePath.Create(path)!)], TestModels.Array(sortedPaths));
 
     [Theory]
+    [InlineData("repo/obj/App.AssemblyInfo.cs", "repo/obj")]
+    [InlineData("repo/obj/Debug/net10.0/App.AssemblyInfo.cs", "repo/obj")]
+    [InlineData("REPO/Obj/x.cs", "repo/obj")]
+    [InlineData("C:/repo/obj/x.cs", "C:/repo/obj")]
+    [InlineData("repo/x.cs", "")]
+    public void IsInFolder_PathUnderTheFolder_IsTrue(string path, string folder) =>
+        SqlPath.IsInFolder(path, folder).ShouldBeTrue();
+
+    [Theory]
+    [InlineData("repo/objx/x.cs", "repo/obj")]
+    [InlineData("repo/obj-old/x.cs", "repo/obj")]
+    [InlineData("repo/obj.cs", "repo/obj")]
+    [InlineData("repo/obj", "repo/obj")]
+    [InlineData("repo/x.cs", "repo/obj")]
+    [InlineData("other/repo/obj/x.cs", "repo/obj")]
+    [InlineData("rep", "repo/obj")]
+    public void IsInFolder_PathBesideOrAboveTheFolder_IsFalse(string path, string folder) =>
+        SqlPath.IsInFolder(path, folder).ShouldBeFalse();
+
+    [Theory]
     [InlineData("app/Repo", "app/Repo/a.sql", "app/Repo/Count.sql", GeneratorHarness.UsersNormalizedPath)]
     [InlineData("APP/repo", "app/Repo/a.sql", "app/Repo/Count.sql", GeneratorHarness.UsersNormalizedPath)]
     [InlineData("app", "app/Repo.sql", "app/Root.sql")]

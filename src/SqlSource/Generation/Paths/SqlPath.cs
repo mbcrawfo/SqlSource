@@ -155,6 +155,14 @@ internal static class SqlPath
     public static string GetFileName(string path) => path.Substring(path.LastIndexOfAny(Separators) + 1);
 
     /// <summary>
+    /// Whether <paramref name="normalizedPath" /> is under <paramref name="normalizedFolder" />, at any depth: it is
+    /// the folder's segments and more, compared by <see cref="Comparison" />, so <c>a/objx/b</c> is not under
+    /// <c>a/obj</c>.  Every path is under the root, which is empty.  It compares in place and allocates nothing.
+    /// </summary>
+    public static bool IsInFolder(string normalizedPath, string normalizedFolder) =>
+        CompareToFolder(normalizedPath, normalizedFolder, normalizedFolder.Length) == 0;
+
+    /// <summary>
     /// Whether <paramref name="sortedPaths" />, which is ordered by <see cref="Comparer" />, holds
     /// <paramref name="normalizedPath" />.
     /// </summary>

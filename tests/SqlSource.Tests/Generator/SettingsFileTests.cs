@@ -50,6 +50,10 @@ public sealed class SettingsFileTests
 
     private const string Dto = "App.GetUserDto-Model.g.cs";
 
+    // The attribute of the assembly that the SDK writes under obj, here under the intermediate folder of the artifacts
+    // layout, outside the project's folder /repo/App.
+    private const string ArtifactsAssemblyInfo = "/repo/artifacts/obj/App/debug/App.AssemblyInfo.cs";
+
     // App.UserId and App.OtherId, over long, beside the type that claims the files.
     private const string IdsSource = """
         using SqlSource;
@@ -587,7 +591,8 @@ public sealed class SettingsFileTests
     }
 
     // Every item is under /app, whose file ends each chain, so no chain reaches the file at the root.  The attribute's
-    // file, which the compiler adds at a path that is not rooted, is no item.
+    // file has a path that is not rooted where the compiler sets no folder for generated files, as the test driver
+    // does, so it is no item; in a build it is under the intermediate folder, which reaches nothing either.
     [Fact]
     public void Run_FileAboveARoot_IsNotReported()
     {
@@ -629,6 +634,103 @@ public sealed class SettingsFileTests
         );
 
         run.ShouldBeClean();
+    }
+
+    // With obj outside the project, as the artifacts layout has it, the SDK's own Compile items are under
+    // /repo/artifacts, whose chain climbs past the project's root file to the broken file of the repository.  The
+    // build gives the generator the intermediate folder, and a compile path under it reaches nothing.
+    [Fact]
+    public void Run_CompileItemUnderTheIntermediateFolder_ReachesNoSettingsFile()
+    {
+        var run = RunOutsideTheProject(
+            ArtifactsAssemblyInfo,
+            new Dictionary<string, string?> { ["SqlSourceIntermediateFolder"] = "/repo/artifacts/obj/App/" }
+        );
+
+        run.ShouldBeClean();
+    }
+
+    [Fact]
+    public void Run_CompileItemUnderTheOutputFolder_ReachesNoSettingsFile()
+    {
+        var run = RunOutsideTheProject(
+            "/repo/artifacts/bin/App/debug/Extra.cs",
+            new Dictionary<string, string?> { ["SqlSourceOutputFolder"] = "/repo/artifacts/bin/App/" }
+        );
+
+        run.ShouldBeClean();
+    }
+
+    // The same project without the build's folders: the SDK's item reaches the file above the project's root.
+    [Fact]
+    public void Run_CompileItemOutsideTheProjectWithoutTheBuildFolders_ReachesTheFileAboveTheRoot()
+    {
+        var run = RunOutsideTheProject(ArtifactsAssemblyInfo, null);
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC015 /repo/sqlsource.json(1,");
+    }
+
+    // A folder is compared segment by segment, so objx is not under obj.
+    [Fact]
+    public void Run_CompileItemInAFolderThatOnlyStartsLikeTheIntermediateFolder_ReachesTheFileAboveTheRoot()
+    {
+        var run = RunOutsideTheProject(
+            "/repo/artifacts/objx/App/debug/App.AssemblyInfo.cs",
+            new Dictionary<string, string?> { ["SqlSourceIntermediateFolder"] = "/repo/artifacts/obj/" }
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC015 /repo/sqlsource.json(1,");
+    }
+
+    // The compiler cuts a value at a # or a ;, so a folder /repo/App#1/obj/ would arrive as /repo/App.  A value that
+    // does not end with a separator is no folder of the build, so the project's own C# file still reaches its folder's
+    // file.
+    [Fact]
+    public void Run_IntermediateFolderCutShort_LeavesNoCompileItemOut()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [
+                new SourceFile("/repo/App/Sample.cs", GeneratorHarness.SampleSource(null)),
+                new SourceFile(
+                    "/repo/App/Code/Helpers.cs",
+                    "[assembly: System.Reflection.AssemblyMetadata(\"Helpers\", \"none\")]\n"
+                ),
+            ],
+            [
+                GeneratorHarness.SettingsFile(
+                    "/repo/App/Code/sqlsource.json", /*lang=json,strict*/
+                    """{"bogus":1}"""
+                ),
+                new SqlFile("/repo/App/Q.sql", Query),
+            ],
+            properties: new Dictionary<string, string?> { ["SqlSourceIntermediateFolder"] = "/repo/App" }
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC016 /repo/App/Code/sqlsource.json(1,");
+    }
+
+    // A .sql file is an item of the project wherever it is, so one under the intermediate folder still reaches the
+    // files above it.
+    [Fact]
+    public void Run_SqlFileUnderTheIntermediateFolder_ReachesTheFileAboveTheRoot()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [new SourceFile("/repo/App/Sample.cs", GeneratorHarness.SampleSource(null))],
+            [
+                GeneratorHarness.SettingsFile("/repo/sqlsource.json", "{"),
+                GeneratorHarness.SettingsFile(
+                    "/repo/App/sqlsource.json", /*lang=json,strict*/
+                    """{"root": true}"""
+                ),
+                new SqlFile("/repo/App/Q.sql", Query),
+                new SqlFile("/repo/artifacts/obj/App/Generated.sql", Query),
+            ],
+            properties: new Dictionary<string, string?> { ["SqlSourceIntermediateFolder"] = "/repo/artifacts/obj/App/" }
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC015 /repo/sqlsource.json(1,");
     }
 
     // The text of /app's file is not JSON, so its root is unknown and the chain goes on to the root's file.  Both are
@@ -737,10 +839,13 @@ public sealed class SettingsFileTests
         ]);
     }
 
-    // Only a file named sqlsource.json exactly is a settings file, so this one neither sets the dialect nor is
-    // reported.
+    // Only a file named sqlsource.json exactly is a settings file, so this one, which the project lists itself as
+    // SqlSource.json, neither sets the dialect nor is reported.  The build's own search never gives such a path: on a
+    // file system that ignores case, as macOS's and Windows' do, it finds the file and gives it under the name
+    // sqlsource.json, so it is read there, and on Linux it does not find it, as MSBuild's own search for a
+    // Directory.Build.props does.
     [Fact]
-    public void Run_MisnamedSettingsFile_IsNotRead()
+    public void Run_ListedFileNamedInAnotherCase_IsNotRead()
     {
         var run = Run(
             null,
@@ -764,6 +869,29 @@ public sealed class SettingsFileTests
             files,
             generatorParameters: generatorParameters,
             dialect: dialect
+        );
+
+    // The type and its .sql file in /repo/App, whose settings file is a root, and a broken settings file at the
+    // repository's root, /repo, with one more C# file at the path given, under the properties given.
+    private static GeneratorRun RunOutsideTheProject(
+        string compilePath,
+        IReadOnlyDictionary<string, string?>? properties
+    ) =>
+        GeneratorHarness.Run(
+            OutputKind.Sql,
+            [
+                new SourceFile("/repo/App/Sample.cs", GeneratorHarness.SampleSource(null)),
+                new SourceFile(compilePath, "[assembly: System.Reflection.AssemblyMetadata(\"Built\", \"yes\")]\n"),
+            ],
+            [
+                GeneratorHarness.SettingsFile("/repo/sqlsource.json", "{"),
+                GeneratorHarness.SettingsFile(
+                    "/repo/App/sqlsource.json", /*lang=json,strict*/
+                    """{"root": true}"""
+                ),
+                new SqlFile("/repo/App/Q.sql", Query),
+            ],
+            properties: properties
         );
 
     // GetUser of Users, at Models under postgres, with an entry of one parameter and one column, both id, and the

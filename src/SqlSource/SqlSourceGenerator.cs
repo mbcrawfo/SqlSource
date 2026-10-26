@@ -263,12 +263,20 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => CompilePathsOf(input.Left, input.Right))
             .WithTrackingName(TrackingNames.CompilePaths);
 
+        // The folders the build writes into, whose files are the build's and reach nothing.  They are equal until a
+        // property changes.
+        var buildFolders = context
+            .AnalyzerConfigOptionsProvider.Select(static (options, _) => BuildFolders.Read(options.GlobalOptions))
+            .WithTrackingName(TrackingNames.BuildFolders);
+
         var reachedSettingsFiles = settingsFiles
             .Combine(sqlPaths)
-            .Combine(compilePaths)
+            .Combine(compilePaths.Combine(buildFolders))
             .Select(
                 static (input, _) =>
-                    input.Left.Left.Reached(input.Left.Right.Concat(NormalizedCompilePaths(input.Right)))
+                    input.Left.Left.Reached(
+                        input.Left.Right.Concat(NormalizedCompilePaths(input.Right.Left, input.Right.Right))
+                    )
             )
             .WithTrackingName(TrackingNames.ReachedSettingsFiles);
 
@@ -1158,16 +1166,21 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 compilation.SyntaxTrees.Select(static tree => tree.FilePath).ToImmutableArray()
             );
 
-    // Each rooted path of the compilation's trees, normalised when it is read.  The compiler gives a Compile item its
-    // full path, and a generator's post-initialization file, the attribute's among them, a path of the generator's
-    // assembly, type and hint name under its base folder for generated files.  In a build that is the output folder, so
-    // the path is rooted and its chain is that of the SDK's own Compile items in obj; where the compiler sets no base
+    // Each rooted path of the compilation's trees that is under no folder of the build, normalised when it is read.
+    // The compiler gives a Compile item its full path, and a generator's post-initialization file, the attribute's
+    // among them, a path of the generator's assembly, type and hint name under its base folder for generated files.
+    // In a build that is the compiler's output folder, which is under the intermediate folder, as the SDK's own Compile
+    // items in obj are, so neither reaches anything, wherever the project puts obj.  Where the compiler sets no base
     // folder, as the test driver does, the path is relative, and a path that is not rooted reaches nothing.
-    private static IEnumerable<string> NormalizedCompilePaths(EquatableArray<string> paths)
+    private static IEnumerable<string> NormalizedCompilePaths(EquatableArray<string> paths, BuildFolders buildFolders)
     {
         foreach (var path in paths)
         {
-            if (SqlPath.IsRooted(path) && SqlPath.Normalize(path) is { } normalized)
+            if (
+                SqlPath.IsRooted(path)
+                && SqlPath.Normalize(path) is { } normalized
+                && !buildFolders.Contains(normalized)
+            )
             {
                 yield return normalized;
             }

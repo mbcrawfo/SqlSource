@@ -29,6 +29,12 @@ internal sealed record ListedSettingsFile(
     /// <summary>
     /// Whether the last segment of <paramref name="path" /> is <see cref="SettingsFile.FileName" />, exactly.
     /// </summary>
+    /// <remarks>
+    /// So a file that a project lists itself under a name in another case, <c>SqlSource.json</c>, is not read.  The
+    /// build's own search asks the file system for <c>sqlsource.json</c>: where names are compared ignoring case, as
+    /// on macOS and Windows, it finds such a file and gives it to the compiler under the lower-case name, so it is read
+    /// there, and on Linux it is not found, as MSBuild's own search for <c>Directory.Build.props</c> does.
+    /// </remarks>
     public static bool IsSettingsFile(string path)
     {
         const string Name = SettingsFile.FileName;

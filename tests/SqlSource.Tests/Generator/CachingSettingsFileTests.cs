@@ -9,6 +9,7 @@ using SqlSource.Testing.Generator;
 using Xunit;
 using static SqlSource.Testing.Generator.CachingScene;
 using static SqlSource.Testing.Generator.StepReasons;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -106,7 +107,7 @@ public sealed class CachingSettingsFileTests
     }
 
     // The edit adds no C# file, so the paths of the trees are equal and the settings files that a chain reaches are
-    // not looked for again.
+    // not looked for again.  The properties are the same, so the build's folders are not read again either.
     [Fact]
     public void Run_CSharpEditThatAddsNoFile_ReachesNoSettingsFileAgain()
     {
@@ -116,8 +117,34 @@ public sealed class CachingSettingsFileTests
         var result = Run(driver, WithMethodBodyEdited(compilation));
 
         AllReasons(result, TrackingNames.CompilePaths).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.BuildFolders).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.ReachedSettingsFiles).ShouldBe([IncrementalStepRunReason.Cached]);
         OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
+    // A folder of the build that holds no C# file of the scene: the folders are read again and changed, and the same
+    // settings files are reached, so nothing is reported again and no file is parsed.
+    [Fact]
+    public void Run_BuildFolderChanged_ReachesTheSameSettingsFiles()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = _scene.FirstRunWithSettingsFiles(compilation, _usersSettings, _ordersSettings);
+
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(
+                new TestOptionsProvider(
+                    OutputKind.Sql,
+                    null,
+                    properties: new Dictionary<string, string?> { ["SqlSourceIntermediateFolder"] = "/app/obj/" }
+                )
+            ),
+            compilation
+        );
+
+        AllReasons(result, TrackingNames.BuildFolders).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.ReachedSettingsFiles).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.ParsedFile)
+            .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
     }
 
     // The edit leaves the dialect alone, so no file is parsed again, and the file's new error is reported.

@@ -17,6 +17,8 @@ internal static class TrackingNames
 
     public const string CompilePaths = nameof(CompilePaths);
 
+    public const string BuildFolders = nameof(BuildFolders);
+
     public const string ReachedSettingsFiles = nameof(ReachedSettingsFiles);
 
     public const string CaseCollisions = nameof(CaseCollisions);

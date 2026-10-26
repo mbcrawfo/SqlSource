@@ -127,6 +127,30 @@
     </Target>
     <!-- editorconfig-checker-enable -->
     <!--
+        Gives the generator the folders the build writes into, BaseIntermediateOutputPath and BaseOutputPath, each a
+        full path, made against the project's folder with a separator at its end.  A C# file under either, such as an
+        AssemblyInfo the SDK writes into obj, or another generator's file, is the build's and reaches no settings file,
+        wherever the project puts obj and bin: with UseArtifactsOutput they are outside the project's folder, and their
+        chain would climb past its root file.  It runs before the file the compiler reads is written, as the trims do,
+        when every property of the SDK and of the artifacts layout is set.
+
+        The compiler reads a value up to its first # or ;, so a folder whose path holds either would arrive cut short,
+        naming a folder above the real one or beside it.  Such a folder is given as empty, and its C# files are read as
+        the project's: TD-0079.  So is one whose base folder has no value, which would be the project's own folder.
+
+        The expressions are long, and a property as written is on one line, so the check of the line length is off.
+    -->
+    <!-- editorconfig-checker-disable -->
+    <Target Name="SqlSourceFindBuildFolders" BeforeTargets="GenerateMSBuildEditorConfigFileCore">
+        <PropertyGroup>
+            <SqlSourceIntermediateFolder>$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseIntermediateOutputPath)))</SqlSourceIntermediateFolder>
+            <SqlSourceOutputFolder>$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseOutputPath)))</SqlSourceOutputFolder>
+            <SqlSourceIntermediateFolder Condition="'$(BaseIntermediateOutputPath)' == '' or $(SqlSourceIntermediateFolder.Contains('#')) or $(SqlSourceIntermediateFolder.Contains(';'))" />
+            <SqlSourceOutputFolder Condition="'$(BaseOutputPath)' == '' or $(SqlSourceOutputFolder.Contains('#')) or $(SqlSourceOutputFolder.Contains(';'))" />
+        </PropertyGroup>
+    </Target>
+    <!-- editorconfig-checker-enable -->
+    <!--
         Finds the settings files: every sqlsource.json in the folder of a .sql file or of a Compile item, or in a folder
         above it, to the top of the drive, as the SDK finds .editorconfig files.  A generator cannot read the disk, so
         each is given to the compiler as an AdditionalFiles item.  The SDK's step through FullPath and Distinct is

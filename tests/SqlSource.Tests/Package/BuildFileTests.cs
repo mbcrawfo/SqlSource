@@ -29,6 +29,9 @@ public sealed partial class BuildFileTests
         "DefineConstants",
         "AfterMicrosoftNETSdkTargets",
         "MSBuildThisFileDirectory",
+        "MSBuildProjectDirectory",
+        "BaseIntermediateOutputPath",
+        "BaseOutputPath",
     ];
 
     // The target that writes the project manifest for the sqlsource tool.  It is the one target no build runs.
@@ -59,6 +62,13 @@ public sealed partial class BuildFileTests
     // What the generator reads as a property of the project and never as metadata of a file.
     private static readonly string[] PropertyOnly = ["SqlSourceNestedClass"];
 
+    // The folders the build writes into, which the targets set and the compiler is shown.  They are no settings: a
+    // project does not write them, and nothing trims them.
+    private static readonly string[] BuildFolders = ["SqlSourceIntermediateFolder", "SqlSourceOutputFolder"];
+
+    // The target that sets them.
+    private const string BuildFoldersTarget = "SqlSourceFindBuildFolders";
+
     private static readonly XDocument Props = Load("SqlSource.props");
 
     private static readonly XDocument Targets = Load("SqlSource.targets");
@@ -88,7 +98,7 @@ public sealed partial class BuildFileTests
 
         items
             .Select(item => item.Attribute("Include").ShouldNotBeNull().Value)
-            .ShouldBe(Settings.Concat(PropertyOnly), ignoreOrder: true);
+            .ShouldBe(Settings.Concat(PropertyOnly).Concat(BuildFolders), ignoreOrder: true);
 
         // A project that sets SqlSourceIncludeFiles to false lists its own .sql files, and still needs the
         // properties.  So nothing may put a condition on the items.
@@ -130,11 +140,12 @@ public sealed partial class BuildFileTests
             .Where(target => target.Attribute("Name")!.Value != ManifestTarget)
             .ToList();
 
-        targets.Count.ShouldBe(5);
+        targets.Count.ShouldBe(6);
         targets
             .Select(target => target.Attribute("BeforeTargets")?.Value)
             .ShouldBe(
                 [
+                    "GenerateMSBuildEditorConfigFileCore",
                     "GenerateMSBuildEditorConfigFileCore",
                     "GenerateMSBuildEditorConfigFileCore",
                     "GenerateMSBuildEditorConfigFileCore",
@@ -223,6 +234,55 @@ public sealed partial class BuildFileTests
                 }
             );
         Props.Descendants("Content").ShouldBeEmpty();
+    }
+
+    // A C# file under the folders the build writes into is the build's, and reaches no settings file.  Each folder is
+    // the full path of the SDK's base folder, made against the project's folder, with the separator that
+    // NormalizeDirectory ends it with.  The compiler reads a value up to its first # or ;, so a folder whose path holds
+    // either is given as empty, as is one the project has no value for, which would be the project's own folder.  The
+    // generator spells the names in BuildFolders, and SettingsFileTests runs it on them.
+    [Fact]
+    public void Targets_BuildFolders_AreTheFullPathsOfTheBaseFoldersOrEmpty()
+    {
+        var target = Target(BuildFoldersTarget);
+
+        target
+            .Attributes()
+            .ToDictionary(attribute => attribute.Name.LocalName, attribute => attribute.Value)
+            .ShouldBe(
+                new Dictionary<string, string>
+                {
+                    ["Name"] = BuildFoldersTarget,
+                    ["BeforeTargets"] = "GenerateMSBuildEditorConfigFileCore",
+                }
+            );
+        var lines = target.Elements("PropertyGroup").ShouldHaveSingleItem().Elements().ToList();
+        lines
+            .Select(line =>
+                (line.Name.LocalName, line.Value, line.Attribute("Condition")?.Value, line.Attributes().Count())
+            )
+            .ShouldBe([
+                (
+                    "SqlSourceIntermediateFolder",
+                    "$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseIntermediateOutputPath)))",
+                    null,
+                    0
+                ),
+                (
+                    "SqlSourceOutputFolder",
+                    "$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $(BaseOutputPath)))",
+                    null,
+                    0
+                ),
+                (
+                    "SqlSourceIntermediateFolder",
+                    "",
+                    EmptyWhen("BaseIntermediateOutputPath", "SqlSourceIntermediateFolder"),
+                    1
+                ),
+                ("SqlSourceOutputFolder", "", EmptyWhen("BaseOutputPath", "SqlSourceOutputFolder"), 1),
+            ]);
+        lines.Select(line => line.Name.LocalName).Distinct().ShouldBe(BuildFolders);
     }
 
     // A generator cannot read the disk, so every settings file that can apply to a .sql file or to a type is given
@@ -619,6 +679,10 @@ public sealed partial class BuildFileTests
     }
 
     private static XElement Manifest() => Target(ManifestTarget);
+
+    // The condition that empties a folder: its base folder has no value, or its full path holds a # or a ;.
+    private static string EmptyWhen(string baseFolder, string folder) =>
+        $"'$({baseFolder})' == '' or $({folder}.Contains('#')) or $({folder}.Contains(';'))";
 
     private static XElement Target(string name) =>
         Targets.Descendants("Target").Single(target => target.Attribute("Name")!.Value == name);
