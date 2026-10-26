@@ -102,17 +102,19 @@ internal static class StepReasons
         Reasons<FileClaim>(result, TrackingNames.FileClaim, claim => claim.Input.File.Path);
 
     // A step that is not among the tracked steps fails the test: it has lost its name.  The exceptions are the steps
-    // that give nothing, and so are not tracked, in a run without what they read: FileSettings where no file has
-    // metadata, SidecarInput and SidecarFile where there is no sidecar, and TypeNeeds where no query needs an entry.
-    // CachingOptionsTests.Run_MetadataOfOneFileGainsAParameter_ParsesNoFileAndEmitsOnlyItsType reads the first in a run
-    // where a file has metadata, and CachingSidecarTests.Run_MethodBodyEdited_ReadsNoSidecar, with the other tests of
-    // sidecars, the other three.
+    // that give nothing, and so are not tracked, in a run without what they read: SettingsFile where there is no
+    // settings file, FileSettings where no file has metadata, SidecarInput and SidecarFile where there is no sidecar,
+    // and TypeNeeds where no query needs an entry.  CachingSettingsFileTests reads the first in runs with settings
+    // files, CachingOptionsTests.Run_MetadataOfOneFileGainsAParameter_ParsesNoFileAndEmitsOnlyItsType the second in a
+    // run where a file has metadata, and CachingSidecarTests.Run_MethodBodyEdited_ReadsNoSidecar, with the other tests
+    // of sidecars, the other three.
     public static IncrementalStepRunReason[] AllReasons(GeneratorDriverRunResult result, string step)
     {
         var steps = result.Results.Single().TrackedSteps;
         return
             step
-                is TrackingNames.FileSettings
+                is TrackingNames.SettingsFile
+                    or TrackingNames.FileSettings
                     or TrackingNames.SidecarInput
                     or TrackingNames.SidecarFile
                     or TrackingNames.TypeNeeds

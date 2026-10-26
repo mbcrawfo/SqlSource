@@ -48,16 +48,42 @@ internal sealed record FileParseInput(
         DialectSetting projectDialect,
         bool projectKeepsComments,
         EquatableArray<string> commentPaths
+    ) =>
+        Resolve(
+            metadata,
+            SqlPath.Normalize(metadata.File.Path),
+            chain,
+            projectDialect,
+            projectKeepsComments,
+            commentPaths
+        );
+
+    /// <summary>
+    /// The same, for a caller that has normalised the file's path already, to find its chain:
+    /// <paramref name="normalizedPath" /> is what <see cref="SqlPath.Normalize" /> gives for it.
+    /// </summary>
+    public static FileParseInput Resolve(
+        FileMetadata metadata,
+        string? normalizedPath,
+        SettingsChain chain,
+        DialectSetting projectDialect,
+        bool projectKeepsComments,
+        EquatableArray<string> commentPaths
     )
     {
-        var path = SqlPath.Normalize(metadata.File.Path);
         var commentsWanted =
             (
                 (chain.Level.Parameters ?? metadata.Settings?.Level.Parameters) is { } list
                     ? (list & GeneratorParameters.KeepComments) != 0
                     : projectKeepsComments
-            ) || (path is not null && SqlPath.Contains(commentPaths, path));
+            ) || (normalizedPath is not null && SqlPath.Contains(commentPaths, normalizedPath));
         var dialect = chain.Dialect ?? metadata.Dialect.Dialect ?? projectDialect.Dialect ?? default;
-        return new FileParseInput(metadata.File, path, dialect, metadata.Dialect.InvalidValue, commentsWanted);
+        return new FileParseInput(
+            metadata.File,
+            normalizedPath,
+            dialect,
+            metadata.Dialect.InvalidValue,
+            commentsWanted
+        );
     }
 }

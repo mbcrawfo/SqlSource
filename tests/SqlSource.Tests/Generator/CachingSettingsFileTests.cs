@@ -80,7 +80,8 @@ public sealed class CachingSettingsFileTests
                 },
                 ignoreOrder: true
             );
-        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ParsedFile)
+            .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.ParsedFiles).ShouldBe([IncrementalStepRunReason.Cached]);
     }
 

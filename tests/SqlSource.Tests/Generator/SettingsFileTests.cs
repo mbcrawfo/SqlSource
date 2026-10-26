@@ -126,7 +126,7 @@ public sealed class SettingsFileTests
 
     // Stage one: the parse builds the form of the query with its comments, which the folder's list may ask for.
     [Fact]
-    public void Run_KeepCommentsInTheFolder_KeepsTheComments()
+    public void Run_KeepCommentsInTheFolder_ParsesTheFormWithComments()
     {
         var run = Run(
             null,
@@ -148,7 +148,7 @@ public sealed class SettingsFileTests
     // The nearer file's list replaces the farther one's and the property's whole, so no level outside the file can
     // ask for comments, and the form with them is not built.
     [Fact]
-    public void Run_EmptyListInANearerFile_DropsTheFartherKeepComments()
+    public void Run_EmptyListInANearerFile_ParsesNoFormWithComments()
     {
         var run = Run(
             null,
@@ -175,7 +175,7 @@ public sealed class SettingsFileTests
     }
 
     [Fact]
-    public void Run_KeepCommentsInTheFolder_OverridesTheMetadatasList()
+    public void Run_KeepCommentsInTheFolder_OverridesTheMetadatasListForTheParse()
     {
         var run = Run(
             null,

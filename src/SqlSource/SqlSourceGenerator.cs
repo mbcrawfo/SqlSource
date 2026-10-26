@@ -292,13 +292,18 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Combine(projectKeepsComments.Combine(commentPaths))
             .Select(
                 static (input, _) =>
-                    FileParseInput.Resolve(
-                        input.Left.Left.Left,
-                        ChainOf(input.Left.Left.Right, input.Left.Left.Left.File),
+                {
+                    var metadata = input.Left.Left.Left;
+                    var path = SqlPath.Normalize(metadata.File.Path);
+                    return FileParseInput.Resolve(
+                        metadata,
+                        path,
+                        path is null ? SettingsChain.None : input.Left.Left.Right.ChainOf(path),
                         input.Left.Right,
                         input.Right.Left,
                         input.Right.Right
-                    )
+                    );
+                }
             )
             .WithTrackingName(TrackingNames.FileParseInput);
 
@@ -891,10 +896,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // Not located, and once for the project and engine, however many of its queries need the driver.
         context.RegisterSourceOutput(codeGenEngines.Combine(npgsqlProbe.Combine(sqlClientProbe)), ReportMissingDrivers);
     }
-
-    // The chain of the file's folder, or none for a path that does not normalise.
-    private static SettingsChain ChainOf(SettingsFileSet settingsFiles, AdditionalText file) =>
-        SqlPath.Normalize(file.Path) is { } path ? settingsFiles.ChainOf(path) : SettingsChain.None;
 
     private static void ReportChecks(SourceProductionContext output, SidecarCheckResult check) =>
         ReportAll(output, check.Diagnostics);
