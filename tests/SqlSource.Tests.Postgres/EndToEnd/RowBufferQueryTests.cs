@@ -46,7 +46,7 @@ public sealed class RowBufferQueryTests(PostgresContainer postgres)
         await using var source = EndToEndSources.App(postgres);
         await using var connection =
             count % 2 == 0 ? await source.OpenConnectionAsync(token) : source.CreateConnection();
-        var expected = Enumerable.Range(1, count).Select(n => new CountedNumber(n));
+        var expected = Enumerable.Range(1, count).Select(n => new CountedNumber(n)).ToArray();
 
         var pooled = await ReadAsync(connection, collection, pooled: true, count, token);
         var unpooled = await ReadAsync(connection, collection, pooled: false, count, token);

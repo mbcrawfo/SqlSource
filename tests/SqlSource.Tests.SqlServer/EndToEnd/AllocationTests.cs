@@ -12,13 +12,15 @@ using Xunit;
 
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
-// The bytes that a generated method allocates for each call, against a hand-written ADO.NET method of the same calls:
+// The bytes that a generated method allocates for each call, against a hand-written ADO.NET method:
 // ShapeQueries.SearchAccounts, with two parameters and three rows of the seed of "app".  The hand-written method makes
 // the generated method's calls, one by one: the open/close rule of the methods, the command and its arguments, the
-// binding of each parameter, the reads of each column, and the same rows in the same collection, an IReadOnlyList with
-// an array behind it, which it can only build by copying a List, since the count of the rows is not known until they
-// are read.  GC.GetTotalAllocatedBytes(true) counts every thread, where the driver completes the continuations of
-// an asynchronous call, so the test runs in MeasuresAllocations, alone and on a server of its own.
+// binding of each parameter and the reads of each column.  It returns the same rows in the same collection, an
+// IReadOnlyList with an array behind it, which it builds as hand-written code does, by copying a List, since the count
+// of the rows is not known until they are read.  The generated method reads its rows through its pooled row buffer
+// instead, which allocates less than the List, so it stays within the margin.  GC.GetTotalAllocatedBytes(true) counts
+// every thread, where the driver completes the continuations of an asynchronous call, so the test runs in
+// MeasuresAllocations, alone and on a server of its own.
 [Collection(MeasuresAllocations.Name)]
 public sealed class AllocationTests(SqlServerContainer sqlServer)
 {
@@ -33,8 +35,8 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
 
     // Twenty pairs of blocks of fifty calls, one block of each method, alternated so that the two see the same state
     // of the process.  A call allocated about 6.7 KB on an open connection and 7.2 KB on a closed one, on SQL Server
-    // 2025 and 2017 alike when the counts were set, and the median of the differences of the pairs was within 6 bytes
-    // of zero; a run of the test takes some seconds.
+    // 2025 and 2017 alike when the counts were set, and the median of the differences of the pairs, when both methods
+    // read the rows into a List, was within 6 bytes of zero; a run of the test takes some seconds.
     private const int Pairs = 20;
 
     private const int CallsPerBlock = 50;
@@ -148,7 +150,7 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
         return sorted.Length % 2 == 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
     }
 
-    // SearchAccounts by hand: the arguments of the generated method, and its calls.
+    // SearchAccounts by hand: the arguments of the generated method, and its calls, with the rows in a List.
     private static async Task<IReadOnlyList<SearchAccountsView>> SearchAccountsByHandAsync(
         DbConnection connection,
         SearchAccountsFilter parameters,
