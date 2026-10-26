@@ -21,7 +21,8 @@ namespace SqlSource.Tests.Generator;
 // property's.  Every other setting comes from the markers, then the attribute, then the chain, nearest file first,
 // then the metadata, then the property; the type override and the column types merge per key across them, the nearer
 // file's entry ranking above the farther's.  A type's nested class comes from the attribute, then the chain of the
-// type's C# file, then the property.
+// type's C# file, then the property.  A settings file's problems are reported at its line and column when the chain
+// of the folder of some .sql file or C# file reaches it.
 public sealed class SettingsFileTests
 {
     // ANSI and MySQL read the backticks as the quotes of an identifier, and the comment starts after it.  PostgreSQL
@@ -516,6 +517,192 @@ public sealed class SettingsFileTests
 
         run.ShouldBeClean();
         run.Sources["App.Sample.g.cs"].ShouldContain(KeptConstant);
+    }
+
+    [Fact]
+    public void Run_UnknownKey_IsReportedAtTheSettingsFile()
+    {
+        var run = Run(
+            null,
+            GeneratorHarness.SettingsFile(
+                SettingsPath, /*lang=json,strict*/
+                "{\n  \"output\": \"sql\",\n  \"bogus\": 1\n}\n"
+            ),
+            new SqlFile(QueryPath, Query)
+        );
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC016 /app/Repo/sqlsource.json(3,3)-(3,10): 'bogus' is not a key of a settings file",
+        ]);
+    }
+
+    [Fact]
+    public void Run_InvalidTypeOverride_IsReported()
+    {
+        var run = Run(
+            null,
+            GeneratorHarness.SettingsFile(
+                SettingsPath, /*lang=json,strict*/
+                """{"typeOverrides":{" int4 ":" int? "}}"""
+            ),
+            new SqlFile(QueryPath, Query)
+        );
+
+        var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.ShouldStartWith("SQLSRC019 /app/Repo/sqlsource.json(1,");
+        diagnostic.ShouldContain("'int4: int?' is not a valid value of typeOverrides");
+    }
+
+    // The tool reads the database and reports its value; the build does not.  The unknown key shows that the build
+    // checked the file.
+    [Fact]
+    public void Run_InvalidDatabase_IsNotReported()
+    {
+        var run = Run(
+            null,
+            GeneratorHarness.SettingsFile(
+                SettingsPath, /*lang=json,strict*/
+                """{"database":" a b ","bogus":1}"""
+            ),
+            new SqlFile(QueryPath, Query)
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC016 /app/Repo/sqlsource.json(1,");
+    }
+
+    // Every item is under /app, whose file ends each chain, so no chain reaches the file at the root.  The attribute's
+    // file, which the compiler adds at a path of its own, is no item.
+    [Fact]
+    public void Run_FileAboveARoot_IsNotReported()
+    {
+        var run = Run(
+            null,
+            GeneratorHarness.SettingsFile("/sqlsource.json", "{"),
+            GeneratorHarness.SettingsFile(
+                FartherSettingsPath, /*lang=json,strict*/
+                """{"root": true}"""
+            ),
+            new SqlFile(QueryPath, Query)
+        );
+
+        run.ShouldBeClean();
+    }
+
+    // The text of /app's file is not JSON, so its root is unknown and the chain goes on to the root's file.  Both are
+    // reported, in the order of their folders.
+    [Fact]
+    public void Run_FileAboveAFileThatIsNotJson_IsReported()
+    {
+        var run = Run(
+            null,
+            GeneratorHarness.SettingsFile(
+                "/sqlsource.json", /*lang=json,strict*/
+                """{"bogus":1}"""
+            ),
+            GeneratorHarness.SettingsFile(FartherSettingsPath, "{"),
+            new SqlFile(QueryPath, Query)
+        );
+
+        run.Diagnostics.Count.ShouldBe(2);
+        run.Diagnostics[0].ShouldStartWith("SQLSRC016 /sqlsource.json(1,");
+        run.Diagnostics[1].ShouldStartWith("SQLSRC015 /app/sqlsource.json(1,");
+    }
+
+    // The C# file declares no type, and no .sql file is in its folder.
+    [Fact]
+    public void Run_FileReachedOnlyByACSharpFile_IsReported()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [
+                new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null)),
+                new SourceFile("/app/Code/Helpers.cs", "namespace App;\n\ninternal static class Helpers;\n"),
+            ],
+            [
+                GeneratorHarness.SettingsFile(
+                    "/app/Code/sqlsource.json", /*lang=json,strict*/
+                    """{"bogus":1}"""
+                ),
+                new SqlFile(QueryPath, Query),
+            ]
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC016 /app/Code/sqlsource.json(1,");
+    }
+
+    // No type claims the .sql file of /app/Other, and its folder's file is checked all the same.
+    [Fact]
+    public void Run_FileReachedByAnUnclaimedSqlFile_IsReported()
+    {
+        var run = Run(
+            null,
+            GeneratorHarness.SettingsFile(
+                "/app/Other/sqlsource.json", /*lang=json,strict*/
+                """{"bogus":1}"""
+            ),
+            new SqlFile("/app/Other/Unclaimed.sql", Query),
+            new SqlFile(QueryPath, Query)
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC016 /app/Other/sqlsource.json(1,");
+        StepOutputs.Single<ParsedSqlFile>(run, TrackingNames.ParsedFile).FileName.ShouldBe("Q.sql");
+    }
+
+    [Fact]
+    public void Run_FileNoItemReaches_IsNotReported()
+    {
+        var run = Run(
+            null,
+            GeneratorHarness.SettingsFile(
+                "/other/sqlsource.json", /*lang=json,strict*/
+                """{"bogus":1}"""
+            ),
+            new SqlFile(QueryPath, Query)
+        );
+
+        run.ShouldBeClean();
+    }
+
+    // The same file twice, and once more under another case of its folder: the first is kept, and reported once.
+    [Fact]
+    public void Run_FileListedTwice_IsReportedOnce()
+    {
+        var run = Run(
+            null,
+            GeneratorHarness.SettingsFile(
+                SettingsPath, /*lang=json,strict*/
+                """{"bogus":1}"""
+            ),
+            GeneratorHarness.SettingsFile(
+                SettingsPath, /*lang=json,strict*/
+                """{"bogus":1}"""
+            ),
+            GeneratorHarness.SettingsFile(
+                "/APP/Repo/sqlsource.json", /*lang=json,strict*/
+                """{"other":1}"""
+            ),
+            new SqlFile(QueryPath, Query)
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC016 /app/Repo/sqlsource.json(1,");
+    }
+
+    // Only a file named sqlsource.json exactly is a settings file, so this one neither sets the dialect nor is
+    // reported.
+    [Fact]
+    public void Run_MisnamedSettingsFile_IsNotRead()
+    {
+        var run = Run(
+            null,
+            GeneratorHarness.SettingsFile(
+                "/app/Repo/SqlSource.json", /*lang=json,strict*/
+                """{"dialect":"postgres","bogus":1}"""
+            ),
+            new SqlFile(QueryPath, Query)
+        );
+
+        run.ShouldBeClean();
+        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + NotPostgres + "\";");
     }
 
     private static GeneratorRun Run(string? dialect, params SqlFile[] files) => Run(dialect, files, null);

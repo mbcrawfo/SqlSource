@@ -105,6 +105,43 @@ public sealed class CachingSettingsFileTests
         _scene.ShouldHaveReadOnly(result, _scene.Users, IncrementalStepRunReason.Unchanged);
     }
 
+    // The edit adds no C# file, so the paths of the trees are equal and the settings files that a chain reaches are
+    // not looked for again.
+    [Fact]
+    public void Run_CSharpEditThatAddsNoFile_ReachesNoSettingsFileAgain()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = _scene.FirstRunWithSettingsFiles(compilation, _usersSettings, _ordersSettings);
+
+        var result = Run(driver, WithMethodBodyEdited(compilation));
+
+        AllReasons(result, TrackingNames.CompilePaths).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.ReachedSettingsFiles).ShouldBe([IncrementalStepRunReason.Cached]);
+        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
+    // The edit leaves the dialect alone, so no file is parsed again, and the file's new error is reported.
+    [Fact]
+    public void Run_SettingsFileEditedToAnError_ReportsItWithoutParsing()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = _scene.FirstRunWithSettingsFiles(compilation, _usersSettings, _ordersSettings);
+
+        var edited = new InMemoryAdditionalText(
+            _usersSettings.Path, /*lang=json,strict*/
+            """{"dialect":"mysql","inputModelSuffix":"In","bogus":1}"""
+        );
+        var result = Run(driver.ReplaceAdditionalText(_usersSettings, edited), compilation);
+
+        AllReasons(result, TrackingNames.ParsedFile)
+            .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
+        // The same files are reached, and the new set is reported from.
+        AllReasons(result, TrackingNames.ReachedSettingsFiles).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        var diagnostic = result.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Id.ShouldBe("SQLSRC016");
+        diagnostic.Location.GetLineSpan().Path.ShouldBe(_usersSettings.Path);
+    }
+
     // Why each settings file was read, by its path.
     private static Dictionary<string, IncrementalStepRunReason> SettingsFileReasons(GeneratorDriverRunResult result) =>
         Reasons<ListedSettingsFile>(result, TrackingNames.SettingsFile, file => file.Path);

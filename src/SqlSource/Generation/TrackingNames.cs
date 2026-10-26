@@ -15,6 +15,10 @@ internal static class TrackingNames
 
     public const string SqlPaths = nameof(SqlPaths);
 
+    public const string CompilePaths = nameof(CompilePaths);
+
+    public const string ReachedSettingsFiles = nameof(ReachedSettingsFiles);
+
     public const string CaseCollisions = nameof(CaseCollisions);
 
     public const string RepeatedPaths = nameof(RepeatedPaths);

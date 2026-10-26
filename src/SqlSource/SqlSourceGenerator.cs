@@ -33,6 +33,13 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
     private const string FloorMember = "ThrowIfNullOrWhiteSpace";
 
+    private const char Separator = '/';
+
+    // The end of the normalised path the compiler gives the attribute's file: the folder named after this generator's
+    // type, which is below one named after its assembly, and the file's name.
+    private static readonly string AttributePathEnd =
+        Separator + typeof(SqlSourceGenerator).FullName + Separator + AttributeSource.HintName;
+
     /// <inheritdoc />
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -40,6 +47,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var settingsFiles = ReadSettingsFiles(context);
         var project = ReadProjectSettings(context);
         var claims = ClaimFiles(context, settingsFiles, project.Level);
+        ReportSettingsFiles(context, settingsFiles, claims.SqlPaths);
         var settings = ReadSettings(context, project, claims.SqlFiles, settingsFiles);
         var parsedFiles = ParseFiles(
             context,
@@ -94,8 +102,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             output.AddSource(AttributeSource.HintName, SourceText.From(AttributeSource.Text, Encoding.UTF8))
         );
 
-    // The project's settings files, each read once, with the chain of every folder.  A settings file's problems are
-    // not reported yet.
+    // The project's settings files, each read once, with the chain of every folder.  Their problems are reported by
+    // ReportSettingsFiles, for the files that a chain reaches.
     private static IncrementalValueProvider<SettingsFileSet> ReadSettingsFiles(
         IncrementalGeneratorInitializationContext context
     ) =>
@@ -235,7 +243,59 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         );
 
-        return new ClaimedFiles(sqlFiles, typeFiles, claimedPaths, commentPaths, repeatedPaths, typeMemberNames);
+        return new ClaimedFiles(
+            sqlFiles,
+            sqlPaths,
+            typeFiles,
+            claimedPaths,
+            commentPaths,
+            repeatedPaths,
+            typeMemberNames
+        );
+    }
+
+    // The problems of each settings file that the chain of the folder of some .sql file or C# file reaches, whether or
+    // not a type claims that .sql file or that C# file declares one.  A file beyond the first root file of every such
+    // chain is never reported.
+    private static void ReportSettingsFiles(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValueProvider<SettingsFileSet> settingsFiles,
+        IncrementalValueProvider<EquatableArray<string>> sqlPaths
+    )
+    {
+        // The paths of the C# files, which are equal until one is added, removed or renamed.  Like the framework check,
+        // it runs on every compilation, and a project without a settings file looks at no tree.
+        var compilePaths = context
+            .CompilationProvider.Combine(settingsFiles)
+            .Select(static (input, _) => CompilePathsOf(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.CompilePaths);
+
+        var reachedSettingsFiles = settingsFiles
+            .Combine(sqlPaths)
+            .Combine(compilePaths)
+            .Select(
+                static (input, _) =>
+                    input.Left.Left.Reached(input.Left.Right.Concat(NormalizedCompilePaths(input.Right)))
+            )
+            .WithTrackingName(TrackingNames.ReachedSettingsFiles);
+
+        // The reached folders are in the order of the set's files, so one walk of both finds them.
+        context.RegisterSourceOutput(
+            settingsFiles.Combine(reachedSettingsFiles),
+            static (output, input) =>
+            {
+                var reached = input.Right;
+                var next = 0;
+                foreach (var file in input.Left.Files)
+                {
+                    if (next < reached.Count && SqlPath.Comparer.Equals(reached[next], file.NormalizedFolder))
+                    {
+                        next++;
+                        ReportAll(output, file.Diagnostics);
+                    }
+                }
+            }
+        );
     }
 
     // What the project's properties and each file's metadata say, and each file's level of stage two.
@@ -1097,6 +1157,32 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         }
     }
 
+    // The path of each of the compilation's trees, and none when the project has no settings file.
+    private static EquatableArray<string> CompilePathsOf(Compilation compilation, SettingsFileSet settingsFiles) =>
+        settingsFiles.Files.Count == 0
+            ? EquatableArray<string>.Empty
+            : new EquatableArray<string>(
+                compilation.SyntaxTrees.Select(static tree => tree.FilePath).ToImmutableArray()
+            );
+
+    // Each path of a C# file of the project that normalises, normalised when it is read.  The compiler adds the
+    // attribute's file, which RegisterAttribute gives, to the compilation before the pipeline runs, and it is no file
+    // of the project: its path is the compiler's, in folders named after the generator that no item is in.  A file
+    // that another generator adds the same way is not told apart (TD-0079).
+    private static IEnumerable<string> NormalizedCompilePaths(EquatableArray<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            if (
+                SqlPath.Normalize(path) is { } normalized
+                && !normalized.EndsWith(AttributePathEnd, StringComparison.Ordinal)
+            )
+            {
+                yield return normalized;
+            }
+        }
+    }
+
     // The file's level under the chain of its folder.  The path of a file with metadata is normalised already, and that
     // of a file without is normalised only in a project with a settings file, so a project without one normalises no
     // path here.
@@ -1146,10 +1232,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<SettingsLevel> Level
     );
 
-    // The project's .sql files, each type with the files it claims, every claimed path, those that keep comments, the
-    // paths the project lists more than once, and the names of the types whose methods go on themselves.
+    // The project's .sql files and their paths, each type with the files it claims, every claimed path, those that
+    // keep comments, the paths the project lists more than once, and the names of the types whose methods go on
+    // themselves.
     private readonly record struct ClaimedFiles(
         IncrementalValuesProvider<AdditionalText> SqlFiles,
+        IncrementalValueProvider<EquatableArray<string>> SqlPaths,
         IncrementalValuesProvider<TypeFiles> ClaimingTypes,
         IncrementalValueProvider<EquatableArray<string>> ClaimedPaths,
         IncrementalValueProvider<EquatableArray<string>> CommentPaths,
