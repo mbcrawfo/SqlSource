@@ -221,7 +221,7 @@ The list for a query is the first of these that gives one, whole:
 
 Several `-- generator:` lines in one place are one list: two lines in a query add up.  A list never adds to the list of another place.
 
-In a property, in metadata and on the attribute the list is words separated by spaces or line breaks.  `default` beside another word there makes the whole value wrong: [SQLSRC014](diagnostics.md#sqlsrc014) in a property or metadata, [SQLSRC006](diagnostics.md#sqlsrc006) on the attribute.  A word that is not a generator parameter is reported the same way, and the other words still apply.  In a marker an empty `-- generator:` line is [SQLSRC110](diagnostics.md#sqlsrc110), and `default` beside another word in one place is [SQLSRC112](diagnostics.md#sqlsrc112).
+In a property, in metadata and on the attribute the list is words separated by spaces or line breaks.  `default` beside another word there makes the whole value wrong: [SQLSRC014](diagnostics.md#sqlsrc014) in a property or metadata, [SQLSRC006](diagnostics.md#sqlsrc006) on the attribute.  A word that is not a generator parameter is reported the same way.  In a property or metadata the other words still apply; on the attribute the type gets no members until the value is fixed.  In a marker an empty `-- generator:` line is [SQLSRC110](diagnostics.md#sqlsrc110), and `default` beside another word in one place is [SQLSRC112](diagnostics.md#sqlsrc112).
 
 <a id="setting-model-suffix"></a>
 

@@ -92,6 +92,26 @@ public sealed class ArrayPoolParameterTests
         unpooled.Sources[MethodRuns.MethodsFile].ShouldBe(pooled.Sources[MethodRuns.MethodsFile]);
     }
 
+    // The other shapes read no list of rows, and the parameter leaves their methods as they are too.
+    [Theory]
+    [InlineData("one", true)]
+    [InlineData("one-optional", true)]
+    [InlineData("rowcount", false)]
+    [InlineData("none", false)]
+    public void Run_NoArrayPool_LeavesTheMethodOfEveryOtherShapeAsItIs(string shape, bool hasRows)
+    {
+        var sql = hasRows ? "SELECT id, name FROM users;\n" : "UPDATE users SET name = name;\n";
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListUsers -> " + shape + "\n" + sql);
+
+        var pooled = Run(file, null, null, hasRows: hasRows);
+        var unpooled = Run(file, "no-array-pool", null, hasRows: hasRows);
+
+        pooled.ShouldBeClean();
+        unpooled.ShouldBeClean();
+        Method(unpooled).UseArrayPool.ShouldBeFalse();
+        unpooled.Sources[MethodRuns.MethodsFile].ShouldBe(pooled.Sources[MethodRuns.MethodsFile]);
+    }
+
     [Fact]
     public void Run_PropertyWithAMisspeltWordBesideNoArrayPool_IsAnErrorAndNoArrayPoolApplies()
     {
@@ -107,7 +127,7 @@ public sealed class ArrayPoolParameterTests
     }
 
     [Fact]
-    public void Run_AttributeWithAMisspeltWordBesideNoArrayPool_IsAnErrorAtTheAttribute()
+    public void Run_AttributeWithAMisspeltWordBesideNoArrayPool_IsAnErrorAtTheAttributeAndGivesNoMethods()
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListUsers\nSELECT id, name FROM users;\n");
 
@@ -116,6 +136,7 @@ public sealed class ArrayPoolParameterTests
         var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
         diagnostic.ShouldStartWith("SQLSRC006 /app/Repo/Sample.cs(");
         diagnostic.ShouldEndWith("'nope' is not a valid value of Parameters");
+        run.Sources.ShouldNotContainKey(MethodRuns.MethodsFile);
     }
 
     // The one method the run planned for App.Sample.
@@ -123,10 +144,20 @@ public sealed class ArrayPoolParameterTests
         StepOutputs.Single<TypeMethods>(run, TrackingNames.TypeMethods).Methods.ShouldHaveSingleItem();
 
     // The file and its sidecar at CodeGen under postgres on Npgsql 10, on App.Sample with the attribute's Parameters,
-    // or with the attribute's arguments as they are, and the property.
-    private static GeneratorRun Run(SqlFile file, string? attribute, string? property, bool attributeArguments = false)
+    // or with the attribute's arguments as they are, and the property.  The entry of ListUsers has the rows id and
+    // name, or none.
+    private static GeneratorRun Run(
+        SqlFile file,
+        string? attribute,
+        string? property,
+        bool attributeArguments = false,
+        bool hasRows = true
+    )
     {
-        SidecarEntry[] entries = [Entry(file, "ListUsers", [], [Column("id"), Column("name", Text, nullable: true)])];
+        SidecarEntry[] entries =
+        [
+            Entry(file, "ListUsers", [], hasRows ? [Column("id"), Column("name", Text, nullable: true)] : null),
+        ];
         var arguments = attributeArguments ? attribute : "Parameters = \"" + attribute + "\"";
         var source = attribute is null ? MethodRuns.Source : MethodRuns.SampleSource(arguments!);
 

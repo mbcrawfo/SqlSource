@@ -19,7 +19,8 @@ namespace SqlSource.Generation.Methods;
 /// <param name="ValidateTokens">Whether the method checks that each token's argument has text.</param>
 /// <param name="UseArrayPool">
 /// Whether a method of <see cref="ResultShape.Many" /> may read its rows into buffers from the shared array pool: false
-/// under <c>no-array-pool</c>.
+/// under <c>no-array-pool</c>.  It is the resolved setting, true for a method of any shape without the parameter, so a
+/// reader checks the shape as well.
 /// </param>
 /// <param name="Input">The input model, or null when the query has no parameters.</param>
 /// <param name="Output">The output model, or null when the query's entry has no rows.</param>
