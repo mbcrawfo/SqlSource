@@ -80,6 +80,15 @@ The reader of a settings file, `sqlsource.json`.  See [settings files](../../doc
 - **Whether a value is valid is `SettingsLevelReader`'s, never the reader's own**, and the dialect's is `SqlDialectName`'s.  A file then accepts what MSBuild accepts; `SettingsFileSource` only turns what is rejected into errors at their spans.
 - **A new key is a constant of `SettingsFileKeys`, a row of its `All` and of `TypeOf`, a property of `schemas/settings-v1.schema.json`, and, for a new kind of error, a case of `SettingsFileDiagnostics`.**  The schema accepts what the reader accepts and no more.
 
+## `Generation/Chains/`
+
+The settings files read, with the problems each side reports, and the chain of each folder.  See [settings files](../../docs/architecture/generator.md#settings-files).
+
+- **A chain is built only here, for the generator and the `sqlsource` tool alike**: a file is read by `ListedSettingsFile.Read` and the chains by `SettingsFileSet.Of`.  A second builder would let a build and the tool give one folder different settings.
+- **Never resolve a chain by a pass over the files.**  `SettingsFileSet.Of` computes the chain that starts at each file once, and `ChainOf` searches each folder above a path's for its nearest file, comparing spans in place, and allocates nothing, which `SettingsFileSetTests` holds.
+- **A file's parent is searched for, never kept on a stack.**  `SqlPath.Comparer` sorts `app-tests` between `app` and `app/Queries`, since `-` sorts before the separator.
+- **What a side reports is `SettingsFileSides.Reports` alone**: both a problem of the file, the build a value of any setting but `database`, the tool one of `dialect`, `output` or `database`.
+
 ## Diagnostics
 
 The generator's are in `Diagnostics/SqlDiagnostics.cs`, and the errors of the `sqlsource` tool that are not the generator's own in `Diagnostics/ToolDiagnostics.cs`, two of which, `SQLSRC209` and `SQLSRC210`, the generator reports too.  See [diagnostics](../../docs/architecture/generator.md#diagnostics).
