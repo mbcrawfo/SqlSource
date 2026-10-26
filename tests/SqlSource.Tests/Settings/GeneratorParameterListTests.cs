@@ -16,6 +16,8 @@ public sealed class GeneratorParameterListTests
     [InlineData("sort-output", 8)]
     [InlineData("no-table-models", 16)]
     [InlineData("async-method-suffix", 32)]
+    [InlineData("no-array-pool", 64)]
+    [InlineData("No-Array-Pool keep-comments", 65)]
     [InlineData("  keep-comments\tsort-input  keep-comments ", 5)]
     [InlineData("default", 0)]
     [InlineData(" Default ", 0)]
@@ -67,6 +69,7 @@ public sealed class GeneratorParameterListTests
     [InlineData("keep-comments default", "keep-comments default")]
     [InlineData("default nope", "default nope")]
     [InlineData("default default sort-input", "default default sort-input")]
+    [InlineData("default no-array-pool", "default no-array-pool")]
     public void Parse_DefaultBesideAnotherWord_IsInvalidWhole(string value, string expected)
     {
         var invalid = new List<string>();

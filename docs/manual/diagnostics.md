@@ -570,7 +570,7 @@ See: [Markers in the wrong place](sql-files.md#markers-in-the-wrong-place)
 
 **Generator parameter is not known**
 
-A `-- generator:` marker holds a word that is not a generator parameter.  The generator parameters are `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix` and `default`.  If you used `token-validation` or `token-ignore` as generator parameters in an earlier preview: leave out the first, since validation is the default, and write the second as a marker inside the query, `-- token-ignore: name`.
+A `-- generator:` marker holds a word that is not a generator parameter.  The generator parameters are `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `no-array-pool` and `default`.  If you used `token-validation` or `token-ignore` as generator parameters in an earlier preview: leave out the first, since validation is the default, and write the second as a marker inside the query, `-- token-ignore: name`.
 
 ```sql error
 -- generator: keep-comment

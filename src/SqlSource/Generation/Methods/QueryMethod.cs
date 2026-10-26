@@ -17,6 +17,10 @@ namespace SqlSource.Generation.Methods;
 /// <param name="Engine">The engine of the query's file, which chooses how a parameter is bound.</param>
 /// <param name="Segments">The SQL in the form that is emitted, its comments kept under <c>keep-comments</c>.</param>
 /// <param name="ValidateTokens">Whether the method checks that each token's argument has text.</param>
+/// <param name="UseArrayPool">
+/// Whether a method of <see cref="ResultShape.Many" /> may read its rows into buffers from the shared array pool: false
+/// under <c>no-array-pool</c>.
+/// </param>
 /// <param name="Input">The input model, or null when the query has no parameters.</param>
 /// <param name="Output">The output model, or null when the query's entry has no rows.</param>
 /// <param name="NameLocation">Where the query's name is, for a diagnostic about the method.</param>
@@ -29,6 +33,7 @@ internal sealed record QueryMethod(
     DatabaseEngine Engine,
     EquatableArray<SqlSegment> Segments,
     bool ValidateTokens,
+    bool UseArrayPool,
     MethodInput? Input,
     MethodOutput? Output,
     LocationInfo NameLocation

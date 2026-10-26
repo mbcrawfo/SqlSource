@@ -54,6 +54,7 @@ SqlSource is in early development.  This table is the one list of what works in 
 | The `Output` setting | Available | [Output](settings.md#setting-output) |
 | The settings for models: model suffixes, namespace, shape and name, and the generator parameters `sort-input`, `sort-output` and `no-table-models` | Available | [All settings](settings.md#all-settings) |
 | The settings for query methods: collection type, `MethodLocation`, and the generator parameter `async-method-suffix` | Available | [All settings](settings.md#all-settings) |
+| The generator parameter `no-array-pool` | Accepted; no effect yet | [Generator parameters](settings.md#setting-generator-parameters) |
 | `null` or `not null` in a `-- param:` marker | Available | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | Result shapes (`-- name: GetUser -> one`) | Available | [Result shapes](sql-files.md#result-shapes) |
 | Describing queries with the `sqlsource` tool, sidecar files, and `--check` | Available | [The tool](tool.md) |
@@ -73,6 +74,8 @@ SqlSource is in early development.  This table is the one list of what works in 
 | C# types written by their short names, `UserId` for `MyApp.UserId`, wherever SqlSource takes a C# type | Available | [Type overrides](settings.md#setting-type-overrides) |
 | Build integration: the tool running in your build | Coming | Not documented until it is delivered; today you run the tool yourself: [install the tool](tool.md#install-the-tool) |
 | Bug-report bundles | Coming | Not documented until it is delivered; today attach a [log](tool.md#logs) |
+
+"Accepted; no effect yet" means that SqlSource reads and checks the setting, and reports a value that is wrong, but the setting does not change the generated code yet.
 
 ## The pages
 
