@@ -281,7 +281,7 @@ public sealed class DescribeRunTests : IDisposable
         _scene.Describer.Opened.ShouldBeEmpty();
     }
 
-    // The plan reported SQLSRC016 for a settings file that the .sql file reaches, at its line and column.  The queries
+    // The plan reports SQLSRC016 for a settings file that the .sql file reaches, at its line and column.  The queries
     // are described all the same, and the exit code is 1.
     [Fact]
     public async Task Run_SettingsFileWithAnError_IsReportedAtItsPlaceAndFailsTheRun()

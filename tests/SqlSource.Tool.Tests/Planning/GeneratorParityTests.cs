@@ -373,10 +373,10 @@ public sealed class GeneratorParityTests : IDisposable
             .Select(source => new SourceFile(project.AddSource(source.Path, source.Text), source.Text))
             .ToArray();
         const string Query = "SELECT 1;";
-        var listed = sqlFiles.Select(path => new SqlFile(project.AddSql(path, Query), Query));
-        var settings = settingsFiles.Select(file =>
-            GeneratorHarness.SettingsFile(project.AddSettings(file.Path, file.Json), file.Json)
-        );
+        var listed = sqlFiles.Select(path => new SqlFile(project.AddSql(path, Query), Query)).ToArray();
+        var settings = settingsFiles
+            .Select(file => GeneratorHarness.SettingsFile(project.AddSettings(file.Path, file.Json), file.Json))
+            .ToArray();
 
         var run = GeneratorHarness.Run(
             null,
@@ -401,6 +401,9 @@ public sealed class GeneratorParityTests : IDisposable
     {
         var project = new TestProject(_folder, directory: "") { LangVersion = "12.0" };
         var source = new SourceFile(project.AddSource("App/Queries.cs", Plans.Type), Plans.Type);
+        // A type claims the files of its own folder alone, so the file of the folder below has a type of its own.
+        var lite = Plans.TypeNamed("Lite");
+        var liteSource = new SourceFile(project.AddSource("App/Lite/Lite.cs", lite), lite);
         const string Ansi = "-- name: First\nSELECT 1 {{where}};\n";
         const string Lite = "-- name: Second\nSELECT 2 {{where}} {{order:ORDER BY 1}};\n";
         const string Json = /*lang=json,strict*/
@@ -415,16 +418,19 @@ public sealed class GeneratorParityTests : IDisposable
             GeneratorHarness.SettingsFile(project.AddSettings("App/Lite/sqlsource.json", LiteJson), LiteJson),
         ];
 
-        var run = GeneratorHarness.Run(null, [source], files);
+        var run = GeneratorHarness.Run(null, [source, liteSource], files);
         var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
 
         var expected = ReportedByGenerator(run, IsCompared);
         var actual = ReportedByTool(plan, IsCompared);
 
         actual.ShouldBe(expected);
-        // A case in which neither reports an error would prove nothing, and each folder has one.
-        expected.ShouldNotBeEmpty();
-        expected.Select(error => error.Id).Distinct().Order().ShouldBe(["SQLSRC209", "SQLSRC210"]);
+        // A case in which neither reports an error would prove nothing, and the file of each folder has both.
+        expected
+            .Select(error => $"{error.Id} {Path.GetFileName(error.Path)}")
+            .Distinct()
+            .Order(StringComparer.Ordinal)
+            .ShouldBe(["SQLSRC209 First.sql", "SQLSRC209 Second.sql", "SQLSRC210 First.sql", "SQLSRC210 Second.sql"]);
     }
 
     // The values that are not valid are reported in an order, and it is the generator's: the dialects in ordinal
