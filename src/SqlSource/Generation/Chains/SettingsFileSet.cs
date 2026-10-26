@@ -146,14 +146,14 @@ internal sealed record SettingsFileSet(
     }
 
     // The index of the nearest file in the folder of the path or a folder above it, or -1.  Each folder is the path's
-    // text up to a separator, searched for as a span.
+    // text up to a separator, searched for in place.
     private static int NearestIndex(EquatableArray<ListedSettingsFile> files, string normalizedPath)
     {
         var end = normalizedPath.LastIndexOf(Separator);
         while (true)
         {
             var length = Math.Max(end, 0);
-            var index = IndexOfFolder(files, normalizedPath.AsSpan(0, length));
+            var index = SqlPath.IndexOf(files, normalizedPath, length, static file => file.NormalizedFolder);
             if (index >= 0 || length == 0)
             {
                 return index;
@@ -161,32 +161,5 @@ internal sealed record SettingsFileSet(
 
             end = normalizedPath.LastIndexOf(Separator, length - 1);
         }
-    }
-
-    // The index of the file of the folder, or -1.  Compares as SqlPath.Comparer orders the files.
-    private static int IndexOfFolder(EquatableArray<ListedSettingsFile> files, ReadOnlySpan<char> folder)
-    {
-        var low = 0;
-        var high = files.Count - 1;
-        while (low <= high)
-        {
-            var middle = low + ((high - low) / 2);
-            var order = files[middle].NormalizedFolder.AsSpan().CompareTo(folder, StringComparison.OrdinalIgnoreCase);
-            if (order == 0)
-            {
-                return middle;
-            }
-
-            if (order < 0)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-
-        return -1;
     }
 }

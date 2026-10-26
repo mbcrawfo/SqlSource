@@ -217,6 +217,34 @@ public sealed class SettingsFileSetTests
     }
 
     [Fact]
+    public void ChainOf_FoldersNotInAscii_AreFoundInTheOrderTheyAreSorted()
+    {
+        // Ä sorts after every ASCII letter, and äpp is Äpp's folder, ignoring case.
+        var set = Set(
+            (
+                "/Äpp/sqlsource.json", /*lang=json,strict*/
+                """{"inputModelSuffix": "Upper"}"""
+            ),
+            (
+                "/äpp/Queries/sqlsource.json", /*lang=json,strict*/
+                """{"output": "sql"}"""
+            ),
+            (
+                "/Zed/sqlsource.json", /*lang=json,strict*/
+                """{"inputModelSuffix": "Zed"}"""
+            )
+        );
+
+        set.Files.Select(static file => file.NormalizedFolder).ShouldBe(["Zed", "Äpp", "äpp/Queries"]);
+        set.Parents.ShouldBe([-1, -1, 1]);
+        var queries = set.ChainOf("ÄPP/queries/a.sql");
+        queries.Level.Output.ShouldBe(OutputKind.Sql);
+        queries.Level.InputModelSuffix.ShouldBe("Upper");
+        set.ChainOf("äpp/b.sql").Level.InputModelSuffix.ShouldBe("Upper");
+        set.ChainOf("zed/c.sql").Level.InputModelSuffix.ShouldBe("Zed");
+    }
+
+    [Fact]
     public void ChainOf_PathFarBelowItsNearestFile_AllocatesNothing()
     {
         // The generator looks up the chain of every .sql file, and the nested class of every type, on each change.

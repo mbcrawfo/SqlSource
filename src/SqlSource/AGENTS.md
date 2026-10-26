@@ -85,9 +85,9 @@ The reader of a settings file, `sqlsource.json`.  See [settings files](../../doc
 The settings files read, with the problems each side reports, and the chain of each folder.  See [settings files](../../docs/architecture/generator.md#settings-files).
 
 - **A chain is built only here, for the generator and the `sqlsource` tool alike**: a file is read by `ListedSettingsFile.Read` and the chains by `SettingsFileSet.Of`.  A second builder would let a build and the tool give one folder different settings.
-- **Never resolve a chain by a pass over the files.**  `SettingsFileSet.Of` computes the chain that starts at each file once, and `ChainOf` searches each folder above a path's for its nearest file, comparing spans in place, and allocates nothing, which `SettingsFileSetTests` holds.
+- **Never resolve a chain by a pass over the files.**  `SettingsFileSet.Of` computes the chain that starts at each file once, and `ChainOf` searches each folder above a path's for its nearest file with `SqlPath.IndexOf`, in place and in the order of `SqlPath.Comparer`, and allocates nothing, which `SettingsFileSetTests` holds.
 - **A file's parent is searched for, never kept on a stack.**  `SqlPath.Comparer` sorts `app-tests` between `app` and `app/Queries`, since `-` sorts before the separator.
-- **What a side reports is `SettingsFileSides.Reports` alone**: both a problem of the file, the build a value of any setting but `database`, the tool one of `dialect`, `output` or `database`.
+- **What a side reports is `SettingsFileSides.Reports` alone**: both report a problem of the file as a file; the build reports a value of any setting but `database`, the tool a value of `dialect`, `output` or `database`.
 
 ## Diagnostics
 

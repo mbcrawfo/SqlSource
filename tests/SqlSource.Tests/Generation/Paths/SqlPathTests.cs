@@ -148,6 +148,26 @@ public sealed class SqlPathTests
     }
 
     [Fact]
+    public void IndexOf_FolderOfAPath_FindsItInTheOrderOfTheComparer()
+    {
+        // '-' sorts before the separator, and a letter that is not ASCII after every ASCII one, ignoring its case.
+        string[] folders = ["", "app", "app-tests", "app/Queries", "Zed", "Äpp", "äpp/Queries"];
+        var sorted = TestModels.Array([
+            .. folders
+                .Distinct(SqlPath.Comparer)
+                .OrderBy(folder => folder, SqlPath.Comparer)
+                .Select(folder => new Item(folder)),
+        ]);
+        const string Path = "ÄPP/QUERIES/a.sql";
+
+        SqlPath.IndexOf(sorted, Path, "ÄPP/QUERIES".Length, static item => item.Path).ShouldBe(sorted.Count - 1);
+        SqlPath.IndexOf(sorted, Path, "ÄPP".Length, static item => item.Path).ShouldBe(sorted.Count - 2);
+        SqlPath.IndexOf(sorted, Path, 0, static item => item.Path).ShouldBe(0);
+        SqlPath.IndexOf(sorted, "app/Queries/a.sql", "app/Queries".Length, static item => item.Path).ShouldBe(3);
+        SqlPath.IndexOf(sorted, "app/Queries/a.sql", "app/Q".Length, static item => item.Path).ShouldBe(-1);
+    }
+
+    [Fact]
     public void FindRepeated_PathListedOnce_IsEmpty() =>
         FindRepeated(["app/A.sql", "app/b.sql"], ["app/A.sql", "app/b.sql"]).ShouldBeEmpty();
 

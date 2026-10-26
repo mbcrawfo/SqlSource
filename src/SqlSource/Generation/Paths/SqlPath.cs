@@ -31,9 +31,14 @@ internal static class SqlPath
     private static readonly char[] Separators = [Separator, '\\'];
 
     /// <summary>
-    /// Compares two normalised paths.
+    /// Compares two normalised paths.  Its order is that of <see cref="Comparison" />.
     /// </summary>
     public static StringComparer Comparer => StringComparer.OrdinalIgnoreCase;
+
+    /// <summary>
+    /// The comparison of <see cref="Comparer" />, for a search that compares a part of a path in place.
+    /// </summary>
+    public const StringComparison Comparison = StringComparison.OrdinalIgnoreCase;
 
     public static bool IsSqlFile(string path) => path.EndsWith(SqlExtension, StringComparison.OrdinalIgnoreCase);
 
@@ -153,6 +158,20 @@ internal static class SqlPath
     /// </summary>
     public static int IndexOf<T>(EquatableArray<T> sortedItems, string normalizedPath, Func<T, string> getPath)
         where T : IEquatable<T> => SortedSearch.IndexOf(sortedItems, normalizedPath, getPath, Comparer);
+
+    /// <summary>
+    /// The index in <paramref name="sortedItems" />, which is ordered by <see cref="Comparer" /> on the path that
+    /// <paramref name="getPath" /> gives, of the item whose path is the first <paramref name="length" /> characters of
+    /// <paramref name="normalizedPath" />, such as one of its folders.  Negative when there is none.  It compares in
+    /// place and allocates nothing.
+    /// </summary>
+    public static int IndexOf<T>(
+        EquatableArray<T> sortedItems,
+        string normalizedPath,
+        int length,
+        Func<T, string> getPath
+    )
+        where T : IEquatable<T> => SortedSearch.IndexOf(sortedItems, normalizedPath, length, getPath, Comparison);
 
     /// <summary>
     /// The paths of <paramref name="sortedPaths" />, which is ordered by <see cref="Comparer" />, that more than one

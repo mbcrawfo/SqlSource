@@ -31,10 +31,21 @@ public sealed class ListedSettingsFileTests
     [Theory]
     [InlineData("/app/Queries/SqlSource.json")]
     [InlineData("/app/Queries/SQLSOURCE.JSON")]
+    public void Read_FileNamedInAnotherCase_IsNull(string path)
+    {
+        ListedSettingsFile.IsSettingsFile(path).ShouldBeFalse();
+        Read(path, "{}").ShouldBeNull();
+
+        // Only the name's case is wrong: the same folder's file named exactly is read.
+        var exact = path[..(path.LastIndexOf('/') + 1)] + "sqlsource.json";
+        Read(exact, "{}").ShouldNotBeNull().NormalizedFolder.ShouldBe("app/Queries");
+    }
+
+    [Theory]
     [InlineData("/app/Queries/sqlsource.json.bak")]
     [InlineData("/app/Queries/my-sqlsource.json")]
     [InlineData("/app/sqlsource.json/Queries.sql")]
-    public void Read_FileNamedInAnotherCase_IsNull(string path)
+    public void Read_FileNotNamedSettingsFile_IsNull(string path)
     {
         ListedSettingsFile.IsSettingsFile(path).ShouldBeFalse();
         Read(path, "{}").ShouldBeNull();
