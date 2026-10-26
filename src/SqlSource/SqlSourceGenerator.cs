@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Generation.Chains;
 using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
@@ -36,12 +37,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         RegisterAttribute(context);
+        var settingsFiles = ReadSettingsFiles(context);
         var project = ReadProjectSettings(context);
         var claims = ClaimFiles(context, project.Level);
         var settings = ReadSettings(context, project, claims.SqlFiles);
         var parsedFiles = ParseFiles(
             context,
             settings.FileMetadata,
+            settingsFiles,
             settings.ProjectDialect,
             settings.ProjectSettings,
             claims.CommentPaths,
@@ -90,6 +93,23 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         context.RegisterPostInitializationOutput(static output =>
             output.AddSource(AttributeSource.HintName, SourceText.From(AttributeSource.Text, Encoding.UTF8))
         );
+
+    // The project's settings files, each read once, with the chain of every folder.  A settings file's problems are
+    // not reported yet.
+    private static IncrementalValueProvider<SettingsFileSet> ReadSettingsFiles(
+        IncrementalGeneratorInitializationContext context
+    ) =>
+        context
+            .AdditionalTextsProvider.Where(static file => ListedSettingsFile.IsSettingsFile(file.Path))
+            .Select(
+                static (file, cancellationToken) =>
+                    ListedSettingsFile.Read(file, SettingsFileSide.Build, cancellationToken)
+            )
+            .WhereNotNull()
+            .WithTrackingName(TrackingNames.SettingsFile)
+            .Collect()
+            .Select(static (files, _) => SettingsFileSet.Of(files))
+            .WithTrackingName(TrackingNames.SettingsFiles);
 
     // What the project's properties say about the settings, which is the same value until one of them changes, and
     // their level alone, which never reaches the parse of a file.
@@ -252,6 +272,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     private static ParsedFiles ParseFiles(
         IncrementalGeneratorInitializationContext context,
         IncrementalValuesProvider<FileMetadata> fileMetadata,
+        IncrementalValueProvider<SettingsFileSet> settingsFiles,
         IncrementalValueProvider<DialectSetting> projectDialect,
         IncrementalValueProvider<ProjectSettings> projectSettings,
         IncrementalValueProvider<EquatableArray<string>> commentPaths,
@@ -262,14 +283,22 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // that changes only when the answer does.
         var projectKeepsComments = projectSettings.Select(static (settings, _) => settings.Level.KeepsComments);
 
-        // Stage one of the settings: each file with what its parse depends on.  It is resolved here, before the
-        // parse, so that a change to a property parses only the files whose input it changes.
+        // Stage one of the settings: each file with what its parse depends on, from the chain of its folder, its
+        // metadata and the properties.  It is resolved here, before the parse, so that a change to a settings file or
+        // a property parses only the files whose input it changes.
         var fileInputs = fileMetadata
+            .Combine(settingsFiles)
             .Combine(projectDialect)
             .Combine(projectKeepsComments.Combine(commentPaths))
             .Select(
                 static (input, _) =>
-                    FileParseInput.Resolve(input.Left.Left, input.Left.Right, input.Right.Left, input.Right.Right)
+                    FileParseInput.Resolve(
+                        input.Left.Left.Left,
+                        ChainOf(input.Left.Left.Right, input.Left.Left.Left.File),
+                        input.Left.Right,
+                        input.Right.Left,
+                        input.Right.Right
+                    )
             )
             .WithTrackingName(TrackingNames.FileParseInput);
 
@@ -862,6 +891,10 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // Not located, and once for the project and engine, however many of its queries need the driver.
         context.RegisterSourceOutput(codeGenEngines.Combine(npgsqlProbe.Combine(sqlClientProbe)), ReportMissingDrivers);
     }
+
+    // The chain of the file's folder, or none for a path that does not normalise.
+    private static SettingsChain ChainOf(SettingsFileSet settingsFiles, AdditionalText file) =>
+        SqlPath.Normalize(file.Path) is { } path ? settingsFiles.ChainOf(path) : SettingsChain.None;
 
     private static void ReportChecks(SourceProductionContext output, SidecarCheckResult check) =>
         ReportAll(output, check.Diagnostics);

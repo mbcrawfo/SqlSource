@@ -60,6 +60,10 @@ internal static class GeneratorHarness
         + (arguments is null ? string.Empty : ", " + arguments)
         + ")]\npublic partial class Sample;\n";
 
+    // A settings file at the path, with this JSON.  The compiler gives one to the generator as an additional file, as
+    // it gives a .sql file, so a test passes it among the .sql files.
+    public static SqlFile SettingsFile(string path, string json) => new(path, json);
+
     // Every run states its output, the project's SqlSourceOutput: null leaves it unset, for a test that needs the
     // project not to set it, of the default or of the output's levels.
     public static GeneratorRun Run(OutputKind? output, string source, params SqlFile[] sqlFiles) =>

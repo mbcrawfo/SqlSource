@@ -81,6 +81,7 @@ public sealed class CachingParseTests
         AllReasons(result, TrackingNames.ResolvedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
         string[] steps =
         [
+            TrackingNames.SettingsFiles,
             TrackingNames.TargetTypes,
             TrackingNames.NestedClassCheck,
             TrackingNames.SqlPaths,

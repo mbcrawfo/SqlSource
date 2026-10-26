@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Generation;
+using SqlSource.Generation.Chains;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Parsing;
 using SqlSource.Settings;
@@ -181,9 +182,107 @@ public sealed class DialectSettingTests
             null,
             fileParameters,
             projectKeepsComments,
-            claimedByATypeThatKeepsComments ? [GeneratorHarness.UsersNormalizedPath] : []
+            commentPaths: claimedByATypeThatKeepsComments ? [GeneratorHarness.UsersNormalizedPath] : []
         )
             .CommentsWanted.ShouldBe(expected);
+
+    [Theory]
+    // The chain's dialect, when it sets one.
+    [InlineData("postgres", "mysql", "oracle", nameof(SqlDialect.PostgreSql), null)]
+    [InlineData("postgres", null, null, nameof(SqlDialect.PostgreSql), null)]
+    // Or else the metadata, or else the property.
+    [InlineData(null, "mysql", "oracle", nameof(SqlDialect.MySql), null)]
+    [InlineData(null, null, "oracle", nameof(SqlDialect.Oracle), null)]
+    // Metadata that is not a dialect is still carried to be reported, though the chain's dialect is the one used.
+    [InlineData("postgres", "nope", "oracle", nameof(SqlDialect.PostgreSql), "nope")]
+    public void Resolve_ChainWithADialect_ComesBeforeTheMetadataAndTheProperty(
+        string? chain,
+        string? metadata,
+        string? property,
+        string dialect,
+        string? invalid
+    )
+    {
+        var file = new InMemoryAdditionalText(GeneratorHarness.UsersPath, "SELECT 1;");
+
+        var resolved = Resolve(file, metadata, property, chain: ChainOf(chain, null));
+
+        resolved.Dialect.ShouldBe(new SqlDialectChoice(Enum.Parse<SqlDialect>(dialect), SqlDialectOptions.None));
+        resolved.InvalidDialect.ShouldBe(invalid);
+    }
+
+    // A value replaces the one it wins over whole: the option of the metadata is not added to the chain's.
+    [Fact]
+    public void Resolve_ChainWithoutAnOption_DoesNotTakeTheOptionOfTheMetadata()
+    {
+        var file = new InMemoryAdditionalText(GeneratorHarness.UsersPath, "SELECT 1;");
+
+        var resolved = Resolve(file, "mysql,ansi-quotes", null, chain: ChainOf("mysql", null));
+
+        resolved.Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.None));
+    }
+
+    [Theory]
+    // The chain's list decides when it gives one; else the metadata's; else the property's.
+    [InlineData("keep-comments", null, false, true)]
+    [InlineData("keep-comments", "sort-input", false, true)]
+    [InlineData("sort-input", "keep-comments", true, false)]
+    // The empty list is a list, which asks for nothing.
+    [InlineData("default", null, true, false)]
+    [InlineData(null, "keep-comments", false, true)]
+    [InlineData(null, null, true, true)]
+    public void Resolve_CommentsWanted_TakesTheChainsListBeforeTheMetadatasAndTheProperty(
+        string? chainParameters,
+        string? fileParameters,
+        bool projectKeepsComments,
+        bool expected
+    ) =>
+        Resolve(
+            new InMemoryAdditionalText(GeneratorHarness.UsersPath, ""),
+            null,
+            null,
+            fileParameters,
+            projectKeepsComments,
+            ChainOf(null, chainParameters)
+        )
+            .CommentsWanted.ShouldBe(expected);
+
+    // A type that claims the file asks for comments, whatever the chain says.
+    [Fact]
+    public void Resolve_FileOfATypeThatKeepsComments_WantsThemWhateverTheChainSays() =>
+        Resolve(
+            new InMemoryAdditionalText(GeneratorHarness.UsersPath, ""),
+            null,
+            null,
+            null,
+            false,
+            ChainOf(null, "default"),
+            GeneratorHarness.UsersNormalizedPath
+        )
+            .CommentsWanted.ShouldBeTrue();
+
+    // A chain with this dialect and this list of generator parameters, or SettingsChain.None for neither.
+    private static SettingsChain ChainOf(string? dialect, string? parameters)
+    {
+        if (dialect is null && parameters is null)
+        {
+            return SettingsChain.None;
+        }
+
+        SqlDialectChoice? choice = null;
+        if (dialect is not null)
+        {
+            SqlDialectName.TryParse(dialect, out var parsed).ShouldBeTrue();
+            choice = parsed;
+        }
+
+        return new SettingsChain(
+            parameters is null
+                ? SettingsLevel.None
+                : new SettingsLevel { Parameters = GeneratorParameterList.Parse(parameters, []) },
+            choice
+        );
+    }
 
     private static FileParseInput Resolve(
         InMemoryAdditionalText file,
@@ -191,6 +290,7 @@ public sealed class DialectSettingTests
         string? project,
         string? fileParameters = null,
         bool projectKeepsComments = false,
+        SettingsChain? chain = null,
         params string[] commentPaths
     ) =>
         FileParseInput.Resolve(
@@ -205,6 +305,7 @@ public sealed class DialectSettingTests
                         EquatableArray<InvalidSetting>.Empty
                     )
             ),
+            chain ?? SettingsChain.None,
             DialectSetting.Parse(project),
             projectKeepsComments,
             TestModels.Array(commentPaths)

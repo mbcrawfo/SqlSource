@@ -5,6 +5,10 @@ namespace SqlSource.Generation;
 /// </summary>
 internal static class TrackingNames
 {
+    public const string SettingsFile = nameof(SettingsFile);
+
+    public const string SettingsFiles = nameof(SettingsFiles);
+
     public const string TargetTypes = nameof(TargetTypes);
 
     public const string NestedClassCheck = nameof(NestedClassCheck);
