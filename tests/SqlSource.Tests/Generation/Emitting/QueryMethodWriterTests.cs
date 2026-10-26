@@ -23,14 +23,18 @@ public sealed class QueryMethodWriterTests
         "var reader = await command.ExecuteReaderAsync("
         + "global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);\n";
 
+    // The row buffer as the methods of a file in the namespace App name it.
+    private const string RowBufferType = "global::App.SqlSourceRowBuffer";
+
     // Ends a line of an expected text that goes on in the next, written so to keep within the width of a line.
     private const string Continued = "\u21a9";
 
     // The type integer, as the entry of a parameter describes it.
     private static readonly PostgresType Integer = TestSidecars.Postgres(bindName: "integer");
 
-    // GetUser -> one-optional of the spec: one parameter, one token, a record of two columns.
-    private static readonly QueryMethod GetUser = new(
+    // GetUser -> one-optional of the spec: one parameter, one token, a record of two columns.  RowBufferTests derives
+    // its method from it.
+    internal static readonly QueryMethod GetUser = new(
         "GetUser",
         "GetUser",
         "The <c>GetUser</c> query from <c>Users.sql</c>.",
@@ -61,7 +65,7 @@ public sealed class QueryMethodWriterTests
     {
         var builder = new StringBuilder("before\n");
 
-        QueryMethodWriter.Append(builder, "    ", GetUser, "public static", isExtension: true);
+        QueryMethodWriter.Append(builder, "    ", GetUser, "public static", isExtension: true, RowBufferType);
 
         builder
             .ToString()
@@ -252,23 +256,23 @@ public sealed class QueryMethodWriterTests
     }
 
     [Theory]
-    [InlineData(nameof(CollectionKind.Array), "global::App.GetUserDto[]", "List", "rows.ToArray()")]
+    [InlineData(nameof(CollectionKind.Array), "global::App.GetUserDto[]", "RowBuffer", "rows.ToArray()")]
     [InlineData(
         nameof(CollectionKind.IEnumerable),
         "global::System.Collections.Generic.IEnumerable<global::App.GetUserDto>",
-        "List",
+        "RowBuffer",
         "rows.ToArray()"
     )]
     [InlineData(
         nameof(CollectionKind.IReadOnlyCollection),
         "global::System.Collections.Generic.IReadOnlyCollection<global::App.GetUserDto>",
-        "List",
+        "RowBuffer",
         "rows.ToArray()"
     )]
     [InlineData(
         nameof(CollectionKind.IReadOnlyList),
         "global::System.Collections.Generic.IReadOnlyList<global::App.GetUserDto>",
-        "List",
+        "RowBuffer",
         "rows.ToArray()"
     )]
     [InlineData(
@@ -325,11 +329,12 @@ public sealed class QueryMethodWriterTests
         text.ShouldContain("public static async global::System.Threading.Tasks.Task<" + returns + "> GetUser(\n");
         text.ShouldContain(
             "        var rows = "
-                + (
-                    buffer == "List"
-                        ? "new global::System.Collections.Generic.List<global::App.GetUserDto>()"
-                        : "global::System.Collections.Immutable." + buffer + ".CreateBuilder<global::App.GetUserDto>()"
-                )
+                + buffer switch
+                {
+                    "List" => "new global::System.Collections.Generic.List<global::App.GetUserDto>()",
+                    "RowBuffer" => "new global::App.SqlSourceRowBuffer<global::App.GetUserDto>()",
+                    _ => "global::System.Collections.Immutable." + buffer + ".CreateBuilder<global::App.GetUserDto>()",
+                }
                 + ";\n"
                 + "        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
                 + "        {\n"
@@ -343,6 +348,30 @@ public sealed class QueryMethodWriterTests
                 + "    }\n"
                 + "    finally\n"
         );
+    }
+
+    // Under no-array-pool the four types the buffer serves read their rows into a list, as before the buffer.
+    [Theory]
+    [InlineData(nameof(CollectionKind.Array))]
+    [InlineData(nameof(CollectionKind.IEnumerable))]
+    [InlineData(nameof(CollectionKind.IReadOnlyCollection))]
+    [InlineData(nameof(CollectionKind.IReadOnlyList))]
+    public void Append_EachPooledCollectionTypeUnderNoArrayPool_BuffersInAList(string collectionName)
+    {
+        var text = Write(
+            GetUser with
+            {
+                Shape = ResultShape.Many,
+                Collection = Enum.Parse<CollectionKind>(collectionName),
+                UseArrayPool = false,
+            }
+        );
+
+        text.ShouldContain(
+            "        var rows = new global::System.Collections.Generic.List<global::App.GetUserDto>();\n"
+        );
+        text.ShouldContain("        return rows.ToArray();\n");
+        text.ShouldNotContain("SqlSourceRowBuffer");
     }
 
     [Theory]
@@ -761,7 +790,14 @@ public sealed class QueryMethodWriterTests
                         Input = index % 3 == 0 ? null : GetUser.Input,
                     };
                     // Every awkward method once by each placement: the segments go by twos, the placement by fours.
-                    QueryMethodWriter.Append(builder, "        ", method, "public static", isExtension: index % 4 < 2);
+                    QueryMethodWriter.Append(
+                        builder,
+                        "        ",
+                        method,
+                        "public static",
+                        isExtension: index % 4 < 2,
+                        RowBufferType
+                    );
                 }
             }
         }
@@ -799,8 +835,13 @@ public sealed class QueryMethodWriterTests
                 }
             }
 
+            namespace App
+            {
+
             """
         );
+        RowBuffer.Append(builder, "    ", RowBuffer.Name);
+        _ = builder.Append("}\n");
 
         var compilation = GeneratorHarness.CreateCompilation(
             [new SourceFile("/app/Queries.cs", "#nullable enable\n" + builder)],
@@ -833,7 +874,7 @@ public sealed class QueryMethodWriterTests
     private static string Write(QueryMethod method, string modifiers = "public static", bool isExtension = true)
     {
         var builder = new StringBuilder();
-        QueryMethodWriter.Append(builder, string.Empty, method, modifiers, isExtension);
+        QueryMethodWriter.Append(builder, string.Empty, method, modifiers, isExtension, RowBufferType);
         return builder.ToString();
     }
 }
