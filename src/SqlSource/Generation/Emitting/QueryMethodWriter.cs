@@ -296,7 +296,19 @@ internal static class QueryMethodWriter
     {
         if (RowBuffer.IsUsedBy(method))
         {
-            return ("new " + rowBufferType + "<" + row + ">()", rows + ".ToArray()");
+            var toResult = method.Collection switch
+            {
+                CollectionKind.List or CollectionKind.IList or CollectionKind.ICollection => ".ToList()",
+                CollectionKind.ImmutableArray => ".ToImmutableArray()",
+                CollectionKind.Array
+                or CollectionKind.IEnumerable
+                or CollectionKind.IReadOnlyCollection
+                or CollectionKind.IReadOnlyList
+                or CollectionKind.ImmutableList
+                or CollectionKind.IImmutableList
+                or _ => ".ToArray()",
+            };
+            return ("new " + rowBufferType + "<" + row + ">()", rows + toResult);
         }
 
         return method.Collection switch

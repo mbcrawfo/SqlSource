@@ -350,10 +350,12 @@ internal static class GeneratedFile
     public const string Header =
         ModelHeader + "#pragma warning disable CS0108, CS0114 // A query can have the name of an inherited member.\n";
 
-    public const string RowBuffer = RowBufferToGrow + RowBufferGrowLine + RowBufferAfterGrow;
+    public const string RowBuffer =
+        RowBufferToImmutable + RowBufferAsImmutableLine + RowBufferToGrow + RowBufferGrowLine + RowBufferAfterGrow;
 
-    // The buffer up to the line of Grow that is longer than the width of a line here, and after it.
-    private const string RowBufferToGrow = """
+    // The buffer up to the line of ToImmutableArray that is longer than the width of a line here, up to the line of
+    // Grow that is, and after it.
+    private const string RowBufferToImmutable = """
             /// <summary>
             /// The rows of a query method, read into buffers from the shared array pool: one of up to 1,024 elements is
             /// rented and returned cleared, and a larger one is left to the garbage collector.
@@ -383,14 +385,53 @@ internal static class GeneratedFile
                     }
 
                     var result = new T[count];
+                    Rows().CopyTo(result);
+                    Release();
+                    return result;
+                }
+
+                public global::System.Collections.Generic.List<T> ToList()
+                {
+                    if (items is null)
+                    {
+                        return new global::System.Collections.Generic.List<T>();
+                    }
+
+                    var result = new global::System.Collections.Generic.List<T>(count);
+                    global::System.Runtime.InteropServices.CollectionsMarshal.SetCount(result, count);
+                    Rows().CopyTo(global::System.Runtime.InteropServices.CollectionsMarshal.AsSpan(result));
+                    Release();
+                    return result;
+                }
+
+                public global::System.Collections.Immutable.ImmutableArray<T> ToImmutableArray()
+                {
+                    if (items is null)
+                    {
+                        return global::System.Collections.Immutable.ImmutableArray<T>.Empty;
+                    }
+
+
+        """;
+
+    private const string RowBufferAsImmutableLine =
+        "            return global::System.Runtime.InteropServices.ImmutableCollectionsMarshal.AsImmutableArray("
+        + "ToArray());\n";
+
+    private const string RowBufferToGrow = """
+                }
+
+                private global::System.ReadOnlySpan<T> Rows() =>
                     global::System.Runtime.InteropServices.MemoryMarshal.CreateReadOnlySpan(
                         ref global::System.Runtime.CompilerServices.Unsafe.As<object, T>(
-                            ref global::System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(items)),
-                        count).CopyTo(result);
-                    Return(items);
+                            ref global::System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(items!)),
+                        count);
+
+                private void Release()
+                {
+                    Return(items!);
                     items = null;
                     count = 0;
-                    return result;
                 }
 
                 private void Grow()

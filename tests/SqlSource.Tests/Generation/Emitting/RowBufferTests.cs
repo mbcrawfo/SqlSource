@@ -39,10 +39,14 @@ public sealed class RowBufferTests
         CollectionKind.IEnumerable,
         CollectionKind.IReadOnlyCollection,
         CollectionKind.IReadOnlyList,
+        CollectionKind.List,
+        CollectionKind.IList,
+        CollectionKind.ICollection,
+        CollectionKind.ImmutableArray,
     ];
 
     [Fact]
-    public void IsUsedBy_EachShapeCollectionAndFlag_IsTrueOnlyForAPooledManyOfTheFourTypes()
+    public void IsUsedBy_EachShapeCollectionAndFlag_IsTrueOnlyForAPooledManyOfAllButTheImmutableLists()
     {
         foreach (var shape in Enum.GetValues<ResultShape>())
         {
