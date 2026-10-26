@@ -86,7 +86,12 @@ internal static class MethodEmitter
 
         var modifiers = ModifiersOf(methods.Placement);
         var memberIndent = TypeEmitter.GetIndent(depth);
-        var usesRowBuffer = kept.Any(RowBuffer.IsUsedBy);
+        var usesRowBuffer = false;
+        for (var index = 0; index < kept.Count && !usesRowBuffer; index++)
+        {
+            usesRowBuffer = RowBuffer.IsUsedBy(kept[index]);
+        }
+
         var rowBufferType = usesRowBuffer ? RowBuffer.TypeTextFor(methods) : string.Empty;
         for (var index = 0; index < kept.Count; index++)
         {

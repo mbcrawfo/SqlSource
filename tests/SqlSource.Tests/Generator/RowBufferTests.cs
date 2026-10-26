@@ -123,85 +123,27 @@ public sealed class RowBufferTests
         run.ShouldBeClean();
         run.Sources[MethodRuns.MethodsFile]
             .ShouldBe(
-                Joined(
-                    $$$"""
-                    {{{GeneratedFile.ModelHeader}}}
-                    namespace App
-                    {
-                        /// <summary>
-                        /// The query methods of <c>App.Sample</c>, which extend the connection they run on.
-                        /// </summary>
-                        public static partial class SampleExtensions
-                        {
-                            /// <summary>
-                            /// The <c>ListUsers</c> query from <c>Users.sql</c>.
-                            /// </summary>
-                            /// <remarks>
-                            /// <code>
-                            /// SELECT id, name FROM users;
-                            /// </code>
-                            /// </remarks>
-                            /// <param name="connection">The connection to run the query on.  ↩
-                        It is opened when it is closed, and closed again when the method opened it.</param>
-                            /// <param name="transaction">The transaction to run the query in, or null.</param>
-                            /// <param name="commandTimeout">↩
-                        The command's timeout in seconds, or null for the driver's.</param>
-                            /// <param name="cancellationToken">Cancels the query.</param>
-                            /// <returns>The rows the query returned.</returns>
-                            public static async global::System.Threading.Tasks.Task<global::App.ListUsersDto[]> ↩
-                        ListUsers(
-                                this global::System.Data.Common.DbConnection connection,
-                                global::System.Data.Common.DbTransaction? transaction = null,
-                                int? commandTimeout = null,
-                                global::System.Threading.CancellationToken cancellationToken = default)
-                            {
-                                global::System.ArgumentNullException.ThrowIfNull(connection);
-                                const string sql = "SELECT id, name FROM users;";
-                                var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
-                                if (wasClosed)
-                                {
-                                    await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-                                }
-
-                                try
-                                {
-                                    var command = connection.CreateCommand();
-                                    await using var commandScope = ↩
-                        global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(command, false);
-                                    command.CommandText = sql;
-                                    command.Transaction = transaction;
-                                    if (commandTimeout.HasValue)
-                                    {
-                                        command.CommandTimeout = commandTimeout.Value;
-                                    }
-
-                                    var reader = await command.ExecuteReaderAsync(↩
-                        global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
-                                    await using var readerScope = ↩
-                        global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
-                                    var rows = new global::App.SqlSourceRowBuffer<global::App.ListUsersDto>();
-                                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                                    {
-                                        rows.Add(new global::App.ListUsersDto(reader.GetFieldValue<int>(0), ↩
-                        reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1)));
-                                    }
-
-                                    return rows.ToArray();
-                                }
-                                finally
-                                {
-                                    if (wasClosed)
-                                    {
-                                        await connection.CloseAsync().ConfigureAwait(false);
-                                    }
-                                }
-                            }
-                        }
-
-                    {{{GeneratedFile.RowBuffer}}}}
-
-                    """
+                ListUsersMethods(
+                    "new global::App.SqlSourceRowBuffer<global::App.ListUsersDto>()",
+                    "\n" + GeneratedFile.RowBuffer + "}\n"
                 )
+            );
+    }
+
+    // Under no-array-pool the method reads its rows into a list, as before the buffer, and the file has no buffer.
+    [Fact]
+    public void Run_ArrayMethodUnderNoArrayPool_WritesTheMethodWithAListAndNoBuffer()
+    {
+        var run = MethodRuns.Run(
+            ListUsers,
+            [Users(ListUsers, "ListUsers")],
+            MethodRuns.SampleSource("Parameters = \"no-array-pool\"")
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile]
+            .ShouldBe(
+                ListUsersMethods("new global::System.Collections.Generic.List<global::App.ListUsersDto>()", "}\n")
             );
     }
 
@@ -267,6 +209,87 @@ public sealed class RowBufferTests
         run.ShouldBeClean();
         MethodsOf(run).ShouldContain(buffer);
     }
+
+    // The file of ListUsers's methods on App.Sample, its rows read into the buffer, and the end after the extension
+    // class: the buffer and the namespace's brace, or the brace alone.
+    private static string ListUsersMethods(string buffer, string end) =>
+        Joined(
+            $$$"""
+            {{{GeneratedFile.ModelHeader}}}
+            namespace App
+            {
+                /// <summary>
+                /// The query methods of <c>App.Sample</c>, which extend the connection they run on.
+                /// </summary>
+                public static partial class SampleExtensions
+                {
+                    /// <summary>
+                    /// The <c>ListUsers</c> query from <c>Users.sql</c>.
+                    /// </summary>
+                    /// <remarks>
+                    /// <code>
+                    /// SELECT id, name FROM users;
+                    /// </code>
+                    /// </remarks>
+                    /// <param name="connection">The connection to run the query on.  ↩
+                It is opened when it is closed, and closed again when the method opened it.</param>
+                    /// <param name="transaction">The transaction to run the query in, or null.</param>
+                    /// <param name="commandTimeout">↩
+                The command's timeout in seconds, or null for the driver's.</param>
+                    /// <param name="cancellationToken">Cancels the query.</param>
+                    /// <returns>The rows the query returned.</returns>
+                    public static async global::System.Threading.Tasks.Task<global::App.ListUsersDto[]> ↩
+                ListUsers(
+                        this global::System.Data.Common.DbConnection connection,
+                        global::System.Data.Common.DbTransaction? transaction = null,
+                        int? commandTimeout = null,
+                        global::System.Threading.CancellationToken cancellationToken = default)
+                    {
+                        global::System.ArgumentNullException.ThrowIfNull(connection);
+                        const string sql = "SELECT id, name FROM users;";
+                        var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
+                        if (wasClosed)
+                        {
+                            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                        }
+
+                        try
+                        {
+                            var command = connection.CreateCommand();
+                            await using var commandScope = ↩
+                global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(command, false);
+                            command.CommandText = sql;
+                            command.Transaction = transaction;
+                            if (commandTimeout.HasValue)
+                            {
+                                command.CommandTimeout = commandTimeout.Value;
+                            }
+
+                            var reader = await command.ExecuteReaderAsync(↩
+                global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
+                            await using var readerScope = ↩
+                global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
+                            var rows = {{{buffer}}};
+                            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                            {
+                                rows.Add(new global::App.ListUsersDto(reader.GetFieldValue<int>(0), ↩
+                reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1)));
+                            }
+
+                            return rows.ToArray();
+                        }
+                        finally
+                        {
+                            if (wasClosed)
+                            {
+                                await connection.CloseAsync().ConfigureAwait(false);
+                            }
+                        }
+                    }
+                }
+            {{{end}}}
+            """
+        );
 
     // ListUsers on App.Sample with the attribute's arguments.
     private static GeneratorRun RunListUsers(string arguments) =>

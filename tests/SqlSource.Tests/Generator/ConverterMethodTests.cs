@@ -379,9 +379,10 @@ public sealed class ConverterMethodTests
         ModelFiles(run).ShouldContain("App.GetEmailDto-Model.g.cs");
     }
 
-    // An override with no converter is read and bound as the driver reads and binds the type, as before converters.
+    // An override with no converter is read and bound as the driver reads and binds the type, as before converters:
+    // the methods are 8.1's apart from the row buffer.
     [Fact]
-    public void Run_ProjectWithoutConverters_GeneratesAs81()
+    public void Run_ProjectWithoutConverters_GeneratesAs81ApartFromTheRowBuffer()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,

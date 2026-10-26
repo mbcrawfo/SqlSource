@@ -11,29 +11,12 @@ namespace SqlSource.Tests.Generation.Emitting;
 
 public sealed class RowBufferTests
 {
-    // The shape of QueryMethodWriterTests' GetUser: no parameter, a record of two columns.
-    private static readonly QueryMethod GetUser = new(
-        "GetUser",
-        "GetUser",
-        "The <c>GetUser</c> query from <c>Users.sql</c>.",
-        ResultShape.Many,
-        CollectionKind.Array,
-        DatabaseEngine.PostgreSql,
-        TestModels.Array(TestModels.Literal("SELECT id, name FROM users")),
-        true,
-        true,
-        null,
-        new MethodOutput(
-            "global::App.GetUserDto",
-            true,
-            TestModels.Array(
-                new MethodColumn("id", "Id", "int", false),
-                new MethodColumn("name", "Name", "string", true)
-            ),
-            TestModels.Array(0, 1)
-        ),
-        TestModels.NameLocation("Users.sql")
-    );
+    // QueryMethodWriterTests' GetUser, reading many rows into an array.
+    private static readonly QueryMethod ListUsers = QueryMethodWriterTests.GetUser with
+    {
+        Shape = ResultShape.Many,
+        Collection = CollectionKind.Array,
+    };
 
     private static readonly HashSet<CollectionKind> Pooled =
     [
@@ -52,7 +35,7 @@ public sealed class RowBufferTests
             {
                 foreach (var useArrayPool in new[] { true, false })
                 {
-                    var method = GetUser with { Shape = shape, Collection = collection, UseArrayPool = useArrayPool };
+                    var method = ListUsers with { Shape = shape, Collection = collection, UseArrayPool = useArrayPool };
                     var expected = shape == ResultShape.Many && useArrayPool && Pooled.Contains(collection);
 
                     RowBuffer
@@ -134,7 +117,7 @@ public sealed class RowBufferTests
             name + "Extensions",
             true,
             TestModels.AttributeLocation,
-            TestModels.Array(GetUser),
+            TestModels.Array(ListUsers),
             EquatableArray<DiagnosticInfo>.Empty,
             CodeGenEngines.Postgres,
             EquatableArray<string>.Empty
