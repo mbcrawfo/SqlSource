@@ -13,8 +13,9 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // The generator parameter no-array-pool: read at every level a list is, the nearest list replacing the farther ones
-// whole, and carried to the query's method as QueryMethod.UseArrayPool.  No generated code reads it yet, so the
-// methods are written the same with it and without it.
+// whole, and carried to the query's method as QueryMethod.UseArrayPool.  A many method that returns an array or a
+// read-only interface reads its rows into a pooled buffer without it and into a list with it; every other method is
+// written the same with it and without it.
 public sealed class ArrayPoolParameterTests
 {
     private const string On = "no-array-pool";
@@ -67,29 +68,33 @@ public sealed class ArrayPoolParameterTests
     }
 
     [Theory]
-    [InlineData("IEnumerable")]
     [InlineData("ICollection")]
-    [InlineData("IReadOnlyCollection")]
     [InlineData("IList")]
-    [InlineData("IReadOnlyList")]
-    [InlineData("Array")]
     [InlineData("List")]
     [InlineData("ImmutableArray")]
     [InlineData("ImmutableList")]
     [InlineData("IImmutableList")]
     public void Run_NoArrayPool_LeavesTheGeneratedTextAsItIs(string collection)
     {
-        var collectionType = "CollectionType = GeneratorCollectionType." + collection;
-        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListUsers\nSELECT id, name FROM users;\n");
+        var (pooled, unpooled) = RunBoth(collection);
 
-        var pooled = Run(file, collectionType, null, attributeArguments: true);
-        var unpooled = Run(file, collectionType + ", Parameters = \"no-array-pool\"", null, attributeArguments: true);
-
-        pooled.ShouldBeClean();
-        unpooled.ShouldBeClean();
-        Method(pooled).UseArrayPool.ShouldBeTrue();
-        Method(unpooled).UseArrayPool.ShouldBeFalse();
         unpooled.Sources[MethodRuns.MethodsFile].ShouldBe(pooled.Sources[MethodRuns.MethodsFile]);
+        pooled.Sources[MethodRuns.MethodsFile].ShouldNotContain("SqlSourceRowBuffer");
+    }
+
+    [Theory]
+    [InlineData("Array")]
+    [InlineData("IEnumerable")]
+    [InlineData("IReadOnlyCollection")]
+    [InlineData("IReadOnlyList")]
+    public void Run_NoArrayPool_GivesTodaysTextForThePooledTypes(string collection)
+    {
+        var (pooled, unpooled) = RunBoth(collection);
+
+        var unpooledMethods = unpooled.Sources[MethodRuns.MethodsFile];
+        unpooledMethods.ShouldNotBe(pooled.Sources[MethodRuns.MethodsFile]);
+        unpooledMethods.ShouldContain("new global::System.Collections.Generic.List<");
+        unpooledMethods.ShouldNotContain("SqlSourceRowBuffer");
     }
 
     // The other shapes read no list of rows, and the parameter leaves their methods as they are too.
@@ -137,6 +142,22 @@ public sealed class ArrayPoolParameterTests
         diagnostic.ShouldStartWith("SQLSRC006 /app/Repo/Sample.cs(");
         diagnostic.ShouldEndWith("'nope' is not a valid value of Parameters");
         run.Sources.ShouldNotContainKey(MethodRuns.MethodsFile);
+    }
+
+    // ListUsers of the collection type, without and with no-array-pool, each clean.
+    private static (GeneratorRun Pooled, GeneratorRun Unpooled) RunBoth(string collection)
+    {
+        var collectionType = "CollectionType = GeneratorCollectionType." + collection;
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListUsers\nSELECT id, name FROM users;\n");
+
+        var pooled = Run(file, collectionType, null, attributeArguments: true);
+        var unpooled = Run(file, collectionType + ", Parameters = \"no-array-pool\"", null, attributeArguments: true);
+
+        pooled.ShouldBeClean();
+        unpooled.ShouldBeClean();
+        Method(pooled).UseArrayPool.ShouldBeTrue();
+        Method(unpooled).UseArrayPool.ShouldBeFalse();
+        return (pooled, unpooled);
     }
 
     // The one method the run planned for App.Sample.
