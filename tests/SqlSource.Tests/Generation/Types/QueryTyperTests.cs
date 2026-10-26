@@ -8,6 +8,7 @@ using SqlSource.Generation.Sidecars;
 using SqlSource.Generation.Types;
 using SqlSource.Parsing;
 using SqlSource.Settings;
+using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 using SqlSource.Testing;
@@ -295,6 +296,51 @@ public sealed class QueryTyperTests
 
         types.Diagnostics.ShouldBeEmpty();
         ColumnTexts(types).ShouldBe([expected]);
+    }
+
+    // A settings file names itself in a diagnostic about a type it mapped: its path, and the setting it wrote.
+    [Fact]
+    public void Type_TypeOverrideOfASettingsFile_NamesTheFileInSqlsrc250()
+    {
+        var entry = Entry(SidecarValues.Engine.Postgres, columns: [TestSidecars.Postgres()]);
+        var level = new SettingsLevel
+        {
+            TypeOverrides = TestSidecars.Of(
+                new TypeOverride("int4", "MyApp.Missing", SettingPlace.OfSettingsFile("/app/sqlsource.json", 1))
+            ),
+        };
+
+        var types = QueryTyper.Type(InputOf(SqlDialect.PostgreSql, entry, level));
+
+        var diagnostic = types.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.MappedTypeNotFound);
+        diagnostic.Arguments[3].ShouldBe("the typeOverrides of the settings file /app/sqlsource.json");
+    }
+
+    [Fact]
+    public void Type_ColumnTypeOfASettingsFile_NamesTheFileInSqlsrc250()
+    {
+        var origin = new SidecarOrigin("public", "users", "id");
+        var entry = TestSidecars.Entry(
+            "GetUser",
+            columns: [TestSidecars.Column(0, "id", TestSidecars.Postgres(), origin: origin)]
+        );
+        var level = new SettingsLevel
+        {
+            ColumnTypes = TestSidecars.Of(
+                new ColumnType(
+                    "public.users.id",
+                    "MyApp.Missing",
+                    SettingPlace.OfSettingsFile("/app/sqlsource.json", 1)
+                )
+            ),
+        };
+
+        var types = QueryTyper.Type(InputOf(SqlDialect.PostgreSql, entry, level));
+
+        var diagnostic = types.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.MappedTypeNotFound);
+        diagnostic.Arguments[3].ShouldBe("the columnTypes of the settings file /app/sqlsource.json");
     }
 
     // The entry under mssql, with no type override, gives no query and SQLSRC246 with the subject, the type's name and

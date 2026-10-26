@@ -388,12 +388,12 @@ public sealed class SettingsLevelReaderTests
     // written as the member's name.
     private struct FakeSource(
         Dictionary<SettingId, string> texts,
-        SettingPlace place = SettingPlace.Property,
+        SettingPlace? place = null,
         Dictionary<SettingId, string[]>? elements = null,
         Dictionary<SettingId, KeyValuePair<string, string>[]>? members = null
     ) : ISettingSource
     {
-        public readonly SettingPlace Place => place;
+        public readonly SettingPlace Place => place ?? SettingPlace.Property;
 
         public List<(SettingId Setting, string Value)> Invalids { get; } = [];
 

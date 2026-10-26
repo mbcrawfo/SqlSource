@@ -35,7 +35,7 @@ public sealed class SettingsFileReaderTests
         }
         """;
 
-    private const SettingPlace Place = SettingPlace.Metadata;
+    private static readonly SettingPlace Place = SettingPlace.Metadata;
 
     // Each key whose value is a string and sets a member of the level, with that member.
     private static readonly Dictionary<string, Func<SettingsLevel, object?>> StringSettings = new()

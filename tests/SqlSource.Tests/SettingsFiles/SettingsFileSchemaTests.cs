@@ -16,7 +16,7 @@ namespace SqlSource.Tests.SettingsFiles;
 // keeps its keys, types and choices in step with the reader's.
 public sealed class SettingsFileSchemaTests
 {
-    private const SettingPlace Place = SettingPlace.Metadata;
+    private static readonly SettingPlace Place = SettingPlace.Metadata;
 
     private static readonly string SchemaText = File.ReadAllText(
         Path.Combine(AppContext.BaseDirectory, "schemas", "settings-v1.schema.json")

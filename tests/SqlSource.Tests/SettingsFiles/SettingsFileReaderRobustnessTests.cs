@@ -12,7 +12,7 @@ namespace SqlSource.Tests.SettingsFiles;
 // exception in the generator costs every type its generated code.
 public sealed class SettingsFileReaderRobustnessTests
 {
-    private const SettingPlace Place = SettingPlace.Metadata;
+    private static readonly SettingPlace Place = SettingPlace.Metadata;
 
     [Fact]
     public void Read_DesignsExampleCutShortAnywhere_ReturnsWithAnError()

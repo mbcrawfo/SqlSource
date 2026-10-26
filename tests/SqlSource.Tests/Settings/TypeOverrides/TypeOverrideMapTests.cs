@@ -218,10 +218,20 @@ public sealed class TypeOverrideMapTests
     [InlineData("Query", "Property")]
     public void Find_PlainEntryAboveAnExactOne_Wins(string higher, string lower)
     {
-        var above = Entry("public.User_Status", "global::App.B", Enum.Parse<SettingPlace>(higher));
+        var above = Entry(
+            "public.User_Status",
+            "global::App.B",
+            new SettingPlace(Enum.Parse<SettingPlaceKind>(higher), null, 0)
+        );
         var merged = TypeOverrideMap.Over(
             Map(above),
-            Map(Entry("public.user_status", "global::App.A", Enum.Parse<SettingPlace>(lower)))
+            Map(
+                Entry(
+                    "public.user_status",
+                    "global::App.A",
+                    new SettingPlace(Enum.Parse<SettingPlaceKind>(lower), null, 0)
+                )
+            )
         )!;
 
         TypeOverrideMap.Find(merged.Value, "public.user_status").ShouldBe(above);
