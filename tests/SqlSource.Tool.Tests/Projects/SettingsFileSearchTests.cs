@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -15,8 +16,8 @@ namespace SqlSource.Tool.Tests.Projects;
 // with SkipCompilerExecution and ProvideCommandLineArgs.  The copy is restored first, outside the repository.
 public sealed class SettingsFileSearchTests : IDisposable
 {
-    // The settings files the search finds in the fixture, relative to its folder.  Unused/sqlsource.json is in a
-    // folder that holds no .sql or C# file, and has none below it.
+    // The settings files the search finds in the fixture before the compiler, relative to its folder, and those the
+    // manifest lists.  Unused/sqlsource.json is in a folder that holds no .sql or C# file, and has none below it.
     internal static readonly string[] Found =
     [
         "sqlsource.json",
@@ -27,16 +28,42 @@ public sealed class SettingsFileSearchTests : IDisposable
         "App/Code/sqlsource.json",
     ];
 
+    // Beside the .sql file that a target of Directory.Build.targets adds from a hook of CoreCompile.
+    private const string BesideTheFileAddedBeforeCompile = "App/Compiled/sqlsource.json";
+
     private readonly FixtureProjects _fixtures = new();
 
     public void Dispose() => _fixtures.Dispose();
 
+    // The search runs from SqlSource.AfterSdk.targets, which the SDK imports after Directory.Build.targets, so it runs
+    // after the target there that hooks CoreCompile, and finds the settings file beside the file that target adds.
     [Fact]
     public async Task Compile_DesignTimeBuild_GivesTheCompilerEverySettingsFileOnce()
     {
+        var (fixture, files) = await SettingsFilesGivenAsync();
+
+        files.ShouldBe(InFixture(fixture, [.. Found, BesideTheFileAddedBeforeCompile]), ignoreOrder: true);
+    }
+
+    // A project that sets AfterMicrosoftNETSdkTargets without keeping its value, as a global property does here,
+    // loses the file that runs the search last.  The search then runs where the trims run, and finds every settings
+    // file but the one beside a file that a later target adds.
+    [Fact]
+    public async Task Compile_DesignTimeBuildWithoutTheTargetsImportedLast_SearchesBeforeTheFileTheCompilerReads()
+    {
+        var (fixture, files) = await SettingsFilesGivenAsync("-p:AfterMicrosoftNETSdkTargets=");
+
+        files.ShouldBe(InFixture(fixture, Found), ignoreOrder: true);
+    }
+
+    private static IEnumerable<string> InFixture(string fixture, IEnumerable<string> files) =>
+        files.Select(file => Path.Combine(fixture, file.Replace('/', Path.DirectorySeparatorChar)));
+
+    // The full paths of the settings files a design-time build gives the compiler, each as often as it is given.
+    private async Task<(string Fixture, List<string> Files)> SettingsFilesGivenAsync(params string[] properties)
+    {
         var project = _fixtures.Copy("SettingsFiles", "App/App.csproj");
         var folder = Path.GetDirectoryName(project)!;
-        var fixture = Path.GetDirectoryName(folder)!;
 
         var (exitCode, output) = await FixtureProjects.RunMSBuildAsync(
             project,
@@ -47,26 +74,23 @@ public sealed class SettingsFileSearchTests : IDisposable
                 "-p:BuildingProject=false",
                 "-p:SkipCompilerExecution=true",
                 "-p:ProvideCommandLineArgs=true",
+                .. properties,
                 "-getItem:CscCommandLineArgs",
             ]
         );
 
         exitCode.ShouldBe(0, output);
         const string Switch = "/additionalfile:";
-        var arguments = JsonDocument
+        var files = JsonDocument
             .Parse(output[output.IndexOf('{', StringComparison.Ordinal)..])
             .RootElement.GetProperty("Items")
             .GetProperty("CscCommandLineArgs")
             .EnumerateArray()
             .Select(item => item.GetProperty("Identity").GetString()!)
-            .ToList();
-        arguments
             .Where(argument => argument.StartsWith(Switch, StringComparison.Ordinal))
             .Select(argument => Path.GetFullPath(argument[Switch.Length..], folder))
             .Where(path => Path.GetFileName(path) == "sqlsource.json")
-            .ShouldBe(
-                Found.Select(file => Path.Combine(fixture, file.Replace('/', Path.DirectorySeparatorChar))),
-                ignoreOrder: true
-            );
+            .ToList();
+        return (Path.GetDirectoryName(folder)!, files);
     }
 }

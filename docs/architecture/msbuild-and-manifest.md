@@ -4,15 +4,16 @@ How [`build/SqlSource.props`](../../src/SqlSource/build/SqlSource.props) and [`b
 
 ## What the props and targets do
 
-NuGet imports the props into each project that references the package before the project's own content, and the targets after it.
+NuGet imports the props into each project that references the package before the project's own content, and the targets after it.  The props have the SDK import a third file, [`build/SqlSource.AfterSdk.targets`](../../src/SqlSource/build/SqlSource.AfterSdk.targets), after all of its own targets: see [finding the settings files](#finding-the-settings-files).
 
-The props do three things.
+The props do four things.
 
 - They set `SqlSourceImported` to `true`, with no condition.  The tool asks a project for this property, and for nothing else, to tell whether it uses SqlSource.  It is in the props because they reach a project whether the package came from NuGet or its files are imported by path.  A project that was never restored has no props of a package, and so no marker.
+- They add `SqlSource.AfterSdk.targets` to `AfterMicrosoftNETSdkTargets`, the list of files the SDK imports last, keeping the list's value.
 - They add every `.sql` file under the project's folder as an `AdditionalFiles` item, the only way a source generator sees a file, unless the project sets `SqlSourceIncludeFiles` to `false`.  The item comes before the project's content, so a project can remove files from it.  The same condition and the same excludes give the compiler every `.sql.json` file too, a `.sql` file's sidecar, which the generator reads; a project that sets `SqlSourceIncludeFiles` to `false` lists its sidecars itself.  Items are evaluated after every property, so `DefaultItemExcludes` already holds the output and intermediate folders, whatever the project sets them to.
 - They list the twelve settings that the generator reads as `CompilerVisibleProperty` items, and eleven of them as `CompilerVisibleItemMetadata` of `SqlSourceSettingsFile`: all but `SqlSourceNestedClass`, which is a property alone.  A generator sees only the properties and metadata that are listed.  None of these is under the condition of `SqlSourceIncludeFiles`, since a project that lists its own `.sql` files still needs them.  `SqlSourceDatabase` is not listed: the tool reads it and the generator does not, as [the tool runs the same code](generator.md#the-tool-runs-the-same-code) explains.  `SqlSourceTypeOverrides` and `SqlSourceColumnTypes` are the other way round: listed, and not read by the tool.
 
-The targets hold five targets of a build, which all hook `GenerateMSBuildEditorConfigFileCore`, the target of the SDK that writes the file the compiler reads the properties and metadata from.  They also hold `SqlSourceWriteManifest`, which no build runs, the `PropertyGroup` that lists what it depends on, an `ItemGroup` that nests each sidecar under its `.sql` file and keeps it out of the output and publish folders, and an `ItemGroup` that keeps the settings files out of them too.  An arrow means "runs before":
+The targets hold five targets of a build.  Three hook `GenerateMSBuildEditorConfigFileCore`, the target of the SDK that writes the file the compiler reads the properties and metadata from; the search for settings files and the tracking of additional files hook `CoreCompile` from `SqlSource.AfterSdk.targets`, or `GenerateMSBuildEditorConfigFileCore` where that file is not imported.  They also hold `SqlSourceWriteManifest`, which no build runs, the `PropertyGroup` that lists what it depends on, an `ItemGroup` that nests each sidecar under its `.sql` file and keeps it out of the output and publish folders, and an `ItemGroup` that keeps the settings files out of them too.  An arrow means "runs before":
 
 ```mermaid
 flowchart LR
@@ -21,9 +22,9 @@ flowchart LR
     trimMetadata --> sdk
     collect --> sdk
     trimMetadata --> find["SqlSourceFindSettingsFiles"]
-    find --> sdk
     find --> track["SqlSourceTrackAdditionalFiles"]
-    track --> sdk
+    track --> late["SqlSourceSettingsFilesBeforeCompile (SqlSource.AfterSdk.targets)"]
+    late --> compile["CoreCompile (SDK)"]
     trimProperties --> manifest["SqlSourceWriteManifest (run by the tool)"]
     trimMetadata --> manifest
     find --> manifest
@@ -44,9 +45,11 @@ A settings file, `sqlsource.json`, applies to its folder and every folder below 
 
 The target adds each file it finds as an `AdditionalFiles` item, unless the project lists it already: the comparison is of full paths, since a project may list the file by a relative one, and the compiler is given none twice.  Each item it adds is `Visible="false"`.  An IDE lists the items of a project as evaluated, never one a target adds, so the metadata is for one that might; a settings file in the project's folder is listed anyway, as `None`, or as `Content` in the Web SDK.
 
-It runs before `GenerateMSBuildEditorConfigFileCore`, and not where the targets are imported, so that a `.sql` file a target adds is searched above too.  It depends on `SqlSourceTrimMetadataOfFiles`, the target that the manual tells such a target to hook, so that the target runs first, in a build and before the manifest.  A design-time build of an IDE runs it, since that build runs `Compile` with the compiler skipped, and the compiler's arguments then hold every file found: `SettingsFileSearchTests` in `tests/SqlSource.Tool.Tests/Projects/` holds it.
+It runs in a target, and not where the targets are imported, so that a `.sql` file a target adds is searched above too, and it runs as late as it can: just before `CoreCompile`, after every target of the project that hooks it.  MSBuild runs the targets that hook one target in the order they are declared, and NuGet imports the package's targets before `Directory.Build.targets`, so a target there that hooks `CoreCompile` to add a `.sql` file would run after a search declared in `SqlSource.targets`.  So the props add `SqlSource.AfterSdk.targets` to `AfterMicrosoftNETSdkTargets`, which the SDK imports after all of its targets and after `Directory.Build.targets`, and `SqlSourceSettingsFilesBeforeCompile` there hooks `CoreCompile` and depends on the search and on the tracking.  That file also empties `SqlSourceSettingsSearchHook`, the property the two targets hook in `SqlSource.targets`, which is `GenerateMSBuildEditorConfigFileCore` otherwise; so they run once, from there.  Where the file is not imported, in a project that is not of the SDK or one that sets `AfterMicrosoftNETSdkTargets` without keeping its value, they run before `GenerateMSBuildEditorConfigFileCore`, as the trims do, and a `.sql` file that a later target adds is not searched above.
 
-`SqlSourceTrackAdditionalFiles` depends on it, so that a settings file added, deleted or moved changes the hash, and the next build compiles again.
+The search depends on `SqlSourceTrimMetadataOfFiles`, the target that the manual tells a target that adds a `.sql` file to hook, so that the target runs first, before the manifest too.  A design-time build of an IDE runs the search, since that build runs `Compile` with the compiler skipped, and the compiler's arguments then hold every file found, the one beside a file that a target of `Directory.Build.targets` adds from a hook of `CoreCompile` included: `SettingsFileSearchTests` in `tests/SqlSource.Tool.Tests/Projects/` holds it, with and without `SqlSource.AfterSdk.targets`.
+
+`SqlSourceTrackAdditionalFiles` depends on it, so that a settings file added, deleted or moved changes the hash, and the next build compiles again.  It runs where the search runs, so a `.sql` file that a target adds before the compiler is in the hash too.
 
 ### Keeping the settings files out of the output
 
@@ -62,7 +65,7 @@ The compiler finds the metadata of a file by its path, so the generator still re
 
 ### Tracking additional files
 
-`SqlSourceTrackAdditionalFiles` makes the build after a `.sql` file or a settings file is deleted, renamed or moved compile again.  A file that is gone has no timestamp to compare, and the SDK's own record of what the compiler was given does not hold `AdditionalFiles`.  So the target writes a hash of the list of `AdditionalFiles` to a file under the intermediate folder, and names that file as a `CustomAdditionalCompileInputs` item, the item the SDK reads for more inputs of the compiler.  It writes the file only when the hash changes, so a build with the same files does not compile for it.  It depends on [the search](#finding-the-settings-files), so that the list holds the settings files.
+`SqlSourceTrackAdditionalFiles` makes the build after a `.sql` file or a settings file is deleted, renamed or moved compile again.  A file that is gone has no timestamp to compare, and the SDK's own record of what the compiler was given does not hold `AdditionalFiles`.  So the target writes a hash of the list of `AdditionalFiles` to a file under the intermediate folder, and names that file as a `CustomAdditionalCompileInputs` item, the item the SDK reads for more inputs of the compiler.  It writes the file only when the hash changes, so a build with the same files does not compile for it.  It depends on [the search](#finding-the-settings-files), so that the list holds the settings files, and runs where the search runs: just before `CoreCompile` in a project of the SDK.
 
 ## Trimming
 
@@ -81,7 +84,7 @@ One target is out of their reach: one that hooks `GenerateMSBuildEditorConfigFil
 
 `SqlSourceWriteManifest` writes what the compiler is given, for the `sqlsource` tool, which runs it by name with `dotnet msbuild` and names the file to write with `SqlSourceManifestFile`.  How the tool runs it and uses what it reads is on [the tool's page](tool.md#evaluating-a-project).
 
-The target hooks nothing: it has no `BeforeTargets`, no `AfterTargets` and no condition.  A hook would make every build write the manifest, and a condition would make a run of the tool find no file.  So nothing of a build runs before it but what it depends on, which is the property `SqlSourceManifestDependsOn`.  That property is set in a `PropertyGroup` at the root of the targets file, because a target's `DependsOnTargets` is read before the target runs.  The only elements of the file that are not targets are that group, the [nesting of the sidecars](#nesting-a-sidecar) and the [group of the settings files](#keeping-the-settings-files-out-of-the-output), and the one condition outside a target is on the second line of that group.
+The target hooks nothing: it has no `BeforeTargets`, no `AfterTargets` and no condition.  A hook would make every build write the manifest, and a condition would make a run of the tool find no file.  So nothing of a build runs before it but what it depends on, which is the property `SqlSourceManifestDependsOn`.  That property is set in a `PropertyGroup` at the root of the targets file, because a target's `DependsOnTargets` is read before the target runs; the group also sets `SqlSourceSettingsSearchHook`.  The only elements of the file that are not targets are that group, the [nesting of the sidecars](#nesting-a-sidecar) and the [group of the settings files](#keeping-the-settings-files-out-of-the-output), and the one condition outside a target is on the last line of that group.
 
 - The two trims make the manifest hold trimmed values, and make a target of the project that hooks `SqlSourceTrimMetadataOfFiles` to add a `.sql` file run first.
 - [The search](#finding-the-settings-files) adds the settings files to the `AdditionalFiles` items.

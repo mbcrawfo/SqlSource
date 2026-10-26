@@ -9,6 +9,18 @@
         <SqlSourceImported>true</SqlSourceImported>
     </PropertyGroup>
     <!--
+        Has the SDK import SqlSource.AfterSdk.targets after its own targets and after Directory.Build.targets, so that
+        the search for settings files runs after every target of the project that adds a .sql file before the
+        compiler: see that file.  AfterMicrosoftNETSdkTargets is the SDK's list of files to import last, and the value
+        is kept.  A project that is not of the SDK does not read it, and the package's targets search earlier there.
+        The value is one line, since white space around it would be part of it, so the check of the line length is off.
+    -->
+    <!-- editorconfig-checker-disable -->
+    <PropertyGroup>
+        <AfterMicrosoftNETSdkTargets>$(AfterMicrosoftNETSdkTargets);$(MSBuildThisFileDirectory)SqlSource.AfterSdk.targets</AfterMicrosoftNETSdkTargets>
+    </PropertyGroup>
+    <!-- editorconfig-checker-enable -->
+    <!--
         Hands every .sql file of the project to the compiler, which is the only way a source generator can see one.
         A .sql file's sidecar, the .sql.json file beside it, goes to the compiler too.
         NuGet imports this file into each project that references the package, before the project's own content, so a

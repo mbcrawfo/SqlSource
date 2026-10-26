@@ -91,6 +91,11 @@
             Link="Fixtures/build/SqlSource.targets"
             CopyToOutputDirectory="PreserveNewest"
         />
+        <None
+            Include="../../src/SqlSource/build/SqlSource.AfterSdk.targets"
+            Link="Fixtures/build/SqlSource.AfterSdk.targets"
+            CopyToOutputDirectory="PreserveNewest"
+        />
         <None Include="../../global.json" Link="Fixtures/global.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
     <ItemGroup>

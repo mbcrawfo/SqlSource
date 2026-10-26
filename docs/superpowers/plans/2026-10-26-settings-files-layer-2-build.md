@@ -29,6 +29,16 @@
 - **`SqlSourceTrackAdditionalFiles` depends on the search**, so that its hash covers the settings files; MSBuild promises no order for two targets that hook the same one.
 - **The search depends on `SqlSourceTrimMetadataOfFiles`**, the hook the manual gives for a target that adds a `.sql` file, so such a target runs before the search too.  Layer 6 replaces the hook.
 
+## The search runs last (owner's answer to review finding R1-F1)
+
+The first review found that a `.sql` file added by a target declared after the package's targets, from a hook of `CoreCompile` in `Directory.Build.targets` for one, reached the compiler without the settings file beside it.  The owner asked for a fix rather than a tech-debt record.  NuGet imports a package's targets before `Directory.Build.targets`, and MSBuild runs the targets that hook one target in the order they are declared, so no target in `SqlSource.targets` can run after such a hook.  The SDK imports every file of `AfterMicrosoftNETSdkTargets` after all of its targets, `Directory.Build.targets` included (SDK 6, 8 and 10 checked), so:
+
+- `SqlSource.props` appends `$(MSBuildThisFileDirectory)SqlSource.AfterSdk.targets` to `AfterMicrosoftNETSdkTargets`, keeping its value.
+- `SqlSource.AfterSdk.targets` empties `SqlSourceSettingsSearchHook` and holds `SqlSourceSettingsFilesBeforeCompile`, `BeforeTargets="CoreCompile"`, `DependsOnTargets="SqlSourceFindSettingsFiles;SqlSourceTrackAdditionalFiles"`.
+- In `SqlSource.targets`, the search and the tracking hook `$(SqlSourceSettingsSearchHook)`, which is `GenerateMSBuildEditorConfigFileCore` unless the late file emptied it: a project that is not of the SDK, or that overwrites `AfterMicrosoftNETSdkTargets`, still searches, as before.
+- The new file is packed, listed by `tools/check-package.sh`, and copied beside the other two wherever a test or a script copies them.
+- `SettingsFileSearchTests` covers a `CoreCompile` hook in the fixture's `Directory.Build.targets`, with the late file and without it (`-p:AfterMicrosoftNETSdkTargets=`).
+
 ## Verify first
 
 A design-time build runs the target and passes its items to the compiler: `dotnet msbuild -t:Compile -p:DesignTimeBuild=true -p:BuildingProject=false -p:SkipCompilerExecution=true -p:ProvideCommandLineArgs=true -getItem:CscCommandLineArgs`, the properties Roslyn's language server and `MSBuildWorkspace` set, lists every settings file as `/additionalfile:`.  Done by hand before planning; Task 3 pins it in a test.  Visual Studio's `CompileDesignTime` is not in the .NET SDK, and calls `Compile` with the same two properties `SkipCompilerExecution` and `ProvideCommandLineArgs`.

@@ -27,6 +27,8 @@ public sealed partial class BuildFileTests
         "TargetFramework",
         "LangVersion",
         "DefineConstants",
+        "AfterMicrosoftNETSdkTargets",
+        "MSBuildThisFileDirectory",
     ];
 
     // The target that writes the project manifest for the sqlsource tool.  It is the one target no build runs.
@@ -60,6 +62,12 @@ public sealed partial class BuildFileTests
     private static readonly XDocument Props = Load("SqlSource.props");
 
     private static readonly XDocument Targets = Load("SqlSource.targets");
+
+    private static readonly XDocument AfterSdk = Load("SqlSource.AfterSdk.targets");
+
+    // What the search for settings files and the hash of AdditionalFiles hook in a build where
+    // SqlSource.AfterSdk.targets is not imported.
+    private const string SearchHook = "$(SqlSourceSettingsSearchHook)";
 
     // The sqlsource tool evaluates a project and asks for this property to find out whether the project uses
     // SqlSource.  A condition would make a project that uses it look like one that does not.
@@ -109,8 +117,10 @@ public sealed partial class BuildFileTests
     // file.  A trim that runs before it sees a value wherever it was set, in Directory.Build.targets or by another
     // target, and runs in every build that writes the file, a design-time build too.  A trim outside a target would
     // see only what is set before NuGet imports the file.  The target that collects the files with metadata runs
-    // there for the same reasons.  The target that writes the manifest is the one that is not of a build: see
-    // Targets_ManifestTarget_HooksNothing.
+    // there for the same reasons.  The search for settings files and the hash hook it through a property, which
+    // SqlSource.AfterSdk.targets empties to run them later: see
+    // Targets_SettingsSearch_RunsBeforeTheCompilerWhereverItIsHooked.  The target that writes the manifest is the one
+    // that is not of a build: see Targets_ManifestTarget_HooksNothing.
     [Fact]
     public void Targets_EveryTargetOfABuild_RunsBeforeTheBuildWritesTheFileTheCompilerReads()
     {
@@ -123,7 +133,16 @@ public sealed partial class BuildFileTests
         targets.Count.ShouldBe(5);
         targets
             .Select(target => target.Attribute("BeforeTargets")?.Value)
-            .ShouldAllBe(before => before == "GenerateMSBuildEditorConfigFileCore");
+            .ShouldBe(
+                [
+                    "GenerateMSBuildEditorConfigFileCore",
+                    "GenerateMSBuildEditorConfigFileCore",
+                    "GenerateMSBuildEditorConfigFileCore",
+                    SearchHook,
+                    SearchHook,
+                ],
+                ignoreOrder: true
+            );
         targets.SelectMany(ConditionsAround).ShouldBeEmpty();
     }
 
@@ -147,13 +166,15 @@ public sealed partial class BuildFileTests
         var lines = group.Elements().ToList();
         lines
             .Select(line => line.Name.LocalName)
-            .ShouldBe(["SqlSourceManifestDependsOn", "SqlSourceManifestDependsOn"]);
+            .ShouldBe(["SqlSourceSettingsSearchHook", "SqlSourceManifestDependsOn", "SqlSourceManifestDependsOn"]);
         lines[0].Attributes().ShouldBeEmpty();
-        lines[0].Value.ShouldBe("SqlSourceTrimProperties;SqlSourceTrimMetadataOfFiles;" + SearchTarget);
+        lines[0].Value.ShouldBe("GenerateMSBuildEditorConfigFileCore");
+        lines[1].Attributes().ShouldBeEmpty();
+        lines[1].Value.ShouldBe("SqlSourceTrimProperties;SqlSourceTrimMetadataOfFiles;" + SearchTarget);
         // A project that is not of the SDK has no TargetFramework, and no such target to depend on.
-        lines[1].Attributes().ShouldHaveSingleItem().Name.LocalName.ShouldBe("Condition");
-        lines[1].Attribute("Condition")!.Value.ShouldBe("'$(TargetFramework)' != ''");
-        lines[1].Value.ShouldBe("$(SqlSourceManifestDependsOn);AddImplicitDefineConstants");
+        lines[2].Attributes().ShouldHaveSingleItem().Name.LocalName.ShouldBe("Condition");
+        lines[2].Attribute("Condition")!.Value.ShouldBe("'$(TargetFramework)' != ''");
+        lines[2].Value.ShouldBe("$(SqlSourceManifestDependsOn);AddImplicitDefineConstants");
 
         // The item types an IDE may nest on: the SDK lists a sidecar under None, and the Web SDK under Content.  Update
         // changes the items that are already there and adds none, so a project without a sidecar is not given one.
@@ -223,7 +244,7 @@ public sealed partial class BuildFileTests
                 new Dictionary<string, string>
                 {
                     ["Name"] = SearchTarget,
-                    ["BeforeTargets"] = "GenerateMSBuildEditorConfigFileCore",
+                    ["BeforeTargets"] = SearchHook,
                     ["DependsOnTargets"] = "SqlSourceTrimMetadataOfFiles",
                 }
             );
@@ -500,6 +521,50 @@ public sealed partial class BuildFileTests
         write.Attribute("Overwrite").ShouldNotBeNull().Value.ShouldBe("true");
         input.Attribute("Include").ShouldNotBeNull().Value.ShouldBe(write.Attribute("File").ShouldNotBeNull().Value);
         target.Attribute("DependsOnTargets").ShouldNotBeNull().Value.ShouldBe(SearchTarget);
+        target.Attribute("BeforeTargets").ShouldNotBeNull().Value.ShouldBe(SearchHook);
+    }
+
+    // NuGet imports the package's targets before Directory.Build.targets, and MSBuild runs the targets that hook one
+    // target in the order they are declared, so a target of the project that hooks CoreCompile to add a .sql file
+    // would run after the search.  The props have the SDK import SqlSource.AfterSdk.targets last, through the list
+    // the SDK keeps for that, and keep the list's value.  A condition would leave the late search out of a project.
+    [Fact]
+    public void Props_AfterSdkTargets_AreAddedToTheFilesTheSdkImportsLast()
+    {
+        var item = Props.Descendants("AfterMicrosoftNETSdkTargets").ShouldHaveSingleItem();
+
+        item.Value.ShouldBe("$(AfterMicrosoftNETSdkTargets);$(MSBuildThisFileDirectory)SqlSource.AfterSdk.targets");
+        item.Parent.ShouldNotBeNull().Name.LocalName.ShouldBe("PropertyGroup");
+        ConditionsAround(item).ShouldBeEmpty();
+    }
+
+    // The search and the hash run just before the compiler, after every target of the project that hooks
+    // CoreCompile, from the file the SDK imports last.  That file empties the property they hook in
+    // SqlSource.targets, so they run once, from there.  Where it is not imported, they run before the file the
+    // compiler reads is written, as the trims do.  A design-time build runs CoreCompile, so it runs them either way.
+    [Fact]
+    public void Targets_SettingsSearch_RunsBeforeTheCompilerWhereverItIsHooked()
+    {
+        var root = AfterSdk.Root.ShouldNotBeNull();
+
+        root.Elements().Select(element => element.Name.LocalName).ShouldBe(["PropertyGroup", "Target"]);
+        var hook = root.Element("PropertyGroup")!.Elements().ShouldHaveSingleItem();
+        hook.Name.LocalName.ShouldBe("SqlSourceSettingsSearchHook");
+        hook.Value.ShouldBeEmpty();
+        var target = root.Element("Target")!;
+        target
+            .Attributes()
+            .ToDictionary(attribute => attribute.Name.LocalName, attribute => attribute.Value)
+            .ShouldBe(
+                new Dictionary<string, string>
+                {
+                    ["Name"] = "SqlSourceSettingsFilesBeforeCompile",
+                    ["BeforeTargets"] = "CoreCompile",
+                    ["DependsOnTargets"] = SearchTarget + ";SqlSourceTrackAdditionalFiles",
+                }
+            );
+        target.HasElements.ShouldBeFalse();
+        root.Descendants().SelectMany(ConditionsAround).ShouldBeEmpty();
     }
 
     // MSBuild puts metadata into an expression as text, before it reads the expression.  A value with a quote in it
@@ -532,9 +597,15 @@ public sealed partial class BuildFileTests
     [Theory]
     [InlineData("SqlSource.props")]
     [InlineData("SqlSource.targets")]
+    [InlineData("SqlSource.AfterSdk.targets")]
     public void BuildFile_EveryPropertyOfThePackage_StartsWithSqlSource(string file)
     {
-        var document = file == "SqlSource.props" ? Props : Targets;
+        var document = file switch
+        {
+            "SqlSource.props" => Props,
+            "SqlSource.targets" => Targets,
+            _ => AfterSdk,
+        };
 
         var names = PropertiesSet(document)
             .Concat(PropertiesShownToTheCompiler(document))

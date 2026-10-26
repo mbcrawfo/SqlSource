@@ -9,7 +9,13 @@
 set -euo pipefail
 
 GENERATOR_ID='SqlSource'
-GENERATOR_REQUIRED=('build/SqlSource.props' 'build/SqlSource.targets' 'analyzers/dotnet/cs/SqlSource.dll' 'README.md')
+GENERATOR_REQUIRED=(
+    'build/SqlSource.props'
+    'build/SqlSource.targets'
+    'build/SqlSource.AfterSdk.targets'
+    'analyzers/dotnet/cs/SqlSource.dll'
+    'README.md'
+)
 TOOL_ID='SqlSource.Tool'
 # A tool carries everything it loads: tools/check-tool-install.sh is what shows that the whole of it runs.
 TOOL_REQUIRED=(
