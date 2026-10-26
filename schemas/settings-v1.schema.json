@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json",
+  "title": "SqlSource settings file, version 1",
+  "description": "A sqlsource.json file, which sets SqlSource's settings for the .sql files of its folder and the folders below it. This schema is for editors: it checks the keys, the JSON type of each value, and the values of the choices and of the dialect. The texts of the other settings are checked when SqlSource reads the file. The file may hold // and /* */ comments and trailing commas.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "description": "The URL of this schema, for editors. SqlSource reads nothing of it.",
+      "type": "string"
+    },
+    "root": {
+      "description": "true ends the search for settings files at this file: no sqlsource.json in a folder above it is read.",
+      "type": "boolean"
+    },
+    "dialect": {
+      "description": "The SQL dialect of the .sql files, with options after a comma for mysql and mariadb, as \"mysql,ansi-quotes\". Matched ignoring case and the white space around each part. Default `ansi`.",
+      "type": "string",
+      "anyOf": [
+        {
+          "enum": ["ansi", "mssql", "postgres", "cockroachdb", "mysql", "mariadb", "sqlite", "oracle"]
+        },
+        {
+          "pattern": "^\\s*(?:(?:[aA][nN][sS][iI]|[mM][sS][sS][qQ][lL]|[sS][qQ][lL][sS][eE][rR][vV][eE][rR]|[tT][sS][qQ][lL]|[pP][oO][sS][tT][gG][rR][eE][sS]|[pP][oO][sS][tT][gG][rR][eE][sS][qQ][lL]|[cC][oO][cC][kK][rR][oO][aA][cC][hH][dD][bB]|[cC][oO][cC][kK][rR][oO][aA][cC][hH]|[sS][qQ][lL][iI][tT][eE]|[oO][rR][aA][cC][lL][eE])|(?:[mM][yY][sS][qQ][lL]|[mM][aA][rR][iI][aA][dD][bB])(?:\\s*,\\s*(?:[aA][nN][sS][iI]-[qQ][uU][oO][tT][eE][sS]|[aA][nN][sS][iI]_[qQ][uU][oO][tT][eE][sS]|[nN][oO]-[bB][aA][cC][kK][sS][lL][aA][sS][hH]-[eE][sS][cC][aA][pP][eE][sS]|[nN][oO]_[bB][aA][cC][kK][sS][lL][aA][sS][hH]_[eE][sS][cC][aA][pP][eE][sS]))*)?\\s*$"
+        }
+      ]
+    },
+    "database": {
+      "description": "The database the sqlsource tool describes the queries against: one word of letters, digits, `-`, `_` and `.`. Default: the name of the file's dialect.",
+      "type": "string"
+    },
+    "output": {
+      "description": "What SqlSource generates for a query: `sql`, `models` or `codegen`, matched ignoring case, hyphens and spaces. Default `codegen`.",
+      "type": "string",
+      "anyOf": [
+        {
+          "enum": ["sql", "models", "codegen"]
+        },
+        {
+          "pattern": "^\\s*(?:[- \\t]*(?:[sS][- \\t]*[qQ][- \\t]*[lL][- \\t]*|[mM][- \\t]*[oO][- \\t]*[dD][- \\t]*[eE][- \\t]*[lL][- \\t]*[sS][- \\t]*|[cC][- \\t]*[oO][- \\t]*[dD][- \\t]*[eE][- \\t]*[gG][- \\t]*[eE][- \\t]*[nN][- \\t]*))?\\s*$"
+        }
+      ]
+    },
+    "generatorParameters": {
+      "description": "The generator parameters, one word for each element. `[]` or `[\"default\"]` is the empty list, every default.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "anyOf": [
+          {
+            "enum": ["keep-comments", "no-token-validation", "sort-input", "sort-output", "no-table-models", "async-method-suffix", "default"]
+          },
+          {
+            "pattern": "^\\s*(?:[kK][eE][eE][pP]-[cC][oO][mM][mM][eE][nN][tT][sS]|[nN][oO]-[tT][oO][kK][eE][nN]-[vV][aA][lL][iI][dD][aA][tT][iI][oO][nN]|[sS][oO][rR][tT]-[iI][nN][pP][uU][tT]|[sS][oO][rR][tT]-[oO][uU][tT][pP][uU][tT]|[nN][oO]-[tT][aA][bB][lL][eE]-[mM][oO][dD][eE][lL][sS]|[aA][sS][yY][nN][cC]-[mM][eE][tT][hH][oO][dD]-[sS][uU][fF][fF][iI][xX]|[dD][eE][fF][aA][uU][lL][tT])?\\s*$"
+          }
+        ]
+      }
+    },
+    "inputModelSuffix": {
+      "description": "The end of the name of a query's input model: characters of a C# identifier. Default `Params`.",
+      "type": "string"
+    },
+    "outputModelSuffix": {
+      "description": "The end of the name of a query's output model: characters of a C# identifier. Default `Dto`.",
+      "type": "string"
+    },
+    "modelNamespace": {
+      "description": "The namespace of the generated models, such as `App.Models`. Default: the namespace of the type.",
+      "type": "string"
+    },
+    "inputModelType": {
+      "description": "The shape of a query's input model: `record`, `sealed record`, `class` or `sealed class`, matched ignoring case, hyphens and spaces. Default `sealed record`.",
+      "type": "string",
+      "anyOf": [
+        {
+          "enum": ["record", "sealed record", "class", "sealed class"]
+        },
+        {
+          "pattern": "^\\s*(?:[- \\t]*(?:[rR][- \\t]*[eE][- \\t]*[cC][- \\t]*[oO][- \\t]*[rR][- \\t]*[dD][- \\t]*|[sS][- \\t]*[eE][- \\t]*[aA][- \\t]*[lL][- \\t]*[eE][- \\t]*[dD][- \\t]*[rR][- \\t]*[eE][- \\t]*[cC][- \\t]*[oO][- \\t]*[rR][- \\t]*[dD][- \\t]*|[cC][- \\t]*[lL][- \\t]*[aA][- \\t]*[sS][- \\t]*[sS][- \\t]*|[sS][- \\t]*[eE][- \\t]*[aA][- \\t]*[lL][- \\t]*[eE][- \\t]*[dD][- \\t]*[cC][- \\t]*[lL][- \\t]*[aA][- \\t]*[sS][- \\t]*[sS][- \\t]*))?\\s*$"
+        }
+      ]
+    },
+    "outputModelType": {
+      "description": "The shape of a query's output model: `record`, `sealed record`, `class` or `sealed class`, matched ignoring case, hyphens and spaces. Default `sealed record`.",
+      "type": "string",
+      "anyOf": [
+        {
+          "enum": ["record", "sealed record", "class", "sealed class"]
+        },
+        {
+          "pattern": "^\\s*(?:[- \\t]*(?:[rR][- \\t]*[eE][- \\t]*[cC][- \\t]*[oO][- \\t]*[rR][- \\t]*[dD][- \\t]*|[sS][- \\t]*[eE][- \\t]*[aA][- \\t]*[lL][- \\t]*[eE][- \\t]*[dD][- \\t]*[rR][- \\t]*[eE][- \\t]*[cC][- \\t]*[oO][- \\t]*[rR][- \\t]*[dD][- \\t]*|[cC][- \\t]*[lL][- \\t]*[aA][- \\t]*[sS][- \\t]*[sS][- \\t]*|[sS][- \\t]*[eE][- \\t]*[aA][- \\t]*[lL][- \\t]*[eE][- \\t]*[dD][- \\t]*[cC][- \\t]*[lL][- \\t]*[aA][- \\t]*[sS][- \\t]*[sS][- \\t]*))?\\s*$"
+        }
+      ]
+    },
+    "collectionType": {
+      "description": "The type a query's method returns many rows in, such as `IReadOnlyList` or `List`, matched ignoring case, hyphens and spaces. Default `Array`.",
+      "type": "string",
+      "anyOf": [
+        {
+          "enum": ["IEnumerable", "ICollection", "IReadOnlyCollection", "IList", "IReadOnlyList", "Array", "List", "ImmutableArray", "ImmutableList", "IImmutableList"]
+        },
+        {
+          "pattern": "^\\s*(?:[- \\t]*(?:[iI][- \\t]*[eE][- \\t]*[nN][- \\t]*[uU][- \\t]*[mM][- \\t]*[eE][- \\t]*[rR][- \\t]*[aA][- \\t]*[bB][- \\t]*[lL][- \\t]*[eE][- \\t]*|[iI][- \\t]*[cC][- \\t]*[oO][- \\t]*[lL][- \\t]*[lL][- \\t]*[eE][- \\t]*[cC][- \\t]*[tT][- \\t]*[iI][- \\t]*[oO][- \\t]*[nN][- \\t]*|[iI][- \\t]*[rR][- \\t]*[eE][- \\t]*[aA][- \\t]*[dD][- \\t]*[oO][- \\t]*[nN][- \\t]*[lL][- \\t]*[yY][- \\t]*[cC][- \\t]*[oO][- \\t]*[lL][- \\t]*[lL][- \\t]*[eE][- \\t]*[cC][- \\t]*[tT][- \\t]*[iI][- \\t]*[oO][- \\t]*[nN][- \\t]*|[iI][- \\t]*[lL][- \\t]*[iI][- \\t]*[sS][- \\t]*[tT][- \\t]*|[iI][- \\t]*[rR][- \\t]*[eE][- \\t]*[aA][- \\t]*[dD][- \\t]*[oO][- \\t]*[nN][- \\t]*[lL][- \\t]*[yY][- \\t]*[lL][- \\t]*[iI][- \\t]*[sS][- \\t]*[tT][- \\t]*|[aA][- \\t]*[rR][- \\t]*[rR][- \\t]*[aA][- \\t]*[yY][- \\t]*|[lL][- \\t]*[iI][- \\t]*[sS][- \\t]*[tT][- \\t]*|[iI][- \\t]*[mM][- \\t]*[mM][- \\t]*[uU][- \\t]*[tT][- \\t]*[aA][- \\t]*[bB][- \\t]*[lL][- \\t]*[eE][- \\t]*[aA][- \\t]*[rR][- \\t]*[rR][- \\t]*[aA][- \\t]*[yY][- \\t]*|[iI][- \\t]*[mM][- \\t]*[mM][- \\t]*[uU][- \\t]*[tT][- \\t]*[aA][- \\t]*[bB][- \\t]*[lL][- \\t]*[eE][- \\t]*[lL][- \\t]*[iI][- \\t]*[sS][- \\t]*[tT][- \\t]*|[iI][- \\t]*[iI][- \\t]*[mM][- \\t]*[mM][- \\t]*[uU][- \\t]*[tT][- \\t]*[aA][- \\t]*[bB][- \\t]*[lL][- \\t]*[eE][- \\t]*[lL][- \\t]*[iI][- \\t]*[sS][- \\t]*[tT][- \\t]*))?\\s*$"
+        }
+      ]
+    },
+    "typeOverrides": {
+      "description": "Database types and the C# type each gets, or `default`, as `\"timestamptz\": \"System.DateTimeOffset\"`.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "columnTypes": {
+      "description": "Columns of a table or view, `table.column` or `schema.table.column`, and the C# type each gets, or `default`, as `\"users.id\": \"UserId\"`.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "nestedClass": {
+      "description": "The name of the class that holds a type's queries: a C# identifier that is not a keyword. Default `Sql`.",
+      "type": "string"
+    }
+  }
+}
