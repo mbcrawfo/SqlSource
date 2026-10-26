@@ -151,7 +151,12 @@ internal static class SettingsLevelReader
             source.InvalidPart(setting, index);
         }
 
-        foreach (var (index, first) in repeated ?? [])
+        if (repeated is null)
+        {
+            return;
+        }
+
+        foreach (var (index, first) in repeated)
         {
             source.RepeatedKey(setting, index, first);
         }

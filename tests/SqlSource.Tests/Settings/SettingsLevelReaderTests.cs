@@ -294,7 +294,7 @@ public sealed class SettingsLevelReaderTests
                 [SettingId.TypeOverrides] =
                 [
                     new("int4", "long"),
-                    new("timestampz", "int"),
+                    new("bogus", "int"),
                     new("integer", "MyApp.X"),
                     new("nvarchar", "string"),
                 ],
