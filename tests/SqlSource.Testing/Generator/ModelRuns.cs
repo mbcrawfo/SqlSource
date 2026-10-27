@@ -57,6 +57,7 @@ internal static class ModelRuns
     // The file with its sidecar of these entries, run on Source.
     public static GeneratorRun Run(SqlFile file, params SidecarEntry[] entries) => Run(file, entries, null);
 
+    // The same with the settings, a JSON object, in the project's settings file.
     public static GeneratorRun Run(SqlFile file, SidecarEntry[] entries, string? settings) =>
         Run(Source, [file, Sidecars.Of(file, entries)], settings);
 

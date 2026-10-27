@@ -10,8 +10,8 @@ using Xunit;
 namespace SqlSource.Tests.Generator;
 
 // The name of the class that holds a type's members under SqlLocation.Nested: the attribute's NestedClass, else the
-// nestedClass of the chain of the folder of the type's C# file, which SettingsFileTests holds, else the project's
-// SqlSourceNestedClass, else Sql.
+// nestedClass of the chain of the folder of the type's C# file, which these tests give in the settings file of that
+// folder, else the project's SqlSourceNestedClass, else Sql.
 public sealed class NestedClassTests
 {
     private const string AttributeOnly = "SqlSourceGenerateAttribute.g.cs";

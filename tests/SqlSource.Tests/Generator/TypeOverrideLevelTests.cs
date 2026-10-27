@@ -14,6 +14,7 @@ using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
 using static SqlSource.Testing.Generator.ModelRuns;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -101,25 +102,49 @@ public sealed class TypeOverrideLevelTests
             { SettingLevel.Query, TheQueryPlace },
         };
 
-    // The project's file maps timestamptz for the project.  B's header replaces it for B, C's header for C, and the
-    // marker of C's second query for that query alone.
+    // The project's file maps timestamptz for the project.  The settings file of B's folder replaces it for B, C's
+    // header for C, and the marker of C's second query for that query alone.  B's folder has a type of its own that
+    // claims B, since a type claims the files of its own folder.
     [Fact]
     public void Run_EachLevel_ReplacesTheProjectFilesTypeForItsScopeAlone()
     {
+        const string BSource = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class BQueries;
+            }
+            """;
         var a = new SqlFile("/app/Repo/A.sql", "-- name: GetA\nSELECT 1;\n");
-        var b = new SqlFile("/app/Repo/B.sql", "-- type-override: timestamptz = long\n\n-- name: GetB\nSELECT 1;\n");
+        var b = new SqlFile("/app/Repo/B/B.sql", "-- name: GetB\nSELECT 1;\n");
+        var bFolder = GeneratorHarness.SettingsFile(
+            "/app/Repo/B/sqlsource.json", /*lang=json,strict*/
+            """{"typeOverrides": {"timestamptz": "long"}}"""
+        );
         var c = new SqlFile(
             "/app/Repo/C.sql",
             "-- type-override: timestamptz = string\n\n-- name: GetC1\nSELECT 1;\n\n-- name: GetC2\n"
                 + "-- type-override: timestamptz = decimal\nSELECT 2;\n"
         );
 
-        var run = Run(
-            /*lang=json,strict*/
-            """{"timestamptz": "System.DateTimeOffset"}""",
-            (a, [Entry(a, "GetA", Timestamptz)]),
-            (b, [Entry(b, "GetB", Timestamptz)]),
-            (c, [Entry(c, "GetC1", Timestamptz), Entry(c, "GetC2", Timestamptz)])
+        var run = GeneratorHarness.Run(
+            OutputKind.Models,
+            [new SourceFile(GeneratorHarness.SourcePath, Source), new SourceFile("/app/Repo/B/BQueries.cs", BSource)],
+            [
+                a,
+                Sidecars.Of(a, Entry(a, "GetA", Timestamptz)),
+                b,
+                Sidecars.Of(b, Entry(b, "GetB", Timestamptz)),
+                bFolder,
+                c,
+                Sidecars.Of(c, Entry(c, "GetC1", Timestamptz), Entry(c, "GetC2", Timestamptz)),
+            ],
+            references: [NpgsqlReferences.Npgsql10],
+            dialect: "postgres",
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"timestamptz": "System.DateTimeOffset"}}"""
         );
 
         run.Diagnostics.ShouldBeEmpty();
