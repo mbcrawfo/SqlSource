@@ -9,8 +9,8 @@ using Xunit;
 namespace SqlSource.Tests.Generator;
 
 // Whether a generated method checks its arguments: a list of generator parameters decides whole, the query's before
-// the file's, and the project's SqlSourceGeneratorParameters property decides for a query that has neither.  Without
-// any of them it checks.  GeneratorParameterLevelTests has the levels between the file and the project.
+// the file's, and the generatorParameters of the project's settings file decide for a query that has neither.
+// Without any of them it checks.  GeneratorParameterLevelTests has the levels between the file and the project.
 public sealed class TokenValidationTests
 {
     private const string Source = """
@@ -30,12 +30,12 @@ public sealed class TokenValidationTests
     [Theory]
     // Nothing set: validate.
     [InlineData(null, null, null, true)]
-    // The property alone.
+    // The project's file alone.
     [InlineData(null, null, "no-token-validation", false)]
     [InlineData(null, null, " No-Token-Validation ", false)]
     [InlineData(null, null, "default", true)]
     [InlineData(null, null, "", true)]
-    // The file's list beats the property, with or without the switch.
+    // The file's list beats the project's file, with or without the switch.
     [InlineData(null, "no-token-validation", null, false)]
     [InlineData(null, "default", "no-token-validation", true)]
     [InlineData(null, "keep-comments", "no-token-validation", true)]
@@ -47,7 +47,7 @@ public sealed class TokenValidationTests
     public void Run_Method_ValidatesByQueryThenFileThenProject(
         string? queryGeneratorParameter,
         string? fileGeneratorParameter,
-        string? property,
+        string? projectFile,
         bool expected
     )
     {
@@ -57,7 +57,7 @@ public sealed class TokenValidationTests
             + (queryGeneratorParameter is null ? string.Empty : "-- generator: " + queryGeneratorParameter + "\n")
             + "SELECT * FROM {{table}};\n";
 
-        var run = Run(OutputKind.Sql, property, new SqlFile(GeneratorHarness.UsersPath, sql));
+        var run = Run(OutputKind.Sql, projectFile, new SqlFile(GeneratorHarness.UsersPath, sql));
 
         run.ShouldBeClean();
         var source = run.Sources["App.Sample.g.cs"];
@@ -72,7 +72,7 @@ public sealed class TokenValidationTests
     }
 
     [Fact]
-    public void Run_PropertyOff_ChangesOnlyTheQueriesWithoutAGeneratorParameter()
+    public void Run_ProjectsFileOff_ChangesOnlyTheQueriesWithoutAGeneratorParameter()
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
@@ -111,11 +111,12 @@ public sealed class TokenValidationTests
         run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs"]);
     }
 
-    private static GeneratorRun Run(OutputKind? output, string? property, SqlFile file) =>
+    // The file under the generator parameters of the project's settings file, or none when they are null.
+    private static GeneratorRun Run(OutputKind? output, string? projectFile, SqlFile file) =>
         GeneratorHarness.Run(
             output,
             [new SourceFile(GeneratorHarness.SourcePath, Source)],
             [file],
-            generatorParameters: property
+            generatorParameters: projectFile
         );
 }

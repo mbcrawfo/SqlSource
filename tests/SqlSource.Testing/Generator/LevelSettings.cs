@@ -70,15 +70,7 @@ internal sealed class LevelSettings
     // Generator parameters as the level writes them: the array of their words at a settings file's level, and the
     // words otherwise.
     public static string WordsAt(SettingLevel level, string words) =>
-        IsFile(level)
-            ? GeneratorHarness.Json(
-                new JsonArray([
-                    .. words
-                        .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
-                        .Select(word => (JsonNode?)JsonValue.Create(word)),
-                ])
-            )
-            : words;
+        IsFile(level) ? GeneratorHarness.Json(GeneratorHarness.Words(words)) : words;
 
     // The setting at the level, with the value as that level writes it: at a settings file's level a JSON value, such
     // as "Sql", ["keep-comments"] or {"int4": "long"}, and otherwise the text of the attribute's argument or the

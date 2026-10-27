@@ -4,9 +4,9 @@ using System;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Chains;
+using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using Xunit;
-using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -51,6 +51,7 @@ public sealed class GeneratorHarnessTests
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string GetUser = ");
     }
 
+    // The project's file holds the list, which a property of the same words would not.
     [Fact]
     public void Run_GeneratorParameters_AreTheArrayOfTheirWords()
     {
@@ -63,6 +64,42 @@ public sealed class GeneratorHarnessTests
 
         run.ShouldBeClean();
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"SELECT 1 -- kept\";");
+        var file = StepOutputs.Single<ListedSettingsFile>(run, TrackingNames.SettingsFile);
+        file.Path.ShouldBe(GeneratorHarness.ProjectSettingsPath);
+        file.File.Errors.ShouldBeEmpty();
+        file.File.Level.Parameters.ShouldBe(GeneratorParameters.SortOutput | GeneratorParameters.KeepComments);
+    }
+
+    // A value is escaped as JSON escapes it, here a quote and a line break, and the words are an array.  The dialect
+    // is not valid, which a test of the text alone leaves to the generator.
+    [Fact]
+    public void Run_ProjectsFile_IsTheJsonAUserWrites()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Models,
+            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
+            [],
+            generatorParameters: " keep-comments  sort-output ",
+            dialect: "a\"b\nc"
+        );
+
+        run.ProjectSettings.ShouldBe(
+            "{\n  \"output\": \"Models\",\n  \"dialect\": \"a\\\"b\\nc\",\n  \"generatorParameters\": [\n"
+                + "    \"keep-comments\",\n    \"sort-output\"\n  ]\n}"
+        );
+    }
+
+    // The spelling is the tests' own, so a change to the generator's spelling fails a test.  A test's data cannot be of
+    // the generator's internal type, so the member is found by its spelling.
+    [Theory]
+    [InlineData("Sql")]
+    [InlineData("Models")]
+    [InlineData("CodeGen")]
+    public void Run_Output_IsSpelledAsAUserWritesIt(string spelled)
+    {
+        var run = GeneratorHarness.Run(Enum.Parse<OutputKind>(spelled), GeneratorHarness.SampleSource(null));
+
+        run.ProjectSettings.ShouldBe("{\n  \"output\": \"" + spelled + "\"\n}");
     }
 
     [Fact]
@@ -71,6 +108,7 @@ public sealed class GeneratorHarnessTests
         var run = GeneratorHarness.Run(null, GeneratorHarness.SampleSource(null), GeneratorHarness.UsersFile);
 
         StepOutputs.Of<ListedSettingsFile>(run, TrackingNames.SettingsFile).ShouldBeEmpty();
+        run.ProjectSettings.ShouldBeNull();
     }
 
     // The two files would be of one folder, and the generator would read only one of them.
@@ -89,7 +127,10 @@ public sealed class GeneratorHarnessTests
             )
         );
 
-        exception.Message.ShouldContain("settings");
+        exception.Message.ShouldBe(
+            "The run writes the project's settings file /sqlsource.json, and a file of the test is at that path.  Put "
+                + "its keys in the run's settings instead."
+        );
     }
 
     // A run that writes no file leaves the path to the test's own.

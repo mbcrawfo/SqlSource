@@ -53,6 +53,7 @@ internal static class GeneratorHarness
     private static readonly JsonSerializerOptions Written = new()
     {
         WriteIndented = true,
+        NewLine = "\n",
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
@@ -117,7 +118,8 @@ internal static class GeneratorHarness
             properties,
             sqlFiles.Where(file => file.Metadata is not null).ToDictionary(file => file.Path, file => file.Metadata!)
         );
-        var files = WithProjectSettings(sqlFiles, ProjectSettings(output, dialect, generatorParameters, settings));
+        var projectSettings = ProjectSettings(output, dialect, generatorParameters, settings);
+        var files = WithProjectSettings(sqlFiles, projectSettings);
         var driver = CreateDriver(files.Select(file => file.ToAdditionalText()), options, parseOptions)
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
@@ -146,14 +148,17 @@ internal static class GeneratorHarness
                     .Select(Format),
             ],
             result
-        );
+        )
+        {
+            ProjectSettings = projectSettings,
+        };
     }
 
     // The JSON of the project's settings file: the output, spelled as a user writes it, the dialect as given, the
     // generator parameters as the array of their words, and then each entry of settings, a JSON object as a user
     // writes the file, which replaces the key it names.  Null when all four are null.  The spelling is the tests' own,
     // not taken from the generator, so that a change to the generator's spelling fails a test.
-    public static string? ProjectSettings(
+    private static string? ProjectSettings(
         OutputKind? output,
         string? dialect = null,
         string? generatorParameters = null,
@@ -178,11 +183,7 @@ internal static class GeneratorHarness
 
         if (generatorParameters is not null)
         {
-            json["generatorParameters"] = new JsonArray([
-                .. generatorParameters
-                    .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
-                    .Select(word => (JsonNode?)JsonValue.Create(word)),
-            ]);
+            json["generatorParameters"] = Words(generatorParameters);
         }
 
         if (settings is not null)
@@ -201,6 +202,14 @@ internal static class GeneratorHarness
 
     // The text of a settings file's JSON, indented, with < and > as a user writes them in a type's name.
     public static string Json(JsonNode json) => json.ToJsonString(Written);
+
+    // Generator parameters as a settings file writes them: the array of their words, split at white space.
+    public static JsonArray Words(string words) =>
+        [
+            .. words
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+                .Select(word => (JsonNode?)JsonValue.Create(word)),
+        ];
 
     // The files with the project's settings file after them, or the files alone when it is null.  A file of the test's
     // own at its path is refused: the generator reads one file of a folder, so one of the two would be dropped unseen.
@@ -437,6 +446,9 @@ internal sealed record GeneratorRun(
     GeneratorDriverRunResult Result
 )
 {
+    // The text of the project's settings file that the harness wrote, or null when it wrote none.
+    public string? ProjectSettings { get; init; }
+
     // The generator reported nothing, and the compiler found no error and no warning in what it generated.
     public void ShouldBeClean()
     {
