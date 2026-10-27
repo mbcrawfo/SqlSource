@@ -9,7 +9,8 @@ namespace SqlSource.Generation.Types;
 /// </param>
 /// <param name="Key">
 /// The key that answered: of the type override's entry, or of the row of the base map, which may be the key of an
-/// array's element or of a domain's base.
+/// array's element or of a domain's base; for a type that a marker or the column types chose, the key an entry of the
+/// type override would have for the database type, which a converter's message names.
 /// </param>
 /// <param name="Place">
 /// The place that chose the type, as <c>SQLSRC250</c> to <c>SQLSRC252</c> word it: the one that wrote the type

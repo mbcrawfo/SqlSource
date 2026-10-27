@@ -611,7 +611,7 @@ public sealed class SqlFileParserMarkerTests
         }
     }
 
-    // The header's entries reach each query's level, under a type override of the query's own.
+    // The header's entries reach the level of a query that has markers of its own.
     [Fact]
     public void Parse_ColumnMarker_InTheHeader_ReachesAQueryWithMarkersOfItsOwn() =>
         Blocks("-- column: posts.id -> PostId\n-- name: A\n-- output: sql\nSELECT 1\n")

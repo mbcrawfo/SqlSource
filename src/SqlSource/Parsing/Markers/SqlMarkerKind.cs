@@ -24,7 +24,8 @@ internal enum SqlMarkerKind
     TokenIgnore,
 
     /// <summary>
-    /// <c>-- param:</c> declares a parameter of its query: its type, whether it is nullable, or both.
+    /// <c>-- param:</c> declares a parameter of its query: its database type, whether it is nullable, its C# type after
+    /// <c>-&gt;</c>, or any of them.
     /// </summary>
     Param,
 
@@ -63,6 +64,9 @@ internal enum SqlMarkerKind
     /// </summary>
     TypeOverride,
 
-    /// <summary><c>-- column:</c> sets the nullability of one column of its query's result.</summary>
+    /// <summary>
+    /// <c>-- column:</c> sets the nullability or the C# type of one column of its query's result, or, in a file's
+    /// header, the C# type of the columns read from one column of a table or view.
+    /// </summary>
     Column,
 }

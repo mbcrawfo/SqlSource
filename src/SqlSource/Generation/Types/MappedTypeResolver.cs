@@ -13,8 +13,9 @@ using SqlSource.Settings.ClrTypes;
 namespace SqlSource.Generation.Types;
 
 /// <summary>
-/// Resolves the C# types that the type override names against the compilation, and keeps of each what a model needs
-/// to know, never its symbol, with the converters declared on those of a referenced assembly.
+/// Resolves the C# types that the type override, the column types and the markers name against the compilation, and
+/// keeps of each what a model needs to know, never its symbol, with the converters declared on those of a referenced
+/// assembly.
 /// </summary>
 /// <remarks>
 /// <para>

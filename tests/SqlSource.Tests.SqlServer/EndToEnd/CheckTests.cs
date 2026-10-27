@@ -59,8 +59,8 @@ public sealed class CheckTests(SqlServerContainer sqlServer)
         // describes as their sidecars hold the realistic cases that a minimumMajor or a checkedFrom leaves out on it.
         // A filtered check compares only what it names, so the run names every other query file of EndToEnd/Queries/
         // and the query.sql of each realistic case that it checks, by their paths.  A "--database" filter would take
-        // the files it leaves out in with the rest.  SQL Server 2017, which CI runs, takes this path: a local run on
-        // the default image does not exercise it.
+        // the files it leaves out in with the rest.  SQL Server 2017, which CI runs, and 2019 and 2022, which the
+        // nightly run runs, take this path: a local run on the default image does not exercise it.
         var leavesOutNewTypes = sqlServer.Major < 17;
         var newTypes = CommittedEntries.Count(
             [RepositoryPaths.NewTypesQueries + ".json"],

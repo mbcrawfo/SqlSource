@@ -6,8 +6,9 @@ using SqlSource.Settings;
 namespace SqlSource.Generation;
 
 /// <summary>
-/// One query of a <c>.sql</c> file.  It becomes a constant, or a method when its SQL has a token, its models when its
-/// output asks for them, and the method that runs it when its output is <c>CodeGen</c>.
+/// One query of a <c>.sql</c> file.  It becomes a constant, or a method when its SQL has a token, and its models when
+/// its output asks for them; when its output is <c>CodeGen</c>, the method that runs it takes the place of the
+/// constant.
 /// </summary>
 /// <param name="Name">The query's name, a valid C# identifier.</param>
 /// <param name="NameLocation">
@@ -42,8 +43,8 @@ namespace SqlSource.Generation;
 /// it is, or null.
 /// </param>
 /// <param name="ColumnMarkers">
-/// What the query's <c>-- column:</c> markers say of the nullability of its columns, in marker order, each column
-/// once.  Empty when it has none.
+/// What the query's <c>-- column:</c> markers say of its columns, their nullability and C# type, in marker order, each
+/// column once.  Empty when it has none.
 /// </param>
 /// <param name="KeptErrors">
 /// The errors of the scan of <paramref name="KeptSegments" /> for tokens, of the comments alone.  They are errors only

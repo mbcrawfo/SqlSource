@@ -17,14 +17,14 @@ using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
-// The caching of the models: which models an edit makes the generator write again.
+// The caching of the models: which models an edit makes the generator write again.  The three files of the models
+// tests: Orders and Payments are claimed by OrderQueries and Users by UserQueries, so the models are
+// App.Orders.GetOrderDto, App.Orders.GetPaymentDto and App.Users.GetUserDto, in that order.  Each file has its own
+// model, with one column, of int4.
 public sealed class CachingModelTests
 {
     private readonly CachingScene _scene = new();
 
-    // The three files of the models tests: Orders and Payments are claimed by OrderQueries and Users by UserQueries,
-    // so the models are App.Orders.GetOrderDto, App.Orders.GetPaymentDto and App.Users.GetUserDto, in that order.
-    // Each file has its own model, with one column, of int4.
     [Fact]
     public void Run_SqlFileEditedChangingOneModel_EmitsOnlyThatModelAgain()
     {

@@ -46,13 +46,19 @@ internal enum TypeMappingKind
     /// <summary>With no Npgsql referenced, the type's C# type differs between Npgsql 8 and 9 and Npgsql 10.</summary>
     DiffersByDriver,
 
-    /// <summary>The type an override names is not found, or several are.</summary>
+    /// <summary>
+    /// The type that the type override, the column types or a marker names is not found, or several are.
+    /// </summary>
     MappedTypeNotFound,
 
-    /// <summary>The type an override names is not accessible from the compilation.</summary>
+    /// <summary>
+    /// The type that the type override, the column types or a marker names is not accessible from the compilation.
+    /// </summary>
     MappedTypeNotAccessible,
 
-    /// <summary>The type an override names cannot be a property's type.</summary>
+    /// <summary>
+    /// The type that the type override, the column types or a marker names cannot be a property's type.
+    /// </summary>
     MappedTypeNotAPropertyType,
 
     /// <summary>

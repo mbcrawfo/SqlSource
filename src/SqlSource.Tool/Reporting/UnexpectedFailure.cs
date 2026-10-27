@@ -10,13 +10,14 @@ namespace SqlSource.Tool.Reporting;
 internal static class UnexpectedFailure
 {
     /// <summary>
-    /// The error of an exception: its type and its message, and its stack trace as lines labelled <c>trace</c>
-    /// when <c>SQLSOURCE_DEBUG</c> is set and not empty.
+    /// The error of an exception: its type and its message, and the exception's whole text (<c>ToString()</c>: its
+    /// type, message, inner exceptions and stack trace) as lines labelled <c>trace</c> when <c>SQLSOURCE_DEBUG</c> is
+    /// set and not empty.
     /// </summary>
     /// <param name="exception">The exception.</param>
     /// <param name="getEnvironmentVariable">The host's.</param>
     /// <param name="redact">
-    /// Applied to the message, and to the whole text of the stack trace before it is cut into lines, so that a
+    /// Applied to the message, and to the exception's whole text before it is cut into lines, so that a
     /// text which spans several lines is replaced whole.  Null leaves the texts as they are.
     /// </param>
     public static ToolDiagnostic Of(

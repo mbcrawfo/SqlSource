@@ -104,7 +104,6 @@ internal static class PasswordFile
         {
             if (escaped)
             {
-                // The backslash stands for the colon or backslash it escapes, and is kept before anything else.
                 if (c is not (':' or '\\'))
                 {
                     _ = field.Append('\\');

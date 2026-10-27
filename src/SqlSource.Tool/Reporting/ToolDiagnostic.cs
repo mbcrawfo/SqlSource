@@ -43,8 +43,8 @@ internal sealed record ToolDiagnostic(
         AtFile(descriptor, path, [path, .. rest]);
 
     /// <summary>
-    /// An error at a file, at no position in it, whose message does not quote that file first: a descriptor of the
-    /// generator for a setting, which quotes no path, or an error at a sidecar that quotes its <c>.sql</c> file.
+    /// An error at a file, at no position in it, whose message does not quote that file first, as an error at a
+    /// sidecar that quotes its <c>.sql</c> file.
     /// </summary>
     /// <param name="descriptor">What is wrong.</param>
     /// <param name="path">The full path of the file.</param>

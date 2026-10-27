@@ -6,6 +6,9 @@ internal enum ConverterOrigin
     /// <summary>A method of the project's own source.</summary>
     Project,
 
-    /// <summary>A method of a type that the type override names, of a referenced assembly.</summary>
+    /// <summary>
+    /// A method of a type of a referenced assembly that the type override, the column types or a <c>-- param:</c> or
+    /// <c>-- column:</c> marker names.
+    /// </summary>
     MappedType,
 }

@@ -7,7 +7,7 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 
 // The result shapes of Queries/Methods.sql, and its token, run through MethodQueries' methods on the seed of "app": a
 // query with no rows is rowcount by default and runs as none, one and one-optional read their row and refuse the rows
-// their shape does not allow, and a token is filled with its default or with another fragment.  A write runs in a
+// their shape does not allow, and a token is given the text of its default or another fragment.  A write runs in a
 // transaction that is rolled back.
 [Collection(UsesSqlServer.Name)]
 public sealed class MethodShapeTests(SqlServerContainer sqlServer)

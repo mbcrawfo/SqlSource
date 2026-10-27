@@ -42,7 +42,7 @@ internal readonly record struct QuerySettings(
     /// <summary>Whether comments and blank lines stay in the query's SQL.</summary>
     public bool KeepComments => (Parameters & GeneratorParameters.KeepComments) != 0;
 
-    /// <summary>Whether the query's method checks its arguments.</summary>
+    /// <summary>Whether the query's token method and query method check that each token's argument has text.</summary>
     public bool ValidateTokens => (Parameters & GeneratorParameters.NoTokenValidation) == 0;
 
     /// <summary>Whether the query's method may read its rows into buffers from the shared array pool.</summary>

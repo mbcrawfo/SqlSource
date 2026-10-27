@@ -28,6 +28,8 @@ public sealed class NullabilityWalkUnusablePlanTests
 
     private static readonly Dictionary<string, (string Reason, string Plan)> UnusableRows = new(StringComparer.Ordinal)
     {
+        // Two rows of the reason "no-output": a UNION's Append, which has no Output, and an Output with fewer
+        // entries than the result has columns.
         { "no-output-of-an-append", ("no-output", Text(Over("Append", Scan("a"), "Member"))) },
         { "fewer-outputs-than-columns", ("no-output", Text(LeftJoin("a.id"))) },
         {
@@ -49,8 +51,6 @@ public sealed class NullabilityWalkUnusablePlanTests
 
     public static TheoryData<string> Unusable => [.. UnusableRows.Keys];
 
-    // The two "no-output" rows: a UNION's Append, which has no Output, and an Output with fewer entries than the result
-    // has columns.
     [Theory]
     [MemberData(nameof(Unusable))]
     public void Run_PlanThatCannotBeUsed_IsUnavailableWithItsReasonAndEveryColumnKeepsWhatItWasBuiltWith(string name)

@@ -119,7 +119,9 @@ internal static class TypeOverrideGrammar
     /// unqualified quoted key must be a name in lower case.  A key with a part that cannot be plain has the quoted form
     /// alone.  Empty for a key with no part in brackets, or one whose brackets are not well formed.
     /// </summary>
-    /// <param name="entry">The entry as written, white space around its <c>=</c> allowed.</param>
+    /// <param name="entry">
+    /// The entry as written, white space around its <c>=</c> allowed, or a settings file's key alone.
+    /// </param>
     public static string BracketHelp(ReadOnlySpan<char> entry)
     {
         if (entry.IndexOf('[') < 0 || !TryRewriteBrackets(entry, out var plain, out var quoted, out var isQualified))

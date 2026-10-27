@@ -13,8 +13,9 @@ using static SqlSource.Tool.Testing.DescribeRequests;
 namespace SqlSource.Tests.SqlServer.Describer;
 
 // The columns of a query's first result set as the server answers them to SqlClient under browse mode 2, held to the
-// spike of phase 6, each described in a session of its own.  A column is written "name nullable origin": nullable 1 or
-// 0, the origin schema.table.column or "-" for none, and a name the server does not give "null".
+// spike of phase 6, docs/superpowers/specs/2026-10-20-query-generation-phase-6-sql-server-spike.md, each described in
+// a session of its own.  A column is written "name nullable origin": nullable 1 or 0, the origin schema.table.column or
+// "-" for none, and a name the server does not give "null".
 [Collection(UsesSqlServer.Name)]
 public sealed class ColumnTests(SqlServerContainer sqlServer)
 {

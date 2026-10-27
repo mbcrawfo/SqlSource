@@ -76,7 +76,7 @@ public sealed class ConversionPlannerTests
         ]);
     }
 
-    // The spec's case: an int8 column mapped to UserId, whose converters are of int.
+    // An int8 column, read as long, mapped to UserId, whose converters are of int.
     [Fact]
     public void Plan_LongColumnWithAnIntConverter_ReportsSQLSRC279()
     {

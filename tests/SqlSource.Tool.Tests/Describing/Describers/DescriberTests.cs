@@ -177,6 +177,6 @@ public sealed class DescriberTests
     [InlineData(nameof(DescribeStep.TableMatch), "table match")]
     [InlineData(nameof(DescribeStep.ResolveType), "resolve type")]
     [InlineData(nameof(DescribeStep.WriteSidecar), "write sidecar")]
-    public void Of_Step_IsTheNameTheEpicGivesIt(string step, string name) =>
+    public void Of_Step_IsItsNameInTheLog(string step, string name) =>
         DescribeStepName.Of(Enum.Parse<DescribeStep>(step)).ShouldBe(name);
 }

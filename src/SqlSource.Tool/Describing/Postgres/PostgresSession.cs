@@ -149,9 +149,8 @@ internal sealed partial class PostgresSession : DescriberSession
         finally
         {
             // With the describe's own token: a cancelled describe leaves the statement and the transaction to die
-            // with its session,
-            // because a cancelled run must not wait on a server, and the run closes the session next.  The error of
-            // the call is never reported.
+            // with its session, because a cancelled run must not wait on a server, and the run closes the session
+            // next.  The error of the call is never reported.
             _ = await DeallocateAsync(
                 request.Name,
                 new PostgresDeallocateRequest(prepare.Statement),

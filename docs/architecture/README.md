@@ -6,7 +6,7 @@ These pages explain how SqlSource's code works and how its parts hand work to ea
 
 SqlSource ships two packages.
 
-- **`SqlSource`** is the generator.  Its assembly, built from `src/SqlSource`, targets `netstandard2.0` because the C# compiler loads it.  It holds `SqlSourceGenerator`, an `IIncrementalGenerator`, and the package's one suppressor, `AttributeConflictSuppressor`.  The package also carries `src/SqlSource/build/SqlSource.props` and `src/SqlSource/build/SqlSource.targets`, which NuGet imports into every project that references it: they hand the project's `.sql` files and settings files to the compiler, and hold the target `SqlSourceWriteManifest`, which writes the manifest.
+- **`SqlSource`** is the generator.  Its assembly, built from `src/SqlSource`, targets `netstandard2.0` because the C# compiler loads it.  It holds `SqlSourceGenerator`, an `IIncrementalGenerator`, and the package's one suppressor, `AttributeConflictSuppressor`.  The package also carries `src/SqlSource/build/SqlSource.props` and `src/SqlSource/build/SqlSource.targets`, which NuGet imports into every project that references it, and `src/SqlSource/build/SqlSource.AfterSdk.targets`, which the props have the SDK import after its own targets: they hand the project's `.sql` files and settings files to the compiler, and hold the target `SqlSourceWriteManifest`, which writes the manifest.
 - **`SqlSource.Tool`** is the `sqlsource` command, packed as a .NET tool.  Its assembly, built from `src/SqlSource.Tool`, targets `net8.0` and has one command, `describe`, which asks a database about each query and writes the query's sidecar.  The tool's package carries the generator assembly too, since the tool runs the generator's code.
 
 ## How a query flows

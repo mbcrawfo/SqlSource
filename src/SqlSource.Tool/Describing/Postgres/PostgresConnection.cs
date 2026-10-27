@@ -434,10 +434,9 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     /// A rollback to a savepoint gives up the locks taken since it, so <see cref="KeepPreparedAsync" /> moves the
     /// savepoint after the <c>PREPARE</c>: the transaction then keeps the locks that preparing took until it ends, and
     /// another session's <c>DROP</c> or <c>ALTER</c> of a relation the query reads waits for the describe.  Npgsql
-    /// sends the <c>BEGIN</c> with the
-    /// <c>SAVEPOINT</c>, in one round trip, here and not with the <c>PREPARE</c>, so that a server that refuses a
-    /// transaction, as PgBouncer in statement mode does, refuses it at this call.  When either fails, the transaction
-    /// is disposed and none is held.
+    /// sends the <c>BEGIN</c> with the <c>SAVEPOINT</c>, in one round trip, here and not with the <c>PREPARE</c>, so
+    /// that a server that refuses a transaction, as PgBouncer in statement mode does, refuses it at this call.  When
+    /// either fails, the transaction is disposed and none is held.
     /// </para>
     /// </remarks>
     /// <exception cref="InvalidOperationException">A describe's transaction is already held.</exception>

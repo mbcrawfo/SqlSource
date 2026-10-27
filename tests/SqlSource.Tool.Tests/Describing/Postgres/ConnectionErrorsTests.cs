@@ -11,9 +11,10 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
-// What the driver threw, as the answer of a call holds it: at "open" and at a later call.  Every server error here
-// names the host and the user in its message, detail and hint, as a server's error of a connection does, and every
-// driver's message names the host and the port, so that what is kept of each is seen to hold neither.
+// What the driver threw, as the answer of a call holds it: at "open" and at a later call.  The server errors of a
+// connection here name the host and the user in their message, detail and hint, as a server's error of a connection
+// does, and the driver's exceptions name the host or the port in their own or an inner message, so that a fixed text
+// that replaces one is seen to hold neither.
 public sealed class ConnectionErrorsTests
 {
     private const string Host = "10.0.0.5";

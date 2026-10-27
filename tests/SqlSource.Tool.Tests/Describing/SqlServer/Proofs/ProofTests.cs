@@ -22,7 +22,8 @@ public sealed class ProofTests
         new Proof.Operand(1).Holds(Answers(true)).ShouldBeFalse();
 
     [Fact]
-    public void Holds_OperandFactsedNotNull_IsTrue() => new Proof.Operand(1).Holds(Answers(false, true)).ShouldBeTrue();
+    public void Holds_OperandAnsweredNotNull_IsTrue() =>
+        new Proof.Operand(1).Holds(Answers(false, true)).ShouldBeTrue();
 
     // Whether an operand is not null does not depend on its type.
     [Fact]

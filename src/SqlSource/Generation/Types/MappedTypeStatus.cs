@@ -1,8 +1,8 @@
 namespace SqlSource.Generation.Types;
 
 /// <summary>
-/// Whether a C# type that the type override names is found, and if not, why.  Of two failures in one name, the
-/// first in this order is the name's.
+/// Whether a C# type that the type override, the column types or a marker names is found, and if not, why.  Of two
+/// failures in one name, the first in this order is the name's.
 /// </summary>
 internal enum MappedTypeStatus
 {

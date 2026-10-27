@@ -23,7 +23,9 @@ internal static class DescribeFailures
     /// refused login and a missing database are not the server rejecting a query.
     /// </summary>
     /// <param name="database">The database.</param>
-    /// <param name="serverLines">What the server said, verbatim.</param>
+    /// <param name="serverLines">
+    /// The engine's code of the error and the describer's fixed text, never the server's message.
+    /// </param>
     /// <param name="help">How to mend it.</param>
     public static DescribeFailure Open(string database, EquatableArray<string> serverLines, string help) =>
         new(ToolDiagnostics.DatabaseCannotBeOpened, new EquatableArray<string>([database]), null, serverLines, help);

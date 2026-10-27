@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0079`
+Next id: `TD-0084`
 
 ## Active items
 
@@ -38,6 +38,11 @@ Next id: `TD-0079`
 | [TD-0076](TD-0076-what-the-first-refusal-of-a-declared-type-says.md) | Open | 2026-10-23 | Low | PostgreSQL's first refusal of a `-- param:` type says only that it is not a type name, where SQL Server's says what was found, and SQL Server's refuses a name that holds a combining mark, a letter number or a format character after its first character, which the server takes |
 | [TD-0077](TD-0077-describer-catalog-sql-takes-a-users-operators.md) | Open | 2026-10-23 | Low | The SQL of the PostgreSQL describer's catalog calls runs under the user's `search_path` and writes its operators without `pg_catalog`, so a user's operator on a system type before `pg_catalog`, or after it for a comparison of no exact operator of `pg_catalog`'s, changes what the catalog answers |
 | [TD-0078](TD-0078-datatypename-is-resolved-on-every-call.md) | Open | 2026-10-25 | Low | A generated PostgreSQL method sets each parameter's `DataTypeName` to the sidecar's display name, `integer`, which Npgsql resolves on every call at about 115 bytes per parameter, where the canonical internal name, `pg_catalog.int4`, costs about 22 to 58 |
+| [TD-0079](TD-0079-duplicated-logic-and-uneven-conventions-in-src.md) | Open | 2026-10-27 | Low | Rules of `src/` are written in several places: a type's usable files, binary searches, the describers' own errors and connection texts, the comparison of parameter names, SQL Server's names, the binders' shapes, a file's engine; the sidecar reader's switches read an unknown key as the last; `MappedTypeResolver` and `QueryMethodWriter` are long, the planners pass long lists, and one member is dead |
+| [TD-0080](TD-0080-duplicated-arrangements-and-uneven-conventions-in-tests.md) | Open | 2026-10-27 | Low | The two engines' realistic, row-buffer and allocation tests are near copies, the generator tests copy small helpers and write file names, call names and SQL texts as literals, some theories change their arrangement by row, test names are uneven, and some named steps have no caching test |
+| [TD-0081](TD-0081-a-test-starts-mkfifo-itself.md) | Open | 2026-10-27 | Low | `PostgresDescriberTests` starts `mkfifo` with `Process.Start` and no skip where it is missing, against the rule that a test starts a program through `Programs` |
+| [TD-0082](TD-0082-a-test-converter-holds-its-token-in-a-static.md) | Open | 2026-10-27 | Low | The test converter `CancelOnRead` holds the token it cancels in a static that a test sets, so two tests reading through it in parallel would cancel each other's |
+| [TD-0083](TD-0083-two-tool-tests-wait-on-limits-of-their-own.md) | Open | 2026-10-27 | Low | `ProgramsTests` and `TerminationTests` wait on limits of their own, 20 and 60 seconds, beside `Eventually.Patience`, which `tests/AGENTS.md` makes the one limit |
 
 ## Columns
 

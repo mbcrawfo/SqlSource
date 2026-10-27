@@ -491,9 +491,8 @@ public sealed class SqlServerBindingTests
     public void Append_NoDescribedType_BindsByValue() =>
         Write(new MethodParameter("name", "Name", "string", false, true)).ShouldBe(ByValue);
 
-    // A type with no row of the binding, as a type of a newer server, a type of another engine, a vector whose
-    // dimension cannot be read and facets no SqlParameter can hold, all from a sidecar edited by hand but for the
-    // first, are bound by value.
+    // A type with no row of the binding, as a type of a newer server, a vector whose dimension cannot be read and
+    // facets no SqlParameter can hold, all from a sidecar edited by hand but for the first, is bound by value.
     [Theory]
     [InlineData("newtype", 892, 0, 0)]
     [InlineData("vector", 20, 0, 0)]

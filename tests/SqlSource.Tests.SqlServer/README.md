@@ -22,6 +22,8 @@ A change to these tests, or to the SQL Server describer, is run on both images b
 
 SQL Server's images are built for x64 alone.  On Apple silicon Docker runs them under emulation: the first run takes minutes while the image is pulled, and a start with the image already pulled takes seconds.
 
+Every container of the project starts through `SqlServerStart` of `tests/SqlSource.Testing`: a container whose server crashes at its start ([TD-0072](../../docs/tech-debt/TD-0072-sql-server-2025-container-crashes-at-start-in-ci.md)) is replaced once, by a new one, and the crash is reported.  `SqlServerStartTests` proves that over fakes, with no container.
+
 ## The images
 
 The default image is `mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04`, named for the tests and the scripts in one place, `DefaultImages.SqlServer` in `tests/SqlSource.Testing/DefaultImages.cs`, and repeated in `examples/SqlServerExamples/docker-compose.yml`.  The variable `SQLSOURCE_TESTS_SQLSERVER_IMAGE`, `EngineImage.SqlServer.Variable`, names another, which `EngineImage.SqlServer.Image` gives the tests, and the oldest that is supported is `mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04`, the floor, whose tag is also in `.github/workflows/build.yml`, `CONTRIBUTING.md` and this readme.  The nightly run, `.github/workflows/nightly.yml`, runs the tests on every supported major between the two, `mcr.microsoft.com/mssql/server:2019-CU32-GDR12-ubuntu-20.04` and `mcr.microsoft.com/mssql/server:2022-CU27-GDR1-ubuntu-22.04`, whose tags are also in `SqlServerContainer.ImageBuilds` and the root `AGENTS.md`.

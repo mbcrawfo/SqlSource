@@ -56,7 +56,7 @@ internal static class MethodRuns
             dialect: "postgres"
         );
 
-    // The same under mssql, on SqlClient 7 unless the references are given.
+    // The first Run under mssql, on SqlClient 7 unless the references are given.
     public static GeneratorRun RunSqlServer(
         SqlFile file,
         SidecarEntry[] entries,

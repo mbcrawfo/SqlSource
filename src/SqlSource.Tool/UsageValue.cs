@@ -11,7 +11,8 @@ namespace SqlSource.Tool;
 /// <param name="Option">The option the value belongs to, or null for an argument.</param>
 /// <param name="Text">
 /// The value.  It may be a connection string, so it is printed only where a rule of the run allows it: a
-/// <c>--database</c> name close to a database of the plan, and a path that <see cref="NamedAsPath" /> prints.
+/// <c>--database</c> name close to a database of the plan, the name of a <c>--connection</c> value close to a
+/// database of the plan, and a path that <see cref="NamedAsPath" /> prints.
 /// </param>
 /// <param name="Position">The place of the token that holds it on the command line, counted from one.</param>
 internal sealed record UsageValue(Option? Option, string Text, int Position)

@@ -28,6 +28,7 @@ public sealed class RunPlannerTests : IDisposable
         return project;
     }
 
+    // The example of docs/superpowers/specs/2026-10-09-query-generation-phase-2-4-work-list-design.md.
     [Fact]
     public void Plan_ExampleOfTheSpec_HasThreeQueriesWithTheirValues()
     {

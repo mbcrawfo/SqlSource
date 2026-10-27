@@ -303,36 +303,44 @@ internal static class AttributeSource
                 public string NestedClass { get; set; }
 
                 /// <summary>
-                /// What is generated for the queries of the type's files.  The default is
+                /// What is generated for the queries of the type's files.  The default is the <c>output</c> of the
+                /// settings files of the folder of the <c>.sql</c> file, else
                 /// <see cref="global::SqlSource.GeneratorOutput.CodeGen" />.  A marker in a file comes first.
                 /// </summary>
                 public GeneratorOutput Output { get; set; }
 
                 /// <summary>
-                /// What ends the name of the type of a query's parameters.  The default is <c>Params</c>.
+                /// What ends the name of the type of a query's parameters.  The default is the
+                /// <c>inputModelSuffix</c> of the settings files of the folder of the <c>.sql</c> file, else
+                /// <c>Params</c>.  A marker in a file comes first.
                 /// </summary>
                 public string InputModelSuffix { get; set; }
 
                 /// <summary>
-                /// What ends the name of the type of a row of a query's result.  The default is <c>Dto</c>.
+                /// What ends the name of the type of a row of a query's result.  The default is the
+                /// <c>outputModelSuffix</c> of the settings files of the folder of the <c>.sql</c> file, else
+                /// <c>Dto</c>.  A marker in a file comes first.
                 /// </summary>
                 public string OutputModelSuffix { get; set; }
 
                 /// <summary>
-                /// The namespace of the types generated for the queries.  The default is the namespace of this
-                /// type.
+                /// The namespace of the types generated for the queries.  The default is the <c>modelNamespace</c>
+                /// of the settings files of the folder of the <c>.sql</c> file, else the namespace of this type.  A
+                /// marker in a file comes first.
                 /// </summary>
                 public string ModelNamespace { get; set; }
 
                 /// <summary>
-                /// The shape of the type of a query's parameters.  The default is
-                /// <see cref="global::SqlSource.GeneratorModelType.SealedRecord" />.
+                /// The shape of the type of a query's parameters.  The default is the <c>inputModelType</c> of the
+                /// settings files of the folder of the <c>.sql</c> file, else
+                /// <see cref="global::SqlSource.GeneratorModelType.SealedRecord" />.  A marker in a file comes first.
                 /// </summary>
                 public GeneratorModelType InputModelType { get; set; }
 
                 /// <summary>
-                /// The shape of the type of a row of a query's result.  The default is
-                /// <see cref="global::SqlSource.GeneratorModelType.SealedRecord" />.
+                /// The shape of the type of a row of a query's result.  The default is the <c>outputModelType</c> of
+                /// the settings files of the folder of the <c>.sql</c> file, else
+                /// <see cref="global::SqlSource.GeneratorModelType.SealedRecord" />.  A marker in a file comes first.
                 /// </summary>
                 public GeneratorModelType OutputModelType { get; set; }
 
@@ -343,14 +351,16 @@ internal static class AttributeSource
                 public MethodLocation MethodLocation { get; set; }
 
                 /// <summary>
-                /// The type a method returns many rows in.  The default is
+                /// The type a method returns many rows in.  The default is the <c>collectionType</c> of the settings
+                /// files of the folder of the <c>.sql</c> file, else
                 /// <see cref="global::SqlSource.GeneratorCollectionType.Array" />.  A marker in a file comes first.
                 /// </summary>
                 public GeneratorCollectionType CollectionType { get; set; }
 
                 /// <summary>
                 /// Generator parameters for the queries of the type's files, separated by spaces, as a
-                /// <c>-- generator:</c> line holds them.  A line in a file comes first.
+                /// <c>-- generator:</c> line holds them.  The default is the <c>generatorParameters</c> of the
+                /// settings files of the folder of the <c>.sql</c> file, else none.  A line in a file comes first.
                 /// </summary>
                 public string Parameters { get; set; }
             }

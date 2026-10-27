@@ -49,15 +49,16 @@ internal enum SqlParseErrorKind
     /// a marker that <see cref="SqlMarkerScope" /> reads, lacks a value it needs or has one that is not valid.
     /// Two arguments: the generator parameter as written, or the marker as <see cref="SqlMarkerReader.Describe" />
     /// gives it; and the help that ends the message, empty but for a type override whose key is written in brackets,
-    /// which <see cref="TypeOverrideGrammar.BracketHelp" /> gives.
+    /// which <see cref="TypeOverrideGrammar.BracketHelp" /> gives, and a query's <c>-- column:</c> that names a
+    /// column's source, which says to map it in the file header.
     /// </summary>
     InvalidMarkerValue,
 
     /// <summary>
-    /// Two settings of one scope contradict each other: <c>default</c> beside another generator parameter, two
-    /// dialects in one file, two values of one setting marker, two declarations of one parameter, or two defaults of
-    /// one token.  Argument: the second one, as the first argument of <see cref="InvalidMarkerValue" />, or the token
-    /// as written.
+    /// Two settings of one scope contradict each other: <c>default</c> beside another generator parameter, two dialects
+    /// in one file, two values of one setting marker, two declarations of one parameter, two defaults of one token, or
+    /// two <c>-- column:</c> markers of one column that say different things.  Argument: the second one, as the first
+    /// argument of <see cref="InvalidMarkerValue" />, or the token as written.
     /// </summary>
     ConflictingSettings,
 

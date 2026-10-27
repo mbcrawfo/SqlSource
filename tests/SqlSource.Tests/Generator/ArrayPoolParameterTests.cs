@@ -89,7 +89,7 @@ public sealed class ArrayPoolParameterTests
     [InlineData("IList", "new global::System.Collections.Generic.List<")]
     [InlineData("ICollection", "new global::System.Collections.Generic.List<")]
     [InlineData("ImmutableArray", "global::System.Collections.Immutable.ImmutableArray.CreateBuilder<")]
-    public void Run_NoArrayPool_GivesTodaysTextForThePooledTypes(string collection, string buffer)
+    public void Run_NoArrayPool_GivesTheTextOfBeforeThePoolForThePooledTypes(string collection, string buffer)
     {
         var (pooled, unpooled) = RunBoth(collection);
 

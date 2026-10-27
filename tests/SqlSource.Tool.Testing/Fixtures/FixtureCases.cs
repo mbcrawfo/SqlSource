@@ -15,7 +15,8 @@ internal static class FixtureCases
     // The cases of an engine in the order of their names.  An engine with no folder has none.
     public static IReadOnlyList<FixtureCase> Of(string engine) => Of(engine, Root);
 
-    // The same under another root, for a test that writes its cases.
+    // The same under another root: a test's own folder, or the repository's, which the container projects read and
+    // record in.
     public static IReadOnlyList<FixtureCase> Of(string engine, string root)
     {
         var folder = Path.Combine(root, engine);

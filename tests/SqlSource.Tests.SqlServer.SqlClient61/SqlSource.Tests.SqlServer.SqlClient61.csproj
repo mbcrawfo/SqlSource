@@ -1,9 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
-        The end-to-end read of all_types and new_types on Microsoft.Data.SqlClient 6.1.7, the newest release of 6.1,
-        the oldest version that is supported.  A project of its own, since the end-to-end project gets SqlClient 7
-        through the tool it references.  The generator comes from a project reference, which does not bring the
-        package's MSBuild files, so the real ones are imported here and at the end of this file.
+        The end-to-end read of all_types and new_types through Dapper, and their write and read through the generated
+        methods, on Microsoft.Data.SqlClient 6.1.7, the newest release of 6.1, the oldest version that is supported.  A
+        project of its own, since the end-to-end project gets SqlClient 7 through the tool it references.  The generator
+        comes from a project reference, which does not bring the package's MSBuild files, so the real ones are imported
+        here and at the end of this file.
     -->
     <Import Project="../../src/SqlSource/build/SqlSource.props" />
     <PropertyGroup>

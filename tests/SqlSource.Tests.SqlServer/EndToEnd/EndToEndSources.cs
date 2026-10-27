@@ -11,8 +11,9 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // The connections that the tests run the end-to-end queries and the realistic cases on, through the generated methods
 // or through Dapper, set up as the manual's recipe tells a project to and no further: Dapper matches snake_case columns
 // to properties and has a handler for each type that a type override of a query it reads names and SqlClient does not
-// give.  The methods read Email and ExternalId through their converters instead.  A test disposes the connection it is
-// given, and one that needs it open, a Dapper test or one that holds a transaction, opens it first.
+// give.  The methods read the types of Types/ that have converters, Email among them, through those instead.  A test
+// disposes the connection it is given, and one that needs it open, a Dapper test or one that holds a transaction, opens
+// it first.
 internal static class EndToEndSources
 {
     // Dapper's settings are the process's, so they are made once, before the first connection.

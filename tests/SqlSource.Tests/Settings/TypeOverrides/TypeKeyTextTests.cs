@@ -108,7 +108,7 @@ public sealed class TypeKeyTextTests
         TypeKeyText.TextOf(TypeKeyText.WritePart(text).AsSpan()).ToString().ShouldBe(text);
     }
 
-    // A control character, which may end the line of a marker, is not in the written part.
+    // A control character other than NUL, which may end the line of a marker, is not in the written part.
     [Theory]
     [InlineData("a\nb")]
     [InlineData("a\tb")]

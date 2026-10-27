@@ -18,7 +18,8 @@ namespace SqlSource.Tests.Generator;
 
 // The probe of the Microsoft.Data.SqlClient a project references, against the drivers themselves and against
 // assemblies made to look like one, and the diagnostics of the driver.  Each run is of a query at Models in an mssql
-// file whose entry is current.  The tests ask for the ids of the driver alone.
+// file whose entry is current, unless it says otherwise; the tests of IsNewerThanKnown, IsBelowTheFloor, Column and
+// Findings read a probe alone.  The tests ask for the ids of the driver alone.
 public sealed class SqlClientProbeTests
 {
     private const string Source = """

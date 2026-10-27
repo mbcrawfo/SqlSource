@@ -15,7 +15,10 @@ internal enum GeneratorParameters
     /// <summary><c>keep-comments</c>: comments and blank lines stay in the SQL.</summary>
     KeepComments = 1,
 
-    /// <summary><c>no-token-validation</c>: a query's method does not check its arguments.</summary>
+    /// <summary>
+    /// <c>no-token-validation</c>: a query's token method and query method do not check that each token's argument has
+    /// text.
+    /// </summary>
     NoTokenValidation = 2,
 
     /// <summary><c>sort-input</c>: an input model's properties are sorted by name.</summary>

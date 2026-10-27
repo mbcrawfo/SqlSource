@@ -33,7 +33,7 @@ public sealed class SettingPlacesTests
         }
     }
 
-    // Neither setting has an attribute level, which ranks below every settings file.
+    // Neither the type override nor the column types has an attribute level, which ranks below every settings file.
     [Fact]
     public void Specificity_SettingsFiles_RankNearerAboveFartherAndBelowTheMarkers()
     {

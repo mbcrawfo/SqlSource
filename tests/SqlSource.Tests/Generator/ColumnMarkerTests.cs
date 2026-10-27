@@ -10,9 +10,10 @@ using static SqlSource.Testing.Generator.ModelRuns;
 
 namespace SqlSource.Tests.Generator;
 
-// The -- column: marker, which sets a column's nullability and leaves its name alone, and SQLSRC260, read from what
-// the step of the models gave and from the models the generator adds.  Each run is at Models under postgres on Npgsql
-// 10, with an entry written for each query's current hash.
+// The -- column: marker, which sets a column's nullability or its C# type and leaves its name alone, and SQLSRC260,
+// read from what the step of the models gave and from the models the generator adds.  ColumnTypeTests has the C# type
+// the marker gives.  Each run is at Models under postgres on Npgsql 10, with an entry written for each query's current
+// hash.
 public sealed class ColumnMarkerTests
 {
     [Fact]

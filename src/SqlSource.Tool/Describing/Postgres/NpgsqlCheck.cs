@@ -47,14 +47,21 @@ internal sealed record CheckVerdict(
 /// </remarks>
 internal static class NpgsqlCheck
 {
-    /// <summary>
-    /// The values of the <c>result</c> member of the <c>check</c> event: the two describes agree; they differ, which
-    /// an error of the server can say; Npgsql cannot bind a parameter's type; or <c>check</c> failed with an error
-    /// that says nothing of how Npgsql reads the SQL, such as a lost connection or a cancel.
-    /// </summary>
+    // The values of the result member of the check event.
+
+    /// <summary>The two describes agree.</summary>
     public const string Same = "same";
+
+    /// <summary>The two describes differ, which an error of the server can say.</summary>
     public const string Differ = "differ";
+
+    /// <summary>Npgsql cannot bind a parameter's type.</summary>
     public const string Unbound = "unbound";
+
+    /// <summary>
+    /// <c>check</c> failed with an error that says nothing of how Npgsql reads the SQL, such as a lost connection or a
+    /// cancel.
+    /// </summary>
     public const string Error = "error";
 
     private const string SyntaxOrAccessClass = "42";

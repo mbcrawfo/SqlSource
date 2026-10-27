@@ -35,8 +35,9 @@ internal static class MethodPlanner
 
     /// <summary>
     /// The methods of the type: one for each query of a file it can use whose output is
-    /// <see cref="OutputKind.CodeGen" />, whose entry has the models it needs, and whose name and tokens a method can
-    /// have.  A type with a diagnostic of its own, or with no file, has none.
+    /// <see cref="OutputKind.CodeGen" />, whose entry has the models it needs, whose shape, name, tokens and
+    /// converters a method can have, and whose engine's driver the project references at or above the floor.  A type
+    /// with a diagnostic of its own, or with no file, has none.
     /// </summary>
     public static TypeMethods Plan(MethodsInput input)
     {
@@ -149,8 +150,8 @@ internal static class MethodPlanner
         return queries;
     }
 
-    // The names of the members the type's file writes for the queries that get no method: each one's constant or token
-    // method, in the type itself or in its nested class.
+    // The names of the members the type's file writes for the queries whose output is not CodeGen: each one's constant
+    // or token method, in the type itself or in its nested class.
     private static HashSet<string> WrittenNames(
         List<(int File, int Query, SqlQuery Value, QuerySettings Settings)> queries
     )

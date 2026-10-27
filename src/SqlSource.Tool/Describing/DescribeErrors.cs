@@ -102,8 +102,10 @@ internal static class DescribeErrors
     }
 
     /// <summary>
-    /// A describer's failure, in the format the epic gives it: <c>query:</c>, <c>step:</c>, a <c>server:</c> line
-    /// for each line of the server, and <c>help:</c>.  A part the tool does not have is left out.
+    /// A describer's failure, in the format the epic's design gives it
+    /// (<c>docs/superpowers/specs/2026-10-07-query-generation-epic-design.md</c>, "Error messages"): <c>query:</c>,
+    /// <c>step:</c>, a <c>server:</c> line for each line of the server, and <c>help:</c>.  A part the tool does not
+    /// have is left out.
     /// </summary>
     /// <param name="failure">What the describer returned.</param>
     /// <param name="query">The query it is reported at.</param>
