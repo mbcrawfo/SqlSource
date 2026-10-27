@@ -14,7 +14,7 @@ Read every `.cs`, `.props`, `.targets` and `.csproj` file of the slice in full. 
 
 A test whose comment says it checks what its assertions do not is reported as a tech-debt candidate, with the gap stated.  The proposed action is a corrected comment, never a change to the test's data, cases or name.
 
-**Slices.**  A slice is about 12k lines of `.cs`, `.props`, `.targets` and `.csproj` files.  No slice is over 13k lines.  Slices follow folders: a folder under the size is one slice, or is joined with its siblings, the folders of the same parent taken in sorted order, until the next would take the slice over the size.  A folder over the size is split by its sub-folders, with its own files counted as one more sibling, and a folder with no sub-folders is split by its files, taken in path order, into parts of up to the size.  `tests/SqlSource.Tests/Snapshot/Examples/` and `tests/SqlSource.Tool.Tests/Fixtures/Projects/` are test data and are in no slice.  Each slice's brief names its folders and gives its exact file list, which the coverage check compares against.  Measure with this command from the repository root.  It leaves out the test data and prints the lines, files and path of every folder at every depth, `src` and `tests` included, and a row marked `(own files)` for the files directly in a folder that also has sub-folders:
+**Slices.**  A slice holds up to about 12k lines of `.cs`, `.props`, `.targets` and `.csproj` files, and never more than 13k.  Slices follow folders.  A folder of up to 13k lines is one slice, or is joined with its siblings, the folders of the same parent taken in sorted order, while the slice stays at or under 12k.  A folder over 13k is split by its sub-folders, with its own files counted as the first sibling, and a folder with no sub-folders is split by its files, taken in path order, into parts of up to 12k.  `tests/SqlSource.Tests/Snapshot/Examples/` and `tests/SqlSource.Tool.Tests/Fixtures/Projects/` are test data and are in no slice.  Each slice's brief names its folders and gives its exact file list, which the coverage check compares against; the sweep's scope is the listed files and nothing else, even where a listed folder holds test data.  Measure with this command from the repository root.  It leaves out the test data and prints the lines, files and path of every folder at every depth, `src` and `tests` included, and a row marked `(own files)` for the files directly in a folder that also has sub-folders, in tree order, each folder followed by its own files and then its sub-folders:
 
 ```bash
 find src tests -type f \( -name '*.cs' -o -name '*.props' -o -name '*.targets' -o -name '*.csproj' \) \
@@ -23,8 +23,17 @@ find src tests -type f \( -name '*.cs' -o -name '*.props' -o -name '*.targets' -
   -print0 | xargs -0 wc -l \
   | awk '{l=$1; sub(/^ *[0-9]+ /, ""); if ($0 == "total") next; n=split($0, p, "/"); k=p[1]
          for (i=1; i<n; i++) { if (i>1) k=k"/"p[i]; L[k]+=l; F[k]++ } OL[k]+=l; OF[k]++ }
-         END { for (k in L) printf "%7d %4d %s\n", L[k], F[k], k
-               for (k in OL) if (OF[k] < F[k]) printf "%7d %4d %s (own files)\n", OL[k], OF[k], k }' | sort -k3
+         END { for (k in L) { s=k; gsub("/", " ", s); printf "%s\t%7d %4d %s\n", s, L[k], F[k], k }
+               for (k in OL) if (OF[k] < F[k]) { s=k; gsub("/", " ", s); printf "%s \t%7d %4d %s (own files)\n", s, OL[k], OF[k], k } }' \
+  | LC_ALL=C sort | cut -f2-
+```
+
+A slice's file list comes from the same filters, rooted at each of its folders, with `-maxdepth 1` for a part that is a folder's own files:
+
+```bash
+find <folder> -type f \( -name '*.cs' -o -name '*.props' -o -name '*.targets' -o -name '*.csproj' \) \
+  -not -path '*/bin/*' -not -path '*/obj/*' \
+  -not -path 'tests/SqlSource.Tests/Snapshot/Examples/*' -not -path 'tests/SqlSource.Tool.Tests/Fixtures/Projects/*' | LC_ALL=C sort
 ```
 
 ## Patterns in `src/`
@@ -42,6 +51,7 @@ A checker is a fresh subagent, given the reports of one slice, a re-sweep's incl
 - for a comment finding that holds, applies the fix, reflowing the whole comment paragraph to 120 columns rather than editing a single line;
 - for a pattern or fragility finding, confirms each listed location and count and returns the item with the confirmed list, editing nothing;
 - for a test-comment gap, corrects the comment and returns the gap as a tech-debt item;
-- drops a finding that does not hold, or the part of it that does not, and returns it with its reason.
+- drops a finding that does not hold, or the part of it that does not, and returns it with its reason; a finding applied in part counts as applied, with its dropped part listed;
+- merges a finding that two reports of the slice both give, and counts it once.
 
 It edits only its sweep's files, and does not build, test, format or touch git.  It reports the files changed, the findings applied, the findings dropped with their reasons, and the items returned for tech debt.
