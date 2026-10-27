@@ -21,7 +21,7 @@ public sealed class ConversionPlannerTests
     private const string When = "global::MyApp.When";
     private const string DateTime = "global::System.DateTime";
     private const string DateTimeOffset = "global::System.DateTimeOffset";
-    private const string Place = "the property SqlSourceTypeOverrides";
+    private const string Place = "the typeOverrides of the settings file /app/sqlsource.json";
 
     private static readonly LocationInfo At = new(
         "/app/Repo/Users.sql",

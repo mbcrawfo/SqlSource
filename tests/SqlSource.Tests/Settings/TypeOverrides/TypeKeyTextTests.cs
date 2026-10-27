@@ -84,7 +84,7 @@ public sealed partial class TypeKeyTextTests
     [InlineData("a\tb", "U&\"a\\0009b\"")]
     [InlineData("a  b", "U&\"a \\0020b\"")]
     [InlineData("a\u00A0b", "U&\"a\\00A0b\"")]
-    [InlineData("a;b#c", "U&\"a\\003Bb\\0023c\"")]
+    [InlineData("a;b#c", "\"a;b#c\"")]
     [InlineData("a\u0001b", "U&\"a\\0001b\"")]
     [InlineData("a\0\nb", "U&\"a\0\\000Ab\"")]
     [InlineData("say \"hi\"\n\\", "U&\"say \"\"hi\"\"\\000A\\\\\"")]
@@ -107,13 +107,11 @@ public sealed partial class TypeKeyTextTests
         TypeKeyText.TextOf(TypeKeyText.WritePart(text).AsSpan()).ToString().ShouldBe(text);
     }
 
-    // What the trim and a line would change, and what the compiler's cut of an MSBuild value did, is not in the
-    // written part.
+    // What the trim and a line would change is not in the written part.
     [Theory]
     [InlineData("a\nb")]
     [InlineData("a\tb")]
     [InlineData("a  b")]
-    [InlineData("a;b")]
     [InlineData("x\u2028y")]
     [InlineData("\uD800\n")]
     public void WritePart_TextThatNeedsTheEscape_SurvivesTheTrimAndALine(string text)
@@ -121,7 +119,6 @@ public sealed partial class TypeKeyTextTests
         var part = TypeKeyText.WritePart(text);
 
         WhitespaceRunPattern().Replace(part, " ").ShouldBe(part);
-        part.Split(';')[0].Split('#')[0].ShouldBe(part);
         part.Where(char.IsWhiteSpace).ShouldAllBe(character => character == ' ');
         part.ShouldNotContain("  ");
         part.ShouldNotContain(";");

@@ -290,7 +290,8 @@ public sealed class TypeOverrideMapTests
             "Near" => Near,
             "Far" => Far,
             "FileHeader" => SettingPlace.FileHeader,
-            _ => SettingPlace.Query,
+            "Query" => SettingPlace.Query,
+            _ => throw new ArgumentOutOfRangeException(nameof(name), name, "No such place in this test."),
         };
 
     private static TypeOverride Entry(string key, string? type, SettingPlace place) => new(key, type, place);

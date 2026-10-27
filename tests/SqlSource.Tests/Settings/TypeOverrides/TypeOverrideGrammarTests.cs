@@ -57,6 +57,8 @@ public sealed class TypeOverrideGrammarTests
     [InlineData("integer=long", "int4", "long")]
     [InlineData("pg_catalog.int8=decimal", "int8", "decimal")]
     [InlineData("Billing.Invoice$State=Billing.State", "Billing.Invoice$State", "global::Billing.State")]
+    [InlineData("s.\"a=b\"=long", "s.\"a=b\"", "long")]
+    [InlineData("s.U&\"a=b\\0022 c\"=int", "s.\"a=b\"\" c\"", "int")]
     public void TryReadEntry_ValidEntry_GivesItsKeyAndTheCanonicalText(string text, string key, string type)
     {
         var entry = Read(text);
@@ -175,6 +177,7 @@ public sealed class TypeOverrideGrammarTests
     [InlineData("int4==int")]
     [InlineData("numeric(18,2)=decimal")]
     [InlineData("int4=default extra")]
+    [InlineData("\"my schema.x=int")]
     public void TryReadEntry_InvalidEntry_IsNotRead(string text)
     {
         TypeOverrideGrammar

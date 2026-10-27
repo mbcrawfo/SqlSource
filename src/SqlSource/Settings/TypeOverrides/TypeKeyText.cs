@@ -129,9 +129,8 @@ internal static class TypeKeyText
     /// double quotes with each <c>"</c> doubled, or in the escaped form when the quotes would not keep it.  A key is
     /// trimmed and a marker is one line, so a text with a control character other than NUL or a white space other than
     /// a lone space is written <c>U&amp;"a\000Ab"</c>, with <c>\XXXX</c> for each such character, <c>\\</c> for a
-    /// <c>\</c> and <c>""</c> for a <c>"</c>.  So is a <c>;</c> or a <c>#</c>, which a key written in an MSBuild
-    /// value, a form that is gone, would have lost to the compiler's cut.  A NUL stays as it is: a PostgreSQL name
-    /// cannot hold it, and <c>\0000</c> is no escape.
+    /// <c>\</c> and <c>""</c> for a <c>"</c>.  A NUL stays as it is: a PostgreSQL name cannot hold it, and
+    /// <c>\0000</c> is no escape.
     /// </summary>
     public static string WritePart(string text)
     {
@@ -184,15 +183,14 @@ internal static class TypeKeyText
     }
 
     // A character that a quoted part would not keep: the trim reads any white space but U+0020 as a space and a run
-    // of them as one, a control character may end the line, and ; and # were cut by the compiler from a key in an
-    // MSBuild value.  A NUL is none of them: no PostgreSQL name holds one, and \0000 cannot write it.
+    // of them as one, and a control character may end the line.  A NUL is none of them: no PostgreSQL name holds one,
+    // and \0000 cannot write it.
     private static bool MustEscape(string text, int index)
     {
         var character = text[index];
         return (character != '\0' && char.IsControl(character))
             || (char.IsWhiteSpace(character) && character != ' ')
-            || (character == ' ' && index > 0 && text[index - 1] == ' ')
-            || character is ';' or '#';
+            || (character == ' ' && index > 0 && text[index - 1] == ' ');
     }
 
     /// <summary>
