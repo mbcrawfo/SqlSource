@@ -393,10 +393,10 @@ public sealed class AllocationTests(PostgresContainer postgres)
         pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
-    // Many rows, where the pool matters: a list that grows by doubling to hold 300 rows allocates arrays of 4 to 512
-    // elements, about 8.4 KB beyond the 300 rows and the final array, and the pooled method rents its buffers from the
-    // pool, so it allocates the 300 rows and the final array alone.  So the generated method allocates less than the
-    // hand-written one, by about the growth arrays.
+    // Many rows, where the pool matters: a list that grows by doubling to hold 300 rows allocates growth arrays of 4 to
+    // 512 elements, about 8.4 KB in all, and the pooled method rents its buffers from the pool, so it allocates the
+    // 300 rows and the final array alone.  So the generated method allocates less than the hand-written one, by about
+    // the list's growth arrays.
     [Fact]
     public async Task NumbersAsArray_PerCallOfAFewHundredRows_AllocatesLessThanAListCopiedToAnArray()
     {

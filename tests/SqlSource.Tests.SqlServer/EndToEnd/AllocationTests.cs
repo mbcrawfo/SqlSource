@@ -54,15 +54,16 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
     private const int Pairs = 500;
 
     // The bytes a call of the generated method may allocate over the hand-written one's, by the commonest difference of
-    // a pair, the same for every pair.  It was 0 for SearchAccounts and SearchAccountsUnpooled, on both connections and
-    // both images, when this was set, and 8 for each of the eight pairs of the numbers queries, NumbersAsList, IList,
-    // ICollection and ImmutableArray through the pool and under no-array-pool, on both connections, on every one of
-    // five runs on SQL Server 2025 and three on 2017, the difference of the two methods' own state; it does not move
-    // with the driver's share of a call or with another thread's work.  The margin is below the 24 bytes of the
-    // smallest object of a 64-bit process, so that any object the generated method allocates for each call and the
-    // hand-written does not fails the test, and an extra object did, at 24 bytes, and an array of 64 bytes, at 88,
-    // failed both pairs.  It lets the generated method's state machine hold up to two more fields of 8 bytes than
-    // the hand-written one's.  Never raise it to make a change pass.
+    // a pair, the same for every pair.  It was 0 for all ten pairs, SearchAccounts and SearchAccountsUnpooled and the
+    // eight of the numbers queries, NumbersAsList, IList, ICollection and ImmutableArray through the pool and under
+    // no-array-pool, on both connections, on every one of six runs when this was set, three on SQL Server 2025 and
+    // three on 2017.  (The numbers pairs were 8 while their hand-written methods took the count and not the input model
+    // that the generated methods take; given the model, they fell to 0.)  It does not move with the driver's share of
+    // a call or with another thread's work.  The margin is below the 24 bytes of the smallest object of a 64-bit
+    // process, so that any object the generated method allocates for each call and the hand-written does not fails the
+    // test, and an extra object did, at 24 bytes, and an array of 64 bytes, at 88, failed both pairs of SearchAccounts.
+    // It lets the generated method's state machine hold up to two more fields of 8 bytes than the hand-written one's.
+    // Never raise it to make a change pass.
     private const long MarginInBytesPerCall = 16;
 
     // A call allocates its command, its parameters, its reader and its rows: some kilobytes on the drivers that the
@@ -84,13 +85,12 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
 
     // The bytes for each call that the pooled method must save on a few hundred rows against a List copied to an array,
     // by the commonest difference of a pair of calls.  The list of 300 rows grows through arrays of 4 to 512 elements,
-    // 8,352 bytes with their headers, which the pooled method does not allocate.  The commonest difference was -8,368
-    // bytes, in 452 to 471 of 500 pairs, on each of eight runs on both connections, five on SQL Server 2025 and three
-    // on 2017; the next were -8,664 and -8,072, in some twenty pairs each, and a few of the 500 were far from any of
-    // them.  So 8,000 is 368 bytes below the commonest and 72 below the least of the next, room for the driver's paths
-    // and not for a growth array, and far above 4,248, the saving of a pooled method that allocated even the largest
-    // growth array, of 512 elements, itself.  It is raised when the pool saves more and never lowered to make a change
-    // pass.
+    // 8,352 bytes with their headers, which the pooled method does not allocate.  The commonest difference was -8,376
+    // bytes, in 450 to 469 of 500 pairs, on each of six runs on both connections, three on SQL Server 2025 and three on
+    // 2017; the next were -8,672 and -8,080, in some twenty pairs each, and a few of the 500 were far from any of them.
+    // So 8,000 is 376 bytes below the commonest and 80 below the least of the next, room for the driver's paths and not
+    // for a growth array, and far above 4,256, the saving of a pooled method that allocated even the largest growth
+    // array, of 512 elements, itself.  It is raised when the pool saves more and never lowered to make a change pass.
     private const long LeastSavingInBytesPerCall = 8_000;
 
     // "%o%" matches bob and carol, and the id alice.
@@ -172,15 +172,15 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             await connection.OpenAsync(token);
         }
 
-        var parameters = new NumbersAsListArgs(CountedRows);
+        var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersAsList(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsListPooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
+        (await NumbersAsListPooledByHandAsync(connection, parameters, cancellationToken: token)).ShouldBe(
             CountedNumbers
         );
 
         var pairs = await CallAllocations.MeasureAsync(
             () => connection.NumbersAsList(parameters, cancellationToken: token),
-            () => NumbersAsListPooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            () => NumbersAsListPooledByHandAsync(connection, parameters, cancellationToken: token),
             WarmUpCalls,
             Pairs
         );
@@ -203,15 +203,15 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             await connection.OpenAsync(token);
         }
 
-        var parameters = new NumbersAsIListArgs(CountedRows);
+        var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersAsIList(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsListPooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
+        (await NumbersAsListPooledByHandAsync(connection, parameters, cancellationToken: token)).ShouldBe(
             CountedNumbers
         );
 
         var pairs = await CallAllocations.MeasureAsync(
             () => connection.NumbersAsIList(parameters, cancellationToken: token),
-            () => NumbersAsListPooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            () => NumbersAsListPooledByHandAsync(connection, parameters, cancellationToken: token),
             WarmUpCalls,
             Pairs
         );
@@ -234,15 +234,15 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             await connection.OpenAsync(token);
         }
 
-        var parameters = new NumbersAsICollectionArgs(CountedRows);
+        var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersAsICollection(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsListPooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
+        (await NumbersAsListPooledByHandAsync(connection, parameters, cancellationToken: token)).ShouldBe(
             CountedNumbers
         );
 
         var pairs = await CallAllocations.MeasureAsync(
             () => connection.NumbersAsICollection(parameters, cancellationToken: token),
-            () => NumbersAsListPooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            () => NumbersAsListPooledByHandAsync(connection, parameters, cancellationToken: token),
             WarmUpCalls,
             Pairs
         );
@@ -265,15 +265,15 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             await connection.OpenAsync(token);
         }
 
-        var parameters = new NumbersAsImmutableArrayArgs(CountedRows);
+        var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersAsImmutableArray(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsImmutableArrayPooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
+        (await NumbersAsImmutableArrayPooledByHandAsync(connection, parameters, cancellationToken: token)).ShouldBe(
             CountedNumbers
         );
 
         var pairs = await CallAllocations.MeasureAsync(
             () => connection.NumbersAsImmutableArray(parameters, cancellationToken: token),
-            () => NumbersAsImmutableArrayPooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            () => NumbersAsImmutableArrayPooledByHandAsync(connection, parameters, cancellationToken: token),
             WarmUpCalls,
             Pairs
         );
@@ -298,15 +298,15 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             await connection.OpenAsync(token);
         }
 
-        var parameters = new NumbersNoPoolAsListArgs(CountedRows);
+        var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersNoPoolAsList(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsListUnpooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
+        (await NumbersAsListUnpooledByHandAsync(connection, parameters, cancellationToken: token)).ShouldBe(
             CountedNumbers
         );
 
         var pairs = await CallAllocations.MeasureAsync(
             () => connection.NumbersNoPoolAsList(parameters, cancellationToken: token),
-            () => NumbersAsListUnpooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            () => NumbersAsListUnpooledByHandAsync(connection, parameters, cancellationToken: token),
             WarmUpCalls,
             Pairs
         );
@@ -329,15 +329,15 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             await connection.OpenAsync(token);
         }
 
-        var parameters = new NumbersNoPoolAsIListArgs(CountedRows);
+        var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersNoPoolAsIList(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsListUnpooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
+        (await NumbersAsListUnpooledByHandAsync(connection, parameters, cancellationToken: token)).ShouldBe(
             CountedNumbers
         );
 
         var pairs = await CallAllocations.MeasureAsync(
             () => connection.NumbersNoPoolAsIList(parameters, cancellationToken: token),
-            () => NumbersAsListUnpooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            () => NumbersAsListUnpooledByHandAsync(connection, parameters, cancellationToken: token),
             WarmUpCalls,
             Pairs
         );
@@ -360,15 +360,15 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             await connection.OpenAsync(token);
         }
 
-        var parameters = new NumbersNoPoolAsICollectionArgs(CountedRows);
+        var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersNoPoolAsICollection(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsListUnpooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
+        (await NumbersAsListUnpooledByHandAsync(connection, parameters, cancellationToken: token)).ShouldBe(
             CountedNumbers
         );
 
         var pairs = await CallAllocations.MeasureAsync(
             () => connection.NumbersNoPoolAsICollection(parameters, cancellationToken: token),
-            () => NumbersAsListUnpooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            () => NumbersAsListUnpooledByHandAsync(connection, parameters, cancellationToken: token),
             WarmUpCalls,
             Pairs
         );
@@ -393,15 +393,15 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             await connection.OpenAsync(token);
         }
 
-        var parameters = new NumbersNoPoolAsImmutableArrayArgs(CountedRows);
+        var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersNoPoolAsImmutableArray(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsImmutableArrayUnpooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
+        (await NumbersAsImmutableArrayUnpooledByHandAsync(connection, parameters, cancellationToken: token)).ShouldBe(
             CountedNumbers
         );
 
         var pairs = await CallAllocations.MeasureAsync(
             () => connection.NumbersNoPoolAsImmutableArray(parameters, cancellationToken: token),
-            () => NumbersAsImmutableArrayUnpooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            () => NumbersAsImmutableArrayUnpooledByHandAsync(connection, parameters, cancellationToken: token),
             WarmUpCalls,
             Pairs
         );
@@ -414,10 +414,10 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
         pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
-    // Many rows, where the pool matters: a list that grows by doubling to hold 300 rows allocates arrays of 4 to 512
-    // elements, about 8.4 KB beyond the 300 rows and the final array, and the pooled method rents its buffers from the
-    // pool, so it allocates the 300 rows and the final array alone.  So the generated method allocates less than the
-    // hand-written one, by about the growth arrays.
+    // Many rows, where the pool matters: a list that grows by doubling to hold 300 rows allocates growth arrays of 4 to
+    // 512 elements, about 8.4 KB in all, and the pooled method rents its buffers from the pool, so it allocates the
+    // 300 rows and the final array alone.  So the generated method allocates less than the hand-written one, by about
+    // the list's growth arrays.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -430,16 +430,14 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             await connection.OpenAsync(token);
         }
 
-        var parameters = new NumbersAsArrayArgs(FewHundredRows);
+        var parameters = new NumbersCount(FewHundredRows);
         var expected = Enumerable.Range(1, FewHundredRows).Select(n => new CountedNumber(n)).ToArray();
         (await connection.NumbersAsArray(parameters, cancellationToken: token)).ShouldBe(expected);
-        (await NumbersAsArrayUnpooledByHandAsync(connection, FewHundredRows, cancellationToken: token)).ShouldBe(
-            expected
-        );
+        (await NumbersAsArrayUnpooledByHandAsync(connection, parameters, cancellationToken: token)).ShouldBe(expected);
 
         var pairs = await CallAllocations.MeasureAsync(
             () => connection.NumbersAsArray(parameters, cancellationToken: token),
-            () => NumbersAsArrayUnpooledByHandAsync(connection, FewHundredRows, cancellationToken: token),
+            () => NumbersAsArrayUnpooledByHandAsync(connection, parameters, cancellationToken: token),
             WarmUpCalls,
             Pairs
         );
@@ -597,7 +595,7 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
     // NumbersAsIList and NumbersAsICollection read them too.
     private static async Task<List<CountedNumber>> NumbersAsListPooledByHandAsync(
         DbConnection connection,
-        int count,
+        NumbersCount parameters,
         DbTransaction? transaction = null,
         int? commandTimeout = null,
         CancellationToken cancellationToken = default
@@ -624,7 +622,7 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             var countParameter = (SqlParameter)command.CreateParameter();
             countParameter.ParameterName = "count";
             countParameter.SqlDbType = SqlDbType.Int;
-            countParameter.Value = count;
+            countParameter.Value = parameters.Count;
             _ = command.Parameters.Add(countParameter);
 
             var reader = await command
@@ -655,7 +653,7 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
     // ImmutableArray.
     private static async Task<ImmutableArray<CountedNumber>> NumbersAsImmutableArrayPooledByHandAsync(
         DbConnection connection,
-        int count,
+        NumbersCount parameters,
         DbTransaction? transaction = null,
         int? commandTimeout = null,
         CancellationToken cancellationToken = default
@@ -682,7 +680,7 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             var countParameter = (SqlParameter)command.CreateParameter();
             countParameter.ParameterName = "count";
             countParameter.SqlDbType = SqlDbType.Int;
-            countParameter.Value = count;
+            countParameter.Value = parameters.Count;
             _ = command.Parameters.Add(countParameter);
 
             var reader = await command
@@ -713,7 +711,7 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
     // returned, as NumbersNoPoolAsIList and NumbersNoPoolAsICollection read them too.
     private static async Task<List<CountedNumber>> NumbersAsListUnpooledByHandAsync(
         DbConnection connection,
-        int count,
+        NumbersCount parameters,
         DbTransaction? transaction = null,
         int? commandTimeout = null,
         CancellationToken cancellationToken = default
@@ -740,7 +738,7 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             var countParameter = (SqlParameter)command.CreateParameter();
             countParameter.ParameterName = "count";
             countParameter.SqlDbType = SqlDbType.Int;
-            countParameter.Value = count;
+            countParameter.Value = parameters.Count;
             _ = command.Parameters.Add(countParameter);
 
             var reader = await command
@@ -771,7 +769,7 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
     // that is drained.
     private static async Task<ImmutableArray<CountedNumber>> NumbersAsImmutableArrayUnpooledByHandAsync(
         DbConnection connection,
-        int count,
+        NumbersCount parameters,
         DbTransaction? transaction = null,
         int? commandTimeout = null,
         CancellationToken cancellationToken = default
@@ -798,7 +796,7 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             var countParameter = (SqlParameter)command.CreateParameter();
             countParameter.ParameterName = "count";
             countParameter.SqlDbType = SqlDbType.Int;
-            countParameter.Value = count;
+            countParameter.Value = parameters.Count;
             _ = command.Parameters.Add(countParameter);
 
             var reader = await command
@@ -829,7 +827,7 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
     // List and ToArray() that the pooled NumbersAsArray is held against for a few hundred rows.
     private static async Task<CountedNumber[]> NumbersAsArrayUnpooledByHandAsync(
         DbConnection connection,
-        int count,
+        NumbersCount parameters,
         DbTransaction? transaction = null,
         int? commandTimeout = null,
         CancellationToken cancellationToken = default
@@ -856,7 +854,7 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             var countParameter = (SqlParameter)command.CreateParameter();
             countParameter.ParameterName = "count";
             countParameter.SqlDbType = SqlDbType.Int;
-            countParameter.Value = count;
+            countParameter.Value = parameters.Count;
             _ = command.Parameters.Add(countParameter);
 
             var reader = await command
