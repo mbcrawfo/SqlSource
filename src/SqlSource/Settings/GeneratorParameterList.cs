@@ -16,8 +16,8 @@ namespace SqlSource.Settings;
 /// A <c>-- generator:</c> marker walks the same words, with <see cref="Words" />, and holds them to a rule of its
 /// own, in <c>SqlGeneratorParameterScope</c>.  The two rules differ on purpose.  A marker has a position for each
 /// word and adds up over several lines, so it reports the one word that conflicts, and a word with <c>=</c> as a
-/// value that is not valid.  An argument of the attribute has no position inside the value, so
-/// <c>default</c> beside another word makes the whole value the thing to quote.
+/// value that is not valid.  An argument of the attribute has no position inside the value, so <c>default</c> beside
+/// another word makes the whole value the thing to quote.
 /// </para>
 /// </remarks>
 internal static class GeneratorParameterList

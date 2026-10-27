@@ -20,8 +20,7 @@ internal static class MappedTypeNames
     /// <remarks>
     /// A query's markers are over its file header's, so the header's entries are read through its queries.  The files
     /// of a folder share their chain's level, and are sorted by path, so a level read for the file before is not read
-    /// again.  A list of the names alone, which an edit that leaves them as they were gives again,
-    /// equal.
+    /// again.  A list of the names alone, which an edit that leaves them as they were gives again, equal.
     /// </remarks>
     public static EquatableArray<string> Collect(EquatableArray<FileLevel> files, EquatableArray<ParsedSqlFile> parsed)
     {

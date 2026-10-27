@@ -169,9 +169,9 @@ public sealed class CachingSettingsFileTests
     }
 
     // The counterpart of Run_OptionsReplacedWithoutChangingTheBuildFolders_EmitsNothingAgain for a settings file: what
-    // the IDE does when one is saved without a change, a new text of the same value.  The file is read again
-    // and gives an equal value, and nothing after it runs: the step named SettingsFile is the one after the filter of
-    // nulls, which reports such a value as taken from the previous run.
+    // the IDE does when one is saved without a change, a new text of the same value.  The file is read again and gives
+    // an equal value, and nothing after it runs: the step named SettingsFile is the one after the filter of nulls,
+    // which reports such a value as taken from the previous run.
     [Fact]
     public void Run_SettingsFileReplacedWithTheSameText_EmitsNothingAgain()
     {

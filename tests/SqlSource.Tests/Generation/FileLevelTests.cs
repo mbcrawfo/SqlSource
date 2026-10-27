@@ -1,6 +1,7 @@
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Chains;
+using SqlSource.Generation.Paths;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using Xunit;
@@ -28,5 +29,5 @@ public sealed class FileLevelTests
 
     [Fact]
     public void Resolve_PathThatDoesNotNormalize_IsNull() =>
-        FileLevel.Resolve(null, new SettingsChain(Chain, null)).ShouldBeNull();
+        FileLevel.Resolve(SqlPath.Normalize("../Users.sql"), new SettingsChain(Chain, null)).ShouldBeNull();
 }

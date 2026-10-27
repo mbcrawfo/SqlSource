@@ -90,12 +90,12 @@ internal readonly record struct QuerySettings(
         ) ?? EquatableArray<TypeOverride>.Empty;
 
     /// <summary>
-    /// The column types of a query: the markers' over the file's level's, merged per key as
-    /// <see cref="ResolveTypeOverrides" /> merges the type override, and one list for both engines.  The file's level
-    /// is the chain of its folder.  The markers' are those of the file's header, by the column's source; a query's own
-    /// <c>-- column:</c> markers name its result's columns and are not among them.  Sorted by key, and empty when no
-    /// level sets one.  It keeps its entries of <c>default</c>, which <see cref="ColumnTypeMap.Find" /> weighs by their
-    /// place, and is kept apart from <see cref="Resolve" /> for the same reason as the type override.
+    /// The column types of a query: the markers' over the file's level's, merged per key as the type override is in
+    /// <see cref="ResolveTypeOverrides" />, and one list for both engines.  The file's level is the chain of its
+    /// folder.  The markers' are those of the file's header, by the column's source; a query's own <c>-- column:</c>
+    /// markers name its result's columns and are not among them.  Sorted by key, and empty when no level sets one.  It
+    /// keeps its entries of <c>default</c>, which <see cref="ColumnTypeMap.Find" /> weighs by their place, and is kept
+    /// apart from <see cref="Resolve" /> for the same reason as the type override.
     /// </summary>
     public static EquatableArray<ColumnType> ResolveColumnTypes(SettingsLevel markers, SettingsLevel file) =>
         ColumnTypeMap.Over(markers.ColumnTypes, file.ColumnTypes) ?? EquatableArray<ColumnType>.Empty;

@@ -25,8 +25,8 @@ internal sealed record SettingsLevel
     public OutputKind? Output { get; init; }
 
     /// <summary>
-    /// The name of the database a query belongs to.  The generator carries it from a marker and never uses it, and
-    /// does not read it from a settings file; the tool does both.
+    /// The name of the database a query belongs to.  The generator carries it, from a marker or a settings file, and
+    /// never uses it; the tool does.
     /// </summary>
     public string? Database { get; init; }
 
@@ -69,8 +69,8 @@ internal sealed record SettingsLevel
 
     /// <summary>
     /// The name of the class that holds a type's members in <see cref="MemberPlacement.Nested" /> placement.  The
-    /// attribute and the chain of the folder of the type's C# file give it; no <c>.sql</c> file's level
-    /// does, since a type's queries can come from several files.
+    /// attribute and the chain of the folder of the type's C# file give it; no <c>.sql</c> file's level does, since a
+    /// type's queries can come from several files.
     /// </summary>
     public string? NestedClass { get; init; }
 
