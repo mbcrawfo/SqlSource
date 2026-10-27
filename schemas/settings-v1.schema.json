@@ -51,10 +51,10 @@
         "type": "string",
         "anyOf": [
           {
-            "enum": ["keep-comments", "no-token-validation", "sort-input", "sort-output", "no-table-models", "async-method-suffix", "default"]
+            "enum": ["keep-comments", "no-token-validation", "sort-input", "sort-output", "no-table-models", "async-method-suffix", "no-array-pool", "default"]
           },
           {
-            "pattern": "^\\s*(?:[kK][eE][eE][pP]-[cC][oO][mM][mM][eE][nN][tT][sS]|[nN][oO]-[tT][oO][kK][eE][nN]-[vV][aA][lL][iI][dD][aA][tT][iI][oO][nN]|[sS][oO][rR][tT]-[iI][nN][pP][uU][tT]|[sS][oO][rR][tT]-[oO][uU][tT][pP][uU][tT]|[nN][oO]-[tT][aA][bB][lL][eE]-[mM][oO][dD][eE][lL][sS]|[aA][sS][yY][nN][cC]-[mM][eE][tT][hH][oO][dD]-[sS][uU][fF][fF][iI][xX]|[dD][eE][fF][aA][uU][lL][tT])?\\s*$"
+            "pattern": "^\\s*(?:[kK][eE][eE][pP]-[cC][oO][mM][mM][eE][nN][tT][sS]|[nN][oO]-[tT][oO][kK][eE][nN]-[vV][aA][lL][iI][dD][aA][tT][iI][oO][nN]|[sS][oO][rR][tT]-[iI][nN][pP][uU][tT]|[sS][oO][rR][tT]-[oO][uU][tT][pP][uU][tT]|[nN][oO]-[tT][aA][bB][lL][eE]-[mM][oO][dD][eE][lL][sS]|[aA][sS][yY][nN][cC]-[mM][eE][tT][hH][oO][dD]-[sS][uU][fF][fF][iI][xX]|[nN][oO]-[aA][rR][rR][aA][yY]-[pP][oO][oO][lL]|[dD][eE][fF][aA][uU][lL][tT])?\\s*$"
           }
         ]
       },
@@ -69,7 +69,7 @@
           {
             "contains": {
               "type": "string",
-              "pattern": "^\\s*(?:[kK][eE][eE][pP]-[cC][oO][mM][mM][eE][nN][tT][sS]|[nN][oO]-[tT][oO][kK][eE][nN]-[vV][aA][lL][iI][dD][aA][tT][iI][oO][nN]|[sS][oO][rR][tT]-[iI][nN][pP][uU][tT]|[sS][oO][rR][tT]-[oO][uU][tT][pP][uU][tT]|[nN][oO]-[tT][aA][bB][lL][eE]-[mM][oO][dD][eE][lL][sS]|[aA][sS][yY][nN][cC]-[mM][eE][tT][hH][oO][dD]-[sS][uU][fF][fF][iI][xX])\\s*$"
+              "pattern": "^\\s*(?:[kK][eE][eE][pP]-[cC][oO][mM][mM][eE][nN][tT][sS]|[nN][oO]-[tT][oO][kK][eE][nN]-[vV][aA][lL][iI][dD][aA][tT][iI][oO][nN]|[sS][oO][rR][tT]-[iI][nN][pP][uU][tT]|[sS][oO][rR][tT]-[oO][uU][tT][pP][uU][tT]|[nN][oO]-[tT][aA][bB][lL][eE]-[mM][oO][dD][eE][lL][sS]|[aA][sS][yY][nN][cC]-[mM][eE][tT][hH][oO][dD]-[sS][uU][fF][fF][iI][xX]|[nN][oO]-[aA][rR][rR][aA][yY]-[pP][oO][oO][lL])\\s*$"
             }
           }
         ]

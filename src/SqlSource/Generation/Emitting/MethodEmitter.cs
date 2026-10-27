@@ -86,6 +86,13 @@ internal static class MethodEmitter
 
         var modifiers = ModifiersOf(methods.Placement);
         var memberIndent = TypeEmitter.GetIndent(depth);
+        var usesRowBuffer = false;
+        for (var index = 0; index < kept.Count && !usesRowBuffer; index++)
+        {
+            usesRowBuffer = RowBuffer.IsUsedBy(kept[index]);
+        }
+
+        var rowBufferType = usesRowBuffer ? RowBuffer.TypeTextFor(methods) : string.Empty;
         for (var index = 0; index < kept.Count; index++)
         {
             if (index > 0)
@@ -93,7 +100,20 @@ internal static class MethodEmitter
                 _ = builder.Append('\n');
             }
 
-            QueryMethodWriter.Append(builder, memberIndent, kept[index], modifiers, isExtension);
+            QueryMethodWriter.Append(builder, memberIndent, kept[index], modifiers, isExtension, rowBufferType);
+        }
+
+        // The buffer goes after every type, in the namespace.
+        var namespaceDepth = methods.NamespaceText.Length > 0 ? 1 : 0;
+        while (depth > namespaceDepth)
+        {
+            _ = builder.Append(TypeEmitter.GetIndent(--depth)).Append("}\n");
+        }
+
+        if (usesRowBuffer)
+        {
+            _ = builder.Append('\n');
+            RowBuffer.Append(builder, TypeEmitter.GetIndent(depth), RowBuffer.NameFor(methods));
         }
 
         while (depth > 0)
