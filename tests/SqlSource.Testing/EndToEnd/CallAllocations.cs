@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Xunit;
 
 namespace SqlSource.Testing.EndToEnd;
 
@@ -24,8 +25,21 @@ namespace SqlSource.Testing.EndToEnd;
 // from it, so that over many pairs they are fewer than the pairs of the same path.  A pair that another thread or the
 // next call disturbed scatters over differences that do not recur.  An object that a generated method allocates on
 // each call is in every pair, and so is its state machine, boxed on every call because each call waits for the server.
+//
+// That holds only while what else the process allocates during a call is rare.  Under coverage it is not: the collector
+// allocates in the process it measures, some 4.4 to 4.7 KB on a fifth of the calls here and on half of them on a busy
+// runner in CI, where the calls that bear it alternate, so that the pairs that differ by it outnumber those that do
+// not, and the commonest difference became the collector's bytes and failed the tests at random.  So a measure skips
+// under coverage, or any other profiler, and CI runs the allocation tests in a step of their own without it.
 internal static class CallAllocations
 {
+    // The variables a coverage collector or a profiler sets in the process it measures: CODE_COVERAGE_SESSION_NAME of
+    // Microsoft.Testing.Extensions.CodeCoverage, which the tests' --coverage runs, and CORECLR_ENABLE_PROFILING of
+    // any profiler the runtime loads.
+    private static bool IsMeasuredByAnother =>
+        Environment.GetEnvironmentVariable("CODE_COVERAGE_SESSION_NAME") is { Length: > 0 }
+        || Environment.GetEnvironmentVariable("CORECLR_ENABLE_PROFILING") == "1";
+
     // Calls each method warmUpCalls times, then makes the pairs, the first of each pair changing from one to the next.
     // Each delegate is made once by the caller, and calling it allocates nothing of its own; each call is measured
     // here, around the call alone, so that no state machine of the measure is counted in it.  The two methods may
@@ -38,6 +52,11 @@ internal static class CallAllocations
         int pairs
     )
     {
+        Assert.SkipWhen(
+            IsMeasuredByAnother,
+            "Coverage or a profiler allocates in the process on some calls and not others, which this measure counts."
+        );
+
         for (var call = 0; call < warmUpCalls; call++)
         {
             _ = await generated();

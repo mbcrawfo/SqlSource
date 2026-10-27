@@ -72,7 +72,7 @@ dotnet test --solution SqlSource.slnx --results-directory artifacts/test-results
 dotnet reportgenerator '-reports:artifacts/test-results/*.cobertura.xml' -targetdir:artifacts/coverage -reporttypes:Html '-assemblyfilters:+SqlSource;+SqlSource.Tool'
 ```
 
-Each test project writes its own Cobertura file, and the report merges them.  It is `artifacts/coverage/index.html`.
+Each test project writes its own Cobertura file, and the report merges them.  It is `artifacts/coverage/index.html`.  The end-to-end `AllocationTests` of the two container projects skip under coverage, since the collector allocates in the process they measure; run them without `--coverage`, as `pre-commit-validation.sh` and CI do.
 
 ## Pack
 

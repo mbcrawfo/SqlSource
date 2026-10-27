@@ -139,6 +139,9 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: tools/pull-test-images.sh
 
+      # The end-to-end allocation tests count what every thread of the process allocates, and the coverage collector
+      # allocates in the process it measures, on some calls and not others, which made them fail at random.  So this
+      # step leaves them out, and the next runs them without coverage on the same images.
       - name: Test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: >-
@@ -146,6 +149,18 @@ jobs:
           --results-directory artifacts/test-results
           --coverage --coverage-output-format cobertura
           --report-github
+          --filter-not-class SqlSource.Tests.Postgres.EndToEnd.AllocationTests
+          --filter-not-class SqlSource.Tests.SqlServer.EndToEnd.AllocationTests
+
+      - name: Test allocations
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          status=0
+          for engine in Postgres SqlServer; do
+              dotnet test --project "tests/SqlSource.Tests.$engine" --configuration "$CONFIGURATION" --no-build \
+                  --report-github --filter-class "SqlSource.Tests.$engine.EndToEnd.AllocationTests" || status=1
+          done
+          exit "$status"
 
       - name: Report coverage
         id: coverage
