@@ -72,15 +72,18 @@ The type gets every `.sql` file in the folder of its C# file.  Once the queries 
 
 ### 3. Set the dialect
 
-In the project file:
+Save this as `sqlsource.json`, beside your project file:
 
-```xml
-<PropertyGroup>
-    <SqlSourceDialect>postgres</SqlSourceDialect>
-</PropertyGroup>
+```jsonc
+// sqlsource.json, beside your project file
+{
+    // No settings file in a folder above this one applies to the project.
+    "root": true,
+    "dialect": "postgres",
+}
 ```
 
-Databases disagree about where a comment or a string ends, and SqlSource takes the comments out of your SQL, so it reads each file by the rules of your database: its dialect.  The dialect also tells the tool which database to ask.  The default is `ansi`; set the one named for your database, such as `postgres` (PostgreSQL), `mssql` (SQL Server), `mysql` or `sqlite`.  More: [choosing a dialect](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/dialects.md#choosing-a-dialect), [settings](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#all-settings) for everything else you can set for a project, a folder or one query.
+A settings file applies to the `.sql` files of its folder and of every folder below it, so this one reads every `.sql` file of the project as PostgreSQL.  Databases disagree about where a comment or a string ends, and SqlSource takes the comments out of your SQL, so it reads each file by the rules of your database: its dialect.  The dialect also tells the tool which database to ask.  The default is `ansi`; set the one named for your database, such as `postgres` (PostgreSQL), `mssql` (SQL Server), `mysql` or `sqlite`.  More: [choosing a dialect](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/dialects.md#choosing-a-dialect), [settings files](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#settings-files), [settings](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#all-settings) for everything else you can set for a project, a folder or one query.
 
 ### 4. Use the queries
 
@@ -129,10 +132,13 @@ Run `describe` again when you change a query, `describe --force` after a change 
 
 Set the output to `models`, to run the queries yourself, with Dapper or your own ADO.NET code.  A query whose output is `models` gets its models, once the tool has described it, as in step 5, and a constant that holds its SQL, or a method that returns it when the query has a token, in place of the method that runs it:
 
-```xml
-<PropertyGroup>
-    <SqlSourceOutput>models</SqlSourceOutput>
-</PropertyGroup>
+```jsonc
+// sqlsource.json, beside your project file
+{
+    "root": true,
+    "dialect": "postgres",
+    "output": "models",
+}
 ```
 
 The constants are in a private class `Sql` of the type, `Sql.GetUser` and `Sql.FindUsers`, and are plain strings, so any library can run them: Dapper here (`dotnet add package Dapper`).
@@ -161,11 +167,13 @@ More: [output](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/setti
 
 Follow steps 1 to 3, set the output to `sql`, and skip the tool.  For a SQL Server project:
 
-```xml
-<PropertyGroup>
-    <SqlSourceDialect>mssql</SqlSourceDialect>
-    <SqlSourceOutput>sql</SqlSourceOutput>
-</PropertyGroup>
+```jsonc
+// sqlsource.json, beside your project file
+{
+    "root": true,
+    "dialect": "mssql",
+    "output": "sql",
+}
 ```
 
 - **`sql` asks for each query's SQL and nothing else**: its constant, or, for a query with a `{{token}}`, a method that fills it in, which you run as [Only want to generate models?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#only-want-to-generate-models) shows, without the models.  It needs no database, no tool and no sidecar.  It tells the tool to leave these queries out, so a run on the project reports nothing for them, and the build to need no sidecar for them and to generate no models.  Without it the default output, `codegen`, asks for every query to be described, and for a method that runs it, and the build reports an error for each file or query that is not.
@@ -177,7 +185,7 @@ More: [output](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/setti
 
 ### I want my query methods to have `Async` names
 
-Add the generator parameter `async-method-suffix`: `<SqlSourceGeneratorParameters>async-method-suffix</SqlSourceGeneratorParameters>` in the project file, and `GetUser`'s method is `GetUserAsync`.  It can also be given for one type, folder, file or query.  A list of generator parameters replaces the one it would take from further out, so a file or query with a `-- generator:` line of its own writes `async-method-suffix` there too.  See [generator parameters](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-generator-parameters).
+Add the generator parameter `async-method-suffix`: `"generatorParameters": ["async-method-suffix"]` in the `sqlsource.json` beside your project file, and `GetUser`'s method is `GetUserAsync`.  It can also be given for one type, folder, file or query.  A list of generator parameters replaces the one it would take from further out, so a file or query with a `-- generator:` line of its own writes `async-method-suffix` there too.  See [generator parameters](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-generator-parameters).
 
 ### I got an `InvalidCastException`; what does it mean and how do I fix it?
 
@@ -190,11 +198,11 @@ When the message is "Column 'name' is null.", the column held a null though its 
 
 ### How do I change the namespace of the models?
 
-By default the models are in the namespace of the type that claims the query.  Set `<SqlSourceModelNamespace>App.Models</SqlSourceModelNamespace>` in the project file, `ModelNamespace` on the attribute, or `-- model-namespace:` in a `.sql` file.  Two types in two namespaces that read one table each get a model of it, one in each namespace, and the setting gives them one.  A name with a period in an `-- output-model:` line, `App.Rows.UserRow`, is a full name and ignores the setting.  See [namespace of the models](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-model-namespace).
+By default the models are in the namespace of the type that claims the query.  Set `"modelNamespace": "App.Models"` in the `sqlsource.json` beside your project file, `ModelNamespace` on the attribute, or `-- model-namespace:` in a `.sql` file.  Two types in two namespaces that read one table each get a model of it, one in each namespace, and the setting gives them one.  A name with a period in an `-- output-model:` line, `App.Rows.UserRow`, is a full name and ignores the setting.  See [namespace of the models](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-model-namespace).
 
 ### My project uses several databases
 
-For several databases of one kind, name the database of each file with a `-- database: billing` line at its top, and give the tool a connection for each name: see [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#use-several-databases).  For files written for another kind of database, give their folder its own dialect with item metadata in the project file, or one file a `-- dialect:` line at its top: see [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#folder-with-another-dialect).
+For several databases of one kind, name the database of each file with a `-- database: billing` line at its top, and give the tool a connection for each name: see [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#use-several-databases).  For files written for another kind of database, give their folder its own dialect with a `sqlsource.json` of its own, or one file a `-- dialect:` line at its top: see [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#folder-with-another-dialect).
 
 ### How do I keep migration scripts out?
 
@@ -218,22 +226,34 @@ Both projects can use SqlSource.  Each has its own copy of the attributes and en
 
 ## Custom type mapping
 
-Each column and parameter of a PostgreSQL query whose output is `models` or `codegen`, and whose entry in its sidecar is current, gets the C# type that Npgsql reads its database type as: see [the PostgreSQL types](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/postgresql.md#type-map).  Those of a SQL Server query get the C# type that Microsoft.Data.SqlClient reads their database type as: see [the SQL Server types](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/sqlserver.md#types).  A project at the output `models` that references no Microsoft.Data.SqlClient, such as a library that leaves the driver to its application, gets the same types, but for `vector`, which needs the reference: see [which version of Microsoft.Data.SqlClient](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/sqlserver.md#which-sqlclient).  A few PostgreSQL types follow the version of Npgsql that the project references: Npgsql 10 reads `date`, `time`, `cidr`, `daterange` and `datemultirange` as other types than Npgsql 8 and 9 do, and a project that references no Npgsql gives those types their C# types with the type override, `date=System.DateOnly time=System.TimeOnly` for an application on Npgsql 10: see [which version of Npgsql](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/postgresql.md#which-npgsql).  The type override gives a database type the C# type of your choice instead, for the project in its file, for some files as item metadata, or in a `.sql` file with `-- type-override:`, and each place changes only the types it names:
+Each column and parameter of a PostgreSQL query whose output is `models` or `codegen`, and whose entry in its sidecar is current, gets the C# type that Npgsql reads its database type as: see [the PostgreSQL types](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/postgresql.md#type-map).  Those of a SQL Server query get the C# type that Microsoft.Data.SqlClient reads their database type as: see [the SQL Server types](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/sqlserver.md#types).  A project at the output `models` that references no Microsoft.Data.SqlClient, such as a library that leaves the driver to its application, gets the same types, but for `vector`, which needs the reference: see [which version of Microsoft.Data.SqlClient](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/sqlserver.md#which-sqlclient).  A few PostgreSQL types follow the version of Npgsql that the project references: Npgsql 10 reads `date`, `time`, `cidr`, `daterange` and `datemultirange` as other types than Npgsql 8 and 9 do, and a project that references no Npgsql gives those types their C# types with the type override, `date=System.DateOnly time=System.TimeOnly` for an application on Npgsql 10: see [which version of Npgsql](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/postgresql.md#which-npgsql).  The type override gives a database type the C# type of your choice instead, for the `.sql` files under a settings file, or in a `.sql` file with `-- type-override:`, and each place changes only the types it names:
 
-```xml
-<PropertyGroup>
-    <SqlSourceTypeOverrides>timestamptz=System.DateTimeOffset public.user_status=MyApp.UserStatus</SqlSourceTypeOverrides>
-</PropertyGroup>
+```jsonc
+// sqlsource.json, beside your project file
+{
+    "root": true,
+    "dialect": "postgres",
+    "typeOverrides": {
+        "timestamptz": "System.DateTimeOffset",
+        "public.user_status": "MyApp.UserStatus",
+    },
+}
 ```
 
 Each property of a model has the type its database type maps to, and a query method asks the driver for that type, so it must be one the driver reads, or one that your [converters](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#converters) convert to and from one it reads: see [the FAQ](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#i-got-an-invalidcastexception-what-does-it-mean-and-how-do-i-fix-it).  An entry that is not written correctly, or whose key has no schema and is not a type SqlSource knows, is a build error, and so is a C# type that the project cannot find or use, at each query that uses it.  See [type overrides](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-type-overrides).
 
-Where two columns of one database type need two C# types, `users.id` a `UserId` and `posts.id` a `PostId` though both are `bigint`, map the column a value is read from with `SqlSourceColumnTypes`, or with `-- column:` in a `.sql` file, and give a parameter its type on its `-- param:` line.  Either wins over the type override:
+Where two columns of one database type need two C# types, `users.id` a `UserId` and `posts.id` a `PostId` though both are `bigint`, map the column a value is read from with `columnTypes` in a settings file, or with `-- column:` in a `.sql` file, and give a parameter its type on its `-- param:` line.  Either wins over the type override:
 
-```xml
-<PropertyGroup>
-    <SqlSourceColumnTypes>users.id=UserId posts.id=PostId</SqlSourceColumnTypes>
-</PropertyGroup>
+```jsonc
+// sqlsource.json, beside your project file
+{
+    "root": true,
+    "dialect": "postgres",
+    "columnTypes": {
+        "users.id": "UserId",
+        "posts.id": "PostId",
+    },
+}
 ```
 
 ```sql fragment
