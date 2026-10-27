@@ -237,7 +237,7 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
     public void Plan_CompileFileUnderABuildFolder_ReachesNothing()
     {
         var project = Plans.Postgres(_folder);
-        project.Properties["SqlSourceBuildFolders"] = "|" + project.PathOf("obj") + Path.DirectorySeparatorChar;
+        project.BuildFolders = "|" + project.PathOf("obj") + Path.DirectorySeparatorChar;
         _ = project.AddSource("obj/Gen.cs", "internal sealed class Gen;");
         _ = project.AddSettings(
             "obj/sqlsource.json", /*lang=json,strict*/

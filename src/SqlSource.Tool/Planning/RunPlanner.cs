@@ -101,7 +101,7 @@ internal static class RunPlanner
                 continue;
             }
 
-            var text = new SqlFileText(listed[path].Path);
+            var text = new SqlFileText(listed[path]);
             // The chain of the file's folder in this project's settings files, as the generator finds it.
             var chain = settingsFileSet.ChainOf(path);
             claimed.Add(
@@ -118,7 +118,7 @@ internal static class RunPlanner
         }
 
         // Every listed .sql file reaches, claimed or not, as every C# file does that is not the build's.
-        var buildFolders = BuildFolders.Of(manifest.Properties.GetValueOrDefault(BuildFolders.PropertyName));
+        var buildFolders = BuildFolders.Of(manifest.BuildFolders);
         settingsFiles.AddProblems(
             settingsFileSet,
             listed.Paths.Concat(buildFolders.ReachingPaths(manifest.CompileFiles)),

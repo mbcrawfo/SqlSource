@@ -410,7 +410,7 @@ public sealed class ProjectEvaluatorTests : IDisposable
     [Fact]
     public async Task Evaluate_ManifestThatCannotBeRead_IsSqlsrc206WithTheReason()
     {
-        _runner.Default = new FakeProject { Manifest = "SqlSourceManifest=1\nCompile=/work/A.cs\n" };
+        _runner.Default = new FakeProject { Manifest = "SqlSourceManifest=2\nCompile=/work/A.cs\n" };
 
         var evaluation = await EvaluateAsync();
 

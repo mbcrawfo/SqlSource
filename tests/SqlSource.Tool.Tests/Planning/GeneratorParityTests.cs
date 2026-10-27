@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Generation.Chains;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using SqlSource.Tool.Planning;
@@ -367,7 +368,7 @@ public sealed class GeneratorParityTests : IDisposable
         if (buildFolders is not null)
         {
             // The package's format: each folder after a bar, with a separator at its end.
-            project.Properties["SqlSourceBuildFolders"] = string.Concat(
+            project.BuildFolders = string.Concat(
                 buildFolders.Select(folder => "|" + project.PathOf(folder) + Path.DirectorySeparatorChar)
             );
         }
@@ -385,7 +386,7 @@ public sealed class GeneratorParityTests : IDisposable
             null,
             written,
             [.. listed, .. settings],
-            properties: project.Properties.ToDictionary(pair => pair.Key, string? (pair) => pair.Value)
+            properties: new Dictionary<string, string?> { [BuildFolders.PropertyName] = project.BuildFolders }
         );
         var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
 

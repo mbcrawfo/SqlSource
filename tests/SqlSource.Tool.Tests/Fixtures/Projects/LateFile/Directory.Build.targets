@@ -1,12 +1,12 @@
 <Project>
     <!--
-        A target that adds a .sql file while it runs, as one that writes its .sql files would.  It hooks the target
-        the package names, so it runs before the manifest is written.
+        A target that adds a .sql file while it runs, as one that writes its .sql files would.  It hooks
+        SqlSourceListFiles, the target the package names, so it runs before the manifest is written.
     -->
     <ItemGroup>
         <AdditionalFiles Remove="Generated/Late.sql" />
     </ItemGroup>
-    <Target Name="AddSqlFile" BeforeTargets="SqlSourceTrimMetadataOfFiles">
+    <Target Name="AddSqlFile" BeforeTargets="SqlSourceListFiles">
         <ItemGroup>
             <AdditionalFiles Include="Generated/Late.sql" />
         </ItemGroup>

@@ -136,7 +136,7 @@ manifest_fails() {
     exit 1
 }
 
-if [[ "$(head -n 1 "$manifest")" != 'SqlSourceManifest=1' ]]; then
+if [[ "$(head -n 1 "$manifest")" != 'SqlSourceManifest=2' ]]; then
     manifest_fails 'does not start with its version'
 fi
 

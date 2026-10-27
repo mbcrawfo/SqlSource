@@ -30,7 +30,7 @@ The libraries are never run as tests, hold no tests and are never packed:
 `tests/SqlSource.Tool.Testing` holds:
 
 - the harness of a whole command: `CliRun`, which fakes MSBuild and the environment or, as `CliRun.Real`, runs the real `dotnet msbuild` and the test process's environment, `CliResult`, `Hosts` and `Plans`, whose `Postgres` is a project with the dialect in its settings file;
-- the fakes of a process and a project: `FakeProcessRunner`, `FakeProject` and `TestProject`, whose `Settings` is the project's `sqlsource.json`, beside the `Properties` and the item metadata that a manifest still carries, for `SqlSourceBuildFolders` and for the test that the tool reads no setting from them;
+- the fakes of a process and a project: `FakeProcessRunner`, `FakeProject` and `TestProject`, whose `Settings` is the project's `sqlsource.json` and `BuildFolders` the `SqlSourceBuildFolders` line of its manifest, which holds no setting;
 - `Programs`, which starts the built tool and runs a program with a limit, its tree killed and the tool's `dotnet`, and names the program that waits (`Waiter`), and `Eventually`, how every wait of the tests waits, with `Patience` as its one limit, which every caller of `Programs.RunAsync` uses too;
 - `TestClock`, a clock that stands still until a test moves it, which a run, a host and a session of the tests stand on unless a test brings a clock;
 - `LogReader`, `Secrets`, `SidecarFiles` and `TempFolder`;

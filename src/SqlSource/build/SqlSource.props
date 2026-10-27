@@ -35,55 +35,14 @@
         <AdditionalFiles Include="**/*.sql.json" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
     </ItemGroup>
     <!--
-        A source generator sees only the MSBuild properties and the item metadata that are listed here: the properties
-        and metadata the generator reads.  Each setting is a property for the project and metadata of an
-        AdditionalFiles item for one file or for the files of a glob.  SqlSourceDialect names the database whose rules
-        the .sql files are read by, and SqlSourceGeneratorParameters holds generator parameters, separated by spaces.
-        SqlSourceOutput says what is generated for a query.  SqlSourceInputModelSuffix, SqlSourceOutputModelSuffix,
-        SqlSourceModelNamespace, SqlSourceInputModelType, SqlSourceOutputModelType and SqlSourceCollectionType say
-        what the models of a query are called, where they are and what shape they have, and what a method returns
-        many rows in.  SqlSourceTypeOverrides maps database types to C# types, and SqlSourceColumnTypes the columns of
-        tables and views, in entries separated by white space; the tool reads neither.  SqlSourceNestedClass names the
-        class that holds a type's generated members; it is a property alone, never metadata, since it belongs to a type
-        and not to a file, and the tool does not read it.
-        SqlSourceDatabase is trimmed and is not listed: the tool reads it, and the generator does not.
-        SqlSourceBuildFolders is no setting: SqlSource.targets sets it to the folders the build writes C# files and its
-        outputs into, and a C# file under one, such as one the SDK writes into obj, reaches no settings file.
-        None of this is under the condition above: a project that lists its own .sql files still needs it.
-
-        The metadata is listed for SqlSourceSettingsFile and not for AdditionalFiles.  The SDK writes a section for
-        every item of the type that is listed, into the file the compiler reads, whether the item has the metadata or
-        not: for AdditionalFiles that is every .sql file of the project.  A target in SqlSource.targets puts the
-        AdditionalFiles items that have any of the metadata into SqlSourceSettingsFile.  The compiler finds the
-        metadata of a file by its path, so the generator still reads it for the file.
-
-        Those sections used to do a second job: the file changed when a .sql file was deleted, renamed or moved, and
-        the next build compiled again.  The target SqlSourceTrackAdditionalFiles in SqlSource.targets does that now.
+        A source generator sees only the MSBuild properties and the item metadata that are listed here.  The settings
+        are in settings files, sqlsource.json, which SqlSource.targets gives the compiler as AdditionalFiles items, so
+        no setting is listed, and no metadata.  SqlSourceBuildFolders is no setting: SqlSource.targets sets it to the
+        folders the build writes C# files and its outputs into, and a C# file under one, such as one the SDK writes
+        into obj, reaches no settings file.  It is not under the condition above: a project that lists its own .sql
+        files still needs it.
     -->
     <ItemGroup>
-        <CompilerVisibleProperty Include="SqlSourceDialect" />
-        <CompilerVisibleProperty Include="SqlSourceGeneratorParameters" />
-        <CompilerVisibleProperty Include="SqlSourceOutput" />
-        <CompilerVisibleProperty Include="SqlSourceInputModelSuffix" />
-        <CompilerVisibleProperty Include="SqlSourceOutputModelSuffix" />
-        <CompilerVisibleProperty Include="SqlSourceModelNamespace" />
-        <CompilerVisibleProperty Include="SqlSourceInputModelType" />
-        <CompilerVisibleProperty Include="SqlSourceOutputModelType" />
-        <CompilerVisibleProperty Include="SqlSourceCollectionType" />
-        <CompilerVisibleProperty Include="SqlSourceTypeOverrides" />
-        <CompilerVisibleProperty Include="SqlSourceColumnTypes" />
-        <CompilerVisibleProperty Include="SqlSourceNestedClass" />
         <CompilerVisibleProperty Include="SqlSourceBuildFolders" />
-        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceDialect" />
-        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceGeneratorParameters" />
-        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceOutput" />
-        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceInputModelSuffix" />
-        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceOutputModelSuffix" />
-        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceModelNamespace" />
-        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceInputModelType" />
-        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceOutputModelType" />
-        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceCollectionType" />
-        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceTypeOverrides" />
-        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceColumnTypes" />
     </ItemGroup>
 </Project>

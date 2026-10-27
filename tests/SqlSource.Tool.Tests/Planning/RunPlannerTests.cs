@@ -373,32 +373,6 @@ public sealed class RunPlannerTests : IDisposable
             .ShouldBe(["Billing", "Billing"]);
     }
 
-    // The MSBuild path is gone: a property or an item's metadata that a project still sets is read by nothing.
-    [Fact]
-    public void Plan_ProjectThatStillSetsAnMSBuildSetting_ReadsNothingOfIt()
-    {
-        var project = Plans.Postgres(_folder);
-        project.Properties["SqlSourceDialect"] = "nope";
-        project.Properties["SqlSourceDatabase"] = "a b";
-        project.Properties["SqlSourceOutput"] = "Sql";
-        _ = project.AddSql(
-            "Q.sql",
-            "SELECT 1;",
-            ("SqlSourceDialect", "mssql"),
-            ("SqlSourceDatabase", "other"),
-            ("SqlSourceOutput", "sql")
-        );
-
-        var result = Plans.Result(project);
-
-        result.Errors.ShouldBeEmpty();
-        var file = result.Plan.Files.ShouldHaveSingleItem();
-        file.Dialect.ShouldBe(SqlDialect.PostgreSql);
-        var query = file.Queries.ShouldHaveSingleItem();
-        query.NeedsEntry.ShouldBeTrue();
-        query.Database.ShouldBe("postgres");
-    }
-
     // The settings files of the chain: sqlsource.json files apply to their folder and below.  A project with no
     // settings of its own, so that a test writes the file at its root as it means to.
     private TestProject Chained()

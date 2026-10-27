@@ -46,8 +46,8 @@ public sealed class SettingsFileSearchTests : IDisposable
     }
 
     // A project that sets AfterMicrosoftNETSdkTargets without keeping its value, as a global property does here,
-    // loses the file that runs the search last.  The search then runs where the trims run, and finds every settings
-    // file but the one beside a file that a later target adds.
+    // loses the file that runs the search last.  The search then runs before GenerateMSBuildEditorConfigFileCore, and
+    // finds every settings file but the one beside a file that a later target adds.
     [Fact]
     public async Task Compile_DesignTimeBuildWithoutTheTargetsImportedLast_SearchesBeforeTheFileTheCompilerReads()
     {

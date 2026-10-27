@@ -121,8 +121,6 @@ public sealed partial class TypeKeyTextTests
         WhitespaceRunPattern().Replace(part, " ").ShouldBe(part);
         part.Where(char.IsWhiteSpace).ShouldAllBe(character => character == ' ');
         part.ShouldNotContain("  ");
-        part.ShouldNotContain(";");
-        part.ShouldNotContain("#");
         part.Any(char.IsControl).ShouldBeFalse();
         TypeKeyText.TextOf(part.AsSpan()).ToString().ShouldBe(text);
     }

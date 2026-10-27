@@ -11,9 +11,9 @@ namespace SqlSource.Tool.Planning;
 /// </summary>
 internal sealed class ListedFiles
 {
-    private readonly Dictionary<string, ManifestFile> _byPath;
+    private readonly Dictionary<string, string> _byPath;
 
-    private ListedFiles(Dictionary<string, ManifestFile> byPath)
+    private ListedFiles(Dictionary<string, string> byPath)
     {
         _byPath = byPath;
         Paths = SqlPath.ToSortedSet(byPath.Keys);
@@ -22,15 +22,15 @@ internal sealed class ListedFiles
     /// <summary>The normalised paths, as <c>PathResolver.FindFiles</c> takes them.</summary>
     public EquatableArray<string> Paths { get; }
 
-    /// <summary>The file of a path of <see cref="Paths" />.</summary>
-    public ManifestFile this[string normalizedPath] => _byPath[normalizedPath];
+    /// <summary>The path of a file of <see cref="Paths" /> as the manifest has it.</summary>
+    public string this[string normalizedPath] => _byPath[normalizedPath];
 
     public static ListedFiles Read(ProjectManifest manifest)
     {
-        var byPath = new Dictionary<string, ManifestFile>(SqlPath.Comparer);
+        var byPath = new Dictionary<string, string>(SqlPath.Comparer);
         foreach (var file in manifest.Files)
         {
-            if (!SqlPath.IsSqlFile(file.Path) || SqlPath.Normalize(file.Path) is not { } path)
+            if (!SqlPath.IsSqlFile(file) || SqlPath.Normalize(file) is not { } path)
             {
                 continue;
             }

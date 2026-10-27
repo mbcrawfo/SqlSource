@@ -2,130 +2,13 @@
     <!--
         NuGet imports this file into each project that references the package, after the project's own content.
 
-        The compiler reads each property that SqlSource.props lists, and each metadata of an AdditionalFiles item that
-        it lists, from a file that the build writes with one line for each value.  A value on a line of its own, as an
-        element written over several lines has it, would arrive empty there and be taken for the default, and a list
-        with one word on each line would arrive as its first word.  Each trim removes the white space around a value
-        and makes one space of each run of white space inside it, a line break among it, so that both forms mean what
-        they say.  No value of the package has a meaning for white space beyond separating its words.
-
-        A trim is on one line however long it is: white space around the expression would be part of the value.  So
-        the check of the line length is off for the target of the properties, as it is for the one of the metadata.
-
-        GenerateMSBuildEditorConfigFileCore is the target of the SDK that writes the file.  The trims run before it and
-        not where this file is imported: Directory.Build.targets is imported later, and a target can add an item while
-        the build runs.  A build that writes the file runs them, so a design-time build does too.
-
-        One target is out of their reach: one that hooks GenerateMSBuildEditorConfigFileCore itself and is declared
-        after this file, as in Directory.Build.targets.  MSBuild runs it after the targets here, so the metadata of a
-        .sql file that it adds is not trimmed and not collected, and does not reach the compiler.  A target that adds a
-        .sql file hooks SqlSourceTrimMetadataOfFiles instead, which runs it first wherever it is declared.  TD-0016.
+        What a build needs of the package is done in targets, and not where this file is imported:
+        Directory.Build.targets is imported later, and a target can add an item while the build runs.  They hook
+        GenerateMSBuildEditorConfigFileCore, the target of the SDK that writes the file the compiler reads its
+        properties from, or run just before CoreCompile from SqlSource.AfterSdk.targets.  A target of a project that
+        adds a .sql file hooks SqlSourceListFiles, which runs it before the search for settings files and before the
+        manifest wherever it is declared.
     -->
-    <!-- editorconfig-checker-disable -->
-    <Target Name="SqlSourceTrimProperties" BeforeTargets="GenerateMSBuildEditorConfigFileCore">
-        <PropertyGroup>
-            <SqlSourceDialect>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceDialect), '\s+', ' ').Trim())</SqlSourceDialect>
-            <SqlSourceGeneratorParameters>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceGeneratorParameters), '\s+', ' ').Trim())</SqlSourceGeneratorParameters>
-            <SqlSourceOutput>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceOutput), '\s+', ' ').Trim())</SqlSourceOutput>
-            <SqlSourceInputModelSuffix>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceInputModelSuffix), '\s+', ' ').Trim())</SqlSourceInputModelSuffix>
-            <SqlSourceOutputModelSuffix>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceOutputModelSuffix), '\s+', ' ').Trim())</SqlSourceOutputModelSuffix>
-            <SqlSourceModelNamespace>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceModelNamespace), '\s+', ' ').Trim())</SqlSourceModelNamespace>
-            <SqlSourceInputModelType>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceInputModelType), '\s+', ' ').Trim())</SqlSourceInputModelType>
-            <SqlSourceOutputModelType>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceOutputModelType), '\s+', ' ').Trim())</SqlSourceOutputModelType>
-            <SqlSourceCollectionType>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceCollectionType), '\s+', ' ').Trim())</SqlSourceCollectionType>
-            <SqlSourceTypeOverrides>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceTypeOverrides), '\s+', ' ').Trim())</SqlSourceTypeOverrides>
-            <SqlSourceColumnTypes>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceColumnTypes), '\s+', ' ').Trim())</SqlSourceColumnTypes>
-            <SqlSourceDatabase>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceDatabase), '\s+', ' ').Trim())</SqlSourceDatabase>
-            <SqlSourceNestedClass>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceNestedClass), '\s+', ' ').Trim())</SqlSourceNestedClass>
-        </PropertyGroup>
-    </Target>
-    <!-- editorconfig-checker-enable -->
-    <!--
-        Outputs makes this run once for each combination of values that the metadata have, with only the items of that
-        combination in reach.  Each value goes through a property because MSBuild puts metadata into an expression as
-        text: inside the quotes of a property function, a value that holds a quote would end the argument early.
-
-        The files without any of the metadata are one batch, and in most projects it holds every file.  It has nothing
-        to trim, so nothing is written back to it.  The condition is on the item group because the condition of a
-        target cannot read metadata.  Each metadata has a condition of its own, so that one an item does not have is
-        not written to it as an empty value.
-
-        A property as written is on one line however long its name is: white space around the value would be part of
-        it, and the condition of the item group would then hold for every file.  The names of the metadata make the
-        list of Outputs and the condition long too, and neither can be wrapped.  So the check of the line length is
-        off for the whole target.
-    -->
-    <!-- editorconfig-checker-disable -->
-    <Target
-        Name="SqlSourceTrimMetadataOfFiles"
-        BeforeTargets="GenerateMSBuildEditorConfigFileCore"
-        Outputs="%(AdditionalFiles.SqlSourceDialect)|%(AdditionalFiles.SqlSourceGeneratorParameters)|%(AdditionalFiles.SqlSourceOutput)|%(AdditionalFiles.SqlSourceInputModelSuffix)|%(AdditionalFiles.SqlSourceOutputModelSuffix)|%(AdditionalFiles.SqlSourceModelNamespace)|%(AdditionalFiles.SqlSourceInputModelType)|%(AdditionalFiles.SqlSourceOutputModelType)|%(AdditionalFiles.SqlSourceCollectionType)|%(AdditionalFiles.SqlSourceTypeOverrides)|%(AdditionalFiles.SqlSourceColumnTypes)|%(AdditionalFiles.SqlSourceDatabase)"
-    >
-        <PropertyGroup>
-            <SqlSourceDialectAsWritten>%(AdditionalFiles.SqlSourceDialect)</SqlSourceDialectAsWritten>
-            <SqlSourceGeneratorParametersAsWritten>%(AdditionalFiles.SqlSourceGeneratorParameters)</SqlSourceGeneratorParametersAsWritten>
-            <SqlSourceOutputAsWritten>%(AdditionalFiles.SqlSourceOutput)</SqlSourceOutputAsWritten>
-            <SqlSourceInputModelSuffixAsWritten>%(AdditionalFiles.SqlSourceInputModelSuffix)</SqlSourceInputModelSuffixAsWritten>
-            <SqlSourceOutputModelSuffixAsWritten>%(AdditionalFiles.SqlSourceOutputModelSuffix)</SqlSourceOutputModelSuffixAsWritten>
-            <SqlSourceModelNamespaceAsWritten>%(AdditionalFiles.SqlSourceModelNamespace)</SqlSourceModelNamespaceAsWritten>
-            <SqlSourceInputModelTypeAsWritten>%(AdditionalFiles.SqlSourceInputModelType)</SqlSourceInputModelTypeAsWritten>
-            <SqlSourceOutputModelTypeAsWritten>%(AdditionalFiles.SqlSourceOutputModelType)</SqlSourceOutputModelTypeAsWritten>
-            <SqlSourceCollectionTypeAsWritten>%(AdditionalFiles.SqlSourceCollectionType)</SqlSourceCollectionTypeAsWritten>
-            <SqlSourceTypeOverridesAsWritten>%(AdditionalFiles.SqlSourceTypeOverrides)</SqlSourceTypeOverridesAsWritten>
-            <SqlSourceColumnTypesAsWritten>%(AdditionalFiles.SqlSourceColumnTypes)</SqlSourceColumnTypesAsWritten>
-            <SqlSourceDatabaseAsWritten>%(AdditionalFiles.SqlSourceDatabase)</SqlSourceDatabaseAsWritten>
-        </PropertyGroup>
-        <ItemGroup Condition="'$(SqlSourceDialectAsWritten)$(SqlSourceGeneratorParametersAsWritten)$(SqlSourceOutputAsWritten)$(SqlSourceInputModelSuffixAsWritten)$(SqlSourceOutputModelSuffixAsWritten)$(SqlSourceModelNamespaceAsWritten)$(SqlSourceInputModelTypeAsWritten)$(SqlSourceOutputModelTypeAsWritten)$(SqlSourceCollectionTypeAsWritten)$(SqlSourceTypeOverridesAsWritten)$(SqlSourceColumnTypesAsWritten)$(SqlSourceDatabaseAsWritten)' != ''">
-            <AdditionalFiles>
-                <SqlSourceDialect Condition="'$(SqlSourceDialectAsWritten)' != ''"
-                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceDialectAsWritten), '\s+', ' ').Trim())</SqlSourceDialect>
-                <SqlSourceGeneratorParameters Condition="'$(SqlSourceGeneratorParametersAsWritten)' != ''"
-                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceGeneratorParametersAsWritten), '\s+', ' ').Trim())</SqlSourceGeneratorParameters>
-                <SqlSourceOutput Condition="'$(SqlSourceOutputAsWritten)' != ''"
-                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceOutputAsWritten), '\s+', ' ').Trim())</SqlSourceOutput>
-                <SqlSourceInputModelSuffix Condition="'$(SqlSourceInputModelSuffixAsWritten)' != ''"
-                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceInputModelSuffixAsWritten), '\s+', ' ').Trim())</SqlSourceInputModelSuffix>
-                <SqlSourceOutputModelSuffix Condition="'$(SqlSourceOutputModelSuffixAsWritten)' != ''"
-                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceOutputModelSuffixAsWritten), '\s+', ' ').Trim())</SqlSourceOutputModelSuffix>
-                <SqlSourceModelNamespace Condition="'$(SqlSourceModelNamespaceAsWritten)' != ''"
-                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceModelNamespaceAsWritten), '\s+', ' ').Trim())</SqlSourceModelNamespace>
-                <SqlSourceInputModelType Condition="'$(SqlSourceInputModelTypeAsWritten)' != ''"
-                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceInputModelTypeAsWritten), '\s+', ' ').Trim())</SqlSourceInputModelType>
-                <SqlSourceOutputModelType Condition="'$(SqlSourceOutputModelTypeAsWritten)' != ''"
-                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceOutputModelTypeAsWritten), '\s+', ' ').Trim())</SqlSourceOutputModelType>
-                <SqlSourceCollectionType Condition="'$(SqlSourceCollectionTypeAsWritten)' != ''"
-                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceCollectionTypeAsWritten), '\s+', ' ').Trim())</SqlSourceCollectionType>
-                <SqlSourceTypeOverrides Condition="'$(SqlSourceTypeOverridesAsWritten)' != ''"
-                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceTypeOverridesAsWritten), '\s+', ' ').Trim())</SqlSourceTypeOverrides>
-                <SqlSourceColumnTypes Condition="'$(SqlSourceColumnTypesAsWritten)' != ''"
-                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceColumnTypesAsWritten), '\s+', ' ').Trim())</SqlSourceColumnTypes>
-                <SqlSourceDatabase Condition="'$(SqlSourceDatabaseAsWritten)' != ''"
-                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceDatabaseAsWritten), '\s+', ' ').Trim())</SqlSourceDatabase>
-            </AdditionalFiles>
-        </ItemGroup>
-    </Target>
-    <!-- editorconfig-checker-enable -->
-    <!--
-        The compiler reads the metadata from the items of SqlSourceSettingsFile: see SqlSource.props.  These are the
-        files that have any of the metadata, and a project has few of them.  This depends on the trim, so that it
-        copies trimmed values and leaves out a file whose values were only white space.  MSBuild does not promise an
-        order for two targets that hook the same one.  SqlSourceDatabase is trimmed above and not collected: the
-        compiler is not shown it.  The condition is long, and cannot be wrapped.
-    -->
-    <!-- editorconfig-checker-disable -->
-    <Target
-        Name="SqlSourceCollectSettingsFiles"
-        BeforeTargets="GenerateMSBuildEditorConfigFileCore"
-        DependsOnTargets="SqlSourceTrimMetadataOfFiles"
-    >
-        <ItemGroup>
-            <SqlSourceSettingsFile
-                Include="@(AdditionalFiles)"
-                Condition="'%(AdditionalFiles.SqlSourceDialect)%(AdditionalFiles.SqlSourceGeneratorParameters)%(AdditionalFiles.SqlSourceOutput)%(AdditionalFiles.SqlSourceInputModelSuffix)%(AdditionalFiles.SqlSourceOutputModelSuffix)%(AdditionalFiles.SqlSourceModelNamespace)%(AdditionalFiles.SqlSourceInputModelType)%(AdditionalFiles.SqlSourceOutputModelType)%(AdditionalFiles.SqlSourceCollectionType)%(AdditionalFiles.SqlSourceTypeOverrides)%(AdditionalFiles.SqlSourceColumnTypes)' != ''"
-            />
-        </ItemGroup>
-    </Target>
-    <!-- editorconfig-checker-enable -->
     <!--
         Gives the generator SqlSourceBuildFolders, the folders the build writes C# files and its outputs into, each a
         full path made against the project's folder with a separator at its end, and each after a |:
@@ -134,8 +17,8 @@
         OutDir, and CompilerGeneratedFilesOutputPath when EmitCompilerGeneratedFiles is true, where the compiler roots
         the generated files instead.  A C# file under any of them is the build's and reaches no settings file, wherever
         the project puts them: with UseArtifactsOutput, or a folder moved out of the project's, their chain would climb
-        past its root file.  It runs before the file the compiler reads is written, as the trims do, when every
-        property of the SDK and of the artifacts layout is set, and it sets the property whatever the project wrote.
+        past its root file.  It runs before the file the compiler reads is written, when every property of the SDK
+        and of the artifacts layout is set, and it sets the property whatever the project wrote.
         A folder that has no value is left out, since it would be the project's own folder.
 
         The compiler reads a value up to its first # or ;, and the folders are parted by |, so each folder is written
@@ -164,6 +47,13 @@
     </Target>
     <!-- editorconfig-checker-enable -->
     <!--
+        The hook for a target of a project that adds a .sql file while the build runs, as one that writes its .sql
+        files does: such a target says BeforeTargets="SqlSourceListFiles", wherever it is declared, so that its files
+        are searched above and are in the manifest.  The search for settings files and the manifest's target depend on
+        it, and it does nothing itself and hooks nothing, so it runs only as what they depend on.
+    -->
+    <Target Name="SqlSourceListFiles" />
+    <!--
         Finds the settings files: every sqlsource.json in the folder of a .sql file or of a Compile item, or in a folder
         above it, to the top of the drive, as the SDK finds .editorconfig files.  A generator cannot read the disk, so
         each is given to the compiler as an AdditionalFiles item.  The SDK's step through FullPath and Distinct is
@@ -174,10 +64,10 @@
         It runs in a target, and not where this file is imported, so that a .sql file that a target adds is searched
         above too.  In a build it runs just before CoreCompile, from SqlSource.AfterSdk.targets, after every target of
         the project that hooks CoreCompile; where that file is not imported, SqlSourceSettingsSearchHook hooks it to
-        GenerateMSBuildEditorConfigFileCore instead.  It depends on SqlSourceTrimMetadataOfFiles, so that a target
-        that hooks it to add a .sql file runs first, before the manifest too.  An IDE lists the items of a project as
-        evaluated, never one that a target adds, so Visible="false" is only for one that might; a settings file in
-        the project's folder is listed anyway, as None or Content.
+        GenerateMSBuildEditorConfigFileCore instead.  It depends on SqlSourceListFiles, so that a target that hooks
+        it to add a .sql file runs first.  An IDE lists the items of a project as evaluated, never one that a target
+        adds, so Visible="false" is only for one that might; a settings file in the project's folder is listed anyway,
+        as None or Content.
 
         The chain of item functions is one attribute, and cannot be wrapped, so the check of the line length is off
         for the target.
@@ -186,7 +76,7 @@
     <Target
         Name="SqlSourceFindSettingsFiles"
         BeforeTargets="$(SqlSourceSettingsSearchHook)"
-        DependsOnTargets="SqlSourceTrimMetadataOfFiles"
+        DependsOnTargets="SqlSourceListFiles"
     >
         <ItemGroup>
             <SqlSourceSettingsSearchStart Include="@(AdditionalFiles)" Condition="'%(Extension)' == '.sql'" />
@@ -235,25 +125,25 @@
     <!--
         What SqlSourceWriteManifest depends on.  A target's DependsOnTargets is read before the target runs, so the
         list is a property and is set here, where the file is imported: this, the nesting below and the group of the
-        settings files are the elements of the file that are not a target, and the second line here holds the one
-        condition outside a target.  The trims make the manifest hold trimmed values, and make a target of a project
-        that hooks SqlSourceTrimMetadataOfFiles to add a .sql file run first.  The search gives the manifest the
-        settings files that it adds to what the compiler is given.  SqlSourceSettingsSearchHook is what the search
-        and the hash hook in a build, and SqlSource.AfterSdk.targets empties it when it runs them itself.  The
-        property of the build's folders is set by a target, SqlSourceFindBuildFolders, so the manifest's target runs
-        it, or the manifest would hold the property empty.
+        settings files are the elements of the file that are not a target, and the third line here holds the one
+        condition outside a target.  SqlSourceListFiles is first, so that a target of a project that hooks it to add
+        a .sql file runs before the rest.  The search gives the manifest the settings files that it adds to what the
+        compiler is given.  SqlSourceSettingsSearchHook is what the search and the hash hook in a build, and
+        SqlSource.AfterSdk.targets empties it when it runs them itself.  The property of the build's folders is set by
+        a target, SqlSourceFindBuildFolders, so the manifest's target runs it, or the manifest would hold the property
+        empty.
 
         AddImplicitDefineConstants is a target of the SDK and not a contract: TD-0027.  It adds the constants of the
         framework, NET10_0 and NET8_0_OR_GREATER among them, which the SDK otherwise adds only on the way to a
         compile.  A project that is not of the SDK has no TargetFramework and no such target.
 
-        The first line is long, and a property as written is on one line: white space around the value would be part
-        of it.  So the check of the line length is off for the group.
+        The list is long, and a property as written is on one line: white space around the value would be part of it.
+        So the check of the line length is off for the group.
     -->
     <!-- editorconfig-checker-disable -->
     <PropertyGroup>
         <SqlSourceSettingsSearchHook>GenerateMSBuildEditorConfigFileCore</SqlSourceSettingsSearchHook>
-        <SqlSourceManifestDependsOn>SqlSourceTrimProperties;SqlSourceTrimMetadataOfFiles;SqlSourceFindSettingsFiles;SqlSourceFindBuildFolders</SqlSourceManifestDependsOn>
+        <SqlSourceManifestDependsOn>SqlSourceListFiles;SqlSourceFindSettingsFiles;SqlSourceFindBuildFolders</SqlSourceManifestDependsOn>
         <SqlSourceManifestDependsOn Condition="'$(TargetFramework)' != ''"
             >$(SqlSourceManifestDependsOn);AddImplicitDefineConstants</SqlSourceManifestDependsOn>
     </PropertyGroup>
@@ -292,23 +182,22 @@
     </ItemGroup>
     <!--
         Writes the project manifest: what the compiler is given, for the sqlsource tool, which runs this target by
-        name.  It hooks nothing on purpose, so no build runs it, and nothing of a build runs before it but the two
-        trims, the searches for settings files and for the build's folders and, for a project of the SDK,
-        AddImplicitDefineConstants: a .sql file that a target adds is in the manifest only when that target hooks
-        SqlSourceTrimMetadataOfFiles.  TD-0025.
+        name.  It hooks nothing on purpose, so no build runs it, and nothing of a build runs before it but what it
+        depends on: SqlSourceListFiles, the searches for settings files and for the build's folders and, for a project
+        of the SDK, AddImplicitDefineConstants.  A .sql file that a target adds is in the manifest only when that
+        target hooks SqlSourceListFiles.  TD-0025.
 
         The file is lines of key=value, and its format is a contract with the tool: the rules are in
         src/SqlSource/AGENTS.md, and the reasons in docs/architecture/msbuild-and-manifest.md.  The tool names the
         file with SqlSourceManifestFile; without it the file is under obj, and is added to FileWrites.  That reaches
         "dotnet clean" only from inside a build, so it has no effect until a build runs this target.
 
-        A property goes through Escape, or MSBuild would make an item of each part of a value that holds a
-        semicolon, as DefineConstants does.  A property of the SDK is put on one line first, the way a trim does it:
-        the trims do not reach it, a project may write its constants one on each line, and a line break inside a
-        value would end its line of the file.  The lines of one .sql file are one item, with %0a between them, so that
-        the metadata of a file stays under its File line whatever the order of the items is; the path and the
-        metadata come from the item and are not split.  A setting of the package that is added is a line here, and
-        one in each of the two lists of the trims.
+        It holds no setting: the tool reads the settings from the files of the Settings lines, as the generator
+        does.  A property goes through Escape, or MSBuild would make an item of each part of a value that holds a
+        semicolon, as DefineConstants does.  A property of the SDK is put on one line first: a project may write its
+        constants one on each line, and a line break inside a value would end its line of the file.
+        SqlSourceBuildFolders holds the folders escaped as the compiler is given them, and the tool decodes them as the
+        generator does.  A path comes from an item and is not split.
 
         A Settings line is written for every AdditionalFiles item named sqlsource.json, the ones the search added and
         any the project lists itself, so that the tool reads exactly the settings files the compiler is given.  Each
@@ -322,27 +211,14 @@
                 >$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.manifest</SqlSourceManifestFile>
         </PropertyGroup>
         <ItemGroup>
-            <SqlSourceManifestLine Include="SqlSourceManifest=1" />
+            <SqlSourceManifestLine Include="SqlSourceManifest=2" />
             <SqlSourceManifestLine Include="Project=$([MSBuild]::Escape($(MSBuildProjectFullPath)))" />
             <SqlSourceManifestLine Include="TargetFramework=$([MSBuild]::Escape($([System.Text.RegularExpressions.Regex]::Replace($(TargetFramework), '\s+', ' ').Trim())))" />
             <SqlSourceManifestLine Include="LangVersion=$([MSBuild]::Escape($([System.Text.RegularExpressions.Regex]::Replace($(LangVersion), '\s+', ' ').Trim())))" />
             <SqlSourceManifestLine Include="DefineConstants=$([MSBuild]::Escape($([System.Text.RegularExpressions.Regex]::Replace($(DefineConstants), '\s+', ' ').Trim())))" />
-            <SqlSourceManifestLine Include="Property.SqlSourceDialect=$([MSBuild]::Escape($(SqlSourceDialect)))" />
-            <SqlSourceManifestLine Include="Property.SqlSourceDatabase=$([MSBuild]::Escape($(SqlSourceDatabase)))" />
-            <SqlSourceManifestLine Include="Property.SqlSourceOutput=$([MSBuild]::Escape($(SqlSourceOutput)))" />
-            <SqlSourceManifestLine Include="Property.SqlSourceGeneratorParameters=$([MSBuild]::Escape($(SqlSourceGeneratorParameters)))" />
-            <SqlSourceManifestLine Include="Property.SqlSourceInputModelSuffix=$([MSBuild]::Escape($(SqlSourceInputModelSuffix)))" />
-            <SqlSourceManifestLine Include="Property.SqlSourceOutputModelSuffix=$([MSBuild]::Escape($(SqlSourceOutputModelSuffix)))" />
-            <SqlSourceManifestLine Include="Property.SqlSourceModelNamespace=$([MSBuild]::Escape($(SqlSourceModelNamespace)))" />
-            <SqlSourceManifestLine Include="Property.SqlSourceInputModelType=$([MSBuild]::Escape($(SqlSourceInputModelType)))" />
-            <SqlSourceManifestLine Include="Property.SqlSourceOutputModelType=$([MSBuild]::Escape($(SqlSourceOutputModelType)))" />
-            <SqlSourceManifestLine Include="Property.SqlSourceCollectionType=$([MSBuild]::Escape($(SqlSourceCollectionType)))" />
-            <SqlSourceManifestLine Include="Property.SqlSourceTypeOverrides=$([MSBuild]::Escape($(SqlSourceTypeOverrides)))" />
-            <SqlSourceManifestLine Include="Property.SqlSourceColumnTypes=$([MSBuild]::Escape($(SqlSourceColumnTypes)))" />
-            <SqlSourceManifestLine Include="Property.SqlSourceNestedClass=$([MSBuild]::Escape($(SqlSourceNestedClass)))" />
-            <SqlSourceManifestLine Include="Property.SqlSourceBuildFolders=$([MSBuild]::Escape($(SqlSourceBuildFolders)))" />
+            <SqlSourceManifestLine Include="SqlSourceBuildFolders=$([MSBuild]::Escape($(SqlSourceBuildFolders)))" />
             <SqlSourceManifestSqlFile Include="@(AdditionalFiles)" Condition="'%(Extension)' == '.sql'" />
-            <SqlSourceManifestLine Include="@(SqlSourceManifestSqlFile->'File=%(FullPath)%0aFile.SqlSourceDialect=%(SqlSourceDialect)%0aFile.SqlSourceDatabase=%(SqlSourceDatabase)%0aFile.SqlSourceOutput=%(SqlSourceOutput)%0aFile.SqlSourceGeneratorParameters=%(SqlSourceGeneratorParameters)%0aFile.SqlSourceInputModelSuffix=%(SqlSourceInputModelSuffix)%0aFile.SqlSourceOutputModelSuffix=%(SqlSourceOutputModelSuffix)%0aFile.SqlSourceModelNamespace=%(SqlSourceModelNamespace)%0aFile.SqlSourceInputModelType=%(SqlSourceInputModelType)%0aFile.SqlSourceOutputModelType=%(SqlSourceOutputModelType)%0aFile.SqlSourceCollectionType=%(SqlSourceCollectionType)%0aFile.SqlSourceTypeOverrides=%(SqlSourceTypeOverrides)%0aFile.SqlSourceColumnTypes=%(SqlSourceColumnTypes)')" />
+            <SqlSourceManifestLine Include="@(SqlSourceManifestSqlFile->'File=%(FullPath)')" />
             <SqlSourceManifestSettingsFile
                 Include="@(AdditionalFiles)"
                 Condition="'%(Filename)%(Extension)' == 'sqlsource.json'"

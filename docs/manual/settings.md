@@ -692,17 +692,17 @@ In a [type override](#setting-type-overrides), and in the [column types](#settin
 
 ## Known issues
 
-- **A `.sql` file that one of your own build targets adds is not fully seen.**  This is about a target in your project that adds a `.sql` file to the `AdditionalFiles` items while the build runs, such as one that writes a file or copies it in.  The build compiles the file, but two things go wrong.  `sqlsource` leaves out the file's queries, so it describes none of them, and the build reports [SQLSRC241](diagnostics.md#sqlsrc241) for each that must be described.  And the settings you gave the file as item metadata, its dialect for one, are dropped when the target runs late in the build, so the file is read with the project's settings.  To make both work, tell your target to run before the package reads its settings, wherever the target is declared:
+- **A `.sql` file that one of your own build targets adds is not described.**  This is about a target in your project that adds a `.sql` file to the `AdditionalFiles` items while the build runs, such as one that writes a file or copies it in.  The build compiles the file, but `sqlsource` leaves out the file's queries, so it describes none of them, and the build reports [SQLSRC241](diagnostics.md#sqlsrc241) for each that must be described.  To make it work, tell your target to run before the package lists the project's files, wherever the target is declared:
 
   ```xml
-  <Target Name="AddGeneratedSql" BeforeTargets="SqlSourceTrimMetadataOfFiles">
+  <Target Name="AddGeneratedSql" BeforeTargets="SqlSourceListFiles">
       <ItemGroup>
-          <AdditionalFiles Include="obj/generated/*.sql" SqlSourceDialect="postgres" />
+          <AdditionalFiles Include="obj/generated/*.sql" />
       </ItemGroup>
   </Target>
   ```
 
-  Change the name, the path and the metadata to your own.  `BeforeTargets="SqlSourceTrimMetadataOfFiles"` is the line that matters.
+  Change the name and the path to your own.  `BeforeTargets="SqlSourceListFiles"` is the line that matters.
 - **A type override's key cannot be written in brackets.**  T-SQL writes a name `[dbo].[Email]`, and a key written so is not valid: [SQLSRC014](diagnostics.md) in a property or metadata, and [SQLSRC111](diagnostics.md#sqlsrc111) in a marker.  Write `dbo.Email`, which matches the type's name in any case, or `"dbo"."Email"`, which matches its case exactly; the message shows both.  See [type overrides](#setting-type-overrides).
 - **A C# type that is generic can give its model a warning for a `?` inside a type argument**, in a type override, a column type or a `-- param:` marker.  A type argument written with a `?` where a constraint forbids null is [SQLSRC252](diagnostics.md#sqlsrc252) at the query, but a `?` inside a type argument is not.  An override such as `MyApp.Names<System.Collections.Generic.List<string?>>`, where `Names<T>` requires `where T : System.Collections.Generic.IEnumerable<string>`, is accepted, and the generated model gets the compiler's warning CS8631.  Give the type arguments the nullability that the constraints ask for.  See [type overrides](#setting-type-overrides).
 - **A type made by Vogen or StronglyTypedId needs converters written for it.**  SqlSource converts a type only through methods marked `[SqlSourceConverter]`, and never through a type's `Value` property and its `From` method or constructor, so such a type with no converter is given to the driver as it is, which throws `InvalidCastException`.  Write the two converters in a class of your project, each calling the type's own members:
