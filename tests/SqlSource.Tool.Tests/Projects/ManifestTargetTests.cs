@@ -3,6 +3,10 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Generation.Chains;
+using SqlSource.Generation.Paths;
+using SqlSource.Tool.Planning;
+using SqlSource.Tool.Projects;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
@@ -31,6 +35,9 @@ public sealed class ManifestTargetTests : IDisposable
     // The settings that are properties of the project and never metadata of a file.
     private static readonly string[] PropertyOnlyNames = ["SqlSourceNestedClass"];
 
+    // The line of the folders the build writes into, which is no setting and holds paths of the machine.
+    private const string BuildFoldersLine = "Property.SqlSourceBuildFolders=";
+
     private readonly FixtureProjects _fixtures = new();
 
     public void Dispose() => _fixtures.Dispose();
@@ -54,6 +61,14 @@ public sealed class ManifestTargetTests : IDisposable
             .Single(line => line.StartsWith("DefineConstants=", StringComparison.Ordinal))["DefineConstants=".Length..]
             .Split(';');
 
+    // The folders of the build that the manifest holds, decoded as the generator decodes them.
+    private async Task<string[]> BuildFoldersOfAsync(string project)
+    {
+        var read = ManifestReader.Read(string.Join('\n', await _fixtures.WriteManifestAsync(project)));
+        read.Succeeded.ShouldBeTrue(read.Failure);
+        return [.. BuildFolders.Read(ManifestOptions.ForProject(read.Value.ShouldNotBeNull())).Folders];
+    }
+
     [Fact]
     public async Task WriteManifest_ProjectWithOneFramework_HoldsWhatTheCompilerIsGiven()
     {
@@ -63,7 +78,10 @@ public sealed class ManifestTargetTests : IDisposable
         var lines = await _fixtures.WriteManifestAsync(project);
 
         lines
-            .Where(line => !line.StartsWith("DefineConstants=", StringComparison.Ordinal))
+            .Where(line =>
+                !line.StartsWith("DefineConstants=", StringComparison.Ordinal)
+                && !line.StartsWith(BuildFoldersLine, StringComparison.Ordinal)
+            )
             .ShouldBe([
                 "SqlSourceManifest=1",
                 "Project=" + project,
@@ -75,6 +93,8 @@ public sealed class ManifestTargetTests : IDisposable
                 "Compile=" + Path.Combine(folder, "UserRepository.cs"),
             ]);
         lines[4].ShouldStartWith("DefineConstants=");
+        // Its value is the machine's: WriteManifest_ProjectWithOneFramework_HoldsTheBuildsFolders reads it.
+        lines.Count(line => line.StartsWith(BuildFoldersLine, StringComparison.Ordinal)).ShouldBe(1);
     }
 
     // The SDK adds the constants of the framework only on the way to a compile, so the manifest target depends on
@@ -256,6 +276,36 @@ public sealed class ManifestTargetTests : IDisposable
         lines.ShouldContain("File=" + Path.Combine(folder, "a;b=c%41 'é.sql"));
         lines.ShouldContain("Settings=" + Path.Combine(folder, "sqlsource.json"));
         lines.ShouldContain("Compile=" + Path.Combine(folder, "a;b=c%41 'é.cs"));
+    }
+
+    // The tool reads the folders of the build from the manifest as the generator reads them from the compiler's
+    // options: the line holds the obj and bin folders of the project.
+    [Fact]
+    public async Task WriteManifest_ProjectWithOneFramework_HoldsTheBuildsFolders()
+    {
+        var project = _fixtures.Copy("Single");
+        var folder = Path.GetDirectoryName(project)!;
+
+        var folders = await BuildFoldersOfAsync(project);
+
+        folders.ShouldContain(SqlPath.Normalize(Path.Combine(folder, "obj") + Path.DirectorySeparatorChar));
+        folders.ShouldContain(SqlPath.Normalize(Path.Combine(folder, "bin") + Path.DirectorySeparatorChar));
+    }
+
+    // The folder of the project holds a semicolon, "%41" that MSBuild would read as "A", an equals sign, a quote and
+    // an accented letter.  The target escapes the folder's %, |, # and ;, and the manifest line then writes the
+    // property through Escape, which WriteLinesToFile undoes, so the line holds the target's escapes and BuildFolders
+    // decodes them.
+    [Fact]
+    public async Task WriteManifest_BuildFoldersOfAnOddPath_DecodeToTheRealFolders()
+    {
+        var project = _fixtures.Copy("OddPaths", folder: "q;=%41 'é");
+        var folder = Path.GetDirectoryName(project)!;
+
+        var folders = await BuildFoldersOfAsync(project);
+
+        folders.ShouldContain(SqlPath.Normalize(Path.Combine(folder, "obj") + Path.DirectorySeparatorChar));
+        folders.ShouldContain(SqlPath.Normalize(Path.Combine(folder, "bin") + Path.DirectorySeparatorChar));
     }
 
     [Fact]

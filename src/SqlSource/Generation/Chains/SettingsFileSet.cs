@@ -131,6 +131,23 @@ internal sealed record SettingsFileSet(
         }
     }
 
+    /// <summary>
+    /// The files whose folders are in <paramref name="reachedFolders" />, a result of <see cref="Reached" /> on this
+    /// set, in the order of <see cref="Files" />.  Both are in that order, so one walk of the two finds them.
+    /// </summary>
+    public IEnumerable<ListedSettingsFile> FilesIn(EquatableArray<string> reachedFolders)
+    {
+        var next = 0;
+        for (var i = 0; i < Files.Count && next < reachedFolders.Count; i++)
+        {
+            if (SqlPath.Comparer.Equals(reachedFolders[next], Files[i].NormalizedFolder))
+            {
+                next++;
+                yield return Files[i];
+            }
+        }
+    }
+
     // The chain that starts at the file, whose parent's chain is given.  A file that says nothing and does not end the
     // chain shares its parent's.
     private static SettingsChain ChainStartingAt(ListedSettingsFile file, SettingsChain parent)

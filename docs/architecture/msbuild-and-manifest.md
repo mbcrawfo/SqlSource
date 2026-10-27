@@ -29,6 +29,7 @@ flowchart LR
     trimProperties --> manifest["SqlSourceWriteManifest (run by the tool)"]
     trimMetadata --> manifest
     find --> manifest
+    folders --> manifest
     defines["AddImplicitDefineConstants (SDK)"] -.->|"with a TargetFramework"| manifest
 ```
 
@@ -60,7 +61,7 @@ The last `ItemGroup` at the root of the targets sets `CopyToOutputDirectory` and
 
 `SqlSourceFindBuildFolders` sets `SqlSourceBuildFolders` to the folders the build writes C# files and its outputs into: `BaseIntermediateOutputPath`, `IntermediateOutputPath`, `BaseOutputPath`, `OutDir` and, when `EmitCompilerGeneratedFiles` is `true`, `CompilerGeneratedFilesOutputPath`, in that order, each after a `|`, made against `MSBuildProjectDirectory` by `$([MSBuild]::NormalizeDirectory(...))`, which ends it with a separator.  A default Debug build gives `|/repo/App/obj/|/repo/App/obj/Debug/net10.0/|/repo/App/bin/|/repo/App/bin/Debug/net10.0/`.  The props show the property to the compiler, and the generator leaves a C# file under any of the folders out of the chains that decide which settings files are checked, so that the SDK's own files in `obj`, and the files of the generators, reach no settings file above the project's root file wherever the project puts them ([which files are checked](generator.md#which-files-are-checked)).  A folder that has no value is left out, since `NormalizeDirectory` would make it the project's own folder.  The target first empties the property and then sets it, so it holds the build's folders whatever the project wrote: it is no setting.  It runs in a target, before `GenerateMSBuildEditorConfigFileCore`, as the trims do, since every property of the SDK and of the artifacts layout is set by then, while `Directory.Build.targets`, which is imported after the package's targets, could still change one where they are imported.
 
-The compiler reads a value up to its first `#` or `;`, and `|` parts the folders, so the target escapes each folder's `%`, `|`, `#` and `;` as `%25`, `%7C`, `%23` and `%3B`, `%` first, with `Replace`, and `BuildFolders.Of` decodes them.  MSBuild reads `%XX` in a project file as the character it stands for, so each escape is written with its `%` as `%25`, `%2523` for `%23`: a real build of a project under `/repo/hash#repo` with `UseArtifactsOutput` gives `|/repo/hash%23repo/artifacts/obj/App/|/repo/hash%23repo/artifacts/obj/App/debug/|...`.  The manifest does not carry the property.
+The compiler reads a value up to its first `#` or `;`, and `|` parts the folders, so the target escapes each folder's `%`, `|`, `#` and `;` as `%25`, `%7C`, `%23` and `%3B`, `%` first, with `Replace`, and `BuildFolders.Of` decodes them.  MSBuild reads `%XX` in a project file as the character it stands for, so each escape is written with its `%` as `%25`, `%2523` for `%23`: a real build of a project under `/repo/hash#repo` with `UseArtifactsOutput` gives `|/repo/hash%23repo/artifacts/obj/App/|/repo/hash%23repo/artifacts/obj/App/debug/|...`.  The manifest carries the property, escaped as it is: [the format](#the-format) says what the tool reads it for.
 
 ### `SqlSourceSettingsFile`
 
@@ -95,6 +96,7 @@ The target hooks nothing: it has no `BeforeTargets`, no `AfterTargets` and no co
 
 - The two trims make the manifest hold trimmed values, and make a target of the project that hooks `SqlSourceTrimMetadataOfFiles` to add a `.sql` file run first.
 - [The search](#finding-the-settings-files) adds the settings files to the `AdditionalFiles` items.
+- [`SqlSourceFindBuildFolders`](#the-builds-folders) sets `SqlSourceBuildFolders`, which only that target gives a value, so that the manifest holds the folders.
 - `AddImplicitDefineConstants`, when the project has a `TargetFramework`, adds the constants of the framework, `NET10_0` and `NET8_0_OR_GREATER` among them, which the SDK otherwise adds only on the way to a compile.  A project that is not of the SDK has no `TargetFramework` and no such target.
 
 Without `SqlSourceManifestFile` the target writes to `$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.manifest`, and adds that file to `FileWrites`, which tells `dotnet clean` of it only once a build runs the target.  A file the tool named is the tool's to delete.  Either way the file is written only when its text changes.
@@ -108,7 +110,7 @@ The file is lines of `key=value`, and the key ends at the first `=`.  The target
 1. `SqlSourceManifest=1`, the version of the format.
 2. `Project=`, the full path of the project file.
 3. `TargetFramework=`, `LangVersion=` and `DefineConstants=`, three properties of the SDK.
-4. `Property.<Name>=` for each of the thirteen properties of the package, empty when it is not set.
+4. `Property.<Name>=` for each of the thirteen settings of the package, empty when it is not set, and then `Property.SqlSourceBuildFolders=`, the value of [the build's folders](#the-builds-folders) as the target sets it, with each folder's `%`, `|`, `#` and `;` escaped.  It is no setting: the tool reads it, with `BuildFolders.Read` over `ManifestOptions`, only to leave out of the reach of a settings file the compile paths under those folders, as the generator does.
 5. For each `AdditionalFiles` item whose extension is `.sql`, compared ignoring case, in the order of the items: `File=` and its full path, then `File.<Name>=` for each of the twelve metadata.
 6. `Settings=` and the full path of each `AdditionalFiles` item named `sqlsource.json`, compared ignoring case, once each: those the search added and any the project lists itself, so that the tool reads exactly the settings files the compiler is given.
 7. `Compile=` and the full path of each `Compile` item.

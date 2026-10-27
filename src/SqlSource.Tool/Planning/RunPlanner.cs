@@ -22,7 +22,9 @@ namespace SqlSource.Tool.Planning;
 /// The plan must agree with the generator on which type claims which file with which output, so every rule here is
 /// the generator's own code: <c>PathResolver</c>, <c>MSBuildSettings</c>, <c>DialectSetting</c>,
 /// <c>FileParseInput</c>, <c>SqlFileReader</c>, <c>QuerySettings</c> and <c>SqlQueryHash</c>.  The order of the
-/// errors for values that are not valid is the generator's too: both sides take it from <c>InvalidValues</c>.
+/// errors for values that are not valid is the generator's too: both sides take it from <c>InvalidValues</c>.  The
+/// settings files are read by the generator's <c>ListedSettingsFile</c> and <c>SettingsFileSet</c>, through
+/// <see cref="RunSettingsFiles" />, and the compile paths that reach one are <c>BuildFolders</c>'.
 /// <c>GeneratorParityTests</c> holds the two together.
 /// </remarks>
 internal static class RunPlanner
@@ -34,6 +36,7 @@ internal static class RunPlanner
     )
     {
         var errors = ImmutableArray.CreateBuilder<ToolDiagnostic>();
+        var settingsFiles = new RunSettingsFiles();
         var unclaimed = ImmutableArray.CreateBuilder<int>(manifests.Length);
 
         // A file that two projects claim is planned once, under the first.
@@ -41,7 +44,7 @@ internal static class RunPlanner
         var byPath = new Dictionary<string, FileWork>(SqlPath.Comparer);
         foreach (var manifest in manifests)
         {
-            var (claimedFiles, unclaimedCount) = ReadProject(manifest, errors, cancellationToken);
+            var (claimedFiles, unclaimedCount) = ReadProject(manifest, settingsFiles, errors, cancellationToken);
             unclaimed.Add(unclaimedCount);
             foreach (var claimed in claimedFiles)
             {
@@ -76,9 +79,11 @@ internal static class RunPlanner
 
     // The claimed files of one project, in the order of their paths, each with the settings of this project, and the
     // number of its listed files that no type of it claims.  The errors of the project are added: SQLSRC208, then
-    // SQLSRC011, then SQLSRC014.
+    // SQLSRC011, then SQLSRC014, then the problems of the settings files that its .sql files and C# files reach, as
+    // the generator reports them, of each file once in the run.
     private static (List<ClaimedFile> Claimed, int Unclaimed) ReadProject(
         ProjectManifest manifest,
+        RunSettingsFiles settingsFiles,
         ImmutableArray<ToolDiagnostic>.Builder errors,
         CancellationToken cancellationToken
     )
@@ -94,6 +99,7 @@ internal static class RunPlanner
         invalid.AddDialect(dialect.InvalidValue);
         AddSettings(invalid, settings.Invalid);
 
+        var settingsFileSet = settingsFiles.Of(manifest, cancellationToken);
         var listed = ListedFiles.Read(manifest);
         var claimsOf = ClaimsByFile(claims.Claims, listed);
 
@@ -107,14 +113,19 @@ internal static class RunPlanner
             }
 
             var text = new SqlFileText(listed[path].Path);
+            var metadata = ReadMetadata(text, listed[path], invalid);
+            // The chain of the file's folder in this project's settings files, as the generator finds it.
+            var chain = settingsFileSet.ChainOf(path);
             claimed.Add(
                 new ClaimedFile(
                     manifest.ProjectPath,
                     path,
                     text,
-                    ReadMetadata(text, listed[path], invalid),
+                    metadata,
                     dialect,
                     settings.Level,
+                    chain,
+                    FileLevel.Resolve(metadata, path, chain)?.Level ?? SettingsLevel.None,
                     fileClaims.Levels,
                     fileClaims.Types
                 )
@@ -122,6 +133,12 @@ internal static class RunPlanner
         }
 
         AddInvalid(errors, manifest.ProjectPath, invalid);
+        // Every listed .sql file reaches, claimed or not, as every C# file does that is not the build's.
+        settingsFiles.AddProblems(
+            settingsFileSet,
+            listed.Paths.Concat(BuildFolders.Read(options).ReachingPaths(manifest.CompileFiles)),
+            errors
+        );
         return (claimed, listed.Paths.Count - claimed.Count);
     }
 
@@ -196,13 +213,14 @@ internal static class RunPlanner
         return FileOf(work, parsed.Dialect, state, new EquatableArray<PlannedQuery>(queries.MoveToImmutable()));
     }
 
-    // Parses a claimed file with the dialect of the project it is planned under.  Comments are never wanted: the
-    // hash comes from the SQL without them.
+    // Parses a claimed file with its dialect: its header marker, else the chain's, else its metadata's, else that of
+    // the project it is planned under.  Comments are never wanted: the hash comes from the SQL without them.
     private static ParsedSqlFile Parse(ClaimedFile owner, CancellationToken cancellationToken)
     {
         var input = FileParseInput.Resolve(
             owner.Metadata,
-            SettingsChain.None,
+            owner.NormalizedPath,
+            owner.Chain,
             owner.ProjectDialect,
             projectKeepsComments: false,
             EquatableArray<string>.Empty
@@ -275,7 +293,7 @@ internal static class RunPlanner
             NeedsEntry: true,
             QuerySettings.ResolveDatabase(
                 query.Markers,
-                owner.Metadata.Settings?.Level ?? SettingsLevel.None,
+                owner.Level,
                 owner.Property,
                 SqlDialectName.Canonical(dialect)
             ),
@@ -320,16 +338,16 @@ internal static class RunPlanner
         );
 
     // The output resolves for each type and query, and a file needs what any type that claims it needs: the
-    // greatest over every claim of every project, each with the metadata and the property of its own project.
+    // greatest over every claim of every project, each with the chain, the metadata and the property of its own
+    // project.
     private static OutputKind GreatestOutput(SqlQuery query, FileWork work)
     {
         var greatest = OutputKind.Sql;
         foreach (var claimant in work.Claimants)
         {
-            var metadata = claimant.Metadata.Settings?.Level ?? SettingsLevel.None;
             foreach (var claim in claimant.Claims)
             {
-                var output = QuerySettings.Resolve(query.Markers, claim, metadata, claimant.Property).Output;
+                var output = QuerySettings.Resolve(query.Markers, claim, claimant.Level, claimant.Property).Output;
                 if (output > greatest)
                 {
                     greatest = output;
@@ -516,7 +534,8 @@ internal static class RunPlanner
         public List<TypeClaim> Types { get; } = [];
     }
 
-    // One claimed file as one project sees it.
+    // One claimed file as one project sees it.  Chain is that of the file's folder in the project's settings files, and
+    // Level the chain's over the metadata's, as the generator's FileLevel gives it.
     private sealed record ClaimedFile(
         string ProjectPath,
         string NormalizedPath,
@@ -524,6 +543,8 @@ internal static class RunPlanner
         FileMetadata Metadata,
         DialectSetting ProjectDialect,
         SettingsLevel Property,
+        SettingsChain Chain,
+        SettingsLevel Level,
         List<SettingsLevel> Claims,
         List<TypeClaim> Types
     );

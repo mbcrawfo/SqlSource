@@ -184,7 +184,10 @@ public sealed partial class BuildFileTests
         lines[0].Attributes().ShouldBeEmpty();
         lines[0].Value.ShouldBe("GenerateMSBuildEditorConfigFileCore");
         lines[1].Attributes().ShouldBeEmpty();
-        lines[1].Value.ShouldBe("SqlSourceTrimProperties;SqlSourceTrimMetadataOfFiles;" + SearchTarget);
+        lines[1]
+            .Value.ShouldBe(
+                "SqlSourceTrimProperties;SqlSourceTrimMetadataOfFiles;" + SearchTarget + ";" + BuildFoldersTarget
+            );
         // A project that is not of the SDK has no TargetFramework, and no such target to depend on.
         lines[2].Attributes().ShouldHaveSingleItem().Name.LocalName.ShouldBe("Condition");
         lines[2].Attribute("Condition")!.Value.ShouldBe("'$(TargetFramework)' != ''");
@@ -380,7 +383,7 @@ public sealed partial class BuildFileTests
     public void Targets_ManifestTarget_WritesEverySettingOfTheProjectAndOfEachFile()
     {
         var names = Settings.Concat(TrimmedOnly).ToList();
-        var properties = names.Concat(PropertyOnly);
+        var properties = names.Concat(PropertyOnly).Concat(BuildFolders);
         var lines = Manifest()
             .Descendants("SqlSourceManifestLine")
             .Select(line => line.Attribute("Include").ShouldNotBeNull().Value)

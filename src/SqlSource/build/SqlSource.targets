@@ -239,7 +239,9 @@
         condition outside a target.  The trims make the manifest hold trimmed values, and make a target of a project
         that hooks SqlSourceTrimMetadataOfFiles to add a .sql file run first.  The search gives the manifest the
         settings files that it adds to what the compiler is given.  SqlSourceSettingsSearchHook is what the search
-        and the hash hook in a build, and SqlSource.AfterSdk.targets empties it when it runs them itself.
+        and the hash hook in a build, and SqlSource.AfterSdk.targets empties it when it runs them itself.  The
+        property of the build's folders is set by a target, SqlSourceFindBuildFolders, so the manifest's target runs
+        it, or the manifest would hold the property empty.
 
         AddImplicitDefineConstants is a target of the SDK and not a contract: TD-0027.  It adds the constants of the
         framework, NET10_0 and NET8_0_OR_GREATER among them, which the SDK otherwise adds only on the way to a
@@ -251,7 +253,7 @@
     <!-- editorconfig-checker-disable -->
     <PropertyGroup>
         <SqlSourceSettingsSearchHook>GenerateMSBuildEditorConfigFileCore</SqlSourceSettingsSearchHook>
-        <SqlSourceManifestDependsOn>SqlSourceTrimProperties;SqlSourceTrimMetadataOfFiles;SqlSourceFindSettingsFiles</SqlSourceManifestDependsOn>
+        <SqlSourceManifestDependsOn>SqlSourceTrimProperties;SqlSourceTrimMetadataOfFiles;SqlSourceFindSettingsFiles;SqlSourceFindBuildFolders</SqlSourceManifestDependsOn>
         <SqlSourceManifestDependsOn Condition="'$(TargetFramework)' != ''"
             >$(SqlSourceManifestDependsOn);AddImplicitDefineConstants</SqlSourceManifestDependsOn>
     </PropertyGroup>
@@ -291,8 +293,9 @@
     <!--
         Writes the project manifest: what the compiler is given, for the sqlsource tool, which runs this target by
         name.  It hooks nothing on purpose, so no build runs it, and nothing of a build runs before it but the two
-        trims, the search for settings files and, for a project of the SDK, AddImplicitDefineConstants: a .sql file
-        that a target adds is in the manifest only when that target hooks SqlSourceTrimMetadataOfFiles.  TD-0025.
+        trims, the searches for settings files and for the build's folders and, for a project of the SDK,
+        AddImplicitDefineConstants: a .sql file that a target adds is in the manifest only when that target hooks
+        SqlSourceTrimMetadataOfFiles.  TD-0025.
 
         The file is lines of key=value, and its format is a contract with the tool: the rules are in
         src/SqlSource/AGENTS.md, and the reasons in docs/architecture/msbuild-and-manifest.md.  The tool names the
@@ -337,6 +340,7 @@
             <SqlSourceManifestLine Include="Property.SqlSourceTypeOverrides=$([MSBuild]::Escape($(SqlSourceTypeOverrides)))" />
             <SqlSourceManifestLine Include="Property.SqlSourceColumnTypes=$([MSBuild]::Escape($(SqlSourceColumnTypes)))" />
             <SqlSourceManifestLine Include="Property.SqlSourceNestedClass=$([MSBuild]::Escape($(SqlSourceNestedClass)))" />
+            <SqlSourceManifestLine Include="Property.SqlSourceBuildFolders=$([MSBuild]::Escape($(SqlSourceBuildFolders)))" />
             <SqlSourceManifestSqlFile Include="@(AdditionalFiles)" Condition="'%(Extension)' == '.sql'" />
             <SqlSourceManifestLine Include="@(SqlSourceManifestSqlFile->'File=%(FullPath)%0aFile.SqlSourceDialect=%(SqlSourceDialect)%0aFile.SqlSourceDatabase=%(SqlSourceDatabase)%0aFile.SqlSourceOutput=%(SqlSourceOutput)%0aFile.SqlSourceGeneratorParameters=%(SqlSourceGeneratorParameters)%0aFile.SqlSourceInputModelSuffix=%(SqlSourceInputModelSuffix)%0aFile.SqlSourceOutputModelSuffix=%(SqlSourceOutputModelSuffix)%0aFile.SqlSourceModelNamespace=%(SqlSourceModelNamespace)%0aFile.SqlSourceInputModelType=%(SqlSourceInputModelType)%0aFile.SqlSourceOutputModelType=%(SqlSourceOutputModelType)%0aFile.SqlSourceCollectionType=%(SqlSourceCollectionType)%0aFile.SqlSourceTypeOverrides=%(SqlSourceTypeOverrides)%0aFile.SqlSourceColumnTypes=%(SqlSourceColumnTypes)')" />
             <SqlSourceManifestSettingsFile
