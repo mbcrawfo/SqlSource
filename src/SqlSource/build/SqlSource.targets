@@ -2,12 +2,13 @@
     <!--
         NuGet imports this file into each project that references the package, after the project's own content.
 
-        What a build needs of the package is done in targets, and not where this file is imported:
-        Directory.Build.targets is imported later, and a target can add an item while the build runs.  They hook
-        GenerateMSBuildEditorConfigFileCore, the target of the SDK that writes the file the compiler reads its
-        properties from, or run just before CoreCompile from SqlSource.AfterSdk.targets.  A target of a project that
-        adds a .sql file hooks SqlSourceListFiles, which runs it before the search for settings files and before the
-        manifest wherever it is declared.
+        What a build needs of a value or an item that a target can change is done in targets, and not where this file
+        is imported: Directory.Build.targets is imported later, and a target can add an item while the build runs.
+        The targets of a build hook GenerateMSBuildEditorConfigFileCore, the target of the SDK that writes the file
+        the compiler reads its properties from, or run just before CoreCompile from SqlSource.AfterSdk.targets.
+        SqlSourceListFiles and SqlSourceWriteManifest hook nothing: a target of a project that adds a .sql file hooks
+        SqlSourceListFiles, which runs it before the search for settings files and before the manifest wherever it is
+        declared, and the sqlsource tool runs the manifest's target by name.
     -->
     <!--
         Gives the generator SqlSourceBuildFolders, the folders the build writes C# files and its outputs into, each a
