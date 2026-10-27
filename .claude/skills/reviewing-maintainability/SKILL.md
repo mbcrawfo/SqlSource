@@ -7,7 +7,7 @@ description: Use when asked for a maintainability review, cleanup, tidy-up or ho
 
 ## Overview
 
-A review of the code in `src/` and `tests/`: its comments, its folder structure and its duplicated patterns.  It reads every file, so it is done as parallel read-only sweeps by subagents, each with one question, and every finding is checked and applied by a fresh agent that did not find it.  Comments and structure are fixed in the review's own pull request; a pattern that needs a refactor is recorded in `docs/tech-debt` and not fixed.  The AGENTS.md files, `docs/architecture/` and the readmes are not reviewed here: the review edits them only to follow code it moves or renames.
+A review of the code in `src/` and `tests/`: its comments, its folder structure and its duplicated patterns.  The comment sweeps read every file, so the review is done as parallel read-only sweeps by subagents, each with one question, and every finding is checked and applied by a fresh agent that did not find it.  Comments and structure are fixed in the review's own pull request; a pattern that needs a refactor is recorded in `docs/tech-debt` and not fixed.  The AGENTS.md files, `docs/architecture/` and the readmes are not reviewed here.  The review edits them only to follow code it moves, and adds an AGENTS.md to a folder whose traps none covers.
 
 **Reading is the test.**  A grep for `phase`, `later` or `TODO` finds the comments that announce their age and misses the ones that are simply wrong.  Each sweep reads its files in full.
 
@@ -17,9 +17,9 @@ The briefs are in [sweeps.md](sweeps.md).  Each brief says what the repository d
 
 1. Measure the folders with the command in "Comments, one sweep per slice" and cut the comment slices by its rule.
 2. Dispatch at once, each a read-only subagent with its brief: folder structure, one comment sweep per slice, patterns in `src/`, patterns in `tests/`.  Write the brief that every comment slice shares once, to a file in the scratchpad, and give each slice's prompt that file, its folders and its file list.
-3. When a sweep reports, compare its list of files read in full with its file list.  A file missing from it, read only in part, or in its list of files not read goes to a new read-only sweep with the same brief before the slice is checked.
-4. Then dispatch a checker with the brief in "The checker", on that slice's files only.  The two pattern reports get a checker too, which edits nothing.  The structure report is checked by the lead: a move by the whole-word count of "Weighing a move", a missing AGENTS.md by reading the evidence the sweep gives.
-5. Folder moves, the rewrites of old paths and names in documents, and the `TD-` items start only after every checker has finished, so no two agents edit one file.
+3. When a comment sweep reports, compare its list of files read in full with its slice's file list.  A file missing from it, read only in part, or in its list of files not read goes to one new read-only sweep with the same brief before the slice is checked.  A file that sweep does not read in full either is a coverage gap, recorded for the final report.
+4. Then dispatch a checker with the brief in "The checker", given the slice's reports and its files only.  Each of the two pattern reports gets a checker too, which edits nothing.  The structure report is checked by the lead: a move by the whole-word count of "Weighing a move", a missing AGENTS.md by reading the evidence the sweep gives.
+5. Only after every checker has finished, the lead makes the folder moves and the rewrites of old paths, adds the AGENTS.md files the structure report calls for, and writes the `TD-` items, so no two agents edit one file.
 
 ## What to do with each kind of finding
 
@@ -28,11 +28,11 @@ The briefs are in [sweeps.md](sweeps.md).  Each brief says what the repository d
 | A cohesive group of four or more files in a large folder | Move now, if the cost below allows |
 | A folder whose traps no AGENTS.md covers | Add one, under 250 lines, traps only, with the maintenance footer |
 | A comment that is wrong, stale, or restates its own code | Fix or delete now |
-| A test whose assertions do not check what its comment says | Correct the comment now; record the gap in the area's grouped `TD-` item; do not change the test |
+| A test whose assertions do not check what its comment says | Correct the comment now; record the gap in the grouped `TD-` item of the tests; do not change the test |
 | Duplicated logic, uneven conventions, over-long methods, dead members | One grouped `TD-` item per area (`src/`, tests), numbered, with the file links; do not refactor |
-| A test that depends on the process, the clock or the repository | Its own `TD-` item: it is fragility, not duplication |
+| A test that depends on the process, the clock or the repository | One `TD-` item per such test: it is fragility, not duplication |
 
-A `TD-` item lists only what a checker confirmed, with the confirmed locations and counts.  `docs/tech-debt/AGENTS.md` has the item format.  Date the review in the item's Problem section.
+A `TD-` item lists only what a checker confirmed, with the confirmed locations and counts.  `docs/tech-debt/AGENTS.md` has the item format, where the id comes from, and the row each item adds to `docs/tech-debt/README.md`.  Date the review in the item's Problem section.
 
 ## Weighing a move
 
@@ -47,12 +47,12 @@ A move changes a namespace: `dotnet_style_namespace_match_folder` is on, and the
 
 1. `git mv` each file and rewrite its `namespace` line.  For every type that moved, add `using <new namespace>;` to each file outside the folder that mentions the type by whole word; a word in a comment adds a `using` the compiler will reject, which the next step removes.
 2. Build the solution in a loop.  IDE0005 is an error, so each pass reports the unnecessary `using` lines; delete them by line number, highest first, and build again until clean.  The build stops at the first failing project, so expect several passes.
-3. Rewrite the old paths in every document that is kept current: the AGENTS.md files, `CONTRIBUTING.md`, `docs/architecture/`, the readmes (`tests/README.md`, `tests/SqlSource.Tests.Postgres/README.md`, `tests/SqlSource.Tests.SqlServer/README.md`, `tools/README.md` and `.github/workflows/README.md`), `docs/tech-debt/*.md` and `docs/deferred/*.md`, and comments in `src`, `tests`, `tools` and `.github`.  Rewrite there too the name of a type, member or test that the review renamed.  Then check every relative link and every backtick path in those files resolves.  This is the only edit the review makes to those documents.  Leave `docs/superpowers/` alone: plans and specs are records of their date.
+3. Rewrite the old paths in every document that is kept current: the AGENTS.md files, `CONTRIBUTING.md`, `docs/architecture/`, the readmes (`tests/README.md`, `tests/SqlSource.Tests.Postgres/README.md`, `tests/SqlSource.Tests.SqlServer/README.md`, `tools/README.md` and `.github/workflows/README.md`), `docs/tech-debt/*.md` and `docs/deferred/*.md`, and comments in `src`, `tests`, `tools` and `.github`.  Rewrite there too every old namespace written out in full.  Then check every relative link and every backtick path in those files resolves.  This is the only edit the review makes to those documents.  Leave `docs/superpowers/` alone: plans and specs are records of their date.
 4. Run `./format.sh` to sort the `using` lines, then the full test suite.
 
 ## Finishing
 
-`./pre-commit-validation.sh` before each commit, and again on the final tree before the push; nothing runs it for you.  Lines over 120 characters fail `editorconfig-checker`, and a rewritten comment is where they appear.  Check `VersionPrefix` against the highest `v*` tag before opening the pull request.  The final report and the pull request state each coverage gap exactly, by file, with no rounding of the count.
+`./pre-commit-validation.sh` before each commit, and again on the final tree before the push; nothing runs it for you.  Lines over 120 characters fail `editorconfig-checker`, and a rewritten comment is where they appear.  Commit the comments, the new AGENTS.md files and the tech debt together, and each move in a commit of its own.  Check `VersionPrefix` against the highest `v*` tag before opening the pull request.  The final report and the pull request say how many findings were applied and how many dropped, which `TD-` items were added, which folders moved, and each coverage gap exactly, by file, with no rounding of the count.
 
 ## Common mistakes
 
