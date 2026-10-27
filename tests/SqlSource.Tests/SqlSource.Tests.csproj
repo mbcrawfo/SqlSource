@@ -8,45 +8,7 @@
         <TargetFramework>net10.0</TargetFramework>
         <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
-        <!--
-            Token validation is off, so that EndToEnd/ shows the property reaching the generator through the MSBuild
-            files: a query there without a list of its own does not check its arguments.  The list has one word on
-            each line on purpose, and the word that the tests can see is the second.  The compiler reads one line of
-            a value, so it would read this as empty, and SqlSource.targets is what puts the list on one line.  Each
-            value below that is written over several lines is so for the same reason.
-        -->
-        <SqlSourceGeneratorParameters>
-            sort-input
-            no-token-validation
-        </SqlSourceGeneratorParameters>
-        <SqlSourceDialect>
-            postgres
-        </SqlSourceDialect>
-        <!--
-            Every query of this project is generated as SQL alone, the constants and the token methods.  A query
-            with models would need a sidecar beside its file.
-        -->
-        <SqlSourceOutput>Sql</SqlSourceOutput>
     </PropertyGroup>
-    <ItemGroup>
-        <AdditionalFiles Update="EndToEnd/Dialects/ByMetadata.sql">
-            <SqlSourceDialect>
-                mysql
-            </SqlSourceDialect>
-        </AdditionalFiles>
-        <AdditionalFiles Update="EndToEnd/Dialects/ByOption.sql">
-            <SqlSourceDialect>
-                mysql,
-                no-backslash-escapes
-            </SqlSourceDialect>
-        </AdditionalFiles>
-        <AdditionalFiles Update="EndToEnd/Parameters/Kept.sql">
-            <SqlSourceGeneratorParameters>
-                no-token-validation
-                keep-comments
-            </SqlSourceGeneratorParameters>
-        </AdditionalFiles>
-    </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Bogus" />
         <PackageReference Include="GitHubActionsTestLogger" />
@@ -85,15 +47,6 @@
         <None
             Include="../../src/SqlSource/build/SqlSource.AfterSdk.targets"
             Link="build/SqlSource.AfterSdk.targets"
-            CopyToOutputDirectory="PreserveNewest"
-        />
-        <!--
-            EndToEnd/EndToEndTests.cs reads the file that the build writes for the compiler of this project.  The SDK
-            writes it before it compiles, and the copy to the output folder comes after.
-        -->
-        <None
-            Include="$(IntermediateOutputPath)$(MSBuildProjectName).GeneratedMSBuildEditorConfig.editorconfig"
-            Link="build/compiler.editorconfig"
             CopyToOutputDirectory="PreserveNewest"
         />
     </ItemGroup>
