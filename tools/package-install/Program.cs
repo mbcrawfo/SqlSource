@@ -36,5 +36,5 @@ Console.WriteLine($"dialect of the file header, with an option: {Queries.ByOptio
 // A target of Directory.Build.targets adds AddedByATarget.sql, and its header says mssql.
 Console.WriteLine($"dialect of a file that a target adds: {Queries.AddedByATarget}");
 
-// ByMarker.sql names its own dialect, mssql, with a marker.
-Console.WriteLine($"dialect of the file's marker: {Queries.ByMarker}");
+// ByMarker.sql names its own dialect, mssql, with a marker below a comment that the project's dialect reads.
+Console.WriteLine($"dialect of a marker below a comment: {Queries.ByMarker}");

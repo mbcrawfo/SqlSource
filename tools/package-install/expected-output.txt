@@ -8,4 +8,4 @@ dialect of the project: SELECT E'it'
 dialect of the file header: SELECT 'it\'s' AS note, 5--3 AS eight;
 dialect of the file header, with an option: SELECT 'C:\temp\' AS path;
 dialect of a file that a target adds: SELECT [it's] FROM #orders;
-dialect of the file's marker: SELECT [it's] FROM #staged;
+dialect of a marker below a comment: SELECT [it's] FROM #staged;
