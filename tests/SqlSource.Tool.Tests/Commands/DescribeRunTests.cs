@@ -266,7 +266,7 @@ public sealed class DescribeRunTests : IDisposable
         _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe("Host=other;Port=5433");
     }
 
-    // The plan reported SQLSRC209 for the file.  Its queries count as failed, and the run adds no error of its own.
+    // The plan reports SQLSRC209 for the file.  Its queries count as failed, and the run adds no error of its own.
     [Fact]
     public async Task Run_FileThatIsNotReady_FailsItsQueriesWithThePlansErrorAlone()
     {
