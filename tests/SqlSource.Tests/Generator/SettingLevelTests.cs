@@ -95,7 +95,8 @@ public sealed class SettingLevelTests
         ];
 
     // The output's row reads the default's query, whose diagnostic names the output read.  Every other row's query is
-    // at sql by its marker, so that the two runs' type files have a constant to compare.
+    // at sql by its marker, so that the two runs' type files have a constant to compare.  A test of the MSBuild path:
+    // each setting is the project's property and the file's metadata.
     [Theory]
     [InlineData("SqlSourceOutput", " Code-Gen ", "codegen")]
     [InlineData("SqlSourceDatabase", "not read by the generator, so never wrong", null)]
@@ -135,6 +136,7 @@ public sealed class SettingLevelTests
         run.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
     }
 
+    // A test of the MSBuild path: each setting is the project's property and the file's metadata.
     [Theory]
     [InlineData("SqlSourceOutput", "model")]
     [InlineData("SqlSourceOutput", "sql models")]
@@ -166,6 +168,7 @@ public sealed class SettingLevelTests
 
     // An entry of the type override that is not valid is reported alone.  That the other entries apply is
     // SettingsLevelReaderTests.Read_TypeOverrideThatIsNotValid_IsRecordedAndTheOthersApply.
+    // A test of the MSBuild path: the overrides are the project's property and the file's metadata.
     [Fact]
     public void Run_TypeOverridesWithAnEntryThatIsNotValid_ReportThatEntryOnce()
     {
@@ -195,7 +198,8 @@ public sealed class SettingLevelTests
         run.CompilationErrors.ShouldBeEmpty();
     }
 
-    // A key in brackets, as T-SQL writes a name, is not read, and the error shows the forms that are.
+    // A key in brackets, as T-SQL writes a name, is not read, and the error shows the forms that are.  A test of the
+    // MSBuild path: the overrides are the project's property.
     [Fact]
     public void Run_TypeOverrideWithAKeyInBrackets_IsSqlsrc014ShowingTheFormsThatAreRead()
     {

@@ -229,6 +229,7 @@ public sealed class RunPlannerTests : IDisposable
         (planned.Database is not null).ShouldBe(needsEntry);
     }
 
+    // A test of the MSBuild path: the dialect and the database are the project's properties and the file's metadata.
     [Theory]
     [InlineData(null, null, null, null, "postgres")]
     [InlineData("main", null, null, null, "main")]
@@ -470,7 +471,8 @@ public sealed class RunPlannerTests : IDisposable
     }
 
     // The compiler gives a file its metadata by its path, so of two items of one path the last that has any metadata
-    // of the package is the one a build reads.  "Include" where "Update" was meant makes such a second item.
+    // of the package is the one a build reads.  "Include" where "Update" was meant makes such a second item.  A test of
+    // the MSBuild path: the output is the project's property and the dialect the files' metadata.
     [Theory]
     [InlineData(null, "postgres", "PostgreSql")]
     [InlineData("postgres", null, "PostgreSql")]
