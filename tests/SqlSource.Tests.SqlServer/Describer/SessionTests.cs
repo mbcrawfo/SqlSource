@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Dapper;
 using Microsoft.Data.SqlClient;
 using Shouldly;
 using SqlSource.Parsing;
@@ -151,11 +152,18 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
     }
 
     // SqlClient reports a command that is cancelled while the server runs it as a SqlException: it is the cancellation
-    // all the same, and no answer.  The token is cancelled once the server shows the session's WAITFOR running, so
-    // that path is the one that runs.  The command has no timeout and waits for a day, so the token alone ends it.
+    // all the same, and no answer.  The command asks for an application lock that a second session holds, with no
+    // timeout of its own or of SqlClient, so the token alone ends it, and the token is cancelled once the server shows
+    // the session waiting on the lock, so that path is the one that runs.  A lock wait has no end of its own, where
+    // SQL Server ends a WAITFOR early when it runs short of threads.
     [Fact]
     public async Task AnswerAsync_CommandCancelledWhileTheServerRunsIt_ThrowsOperationCanceled()
     {
+        var resource = $"{nameof(SessionTests)}-{Guid.NewGuid():N}";
+        await using var holder = new SqlConnection(sqlServer.ConnectionString);
+        await holder.OpenAsync(TestContext.Current.CancellationToken);
+        _ = await holder.ExecuteAsync(AppLock(resource));
+
         await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var token = cancel.Token;
@@ -166,7 +174,7 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         var answered = SqlServerLive.AnswerAsync<SqlServerServerError?>(
             async () =>
             {
-                await using var command = await session.Connection.CommandAsync("WAITFOR DELAY '23:59:59'", token);
+                await using var command = await session.Connection.CommandAsync(AppLock(resource), token);
                 command.CommandTimeout = 0;
                 try
                 {
@@ -188,7 +196,7 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         {
             await Eventually.TrueAsync(
                 async () => await sqlServer.ScalarAsync(RunningWaitOf(id)) is 1,
-                "The server never showed the session's WAITFOR running."
+                "The server never showed the session waiting on the lock."
             );
         }
         finally
@@ -201,11 +209,16 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         _ = thrown.ShouldNotBeNull("the token was cancelled before the server ran the command");
     }
 
-    // How many requests of the session wait in a WAITFOR: 1 while the server runs the test's command.
+    // Takes the session's exclusive application lock of the resource, waiting for it as long as it takes.
+    private static string AppLock(string resource) =>
+        "EXEC sp_getapplock "
+        + $"@Resource = N'{resource}', @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = -1";
+
+    // How many requests of the session wait on a lock: 1 while the server runs the test's command.
     private static string RunningWaitOf(int session) =>
         string.Create(
             CultureInfo.InvariantCulture,
-            $"SELECT COUNT(*) FROM sys.dm_exec_requests WHERE session_id = {session} AND wait_type = 'WAITFOR'"
+            $"SELECT COUNT(*) FROM sys.dm_exec_requests WHERE session_id = {session} AND wait_type LIKE 'LCK[_]M[_]%'"
         );
 
     // No session, SQLSRC224 at no step for the database, and nothing of the value in any text of the failure or in
