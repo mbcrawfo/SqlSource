@@ -1,0 +1,6 @@
+{
+  // A test copies the project to the temporary directory, where no settings file above it may apply.
+  "root": true,
+  "dialect": "mssql",
+  "database": "fixtures",
+}

@@ -12,7 +12,7 @@ dotnet test --project tests/SqlSource.Tests.Postgres
 
 `dotnet test --solution SqlSource.slnx`, and so `pre-commit-validation.sh`, runs it on the default image.
 
-The project copies two fixture projects to its output, with the package's MSBuild files and `global.json`: `Single`, from `tests/SqlSource.Tool.Tests/Fixtures/Projects/`, and `ErrorPaths`, from `EndToEnd/ErrorPaths/`.  `DescribeCommandTests` runs the whole `describe` command in process against the container, over the fixture cases, `--check`, `--force` and `--log`, and `ToolProcessTests` starts the tool that was built in a process of its own and describes a copy of `Single`.  `ErrorPathTests` describes copies of `ErrorPaths`, [below](#the-end-to-end-project).
+The project copies two fixture projects to its output, with the package's MSBuild files and `global.json`: `Single`, from `tests/SqlSource.Tool.Tests/Fixtures/Projects/`, and `ErrorPaths`, from `EndToEnd/ErrorPaths/`.  `DescribeCommandTests` runs the whole `describe` command in process against the container, over the fixture cases, `--check`, `--force` and `--log`, and `ToolProcessTests` starts the tool that was built in a process of its own and describes a copy of `Single`, whose `sqlsource.json` gives the dialect `postgres` and whose one file names the database `billing` by its header.  `ErrorPathTests` describes copies of `ErrorPaths`, [below](#the-end-to-end-project).
 
 ## The image
 

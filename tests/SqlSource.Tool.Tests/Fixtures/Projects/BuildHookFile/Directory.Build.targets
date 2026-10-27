@@ -8,11 +8,7 @@
     </ItemGroup>
     <Target Name="AddSqlFile" BeforeTargets="BeforeBuild">
         <ItemGroup>
-            <AdditionalFiles Include="Generated/Late.sql">
-                <SqlSourceDialect>
-                    mssql
-                </SqlSourceDialect>
-            </AdditionalFiles>
+            <AdditionalFiles Include="Generated/Late.sql" />
         </ItemGroup>
     </Target>
 </Project>
