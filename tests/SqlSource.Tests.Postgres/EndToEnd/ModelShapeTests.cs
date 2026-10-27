@@ -43,7 +43,7 @@ public sealed class ModelShapeTests
         _ = typeof(ModelShapeTests).Assembly.GetType("SqlSource.SqlSourceGenerateAttribute").ShouldNotBeNull();
 
     [Fact]
-    public void Build_PropertySettings_GiveARecordInputAndASealedRecordOutput()
+    public void Build_ProjectFileSettings_GiveARecordInputAndASealedRecordOutput()
     {
         ShouldBeModel(
             typeof(GetAccountArgs),
@@ -114,7 +114,7 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Build_PropertyOverride_MakesTimestamptzADateTimeOffset() =>
+    public void Build_ProjectFileOverride_MakesTimestamptzADateTimeOffset() =>
         ShouldBeModel(
             typeof(ListClosedBeforeDto),
             $"{Namespace}.ListClosedBeforeDto",
@@ -215,9 +215,9 @@ public sealed class ModelShapeTests
             ("NoteCount", typeof(NoteCount), false)
         );
 
-    // accounts.id is an AccountId by the file's column types in the project, notes.account_id by the header's
-    // -- column: marker (pinned by Build_LeftJoin_MakesTheOptionalSideNullable), the count by the query's, and the
-    // parameter by its -- param: marker, which names no database type.
+    // accounts.id and notes.account_id are AccountIds by the header's -- column: markers (notes.account_id pinned by
+    // Build_LeftJoin_MakesTheOptionalSideNullable), the count by the query's, and the parameter by its -- param:
+    // marker, which names no database type.
     [Fact]
     public void Build_ColumnTypesAndParamMarker_MapTheIdsAndTheCountToTypesOfTheProject()
     {
@@ -404,7 +404,7 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Build_OutputTypeByMetadata_IsASealedClass()
+    public void Build_OutputTypeByFolderFile_IsASealedClass()
     {
         ShouldBeModel(
             typeof(Billing.GetInvoiceArgs),
