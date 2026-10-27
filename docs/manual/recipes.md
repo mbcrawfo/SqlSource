@@ -18,15 +18,21 @@ Short answers to "how do I...", each a sample you can copy and a link to the pag
 
 ## Read one folder with another dialect
 
-A project of PostgreSQL files keeps its reports for SQL Server in `Reporting/`.  Item metadata gives the folder its own dialect:
+A project of PostgreSQL files keeps its reports for SQL Server in `Reporting/`.  A settings file in that folder gives it its own dialect:
 
-```xml
-<PropertyGroup>
-    <SqlSourceDialect>postgres</SqlSourceDialect>
-</PropertyGroup>
-<ItemGroup>
-    <AdditionalFiles Update="Reporting/**/*.sql" SqlSourceDialect="mssql" />
-</ItemGroup>
+```jsonc
+// sqlsource.json, in the project's folder
+{
+    "root": true,
+    "dialect": "postgres",
+}
+```
+
+```jsonc
+// Reporting/sqlsource.json
+{
+    "dialect": "mssql",
+}
 ```
 
 For one file, a marker in its file header does the same:
@@ -46,9 +52,9 @@ $ export SQLSOURCE_CONNECTION_MSSQL="Server=localhost,1433;Database=reports;User
 $ dotnet sqlsource describe
 ```
 
-Add `SqlSourceOutput="sql"` to the metadata, or `-- output: sql` to the file, when the reports want their SQL alone: the tool then leaves them out and needs no connection for them.
+Add `"output": "sql"` to `Reporting/sqlsource.json`, or `-- output: sql` to a file, when the reports want their SQL alone: the tool then leaves them out and needs no connection for them.
 
-Rules: [configure one folder differently](settings.md#configure-a-folder), [dialect](settings.md#setting-dialect), [which place wins](settings.md#precedence), [connections](tool.md#connections).
+Rules: [configure one folder differently](settings.md#configure-a-folder), [settings files](settings.md#settings-files), [dialect](settings.md#setting-dialect), [which place wins](settings.md#precedence), [connections](tool.md#connections).
 
 <a id="leave-migration-scripts-out"></a>
 
@@ -78,7 +84,7 @@ Rules: [which files belong to a type](generator.md#files-of-a-type), [which `.sq
 
 ## Use several databases
 
-In a PostgreSQL project (`SqlSourceDialect` set to `postgres`), name the logical database of each file, and give the tool a connection for each name:
+In a PostgreSQL project (`"dialect": "postgres"` in its `sqlsource.json`), name the logical database of each file, and give the tool a connection for each name:
 
 ```sql postgres
 -- database: billing
@@ -103,7 +109,7 @@ Rules: [database](settings.md#setting-database), [connections](tool.md#connectio
 
 ## Check the sidecars in CI
 
-In a PostgreSQL project (`SqlSourceDialect` set to `postgres`), this GitHub Actions job starts PostgreSQL, creates the schema, and fails when a sidecar that is checked in does not match:
+In a PostgreSQL project (`"dialect": "postgres"` in its `sqlsource.json`), this GitHub Actions job starts PostgreSQL, creates the schema, and fails when a sidecar that is checked in does not match:
 
 ```yaml
 jobs:
@@ -131,7 +137,7 @@ jobs:
           SQLSOURCE_CONNECTION: Host=localhost;Database=app;Username=postgres;Password=ci
 ```
 
-In a SQL Server project (`SqlSourceDialect` set to `mssql`), the service and the connection change; the steps are the same, and the step that creates your schema creates the database too:
+In a SQL Server project (`"dialect": "mssql"` in its `sqlsource.json`), the service and the connection change; the steps are the same, and the step that creates your schema creates the database too:
 
 ```yaml
     services:
@@ -163,7 +169,7 @@ Rules: [check in CI](tool.md#check-in-ci), [connections](tool.md#connections) fo
 
 ## Describe again after a schema change
 
-In a PostgreSQL project (`SqlSourceDialect` set to `postgres`), after a migration:
+In a PostgreSQL project (`"dialect": "postgres"` in its `sqlsource.json`), after a migration:
 
 ```console
 $ dotnet sqlsource describe --force
@@ -205,10 +211,15 @@ Rules: [the connection](generator.md#method-connection), [the signature](generat
 
 ## Give an id a type of its own
 
-```xml
-<PropertyGroup>
-    <SqlSourceColumnTypes>customers.id=CustomerId orders.customer_id=CustomerId</SqlSourceColumnTypes>
-</PropertyGroup>
+```jsonc
+// sqlsource.json, in the project's folder
+{
+    "root": true,
+    "columnTypes": {
+        "customers.id": "CustomerId",
+        "orders.customer_id": "CustomerId",
+    },
+}
 ```
 
 ```sql postgres
@@ -237,7 +248,7 @@ GetCustomerDto? customer = await connection.GetCustomer(new GetCustomerParams(cu
 // customer.Id and GetCustomerParams.Id are CustomerId
 ```
 
-The column types give the columns `customers.id` and `orders.customer_id` the type `CustomerId` in every query that reads them, and the `-- param:` marker gives it to `@id`, which is no column.  The other `bigint` columns of the project keep their `long`, and the same lines work on SQL Server.  A computed column, such as `max(customer_id)`, takes the type from a [`-- column:` marker](generator.md#column-marker) inside its query.
+The column types give the columns `customers.id` and `orders.customer_id` the type `CustomerId` in every query that reads them, and the `-- param:` marker gives it to `@id`, which is no column.  The other `bigint` columns of the project keep their `long`, and the same entries work on SQL Server.  A computed column, such as `max(customer_id)`, takes the type from a [`-- column:` marker](generator.md#column-marker) inside its query.
 
 Where the schema makes the ids a type of their own, a domain, `CREATE DOMAIN customer_id AS bigint`, or on SQL Server an alias type, map that type with the type override, and on PostgreSQL declare each parameter compared with such an id as the domain, since PostgreSQL gives it the domain's base type, `bigint`, otherwise:
 
@@ -331,11 +342,13 @@ The input model is the parameter object, and the output model is the type of a r
 - **Write the query's parameters in camelCase**, `@orderId` and not `@order_id`, since Dapper binds a property of the input model only to a parameter of its name, ignoring case.  A query that keeps `@order_id` gives Dapper its parameters by hand: `new { order_id = orderId }`.
 - **Sorted models are classes.**  Dapper matches a record's constructor to the columns by position and name, so a record whose properties are sorted no longer matches.  A class is matched by name:
 
-  ```xml
-  <PropertyGroup>
-      <SqlSourceGeneratorParameters>sort-output</SqlSourceGeneratorParameters>
-      <SqlSourceOutputModelType>class</SqlSourceOutputModelType>
-  </PropertyGroup>
+  ```jsonc
+  // sqlsource.json, in the project's folder
+  {
+      "root": true,
+      "generatorParameters": ["sort-output"],
+      "outputModelType": "class",
+  }
   ```
 
 - **Set a column's nullability with a `-- column:` marker, not with `!` or `?` at the end of its alias.**  A mark stays in the name of the column, `display_name!`, and Dapper does not match it to the property `DisplayName`: it throws `InvalidOperationException` for a record that it cannot make without the column, and leaves the property of a class as it was made, with no error.  The marker leaves the name alone:

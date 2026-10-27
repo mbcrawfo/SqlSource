@@ -16,7 +16,7 @@
 - **TD-0016 is not resolved but rewritten** (owner, 6-remove-msbuild R1-F1): a `.sql` file that a late target adds misses its settings file only in a project that is not of the SDK, or one that overwrites `AfterMicrosoftNETSdkTargets`.  The known issue of `settings.md` keeps one sentence for it.
 - **Which settings files are checked** (owner's decision 2 of 2026-10-26): only files that the chain of some `.sql` file or C# file reaches.  A file beyond the first `"root": true` is never read, so it cannot fail a build.  The manual says so.
 - **The case of the file's name** (owner, 3-generator R1-F3, "document and move on"): a project that lists a `SqlSource.json` itself has it ignored; the build's search finds one in another case on macOS and Windows, and reads it, and not on Linux.
-- **The search for the old names** keeps finding three tests that feed the old names to show they are ignored (`SettingsFileTests.Run_ProjectThatStillSetsMSBuildSettings_ReadsNothingOfThem`, `TestOptionsProvider`'s metadata prefix, `ManifestReaderTests`' passed-over lines).  They stay unless the owner says otherwise (question sent, blocks merge).  Every document and comment is clean.
+- **The search for the old names** found three tests that feed the old names to show they are ignored (`SettingsFileTests.Run_ProjectThatStillSetsMSBuildSettings_ReadsNothingOfThem`, `TestOptionsProvider`'s metadata prefix, `ManifestReaderTests`' passed-over lines).  Owner, 2026-10-27: "Remove or rewrite the three tests so no old MSBuild setting name remains outside docs/superpowers."  Task 7 does it: a test whose point survives without the names is rewritten with neutral names, any other is deleted, and the PR names what covers its ground.
 - **Designer's call changed:** the section "Values written in MSBuild" is replaced by a section on the settings file itself, anchored `settings-files`, which the `See:` lines of `SQLSRC015` to `SQLSRC020` link to in place of the bare page.  Its old anchor `values-written-in-msbuild` goes; the one link to it outside `docs/superpowers/` is updated.
 
 ## Global Constraints
@@ -27,7 +27,7 @@
 - A manual heading that is linked keeps its `<a id>` anchor when reworded; never link into `docs/tech-debt`, `docs/deferred`, `docs/superpowers` or `src/` from the manual.
 - `docs/architecture/` describes the code as it is; check every claim against the code before writing it, and update `docs/architecture/AGENTS.md`'s table when a section it names is renamed or removed.
 - A settings file's example is fenced `jsonc` (it has comments), as `diagnostics.md` already does.
-- At the end, this finds nothing outside `docs/superpowers/` but the three tests named above:
+- At the end, this finds nothing outside `docs/superpowers/`:
 
   ```bash
   git grep -n -P 'SqlSource(Dialect|Database|Output|GeneratorParameters|InputModelSuffix|OutputModelSuffix|ModelNamespace|InputModelType|OutputModelType|CollectionType|TypeOverrides|ColumnTypes|NestedClass|TrimProperties|TrimMetadataOfFiles|CollectSettingsFiles|SettingsFile)(?![A-Za-z])' -- ':!docs/superpowers'
@@ -134,5 +134,15 @@ Checked against the merged code; a task that finds the code says otherwise follo
 
 - [ ] **Step 1: Fix the named files.**  If `AttributeSource.Text` is pinned by a snapshot or a test, update the expected text.
 - [ ] **Step 2: Search comments and guidance** with `git grep -n -i -E 'msbuild (propert|setting|value)|item metadata|metadata of (a|the|each) file|SqlSourceSettingsFile|trim(s|med)? (the )?(propert|metadata)' -- src tests tools examples '*.md' ':!docs/superpowers'` and the removed-names grep of Task 5 over `src tests tools`; fix every hit that describes a removed setting place.  Leave code names that are current (`GeneratorHarness.ProjectSettings`, `LevelSettings`, `TestProject.Settings`).
-- [ ] **Step 3: The final search** of Global Constraints finds only the three tests; record that in the PR description.
-- [ ] **Step 4: Validate and commit**: `git commit -m "Correct the comments and guidance that still named MSBuild settings"`.
+- [ ] **Step 3: Validate and commit**: `git commit -m "Correct the comments and guidance that still named MSBuild settings"`.
+
+### Task 7: The tests that still name old settings
+
+**Files:**
+- Modify: `tests/SqlSource.Tests/Generator/SettingsFileTests.cs` (`Run_ProjectThatStillSetsMSBuildSettings_ReadsNothingOfThem`), `tests/SqlSource.Testing/Generator/TestOptionsProvider.cs` (its `build_metadata.SqlSourceSettingsFile.` prefix and whatever uses it), `tests/SqlSource.Tool.Tests/Projects/ManifestReaderTests.cs` (the version-2 manifest with `Property.SqlSourceDialect` and `File.SqlSourceDialect` lines), and anything that only served them.
+
+- [ ] **Step 1: `ManifestReaderTests`.**  Its point, that the reader passes over a key it does not know, `Property.` and `File.` lines included, survives: rewrite the lines with neutral names, such as `Property.SqlSourceSomethingNew=x` and `File.SqlSourceSomethingNew=y`, and keep the assertions.
+- [ ] **Step 2: `SettingsFileTests.Run_ProjectThatStillSetsMSBuildSettings_ReadsNothingOfThem`.**  Its point is that the old names are ignored, which needs the names: delete it.  If the generator test that shows a property other than `SqlSourceBuildFolders` changes nothing can be kept with a neutral name (`build_property.SqlSourceSomethingNew`), keep that half; otherwise record in the task report which tests cover the ground (the generator reads only `SqlSourceBuildFolders`; `BuildFileTests` pins that the props show the compiler that one property alone).
+- [ ] **Step 3: `TestOptionsProvider`.**  Remove the metadata prefix and the metadata support it gives if nothing else uses it after Step 2; otherwise rename what remains so no old name is left.  Update `tests/AGENTS.md` and `tests/README.md` if they name what changed.
+- [ ] **Step 4: The final search** of Global Constraints finds nothing outside `docs/superpowers/`.
+- [ ] **Step 5: Validate and commit**: `git commit -m "Keep no old setting name in the tests"`.

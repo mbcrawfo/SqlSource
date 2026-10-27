@@ -2,10 +2,12 @@
 
 SqlSource reads SQL Server and Azure SQL files by the `mssql` [dialect](dialects.md), and the `sqlsource` tool can describe their queries: it asks your database what each query's parameters and columns are, and writes the answer to the query's [sidecar](tool.md#sidecar-files).  This page is about describing, about the C# types that a described query's columns and parameters get, about the models built from them, and about the query methods that run them.  How SqlSource reads a T-SQL file, its comments, strings and `[bracketed]` names, is on [the dialects page](dialects.md).
 
-```xml
-<PropertyGroup>
-    <SqlSourceDialect>mssql</SqlSourceDialect>
-</PropertyGroup>
+```jsonc
+// sqlsource.json, in the project's folder
+{
+    "root": true,
+    "dialect": "mssql",
+}
 ```
 
 ```console

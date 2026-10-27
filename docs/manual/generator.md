@@ -105,7 +105,7 @@ var sql = UserQueries.GetUser;
 
 This section is about the constants and token methods of the queries whose output is `sql` or `models`.  A query whose output is `codegen` has a method in their place, which `SqlLocation` does not move: see [where the methods go](#method-location).
 
-[`SqlLocation`](settings.md#setting-sql-location) chooses between a private class `Sql` nested in the type (`Nested`, the default) and the type itself (`Direct`).  Its section says what each means.  [The nested class](settings.md#setting-nested-class) can have another name, for the project or for one type.  What to know when you choose:
+[`SqlLocation`](settings.md#setting-sql-location) chooses between a private class `Sql` nested in the type (`Nested`, the default) and the type itself (`Direct`).  Its section says what each means.  [The nested class](settings.md#setting-nested-class) can have another name, in a settings file for the types of a folder, or on the attribute for one type.  What to know when you choose:
 
 - Use `Nested` for queries that one class runs, and `Direct` for a type whose job is to hold queries that other code uses.
 - With `Nested`, the type cannot have a member or a type parameter named like the nested class, and cannot have that name itself ([SQLSRC007](diagnostics.md#sqlsrc007)).  Rename it, give the nested class another name, or use `Direct`.  The nested class holds the queries whose output is `sql` or `models`, and is not written when every query of the type's usable files is `codegen`.  A type with no queries at all keeps it, empty.

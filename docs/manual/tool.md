@@ -47,6 +47,8 @@ A query is described through its [dialect](concepts.md#dialect).  The tool can a
 
 The tool reads `[SqlSourceGenerate]` from your C# source without compiling it, which limits how `Path` and `Output` can be written there: see [the generator's known issues](generator.md#known-issues).
 
+The tool reads the same [settings files](settings.md#settings-files) as the build, and reports their mistakes at the file, line and column that the build gives them: a file that is not a JSON object, a key that is not known or is written twice, or a value of the wrong JSON type, [SQLSRC015](diagnostics.md#sqlsrc015) to [SQLSRC018](diagnostics.md#sqlsrc018), and a value of `dialect`, `output` or `database` that is not valid, [SQLSRC019](diagnostics.md#sqlsrc019).  It reports them only for a settings file that applies to a `.sql` file or a C# file of a project it runs on, and once in a run, however many of its projects reach the file.  The other settings' values, `typeOverrides` and `columnTypes` among them, are checked by the build and not by the tool, and `database` by the tool alone.
+
 <a id="connections"></a>
 
 ## Connections
@@ -71,7 +73,7 @@ A connection is given in one of three ways.  The first that gives one wins:
 - **The variable of a name** is `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`: `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  Two names that give one variable, such as `app-v2` and `app_v2`, are [SQLSRC214](diagnostics.md#sqlsrc214): give both on the command line, or rename one.
 - **`SQLSOURCE_CONNECTION`** is for a project with one database.  With more than one database in the run it is used for none of them, though a database that is in the run only through queries with errors of their own does not count ([SQLSRC215](diagnostics.md#sqlsrc215)): set the variable of each name instead.
 - **A variable that is empty or holds only white space** is not set.
-- **A connection never goes in the project file**, since it holds credentials.
+- **A connection never goes in the project file or a settings file**, since it holds credentials.  A settings file has no key for one.
 - **Put the value of `--connection` in quotes.**  A shell splits it at a space.  On a command line that has `--connection`, any other argument that holds `=` or `;` is refused, since it may be the rest of a connection string that the shell split.  If it is a project or `.sql` path that holds `=` or `;`, run the command from that file's folder and give the name alone, or give the connection in its variable instead.
 - **A database that needs nothing described needs no connection.**  When every query of a database has a current sidecar entry, the tool asks the database nothing, and without a connection its summary line says `no connection`.  `--force` and `--check` describe every query, so every database of the run needs one then.
 - **A database with a query to describe and no connection** is [SQLSRC213](diagnostics.md#sqlsrc213).  Its `help:` line names the option and the variable to set, and lists any `--connection` names that matched no database of the run but are close to one, so that a misspelt name is seen.  A name that is far from every database is counted by the position of its value on the command line and never printed, since it may be a connection string typed without its name.

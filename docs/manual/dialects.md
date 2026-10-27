@@ -55,13 +55,19 @@ MySQL and MariaDB have SQL modes that change how a string is read.  If your serv
 | `ansi-quotes` | `ansi_quotes` | `ANSI_QUOTES` | `"..."` is a quoted identifier, and a backslash does not escape in it |
 | `no-backslash-escapes` | `no_backslash_escapes` | `NO_BACKSLASH_ESCAPES` | A backslash does not escape in `'...'` or in `"..."` |
 
-```xml
-<PropertyGroup>
-    <SqlSourceDialect>mysql,ansi-quotes</SqlSourceDialect>
-</PropertyGroup>
-<ItemGroup>
-    <AdditionalFiles Update="Legacy/**/*.sql" SqlSourceDialect="mariadb,ansi-quotes,no-backslash-escapes" />
-</ItemGroup>
+```jsonc
+// sqlsource.json, in the project's folder
+{
+    "root": true,
+    "dialect": "mysql,ansi-quotes",
+}
+```
+
+```jsonc
+// Legacy/sqlsource.json
+{
+    "dialect": "mariadb,ansi-quotes,no-backslash-escapes",
+}
 ```
 
 - **Options are not case-sensitive** and come in any order.  Spaces around the name and each option are ignored.

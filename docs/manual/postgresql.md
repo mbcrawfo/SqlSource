@@ -2,10 +2,12 @@
 
 SqlSource reads PostgreSQL files by the `postgres` [dialect](dialects.md), and the `sqlsource` tool can describe their queries: it asks your database what each query's parameters and columns are, and writes the answer to the query's [sidecar](tool.md#sidecar-files).  This page is about describing, about the C# types that a described query's columns and parameters get, about the models built from them, and about the query methods that run them.  How SqlSource reads a PostgreSQL file, its comments and strings, is on [the dialects page](dialects.md).
 
-```xml
-<PropertyGroup>
-    <SqlSourceDialect>postgres</SqlSourceDialect>
-</PropertyGroup>
+```jsonc
+// sqlsource.json, in the project's folder
+{
+    "root": true,
+    "dialect": "postgres",
+}
 ```
 
 ```console
