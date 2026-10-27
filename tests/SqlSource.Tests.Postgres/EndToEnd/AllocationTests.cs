@@ -38,7 +38,8 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 // difference of pairs of calls, one of each method, which CallAllocations explains.  GC.GetTotalAllocatedBytes counts
 // every thread, since an awaited continuation runs where the driver completes it, so the class is in
 // MeasuresAllocations, which runs alone on a container of its own.  That keeps other tests out of the count, but not
-// the process's own background work, which the commonest difference leaves out.
+// the process's own background work, which the commonest difference leaves out, and the class skips under coverage,
+// whose collector allocates in the process too often for it to leave out.
 [Collection(MeasuresAllocations.Name)]
 public sealed class AllocationTests(PostgresContainer postgres)
 {

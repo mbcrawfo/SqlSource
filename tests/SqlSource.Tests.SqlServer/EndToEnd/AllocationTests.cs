@@ -35,7 +35,8 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // same calls, so any object that the generated method allocates on each call and the hand-written one does not fails
 // the test.  The two are compared by the commonest difference of pairs of calls, one of each method, which
 // CallAllocations explains.  GC.GetTotalAllocatedBytes(true) counts every thread, where the driver completes the
-// continuations of an asynchronous call, so the test runs in MeasuresAllocations, alone and on a server of its own.
+// continuations of an asynchronous call, so the test runs in MeasuresAllocations, alone and on a server of its own, and
+// skips under coverage, whose collector allocates in the process too.
 [Collection(MeasuresAllocations.Name)]
 public sealed class AllocationTests(SqlServerContainer sqlServer)
 {
