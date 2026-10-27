@@ -179,8 +179,9 @@ public sealed class CachingTypeTests
     }
 
     // The counterpart of Run_TypeOverridesPropertyChanged_TypesEveryFileAgain, by an edit of the project's settings
-    // file, with the same reasons: each file's map of overrides comes from its level, which the file reaches, so every
-    // file is typed again, and each column of int4 now has the file's type.
+    // file, with the same reasons: each file's map of overrides comes from its level, which comes from the project's
+    // settings file, which every file's chain reaches, so every file is typed again, and each column of int4 now has
+    // the file's type.
     [Fact]
     public void Run_TypeOverridesOfTheProjectsFileChanged_TypesEveryFileAgain()
     {
@@ -355,18 +356,14 @@ public sealed class CachingTypeTests
     public void Run_ColumnTypeEdited_RetypesOnlyThatFile()
     {
         var compilation = WithIds(GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]));
-        var driver = GeneratorHarness
-            .CreateDriver(
-                [
-                    _scene.Users,
-                    _scene.Orders,
-                    OriginSidecar(_scene.Users, "GetUser"),
-                    OriginSidecar(_scene.Orders, "GetOrder"),
-                ],
-                OptionsWithColumnTypes("users.id=MyApp.UserId posts.id=MyApp.OtherId")
-            )
-            .RunGenerators(compilation, TestContext.Current.CancellationToken);
-        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        var driver = FirstRunOnMSBuild(
+            compilation,
+            OptionsWithColumnTypes("users.id=MyApp.UserId posts.id=MyApp.OtherId"),
+            _scene.Users,
+            _scene.Orders,
+            OriginSidecar(_scene.Users, "GetUser"),
+            OriginSidecar(_scene.Orders, "GetOrder")
+        );
 
         var result = Run(
             driver.WithUpdatedAnalyzerConfigOptions(
@@ -406,18 +403,13 @@ public sealed class CachingTypeTests
     {
         var compilation = WithIds(GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]));
         var folder = ColumnTypesFile("MyApp.UserId", "MyApp.OtherId");
-        var driver = CreateDriver(
-                ProjectFileWithTypeOverrides(null),
-                [
-                    _scene.Users,
-                    _scene.Orders,
-                    OriginSidecar(_scene.Users, "GetUser"),
-                    OriginSidecar(_scene.Orders, "GetOrder"),
-                    folder,
-                ]
-            )
-            .RunGenerators(compilation, TestContext.Current.CancellationToken);
-        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        var driver = _scene.FirstRunWithTypes(
+            compilation,
+            ProjectFileWithTypeOverrides(null),
+            OriginSidecar(_scene.Users, "GetUser"),
+            OriginSidecar(_scene.Orders, "GetOrder"),
+            folder
+        );
 
         var result = Run(
             driver.ReplaceAdditionalText(folder, ColumnTypesFile("MyApp.OtherId", "MyApp.UserId")),

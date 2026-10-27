@@ -635,9 +635,7 @@ public sealed class CachingOptionsTests
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var users = new InMemoryAdditionalText(_scene.Users.Path, "-- name: GetUser\nSELECT 1; -- c\n");
         var folder = new InMemoryAdditionalText("/app/Users/sqlsource.json", "{}");
-        var driver = CreateDriver(ProjectFile(OutputKind.Sql), [users, _scene.Orders, folder])
-            .RunGenerators(compilation, TestContext.Current.CancellationToken);
-        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        var driver = _scene.FirstRun(compilation, users, ProjectFile(OutputKind.Sql), folder);
 
         var edited = new InMemoryAdditionalText(
             folder.Path, /*lang=json,strict*/

@@ -247,9 +247,7 @@ public sealed class CachingCheckTests
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var project = ProjectFile(OutputKind.Models, "postgres");
-        var driver = CreateDriver(project, [_scene.Users, _scene.Orders, _scene.UsersSidecar, _scene.OrdersSidecar])
-            .RunGenerators(compilation, TestContext.Current.CancellationToken);
-        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        var driver = _scene.FirstRunWithSidecars(compilation, project);
 
         var edited = ProjectFile(
             OutputKind.Models,

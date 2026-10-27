@@ -70,13 +70,15 @@ internal sealed class CachingScene
     public static CSharpCompilation ModelsCompilation() =>
         GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
 
-    // Both types at Models under postgres, with Users, Orders and Payments, each with a current sidecar whose entry has
-    // one column, of int4.  A sidecar given is used in place of the one of its file.
+    // Both types at Models under postgres, or with this settings file of the project when one is given, with Users,
+    // Orders and Payments, each with a current sidecar whose entry has one column, of int4.  A sidecar given is used in
+    // place of the one of its file.
     public GeneratorDriver FirstRunOfModels(
         Compilation compilation,
         InMemoryAdditionalText users,
         InMemoryAdditionalText orders,
-        params InMemoryAdditionalText[] given
+        InMemoryAdditionalText[]? given = null,
+        InMemoryAdditionalText? projectFile = null
     )
     {
         var sidecars = new List<InMemoryAdditionalText>
@@ -85,14 +87,14 @@ internal sealed class CachingScene
             TypedSidecar(orders, "GetOrder", "int4"),
             PaymentsSidecar,
         };
-        foreach (var sidecar in given)
+        foreach (var sidecar in given ?? [])
         {
             _ = sidecars.RemoveAll(other => other.Path == sidecar.Path);
             sidecars.Add(sidecar);
         }
 
         return Checked(
-            CreateDriver(ProjectFileWithTypeOverrides(null), [users, orders, Payments, .. sidecars]),
+            CreateDriver(projectFile ?? ProjectFileWithTypeOverrides(null), [users, orders, Payments, .. sidecars]),
             compilation
         );
     }
@@ -174,12 +176,14 @@ internal sealed class CachingScene
     public GeneratorDriver FirstRun(OutputKind output, Compilation compilation) =>
         FirstRun(compilation, Users, ProjectFile(output));
 
-    // Both types with this file in place of Users, Orders and the project's settings file.
+    // Both types with this file in place of Users, Orders, the project's settings file, and this settings file of a
+    // folder when one is given.
     public GeneratorDriver FirstRun(
         Compilation compilation,
         InMemoryAdditionalText users,
-        InMemoryAdditionalText projectFile
-    ) => Checked(CreateDriver(projectFile, [users, Orders]), compilation);
+        InMemoryAdditionalText projectFile,
+        InMemoryAdditionalText? folderFile = null
+    ) => Checked(CreateDriver(projectFile, [users, Orders, .. Given(folderFile)]), compilation);
 
     // The first run of a test of the MSBuild path: these files, with no settings file of the project, and what MSBuild
     // tells the generator, the output and the dialect included, so that no settings file outranks what the test
@@ -196,10 +200,14 @@ internal sealed class CachingScene
         params InMemoryAdditionalText[] settingsFiles
     ) => Checked(CreateDriver(ProjectFile(OutputKind.Sql), [Users, Orders, .. settingsFiles]), compilation);
 
-    // Both types at Models under postgres, and each file with its current sidecar.
-    public GeneratorDriver FirstRunWithSidecars(Compilation compilation) =>
+    // Both types at Models under postgres, or with this settings file of the project when one is given, and each file
+    // with its current sidecar.
+    public GeneratorDriver FirstRunWithSidecars(Compilation compilation, InMemoryAdditionalText? projectFile = null) =>
         Checked(
-            CreateDriver(ProjectFile(OutputKind.Models, "postgres"), [Users, Orders, UsersSidecar, OrdersSidecar]),
+            CreateDriver(
+                projectFile ?? ProjectFile(OutputKind.Models, "postgres"),
+                [Users, Orders, UsersSidecar, OrdersSidecar]
+            ),
             compilation
         );
 
@@ -219,11 +227,14 @@ internal sealed class CachingScene
         );
 
     // Both types, with this settings file of the project, and each file with a current sidecar whose entry has a
-    // column of int4, Users with this one when it is given.
+    // column of int4, Users and Orders with these ones when they are given, and this settings file of a folder when
+    // one is given.
     public GeneratorDriver FirstRunWithTypes(
         Compilation compilation,
         InMemoryAdditionalText projectFile,
-        InMemoryAdditionalText? usersSidecar = null
+        InMemoryAdditionalText? usersSidecar = null,
+        InMemoryAdditionalText? ordersSidecar = null,
+        InMemoryAdditionalText? folderFile = null
     ) =>
         Checked(
             CreateDriver(
@@ -232,7 +243,8 @@ internal sealed class CachingScene
                     Users,
                     Orders,
                     usersSidecar ?? TypedSidecar(Users, "GetUser", "int4"),
-                    TypedSidecar(Orders, "GetOrder", "int4"),
+                    ordersSidecar ?? TypedSidecar(Orders, "GetOrder", "int4"),
+                    .. Given(folderFile),
                 ]
             ),
             compilation
@@ -271,6 +283,9 @@ internal sealed class CachingScene
         GeneratorHarness.RefuseTheProjectsPath(given.Select(file => file.Path));
         return GeneratorHarness.CreateDriver([.. given, projectFile], new TestOptionsProvider(null, null));
     }
+
+    // The file, when it is given, as the files it adds to a run.
+    private static InMemoryAdditionalText[] Given(InMemoryAdditionalText? file) => file is null ? [] : [file];
 
     // The driver run over the compilation, which reports nothing.
     private static GeneratorDriver Checked(GeneratorDriver driver, Compilation compilation)

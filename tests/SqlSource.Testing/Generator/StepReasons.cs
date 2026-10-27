@@ -105,8 +105,9 @@ internal static class StepReasons
     // that give nothing, and so are not tracked, in a run without what they read: SettingsFile where there is no
     // settings file, FileSettings where no file has metadata, FileLevel where no file has a settings file above it or
     // metadata, SidecarInput and SidecarFile where there is no sidecar, and TypeNeeds where no query needs an entry.
-    // Every run of CachingScene has the project's settings file but a first run of a test of the MSBuild path,
-    // FirstRunOnMSBuild, so only such a run gives nothing at the first and the third.
+    // Every driver of CachingScene has the project's settings file but one of a test of the MSBuild path,
+    // FirstRunOnMSBuild's, so only a run of such a test gives nothing at the first, and at the third unless a file has
+    // metadata.
     // CachingParseTests.Run_MethodBodyEdited_TakesEveryStepFromThePreviousRun reads the first and the third in a run
     // with the project's settings file, as CachingSettingsFileTests reads the first and
     // CachingOptionsTests.Run_SettingsFileOutputChanged_EmitsTheTypesOfItsFolderAndParsesNoFile the third in runs with

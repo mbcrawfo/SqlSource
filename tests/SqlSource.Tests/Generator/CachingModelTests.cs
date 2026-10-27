@@ -30,7 +30,7 @@ public sealed class CachingModelTests
     {
         var compilation = ModelsCompilation();
         var ordersSidecar = TypedSidecar(_scene.Orders, "GetOrder", "int4");
-        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, ordersSidecar);
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, [ordersSidecar]);
 
         // The column of Orders is now text.
         var result = Run(
@@ -121,7 +121,7 @@ public sealed class CachingModelTests
         );
         var usersSidecar = TypedSidecar(users, "GetUser", "int4");
         var ordersSidecar = TypedSidecar(orders, "GetOrder", "int4");
-        var driver = _scene.FirstRunOfModels(compilation, users, orders, usersSidecar, ordersSidecar);
+        var driver = _scene.FirstRunOfModels(compilation, users, orders, [usersSidecar, ordersSidecar]);
         var before = driver.GetRunResult().GeneratedTrees.Single(IsShared).ToString();
         before.ShouldContain("queries <c>GetOrder</c> from <c>Orders.sql</c> and <c>GetUser</c> from <c>Users.sql</c>");
         before.ShouldContain("Row(int Value)");
@@ -208,7 +208,7 @@ public sealed class CachingModelTests
     {
         var compilation = ModelsCompilation();
         var ordersSidecar = TypedSidecar(_scene.Orders, "GetOrder", "int4");
-        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, ordersSidecar);
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, [ordersSidecar]);
 
         var result = Run(driver.RemoveAdditionalTexts([_scene.Orders, ordersSidecar]), compilation);
 
@@ -233,7 +233,7 @@ public sealed class CachingModelTests
     {
         var compilation = ModelsCompilation();
         var ordersSidecar = TypedSidecar(_scene.Orders, "GetOrder", "int4");
-        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, ordersSidecar);
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, [ordersSidecar]);
         var receipts = new InMemoryAdditionalText(
             "/app/Orders/Receipts.sql",
             _scene.Orders.GetText(TestContext.Current.CancellationToken)!.ToString()
@@ -349,7 +349,7 @@ public sealed class CachingModelTests
         var compilation = ModelsCompilation();
         var orders = new InMemoryAdditionalText(_scene.Orders.Path, "-- name: GetOrder\nSELECT 2 WHERE 1 = @id;\n");
         var ordersSidecar = TypedSidecar(orders, "GetOrder", "int4");
-        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, orders, ordersSidecar);
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, orders, [ordersSidecar]);
 
         var result = Run(
             driver.ReplaceAdditionalText(
@@ -394,7 +394,7 @@ public sealed class CachingModelTests
         );
         var usersSidecar = TypedSidecar(users, "GetUser", "int4");
         var ordersSidecar = TypedSidecar(orders, "GetOrder", "int4");
-        var driver = _scene.FirstRunOfModels(compilation, users, orders, usersSidecar, ordersSidecar);
+        var driver = _scene.FirstRunOfModels(compilation, users, orders, [usersSidecar, ordersSidecar]);
 
         var result = Run(driver.RemoveAdditionalTexts([orders, ordersSidecar]), compilation);
 
@@ -597,19 +597,7 @@ public sealed class CachingModelTests
     {
         var compilation = ModelsCompilation();
         var project = ProjectFile(OutputKind.Models, "postgres");
-        var driver = CreateDriver(
-                project,
-                [
-                    _scene.Users,
-                    _scene.Orders,
-                    _scene.Payments,
-                    TypedSidecar(_scene.Users, "GetUser", "int4"),
-                    TypedSidecar(_scene.Orders, "GetOrder", "int4"),
-                    _scene.PaymentsSidecar,
-                ]
-            )
-            .RunGenerators(compilation, TestContext.Current.CancellationToken);
-        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, projectFile: project);
 
         var edited = ProjectFile(
             OutputKind.Models,
