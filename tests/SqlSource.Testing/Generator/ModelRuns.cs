@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using SqlSource.Generation;
@@ -39,13 +38,12 @@ internal static class ModelRuns
     public static readonly PostgresType Text = TestSidecars.Postgres(name: "text", internalName: "text");
 
     // The source and files at Models under postgres, on Npgsql 10 unless the references are given.  The output and the
-    // dialect are the project's settings file, with the settings' entries over them.
+    // dialect are the project's settings file, with the entries of settings, a JSON object, over them.
     public static GeneratorRun Run(
         string source,
         SqlFile[] files,
-        IReadOnlyDictionary<string, string?>? properties = null,
-        MetadataReference[]? references = null,
-        string? settings = null
+        string? settings = null,
+        MetadataReference[]? references = null
     ) =>
         GeneratorHarness.Run(
             OutputKind.Models,
@@ -53,19 +51,14 @@ internal static class ModelRuns
             files,
             references: references ?? [NpgsqlReferences.Npgsql10],
             dialect: "postgres",
-            properties: properties,
             settings: settings
         );
 
     // The file with its sidecar of these entries, run on Source.
     public static GeneratorRun Run(SqlFile file, params SidecarEntry[] entries) => Run(file, entries, null);
 
-    public static GeneratorRun Run(
-        SqlFile file,
-        SidecarEntry[] entries,
-        IReadOnlyDictionary<string, string?>? properties,
-        string? settings = null
-    ) => Run(Source, [file, Sidecars.Of(file, entries)], properties, settings: settings);
+    public static GeneratorRun Run(SqlFile file, SidecarEntry[] entries, string? settings) =>
+        Run(Source, [file, Sidecars.Of(file, entries)], settings);
 
     // An entry of the query for its current hash: with rows when it has columns, and without when they are null.  The
     // parameters and columns are numbered by their place.

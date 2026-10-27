@@ -552,7 +552,8 @@ public sealed class MethodTests
         var run = MethodRuns.Run(
             Users,
             UsersEntries,
-            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "int4=long" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"int4": "long"}}"""
         );
 
         run.ShouldBeClean();

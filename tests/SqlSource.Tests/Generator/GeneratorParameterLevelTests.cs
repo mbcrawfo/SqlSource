@@ -126,13 +126,13 @@ public sealed class GeneratorParameterLevelTests
         run.Sources["App.Kept.g.cs"].ShouldContain("public static string Q(string note)");
     }
 
-    // The project, or the metadata of the file's item, keeps comments and one type turns them off.  The keyword
-    // stands only in a comment, so it is an error only for the type that keeps it, whose file then gives no members,
-    // and the other type uses the file.
+    // The project's settings file, or the settings file of the file's folder, keeps comments and one type turns them
+    // off.  The keyword stands only in a comment, so it is an error only for the type that keeps it, whose file then
+    // gives no members, and the other type uses the file.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Run_ReservedTokenInAComment_IsReportedOnlyForATypeThatKeepsComments(bool fromMetadata)
+    public void Run_ReservedTokenInAComment_IsReportedOnlyForATypeThatKeepsComments(bool fromFolderFile)
     {
         const string Source = """
             using SqlSource;
@@ -148,19 +148,23 @@ public sealed class GeneratorParameterLevelTests
             [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class Kept { }
             """;
-        var file = new SqlFile(
-            "/app/Repo/Q.sql",
-            ReservedTokenInAComment,
-            Metadata: fromMetadata
-                ? new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "keep-comments" }
-                : null
-        );
+        var file = new SqlFile("/app/Repo/Q.sql", ReservedTokenInAComment);
+        SqlFile[] files = fromFolderFile
+            ?
+            [
+                file,
+                GeneratorHarness.SettingsFile(
+                    "/app/Repo/sqlsource.json", /*lang=json,strict*/
+                    """{"generatorParameters": ["keep-comments"]}"""
+                ),
+            ]
+            : [file];
 
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, Source)],
-            [file],
-            generatorParameters: fromMetadata ? null : "keep-comments"
+            files,
+            generatorParameters: fromFolderFile ? null : "keep-comments"
         );
 
         run.Diagnostics.ShouldBe([

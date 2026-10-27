@@ -1007,7 +1007,8 @@ public sealed class SettingsFileTests
             dialect: dialect
         );
 
-    // The files at sql under the dialect, null for none, each the project's property, for a test of the MSBuild path.
+    // The files with the output sql and the dialect, null for none, as the project's properties, for a test of the
+    // MSBuild path.
     private static GeneratorRun RunOnMSBuild(string? dialect, params SqlFile[] files) =>
         GeneratorHarness.Run(
             null,

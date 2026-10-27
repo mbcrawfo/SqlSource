@@ -1,7 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
 using System;
-using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
@@ -105,7 +104,8 @@ public sealed class ParameterTypeTests
                     )
                 ),
             ],
-            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "int8=long" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"int8": "long"}}"""
         );
 
         run.ShouldBeClean();

@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -24,15 +23,14 @@ internal static class MethodRuns
     public const string MethodsFile = "App.Sample-Methods.g.cs";
 
     // The source and the file with its sidecar of these entries, at CodeGen under postgres, on Npgsql 10 unless the
-    // references are given.  The output and the dialect are the project's settings file, with the settings' entries
-    // over them, and the other files are the run's beside the file and its sidecar.
+    // references are given.  The output and the dialect are the project's settings file, with the entries of settings,
+    // a JSON object, over them, and the other files are the run's beside the file and its sidecar.
     public static GeneratorRun Run(
         SqlFile file,
         SidecarEntry[] entries,
         string source = Source,
         MetadataReference[]? references = null,
         string dialect = "postgres",
-        IReadOnlyDictionary<string, string?>? properties = null,
         LanguageVersion languageVersion = LanguageVersion.CSharp12,
         string? settings = null,
         SqlFile[]? otherFiles = null
@@ -44,7 +42,6 @@ internal static class MethodRuns
             languageVersion: languageVersion,
             references: references ?? [NpgsqlReferences.Npgsql10],
             dialect: dialect,
-            properties: properties,
             settings: settings
         );
 
@@ -65,18 +62,8 @@ internal static class MethodRuns
         SidecarEntry[] entries,
         string source = Source,
         MetadataReference[]? references = null,
-        IReadOnlyDictionary<string, string?>? properties = null,
         string? settings = null
-    ) =>
-        Run(
-            file,
-            entries,
-            source,
-            references ?? [SqlClientReferences.SqlClient7],
-            "mssql",
-            properties,
-            settings: settings
-        );
+    ) => Run(file, entries, source, references ?? [SqlClientReferences.SqlClient7], "mssql", settings: settings);
 
     // An entry of an mssql query for its current hash: with rows when it has columns, and without when they are null.
     // The parameters and columns are numbered by their place.

@@ -1,7 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
 using System;
-using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
@@ -99,7 +98,8 @@ public sealed class TableModelTests
         var run = Run(
             Users,
             [Entry(Users, "GetUser", [], [Column("id")], new SidecarTable("public", "order_lines"))],
-            new Dictionary<string, string?> { ["SqlSourceOutputModelSuffix"] = "Row" }
+            settings: /*lang=json,strict*/
+            """{"outputModelSuffix": "Row"}"""
         );
 
         run.ShouldBeClean();
@@ -137,7 +137,8 @@ public sealed class TableModelTests
         var run = Run(
             Users,
             [Entry(Users, "GetUser", [], [Column("id")], PublicUsers)],
-            new Dictionary<string, string?> { ["SqlSourceGeneratorParameters"] = "sort-output" }
+            settings: /*lang=json,strict*/
+            """{"generatorParameters": ["sort-output"]}"""
         );
 
         run.ShouldBeClean();
@@ -309,7 +310,10 @@ public sealed class TableModelTests
         var run = Run(
             source,
             [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("id")], PublicUsers))],
-            withNamespace ? new Dictionary<string, string?> { ["SqlSourceModelNamespace"] = "Shared" } : null
+            withNamespace
+                ? /*lang=json,strict*/
+                """{"modelNamespace": "Shared"}"""
+                : null
         );
 
         run.ShouldBeClean();

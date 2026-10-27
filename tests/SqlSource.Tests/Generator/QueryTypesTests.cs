@@ -605,8 +605,8 @@ public sealed class QueryTypesTests
     }
 
     // The base map's type of an overridden column, as if no level of the override applied: a domain's base's, though
-    // the property maps it too, and an array's of its element's.  A composite has none, and a column the base map
-    // types has no override to convert.
+    // the project's settings file maps it too, and an array's of its element's.  A composite has none, and a column the
+    // base map types has no override to convert.
     [Fact]
     public void Run_ColumnOfAnOverriddenType_HasItsBaseMapType()
     {
@@ -663,10 +663,8 @@ public sealed class QueryTypesTests
         var run = ModelRuns.Run(
             TypesSource,
             [file, Sidecars.Of(file, entry)],
-            new System.Collections.Generic.Dictionary<string, string?>
-            {
-                ["SqlSourceTypeOverrides"] = "timestamptz=System.DateTimeOffset",
-            },
+            /*lang=json,strict*/
+            """{"typeOverrides": {"timestamptz": "System.DateTimeOffset"}}""",
             [NpgsqlReferences.Npgsql10]
         );
 

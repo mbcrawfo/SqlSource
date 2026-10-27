@@ -1,7 +1,7 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
-using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Generation;
@@ -19,7 +19,7 @@ namespace SqlSource.Tests.Generator;
 // postgres on Npgsql 10, with an entry written for each query's current hash.
 public sealed class ShortNameTests
 {
-    private const string Place = "the property SqlSourceTypeOverrides";
+    private const string Place = "the typeOverrides of the settings file " + GeneratorHarness.ProjectSettingsPath;
 
     private const string AppUserId = """
 
@@ -49,7 +49,7 @@ public sealed class ShortNameTests
     [Fact]
     public void Run_ShortName_OfTheProject_IsItsFullName()
     {
-        var run = RunOf(Source + AppUserId, "int8=UserId", Int8);
+        var run = RunOf(Source + AppUserId, "int8", "UserId", Int8);
 
         run.ShouldBeClean();
         TextOf(run).ShouldBe("global::App.UserId");
@@ -61,7 +61,7 @@ public sealed class ShortNameTests
     {
         var library = GeneratorHarness.CreateReference(OutputKind.Sql, "Lib", LibraryUserId);
 
-        var run = RunOf(Source, "int8=UserId", Int8, library);
+        var run = RunOf(Source, "int8", "UserId", Int8, library);
 
         run.ShouldBeClean();
         TextOf(run).ShouldBe("global::Lib.UserId");
@@ -70,7 +70,7 @@ public sealed class ShortNameTests
     [Fact]
     public void Run_ShortName_InATypeArgument()
     {
-        var run = RunOf(Source + AppUserId, "_int8=System.Collections.Generic.List<UserId>", ArrayOf(Int8, "_int8"));
+        var run = RunOf(Source + AppUserId, "_int8", "System.Collections.Generic.List<UserId>", ArrayOf(Int8, "_int8"));
 
         run.ShouldBeClean();
         TextOf(run).ShouldBe("global::System.Collections.Generic.List<global::App.UserId>");
@@ -79,7 +79,7 @@ public sealed class ShortNameTests
     [Fact]
     public void Run_ShortName_TwoCandidates_IsSqlsrc250()
     {
-        var run = RunOf(Source + AppUserId + OtherUserId, "int8=UserId", Int8);
+        var run = RunOf(Source + AppUserId + OtherUserId, "int8", "UserId", Int8);
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC250 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'int8' is mapped to 'UserId' for "
@@ -99,7 +99,7 @@ public sealed class ShortNameTests
             source += "\n\nnamespace " + space + "\n{\n    public readonly record struct UserId(long Value);\n}\n";
         }
 
-        var run = RunOf(source, "int8=UserId", Int8);
+        var run = RunOf(source, "int8", "UserId", Int8);
 
         run.Diagnostics.ShouldHaveSingleItem()
             .ShouldContain(
@@ -125,7 +125,7 @@ public sealed class ShortNameTests
     [Fact]
     public void Run_GlobalName_IsTheGlobalNamespaceAlone()
     {
-        var run = RunOf(Source + AppUserId, "int8=global::UserId", Int8);
+        var run = RunOf(Source + AppUserId, "int8", "global::UserId", Int8);
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC250 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'int8' is mapped to 'global::UserId' "
@@ -145,7 +145,7 @@ public sealed class ShortNameTests
             LibraryUserId.Replace("public readonly", "internal readonly", System.StringComparison.Ordinal)
         );
 
-        var run = RunOf(Source + AppUserId, "int8=UserId", Int8, library);
+        var run = RunOf(Source + AppUserId, "int8", "UserId", Int8, library);
 
         run.ShouldBeClean();
         TextOf(run).ShouldBe("global::App.UserId");
@@ -163,7 +163,7 @@ public sealed class ShortNameTests
             }
             """;
 
-        var run = RunOf(Source + AppUserId + FileLocal, "int8=UserId", Int8);
+        var run = RunOf(Source + AppUserId + FileLocal, "int8", "UserId", Int8);
 
         run.ShouldBeClean();
         TextOf(run).ShouldBe("global::App.UserId");
@@ -180,7 +180,7 @@ public sealed class ShortNameTests
             }
             """;
 
-        var run = RunOf(Source + FileLocal, "int8=UserId", Int8);
+        var run = RunOf(Source + FileLocal, "int8", "UserId", Int8);
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC250 ");
         run.CompilationErrors.ShouldBeEmpty();
@@ -233,7 +233,8 @@ public sealed class ShortNameTests
             file,
             [Entry(file, "GetUser", [Parameter("id", Int8)], [Column("id", Int8)])],
             Source + Converting,
-            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "int8=UserId" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"int8": "UserId"}}"""
         );
 
         run.ShouldBeClean();
@@ -256,7 +257,7 @@ public sealed class ShortNameTests
             }
             """;
 
-        var run = RunOf(Source + Nested, "int8=UserId", Int8);
+        var run = RunOf(Source + Nested, "int8", "UserId", Int8);
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC250 ");
     }
@@ -328,10 +329,12 @@ public sealed class ShortNameTests
         run.Sources["App.Row-Model.g.cs"].ShouldContain("global::App.UserId Id");
     }
 
-    // GetUser, with one column id of the type, and the property's type override.
+    // GetUser, with one column id of the type, and the type override of the key to the C# type in the project's
+    // settings file.
     private static GeneratorRun RunOf(
         string source,
-        string typeOverrides,
+        string key,
+        string mappedType,
         PostgresType type,
         MetadataReference? reference = null
     )
@@ -340,7 +343,7 @@ public sealed class ShortNameTests
         return Run(
             source,
             [file, Sidecars.Of(file, Entry(file, "GetUser", [], [Column("id", type)]))],
-            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = typeOverrides },
+            GeneratorHarness.Json(new JsonObject { ["typeOverrides"] = new JsonObject { [key] = mappedType } }),
             reference is null ? null : [NpgsqlReferences.Npgsql10, reference]
         );
     }

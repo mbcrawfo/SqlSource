@@ -252,7 +252,7 @@ public sealed class ModelTests
                     [Column("name", Text), Column("count", nullable: true), Column("note", Text, nullable: true)]
                 ),
             ],
-            new Dictionary<string, string?> { ["SqlSourceOutputModelType"] = kind }
+            settings: $$"""{"outputModelType": "{{kind}}"}"""
         );
 
         run.ShouldBeClean();
@@ -273,7 +273,7 @@ public sealed class ModelTests
                     null
                 ),
             ],
-            new Dictionary<string, string?> { ["SqlSourceInputModelType"] = kind }
+            settings: $$"""{"inputModelType": "{{kind}}"}"""
         );
 
         run.ShouldBeClean();
@@ -309,7 +309,8 @@ public sealed class ModelTests
         var run = Run(
             Users,
             [Entry(Users, "GetUser", [], [])],
-            new Dictionary<string, string?> { ["SqlSourceOutputModelType"] = "sealed class" }
+            settings: /*lang=json,strict*/
+            """{"outputModelType": "sealed class"}"""
         );
 
         run.ShouldBeClean();
@@ -467,7 +468,8 @@ public sealed class ModelTests
         var run = Run(
             Source,
             [file, Sidecars.Of(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")]))],
-            new Dictionary<string, string?> { ["SqlSourceModelNamespace"] = "App.Models" }
+            settings: /*lang=json,strict*/
+            """{"modelNamespace": "App.Models"}"""
         );
 
         run.ShouldBeClean();
@@ -528,7 +530,8 @@ public sealed class ModelTests
                     [Column("ba"), Column("b_x"), Column("a")]
                 ),
             ],
-            new Dictionary<string, string?> { ["SqlSourceGeneratorParameters"] = "sort-input" }
+            settings: /*lang=json,strict*/
+            """{"generatorParameters": ["sort-input"]}"""
         );
 
         run.ShouldBeClean();
@@ -549,7 +552,8 @@ public sealed class ModelTests
                     [Column("ba"), Column("b_x"), Column("a")]
                 ),
             ],
-            new Dictionary<string, string?> { ["SqlSourceGeneratorParameters"] = "sort-output" }
+            settings: /*lang=json,strict*/
+            """{"generatorParameters": ["sort-output"]}"""
         );
 
         run.ShouldBeClean();
@@ -640,7 +644,7 @@ public sealed class ModelTests
                     [.. names.Select(name => Column(name))]
                 ),
             ],
-            new Dictionary<string, string?> { ["SqlSourceInputModelType"] = kind, ["SqlSourceOutputModelType"] = kind }
+            settings: $$"""{"inputModelType": "{{kind}}", "outputModelType": "{{kind}}"}"""
         );
 
         run.ShouldBeClean();
@@ -824,7 +828,8 @@ public sealed class ModelTests
         var run = Run(
             Users,
             [Entry(Users, "GetUser", [], [Column("id"), Column("scores", IntArray, nullable: true)])],
-            new Dictionary<string, string?> { ["SqlSourceOutputModelType"] = "record" }
+            settings: /*lang=json,strict*/
+            """{"outputModelType": "record"}"""
         );
 
         run.ShouldBeClean();
@@ -885,7 +890,8 @@ public sealed class ModelTests
                     [Column("id"), Column("scores", IntArray, nullable: true)]
                 ),
             ],
-            new Dictionary<string, string?> { ["SqlSourceOutputModelType"] = "class" }
+            settings: /*lang=json,strict*/
+            """{"outputModelType": "class"}"""
         );
 
         run.ShouldBeClean();

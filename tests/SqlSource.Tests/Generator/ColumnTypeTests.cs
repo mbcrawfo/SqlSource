@@ -1,7 +1,7 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
-using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Types;
@@ -13,20 +13,22 @@ using static SqlSource.Testing.Generator.ModelRuns;
 
 namespace SqlSource.Tests.Generator;
 
-// A column given a C# type by its source, the column of a table or view it is read from, at each level of
-// SqlSourceColumnTypes, and by its query's -- column: marker, over the type override at any level.  Each run is at
+// A column given a C# type by its source, the column of a table or view it is read from, at each level of the
+// columnTypes, and by its query's -- column: marker, over the type override at any level.  Each run is at
 // Models under postgres on Npgsql 10, with an entry written for each query's current hash, unless it says otherwise.
 public sealed class ColumnTypeTests
 {
-    private const string ThePropertyPlace = "the property SqlSourceColumnTypes";
+    private const string TheProjectFilePlace =
+        "the columnTypes of the settings file " + GeneratorHarness.ProjectSettingsPath;
 
-    private const string TheMetadataPlace = "the metadata SqlSourceColumnTypes of the file";
+    private const string TheFolderFilePlace = "the columnTypes of the settings file " + FolderSettingsPath;
 
     private const string TheHeaderPlace = "a -- column: marker in the file header";
 
     private const string TheQueryPlace = "a -- column: marker of the query";
 
-    private const string ColumnTypes = "SqlSourceColumnTypes";
+    // The settings file of the folder of GeneratorHarness.UsersPath.
+    private const string FolderSettingsPath = "/app/Repo/sqlsource.json";
 
     private const string UserId = "global::App.UserId";
 
@@ -64,9 +66,9 @@ public sealed class ColumnTypeTests
     private static readonly DatabaseType LongBase = new("long", true, false);
 
     [Fact]
-    public void Run_PropertyColumnType_TypesItsSourceColumn()
+    public void Run_ProjectFilesColumnType_TypesItsSourceColumn()
     {
-        var run = RunPosts(ListPosts, "users.id=UserId");
+        var run = RunPosts(ListPosts, UsersIdIs("UserId"));
 
         run.ShouldBeClean();
         ColumnsOf(run)
@@ -77,7 +79,7 @@ public sealed class ColumnTypeTests
                     true,
                     EquatableArray<string>.Empty,
                     "int8",
-                    ThePropertyPlace,
+                    TheProjectFilePlace,
                     LongBase,
                     "users.id"
                 ),
@@ -86,23 +88,32 @@ public sealed class ColumnTypeTests
     }
 
     [Fact]
-    public void Run_MetadataColumnType_OverTheProperty()
+    public void Run_FolderFilesColumnType_OverTheProjectsFile()
     {
-        var run = RunPosts(ListPosts, "users.id=OtherId", metadata: "public.users.id=UserId");
+        var run = RunPosts(
+            ListPosts,
+            UsersIdIs("OtherId"),
+            folderFile: /*lang=json,strict*/
+            """{"public.users.id": "UserId"}"""
+        );
 
         run.ShouldBeClean();
         var column = ColumnsOf(run).ShouldHaveSingleItem();
         column.Text.ShouldBe(UserId);
-        column.Place.ShouldBe(TheMetadataPlace);
+        column.Place.ShouldBe(TheFolderFilePlace);
         column.Mapped.ShouldBe("public.users.id");
     }
 
     // Two keys that both match the column, so the places decide, not a key replaced by its own: the header's, though
-    // the metadata's names the schema.
+    // the folder's file's names the schema.
     [Fact]
-    public void Run_HeaderColumnType_OverTheMetadata()
+    public void Run_HeaderColumnType_OverTheFoldersFile()
     {
-        var run = RunPosts("-- column: users.id -> UserId\n\n" + ListPosts, metadata: "public.users.id=OtherId");
+        var run = RunPosts(
+            "-- column: users.id -> UserId\n\n" + ListPosts,
+            folderFile: /*lang=json,strict*/
+            """{"public.users.id": "OtherId"}"""
+        );
 
         run.ShouldBeClean();
         var column = ColumnsOf(run).ShouldHaveSingleItem();
@@ -154,14 +165,15 @@ public sealed class ColumnTypeTests
     {
         var run = RunPosts(
             "-- name: ListPosts\n-- column: id -> default\nSELECT id FROM users;\n",
-            "users.id=UserId",
-            typeOverrides: "int8=long"
+            UsersIdIs("UserId"),
+            typeOverrides: /*lang=json,strict*/
+            """{"int8": "long"}"""
         );
 
         run.ShouldBeClean();
         var column = ColumnsOf(run).ShouldHaveSingleItem();
         column.Text.ShouldBe("long");
-        column.Place.ShouldBe("the property SqlSourceTypeOverrides");
+        column.Place.ShouldBe("the typeOverrides of the settings file " + GeneratorHarness.ProjectSettingsPath);
     }
 
     // Naming a column is more specific than naming a type, so a column type at any level wins over a type override
@@ -171,23 +183,23 @@ public sealed class ColumnTypeTests
     {
         var run = RunPosts(
             "-- name: ListPosts\n-- type-override: int8=long\nSELECT id FROM users;\n",
-            "users.id=UserId"
+            UsersIdIs("UserId")
         );
 
         run.ShouldBeClean();
         var column = ColumnsOf(run).ShouldHaveSingleItem();
         column.Text.ShouldBe(UserId);
-        column.Place.ShouldBe(ThePropertyPlace);
+        column.Place.ShouldBe(TheProjectFilePlace);
     }
 
     // A marker that says only the nullability leaves the column to the column types, which keep the marker's null.
     [Fact]
     public void Run_NullabilityOnlyMarker_KeepsTheColumnType()
     {
-        var run = RunPosts("-- name: ListPosts\n-- column: id null\nSELECT id FROM users;\n", "users.id=UserId");
+        var run = RunPosts("-- name: ListPosts\n-- column: id null\nSELECT id FROM users;\n", UsersIdIs("UserId"));
 
         run.ShouldBeClean();
-        ColumnsOf(run).ShouldHaveSingleItem().Place.ShouldBe(ThePropertyPlace);
+        ColumnsOf(run).ShouldHaveSingleItem().Place.ShouldBe(TheProjectFilePlace);
         run.Sources[DtoModel].ShouldContain("(global::App.UserId? Id)");
     }
 
@@ -202,7 +214,7 @@ public sealed class ColumnTypeTests
             Column("id", Int8, origin: new SidecarOrigin("public", null, "id"))
         );
 
-        var run = Run(IdsSource, [file, Sidecars.Of(file, entry)], Properties("users.id=UserId"));
+        var run = Run(IdsSource, [file, Sidecars.Of(file, entry)], Settings(UsersIdIs("UserId")));
 
         run.ShouldBeClean();
         ColumnsOf(run).Select(column => column.Text).ShouldBe(["long", "long"]);
@@ -215,8 +227,14 @@ public sealed class ColumnTypeTests
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListPosts\nSELECT id FROM user_summaries;\n");
         var entry = PostsEntry(file, Column("id", Int8, origin: new SidecarOrigin("public", "user_summaries", "id")));
 
-        var ofTheTable = Run(IdsSource, [file, Sidecars.Of(file, entry)], Properties("users.id=UserId"));
-        var ofTheView = Run(IdsSource, [file, Sidecars.Of(file, entry)], Properties("user_summaries.id=UserId"));
+        var ofTheTable = Run(IdsSource, [file, Sidecars.Of(file, entry)], Settings(UsersIdIs("UserId")));
+        var ofTheView = Run(
+            IdsSource,
+            [file, Sidecars.Of(file, entry)],
+            Settings( /*lang=json,strict*/
+                """{"user_summaries.id": "UserId"}"""
+            )
+        );
 
         ofTheTable.ShouldBeClean();
         ColumnsOf(ofTheTable).ShouldHaveSingleItem().Text.ShouldBe("long");
@@ -239,15 +257,15 @@ public sealed class ColumnTypeTests
             Column("author!", Int8, nullable: true)
         );
 
-        var run = Run(IdsSource, [file, Sidecars.Of(file, entry)], Properties("users.id=UserId"));
+        var run = Run(IdsSource, [file, Sidecars.Of(file, entry)], Settings(UsersIdIs("UserId")));
 
         run.ShouldBeClean();
         run.Sources[DtoModel].ShouldContain("(global::App.UserId? Id, global::App.UserId Author)");
     }
 
-    // A value in MSBuild serves the files of both engines.
+    // A value of the project's file serves the files of both engines.
     [Fact]
-    public void Run_PropertyColumnType_MapsBothEngines()
+    public void Run_ProjectFilesColumnType_MapsBothEngines()
     {
         var posts = new SqlFile(GeneratorHarness.UsersPath, ListPosts);
         var orders = new SqlFile(
@@ -269,7 +287,7 @@ public sealed class ColumnTypeTests
                 orders,
                 Sidecars.Of(orders, ordersEntry),
             ],
-            Properties("users.id=UserId"),
+            Settings(UsersIdIs("UserId")),
             [NpgsqlReferences.Npgsql10, SqlClientReferences.SqlClient7]
         );
 
@@ -280,8 +298,8 @@ public sealed class ColumnTypeTests
 
     // The message names the key that chose the type, and the place that wrote it.
     [Theory]
-    [InlineData("property", "users.id", ThePropertyPlace)]
-    [InlineData("metadata", "users.id", TheMetadataPlace)]
+    [InlineData("projectFile", "users.id", TheProjectFilePlace)]
+    [InlineData("folderFile", "users.id", TheFolderFilePlace)]
     [InlineData("header", "users.id", TheHeaderPlace)]
     [InlineData("query", "id", TheQueryPlace)]
     public void Run_ColumnType_MissingType_IsSqlsrc250AtItsPlace(string level, string key, string place)
@@ -296,8 +314,8 @@ public sealed class ColumnTypeTests
 
         var run = RunPosts(
             text,
-            level == "property" ? "users.id=NoSuchType" : null,
-            metadata: level == "metadata" ? "users.id=NoSuchType" : null
+            level == "projectFile" ? UsersIdIs("NoSuchType") : null,
+            level == "folderFile" ? UsersIdIs("NoSuchType") : null
         );
 
         run.Diagnostics.ShouldBe([
@@ -319,7 +337,9 @@ public sealed class ColumnTypeTests
             file,
             [PostsEntry(file, column)],
             IdsSource,
-            properties: Properties("posts.tag_ids=UserId[]")
+            settings: Settings( /*lang=json,strict*/
+                """{"posts.tag_ids": "UserId[]"}"""
+            )
         );
 
         run.ShouldBeClean();
@@ -339,7 +359,7 @@ public sealed class ColumnTypeTests
             file,
             [PostsEntry(file, Column("id", Int8, origin: UsersId))],
             IdsSource,
-            properties: Properties("users.id=UserId")
+            settings: Settings(UsersIdIs("UserId"))
         );
 
         run.ShouldBeClean();
@@ -350,27 +370,44 @@ public sealed class ColumnTypeTests
     private static SidecarEntry PostsEntry(SqlFile file, params SidecarColumn[] columns) =>
         Entry(file, "ListPosts", [], columns);
 
-    private static Dictionary<string, string?> Properties(string? columnTypes, string? typeOverrides = null) =>
-        new() { [ColumnTypes] = columnTypes, ["SqlSourceTypeOverrides"] = typeOverrides };
+    // The column types of the one entry that maps users.id to the type, as a settings file writes them.
+    private static string UsersIdIs(string type) => GeneratorHarness.Json(new JsonObject { ["users.id"] = type });
 
-    // ListPosts of this text, whose one column, id, is an int8 read from public.users.id, with the property's and the
-    // metadata's column types given, and the property's type override.
+    // The settings of the column types and the type overrides, each a JSON object of its entries, or none.
+    private static string Settings(string? columnTypes, string? typeOverrides = null)
+    {
+        var json = new JsonObject();
+        if (columnTypes is not null)
+        {
+            json["columnTypes"] = JsonNode.Parse(columnTypes);
+        }
+
+        if (typeOverrides is not null)
+        {
+            json["typeOverrides"] = JsonNode.Parse(typeOverrides);
+        }
+
+        return GeneratorHarness.Json(json);
+    }
+
+    // ListPosts of this text, whose one column, id, is an int8 read from public.users.id, with the column types of
+    // the project's file and of the folder's file given, each a JSON object of its entries, and the project's file's
+    // type overrides.
     private static GeneratorRun RunPosts(
         string text,
-        string? property = null,
-        string? metadata = null,
+        string? projectFile = null,
+        string? folderFile = null,
         string? typeOverrides = null
     )
     {
-        var file = new SqlFile(
-            GeneratorHarness.UsersPath,
-            text,
-            Metadata: metadata is null ? null : new Dictionary<string, string> { [ColumnTypes] = metadata }
-        );
+        var file = new SqlFile(GeneratorHarness.UsersPath, text);
+        SqlFile[] folder = folderFile is null
+            ? []
+            : [GeneratorHarness.SettingsFile(FolderSettingsPath, Settings(folderFile))];
         return Run(
             IdsSource,
-            [file, Sidecars.Of(file, PostsEntry(file, Column("id", Int8, origin: UsersId)))],
-            Properties(property, typeOverrides)
+            [file, Sidecars.Of(file, PostsEntry(file, Column("id", Int8, origin: UsersId))), .. folder],
+            Settings(projectFile, typeOverrides)
         );
     }
 
