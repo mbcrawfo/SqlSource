@@ -70,10 +70,6 @@ internal static class ColumnTypeMap
     public static int IndexOf(List<ColumnType> entries, string key) =>
         SortedKeyedList.IndexOf(entries, key, KeyOrder, KeyOf);
 
-    /// <summary>Puts an entry in its place in a list kept sorted by key, over the entry of its key.</summary>
-    public static void Put(List<ColumnType> entries, ColumnType entry) =>
-        SortedKeyedList.Put(entries, entry, KeyOrder, KeyOf);
-
     /// <summary>
     /// Adds an entry in its place in a list kept sorted by key and gives null, or gives the list's entry of its key
     /// and leaves the list as it is.

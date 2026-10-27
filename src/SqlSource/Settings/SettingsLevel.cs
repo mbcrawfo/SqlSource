@@ -56,7 +56,8 @@ internal sealed record SettingsLevel
 
     /// <summary>
     /// The entries of the type override whose keys SQL Server reads, keyed by its rules, kept as
-    /// <see cref="TypeOverrides" /> is.  An MSBuild value fills both, and a marker the one of its file's engine.
+    /// <see cref="TypeOverrides" /> is.  An object of a settings file fills both, and a marker the one of its file's
+    /// engine.
     /// </summary>
     public EquatableArray<TypeOverride>? SqlServerTypeOverrides { get; init; }
 

@@ -73,9 +73,9 @@ internal static class SettingsLevelReader
         return parameters;
     }
 
-    // An entry that is not valid is recorded, as written or by its index, and the other entries apply.  The members of
-    // an object win over a text.  The value serves both engines: PostgreSQL's entries are returned and SQL Server's
-    // given in sqlServer.  A list with no valid entry is not set.
+    // An entry that is not valid is recorded by its index, and the other entries apply.  The value serves both
+    // engines: PostgreSQL's entries are returned and SQL Server's given in sqlServer.  A list with no valid entry is
+    // not set.
     private static EquatableArray<TypeOverride>? ReadTypeOverrides<TSource>(
         ref TSource source,
         out EquatableArray<TypeOverride>? sqlServer
@@ -83,56 +83,32 @@ internal static class SettingsLevelReader
         where TSource : struct, ISettingSource
     {
         sqlServer = null;
-        TypeOverrideLists overrides;
-        if (source.Members(SettingId.TypeOverrides) is { } members)
-        {
-            var (indexes, repeated) = (new List<int>(), new List<(int Index, int First)>());
-            overrides = TypeOverrideGrammar.ReadMembers(members, source.Place, indexes, repeated);
-            ReportParts(ref source, SettingId.TypeOverrides, indexes, repeated);
-        }
-        else if (source.Text(SettingId.TypeOverrides) is { } list && !string.IsNullOrWhiteSpace(list))
-        {
-            var entries = new List<string>();
-            overrides = TypeOverrideGrammar.ReadList(list, source.Place, entries);
-            foreach (var entry in entries)
-            {
-                source.Invalid(SettingId.TypeOverrides, entry);
-            }
-        }
-        else
+        if (source.Members(SettingId.TypeOverrides) is not { } members)
         {
             return null;
         }
+
+        var (indexes, repeated) = (new List<int>(), new List<(int Index, int First)>());
+        var overrides = TypeOverrideGrammar.ReadMembers(members, source.Place, indexes, repeated);
+        ReportParts(ref source, SettingId.TypeOverrides, indexes, repeated);
 
         sqlServer = overrides.SqlServer.Count == 0 ? null : overrides.SqlServer;
         return overrides.PostgreSql.Count == 0 ? null : overrides.PostgreSql;
     }
 
-    // An entry that is not valid is recorded, as written or by its index, and the other entries apply.  The members of
-    // an object win over a text.  A list with no valid entry is not set.
+    // An entry that is not valid is recorded by its index, and the other entries apply.  A list with no valid entry is
+    // not set.
     private static EquatableArray<ColumnType>? ReadColumnTypes<TSource>(ref TSource source)
         where TSource : struct, ISettingSource
     {
-        EquatableArray<ColumnType> columnTypes;
-        if (source.Members(SettingId.ColumnTypes) is { } members)
-        {
-            var (indexes, repeated) = (new List<int>(), new List<(int Index, int First)>());
-            columnTypes = ColumnTypeGrammar.ReadMembers(members, source.Place, indexes, repeated);
-            ReportParts(ref source, SettingId.ColumnTypes, indexes, repeated);
-        }
-        else if (source.Text(SettingId.ColumnTypes) is { } list && !string.IsNullOrWhiteSpace(list))
-        {
-            var invalid = new List<string>();
-            columnTypes = ColumnTypeGrammar.ReadList(list, source.Place, invalid);
-            foreach (var entry in invalid)
-            {
-                source.Invalid(SettingId.ColumnTypes, entry);
-            }
-        }
-        else
+        if (source.Members(SettingId.ColumnTypes) is not { } members)
         {
             return null;
         }
+
+        var (indexes, repeated) = (new List<int>(), new List<(int Index, int First)>());
+        var columnTypes = ColumnTypeGrammar.ReadMembers(members, source.Place, indexes, repeated);
+        ReportParts(ref source, SettingId.ColumnTypes, indexes, repeated);
 
         return columnTypes.Count == 0 ? null : columnTypes;
     }

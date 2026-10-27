@@ -10,10 +10,14 @@ namespace SqlSource.Tests.Settings.ColumnTypes;
 
 public sealed class ColumnTypeMapTests
 {
+    // A settings file in the folder of the files, and one in a folder above it, which ranks below the nearer.
+    private static readonly SettingPlace Near = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
+    private static readonly SettingPlace Far = SettingPlace.OfSettingsFile("/sqlsource.json", 0);
+
     [Fact]
     public void Find_TwoPartKey_MatchesAnySchema()
     {
-        var map = Map(Entry("users.id", "UserId", SettingPlace.Property));
+        var map = Map(Entry("users.id", "UserId", Far));
 
         ColumnTypeMap.Find(map, "public", "users", "id")!.Type.ShouldBe("UserId");
         ColumnTypeMap.Find(map, "auth", "users", "id")!.Type.ShouldBe("UserId");
@@ -25,7 +29,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_ThreePartKey_MatchesItsSchemaAlone()
     {
-        var map = Map(Entry("billing.invoices.id", "InvoiceId", SettingPlace.Property));
+        var map = Map(Entry("billing.invoices.id", "InvoiceId", Far));
 
         ColumnTypeMap.Find(map, "billing", "invoices", "id")!.Type.ShouldBe("InvoiceId");
         ColumnTypeMap.Find(map, "BILLING", "Invoices", "ID")!.Type.ShouldBe("InvoiceId");
@@ -36,10 +40,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_SchemaWinsOverNoSchema_InOnePlace()
     {
-        var map = Map(
-            Entry("users.id", "UserId", SettingPlace.Metadata),
-            Entry("auth.users.id", "AuthUserId", SettingPlace.Metadata)
-        );
+        var map = Map(Entry("users.id", "UserId", Near), Entry("auth.users.id", "AuthUserId", Near));
 
         ColumnTypeMap.Find(map, "auth", "users", "id")!.Type.ShouldBe("AuthUserId");
         ColumnTypeMap.Find(map, "public", "users", "id")!.Type.ShouldBe("UserId");
@@ -51,21 +52,21 @@ public sealed class ColumnTypeMapTests
         var map = ColumnTypeMap
             .Over(
                 Map(Entry("users.id", "UserId", SettingPlace.FileHeader)),
-                Map(Entry("auth.users.id", "AuthUserId", SettingPlace.Property))
+                Map(Entry("auth.users.id", "AuthUserId", Far))
             )!
             .Value;
 
         ColumnTypeMap.Find(map, "auth", "users", "id")!.Type.ShouldBe("UserId");
     }
 
-    // The header's entry wins by its place, though the metadata's key names the schema.
+    // The header's entry wins by its place, though the settings file's key names the schema.
     [Fact]
-    public void Find_HeaderWins_OverASchemaInTheMetadata()
+    public void Find_HeaderWins_OverASchemaInASettingsFile()
     {
         var map = ColumnTypeMap
             .Over(
                 Map(Entry("users.id", "UserId", SettingPlace.FileHeader)),
-                Map(Entry("public.users.id", "OtherId", SettingPlace.Metadata))
+                Map(Entry("public.users.id", "OtherId", Near))
             )!
             .Value;
 
@@ -75,7 +76,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_QuotedPart_ComparesExactly()
     {
-        var map = Map(Entry("\"Users\".id", "UserId", SettingPlace.Property));
+        var map = Map(Entry("\"Users\".id", "UserId", Far));
 
         ColumnTypeMap.Find(map, "public", "Users", "id")!.Type.ShouldBe("UserId");
         ColumnTypeMap.Find(map, "public", "Users", "ID")!.Type.ShouldBe("UserId");
@@ -87,7 +88,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_QuotedSchema_ComparesExactly()
     {
-        var map = Map(Entry("\"Auth\".users.id", "UserId", SettingPlace.Property));
+        var map = Map(Entry("\"Auth\".users.id", "UserId", Far));
 
         ColumnTypeMap.Find(map, "Auth", "users", "id")!.Type.ShouldBe("UserId");
         ColumnTypeMap.Find(map, "auth", "users", "id").ShouldBeNull();
@@ -97,10 +98,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_ExactSpelling_WinsOverAMatchIgnoringCase()
     {
-        var map = Map(
-            Entry("Users.Id", "Upper", SettingPlace.Property),
-            Entry("users.id", "Lower", SettingPlace.Property)
-        );
+        var map = Map(Entry("Users.Id", "Upper", Far), Entry("users.id", "Lower", Far));
 
         ColumnTypeMap.Find(map, "public", "users", "id")!.Type.ShouldBe("Lower");
         ColumnTypeMap.Find(map, "public", "Users", "Id")!.Type.ShouldBe("Upper");
@@ -111,12 +109,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_SchemaWins_OverExactSpelling_InOnePlace()
     {
-        var map = ColumnTypeMap
-            .Over(
-                Map(Entry("Users.id", "A", SettingPlace.Property)),
-                Map(Entry("auth.users.id", "B", SettingPlace.Property))
-            )!
-            .Value;
+        var map = ColumnTypeMap.Over(Map(Entry("Users.id", "A", Far)), Map(Entry("auth.users.id", "B", Far)))!.Value;
 
         ColumnTypeMap.Find(map, "auth", "Users", "id")!.Type.ShouldBe("B");
     }
@@ -124,7 +117,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_TextWithAQuoteInAQuotedPart_IsFound()
     {
-        var map = Map(Entry("\"a\"\"b\".id", "AbId", SettingPlace.Property));
+        var map = Map(Entry("\"a\"\"b\".id", "AbId", Far));
 
         ColumnTypeMap.Find(map, null, "a\"b", "id")!.Type.ShouldBe("AbId");
     }
@@ -136,17 +129,12 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Over_Default_HidesTheKeyBelow()
     {
-        var lower = Map(
-            Entry("posts.id", "PostId", SettingPlace.Property),
-            Entry("users.id", "UserId", SettingPlace.Property)
-        );
+        var lower = Map(Entry("posts.id", "PostId", Far), Entry("users.id", "UserId", Far));
         var higher = Map(Entry("users.id", null, SettingPlace.FileHeader));
 
         var merged = ColumnTypeMap.Over(higher, lower)!.Value;
 
-        merged.ShouldBe(
-            Map(Entry("posts.id", "PostId", SettingPlace.Property), Entry("users.id", null, SettingPlace.FileHeader))
-        );
+        merged.ShouldBe(Map(Entry("posts.id", "PostId", Far), Entry("users.id", null, SettingPlace.FileHeader)));
         ColumnTypeMap.Find(merged, "public", "users", "id").ShouldBeNull();
         ColumnTypeMap.Find(merged, "public", "posts", "id")!.Type.ShouldBe("PostId");
     }
@@ -156,10 +144,7 @@ public sealed class ColumnTypeMapTests
     public void Over_DefaultAbove_WinsOverASchemaBelow()
     {
         var merged = ColumnTypeMap
-            .Over(
-                Map(Entry("users.id", null, SettingPlace.Metadata)),
-                Map(Entry("auth.users.id", "AuthUserId", SettingPlace.Property))
-            )!
+            .Over(Map(Entry("users.id", null, Near)), Map(Entry("auth.users.id", "AuthUserId", Far)))!
             .Value;
 
         ColumnTypeMap.Find(merged, "auth", "users", "id").ShouldBeNull();
@@ -168,20 +153,12 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Over_Higher_ReplacesOnlyTheKeysItNames()
     {
-        var lower = Map(
-            Entry("posts.id", "PostId", SettingPlace.Property),
-            Entry("users.id", "UserId", SettingPlace.Property)
-        );
-        var higher = Map(Entry("users.id", "global::App.UserId", SettingPlace.Metadata));
+        var lower = Map(Entry("posts.id", "PostId", Far), Entry("users.id", "UserId", Far));
+        var higher = Map(Entry("users.id", "global::App.UserId", Near));
 
         ColumnTypeMap
             .Over(higher, lower)
-            .ShouldBe(
-                Map(
-                    Entry("posts.id", "PostId", SettingPlace.Property),
-                    Entry("users.id", "global::App.UserId", SettingPlace.Metadata)
-                )
-            );
+            .ShouldBe(Map(Entry("posts.id", "PostId", Far), Entry("users.id", "global::App.UserId", Near)));
     }
 
     // A quoted part and a plain part of one text are one key, and keys that differ only by case are two.
@@ -189,17 +166,11 @@ public sealed class ColumnTypeMapTests
     public void Over_QuotedAndPlainSpellingOfOneText_AreOneKey()
     {
         ColumnTypeMap
-            .Over(
-                Map(Entry("\"users\".id", "A", SettingPlace.Metadata)),
-                Map(Entry("users.id", "B", SettingPlace.Property))
-            )
-            .ShouldBe(Map(Entry("\"users\".id", "A", SettingPlace.Metadata)));
+            .Over(Map(Entry("\"users\".id", "A", Near)), Map(Entry("users.id", "B", Far)))
+            .ShouldBe(Map(Entry("\"users\".id", "A", Near)));
 
         ColumnTypeMap
-            .Over(
-                Map(Entry("Users.id", "A", SettingPlace.Metadata)),
-                Map(Entry("users.id", "B", SettingPlace.Property))
-            )!
+            .Over(Map(Entry("Users.id", "A", Near)), Map(Entry("users.id", "B", Far)))!
             .Value.Count.ShouldBe(2);
     }
 
@@ -209,12 +180,8 @@ public sealed class ColumnTypeMapTests
     {
         var merged = ColumnTypeMap
             .Over(
-                Map(
-                    Entry("posts.id", "P", SettingPlace.Metadata),
-                    Entry("z.posts.id", "Z", SettingPlace.Metadata),
-                    Entry("a.users.id", "A", SettingPlace.Metadata)
-                ),
-                Map(Entry("users.id", "U", SettingPlace.Property), Entry("users.name", "N", SettingPlace.Property))
+                Map(Entry("posts.id", "P", Near), Entry("z.posts.id", "Z", Near), Entry("a.users.id", "A", Near)),
+                Map(Entry("users.id", "U", Far), Entry("users.name", "N", Far))
             )!
             .Value;
 
@@ -227,7 +194,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Over_OneSideNull_IsTheOther()
     {
-        var map = Map(Entry("users.id", "UserId", SettingPlace.Property));
+        var map = Map(Entry("users.id", "UserId", Far));
 
         ColumnTypeMap.Over(map, null).ShouldBe(map);
         ColumnTypeMap.Over(null, map).ShouldBe(map);
@@ -236,11 +203,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void IndexOf_Key_IsItsPlaceOrTheComplementOfWhereItWouldGo()
     {
-        var entries = new List<ColumnType>
-        {
-            Entry("posts.id", "P", SettingPlace.Property),
-            Entry("users.id", "U", SettingPlace.Property),
-        };
+        var entries = new List<ColumnType> { Entry("posts.id", "P", Far), Entry("users.id", "U", Far) };
 
         ColumnTypeMap.IndexOf(entries, "users.id").ShouldBe(1);
         ColumnTypeMap.IndexOf(entries, "\"users\".id").ShouldBe(1);

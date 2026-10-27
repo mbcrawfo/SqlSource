@@ -214,8 +214,6 @@ internal static class QueryTyper
     private static string ColumnTypePlaceOf(SettingPlace place) =>
         place.Kind switch
         {
-            SettingPlaceKind.Property => "the property SqlSourceColumnTypes",
-            SettingPlaceKind.Metadata => "the metadata SqlSourceColumnTypes of the file",
             SettingPlaceKind.FileHeader => "a -- column: marker in the file header",
             SettingPlaceKind.Query => QueryColumnMarker,
             SettingPlaceKind.SettingsFile => "the columnTypes of the settings file " + place.Path,
@@ -760,8 +758,6 @@ internal static class QueryTyper
         private static string PlaceOf(SettingPlace place) =>
             place.Kind switch
             {
-                SettingPlaceKind.Property => "the property SqlSourceTypeOverrides",
-                SettingPlaceKind.Metadata => "the metadata SqlSourceTypeOverrides of the file",
                 SettingPlaceKind.FileHeader => "a -- type-override: marker in the file header",
                 SettingPlaceKind.Query => "a -- type-override: marker of the query",
                 SettingPlaceKind.SettingsFile => "the typeOverrides of the settings file " + place.Path,

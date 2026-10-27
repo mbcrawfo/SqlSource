@@ -107,7 +107,8 @@ public sealed partial class TypeKeyTextTests
         TypeKeyText.TextOf(TypeKeyText.WritePart(text).AsSpan()).ToString().ShouldBe(text);
     }
 
-    // What the trim of an MSBuild value and the compiler's cut would change is not in the written part.
+    // What the trim and a line would change, and what the compiler's cut of an MSBuild value did, is not in the
+    // written part.
     [Theory]
     [InlineData("a\nb")]
     [InlineData("a\tb")]

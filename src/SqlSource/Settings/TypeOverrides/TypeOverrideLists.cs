@@ -1,7 +1,7 @@
 namespace SqlSource.Settings.TypeOverrides;
 
 /// <summary>
-/// The entries of one MSBuild value of the type override, read by each engine's rules.  An entry whose key one engine
+/// The entries of one object of the type override, read by each engine's rules.  An entry whose key one engine
 /// does not read is absent from that engine's list.
 /// </summary>
 /// <param name="PostgreSql">

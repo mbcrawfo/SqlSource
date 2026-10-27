@@ -333,7 +333,7 @@ internal sealed class SqlMarkerScope(
     private void ReadTypeOverride(SqlMarker marker)
     {
         var place = scopeKind == SqlScopeKind.Preamble ? SettingPlace.FileHeader : SettingPlace.Query;
-        if (!TypeOverrideGrammar.TryReadEntry(Value(marker), spacesAroundEquals: true, place, Engine, out var entry))
+        if (!TypeOverrideGrammar.TryReadEntry(Value(marker), place, Engine, out var entry))
         {
             AddInvalid(marker, TypeOverrideGrammar.BracketHelp(Value(marker)));
             return;

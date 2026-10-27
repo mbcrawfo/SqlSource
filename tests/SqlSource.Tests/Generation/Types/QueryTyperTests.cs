@@ -58,7 +58,11 @@ public sealed class QueryTyperTests
                 new SettingsLevel
                 {
                     TypeOverrides = TestSidecars.Of(
-                        new TypeOverride("public._user_status", Guid, SettingPlace.Property)
+                        new TypeOverride(
+                            "public._user_status",
+                            Guid,
+                            SettingPlace.OfSettingsFile("/app/sqlsource.json", 1)
+                        )
                     ),
                 }
             )
@@ -247,21 +251,22 @@ public sealed class QueryTyperTests
             "Map it with the type override, as dbo.\"Money\"=<a C# type>"
         );
 
-    // The property serves both engines: a name both have reaches each engine's own type of that name, and a name one
-    // engine alone reads reaches that engine's files alone, so timestamp, which both engines have, is mapped only in
-    // the file of the engine whose key it is.
+    // An object of a settings file serves both engines: a name both have reaches each engine's own type of that name,
+    // and a name one engine alone reads reaches that engine's files alone, so timestamp, which both engines have, is
+    // mapped only in the file of the engine whose key it is.
     [Theory]
-    [InlineData("int=long", "long", "long", "byte[]")]
-    [InlineData("int4=long", "long", "int", "byte[]")]
-    [InlineData("rowversion=MyApp.Version", "int", "int", Version)]
-    public void Type_SharedNameInTheProperty_ReachesEachEngine(
-        string property,
+    [InlineData("int", "long", "long", "long", "byte[]")]
+    [InlineData("int4", "long", "long", "int", "byte[]")]
+    [InlineData("rowversion", "MyApp.Version", "int", "int", Version)]
+    public void Type_SharedNameInASettingsFile_ReachesEachEngine(
+        string key,
+        string type,
         string postgresInt,
         string sqlServerInt,
         string sqlServerTimestamp
     )
     {
-        var level = PropertyOf(property);
+        var level = SettingsFileLevelOf(key, type);
         var postgres = Entry(
             SidecarValues.Engine.Postgres,
             columns:
@@ -286,13 +291,13 @@ public sealed class QueryTyperTests
 
     // A plain part of a user's key matches the type's name in any case, and a quoted part its own case alone.
     [Theory]
-    [InlineData("DBO.EMAIL=MyApp.Email", Email)]
-    [InlineData("\"dbo\".\"email\"=MyApp.Email", "string")]
-    public void Type_UserKeyInAnotherCase_Matches(string property, string expected)
+    [InlineData("DBO.EMAIL", Email)]
+    [InlineData("\"dbo\".\"email\"", "string")]
+    public void Type_UserKeyInAnotherCase_Matches(string key, string expected)
     {
         var entry = Entry(SidecarValues.Engine.SqlServer, columns: [EmailType()]);
 
-        var types = QueryTyper.Type(InputOf(SqlDialect.SqlServer, entry, PropertyOf(property)));
+        var types = QueryTyper.Type(InputOf(SqlDialect.SqlServer, entry, SettingsFileLevelOf(key, "MyApp.Email")));
 
         types.Diagnostics.ShouldBeEmpty();
         ColumnTexts(types).ShouldBe([expected]);
@@ -367,11 +372,16 @@ public sealed class QueryTyperTests
     private static IEnumerable<string> ColumnTexts(FileTypes types) =>
         types.Queries.ShouldHaveSingleItem().Columns.ShouldNotBeNull().Select(type => type.Text);
 
-    // The property's level, read as an MSBuild value is, by each engine's rules.
-    private static SettingsLevel PropertyOf(string value)
+    // The level of a settings file whose type override has the one member, read by each engine's rules.
+    private static SettingsLevel SettingsFileLevelOf(string key, string type)
     {
-        var invalid = new List<string>();
-        var lists = TypeOverrideGrammar.ReadList(value, SettingPlace.Property, invalid);
+        var invalid = new List<int>();
+        var lists = TypeOverrideGrammar.ReadMembers(
+            [new KeyValuePair<string, string>(key, type)],
+            SettingPlace.OfSettingsFile("/app/sqlsource.json", 1),
+            invalid,
+            []
+        );
         invalid.ShouldBeEmpty();
         return new SettingsLevel { TypeOverrides = lists.PostgreSql, SqlServerTypeOverrides = lists.SqlServer };
     }

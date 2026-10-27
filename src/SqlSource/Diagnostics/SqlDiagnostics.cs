@@ -597,9 +597,9 @@ internal static class SqlDiagnostics
     );
 
     // {0} is the column or parameter, as "column 'id'", {1} what is mapped, the type override's key or a parameter
-    // as "@author", {2} the C# type, {3} the place that chose it, as "the property SqlSourceTypeOverrides" or "the
-    // -- param: marker of the parameter", and {4} the types a short name in it could mean, as ", and it could be
-    // App.UserId or Other.UserId", or empty.
+    // as "@author", {2} the C# type, {3} the place that chose it, as "the typeOverrides of the settings file
+    // /app/sqlsource.json" or "the -- param: marker of the parameter", and {4} the types a short name in it could
+    // mean, as ", and it could be App.UserId or Other.UserId", or empty.
     public static readonly DiagnosticDescriptor MappedTypeNotFound = new(
         id: "SQLSRC250",
         title: "Mapped type is not found",
@@ -744,7 +744,7 @@ internal static class SqlDiagnostics
     );
 
     // {0} is the column or parameter, as "column 'id'", {1} the entry's key as written, {2} the place that wrote it,
-    // as "the property SqlSourceTypeOverrides", and {3} the key to write, the element's with [].
+    // as "the typeOverrides of the settings file /app/sqlsource.json", and {3} the key to write, the element's with [].
     public static readonly DiagnosticDescriptor ArrayEntryMapsNothing = new(
         id: "SQLSRC261",
         title: "Entry names an array as the catalog does",
