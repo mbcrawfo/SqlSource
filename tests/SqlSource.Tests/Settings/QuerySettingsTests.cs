@@ -29,6 +29,7 @@ public sealed class QuerySettingsTests
         settings.Parameters.ShouldBe(GeneratorParameters.None);
         settings.KeepComments.ShouldBeFalse();
         settings.ValidateTokens.ShouldBeTrue();
+        settings.UseArrayPool.ShouldBeTrue();
     }
 
     [Fact]
@@ -51,6 +52,12 @@ public sealed class QuerySettingsTests
         QuerySettings
             .Resolve(new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation }, Keep, Keep, Keep)
             .ValidateTokens.ShouldBeFalse();
+
+    [Fact]
+    public void Resolve_NoArrayPool_TurnsThePoolOff() =>
+        QuerySettings
+            .Resolve(new SettingsLevel { Parameters = GeneratorParameters.NoArrayPool }, Keep, Keep, Keep)
+            .UseArrayPool.ShouldBeFalse();
 
     [Fact]
     public void Over_EachMember_ComesFromThisLevelWhenItHasOne()

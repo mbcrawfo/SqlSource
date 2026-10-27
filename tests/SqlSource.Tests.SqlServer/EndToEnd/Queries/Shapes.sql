@@ -10,6 +10,17 @@ FROM dbo.accounts
 WHERE name LIKE @name OR id = @accountId
 ORDER BY id;
 
+-- name: SearchAccountsUnpooled -> many
+-- summary: SearchAccounts under no-array-pool, which reads its rows into a List, for the allocation tests: the query's
+-- summary: own list of generator parameters replaces the attribute's, so a second claim could not give it one.
+-- generator: sort-input no-array-pool
+-- input-model: SearchAccountsFilter
+-- output-model: SearchAccountsView
+SELECT id, name
+FROM dbo.accounts
+WHERE name LIKE @name OR id = @accountId
+ORDER BY id;
+
 -- name: ListAccountColumns
 -- summary: Some columns of every account, in a class whose properties are sorted.
 -- generator: sort-output

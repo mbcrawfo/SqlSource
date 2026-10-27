@@ -29,4 +29,7 @@ internal enum GeneratorParameters
 
     /// <summary><c>async-method-suffix</c>: a generated method's name ends in <c>Async</c>.</summary>
     AsyncMethodSuffix = 32,
+
+    /// <summary><c>no-array-pool</c>: a query's method reads its rows without the shared array pool.</summary>
+    NoArrayPool = 64,
 }

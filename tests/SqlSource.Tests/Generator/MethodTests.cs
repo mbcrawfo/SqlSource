@@ -106,7 +106,7 @@ public sealed class MethodTests
                         global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
                                     await using var readerScope = ↩
                         global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
-                                    var rows = new global::System.Collections.Generic.List<global::App.GetUserDto>();
+                                    var rows = new global::App.SqlSourceRowBuffer<global::App.GetUserDto>();
                                     while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                                     {
                                         rows.Add(new global::App.GetUserDto(reader.GetFieldValue<int>(0), ↩
@@ -124,7 +124,8 @@ public sealed class MethodTests
                                 }
                             }
                         }
-                    }
+
+                    {{{GeneratedFile.RowBuffer}}}}
 
                     """
                 )

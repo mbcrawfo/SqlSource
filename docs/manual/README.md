@@ -53,7 +53,7 @@ SqlSource is in early development.  This table is the one list of what works in 
 | Settings, and an error for a value that is wrong | Available | [Settings](settings.md#all-settings) |
 | The `Output` setting | Available | [Output](settings.md#setting-output) |
 | The settings for models: model suffixes, namespace, shape and name, and the generator parameters `sort-input`, `sort-output` and `no-table-models` | Available | [All settings](settings.md#all-settings) |
-| The settings for query methods: collection type, `MethodLocation`, and the generator parameter `async-method-suffix` | Available | [All settings](settings.md#all-settings) |
+| The settings for query methods: collection type, `MethodLocation`, and the generator parameters `async-method-suffix` and `no-array-pool` | Available | [All settings](settings.md#all-settings) |
 | `null` or `not null` in a `-- param:` marker | Available | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | Result shapes (`-- name: GetUser -> one`) | Available | [Result shapes](sql-files.md#result-shapes) |
 | Describing queries with the `sqlsource` tool, sidecar files, and `--check` | Available | [The tool](tool.md) |

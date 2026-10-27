@@ -163,10 +163,29 @@ internal static class GeneratorHarness
 
     // Another assembly that the generator ran on too, compiled and ready to reference.  With InternalsVisibleTo for
     // "TestAssembly" in its source, it is what a test project sees of the project it tests.
-    public static MetadataReference CreateReference(OutputKind? output, string assemblyName, string source)
+    public static MetadataReference CreateReference(OutputKind? output, string assemblyName, string source) =>
+        CreateProject(output, assemblyName, source).Reference;
+
+    // The same with the .sql files the generator reads, the references and the dialect of the project, and the code the
+    // generator gave it by name.
+    public static (MetadataReference Reference, IReadOnlyDictionary<string, string> Sources) CreateProject(
+        OutputKind? output,
+        string assemblyName,
+        string source,
+        SqlFile[]? sqlFiles = null,
+        MetadataReference[]? references = null,
+        string? dialect = null
+    )
     {
-        var compilation = CreateCompilation([new SourceFile("/other/Other.cs", source)], assemblyName: assemblyName);
-        _ = CreateDriver([], new TestOptionsProvider(output, null))
+        var compilation = CreateCompilation(
+            [new SourceFile("/other/Other.cs", source)],
+            references: references,
+            assemblyName: assemblyName
+        );
+        var driver = CreateDriver(
+                (sqlFiles ?? []).Select(file => file.ToAdditionalText()),
+                new TestOptionsProvider(output, null, dialect)
+            )
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
                 out var updated,
@@ -176,7 +195,7 @@ internal static class GeneratorHarness
 
         using var image = new MemoryStream();
         updated.Emit(image, cancellationToken: TestContext.Current.CancellationToken).Success.ShouldBeTrue();
-        return MetadataReference.CreateFromImage(image.ToArray());
+        return (MetadataReference.CreateFromImage(image.ToArray()), SourcesOf(driver));
     }
 
     // The compiler's warnings and errors for the source together with the generated code, as a build of the project
@@ -188,7 +207,34 @@ internal static class GeneratorHarness
         SqlFile[] sqlFiles,
         MetadataReference[] references,
         bool warningsAsErrors = false,
-        bool packageAnalyzers = true
+        bool packageAnalyzers = true,
+        string? dialect = null
+    )
+    {
+        var (diagnostics, _) = await BuildProjectAsync(
+            output,
+            source,
+            sqlFiles,
+            references,
+            warningsAsErrors,
+            packageAnalyzers,
+            dialect
+        );
+        return diagnostics;
+    }
+
+    // The same, with the code the generator gave the project by name.
+    public static async Task<(
+        IReadOnlyList<string> Diagnostics,
+        IReadOnlyDictionary<string, string> Sources
+    )> BuildProjectAsync(
+        OutputKind? output,
+        string source,
+        SqlFile[] sqlFiles,
+        MetadataReference[] references,
+        bool warningsAsErrors = false,
+        bool packageAnalyzers = true,
+        string? dialect = null
     )
     {
         var compilation = CreateCompilation([new SourceFile(SourcePath, source)], references: references);
@@ -199,7 +245,10 @@ internal static class GeneratorHarness
             );
         }
 
-        _ = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()), new TestOptionsProvider(output, null))
+        var driver = CreateDriver(
+                sqlFiles.Select(file => file.ToAdditionalText()),
+                new TestOptionsProvider(output, null, dialect)
+            )
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
                 out var updated,
@@ -213,8 +262,21 @@ internal static class GeneratorHarness
                 .GetAllDiagnosticsAsync(TestContext.Current.CancellationToken)
             : updated.GetDiagnostics(TestContext.Current.CancellationToken);
 
-        return [.. diagnostics.Where(diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning).Select(Format)];
+        return (
+            [.. diagnostics.Where(diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning).Select(Format)],
+            SourcesOf(driver)
+        );
     }
+
+    // The code the generator gave, by name.
+    private static Dictionary<string, string> SourcesOf(GeneratorDriver driver) =>
+        driver
+            .GetRunResult()
+            .Results.Single()
+            .GeneratedSources.ToDictionary(
+                generated => generated.HintName,
+                generated => generated.SourceText.ToString()
+            );
 
     // "SQLSRC001 /app/Repo/Sample.cs(3,14)-(3,20): message", with lines and columns counted from one as an IDE
     // shows them.
@@ -282,12 +344,129 @@ internal sealed record GeneratorRun(
             .Single();
 }
 
-// The lines that start a generated file: Header a file of queries, ModelHeader a file of models.  They are the
-// tests' own text, not read from the product, so the snapshots that start with them still say what the header is.
+// The lines that start a generated file: Header a file of queries, ModelHeader a file of models.  RowBuffer is the
+// buffer a file of methods ends with when one reads its rows into it, at the depth of a namespace.  They are the
+// tests' own text, not read from the product, so the snapshots that hold them still say what the text is.
 internal static class GeneratedFile
 {
     public const string ModelHeader = "// <auto-generated/>\n#nullable enable\n";
 
     public const string Header =
         ModelHeader + "#pragma warning disable CS0108, CS0114 // A query can have the name of an inherited member.\n";
+
+    public const string RowBuffer =
+        RowBufferToImmutable + RowBufferAsImmutableLine + RowBufferToGrow + RowBufferGrowLine + RowBufferAfterGrow;
+
+    // The buffer up to the line of ToImmutableArray that is longer than the width of a line here, up to the line of
+    // Grow that is, and after it.
+    private const string RowBufferToImmutable = """
+            /// <summary>
+            /// The rows of a query method, read into buffers from the shared array pool: one of up to 1,024 elements is
+            /// rented and returned cleared, and a larger one is left to the garbage collector.
+            /// </summary>
+            file struct SqlSourceRowBuffer<T>
+                where T : class
+            {
+                private object[]? items;
+
+                private int count;
+
+                public void Add(T row)
+                {
+                    if (items is null || count == items.Length)
+                    {
+                        Grow();
+                    }
+
+                    items![count++] = row;
+                }
+
+                public T[] ToArray()
+                {
+                    if (items is null)
+                    {
+                        return global::System.Array.Empty<T>();
+                    }
+
+                    var result = new T[count];
+                    Rows().CopyTo(result);
+                    Release();
+                    return result;
+                }
+
+                public global::System.Collections.Generic.List<T> ToList()
+                {
+                    if (items is null)
+                    {
+                        return new global::System.Collections.Generic.List<T>();
+                    }
+
+                    var result = new global::System.Collections.Generic.List<T>(count);
+                    global::System.Runtime.InteropServices.CollectionsMarshal.SetCount(result, count);
+                    Rows().CopyTo(global::System.Runtime.InteropServices.CollectionsMarshal.AsSpan(result));
+                    Release();
+                    return result;
+                }
+
+                public global::System.Collections.Immutable.ImmutableArray<T> ToImmutableArray()
+                {
+                    if (items is null)
+                    {
+                        return global::System.Collections.Immutable.ImmutableArray<T>.Empty;
+                    }
+
+
+        """;
+
+    private const string RowBufferAsImmutableLine =
+        "            return global::System.Runtime.InteropServices.ImmutableCollectionsMarshal.AsImmutableArray("
+        + "ToArray());\n";
+
+    private const string RowBufferToGrow = """
+                }
+
+                private global::System.ReadOnlySpan<T> Rows() =>
+                    global::System.Runtime.InteropServices.MemoryMarshal.CreateReadOnlySpan(
+                        ref global::System.Runtime.CompilerServices.Unsafe.As<object, T>(
+                            ref global::System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(items!)),
+                        count);
+
+                private void Release()
+                {
+                    Return(items!);
+                    items = null;
+                    count = 0;
+                }
+
+                private void Grow()
+                {
+                    var length = items is null ? 16 : items.Length * 2;
+
+        """;
+
+    private const string RowBufferGrowLine =
+        "            var next = length <= 1024 ? global::System.Buffers.ArrayPool<object>.Shared.Rent(length) : "
+        + "new object[length];\n";
+
+    private const string RowBufferAfterGrow = """
+                    if (items is not null)
+                    {
+                        global::System.Array.Copy(items, next, count);
+                        Return(items);
+                    }
+
+                    items = next;
+                }
+
+                private void Return(object[] buffer)
+                {
+                    if (buffer.Length <= 1024)
+                    {
+                        global::System.Array.Clear(buffer, 0, count);
+                        global::System.Buffers.ArrayPool<object>.Shared.Return(buffer);
+                    }
+                }
+            }
+
+        """;
 }
