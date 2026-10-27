@@ -36,7 +36,7 @@ Every commit must pass `./pre-commit-validation.sh`.  Nothing enforces this: no 
 
 ## Reviewing maintainability
 
-A periodic review of folder growth, AGENTS.md accuracy, comments and duplicated patterns follows the skill in `.claude/skills/reviewing-maintainability/`, which says what is fixed in the review's pull request and what is recorded in `docs/tech-debt`.
+A periodic review of the code's folder growth, comments and duplicated patterns follows the skill in `.claude/skills/reviewing-maintainability/`, which says what is fixed in the review's pull request and what is recorded in `docs/tech-debt`.
 
 ## Adding guidance for AI agents
 
