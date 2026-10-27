@@ -101,15 +101,14 @@ public sealed class ManifestReaderTests
     public void Read_KeyThatIsNotKnown_IsPassedOver() =>
         Read("SqlSourceManifest=2\nProject=p\nAssemblyName=App\nFile=a.sql").Files.ShouldBe(["a.sql"]);
 
-    // Version 1 gave the settings of the project and of each file as Property. and File. lines.  The tool reads the
-    // settings from the settings files, and such a line, which a later package does not write, is a key it does not
-    // know.  A File. line before any File line is no error either.
+    // A Property. or File. line is a key the reader does not know, whatever it names, and is passed over as any other.
+    // A File. line before any File line is no error either.
     [Fact]
-    public void Read_LinesOfVersion1Settings_ArePassedOver()
+    public void Read_PropertyAndFileLines_ArePassedOver()
     {
         var manifest = Read(
-            "SqlSourceManifest=2\nProject=/p.csproj\nProperty.SqlSourceDialect=postgres\nFile.SqlSourceDialect=y\n"
-                + "File=/a.sql\nFile.SqlSourceDialect=x\nSqlSourceBuildFolders=|/p/obj/"
+            "SqlSourceManifest=2\nProject=/p.csproj\nProperty.SqlSourceSomethingNew=x\nFile.SqlSourceSomethingNew=y\n"
+                + "File=/a.sql\nFile.SqlSourceSomethingNew=z\nSqlSourceBuildFolders=|/p/obj/"
         );
 
         manifest.Files.ShouldBe(["/a.sql"]);

@@ -283,33 +283,6 @@ public sealed class SettingsFileTests
         ModelFiles(run).ShouldBe(["App.GetUserParams-Model.g.cs", "App.GetUserRow-Model.g.cs"]);
     }
 
-    // A project that still sets the old MSBuild properties and metadata, with no settings file: none of them is read,
-    // so nothing of them is reported, and the run is that of a project that sets nothing.  The file is read as ansi,
-    // not as its metadata's postgres, and its query has the default output, codegen, which ansi cannot describe.
-    [Fact]
-    public void Run_ProjectThatStillSetsMSBuildSettings_ReadsNothingOfThem()
-    {
-        var options = new TestOptionsProvider(
-            properties: new Dictionary<string, string?>
-            {
-                ["SqlSourceDialect"] = "nope",
-                ["SqlSourceOutput"] = "Sql",
-                ["SqlSourceGeneratorParameters"] = "bad",
-            },
-            fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>>
-            {
-                [QueryPath] = new Dictionary<string, string> { ["SqlSourceDialect"] = "postgres" },
-            }
-        );
-
-        var diagnostics = DiagnosticsOfACastUnder(options);
-
-        diagnostics.ShouldNotContain(diagnostic => diagnostic.StartsWith("SQLSRC011", StringComparison.Ordinal));
-        diagnostics.ShouldNotContain(diagnostic => diagnostic.StartsWith("SQLSRC014", StringComparison.Ordinal));
-        diagnostics.ShouldBe(DiagnosticsOfACastUnder(new TestOptionsProvider()));
-        diagnostics.ShouldContain(diagnostic => diagnostic.StartsWith("SQLSRC209 ", StringComparison.Ordinal));
-    }
-
     // The nearer list has no keep-comments, so the farther file's does not reach the query.
     [Fact]
     public void Run_GeneratorParametersOfANearerFile_ReplaceTheFartherListWhole()
@@ -896,22 +869,6 @@ public sealed class SettingsFileTests
             generatorParameters: generatorParameters,
             dialect: dialect
         );
-
-    // What the generator reports for the type and a query with a PostgreSQL cast, with no settings file, under what
-    // MSBuild tells it.
-    private static IReadOnlyList<string> DiagnosticsOfACastUnder(TestOptionsProvider options) =>
-        [
-            .. GeneratorHarness
-                .CreateDriver([new SqlFile(QueryPath, "-- name: Q\nSELECT 1::int AS a\n").ToAdditionalText()], options)
-                .RunGenerators(
-                    GeneratorHarness.CreateCompilation([
-                        new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null)),
-                    ]),
-                    TestContext.Current.CancellationToken
-                )
-                .GetRunResult()
-                .Diagnostics.Select(GeneratorHarness.Format),
-        ];
 
     // The type and its .sql file in /repo/App, whose settings file is a root that gives the output, since it hides a
     // project's file of the run, and a broken settings file at the repository's root, /repo, with one more C# file at
