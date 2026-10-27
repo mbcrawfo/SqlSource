@@ -1,11 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Generation.Chains;
 using SqlSource.Generation.Paths;
-using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
@@ -58,7 +58,8 @@ public sealed class ManifestTargetTests : IDisposable
     {
         var read = ManifestReader.Read(string.Join('\n', await _fixtures.WriteManifestAsync(project)));
         read.Succeeded.ShouldBeTrue(read.Failure);
-        return [.. BuildFolders.Read(ManifestOptions.ForProject(read.Value.ShouldNotBeNull())).Folders];
+        var properties = read.Value.ShouldNotBeNull().Properties;
+        return [.. BuildFolders.Of(properties.GetValueOrDefault(BuildFolders.PropertyName)).Folders];
     }
 
     [Fact]
