@@ -248,6 +248,7 @@ internal static class MethodPlanner
             databaseEngine,
             settings.KeepComments ? query.KeptSegments ?? query.Segments : query.Segments,
             settings.ValidateTokens,
+            settings.UseArrayPool,
             methodInput,
             methodOutput,
             query.NameLocation

@@ -45,6 +45,9 @@ internal readonly record struct QuerySettings(
     /// <summary>Whether the query's method checks its arguments.</summary>
     public bool ValidateTokens => (Parameters & GeneratorParameters.NoTokenValidation) == 0;
 
+    /// <summary>Whether the query's method may read its rows into buffers from the shared array pool.</summary>
+    public bool UseArrayPool => (Parameters & GeneratorParameters.NoArrayPool) == 0;
+
     /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
     /// the attribute, then the metadata of the file's item, then the project's property, then the default.  The type

@@ -61,12 +61,17 @@ internal static class QueryMethodWriter
     /// </param>
     /// <param name="modifiers"><c>public static</c>, <c>internal static</c> or <c>private static</c>.</param>
     /// <param name="isExtension">Whether the method extends the connection, which writes <c>this</c> before it.</param>
+    /// <param name="rowBufferType">
+    /// The row buffer's type from <see cref="RowBuffer.TypeTextFor" />, read only when
+    /// <see cref="RowBuffer.IsUsedBy" />.
+    /// </param>
     public static void Append(
         StringBuilder builder,
         string indent,
         QueryMethod method,
         string modifiers,
-        bool isExtension
+        bool isExtension,
+        string rowBufferType
     )
     {
         var tokens = MethodWriter.GetTokens(method.Segments);
@@ -124,7 +129,7 @@ internal static class QueryMethodWriter
             }
         }
 
-        AppendExecution(builder, blockIndent, method, locals);
+        AppendExecution(builder, blockIndent, method, locals, rowBufferType);
 
         _ = builder
             .Append(bodyIndent)
@@ -282,8 +287,33 @@ internal static class QueryMethodWriter
         };
 
     // The buffer the rows are read into, and the expression that gives the collection from it.
-    private static (string Buffer, string Result) GetBuffer(CollectionKind collection, string row, string rows) =>
-        collection switch
+    private static (string Buffer, string Result) GetBuffer(
+        QueryMethod method,
+        string row,
+        string rows,
+        string rowBufferType
+    )
+    {
+        if (RowBuffer.IsUsedBy(method))
+        {
+            var toResult = method.Collection switch
+            {
+                CollectionKind.List or CollectionKind.IList or CollectionKind.ICollection => ".ToList()",
+                CollectionKind.ImmutableArray => ".ToImmutableArray()",
+                // The two immutable lists never reach this switch, since RowBuffer.IsUsedBy leaves them out; they are
+                // named so that the switch lists every member.
+                CollectionKind.Array
+                or CollectionKind.IEnumerable
+                or CollectionKind.IReadOnlyCollection
+                or CollectionKind.IReadOnlyList
+                or CollectionKind.ImmutableList
+                or CollectionKind.IImmutableList
+                or _ => ".ToArray()",
+            };
+            return ("new " + rowBufferType + "<" + row + ">()", rows + toResult);
+        }
+
+        return method.Collection switch
         {
             CollectionKind.List or CollectionKind.IList or CollectionKind.ICollection => (
                 "new global::System.Collections.Generic.List<" + row + ">()",
@@ -303,6 +333,7 @@ internal static class QueryMethodWriter
             or CollectionKind.IReadOnlyList
             or _ => ("new global::System.Collections.Generic.List<" + row + ">()", rows + ".ToArray()"),
         };
+    }
 
     private static void AppendChecks(StringBuilder builder, string indent, QueryMethod method, List<string> arguments)
     {
@@ -424,7 +455,13 @@ internal static class QueryMethodWriter
         _ = builder.Append('\n');
     }
 
-    private static void AppendExecution(StringBuilder builder, string indent, QueryMethod method, Locals locals)
+    private static void AppendExecution(
+        StringBuilder builder,
+        string indent,
+        QueryMethod method,
+        Locals locals,
+        string rowBufferType
+    )
     {
         if (method.Shape is ResultShape.None or ResultShape.RowCount)
         {
@@ -453,7 +490,7 @@ internal static class QueryMethodWriter
 
         if (method.Shape == ResultShape.Many)
         {
-            var (buffer, result) = GetBuffer(method.Collection, output.TypeText, locals.Rows);
+            var (buffer, result) = GetBuffer(method, output.TypeText, locals.Rows, rowBufferType);
             _ = builder.Append(indent).Append("var ").Append(locals.Rows).Append(" = ").Append(buffer).Append(";\n");
             _ = builder.Append(indent).Append("while (");
             AppendRead(builder, locals);

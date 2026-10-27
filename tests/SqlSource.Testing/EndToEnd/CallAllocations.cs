@@ -28,10 +28,12 @@ internal static class CallAllocations
 {
     // Calls each method warmUpCalls times, then makes the pairs, the first of each pair changing from one to the next.
     // Each delegate is made once by the caller, and calling it allocates nothing of its own; each call is measured
-    // here, around the call alone, so that no state machine of the measure is counted in it.
-    public static async Task<CallPairs> MeasureAsync<T>(
-        Func<Task<T>> generated,
-        Func<Task<T>> byHand,
+    // here, around the call alone, so that no state machine of the measure is counted in it.  The two methods may
+    // return different types, since a generated method returns what the query declares and a hand-written one the
+    // type it builds, and the result of a call is dropped.
+    public static async Task<CallPairs> MeasureAsync<TGenerated, TByHand>(
+        Func<Task<TGenerated>> generated,
+        Func<Task<TByHand>> byHand,
         int warmUpCalls,
         int pairs
     )
@@ -49,9 +51,16 @@ internal static class CallAllocations
             for (var turn = 0; turn < 2; turn++)
             {
                 var isGenerated = (pair + turn) % 2 == 0;
-                var method = isGenerated ? generated : byHand;
                 var before = GC.GetTotalAllocatedBytes(precise: true);
-                _ = await method();
+                if (isGenerated)
+                {
+                    _ = await generated();
+                }
+                else
+                {
+                    _ = await byHand();
+                }
+
                 var bytes = GC.GetTotalAllocatedBytes(precise: true) - before;
                 (isGenerated ? generatedCalls : byHandCalls)[pair] = bytes;
             }
