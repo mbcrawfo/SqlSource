@@ -226,8 +226,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => CompilePathsOf(input.Left, input.Right))
             .WithTrackingName(TrackingNames.CompilePaths);
 
-        // The folders the build writes into, whose files are the build's and reach nothing.  They are equal until a
-        // property changes.
+        // The folders the build writes into and the NuGet package folders, whose files are the build's or a package's
+        // and reach nothing.  They are equal until a property changes.
         var buildFolders = context
             .AnalyzerConfigOptionsProvider.Select(static (options, _) => BuildFolders.Read(options.GlobalOptions))
             .WithTrackingName(TrackingNames.BuildFolders);

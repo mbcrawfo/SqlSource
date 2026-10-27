@@ -635,6 +635,35 @@ public sealed class SettingsFileTests
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC015 /repo/sqlsource.json(1,");
     }
 
+    // A package that ships C# files as content, as Polyfill does, adds Compile items under the folder NuGet restored it
+    // to, the global packages folder in the home folder or a fallback folder, whose chain never meets the project's
+    // root file.  The targets give the generator those folders with the build's, and a compile path under one reaches
+    // nothing, so the broken file of the home folder is never checked.
+    [Theory]
+    [InlineData("/home/me/.nuget/packages/polyfill/7.12.0/contentFiles/cs/net10.0/Polyfill/Polyfill.cs")]
+    [InlineData("/home/me/fallback/nullable/1.3.1/contentFiles/cs/netstandard2.0/Nullable/AllowNullAttribute.cs")]
+    public void Run_CompileItemOfAPackage_ReachesNoSettingsFile(string compilePath)
+    {
+        var run = RunWithAPackageFile(
+            compilePath,
+            "|/home/me/repo/App/obj/|/home/me/.nuget/packages/|/home/me/fallback/"
+        );
+
+        run.ShouldBeClean();
+    }
+
+    // The same, with the package folders left out of the property: the package's file reaches the home folder's file.
+    [Fact]
+    public void Run_CompileItemOfAPackageWithoutThePackageFolders_ReachesTheFileAboveTheRoot()
+    {
+        var run = RunWithAPackageFile(
+            "/home/me/.nuget/packages/polyfill/7.12.0/contentFiles/cs/net10.0/Polyfill/Polyfill.cs",
+            "|/home/me/repo/App/obj/"
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC015 /home/me/sqlsource.json(1,");
+    }
+
     // A folder is compared segment by segment, so objx is not under obj.
     [Fact]
     public void Run_CompileItemInAFolderThatOnlyStartsLikeTheIntermediateFolder_ReachesTheFileAboveTheRoot()
@@ -892,6 +921,26 @@ public sealed class SettingsFileTests
                 new SqlFile("/repo/App/Q.sql", Query),
             ],
             properties: properties
+        );
+
+    // A project in /home/me/repo/App, whose root file gives the output, with a C# file of a package at the path given
+    // and a broken file in the home folder above both, run with the build's folders given.
+    private static GeneratorRun RunWithAPackageFile(string compilePath, string buildFolders) =>
+        GeneratorHarness.Run(
+            null,
+            [
+                new SourceFile("/home/me/repo/App/Sample.cs", GeneratorHarness.SampleSource(null)),
+                new SourceFile(compilePath, "[assembly: System.Reflection.AssemblyMetadata(\"Package\", \"yes\")]\n"),
+            ],
+            [
+                GeneratorHarness.SettingsFile("/home/me/sqlsource.json", "{"),
+                GeneratorHarness.SettingsFile(
+                    "/home/me/repo/App/sqlsource.json", /*lang=json,strict*/
+                    """{"root": true, "output": "Sql"}"""
+                ),
+                new SqlFile("/home/me/repo/App/Q.sql", Query),
+            ],
+            properties: new Dictionary<string, string?> { ["SqlSourceBuildFolders"] = buildFolders }
         );
 
     // GetUser of Users, at Models under postgres, with an entry of one parameter and one column, both id, the

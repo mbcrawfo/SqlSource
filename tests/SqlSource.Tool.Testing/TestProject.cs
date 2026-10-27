@@ -32,8 +32,9 @@ internal sealed class TestProject
 
     public List<string> Constants { get; } = [];
 
-    // The folders the build writes into, as the package's target writes SqlSourceBuildFolders: each after a |, with a
-    // separator at its end.  No setting: a test gives its settings in Settings or in a settings file.
+    // The folders the build writes into and the NuGet package folders, as the package's target writes
+    // SqlSourceBuildFolders: each after a |, with a separator at its end.  No setting: a test gives its settings in
+    // Settings or in a settings file.
     public string BuildFolders { get; set; } = "";
 
     // The project's own settings file, sqlsource.json in the folder of the project file, as a user writes it.  Whenever
@@ -54,6 +55,9 @@ internal sealed class TestProject
         _compile.Add(path);
         return path;
     }
+
+    // A C# file that the project compiles and this helper does not write: one outside the project, as a package's.
+    public void ListSource(string fullPath) => _compile.Add(fullPath);
 
     // A .sql file on the disk that the project lists.
     public string AddSql(string relativePath, string text)

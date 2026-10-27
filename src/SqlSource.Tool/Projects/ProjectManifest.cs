@@ -23,8 +23,9 @@ internal sealed class ProjectManifest
     public required ImmutableArray<string> DefineConstants { get; init; }
 
     /// <summary>
-    /// The folders the build writes C# files and its outputs into, as the package's target escapes them and the
-    /// compiler is given them: <c>BuildFolders.Of</c> reads it.  Empty when the manifest has no such line.
+    /// The folders the build writes C# files and its outputs into and the NuGet package folders, as the package's
+    /// target escapes them and the compiler is given them: <c>BuildFolders.Of</c> reads it.  Empty when the manifest
+    /// has no such line.
     /// </summary>
     public required string BuildFolders { get; init; }
 

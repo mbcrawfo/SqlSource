@@ -30,6 +30,24 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
         return project;
     }
 
+    // A project in repo/App with a root file of its own, a C# file of a package under .nuget/packages, and a broken
+    // settings file in the folder above both, which the build lists as it climbs from the package's file.
+    private TestProject ProjectWithAPackageFile()
+    {
+        var project = Plans.Postgres(_folder, "App", "repo/App");
+        project.Settings["root"] = true;
+        project.BuildFolders = "|" + project.PathOf("obj") + Path.DirectorySeparatorChar;
+        _ = project.AddSql("Q.sql", "SELECT 1;");
+        project.ListSource(
+            _folder.WriteFile(
+                ".nuget/packages/polyfill/7.12.0/contentFiles/cs/net10.0/Polyfill/Polyfill.cs",
+                "internal static class Polyfill;"
+            )
+        );
+        project.ListSettings(_folder.WriteFile("sqlsource.json", "{ nope"));
+        return project;
+    }
+
     [Fact]
     public void Plan_SettingsFileWithErrorsOfTheFile_ReportsEachAtItsLineAndColumn()
     {
@@ -257,6 +275,34 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
             .ShouldBe([
                 new Reported("SQLSRC016", reached, new LinePosition(0, 1), "'reached' is not a key of a settings file"),
             ]);
+    }
+
+    // A package that ships C# files as content adds Compile items under the NuGet packages folder, above which the
+    // build lists every settings file to the top of the drive, the home folder's among them.  The packages folder is a
+    // folder of the build, so the package's file reaches nothing, and the broken file above the project's root file is
+    // never read.
+    [Fact]
+    public void Plan_CompileFileUnderThePackagesFolder_ReachesNothing()
+    {
+        var project = ProjectWithAPackageFile();
+        project.BuildFolders += "|" + _folder.PathOf(".nuget/packages") + Path.DirectorySeparatorChar;
+
+        var result = Plans.Result(project);
+
+        result.Errors.ShouldBeEmpty();
+    }
+
+    // The same without the packages folder: the package's file reaches the home folder's file.
+    [Fact]
+    public void Plan_CompileFileOfAPackageWithoutThePackagesFolder_ReachesTheFileAboveTheRoot()
+    {
+        var project = ProjectWithAPackageFile();
+
+        var result = Plans.Result(project);
+
+        result
+            .Errors.Select(error => (error.Descriptor.Id, error.Path))
+            .ShouldBe([("SQLSRC015", _folder.PathOf("sqlsource.json"))]);
     }
 
     [Fact]

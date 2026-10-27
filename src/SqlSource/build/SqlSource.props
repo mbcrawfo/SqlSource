@@ -38,9 +38,9 @@
         A source generator sees only the MSBuild properties and the item metadata that are listed here.  The settings
         are in settings files, sqlsource.json, which SqlSource.targets gives the compiler as AdditionalFiles items, so
         no setting is listed, and no metadata.  SqlSourceBuildFolders is no setting: SqlSource.targets sets it to the
-        folders the build writes C# files and its outputs into, and a C# file under one, such as one the SDK writes
-        into obj, reaches no settings file.  It is not under the condition above: a project that lists its own .sql
-        files still needs it.
+        folders the build writes C# files and its outputs into and the NuGet package folders, and a C# file under
+        one, such as one the SDK writes into obj or one a package ships, reaches no settings file.  It is not under
+        the condition above: a project that lists its own .sql files still needs it.
     -->
     <ItemGroup>
         <CompilerVisibleProperty Include="SqlSourceBuildFolders" />

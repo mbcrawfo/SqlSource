@@ -7,9 +7,10 @@ using SqlSource.Generation.Paths;
 namespace SqlSource.Generation.Chains;
 
 /// <summary>
-/// The folders a build writes C# trees and its outputs into, whose files are the build's and not the project's: a
-/// compile path under any of them reaches no settings file.  The generator reads them from the compiler's options
-/// with <see cref="Read" />, and the <c>sqlsource</c> tool can read them from a manifest's properties the same way.
+/// The folders a build writes C# trees and its outputs into and the NuGet package folders, whose files are the
+/// build's or a package's and not the project's: a compile path under any of them reaches no settings file.  The
+/// generator reads them from the compiler's options with <see cref="Read" />, and the <c>sqlsource</c> tool can read
+/// them from a manifest's properties the same way.
 /// </summary>
 /// <param name="Folders">The normalised folders, in the order the build gives them.</param>
 internal sealed record BuildFolders(EquatableArray<string> Folders)
@@ -17,8 +18,9 @@ internal sealed record BuildFolders(EquatableArray<string> Folders)
     /// <summary>
     /// The property that holds the folders, which <c>build/SqlSource.targets</c> sets and <c>build/SqlSource.props</c>
     /// shows to the compiler: the full paths of <c>BaseIntermediateOutputPath</c>, <c>IntermediateOutputPath</c>,
-    /// <c>BaseOutputPath</c>, <c>OutDir</c> and, when the compiler writes its generated files,
-    /// <c>CompilerGeneratedFilesOutputPath</c>, escaped and joined by <c>|</c>.
+    /// <c>BaseOutputPath</c>, <c>OutDir</c>, <c>CompilerGeneratedFilesOutputPath</c> when the compiler writes its
+    /// generated files, <c>NuGetPackageRoot</c> and each other folder of <c>NuGetPackageFolders</c>, escaped and joined
+    /// by <c>|</c>.
     /// </summary>
     public const string PropertyName = "SqlSourceBuildFolders";
 
