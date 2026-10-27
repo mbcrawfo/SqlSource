@@ -369,7 +369,7 @@ Rules: [models](generator.md#models), [property names](generator.md#property-nam
 
 ### With PostgreSQL
 
-- **A type override to a type that Npgsql does not give needs a Dapper type handler.**  Dapper fills a property with the type Npgsql gives for its column, or through a handler.  `timestamptz=System.DateTimeOffset` makes a property a `DateTimeOffset` where Npgsql gives a `DateTime`.  A domain mapped to a struct of your own is the same: Npgsql gives the domain's base type, a `string` for a domain over `text`.  Add a handler for each, once, beside `MatchNamesWithUnderscores`:
+- **A type override to a type that Npgsql does not give needs a Dapper type handler.**  Dapper fills a property with the type Npgsql gives for its column, or through a handler.  A settings file's `"timestamptz": "System.DateTimeOffset"` makes a property a `DateTimeOffset` where Npgsql gives a `DateTime`.  A domain mapped to a struct of your own is the same: Npgsql gives the domain's base type, a `string` for a domain over `text`.  Add a handler for each, once, beside `MatchNamesWithUnderscores`:
 
   ```csharp
   using System.Data;
@@ -514,7 +514,7 @@ connection.QueryAsync<ListCustomerOrdersSinceDto>(
   `SqlDbTypeExtensions` is Microsoft.Data.SqlClient's, in the namespace `Microsoft.Data`, so the call builds on .NET 8 and later, where `SqlDbType.Vector` is in .NET 10 alone.
 
   A `string` for a `json` column needs nothing: SQL Server converts Dapper's text to `json`.
-- **A type override to a type that SqlClient does not give needs a Dapper type handler.**  Dapper fills a property with the type SqlClient gives for its column, or through a handler.  `date=System.DateOnly` makes a property a `DateOnly` where SqlClient gives a `DateTime`, and `time=System.TimeOnly` a `TimeOnly` where it gives a `TimeSpan`.  An alias type mapped to a struct of your own is the same: SqlClient gives the alias type's base type, a `string` for one over `nvarchar`.  Add a handler for each, once, beside `MatchNamesWithUnderscores`:
+- **A type override to a type that SqlClient does not give needs a Dapper type handler.**  Dapper fills a property with the type SqlClient gives for its column, or through a handler.  A settings file's `"date": "System.DateOnly"` makes a property a `DateOnly` where SqlClient gives a `DateTime`, and `"time": "System.TimeOnly"` a `TimeOnly` where it gives a `TimeSpan`.  An alias type mapped to a struct of your own is the same: SqlClient gives the alias type's base type, a `string` for one over `nvarchar`.  Add a handler for each, once, beside `MatchNamesWithUnderscores`:
 
   ```csharp
   using System;

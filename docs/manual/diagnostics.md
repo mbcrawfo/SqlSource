@@ -2645,7 +2645,7 @@ The error has a second form, when the column's or parameter's database type has 
 /work/App/Queries/Users.sql(1,10): error SQLSRC279: The column 'address' has type 'App.Address', which has converters, but the database type 'public.address' has no C# type to convert from.  Choose a C# type without converters for it, or remove the converters of 'App.Address'.
 ```
 
-For an array whose element type a type override, a column type or a `-- param:` marker chose, such as `email[]` under `public.email=App.Email` or `posts.tag_ids=TagId[]`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
+For an array whose element type a type override, a column type or a `-- param:` marker chose, such as `email[]` under `public.email=App.Email` or `"posts.tag_ids": "TagId[]"`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
 
 See: [Converters](settings.md#converters)
 
