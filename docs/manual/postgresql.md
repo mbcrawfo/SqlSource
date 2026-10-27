@@ -2,10 +2,12 @@
 
 SqlSource reads PostgreSQL files by the `postgres` [dialect](dialects.md), and the `sqlsource` tool can describe their queries: it asks your database what each query's parameters and columns are, and writes the answer to the query's [sidecar](tool.md#sidecar-files).  This page is about describing, about the C# types that a described query's columns and parameters get, about the models built from them, and about the query methods that run them.  How SqlSource reads a PostgreSQL file, its comments and strings, is on [the dialects page](dialects.md).
 
-```xml
-<PropertyGroup>
-    <SqlSourceDialect>postgres</SqlSourceDialect>
-</PropertyGroup>
+```jsonc
+// sqlsource.json, in the project's folder
+{
+    "root": true,
+    "dialect": "postgres",
+}
 ```
 
 ```console
@@ -155,7 +157,7 @@ WHERE id = @id;
 
 Each column and each parameter of a described PostgreSQL query gets a C# type: the type that Npgsql reads a value of its PostgreSQL type as.  If `id` is a `bigint`, `placed_at` a `timestamp with time zone`, `total` a `numeric(12,2)`, `tags` a `text[]` and `born` a `date`, they are `long`, `System.DateTime`, `decimal`, `string[]`, and `System.DateTime` on Npgsql 8 and 9 or `System.DateOnly` on Npgsql 10; `@id` is a `long`.  Whether a column can be null is decided [above](#nullability), not by its type.
 
-The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for a type that Npgsql cannot read.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides): `timestamptz=System.DateTimeOffset`.  To give one column another, use a [column type](settings.md#setting-column-types), `users.id=MyApp.UserId`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Npgsql does not read, such as an id or an `Email` over a domain, needs [converters](settings.md#converters) to and from the type of the table below.
+The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for a type that Npgsql cannot read.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides), `"timestamptz": "System.DateTimeOffset"` in a settings file's `typeOverrides`.  To give one column another, use a [column type](settings.md#setting-column-types), `"users.id": "MyApp.UserId"` in its `columnTypes`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Npgsql does not read, such as an id or an `Email` over a domain, needs [converters](settings.md#converters) to and from the type of the table below.
 
 <a id="which-npgsql"></a>
 
@@ -166,7 +168,7 @@ A few types are read as another C# type by Npgsql 10 than by Npgsql 8 and 9, so 
 - **Npgsql 8, 9 or 10** gets the column of the table below for its version.  Updating Npgsql from 9 to 10 changes the C# types of `date`, `time`, `cidr`, `daterange` and `datemultirange`, as it changes what Npgsql reads.
 - **Npgsql older than 8** is [SQLSRC247](diagnostics.md#sqlsrc247).  Update it.
 - **Npgsql 11 or later** gets the types of Npgsql 10, with the information [SQLSRC248](diagnostics.md#sqlsrc248), since this version of SqlSource does not know a newer one.
-- **No Npgsql**, as in a library that holds the queries and leaves the driver to the application, gets every type that Npgsql 8, 9 and 10 read alike, and models alone: give its queries the output `models`, since a query method needs the driver ([SQLSRC273](diagnostics.md#sqlsrc273)).  A type that they read differently, and a type of Npgsql's own `NpgsqlTypes` namespace, have no C# type without the driver: each is [SQLSRC249](diagnostics.md#sqlsrc249), unless the type override names it.  For the types that differ, the override says which Npgsql the application runs on: `date=System.DateOnly time=System.TimeOnly` for Npgsql 10.
+- **No Npgsql**, as in a library that holds the queries and leaves the driver to the application, gets every type that Npgsql 8, 9 and 10 read alike, and models alone: give its queries the output `models`, since a query method needs the driver ([SQLSRC273](diagnostics.md#sqlsrc273)).  A type that they read differently, and a type of Npgsql's own `NpgsqlTypes` namespace, have no C# type without the driver: each is [SQLSRC249](diagnostics.md#sqlsrc249), unless the type override names it.  For the types that differ, the override says which Npgsql the application runs on: `"date": "System.DateOnly"` and `"time": "System.TimeOnly"` in a settings file's `typeOverrides` for Npgsql 10.
 
 <a id="type-table"></a>
 

@@ -15,7 +15,8 @@ namespace SqlSource.Tool.Tests.Projects;
 // projects of Fixtures/Projects.  Each test starts MSBuild once or twice, which takes a second or two.
 public sealed class ManifestTargetTests : IDisposable
 {
-    // The line of the folders the build writes into, which is no setting and holds paths of the machine.
+    // The line of the folders the build writes into and the package folders, which is no setting and holds paths of
+    // the machine.
     private const string BuildFoldersLine = "SqlSourceBuildFolders=";
 
     private readonly FixtureProjects _fixtures = new();
@@ -34,6 +35,12 @@ public sealed class ManifestTargetTests : IDisposable
         read.Succeeded.ShouldBeTrue(read.Failure);
         return [.. BuildFolders.Of(read.Value.ShouldNotBeNull().BuildFolders).Folders];
     }
+
+    // The value of the line of the folders, escaped as the target writes it.
+    private async Task<string> BuildFoldersValueOfAsync(string project) =>
+        (await _fixtures.WriteManifestAsync(project)).Single(line =>
+            line.StartsWith(BuildFoldersLine, StringComparison.Ordinal)
+        )[BuildFoldersLine.Length..];
 
     [Fact]
     public async Task WriteManifest_ProjectWithOneFramework_HoldsWhatTheCompilerIsGiven()
@@ -258,6 +265,52 @@ public sealed class ManifestTargetTests : IDisposable
 
         folders.ShouldContain(SqlPath.Normalize(Path.Combine(folder, "obj") + Path.DirectorySeparatorChar));
         folders.ShouldContain(SqlPath.Normalize(Path.Combine(folder, "bin") + Path.DirectorySeparatorChar));
+    }
+
+    // A package that ships C# files as content adds Compile items under the folder NuGet restored it to, and their
+    // chain would climb past the project's root file, so the line holds the NuGet package folders too: the global
+    // packages folder, NuGetPackageRoot, once, though NuGetPackageFolders names it as well, and each fallback folder
+    // of NuGetPackageFolders, which the targets split at its ;, with a # that they escape.  A restore writes both
+    // properties into a file under obj that the project imports; without one they have no value.
+    [Fact]
+    public async Task WriteManifest_RestoredProject_HoldsTheNuGetPackageFolders()
+    {
+        var project = _fixtures.Copy("Single");
+        var packages = _fixtures.PathOf("Packages") + Path.DirectorySeparatorChar;
+        var fallback = _fixtures.PathOf("Fallback#1");
+        var other = _fixtures.PathOf("Fallback 2");
+        var (exitCode, output) = await FixtureProjects.RunMSBuildAsync(
+            project,
+            ["-t:Restore", $"-p:RestorePackagesPath={packages}", $"-p:RestoreFallbackFolders={fallback}%3B{other}"]
+        );
+        exitCode.ShouldBe(0, output);
+
+        var value = await BuildFoldersValueOfAsync(project);
+
+        value.ShouldContain("Fallback%231" + Path.DirectorySeparatorChar);
+        var folders = BuildFolders.Of(value).Folders;
+        folders.Count(folder => folder == SqlPath.Normalize(packages)).ShouldBe(1);
+        folders.ShouldContain(SqlPath.Normalize(fallback + Path.DirectorySeparatorChar));
+        folders.ShouldContain(SqlPath.Normalize(other + Path.DirectorySeparatorChar));
+    }
+
+    // Before a restore, NuGet has set neither property, and the line holds only the folders the build writes into,
+    // all in the project's folder, and no empty entry: an empty property would be made the project's folder itself,
+    // which holds every file of the project.
+    [Fact]
+    public async Task WriteManifest_ProjectNeverRestored_HoldsNoPackageFolder()
+    {
+        var project = _fixtures.Copy("Single");
+        var folder = SqlPath.Normalize(Path.GetDirectoryName(project)!).ShouldNotBeNull();
+
+        var value = await BuildFoldersValueOfAsync(project);
+
+        value.ShouldNotContain("||");
+        value.ShouldNotEndWith("|");
+        var folders = BuildFolders.Of(value).Folders;
+        folders.ShouldNotBeEmpty();
+        folders.ShouldNotContain(folder);
+        folders.ShouldAllBe(path => SqlPath.IsInFolder(path, folder));
     }
 
     // The folder of the project holds a semicolon, "%41" that MSBuild would read as "A", an equals sign, a quote and

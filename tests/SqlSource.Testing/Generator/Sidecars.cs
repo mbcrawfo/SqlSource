@@ -17,8 +17,8 @@ internal static class Sidecars
 {
     // The hash the generator computes for the query with this name in the file, under this dialect.  A -- dialect:
     // marker in the file wins, as it does in a build.  A name the file lacks is a bug of the test, and so is a file
-    // that does not parse.  The caller passes the dialect the generator will see for the file, its metadata's or the
-    // project's, since these helpers do not read SqlFile.Dialect.
+    // that does not parse.  The caller passes the dialect the generator will see for the file, that of the settings
+    // files of its folder, since these helpers read no settings file.
     public static string HashOf(SqlFile sqlFile, string queryName, SqlDialect dialect = SqlDialect.Ansi) =>
         HashOf(sqlFile, queryName, dialect, out _);
 

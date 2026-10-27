@@ -10,7 +10,7 @@ A converter is an edge between two C# types for the whole project: [`ConverterSe
 
 ## Why deferred
 
-The research judged a converter per file a rare need, and the suffix costly: a new part of the grammar of the settings files and both markers, a member of `TypeOverride`, `SQLSRC112` comparing converters too, and a converter to repeat on every key that maps to the type, a domain, its array and other domains.  It recommended it as a later extension that the attribute leaves room for.
+The research judged a converter per file a rare need, and naming one in the entry costly: a new part of the grammar of the settings files and both markers, a member of `TypeOverride`, `SQLSRC112` comparing converters too, and a converter to repeat on every key that maps to the type, a domain, its array and other domains.  It recommended it as a later extension that the attribute leaves room for.
 
 ## Remaining work
 

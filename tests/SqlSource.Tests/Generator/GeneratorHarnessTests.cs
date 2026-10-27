@@ -51,7 +51,7 @@ public sealed class GeneratorHarnessTests
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string GetUser = ");
     }
 
-    // The project's file holds the list, which a property of the same words would not.
+    // The harness writes the words, split at white space, as the array of the project's settings file.
     [Fact]
     public void Run_GeneratorParameters_AreTheArrayOfTheirWords()
     {

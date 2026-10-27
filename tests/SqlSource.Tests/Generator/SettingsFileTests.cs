@@ -283,33 +283,6 @@ public sealed class SettingsFileTests
         ModelFiles(run).ShouldBe(["App.GetUserParams-Model.g.cs", "App.GetUserRow-Model.g.cs"]);
     }
 
-    // A project that still sets the old MSBuild properties and metadata, with no settings file: none of them is read,
-    // so nothing of them is reported, and the run is that of a project that sets nothing.  The file is read as ansi,
-    // not as its metadata's postgres, and its query has the default output, codegen, which ansi cannot describe.
-    [Fact]
-    public void Run_ProjectThatStillSetsMSBuildSettings_ReadsNothingOfThem()
-    {
-        var options = new TestOptionsProvider(
-            properties: new Dictionary<string, string?>
-            {
-                ["SqlSourceDialect"] = "nope",
-                ["SqlSourceOutput"] = "Sql",
-                ["SqlSourceGeneratorParameters"] = "bad",
-            },
-            fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>>
-            {
-                [QueryPath] = new Dictionary<string, string> { ["SqlSourceDialect"] = "postgres" },
-            }
-        );
-
-        var diagnostics = DiagnosticsOfACastUnder(options);
-
-        diagnostics.ShouldNotContain(diagnostic => diagnostic.StartsWith("SQLSRC011", StringComparison.Ordinal));
-        diagnostics.ShouldNotContain(diagnostic => diagnostic.StartsWith("SQLSRC014", StringComparison.Ordinal));
-        diagnostics.ShouldBe(DiagnosticsOfACastUnder(new TestOptionsProvider()));
-        diagnostics.ShouldContain(diagnostic => diagnostic.StartsWith("SQLSRC209 ", StringComparison.Ordinal));
-    }
-
     // The nearer list has no keep-comments, so the farther file's does not reach the query.
     [Fact]
     public void Run_GeneratorParametersOfANearerFile_ReplaceTheFartherListWhole()
@@ -662,6 +635,35 @@ public sealed class SettingsFileTests
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC015 /repo/sqlsource.json(1,");
     }
 
+    // A package that ships C# files as content, as Polyfill does, adds Compile items under the folder NuGet restored it
+    // to, the global packages folder in the home folder or a fallback folder, whose chain never meets the project's
+    // root file.  The targets give the generator those folders with the build's, and a compile path under one reaches
+    // nothing, so the broken file of the home folder is never checked.
+    [Theory]
+    [InlineData("/home/me/.nuget/packages/polyfill/7.12.0/contentFiles/cs/net10.0/Polyfill/Polyfill.cs")]
+    [InlineData("/home/me/fallback/nullable/1.3.1/contentFiles/cs/netstandard2.0/Nullable/AllowNullAttribute.cs")]
+    public void Run_CompileItemOfAPackage_ReachesNoSettingsFile(string compilePath)
+    {
+        var run = RunWithAPackageFile(
+            compilePath,
+            "|/home/me/repo/App/obj/|/home/me/.nuget/packages/|/home/me/fallback/"
+        );
+
+        run.ShouldBeClean();
+    }
+
+    // The same, with the package folders left out of the property: the package's file reaches the home folder's file.
+    [Fact]
+    public void Run_CompileItemOfAPackageWithoutThePackageFolders_ReachesTheFileAboveTheRoot()
+    {
+        var run = RunWithAPackageFile(
+            "/home/me/.nuget/packages/polyfill/7.12.0/contentFiles/cs/net10.0/Polyfill/Polyfill.cs",
+            "|/home/me/repo/App/obj/"
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC015 /home/me/sqlsource.json(1,");
+    }
+
     // A folder is compared segment by segment, so objx is not under obj.
     [Fact]
     public void Run_CompileItemInAFolderThatOnlyStartsLikeTheIntermediateFolder_ReachesTheFileAboveTheRoot()
@@ -897,22 +899,6 @@ public sealed class SettingsFileTests
             dialect: dialect
         );
 
-    // What the generator reports for the type and a query with a PostgreSQL cast, with no settings file, under what
-    // MSBuild tells it.
-    private static IReadOnlyList<string> DiagnosticsOfACastUnder(TestOptionsProvider options) =>
-        [
-            .. GeneratorHarness
-                .CreateDriver([new SqlFile(QueryPath, "-- name: Q\nSELECT 1::int AS a\n").ToAdditionalText()], options)
-                .RunGenerators(
-                    GeneratorHarness.CreateCompilation([
-                        new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null)),
-                    ]),
-                    TestContext.Current.CancellationToken
-                )
-                .GetRunResult()
-                .Diagnostics.Select(GeneratorHarness.Format),
-        ];
-
     // The type and its .sql file in /repo/App, whose settings file is a root that gives the output, since it hides a
     // project's file of the run, and a broken settings file at the repository's root, /repo, with one more C# file at
     // the path given, under the properties given.
@@ -935,6 +921,26 @@ public sealed class SettingsFileTests
                 new SqlFile("/repo/App/Q.sql", Query),
             ],
             properties: properties
+        );
+
+    // A project in /home/me/repo/App, whose root file gives the output, with a C# file of a package at the path given
+    // and a broken file in the home folder above both, run with the build's folders given.
+    private static GeneratorRun RunWithAPackageFile(string compilePath, string buildFolders) =>
+        GeneratorHarness.Run(
+            null,
+            [
+                new SourceFile("/home/me/repo/App/Sample.cs", GeneratorHarness.SampleSource(null)),
+                new SourceFile(compilePath, "[assembly: System.Reflection.AssemblyMetadata(\"Package\", \"yes\")]\n"),
+            ],
+            [
+                GeneratorHarness.SettingsFile("/home/me/sqlsource.json", "{"),
+                GeneratorHarness.SettingsFile(
+                    "/home/me/repo/App/sqlsource.json", /*lang=json,strict*/
+                    """{"root": true, "output": "Sql"}"""
+                ),
+                new SqlFile("/home/me/repo/App/Q.sql", Query),
+            ],
+            properties: new Dictionary<string, string?> { ["SqlSourceBuildFolders"] = buildFolders }
         );
 
     // GetUser of Users, at Models under postgres, with an entry of one parameter and one column, both id, the

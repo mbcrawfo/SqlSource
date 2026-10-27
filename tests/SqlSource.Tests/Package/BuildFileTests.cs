@@ -35,6 +35,8 @@ public sealed partial class BuildFileTests
         "OutDir",
         "EmitCompilerGeneratedFiles",
         "CompilerGeneratedFilesOutputPath",
+        "NuGetPackageRoot",
+        "NuGetPackageFolders",
     ];
 
     // The target that writes the project manifest for the sqlsource tool.  It is the one target no build runs.
@@ -47,12 +49,15 @@ public sealed partial class BuildFileTests
     // in the manifest.
     private const string ListTarget = "SqlSourceListFiles";
 
-    // The folders the build writes into, which the targets set and the compiler is shown.  They are no setting: a
-    // project does not write them.
+    // The folders the build writes into and the NuGet package folders, which the targets set and the compiler is
+    // shown.  They are no setting: a project does not write them.
     private const string BuildFolders = "SqlSourceBuildFolders";
 
     // The target that sets them.
     private const string BuildFoldersTarget = "SqlSourceFindBuildFolders";
+
+    // The item of that target that holds the NuGet package folders other than the global packages folder.
+    private const string PackageFolder = "SqlSourcePackageFolder";
 
     private static readonly XDocument Props = Load("SqlSource.props");
 
@@ -217,12 +222,15 @@ public sealed partial class BuildFileTests
 
     // A C# file under the folders the build writes C# files and its outputs into is the build's, and reaches no
     // settings file: the base folders, the intermediate and output folders, and the folder of the compiler's generated
-    // files when it writes them.  Each is the full path made against the project's folder, with the separator that
-    // NormalizeDirectory ends it with, after a |, and is left out when it has no value.  The property is emptied first,
-    // so that it holds the build's folders whatever the project wrote.  The compiler reads a value up to its first # or
-    // ;, and | parts the folders, so each folder's %, |, # and ; are escaped as %25, %7C, %23 and %3B, % first, which
-    // BuildFolders decodes; MSBuild reads %XX in the file as the character it stands for, so each escape is written
-    // with its % as %25.  The generator spells the name in BuildFolders, and SettingsFileTests runs it on it.
+    // files when it writes them.  So is one under the NuGet package folders, where a package that ships C# files as
+    // content has its Compile items: the global packages folder and each folder of NuGetPackageFolders, a ;-parted
+    // list that names it too, split as an item and left without it.  Each is the full path made against the project's
+    // folder, with the separator that NormalizeDirectory ends it with, after a |, and is left out when it has no value.
+    // The property is emptied first, so that it holds the build's folders whatever the project wrote.  The compiler
+    // reads a value up to its first # or ;, and | parts the folders, so each folder's %, |, # and ; are escaped as
+    // %25, %7C, %23 and %3B, % first, which BuildFolders decodes; MSBuild reads %XX in the file as the character it
+    // stands for, so each escape is written with its % as %25.  The generator spells the name in BuildFolders, and
+    // SettingsFileTests runs it on it.  ManifestTargetTests runs the target.
     [Fact]
     public void Targets_BuildFolders_AreTheEscapedFullPathsOfEveryFolderTheBuildWritesInto()
     {
@@ -238,6 +246,23 @@ public sealed partial class BuildFileTests
                     ["BeforeTargets"] = "GenerateMSBuildEditorConfigFileCore",
                 }
             );
+        target.Elements().Select(element => element.Name.LocalName).ShouldBe(["ItemGroup", "PropertyGroup"]);
+        var items = target.Elements("ItemGroup").ShouldHaveSingleItem().Elements().ToList();
+        items
+            .Select(item =>
+                (
+                    item.Name.LocalName,
+                    string.Join(
+                        " ",
+                        item.Attributes().Select(attribute => $"{attribute.Name.LocalName}={attribute.Value}")
+                    ),
+                    string.Join(" ", item.Elements().Select(metadata => $"{metadata.Name.LocalName}={metadata.Value}"))
+                )
+            )
+            .ShouldBe([
+                (PackageFolder, "Include=$(NuGetPackageFolders) Exclude=$(NuGetPackageRoot)", ""),
+                (PackageFolder, "", "SqlSourceFolder=" + Escaped("%(Identity)")),
+            ]);
         var lines = target.Elements("PropertyGroup").ShouldHaveSingleItem().Elements().ToList();
         lines.ShouldAllBe(line => line.Name.LocalName == "SqlSourceBuildFolders");
         lines
@@ -251,6 +276,12 @@ public sealed partial class BuildFileTests
                 (
                     Appended("CompilerGeneratedFilesOutputPath"),
                     "'$(EmitCompilerGeneratedFiles)' == 'true' and '$(CompilerGeneratedFilesOutputPath)' != ''",
+                    1
+                ),
+                (Appended("NuGetPackageRoot"), "'$(NuGetPackageRoot)' != ''", 1),
+                (
+                    $"$(SqlSourceBuildFolders)|@({PackageFolder}->'%(SqlSourceFolder)', '|')",
+                    $"'@({PackageFolder})' != ''",
                     1
                 ),
             ]);
@@ -571,10 +602,13 @@ public sealed partial class BuildFileTests
 
     private static XElement Manifest() => Target(ManifestTarget);
 
-    // The property with a folder after a |: its full path, with its %, |, # and ; escaped for the compiler, each % of
-    // an escape written %25 for MSBuild.
-    private static string Appended(string folder) =>
-        $"$(SqlSourceBuildFolders)|$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), $({folder}))"
+    // The property with a folder after a |, escaped.
+    private static string Appended(string folder) => "$(SqlSourceBuildFolders)|" + Escaped($"$({folder})");
+
+    // A folder's full path, with its %, |, # and ; escaped for the compiler, each % of an escape written %25 for
+    // MSBuild.
+    private static string Escaped(string folder) =>
+        $"$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), {folder})"
         + ".Replace('%', '%2525').Replace('|', '%257C').Replace('#', '%2523').Replace(';', '%253B'))";
 
     private static XElement Target(string name) =>
