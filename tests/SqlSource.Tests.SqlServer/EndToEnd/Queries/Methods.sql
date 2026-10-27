@@ -97,11 +97,6 @@ ON a.id = s.id
 WHEN MATCHED THEN UPDATE SET status = @status
 OUTPUT $action AS change, INSERTED.id;
 
--- name: WaitFiveSeconds -> one
--- summary: Waits five seconds before its row, longer than a command timeout of one second.
-WAITFOR DELAY '00:00:05';
-SELECT 1 AS n;
-
 -- name: ListAccountIdsCancellingOnRead
 -- summary: The ids of the accounts, each read as a CancelOnRead, whose converter cancels the token of its test, so
 -- that the read of the second row sees it cancelled.
