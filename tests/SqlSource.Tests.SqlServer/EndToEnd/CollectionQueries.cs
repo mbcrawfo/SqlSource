@@ -45,7 +45,7 @@ internal static partial class ImmutableListCollectionQueries;
 
 // The file header of ByMetadata.sql, ImmutableArray, over the project's settings file.
 [SqlSourceGenerate(Path = "Queries/Collections/ByMetadata.sql", MethodLocation = MethodLocation.Public)]
-internal static partial class MetadataCollectionQueries;
+internal static partial class HeaderCollectionQueries;
 
 // The markers of the file header and of the queries, over the project's settings file.
 [SqlSourceGenerate(Path = "Queries/Collections/ByMarkers.sql", MethodLocation = MethodLocation.Public)]

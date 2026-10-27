@@ -123,14 +123,14 @@ public sealed class MethodCollectionTests(SqlServerContainer sqlServer)
     {
         await using var connection = EndToEndSources.App(sqlServer);
 
-        var rows = await MetadataCollectionQueries.ListAccountsByMetadata(
+        var rows = await HeaderCollectionQueries.ListAccountsByMetadata(
             connection,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
         ShouldHold<ImmutableArray<CollectedAccount>, ImmutableArray<CollectedAccount>>(
-            typeof(MetadataCollectionQueries),
-            nameof(MetadataCollectionQueries.ListAccountsByMetadata),
+            typeof(HeaderCollectionQueries),
+            nameof(HeaderCollectionQueries.ListAccountsByMetadata),
             rows
         );
     }
