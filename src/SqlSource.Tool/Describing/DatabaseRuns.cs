@@ -27,7 +27,8 @@ namespace SqlSource.Tool.Describing;
 /// This is the one place outside <c>Cli</c> that catches every exception: a describer's, which is a bug of the
 /// describer and may hold the connection's value.  It is thrown again as a <see cref="DescriberFaultException" />
 /// without the value, and the run ends.  A description that holds the value, which would be written into a sidecar,
-/// is such a bug too (<see cref="EntrySecretCheck" />).  A run that was cancelled ends as one.
+/// is such a bug too (<see cref="EntrySecretCheck" />).  A cancellation is not caught: a run that was cancelled ends
+/// as cancelled, not as <c>SQLSRC200</c>.
 /// </para>
 /// </remarks>
 internal static class DatabaseRuns

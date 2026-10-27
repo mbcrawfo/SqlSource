@@ -10,8 +10,8 @@ using Conversion = SqlSource.Generation.Methods.Conversion;
 namespace SqlSource.Generation.Emitting;
 
 /// <summary>
-/// Writes the asynchronous method of a query: it opens the connection when it is closed, binds the parameters by
-/// value, runs the query and reads its rows as the shape says.
+/// Writes the asynchronous method of a query: it opens the connection when it is closed, binds each parameter with
+/// the <see cref="ParameterBinder" /> of its file's engine, runs the query and reads its rows as the shape says.
 /// </summary>
 /// <remarks>
 /// A token's argument can have any name that is not a fixed argument's, so every local, and the parameters of the

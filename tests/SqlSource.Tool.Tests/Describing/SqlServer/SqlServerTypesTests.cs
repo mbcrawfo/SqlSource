@@ -6,8 +6,9 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer;
 
-// A SQL Server type from a row of either procedure: the system type name and the facets verbatim, and the user type
-// when the row names one.  The rows are those of the table of types in
+// A SQL Server type from a row of sp_describe_undeclared_parameters or of sys.dm_exec_describe_first_result_set, a
+// parameter's, a declared parameter's or a column's: the system type name and the facets verbatim, and the user type
+// when the row names one; and how a type is declared and spelled.  The rows are those of the table of types in
 // docs/superpowers/specs/2026-10-20-query-generation-phase-6-sql-server-spike.md.
 public sealed class SqlServerTypesTests
 {

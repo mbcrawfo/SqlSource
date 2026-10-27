@@ -88,7 +88,7 @@ public sealed class TypeOverrideLevelTests
         (SettingLevel.Header, "timestamptz = string"),
     ];
 
-    // The place of each level, as SQLSRC250 to SQLSRC252 name it.
+    // The place of each level, as SQLSRC250 to SQLSRC252 and SQLSRC261 name it.
     public static TheoryData<SettingLevel, string> Places =>
         new()
         {

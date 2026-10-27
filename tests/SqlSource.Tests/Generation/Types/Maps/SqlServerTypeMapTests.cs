@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using Shouldly;
-using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.Drivers;
+using SqlSource.Generation.Types.Maps;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using Xunit;
 
-namespace SqlSource.Tests.Generation.Types;
+namespace SqlSource.Tests.Generation.Types.Maps;
 
 public sealed class SqlServerTypeMapTests
 {

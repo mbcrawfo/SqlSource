@@ -32,7 +32,7 @@ public sealed class QueryMethodWriterTests
     // The type integer, as the entry of a parameter describes it.
     private static readonly PostgresType Integer = TestSidecars.Postgres(bindName: "integer");
 
-    // GetUser -> one-optional of the spec: one parameter, one token, a record of two columns.  RowBufferTests derives
+    // GetUser -> one-optional: one parameter, one token, a record of two columns.  RowBufferTests derives
     // its method from it.
     internal static readonly QueryMethod GetUser = new(
         "GetUser",
@@ -61,7 +61,7 @@ public sealed class QueryMethodWriterTests
     );
 
     [Fact]
-    public void Append_OneOptionalWithParametersAndAToken_IsTheMethodOfTheSpec()
+    public void Append_OneOptionalWithParametersAndAToken_IsTheWholeMethod()
     {
         var builder = new StringBuilder("before\n");
 

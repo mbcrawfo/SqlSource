@@ -1,4 +1,4 @@
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.Drivers;
 
 /// <summary>The column of the PostgreSQL base map that a project's Npgsql chooses.</summary>
 internal enum NpgsqlColumn

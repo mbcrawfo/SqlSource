@@ -14,7 +14,7 @@ namespace SqlSource.Tool.Tests;
 // session builds them, with their origins, the runs of a walk over a plan, and the answers of a walk.
 internal static class PostgresWalkColumns
 {
-    // A table with a NOT NULL column and a nullable one, and a view of the same two.
+    // A table with a NOT NULL column and a nullable one, and a view and a foreign table of the same two.
     public static readonly PostgresTableRow Table = PostgresTables.TableOf(
         16700,
         "t",

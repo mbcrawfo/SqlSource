@@ -1,4 +1,4 @@
-using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.Drivers;
 
 namespace SqlSource.Generation.Methods;
 

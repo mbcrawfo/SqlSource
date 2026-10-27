@@ -52,8 +52,14 @@ public sealed class ExpressionProofsTests
         false,
         "CASE WHEN EXISTS (SELECT 1 FROM o WHERE o.c = t.id) THEN 1 ELSE 0 END"
     )]
-    [InlineData("CASE WHEN EXISTS (SELECT 1 FROM o HAVING MAX(t.a) > 0) THEN 1 ELSE 0 END", "", false, false, "")]
-    [InlineData("(SELECT dbo.f(o.x) FROM o)", "", false, false, "")]
+    [InlineData(
+        "COALESCE(CASE WHEN EXISTS (SELECT 1 FROM o HAVING MAX(t.a) > 0) THEN 1 ELSE 0 END, NULL)",
+        "",
+        false,
+        false,
+        ""
+    )]
+    [InlineData("COALESCE((SELECT dbo.f(o.x) FROM o), NULL)", "", false, false, "")]
     // A COUNT under GROUP BY ALL, which proves nothing.
     [InlineData("COUNT(*)", "GROUP BY ALL t.b", false, false, "")]
     // The ranking functions.
@@ -230,24 +236,26 @@ public sealed class ExpressionProofsTests
     [InlineData("t.a AT TIME ZONE 'UTC'", "", false, false, "")]
     [InlineData("ISNULL(t.a, 0)", "", false, false, "")]
     [InlineData("t.a + 1", "", true, false, "t.a")]
-    // A user's function, or anything that holds one, is never asked.
+    // A user's function, or anything that holds one, is never asked.  Each item that is no form stands inside
+    // COALESCE(..., NULL), since a leaf alone asks nothing.
     [InlineData("dbo.COUNT(t.a)", "", false, false, "")]
     [InlineData("dbo.f(t.a) + 1", "", false, false, "")]
-    [InlineData("ISNULL(dbo.f(t.a), 0)", "", false, false, "")]
-    [InlineData("t.x.value('(/a)[1]', 'int')", "", false, false, "")]
-    [InlineData("geography::Point(1, 2, 4326)", "", false, false, "")]
+    [InlineData("COALESCE(ISNULL(dbo.f(t.a), 0), NULL)", "", false, false, "")]
+    [InlineData("COALESCE(t.x.value('(/a)[1]', 'int'), NULL)", "", false, false, "")]
+    [InlineData("COALESCE(geography::Point(1, 2, 4326), NULL)", "", false, false, "")]
     [InlineData("CAST(t.a AS int).ToString()", "", false, false, "")]
     [InlineData("x.SUM(t.a)", "GROUP BY t.b", false, false, "")]
     // An old table hint after a schema's table reads as a call of a schema's name.
     [InlineData("ISNULL((SELECT o.x FROM dbo.o (NOLOCK)), 0)", "", false, false, "")]
-    // Nor is anything that holds an aggregate or OVER that is not a form.
-    [InlineData("AVG(t.a)", "GROUP BY t.b", false, false, "")]
+    // Nor is anything that holds an aggregate or OVER that is not a form, each item that is no form again inside
+    // COALESCE(..., NULL).
+    [InlineData("COALESCE(AVG(t.a), NULL)", "GROUP BY t.b", false, false, "")]
     [InlineData("[COUNT](t.a)", "GROUP BY t.b", false, false, "")]
     [InlineData("JSON_ARRAYAGG(t.a)", "GROUP BY t.b", false, false, "")]
     [InlineData("JSON_OBJECTAGG(t.k : t.v)", "GROUP BY t.b", false, false, "")]
-    [InlineData("ISNULL(MAX(t.a), 0)", "GROUP BY t.b", false, false, "")]
-    [InlineData("CASE WHEN SUM(t.a) > 0 THEN 1 ELSE 0 END", "GROUP BY t.b", false, false, "")]
-    [InlineData("LAG(t.a, 1, 0) OVER (ORDER BY t.id)", "", false, false, "")]
+    [InlineData("COALESCE(ISNULL(MAX(t.a), 0), NULL)", "GROUP BY t.b", false, false, "")]
+    [InlineData("COALESCE(CASE WHEN SUM(t.a) > 0 THEN 1 ELSE 0 END, NULL)", "GROUP BY t.b", false, false, "")]
+    [InlineData("COALESCE(LAG(t.a, 1, 0) OVER (ORDER BY t.id), NULL)", "", false, false, "")]
     // Columns, in the select's context.
     [InlineData("t.a", "GROUP BY ROLLUP (t.a)", false, false, "")]
     [InlineData("COALESCE(t.a, NULL)", "GROUP BY t.a", true, false, "t.a")]

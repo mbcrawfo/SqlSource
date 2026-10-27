@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
+using SqlSource.Generation.Types.Drivers;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.Maps;
 
 /// <summary>The type override's answer for the SQL Server type of <paramref name="key" />, or null.</summary>
 internal delegate TypeMapping? SqlServerOverrideOf(string key);

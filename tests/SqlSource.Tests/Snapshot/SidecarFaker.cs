@@ -9,8 +9,8 @@ namespace SqlSource.Tests.Snapshot;
 
 // Builds sidecars from a seed, so that a failure can be run again.  Strict, they are what the tool builds: one of
 // the two engines, every "always" key with a value, and every value inside the limits of the schema.  Lenient, they
-// are what a reader may find: another engine, a kind and a provenance value it does not know, and nulls where the
-// reader allows them.  Neither holds what the writer's conditions leave out.
+// are what a reader may find: another engine, a kind and a provenance value it does not know, an entry with rows and
+// no columns, and nulls where the reader allows them.  Neither holds what the writer's conditions leave out.
 internal sealed class SidecarFaker(int seed, bool lenient)
 {
     public const string UnknownEngine = "sqlite";

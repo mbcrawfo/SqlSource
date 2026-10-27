@@ -11,8 +11,8 @@ using Xunit;
 namespace SqlSource.Tests.Generator;
 
 // The methods of the project marked [SqlSourceConverter]: SQLSRC277 at one that is not a converter, and SQLSRC278 at
-// two of one edge.  Each run has converters and no .sql file, so what is reported is the converters' alone, and is
-// at Models unless it says otherwise.
+// two of one edge.  Each run has converters and, unless it says otherwise, no .sql file, so what is reported is the
+// converters' alone, and is at Models unless it says otherwise.
 public sealed class ConverterDiagnosticsTests
 {
     // The line of the marked method in FaultySource.

@@ -11,8 +11,8 @@ using Xunit;
 namespace SqlSource.Tests.SqlServer.Describer;
 
 // The whole "describe" command in process, as Cli.Run runs it, on the real MSBuild and with the describers of the
-// released tool, against the container: a copy of the fixture project SqlServer, whose one file is of the dialect
-// mssql and names the database "fixtures", and a connection for it on the command line.
+// released tool, against the container: a copy of the fixture project SqlServer, whose sqlsource.json gives its one
+// file the dialect mssql and the database "fixtures", and a connection for it on the command line.
 [Collection(UsesSqlServer.Name)]
 public sealed class DescribeCommandTests(SqlServerContainer sqlServer) : IDisposable
 {

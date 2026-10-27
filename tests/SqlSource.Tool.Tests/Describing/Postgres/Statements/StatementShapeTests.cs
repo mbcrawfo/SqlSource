@@ -81,6 +81,7 @@ public sealed class StatementShapeTests
     [InlineData("WITH d AS (DELETE FROM t RETURNING *) INSERT INTO u SELECT * FROM d")]
     // A typo is the server's to reject, as SQLSRC225.
     [InlineData("SELEC 1")]
+    // An INTO in a string, in a comment or inside parentheses is no INTO clause of the statement.
     [InlineData("SELECT 'INTO' FROM t")]
     [InlineData("SELECT 1 -- INTO t")]
     [InlineData("SELECT (SELECT 1 INTO t)")]

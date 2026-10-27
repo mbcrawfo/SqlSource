@@ -237,7 +237,7 @@ public sealed class TypeKeysTests
         normalized.ShouldBeEmpty();
     }
 
-    // PostgreSQL reads a key as it did before SQL Server's names were known.
+    // A name that SQL Server alone has is no key of PostgreSQL's.
     [Theory]
     [InlineData("nvarchar")]
     [InlineData("rowversion")]

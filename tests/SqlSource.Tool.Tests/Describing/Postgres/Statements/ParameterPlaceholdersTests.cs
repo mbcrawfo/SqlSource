@@ -65,7 +65,8 @@ public sealed class ParameterPlaceholdersTests
     public void Rewrite_DollarSignAfterANonAsciiCharacter_OpensNoQuoteSoTheSecondStatementIsFound(string sql) =>
         ParameterPlaceholders.Rewrite(sql, List()).ShouldBeNull();
 
-    // The plan's parser made the list from the same SQL, so a parameter outside it is a bug of the plan.
+    // The run's planner made the list from the same SQL with the generator's parser, so a parameter outside it is a bug
+    // there.
     [Fact]
     public void Rewrite_ParameterTheListDoesNotHold_Throws() =>
         Should

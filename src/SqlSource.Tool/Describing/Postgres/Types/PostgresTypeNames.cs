@@ -12,7 +12,7 @@ namespace SqlSource.Tool.Describing.Postgres.Types;
 /// of the same name stands before <c>pg_catalog</c> on the <c>search_path</c> (<see cref="WithoutCatalog" />).  A type
 /// of any other schema is the schema and the name, whatever the <c>search_path</c>.  An identifier is quoted unless it
 /// is lower-case letters, digits and <c>_</c>.  A reserved word is not quoted, as in <c>user.status</c>: the
-/// <c>name</c> has been spelled so since phase 3, and the container test
+/// <c>name</c> has been spelled so since the describer was delivered, and the container test
 /// <c>DescribeAsync_TypeOfASchemaNamedByAReservedWord_IsSpelledBare</c> pins it.  The name that Npgsql binds is the
 /// <c>bindName</c> (<see cref="PostgresBindNames" />), not this one.
 /// </remarks>

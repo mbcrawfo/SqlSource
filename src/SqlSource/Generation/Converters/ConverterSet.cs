@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using SqlSource.Diagnostics;
-using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.Maps;
 
 namespace SqlSource.Generation.Converters;
 
@@ -33,7 +33,10 @@ internal sealed record ConverterSet(EquatableArray<Converter> Converters, Equata
     // search.  It is made from Converters, so it is not part of the set's equality.
     private readonly ImmutableArray<int> _byReturn = OrderByReturn(Converters);
 
-    /// <summary>The converters found in the project's source, in the order of <see cref="Comparer" />.</summary>
+    /// <summary>
+    /// The converters as found, from the project's source or from the mapped types, in the order of
+    /// <see cref="Comparer" />.
+    /// </summary>
     public static EquatableArray<Converter> Sort(ImmutableArray<Converter> converters) =>
         converters.IsEmpty ? EquatableArray<Converter>.Empty : new(converters.Sort(Comparer));
 

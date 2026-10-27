@@ -40,8 +40,8 @@ internal static class ParameterPlaceholders
     /// comments: the query holds more than one statement.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The SQL does not lex, or holds a parameter that the list does not: a bug of the plan, whose parser read the
-    /// same text.
+    /// The SQL does not lex, or holds a parameter that the list does not: a bug of the run's planner, whose parser
+    /// read the same text.
     /// </exception>
     public static string? Rewrite(string sql, EquatableArray<SqlQueryParameter> parameters) =>
         Statement(sql, parameters);

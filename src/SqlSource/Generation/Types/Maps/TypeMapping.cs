@@ -1,4 +1,4 @@
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.Maps;
 
 /// <summary>The C# type of a database type, or the reason it has none.</summary>
 /// <param name="Kind">Whether the type has a C# type, and if not, why.</param>
@@ -7,8 +7,9 @@ namespace SqlSource.Generation.Types;
 /// </param>
 /// <param name="Text">
 /// The C# type as a model writes it, a keyword or <c>global::</c>-qualified, or null when the type has none.  A
-/// failure of a type the override names keeps that type here, for its message, and
-/// <see cref="TypeMappingKind.ArrayNamedByItsOwnKey" /> the key to write instead, its element's with <c>[]</c>.
+/// failure of a type that the type override, the column types or a marker chose keeps that type here, for its
+/// message, and <see cref="TypeMappingKind.ArrayNamedByItsOwnKey" /> the key to write instead, its element's with
+/// <c>[]</c>.
 /// </param>
 /// <param name="IsValueType">Whether the C# type is a value type.</param>
 /// <param name="IsPublic">Whether the C# type is accessible from any assembly.</param>
@@ -17,9 +18,10 @@ namespace SqlSource.Generation.Types;
 /// What a failure's message adds, or null: for <see cref="TypeMappingKind.CastToOid" />,
 /// <see cref="TypeMappingKind.CastToText" /> and <see cref="TypeMappingKind.NeedsNpgsql10" />, the type to cast to,
 /// an array of it for an array; for <see cref="TypeMappingKind.DiffersByDriver" />, the entry of the type
-/// override for each driver whose C# type is not of <c>NpgsqlTypes</c>, or null when neither is; and for a type the
-/// override names, found or not, and for <see cref="TypeMappingKind.ArrayNamedByItsOwnKey" />, the place that wrote
-/// the entry; for <see cref="TypeMappingKind.NeedsSqlServerTypes" />, the package's C# type for the type; and for
+/// override for each driver whose C# type is not of <c>NpgsqlTypes</c>, or null when neither is; for a type that the
+/// type override, the column types or a marker chose, found or not, the place that chose it, and for
+/// <see cref="TypeMappingKind.ArrayNamedByItsOwnKey" />, the place that wrote the entry; for
+/// <see cref="TypeMappingKind.NeedsSqlServerTypes" />, the package's C# type for the type; and for
 /// <see cref="TypeMappingKind.NeedsNewerSqlClient" />, the version of SqlClient that first has its C# type.
 /// </param>
 internal sealed record TypeMapping(

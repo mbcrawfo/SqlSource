@@ -9,9 +9,9 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 
 // The queries of Queries/Notes.sql, run on the seed of "app" through the methods that NoteQueries gets: the enum
 // note_kind is read as the C# enum NoteKind, which the data source maps, the domains email and note_ref as the record
-// structs Email and NoteRef, and the ids of the accounts and a count, by the file's column types and the queries'
-// markers, as the record structs AccountId and NoteCount, through their converters, as columns and as parameters.  Half
-// the tests give the method an open connection and half a closed one, which the method opens.
+// structs Email and NoteRef, and the ids of the accounts and a count, by the header's and the queries' markers, as
+// the record structs AccountId and NoteCount, through their converters, as columns and as parameters.  Half the tests
+// give the method an open connection and half a closed one, which the method opens.
 [Collection(UsesPostgres.Name)]
 public sealed class NoteQueryTests(PostgresContainer postgres)
 {
@@ -46,9 +46,9 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
         ]);
     }
 
-    // accounts.id is an AccountId by the file's column types in the project, and notes.account_id one by the header's
-    // -- column: marker, nullable on the optional side of the join: each is read from the int that Npgsql gives,
-    // through FromDatabase, and carol's NULL is read as null, never given to it.
+    // accounts.id and notes.account_id are AccountIds by the header's -- column: markers, notes.account_id nullable on
+    // the optional side of the join: each is read from the int that Npgsql gives, through FromDatabase, and carol's
+    // NULL is read as null, never given to it.
     [Fact]
     public async Task ListAccountNotes_EveryRow_ReadsTheIdsAsAccountIds()
     {

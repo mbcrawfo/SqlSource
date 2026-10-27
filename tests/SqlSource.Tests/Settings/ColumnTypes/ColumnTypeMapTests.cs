@@ -94,7 +94,7 @@ public sealed class ColumnTypeMapTests
         ColumnTypeMap.Find(map, "auth", "users", "id").ShouldBeNull();
     }
 
-    // Within one place, of two keys that differ only by case, the one spelled as the origin is.
+    // Within one place, of two keys that differ only by case, the one spelled exactly as the column's origin wins.
     [Fact]
     public void Find_ExactSpelling_WinsOverAMatchIgnoringCase()
     {

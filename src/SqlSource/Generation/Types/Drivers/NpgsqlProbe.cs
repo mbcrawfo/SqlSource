@@ -4,7 +4,7 @@ using System.Globalization;
 using Microsoft.CodeAnalysis;
 using SqlSource.Diagnostics;
 
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.Drivers;
 
 /// <summary>
 /// What a project references of Npgsql: whether it references the driver at all, and which of the versions that the

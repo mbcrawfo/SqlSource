@@ -55,14 +55,15 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
         ORDER BY column_ordinal
         """;
 
-    // The columns of a first result set, or the errors of its describe as rows, for "columns" and "table".  Browse
-    // mode 2: a view is its columns' source, as on PostgreSQL, and the one hidden column it adds is ROWSTAT.  Mode 1
-    // names a view's base table and adds hidden key columns of every table read.  source_type is the tool's own: the
-    // BaseType of the source, U for a table, V for a view and IF or TF for a table-valued function, whose columns the
-    // server names the function as the source of.  It is read only for a source of the session's own server and
-    // database, the names compared by their code points as SqlServerColumns compares them: OBJECTPROPERTYEX reads the
-    // current database whatever OBJECT_ID named, a name of two parts finds sys.databases of the system resource in it,
-    // and a linked server's database of the session's name would find a local object of the source's name.
+    // The columns of a first result set, or the errors of its describe as rows, for "columns", "operands" and
+    // "table".  Browse mode 2: a view is its columns' source, as on PostgreSQL, and the one hidden column it adds is
+    // ROWSTAT.  Mode 1 names a view's base table and adds hidden key columns of every table read.  source_type is the
+    // tool's own: the BaseType of the source, U for a table, V for a view and IF or TF for a table-valued function,
+    // whose columns the server names the function as the source of.  It is read only for a source of the session's
+    // own server and database, the names compared by their code points as SqlServerColumns compares them:
+    // OBJECTPROPERTYEX reads the current database whatever OBJECT_ID named, a name of two parts finds sys.databases of
+    // the system resource in it, and a linked server's database of the session's name would find a local object of
+    // the source's name.
     // persisted_not_null is the tool's own too: whether the source, under the same condition and a table of sys.tables,
     // has its column computed PERSISTED NOT NULL in sys.computed_columns, the name compared under the database's
     // collation, as the server resolves a name.  The server's is_nullable judges the column's expression instead.
@@ -235,7 +236,10 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             token
         );
 
-    /// <summary>The columns of the query's first result set, a row each, or the error rows of the describe.</summary>
+    /// <summary>
+    /// The first result set of a text under its declarations (the query's for <c>columns</c>, the operands' for
+    /// <c>operands</c>), a row each, or the error rows of the describe.
+    /// </summary>
     public Task<SqlServerColumnsAnswer> ColumnsAsync(SqlServerColumnsRequest request, CancellationToken token) =>
         DescribeColumnsAsync(request.Sql, request.Params, token);
 

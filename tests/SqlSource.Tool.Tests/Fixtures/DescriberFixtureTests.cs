@@ -97,6 +97,7 @@ public sealed class DescriberFixtureTests : IDisposable
                 "postgres/select-modifiers-expression",
                 "postgres/select-other-schema",
                 "postgres/select-plain",
+                "postgres/select-range-intersection",
                 "postgres/select-suffix-names",
                 "postgres/select-view",
                 "postgres/update-array-and-range",
@@ -104,6 +105,7 @@ public sealed class DescriberFixtureTests : IDisposable
                 "postgres/walk-aggregate",
                 "postgres/walk-anti",
                 "postgres/walk-chain",
+                "postgres/walk-count-argument",
                 "postgres/walk-cte-inlined",
                 "postgres/walk-cte-materialized",
                 "postgres/walk-cube",
@@ -162,6 +164,7 @@ public sealed class DescriberFixtureTests : IDisposable
                 "mssql/select-alias-and-clr",
                 "mssql/select-columns-differ",
                 "mssql/select-computed-not-null",
+                "mssql/select-computed-outer-join",
                 "mssql/select-first-result-set",
                 "mssql/select-hidden-period",
                 "mssql/select-left-join",
@@ -169,6 +172,7 @@ public sealed class DescriberFixtureTests : IDisposable
                 "mssql/select-nullability-differs",
                 "mssql/select-order-differs",
                 "mssql/select-other-database",
+                "mssql/select-proved-forms",
                 "mssql/select-several-tables",
                 "mssql/select-table-function",
                 "mssql/select-table-star",
@@ -204,6 +208,7 @@ public sealed class DescriberFixtureTests : IDisposable
     [InlineData("probe", "update-optional-filter")]
     [InlineData("declared", "insert-declared")]
     [InlineData("columns")]
+    [InlineData("operands", "select-aggregates")]
     [InlineData("table", "select-table-star")]
     public Task Replay_SqlServerCaptureWithACallRemoved_ThrowsACaptureMiss(
         string method,

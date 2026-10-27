@@ -11,9 +11,10 @@ namespace SqlSource.Settings.TypeOverrides;
 /// together.
 /// </summary>
 /// <remarks>
-/// The levels merge per key, the exception to the rule that a level replaces the one below it whole: a level
-/// replaces only the keys it names.  An entry of <c>default</c> stays in a merged map, so that it hides the key of
-/// a level merged under it later and so that <see cref="Find" /> weighs it in its place like any other entry.
+/// The levels merge per key, as those of the column types do (<see cref="ColumnTypes.ColumnTypeMap" />): the two
+/// exceptions to the rule that a level replaces the one below it whole.  A level replaces only the keys it names.  An
+/// entry of <c>default</c> stays in a merged map, so that it hides the key of a level merged under it later and so that
+/// <see cref="Find" /> weighs it in its place like any other entry.
 /// </remarks>
 internal static class TypeOverrideMap
 {

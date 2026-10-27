@@ -118,7 +118,7 @@ public sealed class ColumnTypeGrammarTests
     [InlineData("posts.id -> not a type")]
     [InlineData("posts.id = PostId")]
     [InlineData("-> PostId")]
-    public void TryReadHeaderEntry_Nullability_IsNotValid(string value)
+    public void TryReadHeaderEntry_MalformedEntry_IsNotValid(string value)
     {
         ColumnTypeGrammar.TryReadHeaderEntry(value.AsSpan(), out var entry).ShouldBeFalse();
 

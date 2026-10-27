@@ -205,8 +205,8 @@ public sealed class GeneratorParityTests : IDisposable
     };
 
     // The errors of the settings files that both report, with the files that the case reaches them from.  The paths
-    // are from the folder of the temporary files, where the project's own file is App.csproj, and none has a
-    // dialect, a database or a type override, which only one side reads.
+    // are from the folder of the temporary files, where the project's own file is App.csproj, and none has a value of
+    // a setting that only one side reads, such as a database or a type override.
     private static readonly Dictionary<string, SettingsCase> SettingsCases = new()
     {
         ["errors of the file"] = new(

@@ -44,7 +44,8 @@ public sealed class SidecarReaderTests
         + ColumnsJson
         + "}";
 
-    // One entry, on one line, with every key of the file, of an entry, of a parameter, of a column and of an origin.
+    // One entry, on one line, with every key the reader reads: of the file, of an entry, of a parameter, of a column
+    // and of an origin.  _WARNING and $schema, which it ignores, are left out.
     // Its types are a base and an array, with no bindName, length, precision or scale, and no key of another kind.
     // Each test changes one thing in it.
     private const string Valid = "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': " + EntryJson + "}}";

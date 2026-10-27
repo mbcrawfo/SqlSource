@@ -3,7 +3,7 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SqlSource.Diagnostics;
-using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.MappedTypes;
 
 namespace SqlSource.Generation.Converters;
 

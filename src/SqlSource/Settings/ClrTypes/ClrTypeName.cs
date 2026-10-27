@@ -6,8 +6,9 @@ using Microsoft.CodeAnalysis.CSharp;
 namespace SqlSource.Settings.ClrTypes;
 
 /// <summary>
-/// A C# type as the type override names it: a keyword, a name qualified from the global namespace, or a short name,
-/// with its type arguments and the ranks of an array.
+/// A C# type as a setting names it, the type override, the column types or the <c>-&gt;</c> of a <c>-- param:</c> or
+/// <c>-- column:</c> marker: a keyword, a name qualified from the global namespace, or a short name, with its type
+/// arguments and the ranks of an array.
 /// </summary>
 /// <remarks>
 /// <para>

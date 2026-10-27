@@ -10,7 +10,10 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// <param name="Column">The column as it will be recorded.</param>
 /// <param name="Output">The column's entry of the root's <c>Output</c>, or null when there was none to read.</param>
 /// <param name="Reference">The entry as a reference, or null for an expression and for a column not looked up.</param>
-/// <param name="Mapped">Whether the reference named a relation instance of the plan.</param>
+/// <param name="Mapped">
+/// Whether the reference was resolved, to an instance of the plan or through a scan of another plan, as preserved or
+/// as null-extended.
+/// </param>
 /// <param name="NullExtended">Whether a join null-extends that instance.</param>
 internal sealed record WalkedColumn(
     SidecarColumn Column,

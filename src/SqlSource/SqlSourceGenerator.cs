@@ -15,6 +15,8 @@ using SqlSource.Generation.Models;
 using SqlSource.Generation.Paths;
 using SqlSource.Generation.Sidecars;
 using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.Drivers;
+using SqlSource.Generation.Types.MappedTypes;
 using SqlSource.Parsing;
 using SqlSource.Settings;
 
@@ -1039,8 +1041,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     }
 
     // The project's .sql files and their paths, each type with the files it claims, every claimed path, those that
-    // keep comments, the paths the project lists more than once, and the names of the types whose methods go on
-    // themselves.
+    // keep comments, the paths the project lists more than once, and the member names that each type whose methods go
+    // on itself already has.
     private readonly record struct ClaimedFiles(
         IncrementalValuesProvider<AdditionalText> SqlFiles,
         IncrementalValueProvider<EquatableArray<string>> SqlPaths,

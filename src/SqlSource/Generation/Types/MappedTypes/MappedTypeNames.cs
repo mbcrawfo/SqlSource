@@ -4,7 +4,7 @@ using System.Collections.Immutable;
 using SqlSource.Settings;
 using SqlSource.Settings.TypeOverrides;
 
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.MappedTypes;
 
 /// <summary>
 /// The C# types that the type override and the column types name, at any level, and that the <c>-- param:</c> and

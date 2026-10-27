@@ -19,9 +19,10 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <para>
 /// Some readers keep a rule of their own on purpose.  <see cref="DeclaredTypeText" />'s is stricter than the word rule,
 /// since it guards what is put into a <c>PREPARE</c>.  <see cref="PostgresSearchPath" /> reads a bare element as
-/// anything up to a comma or white space, as the server does.  <see cref="OuterJoinGate" /> compares a quoted name
-/// without unescaping it.  <see cref="StatementShape.PositionalParameter" /> and <c>NpgsqlCheck</c>'s <c>PartAt</c>
-/// find a <c>$n</c> without reading its number.
+/// everything up to a comma, without its white space, which a list the server accepted never holds inside a bare name.
+/// <see cref="OuterJoinGate" /> compares a quoted name without unescaping it.
+/// <see cref="StatementShape.PositionalParameter" /> and <c>NpgsqlCheck</c>'s <c>PartAt</c> find a <c>$n</c> without
+/// reading its number.
 /// </para>
 /// </remarks>
 internal static class PostgresIdentifiers

@@ -5,7 +5,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.MappedTypes;
 
 /// <summary>
 /// The ids of the warnings that a use of a mapped type gives, which a model's file disables, and whether a pragma can

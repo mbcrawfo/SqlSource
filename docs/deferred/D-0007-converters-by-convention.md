@@ -6,7 +6,7 @@
 
 ## Delivered instead
 
-Only a method marked `[SqlSourceConverter]` is a converter: [`ConverterReader`](../../src/SqlSource/Generation/Converters/ConverterReader.cs) reads the marked methods of the project's source, and [`MappedTypeResolver`](../../src/SqlSource/Generation/Types/MappedTypeResolver.cs) those of each mapped type of a referenced assembly.  A type with no marked method is given to the driver as it is, which throws `InvalidCastException` for a type the driver does not know.  The manual's known issues of [settings](../manual/settings.md#known-issues) show the two converters a project writes for such a type, each calling the type's own `From` and `Value`.
+Only a method marked `[SqlSourceConverter]` is a converter: [`ConverterReader`](../../src/SqlSource/Generation/Converters/ConverterReader.cs) reads the marked methods of the project's source, and [`MappedTypeResolver`](../../src/SqlSource/Generation/Types/MappedTypes/MappedTypeResolver.cs) those of each mapped type of a referenced assembly.  A type with no marked method is given to the driver as it is, which throws `InvalidCastException` for a type the driver does not know.  The manual's known issues of [settings](../manual/settings.md#known-issues) show the two converters a project writes for such a type, each calling the type's own `From` and `Value`.
 
 ## Why deferred
 

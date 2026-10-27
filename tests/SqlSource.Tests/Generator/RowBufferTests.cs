@@ -274,8 +274,8 @@ public sealed class RowBufferTests
         MethodsOf(run).ShouldContain(buffer);
     }
 
-    // The file of ListUsers's methods on App.Sample, its rows read into the buffer, and the end after the extension
-    // class: the buffer and the namespace's brace, or the brace alone.
+    // The file of ListUsers's methods on App.Sample, its rows read into the given buffer, the pooled one or a list, and
+    // the end after the extension class: the buffer's struct and the namespace's brace, or the brace alone.
     private static string ListUsersMethods(string buffer, string end) =>
         Joined(
             $$$"""

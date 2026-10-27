@@ -8,7 +8,7 @@ using System.Net.NetworkInformation;
 using System.Reflection;
 using NpgsqlTypes;
 using Shouldly;
-using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.Maps;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
 using SqlSource.Testing.EndToEnd;

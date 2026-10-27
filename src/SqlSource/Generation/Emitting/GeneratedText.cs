@@ -1,7 +1,7 @@
 namespace SqlSource.Generation.Emitting;
 
 /// <summary>
-/// The text that every file the generator writes for a type or a model shares.
+/// The text that every file the generator writes for a type, a type's methods or a model shares.
 /// </summary>
 internal static class GeneratedText
 {

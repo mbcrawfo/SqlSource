@@ -4,14 +4,13 @@ using SqlSource.Tool.Testing;
 
 namespace SqlSource.Tests.Postgres.Describer;
 
-// Every object that a test of the UsesPostgres collection leaves on its one server beyond the fixture has its text
-// here alone, made by SQL that can be run again, and is never dropped beyond what its own text replaces: the
-// container is thrown away, and the fixtures are recorded in one of their own.  So a class that runs it first makes
-// the same object as any other would.  An object that changes what another test sees while it exists,
-// public."numeric", the schema "user", the schema shadow of ShadowCount and ShadowOperators, the aggregate
-// pg_catalog.count(text) of CatalogCount, the operator pg_catalog.* of CatalogOperator, the schema zz of
-// OperatorsAfterTheCatalog, describer_canary,
-// command_widgets, error_path_widgets and session_gone, is made by its test and dropped in a finally.
+// Every object that a test of the UsesPostgres collection leaves on its one server beyond the fixture has its text here
+// alone, made by SQL that can be run again, and is never dropped beyond what its own text replaces: the container is
+// thrown away, and the fixtures are recorded in one of their own.  So a class that runs it first makes the same object
+// as any other would.  An object that changes what another test sees while it exists, public."numeric", the schema
+// "user", the schema shadow of ShadowCount and ShadowOperators, the aggregate pg_catalog.count(text) of CatalogCount,
+// the operator pg_catalog.* of CatalogOperator, the schema zz of OperatorsAfterTheCatalog, describer_canary,
+// command_widgets, error_path_widgets, session_gone and transaction_kept, is made by its test and dropped in a finally.
 internal static class ScratchSchema
 {
     /// <summary>

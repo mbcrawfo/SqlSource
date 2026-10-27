@@ -9,8 +9,9 @@ using Xunit.Sdk;
 
 namespace SqlSource.Tests;
 
-// The gates on a server's version that the containers of both engines share.  They are tested here, with no server:
-// each takes the version it is asked about, so a test names it.
+// What the containers of both engines share, tested here with no server: the gates on a server's version, each of
+// which takes the version it is asked about so that a test names it; the tag of an image; each engine's default image
+// and whether it retries a crash at start; and the start that disposes a container whose start threw.
 public sealed class EngineImageTests
 {
     [Theory]

@@ -26,12 +26,12 @@ public sealed class SharedModelTests
     // The name of GetUser in Users, of GetA in A and of GetB in B.
     private const string GetUserName = $"{GeneratorHarness.UsersPath}(1,10)-(1,17)";
 
-    private const string TheProjectFilePlace =
-        "the typeOverrides of the settings file " + GeneratorHarness.ProjectSettingsPath;
-
     private const string GetAName = "/app/Repo/A.sql(1,10)-(1,14)";
 
     private const string GetBName = "/app/Repo/B.sql(1,10)-(1,14)";
+
+    private const string TheProjectFilePlace =
+        "the typeOverrides of the settings file " + GeneratorHarness.ProjectSettingsPath;
 
     private const string Help257 = "  Give one of the two queries another model name, or make the two the same.";
 

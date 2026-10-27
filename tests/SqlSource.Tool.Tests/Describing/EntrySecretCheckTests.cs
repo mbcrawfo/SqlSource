@@ -111,7 +111,8 @@ public sealed class EntrySecretCheckTests
     public void Holds_ValueThatThePlanGave_IsFalse(string value) =>
         EntrySecretCheck.Holds(Entry, new ConnectionSecret(value)).ShouldBeFalse();
 
-    // The owner's decision: a part is never searched for in an entry, so a password that stands in one is no fault.
+    // A part is never searched for in an entry, since a password that equals a catalog's name would end the run for a
+    // common schema: a password that stands in an entry is no fault.
     [Fact]
     public void Holds_PasswordInAnEntry_IsFalse() =>
         EntrySecretCheck

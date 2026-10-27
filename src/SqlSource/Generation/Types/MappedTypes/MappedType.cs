@@ -1,8 +1,9 @@
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.MappedTypes;
 
 /// <summary>
-/// A C# type that the type override names, as the compilation resolves it.  It holds no symbol, so it is equal from
-/// one edit to the next until the type itself changes.
+/// A C# type that the type override, the column types or a <c>-- param:</c> or <c>-- column:</c> marker names, as the
+/// compilation resolves it.  It holds no symbol, so it is equal from one edit to the next until the type itself
+/// changes.
 /// </summary>
 /// <param name="Name">The type as <see cref="Settings.ClrTypes.ClrTypeName.Text" /> writes it.</param>
 /// <param name="Status">Whether the type is found, and if not, why.</param>

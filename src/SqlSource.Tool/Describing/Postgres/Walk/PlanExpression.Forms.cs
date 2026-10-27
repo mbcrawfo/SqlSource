@@ -150,9 +150,10 @@ internal static partial class PlanExpression
         private long? Intersection(string name, long left, long right) =>
             name == "*" && left == right && CatalogOverloads.IsRange(left) && OperatorHeldAlone(name) ? left : null;
 
-        // (E)::T, where E is proved of a type that carries to T within a family of SetOperationTypes: pg_cast holds
-        // one row for a pair, the server ships one for every ordered pair of a family and pins it, and none returns
-        // NULL for a value that is not.  T is a built-in type's name, with a modifier allowed.
+        // (E)::T, where E is proved of a type that carries to T within a family of SetOperationTypes: pg_cast holds one
+        // row for a pair, the server ships one for every ordered pair of a family, which
+        // Catalog_CastFamilies_AreBuiltInBothWays pins, and none returns NULL for a value that is not.  T is a built-in
+        // type's name, with a modifier allowed.
         private long? Cast(int from, int to)
         {
             var close = _closes[from];

@@ -256,7 +256,7 @@ internal static class PostgresErrors
         string database
     )
     {
-        // Before anything is counted against the PREPARE's text: neither is a fault of it.
+        // Before anything is counted against the PREPARE's text: none of the three is a fault of it.
         if (
             error.SqlState == DuplicatePreparedStatement
             || (error.SqlState is null && error.Message == PostgresLive.StatementNotListed)

@@ -16,7 +16,8 @@ namespace SqlSource.Tests.SqlServer.Describer;
 // the nullableSource expression and give no NULL over rows chosen to tempt one: empty groups' neighbours, the totals
 // of a grouping set, NULLs beside the values.  A query that tries to break a proof must stay the server's nullable
 // and give at least one NULL over the same rows, which shows the server was right.  Every column is named c, which the
-// count of NULL rows reads.  The facts of the design that the proofs stand on are pinned beside them.
+// count of NULL rows reads.  The facts of docs/superpowers/specs/2026-10-23-sql-server-nullability-noise-design.md that
+// the proofs stand on, its "fact N" below, are pinned beside them.
 [Collection(UsesSqlServer.Name)]
 public sealed class ProofTests(SqlServerContainer sqlServer)
 {
@@ -71,11 +72,12 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
             { 0, "SELECT COALESCE(CAST(b AS nvarchar(20)), N'none') AS c FROM dbo.proof_rows" },
         };
 
-    // The queries that try to break a proof, with the major they need, each NULL in some row: the design's list, then
-    // the same forms wrapped or written another way.  Under ROLLUP the grouping column is NULL in the total's row even
-    // where the table holds none: the rows of a, which the table never makes NULL, show it, and those of g, NULL in
-    // the table too, do not.  The scalar subqueries of COUNT that a set operator, an OFFSET, a TOP or a grouping can
-    // leave with no row are inside arithmetic, so that the item is not one leaf alone, which would ask nothing.
+    // The queries that try to break a proof, with the major they need, each NULL in some row: the list of that design's
+    // Tests section, then the same forms wrapped or written another way.  Under ROLLUP the grouping column is NULL in
+    // the total's row even where the table holds none: the rows of a, which the table never makes NULL, show it, and
+    // those of g, NULL in the table too, do not.  The scalar subqueries of COUNT that a set operator, an OFFSET, a TOP
+    // or a grouping can leave with no row are inside arithmetic, so that the item is not one leaf alone, which would
+    // ask nothing.
     public static TheoryData<int, string> BreakingAttempts =>
         new()
         {

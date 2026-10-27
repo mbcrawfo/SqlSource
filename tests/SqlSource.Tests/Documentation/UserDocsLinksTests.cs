@@ -14,7 +14,7 @@ public sealed class UserDocsLinksTests
     // The two readmes are packed into NuGet packages and shown on nuget.org, away from the repository.
     private static readonly string[] PackedReadmes = ["README.md", "src/SqlSource.Tool/README.md"];
 
-    // What a user's document does not send the reader into: the notes of the project's own work.
+    // What a user's document does not send the reader into: the notes of the project's own work, and its source.
     private static readonly string[] InternalFolders =
     [
         "docs/tech-debt/",

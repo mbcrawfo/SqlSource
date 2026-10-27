@@ -10,14 +10,14 @@ internal static partial class NullabilityWalk
     // The entries of a plan read as expressions, with a reference inside one answered as the walk answers a column:
     // through an instance that no join extends, to a column of a relation that "tables" or "relations" answered, by the
     // catalog's rule.  At a Full join that computes the entry, the reader is told too which side an instance that only
-    // that join extends is under (ProvedOnSideOf), for a COALESCE over both sides.  A bare name is the plan's one
-    // relation's (PlanInstances.BareAlias): a plan of several prints every name with its alias but the columns of a
-    // relation the planner proved empty, a Result under an outer join, and at a ModifyTable that may return the old or
-    // the new row only the target's alias is a relation.  An entry is read in a plan where no join null-extends a side,
-    // or where the walk follows it to the node that computes it and no join null-extends that node: a node prints a
-    // value computed under it in one pair of parentheses, at every node up to the root.  An aggregate is read only
-    // where the walk follows the entry to the node that computes it.  A subquery's SubPlan is found by its name in the
-    // whole plan and read as a plan of its own, as deep as Plans.MaxDepth allows.
+    // that join extends is under (ExpressionContext.ProvedOnFullJoinSide), for a COALESCE over both sides.  A bare name
+    // is the plan's one relation's (PlanInstances.BareAlias): a plan of several prints every name with its alias but
+    // the columns of a relation the planner proved empty, a Result under an outer join, and at a ModifyTable that may
+    // return the old or the new row only the target's alias is a relation.  An entry is read in a plan where no join
+    // null-extends a side, or where the walk follows it to the node that computes it and no join null-extends that
+    // node: a node prints a value computed under it in one pair of parentheses, at every node up to the root.  An
+    // aggregate is read only where the walk follows the entry to the node that computes it.  A subquery's SubPlan is
+    // found by its name in the whole plan and read as a plan of its own, as deep as Plans.MaxDepth allows.
     private sealed class Expressions(
         Plans plans,
         PlanNode root,

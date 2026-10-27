@@ -10,7 +10,8 @@ internal static class RealisticCases
 {
     public static RealisticCorpus Corpus => RealisticCorpus.SqlServer;
 
-    // The models of the classes of Realistic/Generation/RealisticQueries.cs, named as the generator names them.
+    // The models and methods of the classes of Realistic/Generation/RealisticQueries.cs and RealisticMethods.cs, named
+    // as the generator names them.
     public static RealisticModels Models { get; } =
         new(
             typeof(RealisticCases).Assembly,

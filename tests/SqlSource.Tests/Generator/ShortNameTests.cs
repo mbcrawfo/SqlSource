@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.MappedTypes;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using Xunit;

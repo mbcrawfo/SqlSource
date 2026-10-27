@@ -33,7 +33,7 @@ public sealed class SettingLevelTests
         "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
     );
 
-    // The single query of Sql under the defaults, Q at its first line.
+    // The one diagnostic of Sql under the defaults: SQLSRC209 at Q, on its first line.
     private static readonly string[] Default = [NotDescribable("codegen", 1)];
 
     public static TheoryData<string, string, string[], string[]> MarkersWithoutAnEffect =>

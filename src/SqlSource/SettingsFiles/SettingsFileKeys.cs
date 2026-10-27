@@ -42,7 +42,7 @@ internal static class SettingsFileKeys
 
     public const string NestedClass = "nestedClass";
 
-    // The keys of the settings of a level, in the order of SettingId.  Above All, which is built from it.
+    // The keys of the settings of a level, in the order of SettingId, which KeyOf indexes.
     private static readonly string[] Settings =
     [
         GeneratorParameters,

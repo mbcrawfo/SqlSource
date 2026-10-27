@@ -7,6 +7,7 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.Drivers;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
@@ -17,9 +18,10 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // The probe of the Npgsql a project references, against the drivers themselves and against assemblies made to look
-// like one, and the diagnostics of the driver.  Each test but one runs a query at Models in a postgres file whose
-// entry is current, with no columns but in the tests of the types a project without Npgsql can have; that one shows
-// that a query at Sql or under mssql reads nothing of the driver.
+// like one, and the diagnostics of the driver.  The Findings_ tests read a probe's findings alone.  Each other test
+// but one runs a query at Models in a postgres file whose entry is current, with no columns but in the tests of the
+// types a project without Npgsql can have; that one shows that a query at Sql or under mssql reads nothing of the
+// driver.
 public sealed class NpgsqlProbeTests
 {
     private const string Source = """

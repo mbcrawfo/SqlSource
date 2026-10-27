@@ -56,8 +56,7 @@ public sealed class ToolDiagnosticsTests
         }
     }
 
-    // RS1032, which the build checks, allows a period only at the end of a message of several sentences.  The tool
-    // formats a message itself, so nothing else would notice a placeholder that the arguments do not fill.
+    // The tool formats a message itself, so nothing else would notice a placeholder that the arguments do not fill.
     [Fact]
     public void All_Messages_FormatWithTheirArguments()
     {

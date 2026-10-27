@@ -12,8 +12,8 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Planning;
 
-// What is wrong with a plan: each row of its table in docs/superpowers/specs/2026-10-09-query-generation-phase-2-4-
-// work-list-design.md, with its id, its place and what it does to the plan.
+// What is wrong with a plan: each error the planner reports of a project and its files, with its id, its place and
+// what it does to the plan.
 public sealed class RunPlannerErrorTests : IDisposable
 {
     private readonly TempFolder _folder = new();

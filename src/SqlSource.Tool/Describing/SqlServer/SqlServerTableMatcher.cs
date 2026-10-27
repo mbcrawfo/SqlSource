@@ -42,8 +42,8 @@ internal static class SqlServerTableMatcher
     /// </summary>
     /// <param name="columns">The columns of a statement with rows, in order, as they will be recorded.</param>
     /// <param name="table">
-    /// The visible rows of <c>table</c>'s answer for <see cref="TableOf" />'s table, or null when it was not asked
-    /// because the first two checks failed.  A hidden row is no column of the table.
+    /// The rows of <c>table</c>'s answer for <see cref="TableOf" />'s table, the hidden ones included, which are
+    /// dropped here as no column of the table; or null when it was not asked because the first two checks failed.
     /// </param>
     /// <exception cref="InvalidOperationException">
     /// There is no column, or the first two checks passed with no table: a bug of the describer.

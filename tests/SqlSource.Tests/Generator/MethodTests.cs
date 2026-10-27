@@ -357,8 +357,8 @@ public sealed class MethodTests
         run.Sources[MethodRuns.MethodsFile].ShouldContain("    internal static partial class SampleExtensions\n");
     }
 
-    // Review Focus 4: one top-level class for each, named by the type's own name, internal unless the type and every
-    // type around it are public.
+    // One top-level class for each type, named by the type's own name, internal unless the type and every type around
+    // it are public.
     [Fact]
     public void Run_NestedAndGenericTypes_GiveOneTopLevelExtensionClassEach()
     {
@@ -532,7 +532,7 @@ public sealed class MethodTests
         methods.ShouldContain("rows.Add(new global::App.UsersDto(reader.GetFieldValue<int>(0)));\n");
     }
 
-    // Review Focus 5: the method names the model from global::, whatever its namespace.
+    // The method names the model from global::, whatever its namespace.
     [Theory]
     [InlineData("", "global::GetUserDto")]
     [InlineData("namespace @class.Rows;\n\n", "global::@class.Rows.GetUserDto")]

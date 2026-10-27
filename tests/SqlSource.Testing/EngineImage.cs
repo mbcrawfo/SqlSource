@@ -38,7 +38,8 @@ internal sealed class EngineImage
     // The name of the engine in a message.
     public string Product { get; }
 
-    // Names another image: CI runs the tests again on the oldest server of the engine that is supported.
+    // Names another image: CI runs the tests again on the oldest supported server, and the nightly run on each major
+    // between it and the default.
     public string Variable { get; }
 
     public string Default { get; }

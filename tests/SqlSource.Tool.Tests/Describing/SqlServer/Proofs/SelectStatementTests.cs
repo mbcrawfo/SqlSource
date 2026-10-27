@@ -162,7 +162,8 @@ public sealed class SelectStatementTests
             .ShouldBe("FROM t FOR SYSTEM_TIME AS OF @t");
     }
 
-    // A WHERE without a FROM is left out of the rows the operands are asked over, as the design says.
+    // A WHERE without a FROM is left out of the rows the operands are asked over, as OperandsQuery builds its
+    // text (docs/architecture/sqlserver-describer.md, "The text of operands").
     [Fact]
     public void Read_WhereWithoutFrom_HasNoFrom()
     {

@@ -183,12 +183,15 @@ internal sealed record SqlServerDeclaredRow(
 internal sealed record SqlServerDescribeError(int Number, int Type, string Message);
 
 /// <summary>
-/// The request of <c>columns</c>: <c>sys.dm_exec_describe_first_result_set</c> of the query's SQL in browse mode 2,
-/// under the declarations of every parameter of its list.
+/// The request of <c>columns</c> and of <c>operands</c>: <c>sys.dm_exec_describe_first_result_set</c> of a text in
+/// browse mode 2 under declarations.
 /// </summary>
-/// <param name="Sql">The SQL as written.</param>
+/// <param name="Sql">
+/// The query's SQL as written for <c>columns</c>, or the text of <c>OperandsQuery</c> for <c>operands</c>.
+/// </param>
 /// <param name="Params">
-/// The declarations of the parameters, each at its described type, <c>@a int, @b nvarchar(50)</c>, or null.
+/// The declarations of the parameters, each at its described type, <c>@a int, @b nvarchar(50)</c>, or the declared
+/// parameters alone for the <c>columns</c> asked after 11501; or null.
 /// </param>
 internal sealed record SqlServerColumnsRequest(string Sql, string? Params);
 
@@ -201,8 +204,8 @@ internal sealed record SqlServerColumnsRequest(string Sql, string? Params);
 internal sealed record SqlServerTableRequest(string Schema, string Table);
 
 /// <summary>
-/// The columns of the first result set that <c>columns</c> or <c>table</c> described, or what the server found wrong
-/// with its text.
+/// The columns of the first result set that <c>columns</c>, <c>operands</c> or <c>table</c> described, or what the
+/// server found wrong with its text.
 /// </summary>
 /// <param name="Rows">
 /// Every row of the describe, the hidden ones included, in the order of their ordinals, when the server found no

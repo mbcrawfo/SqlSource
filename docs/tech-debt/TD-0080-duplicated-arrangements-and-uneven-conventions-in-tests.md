@@ -1,0 +1,61 @@
+# TD-0080 - Duplicated arrangements and uneven conventions in tests
+
+## Problem
+
+The maintainability review of 2026-10-27 found these in `tests/`.  The tests that depend on a program, a shared static or the real clock are items of their own (TD-0081 to TD-0083).  Paths are under `tests/`.
+
+1. **The two engines' realistic test classes are near copies.**  `SqlSource.Tests.Postgres/Realistic/` and `SqlSource.Tests.SqlServer/Realistic/` each hold `Generation/RealisticModelRefusalTests.cs`, `Generation/RealisticClaimsTests.cs`, `RealisticCasesTests.cs`, `Describer/RealisticDescriptionTests.cs`, `Describer/RealisticNullabilitySafetyTests.cs` (with a helper `ColumnOf` in each) and `Generation/RealisticModelNullabilityTests.cs`, which differ only in the container, the reference and the namespace.
+2. **`EndToEnd/RowBufferQueryTests.cs` is copied whole** between the two engines, with the same helpers `ShouldBeTheCallersAloneAsync`, `Rows<T>` and `ImmutableRowsNeverDefault`.
+3. **The allocation tests copy one body per test, and the two engines have drifted.**  [`SqlSource.Tests.Postgres/EndToEnd/AllocationTests.cs`](../../tests/SqlSource.Tests.Postgres/EndToEnd/AllocationTests.cs) has 14 facts with the same 17-line body and [`SqlSource.Tests.SqlServer/EndToEnd/AllocationTests.cs`](../../tests/SqlSource.Tests.SqlServer/EndToEnd/AllocationTests.cs) 13 theories with the same 25-line body; one names its tests `PerCall…HandWritten` and leaves `Async` off its by-hand helpers, the other `ManyCalls…ByHand` with `Async`, and only the second logs what it measured.
+4. **The caching tests share a tail written twice**: `CachingConverterTests` and `CachingMethodTests` of `SqlSource.Tests/Generator/` each define `UserMethods`, `OrderMethods`, `ShouldAllBeCached`, `Expect` and `MethodsOf`, and `reasons.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached)` is written 51 times across the `Caching*Tests` classes.
+5. **Generated file names are literals**: `"App.Sample.g.cs"` about 75 times in 19 classes and `"App.GetUserDto-Model.g.cs"` about 50 times in 9, where only `MethodRuns.MethodsFile` is a constant.
+6. **[`SqlServerScript`](../../tests/SqlSource.Tool.Tests/SqlServerScript.cs) takes a call's name as a string**, so its users spell `"parameters"` and `"columns"` about 90 times each and write the pair "an empty parameters answer, then a columns answer" a dozen times, where [`PostgresScript`](../../tests/SqlSource.Tool.Tests/PostgresScript.cs) has typed builders.  No test uses `SqlServerCallNames` or `PostgresCallNames`.
+7. **The builder of a realistic sample's dictionary is copied six times, with different comparers**: `SqlSource.Tool.Tests/Realistic/RealisticSampleChecksTests.cs`, each engine's `Realistic/RealisticSamplesTests.cs` and `Realistic/Generation/RealisticParametersTests.cs`, and SQL Server's `Realistic/Describer/RealisticNullabilityOracleTests.cs`.  Five use `Ordinal`; PostgreSQL's parameters copy uses `OrdinalIgnoreCase`, which is what `RealisticCaseReader` gives a real sample.  PostgreSQL also builds the same dictionary of types twice, since its `RealisticSamples.Substitute` takes a dictionary where SQL Server's `Batch` takes the parameters.
+8. **Small helpers of the generator tests are copied**: `Problems(GeneratorRun)` in `ConverterMethodTests`, `MethodConflictTests` and `MethodDiagnosticsTests`; `Joined`, the `↩` of a continued line, in `ConverterMethodTests`, `MethodTests`, `RowBufferTests` and `Generation/Emitting/QueryMethodWriterTests`; `ColumnsOf` in `ColumnTypeTests`, `QueryTypesTests`, `TypeOverrideLevelTests` and `SettingsFileTests`; and `Catalog(...)` in `NpgsqlProbeTests` and `Generation/Types/PostgresTypeMapTests`, both wider copies of `ModelRuns.Catalog`.
+9. **`IStartingContainer` is faked twice**, in `SqlSource.Tests/EngineImageTests.cs` and `SqlSource.Tests.SqlServer/SqlServerStartTests.cs`, the second a superset of the first.
+10. **`EquatableArray` has three builders**: `TestSidecars.Of` of `SqlSource.Testing`, `TestModels.Array` of `SqlSource.Tests/Generation/`, with the same body, and a wrapper in `Generator/QueryTypesTests.cs`.
+11. **Classes over 600 lines mix subjects**: `SqlSource.Tests.Postgres/Describer/PlanOutputTests.cs` (about 1,100 lines) holds six `Catalog_*` pins of `pg_catalog` between its `Explain_*` tests; `Generator/SettingsFileTests.cs` (about 980) holds the `SqlSourceBuildFolders` exclusion tests beside those of which level wins; `Generator/ConverterMethodTests.cs` (about 1,280) holds the obsolete and experimental tests and the array tests beside the converters'.
+12. **Theories whose row changes the arrangement and the assertions**: `Generation/Emitting/TypeEmitterTests.cs` picks between two sets of assertions with an `if`; `Generator/GeneratorParameterLevelTests.cs`, `Generator/CachingModelTests.cs` (two) and `SqlSource.Tool.Tests/Describing/Postgres/PostgresSessionParameterTests.cs` pick between arrangements.
+13. **Test names are uneven**: a diagnostic id is `IsSQLSRC111` in about 30 names, mostly `Generation/Methods/ConversionPlannerTests.cs` and `Parsing/SqlFileParserMarkerTests.cs`, against `IsSqlsrc250` in about 370; and about 50 names do not have the three parts of `Method_Scenario_Outcome`, such as most of `Generator/ShortNameTests.cs`.
+14. **A log event's name is read by hand**: `GetProperty("event").GetString()` about 27 times across the tool's tests, 15 of them in `Logging/RunLogRedactionTests.cs`, and a local `NameOf` in `SqlSource.Tests.Postgres/Describer/DescribeCommandTests.cs`, where `LogReader` has only `Names(path)`.
+15. **Literals that one place should hold**: the default image tags are written again in `SqlSource.Tests/EngineImageTests.cs` and `SqlSource.Tests.SqlServer/SqlServerStartTests.cs`, though `tests/AGENTS.md` makes `DefaultImages` the one place that names them, and they go stale when an image moves; `RepositoryPaths.DescriberFixtures` is the same path in both container projects.
+16. **Shared SQL texts are written out**: `"-- name: ListInvoices\n-- database: billing\nSELECT 3;\n"` four times and `"-- name: Plain\n-- output: sql\nSELECT 4;\n"` six times in the tool's `Commands/` and `Logging/` tests, and `Generator/TypeOverrideLevelTests.cs` writes `GeneratorHarness.UsersFile` out three times.
+17. **The list of describer fixture cases is checked as a subset**: `Cases_OfPostgres_HoldEveryCase` and `Cases_OfSqlServer_HoldEveryCase` of `SqlSource.Tool.Tests/Fixtures/DescriberFixtureTests.cs` check that the listed cases exist, not that no other does, so a case recorded later is left out of the list without a failure (four were, until this review).
+18. **The fixture build files are linked by the same block in three projects**: `SqlSource.Tool.Tests`, `SqlSource.Tests.Postgres` and `SqlSource.Tests.SqlServer` each copy the `Fixtures/build/` and `Fixtures/global.json` items word for word.
+19. **Some named steps of the generator have no caching test**: `src/SqlSource/AGENTS.md` and `tests/AGENTS.md` say a step whose re-runs matter has a name in `TrackingNames` and a test in the `Caching*Tests` class of its step, and no `Caching*Tests` class names `RepeatedPaths`, `AmbiguousHintNames`, `AllFileModels`, `FileModelSlots` or `ModelsByFile` (which `ModelsByFileTests` tests as a unit).  The first two almost never change and may be exempt; the rule does not say so.
+
+What the arrangement of compiling `SqlSource.Tests/Generator/` twice blocks: a test there cannot use a helper elsewhere in `SqlSource.Tests` (`TestModels`, `ParseOf`, `TextSpans`, `SidecarFaker`), so a shared helper must go in `SqlSource.Testing`, which stays on Roslyn 4.8 and cannot reach `SqlSource.Tool.Testing`.  It does not force items 4 and 8: `SqlSource.Testing/Generator/` can already hold them.
+
+## Why it exists
+
+Each engine's tests were written by copying the first engine's, and the helpers of the generator's tests were written in the class that first needed them.  The review records them and does not refactor, so that its pull request stays a review.
+
+## Impact
+
+Low each, Medium together: a fix to one copy leaves the other wrong, as the comparers of item 7 and the names of item 3 already show, and the long literals and theories make a change to the generator's output a change to dozens of lines.
+
+## Proposed fix
+
+One item at a time, each in its own pull request:
+
+1. and 2. Move each body into `SqlSource.Tool.Testing/Realistic/` or `SqlSource.Testing/EndToEnd/` behind an engine binding, as `ErrorPaths` and `ToolProcess` are, and leave one-line facts in each engine.
+3. One `ShouldAllocateNoMoreThanByHandAsync(generated, byHand, expected)` and one scheme of names for both engines.
+4. and 8. Move the helpers into `SqlSource.Testing/Generator/` (`StepReasons`, `CachingScene`, `GeneratorRun`, `StepOutputs`, a widened `ModelRuns.Catalog`).
+5. `GeneratorHarness.SampleFile` and `ModelRuns.GetUserDtoFile`.
+6. Typed `Parameters`, `Columns` and `Table` builders on `SqlServerScript`, and the call names from `*CallNames`.
+7. A `RealisticSample.Of(...)` in `SqlSource.Tool.Testing` with the reader's comparer, and a `Substitute(sql, sample, parameters)`.
+9. One `FakeStartingContainer` in `SqlSource.Testing`.
+10. Keep `TestSidecars.Of` and delete `TestModels.Array`.
+11. Split each class by subject.
+12. Split each theory into facts.
+13. Rename to `Sqlsrc` and to three parts.
+14. `LogReader.EventOf(JsonElement)` and `LogReader.Events(path, name)`.
+15. Use `DefaultImages`, or a tag that is plainly fake, and one `RepositoryPaths.DescriberFixtures` in `SqlSource.Testing`.
+16. Add the two texts to `SqlTexts`, and use `GeneratorHarness.UsersFile`.
+17. Compare the list with the case folders whole.
+18. A `tests/Fixtures.props` that the three projects import.
+19. A caching test for each of the model steps, and the exemptions named in the rule.
+
+## Trigger
+
+A change to a test that has a copy: make the shared helper first.  Otherwise the next maintainability review.
