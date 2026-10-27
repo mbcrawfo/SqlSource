@@ -126,11 +126,11 @@ internal static class TypeKeyText
     /// <summary>
     /// Writes <paramref name="text" /> as a part of a key: as it is when it is not empty and holds only letters,
     /// digits, <c>_</c> and <c>$</c>, none of them upper case, since a plain part is read in lower case; otherwise in
-    /// double quotes with each <c>"</c> doubled, or in the escaped form when the quotes would not keep it.  A key is
-    /// trimmed and a marker is one line, so a text with a control character other than NUL or a white space other than
-    /// a lone space is written <c>U&amp;"a\000Ab"</c>, with <c>\XXXX</c> for each such character, <c>\\</c> for a
-    /// <c>\</c> and <c>""</c> for a <c>"</c>.  A NUL stays as it is: a PostgreSQL name cannot hold it, and
-    /// <c>\0000</c> is no escape.
+    /// double quotes with each <c>"</c> doubled, or in the escaped form when the quotes would not keep it.  A marker is
+    /// one line, so a text with a control character other than NUL is written <c>U&amp;"a\000Ab"</c>, with
+    /// <c>\XXXX</c> for each such character, <c>\\</c> for a <c>\</c> and <c>""</c> for a <c>"</c>.  White space that
+    /// is not a control character is kept as it is in the quotes.  A NUL stays as it is: a PostgreSQL name cannot hold
+    /// it, and <c>\0000</c> is no escape.
     /// </summary>
     public static string WritePart(string text)
     {
@@ -152,7 +152,7 @@ internal static class TypeKeyText
         for (var index = 0; index < text.Length; index++)
         {
             var character = text[index];
-            if (MustEscape(text, index))
+            if (MustEscape(character))
             {
                 _ = written.Append('\\').Append(((int)character).ToString("X4", CultureInfo.InvariantCulture));
             }
@@ -169,29 +169,11 @@ internal static class TypeKeyText
         return written.Append('"').ToString();
     }
 
-    private static bool NeedsEscape(string text)
-    {
-        for (var index = 0; index < text.Length; index++)
-        {
-            if (MustEscape(text, index))
-            {
-                return true;
-            }
-        }
+    private static bool NeedsEscape(string text) => text.Any(MustEscape);
 
-        return false;
-    }
-
-    // A character that a quoted part would not keep: the trim reads any white space but U+0020 as a space and a run
-    // of them as one, and a control character may end the line.  A NUL is none of them: no PostgreSQL name holds one,
-    // and \0000 cannot write it.
-    private static bool MustEscape(string text, int index)
-    {
-        var character = text[index];
-        return (character != '\0' && char.IsControl(character))
-            || (char.IsWhiteSpace(character) && character != ' ')
-            || (character == ' ' && index > 0 && text[index - 1] == ' ');
-    }
+    // A character that a quoted part would not keep: a control character, which may end the line of a marker.  A NUL
+    // is not escaped: no PostgreSQL name holds one, and \0000 cannot write it.
+    private static bool MustEscape(char character) => character != '\0' && char.IsControl(character);
 
     /// <summary>
     /// Reads the part of a key that starts at <paramref name="start" />, plain, quoted or escaped, and gives the index

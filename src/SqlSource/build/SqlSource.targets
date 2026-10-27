@@ -65,10 +65,11 @@
         It runs in a target, and not where this file is imported, so that a .sql file that a target adds is searched
         above too.  In a build it runs just before CoreCompile, from SqlSource.AfterSdk.targets, after every target of
         the project that hooks CoreCompile; where that file is not imported, SqlSourceSettingsSearchHook hooks it to
-        GenerateMSBuildEditorConfigFileCore instead.  It depends on SqlSourceListFiles, so that a target that hooks
-        it to add a .sql file runs first.  An IDE lists the items of a project as evaluated, never one that a target
-        adds, so Visible="false" is only for one that might; a settings file in the project's folder is listed anyway,
-        as None or Content.
+        GenerateMSBuildEditorConfigFileCore instead, and a .sql file that a later target adds, one that hooks that
+        target or CoreCompile, is not searched above: TD-0016.  It depends on SqlSourceListFiles, so that a target
+        that hooks it to add a .sql file runs first.  An IDE lists the items of a project as evaluated, never one
+        that a target adds, so Visible="false" is only for one that might; a settings file in the project's folder is
+        listed anyway, as None or Content.
 
         The chain of item functions is one attribute, and cannot be wrapped, so the check of the line length is off
         for the target.
