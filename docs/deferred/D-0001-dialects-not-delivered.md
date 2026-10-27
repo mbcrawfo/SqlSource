@@ -2,7 +2,7 @@
 
 ## Planned
 
-The [dialect design](../superpowers/specs/2026-10-06-sql-dialects-design.md) researched every engine a .NET project is likely to use, and lists what each would need in its section "Engines not delivered".
+The [dialect design](https://github.com/mbcrawfo/SqlSource/blob/c4c3454e6ec16f9bb3b96aedc07f1fd1195f561b/docs/superpowers/specs/2026-10-06-sql-dialects-design.md) researched every engine a .NET project is likely to use, and lists what each would need in its section "Engines not delivered".
 
 ## Delivered instead
 
@@ -28,7 +28,7 @@ A dialect is a value of `SqlDialect`, a name in `SqlDialectName`, a static prope
 | Spark and Databricks | Neither | Backslash escapes; `"..."` as a string by default; `r'...'` raw strings that end at the first quote; a backslash before a line break continues a `--` comment; nesting.  Confirm `$tag$` on Databricks. |
 | Trino and Presto | Neither | No nesting; otherwise `ansi` without backticks and dollar quotes |
 
-The sources are in the design's "Sources" section.
+The sources are in the design's [Sources](https://github.com/mbcrawfo/SqlSource/blob/c4c3454e6ec16f9bb3b96aedc07f1fd1195f561b/docs/superpowers/specs/2026-10-06-sql-dialects-design.md#sources) section.
 
 ## Trigger
 
