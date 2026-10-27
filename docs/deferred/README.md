@@ -15,7 +15,7 @@ Next id: `D-0009`
 | [D-0005](D-0005-bracketed-type-override-keys.md) | Open | 2026-10-20 | [Query generation epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.md) | Type override keys written in T-SQL's bracket form, `[dbo].[OrderStatus]` |
 | [D-0006](D-0006-multiple-result-sets-on-sql-server.md) | Open | 2026-10-20 | [Phase 6 spike](../superpowers/specs/2026-10-20-query-generation-phase-6-sql-server-spike.md) | Models for a SQL Server query that returns more than one result set; only the first is described |
 | [D-0007](D-0007-converters-by-convention.md) | Open | 2026-10-25 | [Converter research](../superpowers/specs/2026-10-24-query-generation-phase-8-converter-research.md) | Converters found by convention, a type's `Value` and its `From` or constructor, for Vogen's and StronglyTypedId's types; only methods marked `[SqlSourceConverter]` are converters |
-| [D-0008](D-0008-converter-per-file-or-query.md) | Open | 2026-10-25 | [Converter research](../superpowers/specs/2026-10-24-query-generation-phase-8-converter-research.md) | A converter chosen per file or per query, by a suffix on the type override's entry; a type has one conversion in a project |
+| [D-0008](D-0008-converter-per-file-or-query.md) | Open | 2026-10-25 | [Converter research](../superpowers/specs/2026-10-24-query-generation-phase-8-converter-research.md) | A converter chosen per file or per query, named in a type override's or column type's entry; a type has one conversion in a project |
 
 ## Columns
 

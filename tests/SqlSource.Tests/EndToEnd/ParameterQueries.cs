@@ -1,6 +1,6 @@
 namespace SqlSource.Tests.EndToEnd;
 
-// The files of the Parameters folder, with whatever MSBuild says about each.
+// The files of the Parameters folder, under the generator parameters of the project's settings file or of their header.
 [SqlSourceGenerate(Path = "Parameters", SqlLocation = SqlLocation.Direct)]
 internal static partial class ParameterQueries;
 

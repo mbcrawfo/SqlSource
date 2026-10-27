@@ -56,8 +56,8 @@ internal sealed class LevelSettings
 
     private readonly List<(SettingLevel Level, Setting Setting, string Value)> _settings = [];
 
-    // The JSON object of the settings at the project file's level, for the harness's settings, or null when no
-    // setting is at that level.
+    // The JSON object of the settings at the level of the project's settings file, for the harness's settings, or null
+    // when no setting is at that level.
     public string? ProjectSettings => FileText(SettingLevel.ProjectFile);
 
     // Whether the level is a settings file, whose value is a JSON value.
