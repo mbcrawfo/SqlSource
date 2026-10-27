@@ -92,23 +92,60 @@ public sealed class NpgsqlProbeTests
             { "domain over time", OrMap("time=System.TimeSpan on Npgsql 8 and 9, time=System.TimeOnly on Npgsql 10") },
         };
 
-    // The case of Differing, the override, and the C# type it gives with the key of its entry.
+    // The case of Differing, the type overrides, and the C# type they give with the key of its entry.
     public static TheoryData<string, string, string, bool, string> DifferingOverridden =>
         new()
         {
-            { "date", "date=System.DateOnly", "global::System.DateOnly", true, "date" },
-            { "time", "time=System.TimeOnly", "global::System.TimeOnly", true, "time" },
-            { "cidr", "cidr=System.Net.IPNetwork", "global::System.Net.IPNetwork", true, "cidr" },
-            { "daterange", "daterange=MyApp.DateSpan", "global::MyApp.DateSpan", true, "daterange" },
+            {
+                "date", /*lang=json,strict*/
+                """{"date": "System.DateOnly"}""",
+                "global::System.DateOnly",
+                true,
+                "date"
+            },
+            {
+                "time", /*lang=json,strict*/
+                """{"time": "System.TimeOnly"}""",
+                "global::System.TimeOnly",
+                true,
+                "time"
+            },
+            {
+                "cidr", /*lang=json,strict*/
+                """{"cidr": "System.Net.IPNetwork"}""",
+                "global::System.Net.IPNetwork",
+                true,
+                "cidr"
+            },
+            {
+                "daterange", /*lang=json,strict*/
+                """{"daterange": "MyApp.DateSpan"}""",
+                "global::MyApp.DateSpan",
+                true,
+                "daterange"
+            },
             {
                 "datemultirange",
-                "datemultirange=MyApp.DateSpan[]",
+                /*lang=json,strict*/
+                """{"datemultirange": "MyApp.DateSpan[]"}""",
                 "global::MyApp.DateSpan[]",
                 false,
                 "datemultirange"
             },
-            { "array of date", "date=System.DateOnly", "global::System.DateOnly[]", false, "date" },
-            { "domain over time", "time=System.TimeOnly", "global::System.TimeOnly", true, "time" },
+            {
+                "array of date", /*lang=json,strict*/
+                """{"date": "System.DateOnly"}""",
+                "global::System.DateOnly[]",
+                false,
+                "date"
+            },
+            {
+                "domain over time", /*lang=json,strict*/
+                """{"time": "System.TimeOnly"}""",
+                "global::System.TimeOnly",
+                true,
+                "time"
+            },
         };
 
     private static readonly SqlFile Orders = new("/app/Repo/Orders.sql", "-- name: GetOrder\nSELECT 2;\n");
@@ -335,7 +372,7 @@ public sealed class NpgsqlProbeTests
                     true,
                     NoWarnings,
                     key,
-                    "the property SqlSourceTypeOverrides",
+                    "the typeOverrides of the settings file " + GeneratorHarness.ProjectSettingsPath,
                     new DatabaseType(null, false, false)
                 ),
             ]);
@@ -404,8 +441,8 @@ public sealed class NpgsqlProbeTests
     private static string OrMap(string entries) =>
         "Reference Npgsql, or map it with the type override for the Npgsql the application runs on: " + entries + ".";
 
-    // A query of Users at Models, with no Npgsql, whose entry has one column of the type, and the property's type
-    // override, or none.
+    // A query of Users at Models, with no Npgsql, whose entry has one column of the type, and the type overrides of
+    // the project's settings file, a JSON object of their entries, or none.
     private static GeneratorRun RunWithColumn(PostgresType type, string? overrides)
     {
         var entry = TestSidecars.Entry(
@@ -422,7 +459,7 @@ public sealed class NpgsqlProbeTests
             [new SourceFile(GeneratorHarness.SourcePath, SourceWithDateSpan)],
             [GeneratorHarness.UsersFile, Sidecars.Of(GeneratorHarness.UsersFile, entry)],
             dialect: "postgres",
-            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = overrides }
+            settings: overrides is null ? null : "{\"typeOverrides\": " + overrides + "}"
         );
     }
 

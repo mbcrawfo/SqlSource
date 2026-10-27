@@ -332,13 +332,16 @@ public sealed class GeneratorParityTests : IDisposable
     {
         var (dialect, output, sqlFiles) = ErrorCases[name];
         var project = new TestProject(_folder) { LangVersion = "12.0" };
-        project.Properties["SqlSourceDialect"] = dialect;
-        project.Properties["SqlSourceOutput"] = SettingValue.NameOf(output);
+        project.Settings["dialect"] = dialect;
+        project.Settings["output"] = SettingValue.NameOf(output);
         var source = new SourceFile(project.AddSource("Queries.cs", Plans.Type), Plans.Type);
         var listed = sqlFiles.Select(file => new SqlFile(project.AddSql(file.Path, file.Text), file.Text)).ToArray();
 
-        var run = GeneratorHarness.Run(output, [source], listed, dialect: dialect);
+        // The manifest writes the project's settings file, and the generator is given that file, by its path and its
+        // text, and none that the tool's side cannot read.
         var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
+        var settings = GeneratorHarness.SettingsFile(project.SettingsPath, File.ReadAllText(project.SettingsPath));
+        var run = GeneratorHarness.Run(null, [source], [.. listed, settings]);
 
         // Each side is compared by its message, as Reported.MessageOf says.
         var expected = ReportedByGenerator(run, IsCompared);
@@ -436,7 +439,8 @@ public sealed class GeneratorParityTests : IDisposable
     // The values that are not valid are reported in an order, and it is the generator's: the dialects in ordinal
     // order, then the settings by name and value.  The files list the dialects out of that order and one twice, and
     // each side's errors are compared as they come, never sorted.  The generator never sees SqlSourceDatabase, so
-    // only SqlSourceOutput is compared among the settings.
+    // only SqlSourceOutput is compared among the settings.  A test of the MSBuild path: each side reads the values as
+    // properties and metadata.
     [Fact]
     public void Errors_OfInvalidValues_AreInTheGeneratorsOrder()
     {
@@ -470,8 +474,7 @@ public sealed class GeneratorParityTests : IDisposable
             null,
             [source],
             listed,
-            dialect: "zeta",
-            properties: new Dictionary<string, string?> { ["SqlSourceOutput"] = "nothing" }
+            properties: project.Properties.ToDictionary(pair => pair.Key, string? (pair) => pair.Value)
         );
         var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
 

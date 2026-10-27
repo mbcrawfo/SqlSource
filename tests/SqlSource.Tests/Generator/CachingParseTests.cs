@@ -80,8 +80,8 @@ public sealed class CachingParseTests
         AllReasons(result, TrackingNames.SqlClientProbe).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.ResolvedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.CompilePaths).ShouldBe([IncrementalStepRunReason.Unchanged]);
-        // The project has no settings file, so the step that reads one gives nothing.
-        AllReasons(result, TrackingNames.SettingsFile).ShouldBeEmpty();
+        // The project's settings file, which gives the output, is the one settings file, and is not read again.
+        AllReasons(result, TrackingNames.SettingsFile).ShouldBe([IncrementalStepRunReason.Cached]);
         string[] steps =
         [
             TrackingNames.SettingsFiles,

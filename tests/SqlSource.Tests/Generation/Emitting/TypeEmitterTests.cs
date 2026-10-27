@@ -755,7 +755,7 @@ public sealed class TypeEmitterTests
     // A theory cannot take the internal enum as a parameter.
     private static MemberPlacement Placement(bool direct) => direct ? MemberPlacement.Direct : MemberPlacement.Nested;
 
-    // Each test states its output, the project's SqlSourceOutput, which goes on the level of the project's properties.
+    // Each test states its output, which goes on the project's level.
     private static TypeOutput Emit(OutputKind? output, TargetType type, params ParsedSqlFile[] files) =>
         Emit(output, type, validateTokens: true, files);
 

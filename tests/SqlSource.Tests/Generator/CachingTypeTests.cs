@@ -29,7 +29,7 @@ public sealed class CachingTypeTests
     public void Run_CSharpEdit_TypesNoQuery()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
-        var driver = _scene.FirstRunWithTypes(compilation, OptionsWithTypeOverrides(null));
+        var driver = _scene.FirstRunWithTypes(compilation, ProjectFileWithTypeOverrides(null));
         Outputs(driver.GetRunResult(), TrackingNames.FileTypes)
             .Select(output => (FileTypes)output.Value)
             .ShouldAllBe(types => types.Queries.Count == 1);
@@ -47,7 +47,7 @@ public sealed class CachingTypeTests
     public void Run_SqlFileEdited_TypesOnlyThatFile()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
-        var driver = _scene.FirstRunWithTypes(compilation, OptionsWithTypeOverrides(null));
+        var driver = _scene.FirstRunWithTypes(compilation, ProjectFileWithTypeOverrides(null));
 
         var edited = new InMemoryAdditionalText(_scene.Users.Path, "-- name: GetUser\nSELECT 1, 2;\n");
         var result = Run(driver.ReplaceAdditionalText(_scene.Users, edited), compilation);
@@ -111,7 +111,7 @@ public sealed class CachingTypeTests
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
         var usersSidecar = TypedSidecar(_scene.Users, "GetUser", "int4");
-        var driver = _scene.FirstRunWithTypes(compilation, OptionsWithTypeOverrides(null), usersSidecar);
+        var driver = _scene.FirstRunWithTypes(compilation, ProjectFileWithTypeOverrides(null), usersSidecar);
 
         var edited = TypedSidecar(_scene.Users, "GetUser", "text");
         var result = Run(driver.ReplaceAdditionalText(usersSidecar, edited), compilation);
@@ -143,12 +143,20 @@ public sealed class CachingTypeTests
     }
 
     // Each file's map of overrides comes from the property, so every file is typed again, and each column of int4
-    // now has the property's type.
+    // now has the property's type.  A test of the MSBuild path: the output, the dialect and the type override are the
+    // project's properties.
     [Fact]
     public void Run_TypeOverridesPropertyChanged_TypesEveryFileAgain()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
-        var driver = _scene.FirstRunWithTypes(compilation, OptionsWithTypeOverrides(null));
+        var driver = FirstRunOnMSBuild(
+            compilation,
+            OptionsWithTypeOverrides(null),
+            _scene.Users,
+            _scene.Orders,
+            TypedSidecar(_scene.Users, "GetUser", "int4"),
+            TypedSidecar(_scene.Orders, "GetOrder", "int4")
+        );
 
         var result = Run(driver.WithUpdatedAnalyzerConfigOptions(OptionsWithTypeOverrides("int4=long")), compilation);
 
@@ -170,13 +178,52 @@ public sealed class CachingTypeTests
             .Text.ShouldBe("long");
     }
 
-    // The probe and the resolution of the property's one type run on the new compilation and give equal values, so
-    // a project with a type override types no file again either.
+    // The counterpart of Run_TypeOverridesPropertyChanged_TypesEveryFileAgain, by an edit of the project's settings
+    // file, with the same reasons: each file's map of overrides comes from its level, which comes from the project's
+    // settings file, which every file's chain reaches, so every file is typed again, and each column of int4 now has
+    // the file's type.
+    [Fact]
+    public void Run_TypeOverridesOfTheProjectsFileChanged_TypesEveryFileAgain()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
+        var project = ProjectFileWithTypeOverrides(null);
+        var driver = _scene.FirstRunWithTypes(compilation, project);
+
+        var edited = ProjectFileWithTypeOverrides( /*lang=json,strict*/
+            """{"int4": "long"}"""
+        );
+        var result = Run(driver.ReplaceAdditionalText(project, edited), compilation);
+
+        AllReasons(result, TrackingNames.FileTypesInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Modified,
+                },
+                ignoreOrder: true
+            );
+        TypesOf(result, "app/Orders/Orders.sql")
+            .Queries.ShouldHaveSingleItem()
+            .Columns.ShouldNotBeNull()
+            .ShouldHaveSingleItem()
+            .Text.ShouldBe("long");
+    }
+
+    // The probe and the resolution of the settings file's one type run on the new compilation and give equal values,
+    // so a project with a type override types no file again either.
     [Fact]
     public void Run_MethodBodyEditedWithATypeOverride_TypesNoQuery()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
-        var driver = _scene.FirstRunWithTypes(compilation, OptionsWithTypeOverrides("int4=long"));
+        var driver = _scene.FirstRunWithTypes(
+            compilation,
+            ProjectFileWithTypeOverrides( /*lang=json,strict*/
+                """{"int4": "long"}"""
+            )
+        );
 
         var result = Run(driver, WithMethodBodyEdited(compilation));
 
@@ -191,23 +238,24 @@ public sealed class CachingTypeTests
             .Text.ShouldBe("long");
     }
 
-    // The property maps int4 to a type the project does not have, so Users, whose column is of int4, is SQLSRC250.
-    // A new file declares the type: its resolution changes, its converters, none, do not, and Users is typed again
-    // without the error.  Every file with a usable entry carries the resolved types, so Orders, whose column is of
-    // text, is typed again too, and gives an equal value, which nothing after it reads again.
+    // The project's settings file maps int4 to a type the project does not have, so Users, whose column is of int4,
+    // is SQLSRC250.  A new file declares the type: its resolution changes, its converters, none, do not, and Users is
+    // typed again without the error.  Every file with a usable entry carries the resolved types, so Orders, whose
+    // column is of text, is typed again too, and gives an equal value, which nothing after it reads again.
     [Fact]
     public void Run_CSharpEditAddsTheMappedType_TypesTheFileThatUsesItAnew()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
-        var driver = GeneratorHarness
-            .CreateDriver(
+        var driver = CreateDriver(
+                ProjectFileWithTypeOverrides( /*lang=json,strict*/
+                    """{"int4": "MyApp.Missing"}"""
+                ),
                 [
                     _scene.Users,
                     _scene.Orders,
                     TypedSidecar(_scene.Users, "GetUser", "int4"),
                     TypedSidecar(_scene.Orders, "GetOrder", "text"),
-                ],
-                OptionsWithTypeOverrides("int4=MyApp.Missing")
+                ]
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
         driver.GetRunResult().Diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(["SQLSRC250"]);
@@ -261,15 +309,14 @@ public sealed class CachingTypeTests
             );
         var users = UsersWithMarker("UserId");
         var parameter = TestSidecars.Parameter(0, "id", TestSidecars.Postgres("int4", internalName: "int4"), false);
-        var driver = GeneratorHarness
-            .CreateDriver(
+        var driver = CreateDriver(
+                ProjectFileWithTypeOverrides(null),
                 [
                     users,
                     _scene.Orders,
                     TypedSidecar(users, "GetUser", "int4", [parameter]),
                     TypedSidecar(_scene.Orders, "GetOrder", "int4"),
-                ],
-                OptionsWithTypeOverrides(null)
+                ]
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
         driver.GetRunResult().Diagnostics.ShouldBeEmpty();
@@ -303,23 +350,20 @@ public sealed class CachingTypeTests
 
     // The column types of Users' metadata change the type of its column read from users.id.  The edit swaps the two
     // types it names, so the mapped types are equal, and Orders, without metadata, gathers an equal input and is not
-    // typed again.
+    // typed again.  A test of the MSBuild path: the output and the dialect are the project's properties, and the
+    // column types Users' metadata.
     [Fact]
     public void Run_ColumnTypeEdited_RetypesOnlyThatFile()
     {
         var compilation = WithIds(GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]));
-        var driver = GeneratorHarness
-            .CreateDriver(
-                [
-                    _scene.Users,
-                    _scene.Orders,
-                    OriginSidecar(_scene.Users, "GetUser"),
-                    OriginSidecar(_scene.Orders, "GetOrder"),
-                ],
-                OptionsWithColumnTypes("users.id=MyApp.UserId posts.id=MyApp.OtherId")
-            )
-            .RunGenerators(compilation, TestContext.Current.CancellationToken);
-        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        var driver = FirstRunOnMSBuild(
+            compilation,
+            OptionsWithColumnTypes("users.id=MyApp.UserId posts.id=MyApp.OtherId"),
+            _scene.Users,
+            _scene.Orders,
+            OriginSidecar(_scene.Users, "GetUser"),
+            OriginSidecar(_scene.Orders, "GetOrder")
+        );
 
         var result = Run(
             driver.WithUpdatedAnalyzerConfigOptions(
@@ -351,6 +395,57 @@ public sealed class CachingTypeTests
         ColumnTextOf(result, "app/Orders/Orders.sql").ShouldBe("long");
     }
 
+    // The counterpart of Run_ColumnTypeEdited_RetypesOnlyThatFile, by an edit of the settings file of Users' folder,
+    // with the same reasons: the edit swaps the two types it names, so the mapped types are equal, and Orders, which
+    // the file does not reach, gathers an equal input and is not typed again.
+    [Fact]
+    public void Run_ColumnTypesOfAFolderFileEdited_RetypesOnlyThatFoldersFile()
+    {
+        var compilation = WithIds(GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]));
+        var folder = ColumnTypesFile("MyApp.UserId", "MyApp.OtherId");
+        var driver = _scene.FirstRunWithTypes(
+            compilation,
+            ProjectFileWithTypeOverrides(null),
+            OriginSidecar(_scene.Users, "GetUser"),
+            OriginSidecar(_scene.Orders, "GetOrder"),
+            folder
+        );
+
+        var result = Run(
+            driver.ReplaceAdditionalText(folder, ColumnTypesFile("MyApp.OtherId", "MyApp.UserId")),
+            compilation
+        );
+
+        Reasons<FileTypesInput>(result, TrackingNames.FileTypesInput, input => input.Check.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        result.Diagnostics.ShouldBeEmpty();
+        ColumnTextOf(result, "app/Users/Users.sql").ShouldBe("global::MyApp.OtherId");
+        ColumnTextOf(result, "app/Orders/Orders.sql").ShouldBe("long");
+
+        // The settings file of Users' folder, with these types for users.id and posts.id.
+        static InMemoryAdditionalText ColumnTypesFile(string usersId, string postsId) =>
+            new(
+                "/app/Users/sqlsource.json",
+                "{\"columnTypes\": {\"users.id\": \"" + usersId + "\", \"posts.id\": \"" + postsId + "\"}}"
+            );
+    }
+
     // The C# type of a -- column: marker is no part of the hash, so an edit of it checks the sidecar again to an equal
     // value, and types Users again with the new type.  Orders' check is taken from the previous run.
     [Fact]
@@ -358,15 +453,14 @@ public sealed class CachingTypeTests
     {
         var compilation = WithIds(GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]));
         var users = UsersWithColumnMarker("UserId");
-        var driver = GeneratorHarness
-            .CreateDriver(
+        var driver = CreateDriver(
+                ProjectFileWithTypeOverrides(null),
                 [
                     users,
                     _scene.Orders,
                     TypedSidecar(users, "GetUser", "int4"),
                     TypedSidecar(_scene.Orders, "GetOrder", "int4"),
-                ],
-                OptionsWithTypeOverrides(null)
+                ]
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
         driver.GetRunResult().Diagnostics.ShouldBeEmpty();
@@ -401,15 +495,14 @@ public sealed class CachingTypeTests
     public void Run_NpgsqlReferenceAdded_TypesEveryFileAgain()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = GeneratorHarness
-            .CreateDriver(
+        var driver = CreateDriver(
+                ProjectFileWithTypeOverrides(null),
                 [
                     _scene.Users,
                     _scene.Orders,
                     TypedSidecar(_scene.Users, "GetUser", "date"),
                     TypedSidecar(_scene.Orders, "GetOrder", "date"),
-                ],
-                OptionsWithTypeOverrides(null)
+                ]
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
         driver.GetRunResult().Diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(["SQLSRC249", "SQLSRC249"]);
@@ -446,7 +539,8 @@ public sealed class CachingTypeTests
             )
         );
 
-    // The options at Models under postgres, with these column types in the metadata of Users.
+    // The options at Models under postgres, with these column types in the metadata of Users, for a test of the
+    // MSBuild path.
     private TestOptionsProvider OptionsWithColumnTypes(string columnTypes) =>
         new(
             OutputKind.Models,
@@ -456,6 +550,16 @@ public sealed class CachingTypeTests
             {
                 [_scene.Users.Path] = new Dictionary<string, string> { ["SqlSourceColumnTypes"] = columnTypes },
             }
+        );
+
+    // The options at Models under postgres, with this type override as the project's property, for a test of the
+    // MSBuild path.
+    private static TestOptionsProvider OptionsWithTypeOverrides(string? overrides) =>
+        new(
+            OutputKind.Models,
+            null,
+            "postgres",
+            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = overrides }
         );
 
     // A current sidecar whose entry has one column, value, an int8 read from public.users.id.

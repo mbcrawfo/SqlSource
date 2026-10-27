@@ -576,7 +576,7 @@ public sealed class RunLogTests : IDisposable
     public async Task Run_FilesThatAreNotReady_HaveTheStateOfWhatIsWrongWithThem()
     {
         var broken = _scene.Project.AddSql("Broken.sql", "-- name: One\nSELECT 'open\n");
-        var ansi = _scene.Project.AddSql("Ansi.sql", "-- name: Two\nSELECT 2;\n", ("SqlSourceDialect", "ansi"));
+        var ansi = _scene.Project.AddSql("Ansi.sql", "-- dialect: ansi\n-- name: Two\nSELECT 2;\n");
 
         _ = await _scene.DescribeAsync("--log", "run.log");
 

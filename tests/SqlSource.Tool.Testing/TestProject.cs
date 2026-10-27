@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.Json.Nodes;
+using SqlSource.Testing.Generator;
 using SqlSource.Tool.Projects;
 
 namespace SqlSource.Tool.Testing;
@@ -30,8 +32,17 @@ internal sealed class TestProject
 
     public List<string> Constants { get; } = [];
 
-    // The properties of the package, by the name MSBuild knows them by.
+    // The properties of the package, by the name MSBuild knows them by, for the tests of the manifest's MSBuild values.
+    // A test that only configures a project gives its settings in Settings or in a settings file.
     public Dictionary<string, string> Properties { get; } = [with(StringComparer.Ordinal)];
+
+    // The project's own settings file, sqlsource.json in the folder of the project file, as a user writes it.  Whenever
+    // it has a key, the file is written from it each time the manifest is, so that a change made after the runner was
+    // told of the project still reaches the run, and listed before the files a test adds or lists.
+    public JsonObject Settings { get; } = [];
+
+    // The path of the project's own settings file.
+    public string SettingsPath => PathOf("sqlsource.json");
 
     // The full path of a file of the project, from a path with forward slashes.
     public string PathOf(string relativePath) => _folder.PathOf(Relative(relativePath));
@@ -68,6 +79,11 @@ internal sealed class TestProject
     // A settings file on the disk that the project lists, as the build lists one above a .sql file or a C# file.
     public string AddSettings(string relativePath, string json)
     {
+        if (Settings.Count > 0 && IsSettingsPath(PathOf(relativePath)))
+        {
+            throw AtSettingsPath();
+        }
+
         var path = _folder.WriteFile(Relative(relativePath), json);
         _settings.Add(path);
         return path;
@@ -99,6 +115,17 @@ internal sealed class TestProject
             }
         }
 
+        if (Settings.Count > 0)
+        {
+            if (_settings.Exists(IsSettingsPath))
+            {
+                throw AtSettingsPath();
+            }
+
+            File.WriteAllText(SettingsPath, GeneratorHarness.Json(Settings));
+            _ = text.Append("Settings=").Append(SettingsPath).Append('\n');
+        }
+
         foreach (var path in _settings)
         {
             _ = text.Append("Settings=").Append(path).Append('\n');
@@ -124,6 +151,17 @@ internal sealed class TestProject
         runner.Projects[ProjectPath] = new FakeProject { ManifestWriter = ManifestText };
         return this;
     }
+
+    // Ignores case on every platform, so that a test refused on one disk is refused on all: a path in another case is
+    // the same file on a disk that ignores case, as the disks of macOS and Windows do.
+    private bool IsSettingsPath(string path) =>
+        string.Equals(Path.GetFullPath(path), Path.GetFullPath(SettingsPath), StringComparison.OrdinalIgnoreCase);
+
+    private static InvalidOperationException AtSettingsPath() =>
+        new(
+            "The project writes its own settings file from Settings, and the test gives a file at that path.  Put its "
+                + "keys in Settings instead."
+        );
 
     private string Relative(string relativePath) =>
         _directory.Length == 0 ? relativePath : _directory + "/" + relativePath;

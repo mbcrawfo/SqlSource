@@ -165,10 +165,9 @@ public sealed class CachingSidecarTests
             _scene.UsersSidecar.GetText(TestContext.Current.CancellationToken)!.ToString()
         );
 
-        var result = GeneratorHarness
-            .CreateDriver(
-                [_scene.Users, _scene.Orders, _scene.UsersSidecar, _scene.OrdersSidecar, again],
-                new TestOptionsProvider(OutputKind.Models, null, "postgres")
+        var result = CreateDriver(
+                ProjectFile(OutputKind.Models, "postgres"),
+                [_scene.Users, _scene.Orders, _scene.UsersSidecar, _scene.OrdersSidecar, again]
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken)
             .GetRunResult();

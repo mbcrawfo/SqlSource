@@ -1,6 +1,5 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
-using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using SqlSource.Generation;
@@ -517,7 +516,8 @@ public sealed class ConverterDiagnosticsTests
     }
 
     // A converter of the project's source of an edge that a converter of a referenced mapped type has too replaces
-    // that one, with no SQLSRC278, and the mapped type's other converter is kept.
+    // that one, with no SQLSRC278, and the mapped type's other converter is kept.  The project's settings file maps
+    // the type, and a .sql file, which no type claims, is there for its chain to reach that file.
     [Fact]
     public void Run_ProjectConverterOfAnEdgeAReferenceHas_ReportsNothing()
     {
@@ -556,9 +556,10 @@ public sealed class ConverterDiagnosticsTests
                     """
                 ),
             ],
-            [],
+            [GeneratorHarness.UsersFile],
             references: [library],
-            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "text=Lib.Email" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"text": "Lib.Email"}}"""
         );
 
         run.ShouldBeClean();

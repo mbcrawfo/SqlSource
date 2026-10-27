@@ -10,6 +10,8 @@ namespace SqlSource.Tool.Testing.Realistic;
 // them, and the engine its cases are read for.  A case folder that is wrong fails naming the case and the fault.
 internal sealed class RealisticCorpus
 {
+    private const string SettingsFileName = "sqlsource.json";
+
     private RealisticCorpus(string project, string engine, EngineImage image)
     {
         Project = project;
@@ -37,6 +39,13 @@ internal sealed class RealisticCorpus
     public string Seed => Path.Combine(Folder, "seed.sql");
 
     public string Cases => Path.Combine(Folder, "Cases");
+
+    // The settings file of the engine's project, which the corpus shares with the project's other tests: the file of
+    // a build that holds the corpus's queries.
+    public string ProjectSettingsFile => Path.Combine(RepositoryRoot.Folder, "tests", Project, SettingsFileName);
+
+    // The settings file of Cases/, which every query of the corpus is below: its database and its type override.
+    public string CasesSettingsFile => Path.Combine(Cases, SettingsFileName);
 
     // The classes that claim each case with models as a query of the project, at the output Models.
     public string Queries => Path.Combine(Folder, "Generation", "RealisticQueries.cs");

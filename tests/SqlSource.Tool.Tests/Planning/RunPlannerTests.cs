@@ -23,9 +23,19 @@ public sealed class RunPlannerTests : IDisposable
     private static (string Name, string Value)[] Metadata(string name, string? value) =>
         value is null ? [] : [(name, value)];
 
+    // A project whose settings file says the dialect is postgres.
     private TestProject Postgres(string name = "App")
     {
         var project = new TestProject(_folder, name);
+        project.Settings["dialect"] = "postgres";
+        return project;
+    }
+
+    // A project whose dialect is postgres by the property, for the tests of the MSBuild levels, which no settings file
+    // may outrank.
+    private TestProject PostgresOnMSBuild()
+    {
+        var project = new TestProject(_folder);
         project.Properties["SqlSourceDialect"] = "postgres";
         return project;
     }
@@ -193,7 +203,7 @@ public sealed class RunPlannerTests : IDisposable
         bool needsEntry
     )
     {
-        var project = Postgres();
+        var project = PostgresOnMSBuild();
         if (property is not null)
         {
             project.Properties["SqlSourceOutput"] = property;
@@ -219,6 +229,7 @@ public sealed class RunPlannerTests : IDisposable
         (planned.Database is not null).ShouldBe(needsEntry);
     }
 
+    // A test of the MSBuild path: the dialect and the database are the project's properties and the file's metadata.
     [Theory]
     [InlineData(null, null, null, null, "postgres")]
     [InlineData("main", null, null, null, "main")]
@@ -263,7 +274,7 @@ public sealed class RunPlannerTests : IDisposable
     [Fact]
     public void Plan_DialectOfAFile_IsItsMarkerThenItsMetadataThenTheProperty()
     {
-        var project = Postgres();
+        var project = PostgresOnMSBuild();
         _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         _ = project.AddSql("A.sql", "SELECT 1;");
         _ = project.AddSql("B.sql", "SELECT 1;", ("SqlSourceDialect", "mssql"));
@@ -323,8 +334,14 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_FileThatTwoProjectsClaim_IsPlannedOnceUnderTheFirstAndNeedsWhatEitherNeeds()
     {
         var shared = _folder.WriteFile("Shared/One.sql", "SELECT 1;");
+        // The file is in neither project's folder: the settings file of its own folder, which the first project lists
+        // and the second does not, gives the first's claim no need of an entry.
+        var settings = _folder.WriteFile(
+            "Shared/sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "postgres", "output": "sql"}"""
+        );
         var first = Postgres("A");
-        first.Properties["SqlSourceOutput"] = "sql";
+        first.ListSettings(settings);
         _ = first.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../Shared\""));
         first.ListSql(shared);
         var second = Postgres("B");
@@ -390,12 +407,24 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_FileThatTheFirstProjectListsAndTheSecondClaims_IsPlannedUnderTheSecond()
     {
         var shared = _folder.WriteFile("Shared/One.sql", "SELECT 1;");
+        // The file is in neither project's folder.  Both list the farther settings file, which says postgres, and the
+        // second lists the nearer one too, which says mssql.
+        var farther = _folder.WriteFile(
+            "sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "postgres"}"""
+        );
+        var nearer = _folder.WriteFile(
+            "Shared/sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "mssql"}"""
+        );
         var first = Postgres("A");
+        first.ListSettings(farther);
         _ = first.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         _ = first.AddSql("Own.sql", "SELECT 1;");
         first.ListSql(shared);
         var second = Postgres("B");
-        second.Properties["SqlSourceDialect"] = "mssql";
+        second.ListSettings(farther);
+        second.ListSettings(nearer);
         _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../Shared\""));
         second.ListSql(shared);
 
@@ -411,7 +440,7 @@ public sealed class RunPlannerTests : IDisposable
         var project = Postgres();
         _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         _ = project.AddSql("A.sql", "-- name: One\nSELECT 1;\n\n-- name: Plain\n-- output: sql\nSELECT 0;\n");
-        _ = project.AddSql("B.sql", "SELECT 2;", ("SqlSourceDialect", "mssql"));
+        _ = project.AddSql("B.sql", "-- dialect: mssql\nSELECT 2;");
         _ = project.AddSql("C.sql", "-- output: sql\n-- database: unused\n-- name: Three\nSELECT 3;\n");
 
         var result = Plans.Result(project);
@@ -442,7 +471,8 @@ public sealed class RunPlannerTests : IDisposable
     }
 
     // The compiler gives a file its metadata by its path, so of two items of one path the last that has any metadata
-    // of the package is the one a build reads.  "Include" where "Update" was meant makes such a second item.
+    // of the package is the one a build reads.  "Include" where "Update" was meant makes such a second item.  A test of
+    // the MSBuild path: the output is the project's property and the dialect the files' metadata.
     [Theory]
     [InlineData(null, "postgres", "PostgreSql")]
     [InlineData("postgres", null, "PostgreSql")]
@@ -465,8 +495,9 @@ public sealed class RunPlannerTests : IDisposable
         file.Dialect.ToString().ShouldBe(expected);
     }
 
-    // The settings files of the chain: sqlsource.json files apply to their folder and below.  A project that sets
-    // nothing of its own gets its dialect from the chain, where the project of the other tests has a property.
+    // The settings files of the chain: sqlsource.json files apply to their folder and below.  A project with no
+    // settings of its own, so that a test writes the file at its root as it means to, with the dialect as the property
+    // for a test of the chain's rank over the MSBuild levels.
     private TestProject Chained(string? dialect = null)
     {
         var project = new TestProject(_folder);
@@ -585,10 +616,9 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_OutputOfTheChain_DecidesWhetherAQueryNeedsAnEntry(string? chain, bool needsEntry)
     {
         var project = Postgres();
-        project.Properties["SqlSourceOutput"] = "models";
         if (chain is not null)
         {
-            _ = project.AddSettings("sqlsource.json", $$"""{"output": "{{chain}}"}""");
+            project.Settings["output"] = chain;
         }
 
         _ = project.AddSource("Queries.cs", Plans.Type);
@@ -601,10 +631,7 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_AttributesOutput_WinsOverTheChain()
     {
         var project = Postgres();
-        _ = project.AddSettings(
-            "sqlsource.json", /*lang=json,strict*/
-            """{"output": "sql"}"""
-        );
+        project.Settings["output"] = "sql";
         _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Output = SqlSource.GeneratorOutput.Models"));
         _ = project.AddSql("Q.sql", "SELECT 1;");
 
@@ -615,34 +642,23 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_DatabaseOfTheChain_IsTheQuerysDatabase()
     {
         var project = Postgres();
-        project.Properties["SqlSourceDatabase"] = "property";
-        _ = project.AddSettings(
-            "sqlsource.json", /*lang=json,strict*/
-            """{"dialect": "postgres", "database": "billing"}"""
-        );
+        project.Settings["database"] = "billing";
         _ = project.AddSource("Queries.cs", Plans.Type);
-        _ = project.AddSql(
-            "Q.sql",
-            "-- name: One\nSELECT 1;\n\n-- name: Two\n-- database: other\nSELECT 2;\n",
-            ("SqlSourceDatabase", "metadata")
-        );
+        _ = project.AddSql("Q.sql", "-- name: One\nSELECT 1;\n\n-- name: Two\n-- database: other\nSELECT 2;\n");
 
         OnlyFile(project).Queries.Select(query => query.Database).ShouldBe(["billing", "other"]);
     }
 
     // The two projects see one file: the chain of each is that of the file in its own project's set, and the file
-    // needs what either needs.
+    // needs what either needs.  The second does not list the first's settings file, so its claim has the default
+    // output, which needs an entry.
     [Fact]
     public void Plan_FileClaimedByTwoProjects_TakesEachProjectsChainForItsOutput()
     {
         var first = Plans.Postgres(_folder, "A");
-        _ = first.AddSettings(
-            "sqlsource.json", /*lang=json,strict*/
-            """{"output": "sql"}"""
-        );
+        first.Settings["output"] = "sql";
         var shared = first.AddSql("One.sql", "SELECT 1;");
         var second = Postgres("B");
-        second.Properties["SqlSourceOutput"] = "models";
         _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../A\""));
         second.ListSql(shared);
 
@@ -652,25 +668,29 @@ public sealed class RunPlannerTests : IDisposable
         file.Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBeTrue();
     }
 
-    // The second project lists the settings file and the first does not, so only the second's claim has a chain: the
-    // owner's chain is not the one of every claim.
+    // Both projects list the farther settings file, which says sql, and only the second lists the nearer one, which
+    // says models, so only the second's claim needs an entry: the owner's chain is not the one of every claim.
     [Fact]
     public void Plan_FileClaimedByTwoProjects_TakesTheChainOfAProjectThatIsNotTheOwner()
     {
-        var settings = _folder.WriteFile(
+        var farther = _folder.WriteFile(
+            "sqlsource.json", /*lang=json,strict*/
+            """{"dialect": "postgres", "output": "sql"}"""
+        );
+        var nearer = _folder.WriteFile(
             "Shared/sqlsource.json", /*lang=json,strict*/
             """{"output": "models"}"""
         );
         var shared = _folder.WriteFile("Shared/One.sql", "SELECT 1;");
         var first = Postgres("A");
-        first.Properties["SqlSourceOutput"] = "sql";
+        first.ListSettings(farther);
         _ = first.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../Shared\""));
         first.ListSql(shared);
         var second = Postgres("B");
-        second.Properties["SqlSourceOutput"] = "sql";
+        second.ListSettings(farther);
+        second.ListSettings(nearer);
         _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../Shared\""));
         second.ListSql(shared);
-        second.ListSettings(settings);
 
         var file = Plans.Result(first, second).Plan.Files.ShouldHaveSingleItem();
 

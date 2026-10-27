@@ -1,7 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
 using System;
-using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
@@ -32,7 +31,13 @@ public sealed class TableModelTests
 
     // The levels that give the generator parameters of a query, from the least specific.
     public static TheoryData<SettingLevel> Levels =>
-        [SettingLevel.Property, SettingLevel.Metadata, SettingLevel.Attribute, SettingLevel.Header, SettingLevel.Query];
+        [
+            SettingLevel.ProjectFile,
+            SettingLevel.FolderFile,
+            SettingLevel.Attribute,
+            SettingLevel.Header,
+            SettingLevel.Query,
+        ];
 
     [Fact]
     public void Run_QueryThatMatchesATable_GetsAModelNamedAfterTheTable()
@@ -93,7 +98,8 @@ public sealed class TableModelTests
         var run = Run(
             Users,
             [Entry(Users, "GetUser", [], [Column("id")], new SidecarTable("public", "order_lines"))],
-            new Dictionary<string, string?> { ["SqlSourceOutputModelSuffix"] = "Row" }
+            settings: /*lang=json,strict*/
+            """{"outputModelSuffix": "Row"}"""
         );
 
         run.ShouldBeClean();
@@ -104,13 +110,18 @@ public sealed class TableModelTests
     [MemberData(nameof(Levels))]
     public void Run_NoTableModelsAtEachLevel_NamesTheModelAfterTheQuery(SettingLevel level)
     {
-        var settings = new LevelSettings().At(level, Setting.GeneratorParameters, "no-table-models");
-        var file = settings.File(Users);
+        var settings = new LevelSettings().At(
+            level,
+            Setting.GeneratorParameters,
+            LevelSettings.WordsAt(level, "no-table-models")
+        );
+        var files = settings.Files(Users);
+        var file = files[0];
 
         var run = Run(
             settings.Source(Source),
-            [file, Sidecars.Of(file, Entry(file, "GetUser", [], [Column("id")], PublicUsers))],
-            settings.Properties
+            [.. files, Sidecars.Of(file, Entry(file, "GetUser", [], [Column("id")], PublicUsers))],
+            settings: settings.ProjectSettings
         );
 
         run.ShouldBeClean();
@@ -126,7 +137,8 @@ public sealed class TableModelTests
         var run = Run(
             Users,
             [Entry(Users, "GetUser", [], [Column("id")], PublicUsers)],
-            new Dictionary<string, string?> { ["SqlSourceGeneratorParameters"] = "sort-output" }
+            settings: /*lang=json,strict*/
+            """{"generatorParameters": ["sort-output"]}"""
         );
 
         run.ShouldBeClean();
@@ -298,7 +310,10 @@ public sealed class TableModelTests
         var run = Run(
             source,
             [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("id")], PublicUsers))],
-            withNamespace ? new Dictionary<string, string?> { ["SqlSourceModelNamespace"] = "Shared" } : null
+            withNamespace
+                ? /*lang=json,strict*/
+                """{"modelNamespace": "Shared"}"""
+                : null
         );
 
         run.ShouldBeClean();

@@ -294,14 +294,20 @@ public sealed class FilterRunTests : IDisposable
     }
 
     // The planner drops a setting it cannot read and falls back to the next level, so a file can look as if it needs no
-    // entry only because of the error: a run that reported anything deletes nothing.
+    // entry only because of the error: a run that reported anything deletes nothing.  The output of the folder's
+    // settings file is not valid, so Broken.sql takes the project's.
     [Fact]
     public async Task Run_SettingThatIsNotValid_KeepsTheSidecarOfTheFileItHides()
     {
-        _scene.Project.Properties["SqlSourceOutput"] = "sql";
+        _scene.Project.Settings["output"] = "sql";
         // A query that needs an entry, so that the summary shows the run went on to describe and to decide the files.
         var wanted = _scene.Project.AddSql("Wanted.sql", "-- name: Wanted\n-- output: models\nSELECT 6;\n");
-        var broken = _scene.Project.AddSql("Broken.sql", "-- name: Broken\nSELECT 5;\n", ("SqlSourceOutput", "modles"));
+        _ = _scene.Project.AddSource("Broken/Broken.cs", Plans.TypeNamed("Broken"));
+        _ = _scene.Project.AddSettings(
+            "Broken/sqlsource.json", /*lang=json,strict*/
+            """{"output": "modles"}"""
+        );
+        var broken = _scene.Project.AddSql("Broken/Broken.sql", "-- name: Broken\nSELECT 5;\n");
         await File.WriteAllTextAsync(
             SidecarFormat.PathFor(broken),
             "of a query that needed an entry",
@@ -312,7 +318,7 @@ public sealed class FilterRunTests : IDisposable
         var result = await _scene.DescribeAsync();
 
         result.ExitCode.ShouldBe(1);
-        result.Error.ShouldContain("error SQLSRC014: ");
+        result.Error.ShouldContain("error SQLSRC019: ");
         result.Out.ShouldBe("postgres (postgres): 1 described, 0 skipped, 0 failed\n");
         File.Exists(SidecarFormat.PathFor(wanted)).ShouldBeTrue();
         File.Exists(SidecarFormat.PathFor(broken)).ShouldBeTrue();

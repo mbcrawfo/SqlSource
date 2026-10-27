@@ -22,10 +22,19 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
 
     public void Dispose() => _folder.Dispose();
 
+    // A project with no settings of its own, so that a test writes the file at its root as it means to, with a type
+    // that claims the .sql files beside it.
+    private TestProject OwnFile()
+    {
+        var project = new TestProject(_folder);
+        _ = project.AddSource("Queries.cs", Plans.Type);
+        return project;
+    }
+
     [Fact]
     public void Plan_SettingsFileWithErrorsOfTheFile_ReportsEachAtItsLineAndColumn()
     {
-        var project = Plans.Postgres(_folder);
+        var project = OwnFile();
         var settings = project.AddSettings(
             "sqlsource.json",
             /*lang=json*/
@@ -56,7 +65,7 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
     [Fact]
     public void Plan_SettingsFileThatIsNotJson_IsSqlsrc015()
     {
-        var project = Plans.Postgres(_folder);
+        var project = OwnFile();
         var settings = project.AddSettings("sqlsource.json", "{ \"output\": ");
 
         var result = Plans.Result(project);
@@ -69,7 +78,7 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
     [Fact]
     public void Plan_InvalidValuesOfSettingsTheToolReads_AreReported()
     {
-        var project = Plans.Postgres(_folder);
+        var project = OwnFile();
         var settings = project.AddSettings(
             "sqlsource.json",
             /*lang=json,strict*/
@@ -97,7 +106,7 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
     [Fact]
     public void Plan_InvalidValuesOfSettingsTheToolDoesNotRead_AreNotReported()
     {
-        var project = Plans.Postgres(_folder);
+        var project = OwnFile();
         var settings = project.AddSettings(
             "sqlsource.json", /*lang=json,strict*/
             """
@@ -123,7 +132,7 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
     [Fact]
     public void Plan_SettingsFileAboveTheRootFile_IsNeverReported()
     {
-        var project = Plans.Postgres(_folder);
+        var project = OwnFile();
         project.ListSettings(_folder.WriteFile("sqlsource.json", "{ nope"));
         // The root file is reached, and its own problem is reported.
         var root = project.AddSettings(
@@ -168,7 +177,7 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
     public void Plan_SettingsFileReachedOnlyByAnUnclaimedSqlFile_IsReported()
     {
         var project = new TestProject(_folder);
-        project.Properties["SqlSourceDialect"] = "postgres";
+        project.Settings["dialect"] = "postgres";
         _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"Queries\""));
         _ = project.AddSql("Other/X.sql", "SELECT 1;");
         var settings = project.AddSettings(
@@ -206,7 +215,7 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
     [Fact]
     public void Plan_ChainThroughAFileThatIsNotJson_ReachesTheFartherFile()
     {
-        var project = Plans.Postgres(_folder);
+        var project = OwnFile();
         var farther = project.AddSettings(
             "sqlsource.json", /*lang=json,strict*/
             """{"unknown": 1}"""
@@ -277,7 +286,7 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
     [Fact]
     public void Plan_SettingsFileNamedInAnotherCase_IsNotRead()
     {
-        var project = Plans.Postgres(_folder);
+        var project = OwnFile();
         _ = project.AddSettings("SqlSource.json", "{ nope");
 
         var result = Plans.Result(project);
@@ -290,8 +299,8 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
     public void Plan_SettingsFileThatIsGone_IsSqlsrc015()
     {
         var project = Plans.Postgres(_folder);
-        _ = project.AddSql("One.sql", "SELECT 1;");
-        var gone = project.PathOf("sqlsource.json");
+        _ = project.AddSql("Queries/One.sql", "SELECT 1;");
+        var gone = project.PathOf("Queries/sqlsource.json");
         project.ListSettings(gone);
 
         var result = Plans.Result(project);
@@ -301,11 +310,12 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
         error.Path.ShouldBe(gone);
     }
 
-    // The settings files come in the order of their folders, ignoring case, after the values of the project.
+    // The settings files come in the order of their folders, ignoring case, after the values of the project.  A test
+    // of the MSBuild path: the value that is not valid is the property's.
     [Fact]
     public void Plan_ErrorsOfAProject_AreInvalidValuesThenSettingsFiles()
     {
-        var project = Plans.Postgres(_folder);
+        var project = OwnFile();
         project.Properties["SqlSourceOutput"] = "nothing";
         var lower = project.AddSettings(
             "b/sqlsource.json", /*lang=json,strict*/

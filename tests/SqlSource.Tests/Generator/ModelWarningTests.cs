@@ -1,6 +1,5 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
-using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Testing.Generator;
 using Xunit;
@@ -52,12 +51,14 @@ public sealed class ModelWarningTests
                     )
                 ),
             ],
-            new Dictionary<string, string?>
+            settings: /*lang=json,strict*/
+            """
             {
-                ["SqlSourceOutputModelType"] = "class",
-                ["SqlSourceGeneratorParameters"] = "sort-output",
-                ["SqlSourceTypeOverrides"] = "int4=MyApp.OldId text=MyApp.OldName",
+                "outputModelType": "class",
+                "generatorParameters": ["sort-output"],
+                "typeOverrides": {"int4": "MyApp.OldId", "text": "MyApp.OldName"}
             }
+            """
         );
 
         run.ShouldBeClean();
@@ -115,7 +116,8 @@ public sealed class ModelWarningTests
         var run = Run(
             source,
             [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("name", Text)]))],
-            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "text=MyApp.OldName" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"text": "MyApp.OldName"}}"""
         );
 
         run.ShouldBeClean();
@@ -154,7 +156,8 @@ public sealed class ModelWarningTests
                     Entry(Users, "GetUser", [], [Column("id"), Column("name", Text), Column("note", Text)])
                 ),
             ],
-            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "int4=MyApp.TrialId text=MyApp.OldName" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"int4": "MyApp.TrialId", "text": "MyApp.OldName"}}"""
         );
 
         run.ShouldBeClean();
@@ -187,7 +190,8 @@ public sealed class ModelWarningTests
         var run = Run(
             source,
             [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("id"), Column("name", Text)]))],
-            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "int4=MyApp.TrialId text=MyApp.OldName" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"int4": "MyApp.TrialId", "text": "MyApp.OldName"}}"""
         );
 
         run.ShouldBeClean();
@@ -217,14 +221,15 @@ public sealed class ModelWarningTests
         var run = Run(
             source,
             [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("name", Text)]))],
-            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "text=MyApp.GoneName" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"text": "MyApp.GoneName"}}"""
         );
 
         run.Diagnostics.ShouldHaveSingleItem()
             .ShouldStartWith(
                 $"SQLSRC252 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'text' is mapped to "
-                    + "'MyApp.GoneName' for column 'name', in the property SqlSourceTypeOverrides, and no property "
-                    + "can have that type."
+                    + "'MyApp.GoneName' for column 'name', in the typeOverrides of the settings file "
+                    + $"{GeneratorHarness.ProjectSettingsPath}, and no property can have that type."
             );
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
@@ -249,14 +254,15 @@ public sealed class ModelWarningTests
         var run = Run(
             source,
             [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("name", Text)]))],
-            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "text=MyApp.ValueBox<string>" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"text": "MyApp.ValueBox<string>"}}"""
         );
 
         run.Diagnostics.ShouldHaveSingleItem()
             .ShouldStartWith(
                 $"SQLSRC252 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'text' is mapped to "
-                    + "'MyApp.ValueBox<string>' for column 'name', in the property SqlSourceTypeOverrides, and no "
-                    + "property can have that type."
+                    + "'MyApp.ValueBox<string>' for column 'name', in the typeOverrides of the settings file "
+                    + $"{GeneratorHarness.ProjectSettingsPath}, and no property can have that type."
             );
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
@@ -324,7 +330,8 @@ public sealed class ModelWarningTests
         var run = Run(
             Source + "\n\n" + declarations,
             [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("name", Text)]))],
-            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "text=MyApp.OddName" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"text": "MyApp.OddName"}}"""
         );
 
         run.ShouldBeClean();

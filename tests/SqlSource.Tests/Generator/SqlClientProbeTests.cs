@@ -182,7 +182,7 @@ public sealed class SqlClientProbeTests
             NpgsqlReferences.Synthetic("7.0.0", slimBuilder: false, cube: false),
             SqlClientReferences.SqlClient60,
         ];
-        var sqlServer = Orders with { Dialect = "mssql" };
+        var sqlServer = Orders with { Text = "-- dialect: mssql\n" + Orders.Text };
         SqlFile[] sqlServerFiles = [sqlServer, CurrentSidecar(sqlServer, "GetOrder")];
 
         var both = Run(OutputKind.Models, drivers, "postgres", [.. PostgresUsers, .. sqlServerFiles]);

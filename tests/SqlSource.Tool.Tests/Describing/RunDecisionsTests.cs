@@ -219,7 +219,7 @@ public sealed class RunDecisionsTests : IDisposable
     [Fact]
     public void Decide_FileThatIsNotReady_FailsItsQueriesAndReadsNoSidecar()
     {
-        _project.Properties["SqlSourceDialect"] = "ansi";
+        _project.Settings["dialect"] = "ansi";
         var plan = Plans.Of(_project);
         plan.Files[0].State.ShouldBe(PlannedFileState.NotDescribable);
         _ = SidecarFiles.Write(plan.Files[0], [], formatVersion: 2);
