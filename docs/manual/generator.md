@@ -562,7 +562,7 @@ The method opens the connection when its `State` is `Closed`, and closes it agai
 
 The [result shape](sql-files.md#result-shapes) after the query's name says what the method does with the rows.  Without one, a query that returns rows is `many`, and one that returns none is `rowcount`.
 
-- **`many`** reads every row into the [collection type](settings.md#setting-collection-type), an array by default, and complete when the task completes.  Unless the query has [`no-array-pool`](settings.md#setting-generator-parameters), the rows of an array, `IEnumerable<T>`, `IReadOnlyCollection<T>` or `IReadOnlyList<T>` are read into buffers borrowed from .NET's shared array pool, so that, once the pool holds buffers of the sizes it needs, the method allocates no collection for up to about 1,000 rows but the one it returns.
+- **`many`** reads every row into the [collection type](settings.md#setting-collection-type), an array by default, and complete when the task completes.  Unless the query has [`no-array-pool`](settings.md#setting-generator-parameters), the rows of every collection type but `ImmutableList<T>` and `IImmutableList<T>` are read into buffers borrowed from .NET's shared array pool, so that, once the pool holds buffers of the sizes it needs, the method allocates no collection for up to about 1,000 rows but the one it returns.
 - **`one`** returns the one row.  It throws [`UnexpectedRowCountException`](#unexpected-row-count) when the query returns no rows, or more than one: it reads a second row to see whether there is one.
 - **`one-optional`** returns the row, or null when there is none, and throws the same exception for more than one.
 - **`none`** runs the statement and returns nothing.
