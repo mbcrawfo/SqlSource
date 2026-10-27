@@ -12,7 +12,7 @@ SELECT id, name FROM users;
 ```
 
 ```jsonc
-// Reports/sqlsource.json
+// sqlsource.json, in the project's folder
 {
     "root": true,
     "dialect": "postgres",
@@ -76,7 +76,7 @@ The rules:
 
 - **Each setting is decided on its own.**  A query that writes `-- output: sql` still takes its file header's `-- database:`.
 - **A place that gives no value is skipped.**  A settings file that does not name the setting gives none, and so does a string of a settings file or of the attribute that is empty or white space.  `Path` is the exception: see [Path](#setting-path).
-- **A setting has only the places its row of [the tables](#all-settings) lists.**  A key of a settings file that is not in them is [SQLSRC016](diagnostics.md#sqlsrc016).  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
+- **A setting has only the places its row of [the tables](#all-settings) lists.**  A key of a settings file that is not in them, nor `root` or `$schema`, is [SQLSRC016](diagnostics.md#sqlsrc016).  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
 - **The attribute belongs to one type.**  Two types that claim one file each use their own attribute, and each gets its own result.
 
 Four exceptions, stated plainly:
@@ -93,7 +93,7 @@ Four exceptions, stated plainly:
 | Written as | Reported as | What happens |
 |----|----|----|
 | A marker | [SQLSRC111](diagnostics.md#sqlsrc111), a dialect included.  A generator parameter that does not exist is [SQLSRC109](diagnostics.md#sqlsrc109); a value that contradicts another in the same place is [SQLSRC112](diagnostics.md#sqlsrc112) | The file produces no members until it is fixed |
-| A settings file | [SQLSRC015](diagnostics.md#sqlsrc015) to [SQLSRC020](diagnostics.md#sqlsrc020), at the file, line and column of the mistake: see [settings files](#settings-files) | The setting is not set by that file, so a farther settings file or the default gives it, for a dialect too |
+| A settings file | [SQLSRC015](diagnostics.md#sqlsrc015) to [SQLSRC020](diagnostics.md#sqlsrc020), at the file, line and column of the mistake: see [settings files](#settings-files) | A value that is wrong is not set by that file, so a farther settings file or the default gives it, for a dialect too.  The rest of the file still applies, and so do the other words of a list, unless one is `default` beside another, and the other entries of `typeOverrides` or `columnTypes`.  Of a key, or an entry, written twice, the first applies.  A file that is not a JSON object gives nothing |
 | A property of the attribute | [SQLSRC006](diagnostics.md#sqlsrc006) | The type produces no members until it is fixed |
 
 <a id="setting-output"></a>
@@ -227,7 +227,7 @@ The list for a query is the first of these that gives one, whole:
 
 Several `-- generator:` lines in one place are one list: two lines in a query add up.  A list never adds to the list of another place.
 
-On the attribute the list is words separated by spaces or line breaks.  In a settings file it is an array of strings, one word in each: `"generatorParameters": ["keep-comments", "no-token-validation"]`.  `[]` is the empty list, every default, and so is `["default"]`; an element that is empty or white space is skipped.  `default` beside another word makes the whole value wrong: [SQLSRC019](diagnostics.md#sqlsrc019) in a settings file, whose list is then not set, so a farther one applies, and [SQLSRC006](diagnostics.md#sqlsrc006) on the attribute.  A word that is not a generator parameter is reported the same way.  In a settings file the other words of the list still apply; on the attribute the type gets no members until the value is fixed.  In a marker an empty `-- generator:` line is [SQLSRC110](diagnostics.md#sqlsrc110), and `default` beside another word in one place is [SQLSRC112](diagnostics.md#sqlsrc112).
+On the attribute the list is words separated by spaces or line breaks.  In a settings file it is an array of strings, one word in each: `"generatorParameters": ["keep-comments", "no-token-validation"]`.  `[]` is the empty list, every default, and so is `["default"]`; an element that is empty or white space is skipped.  `default` beside another word makes the whole value wrong: [SQLSRC019](diagnostics.md#sqlsrc019) in a settings file, whose list is then not set, so a farther one applies, and [SQLSRC006](diagnostics.md#sqlsrc006) on the attribute.  A word that is not a generator parameter is reported the same way.  In a settings file the other words of the list still apply, and a list none of whose words is a generator parameter is not set, so a farther one applies; on the attribute the type gets no members until the value is fixed.  In a marker an empty `-- generator:` line is [SQLSRC110](diagnostics.md#sqlsrc110), and `default` beside another word in one place is [SQLSRC112](diagnostics.md#sqlsrc112).
 
 <a id="setting-model-suffix"></a>
 
@@ -692,7 +692,7 @@ Turning the default off turns it off for sidecars too, so list them as well, as 
 
 A settings file is a file named `sqlsource.json`, in any folder.  It sets the settings of the `.sql` files of its folder and of every folder below it.  The one above, in the project's folder, reads every `.sql` file of the project as PostgreSQL, gives each query its models and no method, keeps comments and sorts the output models' properties, and gives every `timestamptz` the C# type `System.DateTimeOffset` and every `users.id` column `MyApp.UserId`.  A setting it does not name keeps its default, and a marker or the attribute still wins over it, as [which place wins](#precedence) says.
 
-**Its name** is `sqlsource.json`, in lower case.  A file named in another case, such as `SqlSource.json`, is not read when the project file lists it itself.  When it is not listed, the build finds it and reads it on macOS and Windows, which compare names ignoring case, and does not find it on Linux, so a project built on both would read different settings.
+**Its name** is `sqlsource.json`, in lower case.  A file named in another case, such as `SqlSource.json`, is not read when the project file lists it itself as an `AdditionalFiles` item.  When it is not listed, the build finds it and reads it on macOS and Windows, which compare names ignoring case, and does not find it on Linux, so a project built on both would read different settings.
 
 **What it holds** is one JSON object, whose members are the settings.  It may hold `//` and `/* */` comments, and a comma after the last member of an object or the last element of an array.
 
