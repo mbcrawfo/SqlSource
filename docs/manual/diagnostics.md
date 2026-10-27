@@ -1087,7 +1087,7 @@ A query whose output is `models` or `codegen` is described by a database, and th
 /work/App/Queries/Users.sql(1,10): error SQLSRC209: The output 'codegen' needs each query described by its database, and the dialect 'ansi' has no database to ask.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.
 ```
 
-For PostgreSQL or SQL Server files, set the dialect, `postgres` or `mssql`: in the [settings file](settings.md#settings-files) of the project's folder for every file of the project, in that of the files' own folder for those files alone, or with `-- dialect: postgres` or `-- dialect: mssql` at the top of the file:
+For PostgreSQL or SQL Server files, set the dialect, `postgres` or `mssql`: in the [settings file](settings.md#settings-files) of the project's folder for every file under it, in that of the files' own folder for those files alone, or with `-- dialect: postgres` or `-- dialect: mssql` at the top of the file:
 
 ```jsonc
 // sqlsource.json, in the project's folder
@@ -2268,7 +2268,7 @@ The type override has an entry for the name the database gives an array type, an
 /work/App/Queries/Users.sql(1,10): error SQLSRC261: The type override's entry for 'public._user_status', in the typeOverrides of the settings file /work/App/sqlsource.json, maps nothing: 'public._user_status' is the database's own name of the array type of column 'statuses', and an entry names that array as its element's key with [].  Write the entry for 'public.user_status[]' instead.
 ```
 
-Rename the entry to the key the message gives: `public.user_status[]=System.Collections.Generic.List<string>`.  When the type override already has an entry for that key, remove the one the message names.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
+Rename the entry to the key the message gives: the member `"public.user_status[]": "System.Collections.Generic.List<string>"` in a settings file's `typeOverrides`, or `-- type-override: public.user_status[]=System.Collections.Generic.List<string>` in a marker.  When the type override already has an entry for that key, remove the one the message names.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
 
 See: [Type overrides](settings.md#setting-type-overrides)
 
