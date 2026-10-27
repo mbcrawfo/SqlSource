@@ -7,7 +7,6 @@ using SqlSource.Diagnostics;
 using SqlSource.Generation.Chains;
 using SqlSource.Parsing;
 using SqlSource.Tool.Planning;
-using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -238,7 +237,7 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
     public void Plan_CompileFileUnderABuildFolder_ReachesNothing()
     {
         var project = Plans.Postgres(_folder);
-        project.Properties["SqlSourceBuildFolders"] = "|" + project.PathOf("obj") + Path.DirectorySeparatorChar;
+        project.BuildFolders = "|" + project.PathOf("obj") + Path.DirectorySeparatorChar;
         _ = project.AddSource("obj/Gen.cs", "internal sealed class Gen;");
         _ = project.AddSettings(
             "obj/sqlsource.json", /*lang=json,strict*/
@@ -310,13 +309,12 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
         error.Path.ShouldBe(gone);
     }
 
-    // The settings files come in the order of their folders, ignoring case, after the values of the project.  A test
-    // of the MSBuild path: the value that is not valid is the property's.
+    // The settings files come in the order of their folders, ignoring case, after the errors of the claims.
     [Fact]
-    public void Plan_ErrorsOfAProject_AreInvalidValuesThenSettingsFiles()
+    public void Plan_ErrorsOfAProject_AreClaimsThenSettingsFiles()
     {
         var project = OwnFile();
-        project.Properties["SqlSourceOutput"] = "nothing";
+        var other = project.AddSource("Other.cs", Plans.TypeNamed("Other", "Path = Folder"));
         var lower = project.AddSettings(
             "b/sqlsource.json", /*lang=json,strict*/
             """{"lower": 1}"""
@@ -333,14 +331,11 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
         result
             .Errors.Select(Reported.Of)
             .ShouldBe([
-                Reported.Of(
-                    ToolDiagnostic.AtFile(
-                        SqlDiagnostics.InvalidSettingValue,
-                        project.ProjectPath,
-                        "nothing",
-                        "SqlSourceOutput",
-                        ""
-                    )
+                new Reported(
+                    "SQLSRC208",
+                    other,
+                    new LinePosition(0, "[SqlSource.SqlSourceGenerate(Path = ".Length),
+                    "'Path' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here"
                 ),
                 new Reported("SQLSRC016", upper, new LinePosition(0, 1), "'upper' is not a key of a settings file"),
                 new Reported("SQLSRC016", lower, new LinePosition(0, 1), "'lower' is not a key of a settings file"),

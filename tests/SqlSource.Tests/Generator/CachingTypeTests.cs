@@ -15,7 +15,6 @@ using SqlSource.Testing.Snapshot;
 using Xunit;
 using static SqlSource.Testing.Generator.CachingScene;
 using static SqlSource.Testing.Generator.StepReasons;
-using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -142,46 +141,9 @@ public sealed class CachingTypeTests
             .Text.ShouldBe("string");
     }
 
-    // Each file's map of overrides comes from the property, so every file is typed again, and each column of int4
-    // now has the property's type.  A test of the MSBuild path: the output, the dialect and the type override are the
-    // project's properties.
-    [Fact]
-    public void Run_TypeOverridesPropertyChanged_TypesEveryFileAgain()
-    {
-        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
-        var driver = FirstRunOnMSBuild(
-            compilation,
-            OptionsWithTypeOverrides(null),
-            _scene.Users,
-            _scene.Orders,
-            TypedSidecar(_scene.Users, "GetUser", "int4"),
-            TypedSidecar(_scene.Orders, "GetOrder", "int4")
-        );
-
-        var result = Run(driver.WithUpdatedAnalyzerConfigOptions(OptionsWithTypeOverrides("int4=long")), compilation);
-
-        AllReasons(result, TrackingNames.FileTypesInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
-        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
-            .ShouldBe(
-                new Dictionary<string, IncrementalStepRunReason>
-                {
-                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
-                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Modified,
-                },
-                ignoreOrder: true
-            );
-        TypesOf(result, "app/Orders/Orders.sql")
-            .Queries.ShouldHaveSingleItem()
-            .Columns.ShouldNotBeNull()
-            .ShouldHaveSingleItem()
-            .Text.ShouldBe("long");
-    }
-
-    // The counterpart of Run_TypeOverridesPropertyChanged_TypesEveryFileAgain, by an edit of the project's settings
-    // file, with the same reasons: each file's map of overrides comes from its level, which comes from the project's
-    // settings file, which every file's chain reaches, so every file is typed again, and each column of int4 now has
-    // the file's type.
+    // An edit of the project's settings file's type override: each file's map of overrides comes from its level, which
+    // comes from the project's settings file, which every file's chain reaches, so every file is typed again, and each
+    // column of int4 now has the file's type.
     [Fact]
     public void Run_TypeOverridesOfTheProjectsFileChanged_TypesEveryFileAgain()
     {
@@ -348,56 +310,8 @@ public sealed class CachingTypeTests
             .Text.ShouldBe("global::MyApp.OtherId");
     }
 
-    // The column types of Users' metadata change the type of its column read from users.id.  The edit swaps the two
-    // types it names, so the mapped types are equal, and Orders, without metadata, gathers an equal input and is not
-    // typed again.  A test of the MSBuild path: the output and the dialect are the project's properties, and the
-    // column types Users' metadata.
-    [Fact]
-    public void Run_ColumnTypeEdited_RetypesOnlyThatFile()
-    {
-        var compilation = WithIds(GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]));
-        var driver = FirstRunOnMSBuild(
-            compilation,
-            OptionsWithColumnTypes("users.id=MyApp.UserId posts.id=MyApp.OtherId"),
-            _scene.Users,
-            _scene.Orders,
-            OriginSidecar(_scene.Users, "GetUser"),
-            OriginSidecar(_scene.Orders, "GetOrder")
-        );
-
-        var result = Run(
-            driver.WithUpdatedAnalyzerConfigOptions(
-                OptionsWithColumnTypes("users.id=MyApp.OtherId posts.id=MyApp.UserId")
-            ),
-            compilation
-        );
-
-        Reasons<FileTypesInput>(result, TrackingNames.FileTypesInput, input => input.Check.NormalizedPath)
-            .ShouldBe(
-                new Dictionary<string, IncrementalStepRunReason>
-                {
-                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
-                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Unchanged,
-                },
-                ignoreOrder: true
-            );
-        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
-            .ShouldBe(
-                new Dictionary<string, IncrementalStepRunReason>
-                {
-                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
-                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
-                },
-                ignoreOrder: true
-            );
-        result.Diagnostics.ShouldBeEmpty();
-        ColumnTextOf(result, "app/Users/Users.sql").ShouldBe("global::MyApp.OtherId");
-        ColumnTextOf(result, "app/Orders/Orders.sql").ShouldBe("long");
-    }
-
-    // The counterpart of Run_ColumnTypeEdited_RetypesOnlyThatFile, by an edit of the settings file of Users' folder,
-    // with the same reasons: the edit swaps the two types it names, so the mapped types are equal, and Orders, which
-    // the file does not reach, gathers an equal input and is not typed again.
+    // An edit of the settings file of Users' folder that swaps the two column types it names: the mapped types are
+    // equal, and Orders, which the file does not reach, gathers an equal input and is not typed again.
     [Fact]
     public void Run_ColumnTypesOfAFolderFileEdited_RetypesOnlyThatFoldersFile()
     {
@@ -537,29 +451,6 @@ public sealed class CachingTypeTests
                 "/app/MyApp/Ids.cs",
                 cancellationToken: TestContext.Current.CancellationToken
             )
-        );
-
-    // The options at Models under postgres, with these column types in the metadata of Users, for a test of the
-    // MSBuild path.
-    private TestOptionsProvider OptionsWithColumnTypes(string columnTypes) =>
-        new(
-            OutputKind.Models,
-            null,
-            "postgres",
-            fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>>
-            {
-                [_scene.Users.Path] = new Dictionary<string, string> { ["SqlSourceColumnTypes"] = columnTypes },
-            }
-        );
-
-    // The options at Models under postgres, with this type override as the project's property, for a test of the
-    // MSBuild path.
-    private static TestOptionsProvider OptionsWithTypeOverrides(string? overrides) =>
-        new(
-            OutputKind.Models,
-            null,
-            "postgres",
-            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = overrides }
         );
 
     // A current sidecar whose entry has one column, value, an int8 read from public.users.id.

@@ -21,8 +21,7 @@ namespace SqlSource.Testing.Generator;
 // A run's output, dialect and type overrides are the project's settings file, at GeneratorHarness.ProjectSettingsPath,
 // an additional text of the driver beside the .sql files, as GeneratorHarness writes it, and MSBuild tells the
 // generator nothing.  So every run has a settings file, which SettingsFile reads, and every .sql file a level of stage
-// two from it, at FileLevel.  The exception is a test of the MSBuild path, which swaps the options for others: its
-// first run, FirstRunOnMSBuild, has no settings file, so that none outranks what it changes.
+// two from it, at FileLevel.
 //
 // Like the other files of this folder, it stays within Roslyn 4.8.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
@@ -185,15 +184,6 @@ internal sealed class CachingScene
         InMemoryAdditionalText? folderFile = null
     ) => Checked(CreateDriver(projectFile, [users, Orders, .. Given(folderFile)]), compilation);
 
-    // The first run of a test of the MSBuild path: these files, with no settings file of the project, and what MSBuild
-    // tells the generator, the output and the dialect included, so that no settings file outranks what the test
-    // changes when it swaps these options for others.
-    public static GeneratorDriver FirstRunOnMSBuild(
-        Compilation compilation,
-        TestOptionsProvider options,
-        params InMemoryAdditionalText[] files
-    ) => Checked(GeneratorHarness.CreateDriver(files, options), compilation);
-
     // Both types at Sql, with Users, Orders and these settings files, nearer than the project's.
     public GeneratorDriver FirstRunWithSettingsFiles(
         Compilation compilation,
@@ -281,7 +271,7 @@ internal sealed class CachingScene
     {
         var given = files.ToList();
         GeneratorHarness.RefuseTheProjectsPath(given.Select(file => file.Path));
-        return GeneratorHarness.CreateDriver([.. given, projectFile], new TestOptionsProvider(null, null));
+        return GeneratorHarness.CreateDriver([.. given, projectFile], new TestOptionsProvider());
     }
 
     // The file, when it is given, as the files it adds to a run.

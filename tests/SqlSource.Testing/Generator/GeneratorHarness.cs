@@ -88,7 +88,7 @@ internal static class GeneratorHarness
     public static SqlFile SettingsFile(string path, string json) => new(path, json);
 
     // Every run states its output, the output of the project's settings file: null writes none, for a test that needs
-    // the project not to set it, of the default, of the output's levels or of the MSBuild path.
+    // the project not to set it, of the default or of the output's levels.
     public static GeneratorRun Run(OutputKind? output, string source, params SqlFile[] sqlFiles) =>
         Run(output, [new SourceFile(SourcePath, source)], sqlFiles);
 
@@ -108,16 +108,8 @@ internal static class GeneratorHarness
         var parseOptions = ParseOptions.WithLanguageVersion(languageVersion);
         var compilation = CreateCompilation(sources, supportedFramework, parseOptions, references);
 
-        // The properties and each file's dialect and metadata are what MSBuild tells the generator, for the tests of
-        // the MSBuild path.
-        var options = new TestOptionsProvider(
-            null,
-            null,
-            null,
-            sqlFiles.Where(file => file.Dialect is not null).ToDictionary(file => file.Path, file => file.Dialect!),
-            properties,
-            sqlFiles.Where(file => file.Metadata is not null).ToDictionary(file => file.Path, file => file.Metadata!)
-        );
+        // The properties are what MSBuild tells the generator, for the tests of SqlSourceBuildFolders.
+        var options = new TestOptionsProvider(properties);
         var projectSettings = ProjectSettings(output, dialect, generatorParameters, settings);
         var files = WithProjectSettings(sqlFiles, projectSettings);
         var driver = CreateDriver(files.Select(file => file.ToAdditionalText()), options, parseOptions)
@@ -309,7 +301,7 @@ internal static class GeneratorHarness
         var driver = CreateDriver(
                 WithProjectSettings(sqlFiles ?? [], ProjectSettings(output, dialect))
                     .Select(file => file.ToAdditionalText()),
-                new TestOptionsProvider(null, null)
+                new TestOptionsProvider()
             )
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
@@ -372,7 +364,7 @@ internal static class GeneratorHarness
 
         var driver = CreateDriver(
                 WithProjectSettings(sqlFiles, ProjectSettings(output, dialect)).Select(file => file.ToAdditionalText()),
-                new TestOptionsProvider(null, null)
+                new TestOptionsProvider()
             )
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
@@ -405,7 +397,7 @@ internal static class GeneratorHarness
 
     // "SQLSRC001 /app/Repo/Sample.cs(3,14)-(3,20): message", with lines and columns counted from one as an IDE
     // shows them.
-    private static string Format(Diagnostic diagnostic)
+    public static string Format(Diagnostic diagnostic)
     {
         var span = diagnostic.Location.GetLineSpan();
         var start = Format(span.StartLinePosition);
@@ -427,14 +419,8 @@ internal sealed class LoadedAssembly : IAnalyzerAssemblyLoader
     public Assembly LoadFromPath(string fullPath) => typeof(SqlSourceGenerator).Assembly;
 }
 
-// Dialect is the SqlSourceDialect metadata of the file's AdditionalFiles item, and Metadata its other metadata by
-// MSBuild name, for the tests of the MSBuild path.  Null is a file without it.
-internal sealed record SqlFile(
-    string Path,
-    string? Text,
-    string? Dialect = null,
-    IReadOnlyDictionary<string, string>? Metadata = null
-)
+// A .sql file, or any other additional file, as the compiler gives it to the generator.
+internal sealed record SqlFile(string Path, string? Text)
 {
     public AdditionalText ToAdditionalText() => new InMemoryAdditionalText(Path, Text);
 }

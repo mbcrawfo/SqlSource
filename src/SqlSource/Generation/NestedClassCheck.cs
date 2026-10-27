@@ -8,8 +8,8 @@ using SqlSource.Settings;
 namespace SqlSource.Generation;
 
 /// <summary>
-/// Names a type's nested class, from its attribute, the chain of the folder of its C# file and the project's property,
-/// and reports <c>SQLSRC007</c> when the type already uses the name.
+/// Names a type's nested class, from its attribute and the chain of the folder of its C# file, and reports
+/// <c>SQLSRC007</c> when the type already uses the name.
 /// </summary>
 internal static class NestedClassCheck
 {
@@ -21,8 +21,7 @@ internal static class NestedClassCheck
     /// <param name="settingsFiles">
     /// The project's settings files, among which the chain of the folder of the type's C# file is searched for.
     /// </param>
-    /// <param name="property">What the project's properties say.</param>
-    public static TargetType Apply(DeclaredType declared, SettingsFileSet settingsFiles, SettingsLevel property)
+    public static TargetType Apply(DeclaredType declared, SettingsFileSet settingsFiles)
     {
         var type = declared.Type;
         if (type.Placement != MemberPlacement.Nested)
@@ -36,7 +35,7 @@ internal static class NestedClassCheck
             settingsFiles.Files.Count > 0 && SqlPath.Normalize(type.FilePath) is { } path
                 ? settingsFiles.ChainOf(path)
                 : SettingsChain.None;
-        var name = QuerySettings.ResolveNestedClass(type.Settings, chain.Level, property);
+        var name = QuerySettings.ResolveNestedClass(type.Settings, chain.Level);
         if (SortedSearch.IndexOf(declared.TakenNames, name, static taken => taken, StringComparer.Ordinal) < 0)
         {
             return name == type.NestedClass ? type : type with { NestedClass = name };

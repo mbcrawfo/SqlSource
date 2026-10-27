@@ -137,8 +137,6 @@ public sealed class CachingSettingsFileTests
         var result = Run(
             driver.WithUpdatedAnalyzerConfigOptions(
                 new TestOptionsProvider(
-                    null,
-                    null,
                     properties: new Dictionary<string, string?> { ["SqlSourceBuildFolders"] = "/app/obj/" }
                 )
             ),
@@ -151,10 +149,29 @@ public sealed class CachingSettingsFileTests
             .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
     }
 
-    // The counterpart of CachingOptionsTests.Run_OptionsReplacedWithoutChangingTheProperty_EmitsNothingAgain: what the
-    // IDE does when a settings file is saved without a change, a new text of the same value.  The file is read again
-    // and gives an equal value, and nothing after it runs: the step named SettingsFile is the one after the filter of
-    // nulls, which reports such a value as taken from the previous run.
+    // What the IDE does when any property or an .editorconfig changes: new options, and the same folders of the build.
+    // The folders are read again and come out equal, and nothing after them runs.
+    [Fact]
+    public void Run_OptionsReplacedWithoutChangingTheBuildFolders_EmitsNothingAgain()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = _scene.FirstRunWithSettingsFiles(compilation, _usersSettings, _ordersSettings);
+
+        var result = Run(driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider()), compilation);
+
+        AllReasons(result, TrackingNames.BuildFolders).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.ReachedSettingsFiles).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.FileParseInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
+    // The counterpart of Run_OptionsReplacedWithoutChangingTheBuildFolders_EmitsNothingAgain for a settings file: what
+    // the IDE does when one is saved without a change, a new text of the same value.  The file is read again and gives
+    // an equal value, and nothing after it runs: the step named SettingsFile is the one after the filter of nulls,
+    // which reports such a value as taken from the previous run.
     [Fact]
     public void Run_SettingsFileReplacedWithTheSameText_EmitsNothingAgain()
     {

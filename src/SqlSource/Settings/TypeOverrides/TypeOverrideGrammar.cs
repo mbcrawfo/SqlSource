@@ -8,18 +8,17 @@ using SqlSource.Settings.ClrTypes;
 namespace SqlSource.Settings.TypeOverrides;
 
 /// <summary>
-/// Reads the type override, in an MSBuild value, in the members of an object of a settings file and in a
-/// <c>-- type-override:</c> marker alike.  An entry is <c>key=type</c>, or a member of an object, where the key is one
-/// that an engine reads, by <see cref="TypeKeys.TryNormalizePostgres" /> for PostgreSQL and
-/// <see cref="TypeKeys.TryNormalizeSqlServer" /> for SQL Server, and the type one that
-/// <see cref="ClrTypeName.TryParse" /> reads, or <c>default</c>, ignoring case, which takes the key out of the map.
+/// Reads the type override, in the members of an object of a settings file and in a <c>-- type-override:</c> marker
+/// alike.  An entry is <c>key=type</c>, or a member of an object, where the key is one that an engine reads, by
+/// <see cref="TypeKeys.TryNormalizePostgres" /> for PostgreSQL and <see cref="TypeKeys.TryNormalizeSqlServer" /> for
+/// SQL Server, and the type one that <see cref="ClrTypeName.TryParse" /> reads, or <c>default</c>, ignoring case,
+/// which takes the key out of the map.
 /// </summary>
 /// <remarks>
-/// An MSBuild value is a list of entries separated by white space, line breaks included, outside <c>&lt;&gt;</c>,
-/// <c>[]</c> and double quotes, and serves both engines, as an object does.  A marker holds one entry, with white space
-/// allowed around its <c>=</c>, and is read by its file's engine.  The <c>=</c> of an entry is the first one outside
-/// double quotes.  A quoted part of a key may be written <c>U&amp;"..."</c>, with escapes such as <c>\000A</c> for a
-/// line break; it keeps <c>""</c> for a quote, so the quotes of a key still pair, and <see cref="TypeKeys" /> reads it.
+/// An object serves both engines.  A marker holds one entry, with white space allowed around its <c>=</c>, and is read
+/// by its file's engine.  The <c>=</c> of an entry is the first one outside double quotes.  A quoted part of a key may
+/// be written <c>U&amp;"..."</c>, with escapes such as <c>\000A</c> for a line break; it keeps <c>""</c> for a quote,
+/// so the quotes of a key still pair, and <see cref="TypeKeys" /> reads it.
 /// </remarks>
 internal static class TypeOverrideGrammar
 {
@@ -31,26 +30,19 @@ internal static class TypeOverrideGrammar
     /// Reads one entry, its key by <paramref name="engine" />'s rules.  False, with a null <paramref name="entry" />,
     /// for a text that is not one or a key that the engine does not read, and never an exception.
     /// </summary>
-    /// <param name="text">The entry and nothing else.</param>
-    /// <param name="spacesAroundEquals">
-    /// Whether white space may stand on either side of the <c>=</c>, as in a marker.
-    /// </param>
+    /// <param name="text">The entry and nothing else, white space allowed around its <c>=</c>.</param>
     /// <param name="place">Where the entry was written.</param>
     /// <param name="engine">The engine whose rules read the key.</param>
     /// <param name="entry">The entry that was read.</param>
     public static bool TryReadEntry(
         ReadOnlySpan<char> text,
-        bool spacesAroundEquals,
         SettingPlace place,
         DatabaseEngine engine,
         out TypeOverride? entry
     )
     {
         entry = null;
-        if (
-            !TrySplitEntry(text, spacesAroundEquals, out var key, out var type)
-            || !TryNormalize(key, engine, out var normalized)
-        )
+        if (!TrySplitEntry(text, out var key, out var type) || !TryNormalize(key, engine, out var normalized))
         {
             return false;
         }
@@ -60,50 +52,10 @@ internal static class TypeOverrideGrammar
     }
 
     /// <summary>
-    /// Reads an MSBuild value, which serves both engines: each entry goes in the list of each engine that reads its
-    /// key, and an entry that neither reads, or that is not one, is added to <paramref name="invalid" /> as written.
-    /// The other entries apply.  Of two entries for one key of a list, the last wins, so that a project can add to a
-    /// value it was given.  Each list is in the order of <see cref="TypeOverrideMap" />, and empty when it has no
-    /// entry.
-    /// </summary>
-    public static TypeOverrideLists ReadList(string text, SettingPlace place, List<string> invalid)
-    {
-        List<TypeOverride>? postgreSql = null;
-        List<TypeOverride>? sqlServer = null;
-        var rest = text.AsSpan();
-        while (NextEntry(ref rest) is { IsEmpty: false } written)
-        {
-            if (!TrySplitEntry(written, spacesAroundEquals: false, out var key, out var type))
-            {
-                invalid.Add(written.ToString());
-                continue;
-            }
-
-            if (!TypeKeys.TryNormalizeEach(key, out var postgreSqlKey, out var sqlServerKey))
-            {
-                invalid.Add(written.ToString());
-                continue;
-            }
-
-            if (postgreSqlKey is not null)
-            {
-                TypeOverrideMap.Put(postgreSql ??= [], new TypeOverride(postgreSqlKey, type, place));
-            }
-
-            if (sqlServerKey is not null)
-            {
-                TypeOverrideMap.Put(sqlServer ??= [], new TypeOverride(sqlServerKey, type, place));
-            }
-        }
-
-        return new TypeOverrideLists(ToArray(postgreSql), ToArray(sqlServer));
-    }
-
-    /// <summary>
-    /// Reads the members of an object, as a settings file writes the type override, which serves both engines as an
-    /// MSBuild value does.  A member's key and type are trimmed, and each entry goes in the list of each engine that
-    /// reads its key.  The index of a member that neither engine reads, or whose type is not valid or is empty, is
-    /// added to <paramref name="invalid" />.  A member whose key either list already has, by the identity of
+    /// Reads the members of an object, as a settings file writes the type override, which serves both engines.  A
+    /// member's key and type are trimmed, and each entry goes in the list of each engine that reads its key.  The index
+    /// of a member that neither engine reads, or whose type is not valid or is empty, is added to
+    /// <paramref name="invalid" />.  A member whose key either list already has, by the identity of
     /// <see cref="TypeOverrideMap" />, goes in neither, and is added to <paramref name="repeated" /> with the index of
     /// the earlier member that put the key: of two members for one key, the first wins.  The other members apply.
     /// Each list is in the order of <see cref="TypeOverrideMap" />, and empty when it has no entry.
@@ -185,17 +137,9 @@ internal static class TypeOverrideGrammar
             : NotInBrackets + plain;
     }
 
-    /// <summary>
-    /// The key and the C# type of an entry, null for <c>default</c>, or false for a text with no <c>=</c> outside
-    /// double quotes or a type that is not valid.  The key is not read here.  The column types' grammar splits its
-    /// entries of MSBuild with it too.
-    /// </summary>
-    internal static bool TrySplitEntry(
-        ReadOnlySpan<char> text,
-        bool spacesAroundEquals,
-        out ReadOnlySpan<char> key,
-        out string? type
-    )
+    // The key and the C# type of an entry, white space around its = trimmed, the type null for default, or false for a
+    // text with no = outside double quotes or a type that is not valid.  The key is not read here.
+    private static bool TrySplitEntry(ReadOnlySpan<char> text, out ReadOnlySpan<char> key, out string? type)
     {
         key = default;
         type = null;
@@ -205,15 +149,8 @@ internal static class TypeOverrideGrammar
             return false;
         }
 
-        key = text.Slice(0, equals);
-        var written = text.Slice(equals + 1);
-        if (spacesAroundEquals)
-        {
-            key = key.TrimEnd();
-            written = written.TrimStart();
-        }
-
-        return TryReadType(written, out type);
+        key = text.Slice(0, equals).TrimEnd();
+        return TryReadType(text.Slice(equals + 1).TrimStart(), out type);
     }
 
     /// <summary>
@@ -383,50 +320,5 @@ internal static class TypeOverrideGrammar
         }
 
         return -1;
-    }
-
-    /// <summary>
-    /// The next entry of an MSBuild value, a run of text outside white space, where white space inside <c>&lt;&gt;</c>,
-    /// <c>[]</c> or double quotes belongs to the run, and a bracket inside double quotes is not counted.  Only the key
-    /// opens a double quote.  Empty at the end.  The column types' grammar reads its entries of MSBuild with it too.
-    /// </summary>
-    internal static ReadOnlySpan<char> NextEntry(ref ReadOnlySpan<char> rest)
-    {
-        var start = 0;
-        while (start < rest.Length && char.IsWhiteSpace(rest[start]))
-        {
-            start++;
-        }
-
-        var end = start;
-        var open = 0;
-        var quoted = false;
-        var inType = false;
-        while (end < rest.Length && (open > 0 || quoted || !char.IsWhiteSpace(rest[end])))
-        {
-            // Quotes belong to the key: once its = is read, a " is a character of the type, which is invalid.
-            if (rest[end] == '"' && !inType)
-            {
-                quoted = !quoted;
-            }
-            else if (!quoted && rest[end] == '=')
-            {
-                inType = true;
-            }
-            else if (!quoted && rest[end] is '<' or '[')
-            {
-                open++;
-            }
-            else if (!quoted && rest[end] is '>' or ']' && open > 0)
-            {
-                open--;
-            }
-
-            end++;
-        }
-
-        var entry = rest.Slice(start, end - start);
-        rest = rest.Slice(end);
-        return entry;
     }
 }

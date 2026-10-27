@@ -7,9 +7,9 @@ namespace SqlSource.Tests.Settings;
 public sealed class SettingPlacesTests
 {
     // A settings file is more specific the nearer its folder is to the query's, and every one of them is below the
-    // file's own header and above the metadata.
+    // file's own header and above the attribute.
     [Fact]
-    public void Specificity_OfEachPlace_RanksQueryThenHeaderThenSettingsFilesThenMetadataThenProperty()
+    public void Specificity_OfEachPlace_RanksQueryThenHeaderThenSettingsFilesThenAttribute()
     {
         var ranks = new[]
         {
@@ -18,8 +18,7 @@ public sealed class SettingPlacesTests
             SettingPlace.OfSettingsFile("/a/b/sqlsource.json", 2),
             SettingPlace.OfSettingsFile("/a/sqlsource.json", 1),
             SettingPlace.OfSettingsFile("/sqlsource.json", 0),
-            SettingPlace.Metadata,
-            SettingPlace.Property,
+            SettingPlace.Attribute,
         };
 
         var specificities = new int[ranks.Length];
@@ -34,10 +33,17 @@ public sealed class SettingPlacesTests
         }
     }
 
-    // Neither setting has an attribute level, which ranks with the property.
+    // Neither setting has an attribute level, which ranks below every settings file.
     [Fact]
-    public void Specificity_OfTheAttribute_EqualsTheProperty() =>
-        SettingPlaces.Specificity(SettingPlace.Attribute).ShouldBe(SettingPlaces.Specificity(SettingPlace.Property));
+    public void Specificity_SettingsFiles_RankNearerAboveFartherAndBelowTheMarkers()
+    {
+        var root = SettingPlace.OfSettingsFile("/sqlsource.json", 0);
+        var nearer = SettingPlace.OfSettingsFile("/a/b/sqlsource.json", 2);
+        SettingPlaces.Specificity(root).ShouldBe(1);
+        SettingPlaces.Specificity(SettingPlace.Attribute).ShouldBe(0);
+        SettingPlaces.Specificity(nearer).ShouldBeGreaterThan(SettingPlaces.Specificity(root));
+        SettingPlaces.Specificity(SettingPlace.FileHeader).ShouldBeGreaterThan(SettingPlaces.Specificity(nearer));
+    }
 
     [Fact]
     public void Specificity_OfADeepSettingsFile_StaysBelowTheFileHeader() =>
@@ -55,20 +61,11 @@ public sealed class SettingPlacesTests
         place.Depth.ShouldBe(3);
     }
 
-    // The places of a project have no file of their own.
+    // Only a settings file has a file of its own.
     [Fact]
     public void Places_OfTheOtherKinds_HaveNoPathAndNoDepth()
     {
-        foreach (
-            var place in new[]
-            {
-                SettingPlace.Property,
-                SettingPlace.Metadata,
-                SettingPlace.Attribute,
-                SettingPlace.FileHeader,
-                SettingPlace.Query,
-            }
-        )
+        foreach (var place in new[] { SettingPlace.Attribute, SettingPlace.FileHeader, SettingPlace.Query })
         {
             place.Path.ShouldBeNull();
             place.Depth.ShouldBe(0);

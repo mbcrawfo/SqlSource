@@ -5,7 +5,6 @@ using System.Threading;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Chains;
-using SqlSource.Generation.MSBuild;
 using SqlSource.Generation.Paths;
 using SqlSource.Parsing;
 using SqlSource.Settings;
@@ -20,12 +19,10 @@ namespace SqlSource.Tool.Planning;
 /// </summary>
 /// <remarks>
 /// The plan must agree with the generator on which type claims which file with which output, so every rule here is
-/// the generator's own code: <c>PathResolver</c>, <c>MSBuildSettings</c>, <c>DialectSetting</c>,
-/// <c>FileParseInput</c>, <c>SqlFileReader</c>, <c>QuerySettings</c> and <c>SqlQueryHash</c>.  The order of the
-/// errors for values that are not valid is the generator's too: both sides take it from <c>InvalidValues</c>.  The
-/// settings files are read by the generator's <c>ListedSettingsFile</c> and <c>SettingsFileSet</c>, through
-/// <see cref="RunSettingsFiles" />, and the compile paths that reach one are <c>BuildFolders</c>'.
-/// <c>GeneratorParityTests</c> holds the two together.
+/// the generator's own code: <c>PathResolver</c>, <c>FileParseInput</c>, <c>SqlFileReader</c>, <c>FileLevel</c>,
+/// <c>QuerySettings</c> and <c>SqlQueryHash</c>.  The settings come from the settings files alone, which the
+/// generator's <c>ListedSettingsFile</c> and <c>SettingsFileSet</c> read, through <see cref="RunSettingsFiles" />, and
+/// the compile paths that reach one are <c>BuildFolders</c>'.  <c>GeneratorParityTests</c> holds the two together.
 /// </remarks>
 internal static class RunPlanner
 {
@@ -77,10 +74,10 @@ internal static class RunPlanner
         );
     }
 
-    // The claimed files of one project, in the order of their paths, each with the settings of this project, and the
-    // number of its listed files that no type of it claims.  The errors of the project are added: SQLSRC208, then
-    // SQLSRC011, then SQLSRC014, then the problems of the settings files that its .sql files and C# files reach, as
-    // the generator reports them, of each file once in the run.
+    // The claimed files of one project, in the order of their paths, each with the settings files that reach it, and
+    // the number of its listed files that no type of it claims.  The errors of the project are added: SQLSRC208, then
+    // the problems of the settings files that its .sql files and C# files reach, as the generator reports them, of
+    // each file once in the run.
     private static (List<ClaimedFile> Claimed, int Unclaimed) ReadProject(
         ProjectManifest manifest,
         RunSettingsFiles settingsFiles,
@@ -91,19 +88,11 @@ internal static class RunPlanner
         var claims = AttributeReader.Read(manifest, cancellationToken);
         errors.AddRange(claims.Errors);
 
-        var options = ManifestOptions.ForProject(manifest);
-        var dialect = DialectSetting.ReadProperty(options);
-        // The keys of a manifest: they have the database, which the keys of the compiler do not.
-        var settings = ProjectSettings.Read(options, MSBuildSettings.ManifestProperty);
-        var invalid = new InvalidValues();
-        invalid.AddDialect(dialect.InvalidValue);
-        AddSettings(invalid, settings.Invalid);
-
         var settingsFileSet = settingsFiles.Of(manifest, cancellationToken);
         var listed = ListedFiles.Read(manifest);
         var claimsOf = ClaimsByFile(claims.Claims, listed);
 
-        // The metadata of a file that no type claims is not read, as nothing else of such a file is.
+        // A file that no type claims is not read, as nothing else of such a file is.
         var claimed = new List<ClaimedFile>(claimsOf.Count);
         foreach (var path in listed.Paths)
         {
@@ -112,8 +101,7 @@ internal static class RunPlanner
                 continue;
             }
 
-            var text = new SqlFileText(listed[path].Path);
-            var metadata = ReadMetadata(text, listed[path], invalid);
+            var text = new SqlFileText(listed[path]);
             // The chain of the file's folder in this project's settings files, as the generator finds it.
             var chain = settingsFileSet.ChainOf(path);
             claimed.Add(
@@ -121,22 +109,19 @@ internal static class RunPlanner
                     manifest.ProjectPath,
                     path,
                     text,
-                    metadata,
-                    dialect,
-                    settings.Level,
                     chain,
-                    FileLevel.Resolve(metadata, path, chain)?.Level ?? SettingsLevel.None,
+                    FileLevel.Resolve(path, chain)?.Level ?? SettingsLevel.None,
                     fileClaims.Levels,
                     fileClaims.Types
                 )
             );
         }
 
-        AddInvalid(errors, manifest.ProjectPath, invalid);
         // Every listed .sql file reaches, claimed or not, as every C# file does that is not the build's.
+        var buildFolders = BuildFolders.Of(manifest.BuildFolders);
         settingsFiles.AddProblems(
             settingsFileSet,
-            listed.Paths.Concat(BuildFolders.Read(options).ReachingPaths(manifest.CompileFiles)),
+            listed.Paths.Concat(buildFolders.ReachingPaths(manifest.CompileFiles)),
             errors
         );
         return (claimed, listed.Paths.Count - claimed.Count);
@@ -163,19 +148,6 @@ internal static class RunPlanner
         }
 
         return byFile;
-    }
-
-    // The metadata of a claimed file's item.  What is not valid in it is kept for the errors of the project.
-    private static FileMetadata ReadMetadata(SqlFileText text, ManifestFile file, InvalidValues invalid)
-    {
-        var metadata = FileMetadata.Read(text, ManifestOptions.ForFile(file), MSBuildSettings.ManifestMetadata);
-        invalid.AddDialect(metadata.Dialect.InvalidValue);
-        if (metadata.Settings is { } settings)
-        {
-            AddSettings(invalid, settings.Invalid);
-        }
-
-        return metadata;
     }
 
     // Plans a claimed file once, under the first project that claims it.  A file with a parse error has no query.  When
@@ -213,23 +185,15 @@ internal static class RunPlanner
         return FileOf(work, parsed.Dialect, state, new EquatableArray<PlannedQuery>(queries.MoveToImmutable()));
     }
 
-    // Parses a claimed file with its dialect: its header marker, else the chain's, else its metadata's, else that of
-    // the project it is planned under.  Comments are never wanted: the hash comes from the SQL without them.
+    // Parses a claimed file with its dialect: its header marker, else the chain's, else ansi.  Comments are never
+    // wanted: the hash comes from the SQL without them.
     private static ParsedSqlFile Parse(ClaimedFile owner, CancellationToken cancellationToken)
     {
-        var input = FileParseInput.Resolve(
-            owner.Metadata,
-            owner.NormalizedPath,
-            owner.Chain,
-            owner.ProjectDialect,
-            projectKeepsComments: false,
-            EquatableArray<string>.Empty
-        );
+        var input = FileParseInput.Resolve(owner.Text, owner.NormalizedPath, owner.Chain, EquatableArray<string>.Empty);
         return SqlFileReader.Read(
-            owner.Metadata.File,
+            owner.Text,
             owner.NormalizedPath,
             input.Dialect,
-            input.InvalidDialect,
             commentsWanted: false,
             cancellationToken
         );
@@ -291,19 +255,14 @@ internal static class RunPlanner
         return new PlannedQuery(
             query,
             NeedsEntry: true,
-            QuerySettings.ResolveDatabase(
-                query.Markers,
-                owner.Level,
-                owner.Property,
-                SqlDialectName.Canonical(dialect)
-            ),
+            QuerySettings.ResolveDatabase(query.Markers, owner.Level, SqlDialectName.Canonical(dialect)),
             SqlQueryHash.Compute(dialect, query.Segments, query.Tokens, query.Parameters),
             problems
         );
     }
 
     private static ToolDiagnostic FileNotUtf8(FileWork work) =>
-        ToolDiagnostic.ForFile(ToolDiagnostics.FileNotUtf8, work.Owner.Metadata.File.Path);
+        ToolDiagnostic.ForFile(ToolDiagnostics.FileNotUtf8, work.Owner.Text.Path);
 
     // The planned file of a work, under its owner.
     private static PlannedFile FileOf(
@@ -313,7 +272,7 @@ internal static class RunPlanner
         EquatableArray<PlannedQuery> queries
     ) =>
         new(
-            work.Owner.Metadata.File.Path,
+            work.Owner.Text.Path,
             work.Owner.NormalizedPath,
             work.Owner.ProjectPath,
             dialect,
@@ -338,8 +297,7 @@ internal static class RunPlanner
         );
 
     // The output resolves for each type and query, and a file needs what any type that claims it needs: the
-    // greatest over every claim of every project, each with the chain, the metadata and the property of its own
-    // project.
+    // greatest over every claim of every project, each with the chain of its own project.
     private static OutputKind GreatestOutput(SqlQuery query, FileWork work)
     {
         var greatest = OutputKind.Sql;
@@ -347,7 +305,7 @@ internal static class RunPlanner
         {
             foreach (var claim in claimant.Claims)
             {
-                var output = QuerySettings.Resolve(query.Markers, claim, claimant.Level, claimant.Property).Output;
+                var output = QuerySettings.Resolve(query.Markers, claim, claimant.Level).Output;
                 if (output > greatest)
                 {
                     greatest = output;
@@ -493,39 +451,6 @@ internal static class RunPlanner
     private static bool IsNamed(PlannedQuery query, RunFilters filters) =>
         filters.Databases.IsEmpty || (query.Database is { } database && filters.NamesDatabase(database));
 
-    // The generator's reader gives every setting that is not valid.  The tool reports the ones it reads: the build
-    // reports the rest.  The database is the tool's alone: the generator does not read it.
-    private static void AddSettings(InvalidValues invalid, IEnumerable<InvalidSetting> settings) =>
-        invalid.AddSettings(
-            settings.Where(static setting => setting.Name is MSBuildSettings.OutputName or MSBuildSettings.DatabaseName)
-        );
-
-    // SQLSRC011 for each dialect that is not valid, then SQLSRC014 for each setting, in the order of InvalidValues.
-    private static void AddInvalid(
-        ImmutableArray<ToolDiagnostic>.Builder errors,
-        string projectPath,
-        InvalidValues invalid
-    )
-    {
-        foreach (var value in invalid.Dialects)
-        {
-            errors.Add(ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, projectPath, value));
-        }
-
-        foreach (var setting in invalid.Settings)
-        {
-            errors.Add(
-                ToolDiagnostic.AtFile(
-                    SqlDiagnostics.InvalidSettingValue,
-                    projectPath,
-                    setting.Value,
-                    setting.Name,
-                    setting.Help
-                )
-            );
-        }
-    }
-
     // The claims of one file in one project: what each says, and the type that says it, in the order they came.
     private sealed class FileClaims
     {
@@ -535,14 +460,11 @@ internal static class RunPlanner
     }
 
     // One claimed file as one project sees it.  Chain is that of the file's folder in the project's settings files, and
-    // Level the chain's over the metadata's, as the generator's FileLevel gives it.
+    // Level is the chain's, as the generator's FileLevel gives it.
     private sealed record ClaimedFile(
         string ProjectPath,
         string NormalizedPath,
         SqlFileText Text,
-        FileMetadata Metadata,
-        DialectSetting ProjectDialect,
-        SettingsLevel Property,
         SettingsChain Chain,
         SettingsLevel Level,
         List<SettingsLevel> Claims,

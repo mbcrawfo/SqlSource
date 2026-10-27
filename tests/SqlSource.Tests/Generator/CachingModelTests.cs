@@ -551,47 +551,8 @@ public sealed class CachingModelTests
         OutputReasons(result).Distinct().ShouldBe([IncrementalStepRunReason.Cached]);
     }
 
-    // No model reads the collection type, so the requests of each type come out equal and nothing after them runs.  A
-    // test of the MSBuild path: the output, the dialect and the collection type are the project's properties.
-    [Fact]
-    public void Run_CollectionTypePropertyChanged_EmitsNoModelAgain()
-    {
-        var compilation = ModelsCompilation();
-        var driver = FirstRunOnMSBuild(
-            compilation,
-            new TestOptionsProvider(OutputKind.Models, null, "postgres"),
-            _scene.Users,
-            _scene.Orders,
-            _scene.Payments,
-            TypedSidecar(_scene.Users, "GetUser", "int4"),
-            TypedSidecar(_scene.Orders, "GetOrder", "int4"),
-            _scene.PaymentsSidecar
-        );
-
-        var result = Run(
-            driver.WithUpdatedAnalyzerConfigOptions(
-                new TestOptionsProvider(
-                    OutputKind.Models,
-                    null,
-                    "postgres",
-                    properties: new Dictionary<string, string?> { ["SqlSourceCollectionType"] = "List" }
-                )
-            ),
-            compilation
-        );
-
-        AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Modified]);
-        AllReasons(result, TrackingNames.TypeModels)
-            .ShouldBe([IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Unchanged]);
-        AllReasons(result, TrackingNames.ModelGroups).ShouldBe([IncrementalStepRunReason.Cached]);
-        AllReasons(result, TrackingNames.Models).ShouldBe([IncrementalStepRunReason.Cached]);
-        AllReasons(result, TrackingNames.ModelOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        ModelReasons(result).Count.ShouldBe(3);
-    }
-
-    // The counterpart of Run_CollectionTypePropertyChanged_EmitsNoModelAgain, by an edit of the project's settings
-    // file, with the same reasons: no model reads the collection type, so the requests of each type come out equal
-    // and nothing after them runs.
+    // An edit of the project's settings file's collection type: no model reads it, so the requests of each type come
+    // out equal and nothing after them runs.
     [Fact]
     public void Run_CollectionTypeOfTheProjectsFileChanged_EmitsNoModelAgain()
     {

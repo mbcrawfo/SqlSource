@@ -1,6 +1,5 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
-using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Settings;
@@ -11,9 +10,8 @@ namespace SqlSource.Tests.Generator;
 
 // The list of generator parameters in effect for a query, for a type that claims its file, is the one from the most
 // specific level that gives a list, whole: the query's markers, the preamble's, the attribute, the settings file of
-// the file's folder, the project's settings file, and on the MSBuild path the metadata of the file's item and the
-// project's property.  Two parameters change a query's generated code, keep-comments its SQL and no-token-validation
-// its method's checks, and each row shows both.
+// the file's folder, then the project's settings file.  Two parameters change a query's generated code, keep-comments
+// its SQL and no-token-validation its method's checks, and each row shows both.
 public sealed class GeneratorParameterLevelTests
 {
     private const string On = "keep-comments no-token-validation";
@@ -244,99 +242,6 @@ public sealed class GeneratorParameterLevelTests
     }
 
     [Fact]
-    public void Run_PropertyWithAWordThatIsNoParameter_IsAnErrorWithoutAPositionAndTheOthersApply()
-    {
-        var run = RunOnMSBuild("keep-comments nope token-validation");
-
-        run.Diagnostics.ShouldBe([
-            "SQLSRC014 (1,1)-(1,1): 'nope' is not a valid value of SqlSourceGeneratorParameters",
-            "SQLSRC014 (1,1)-(1,1): 'token-validation' is not a valid value of SqlSourceGeneratorParameters",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("-- kept");
-    }
-
-    // The metadata of a file that a type claims, with no property beside it.
-    [Fact]
-    public void Run_MetadataWithAWordThatIsNoParameter_IsAnErrorWithoutAPositionAndTheOthersApply()
-    {
-        var run = GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
-            [
-                new SqlFile(
-                    GeneratorHarness.UsersPath,
-                    "-- name: ListFrom\nSELECT * FROM {{table}}; -- kept\n",
-                    Metadata: new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "keep-comments nope" }
-                ),
-            ],
-            properties: SqlOutput
-        );
-
-        run.Diagnostics.ShouldBe([
-            "SQLSRC014 (1,1)-(1,1): 'nope' is not a valid value of SqlSourceGeneratorParameters",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("-- kept");
-    }
-
-    [Fact]
-    public void Run_TheSameInvalidWordInThePropertyAndInTwoFiles_IsReportedOnce()
-    {
-        var metadata = new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "nope" };
-
-        var run = GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
-            [
-                new SqlFile("/app/Repo/A.sql", "SELECT 1;\n", Metadata: metadata),
-                new SqlFile("/app/Repo/B.sql", "SELECT 2;\n", Metadata: metadata),
-            ],
-            properties: new Dictionary<string, string?>
-            {
-                ["SqlSourceOutput"] = "Sql",
-                ["SqlSourceGeneratorParameters"] = "nope",
-            }
-        );
-
-        run.Diagnostics.ShouldBe([
-            "SQLSRC014 (1,1)-(1,1): 'nope' is not a valid value of SqlSourceGeneratorParameters",
-        ]);
-    }
-
-    // A file that no type claims is never read, and neither is what MSBuild says about it.
-    [Fact]
-    public void Run_InvalidMetadataOfAFileThatNoTypeClaims_IsNotReported()
-    {
-        var run = GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
-            [
-                new SqlFile("/app/Repo/A.sql", "SELECT 1;\n"),
-                new SqlFile(
-                    "/app/Migrations/001.sql",
-                    "SELECT 2;\n",
-                    Metadata: new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "nope" }
-                ),
-            ],
-            properties: SqlOutput
-        );
-
-        run.Diagnostics.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Run_DefaultBesideAnotherWordInTheProperty_IsReportedWholeAndGivesNoList()
-    {
-        var run = RunOnMSBuild("default keep-comments");
-
-        run.Diagnostics.ShouldBe([
-            "SQLSRC014 (1,1)-(1,1): 'default keep-comments' is not a valid value of SqlSourceGeneratorParameters",
-        ]);
-        run.Sources["App.Sample.g.cs"].ShouldNotContain("-- kept");
-    }
-
-    [Fact]
     public void Run_AttributeWithAWordThatIsNoParameter_IsAnErrorAtTheAttribute()
     {
         var run = Run(OutputKind.Sql, null, "keep-comments nope");
@@ -356,9 +261,6 @@ public sealed class GeneratorParameterLevelTests
         run.Sources["App.Sample.g.cs"].ShouldContain("-- kept");
     }
 
-    // The output sql as the project's property, for a test of the MSBuild path, which writes no settings file.
-    private static Dictionary<string, string?> SqlOutput => new() { ["SqlSourceOutput"] = "Sql" };
-
     private static string Source(string? attribute) =>
         GeneratorHarness.SampleSource(attribute is null ? null : "Parameters = \"" + attribute + "\"");
 
@@ -369,19 +271,5 @@ public sealed class GeneratorParameterLevelTests
             [new SourceFile(GeneratorHarness.SourcePath, Source(attribute))],
             [new SqlFile(GeneratorHarness.UsersPath, "-- name: ListFrom\nSELECT * FROM {{table}}; -- kept\n")],
             generatorParameters: projectFile
-        );
-
-    // The run of Run at sql with the generator parameters, the MSBuild way: the output and the parameters are the
-    // project's properties, for a test of the MSBuild path.
-    private static GeneratorRun RunOnMSBuild(string property) =>
-        GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
-            [new SqlFile(GeneratorHarness.UsersPath, "-- name: ListFrom\nSELECT * FROM {{table}}; -- kept\n")],
-            properties: new Dictionary<string, string?>
-            {
-                ["SqlSourceOutput"] = "Sql",
-                ["SqlSourceGeneratorParameters"] = property,
-            }
         );
 }

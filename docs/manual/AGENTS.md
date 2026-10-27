@@ -97,6 +97,6 @@ Which pages each phase touches, besides those seven steps:
 | 9. Build integration | `tool.md`: running in the build, the `.env` file and what to keep out of git, watch mode, and the new options in the command reference.  `settings.md`: the property that turns it on.  README: step 5 |
 | 10. Bug reports | `tool.md`: making a bundle, what it holds before you share it, and the new commands in the command reference |
 
-A database that becomes describable gets its own page, a row in the support table of `dialects.md`, and the README's supported environments.  A dialect that is added gets its rows in the tables of `dialects.md` and its name in the section of `SQLSRC011` in `diagnostics.md`; `settings.md`'s Dialect row changes only for a dialect with options.
+A database that becomes describable gets its own page, a row in the support table of `dialects.md`, and the README's supported environments.  A dialect that is added gets its rows in the tables of `dialects.md` and its name in the section of `SQLSRC019` in `diagnostics.md`, where `dialect` lists the names; `settings.md`'s Dialect row changes only for a dialect with options.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

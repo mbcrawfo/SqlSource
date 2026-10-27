@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Generation.Chains;
 using SqlSource.Generation.Paths;
-using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
@@ -16,37 +15,12 @@ namespace SqlSource.Tool.Tests.Projects;
 // projects of Fixtures/Projects.  Each test starts MSBuild once or twice, which takes a second or two.
 public sealed class ManifestTargetTests : IDisposable
 {
-    private static readonly string[] Names =
-    [
-        "SqlSourceDialect",
-        "SqlSourceDatabase",
-        "SqlSourceOutput",
-        "SqlSourceGeneratorParameters",
-        "SqlSourceInputModelSuffix",
-        "SqlSourceOutputModelSuffix",
-        "SqlSourceModelNamespace",
-        "SqlSourceInputModelType",
-        "SqlSourceOutputModelType",
-        "SqlSourceCollectionType",
-        "SqlSourceTypeOverrides",
-        "SqlSourceColumnTypes",
-    ];
-
-    // The settings that are properties of the project and never metadata of a file.
-    private static readonly string[] PropertyOnlyNames = ["SqlSourceNestedClass"];
-
     // The line of the folders the build writes into, which is no setting and holds paths of the machine.
-    private const string BuildFoldersLine = "Property.SqlSourceBuildFolders=";
+    private const string BuildFoldersLine = "SqlSourceBuildFolders=";
 
     private readonly FixtureProjects _fixtures = new();
 
     public void Dispose() => _fixtures.Dispose();
-
-    // The lines of one file with no metadata: its File line and the twelve under it, each empty.
-    private static string[] FileLines(string path) => ["File=" + path, .. Names.Select(name => $"File.{name}=")];
-
-    // The line of each setting of a project that sets none, each empty.
-    private static string[] PropertyLines() => [.. Names.Concat(PropertyOnlyNames).Select(name => $"Property.{name}=")];
 
     private static string[] Constants(string[] lines) =>
         lines
@@ -58,7 +32,7 @@ public sealed class ManifestTargetTests : IDisposable
     {
         var read = ManifestReader.Read(string.Join('\n', await _fixtures.WriteManifestAsync(project)));
         read.Succeeded.ShouldBeTrue(read.Failure);
-        return [.. BuildFolders.Read(ManifestOptions.ForProject(read.Value.ShouldNotBeNull())).Folders];
+        return [.. BuildFolders.Of(read.Value.ShouldNotBeNull().BuildFolders).Folders];
     }
 
     [Fact]
@@ -75,20 +49,23 @@ public sealed class ManifestTargetTests : IDisposable
                 && !line.StartsWith(BuildFoldersLine, StringComparison.Ordinal)
             )
             .ShouldBe([
-                "SqlSourceManifest=1",
+                "SqlSourceManifest=2",
                 "Project=" + project,
                 "TargetFramework=net10.0",
                 "LangVersion=14.0",
-                // The project's settings are in its sqlsource.json and its file's header, so no line of a setting
-                // has a value.
-                .. PropertyLines(),
-                .. FileLines(Path.Combine(folder, "Queries", "Users.sql")),
+                "File=" + Path.Combine(folder, "Queries", "Users.sql"),
                 "Settings=" + Path.Combine(folder, "sqlsource.json"),
                 "Compile=" + Path.Combine(folder, "UserRepository.cs"),
             ]);
         lines[4].ShouldStartWith("DefineConstants=");
         // Its value is the machine's: WriteManifest_ProjectWithOneFramework_HoldsTheBuildsFolders reads it.
+        lines[5].ShouldStartWith(BuildFoldersLine);
         lines.Count(line => line.StartsWith(BuildFoldersLine, StringComparison.Ordinal)).ShouldBe(1);
+        // The project's settings are in its sqlsource.json and its file's header, and no line holds a setting.
+        lines.ShouldAllBe(line =>
+            !line.StartsWith("Property.", StringComparison.Ordinal)
+            && !line.StartsWith("File.", StringComparison.Ordinal)
+        );
     }
 
     // The SDK adds the constants of the framework only on the way to a compile, so the manifest target depends on
@@ -107,8 +84,7 @@ public sealed class ManifestTargetTests : IDisposable
         constants.ShouldAllBe(constant => constant.Length > 0);
     }
 
-    // A line break inside a value would end its line of the manifest, and the next line would have no key.  The
-    // trims of the package do not reach a property of the SDK.
+    // A line break inside a value would end its line of the manifest, and the next line would have no key.
     [Fact]
     public async Task WriteManifest_ConstantsWrittenOverSeveralLines_AreOnOneLine()
     {
@@ -135,7 +111,7 @@ public sealed class ManifestTargetTests : IDisposable
             .GetFiles(obj, "App.csproj.SqlSource.manifest", SearchOption.AllDirectories)
             .ShouldHaveSingleItem();
         Path.GetFileName(Path.GetDirectoryName(file)).ShouldBe("net10.0");
-        (await File.ReadAllLinesAsync(file, TestContext.Current.CancellationToken))[0].ShouldBe("SqlSourceManifest=1");
+        (await File.ReadAllLinesAsync(file, TestContext.Current.CancellationToken))[0].ShouldBe("SqlSourceManifest=2");
     }
 
     [Fact]
@@ -182,18 +158,16 @@ public sealed class ManifestTargetTests : IDisposable
             .ShouldBe(["Compile=" + Path.Combine(folder, "Queries.cs")]);
     }
 
+    // The fixture's target hooks SqlSourceListFiles, which the manifest's target depends on first.
     [Fact]
-    public async Task WriteManifest_FileAddedByATargetThatHooksTheTrim_IsListed()
+    public async Task WriteManifest_FileAddedByATargetThatHooksSqlSourceListFiles_IsListed()
     {
         var project = _fixtures.Copy("LateFile");
         var folder = Path.GetDirectoryName(project)!;
 
         var lines = await _fixtures.WriteManifestAsync(project);
 
-        var late = FileLines(Path.Combine(folder, "Generated", "Late.sql"));
-        var at = Array.IndexOf(lines, late[0]);
-        at.ShouldBeGreaterThan(0);
-        lines.Skip(at).Take(late.Length).ShouldBe(late);
+        lines.ShouldContain("File=" + Path.Combine(folder, "Generated", "Late.sql"));
         lines.ShouldContain("File=" + Path.Combine(folder, "Queries", "Users.sql"));
     }
 
@@ -251,7 +225,7 @@ public sealed class ManifestTargetTests : IDisposable
                 ignoreOrder: true
             );
         var settings = Array.FindIndex(lines, line => line.StartsWith("Settings=", StringComparison.Ordinal));
-        settings.ShouldBe(Array.FindLastIndex(lines, line => line.StartsWith("File", StringComparison.Ordinal)) + 1);
+        settings.ShouldBe(Array.FindLastIndex(lines, line => line.StartsWith("File=", StringComparison.Ordinal)) + 1);
         Array
             .FindLastIndex(lines, line => line.StartsWith("Settings=", StringComparison.Ordinal))
             .ShouldBe(Array.FindIndex(lines, line => line.StartsWith("Compile=", StringComparison.Ordinal)) - 1);
@@ -300,20 +274,5 @@ public sealed class ManifestTargetTests : IDisposable
 
         folders.ShouldContain(SqlPath.Normalize(Path.Combine(folder, "obj") + Path.DirectorySeparatorChar));
         folders.ShouldContain(SqlPath.Normalize(Path.Combine(folder, "bin") + Path.DirectorySeparatorChar));
-    }
-
-    [Fact]
-    public async Task WriteManifest_ValuesThatHoldASemicolon_AreEachOneLine()
-    {
-        var project = _fixtures.Copy("Single");
-
-        var lines = await _fixtures.WriteManifestAsync(
-            project,
-            "SqlSourceGeneratorParameters=a%3Bb",
-            "SqlSourceModelNamespace=A=B"
-        );
-
-        lines.ShouldContain("Property.SqlSourceGeneratorParameters=a;b");
-        lines.ShouldContain("Property.SqlSourceModelNamespace=A=B");
     }
 }

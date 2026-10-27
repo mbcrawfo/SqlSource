@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Generation.Chains;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using SqlSource.Tool.Planning;
@@ -20,9 +21,9 @@ namespace SqlSource.Tool.Tests.Planning;
 // The plan must agree with the generator on which type claims which file with which output: a query the tool does
 // not describe is a build error, SQLSRC241, and one it describes for nothing costs a description.  The generator
 // reads symbols and the tool reads syntax, so each case runs both over the same sources and file list and compares
-// what they find.  Both report SQLSRC209 and SQLSRC210, which must be at the same places with the same text, and
-// SQLSRC011 and SQLSRC014, which must come in the same order.  The errors of the settings files, SQLSRC015 to
-// SQLSRC020, are compared the same way, where the two reach the same files.
+// what they find.  Both report SQLSRC209 and SQLSRC210, which must be at the same places with the same text.  The
+// errors of the settings files, SQLSRC015 to SQLSRC020, are compared the same way, where the two reach the same
+// files.
 public sealed class GeneratorParityTests : IDisposable
 {
     private const string Using = "using SqlSource;\n";
@@ -367,7 +368,7 @@ public sealed class GeneratorParityTests : IDisposable
         if (buildFolders is not null)
         {
             // The package's format: each folder after a bar, with a separator at its end.
-            project.Properties["SqlSourceBuildFolders"] = string.Concat(
+            project.BuildFolders = string.Concat(
                 buildFolders.Select(folder => "|" + project.PathOf(folder) + Path.DirectorySeparatorChar)
             );
         }
@@ -385,7 +386,7 @@ public sealed class GeneratorParityTests : IDisposable
             null,
             written,
             [.. listed, .. settings],
-            properties: project.Properties.ToDictionary(pair => pair.Key, string? (pair) => pair.Value)
+            properties: new Dictionary<string, string?> { [BuildFolders.PropertyName] = project.BuildFolders }
         );
         var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
 
@@ -436,75 +437,6 @@ public sealed class GeneratorParityTests : IDisposable
             .ShouldBe(["SQLSRC209 First.sql", "SQLSRC209 Second.sql", "SQLSRC210 First.sql", "SQLSRC210 Second.sql"]);
     }
 
-    // The values that are not valid are reported in an order, and it is the generator's: the dialects in ordinal
-    // order, then the settings by name and value.  The files list the dialects out of that order and one twice, and
-    // each side's errors are compared as they come, never sorted.  The generator never sees SqlSourceDatabase, so
-    // only SqlSourceOutput is compared among the settings.  A test of the MSBuild path: each side reads the values as
-    // properties and metadata.
-    [Fact]
-    public void Errors_OfInvalidValues_AreInTheGeneratorsOrder()
-    {
-        var project = new TestProject(_folder) { LangVersion = "12.0" };
-        project.Properties["SqlSourceDialect"] = "zeta";
-        project.Properties["SqlSourceOutput"] = "nothing";
-        var source = new SourceFile(project.AddSource("Queries.cs", Plans.Type), Plans.Type);
-        const string Text = "-- name: Q\nSELECT 1;\n";
-        (string Name, string Value)[][] metadata =
-        [
-            [("SqlSourceDialect", "beta")],
-            [("SqlSourceDialect", "alpha")],
-            [("SqlSourceDialect", "beta")],
-            [("SqlSourceOutput", "bad")],
-        ];
-        var listed = metadata
-            .Select(
-                (pairs, index) =>
-                {
-                    var name = "Q" + index.ToString(CultureInfo.InvariantCulture) + ".sql";
-                    return new SqlFile(
-                        project.AddSql(name, Text, pairs),
-                        Text,
-                        Metadata: pairs.ToDictionary(pair => pair.Name, pair => pair.Value)
-                    );
-                }
-            )
-            .ToArray();
-
-        var run = GeneratorHarness.Run(
-            null,
-            [source],
-            listed,
-            properties: project.Properties.ToDictionary(pair => pair.Key, string? (pair) => pair.Value)
-        );
-        var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
-
-        var expected = run
-            .Result.Diagnostics.Where(IsInvalidValue)
-            .Select(diagnostic => (diagnostic.Id, Message: diagnostic.GetMessage(CultureInfo.InvariantCulture)))
-            .ToArray();
-        var actual = plan
-            .Errors.Select(error => (error.Descriptor.Id, Message: Reported.MessageOf(error)))
-            .Where(error => IsInvalidValue(error.Id, error.Message))
-            .ToArray();
-
-        actual.ShouldBe(expected);
-        // A case in which the two agree on nothing would prove nothing.
-        expected
-            .Where(error => error.Id == SqlDiagnostics.InvalidDialect.Id)
-            .Select(error => error.Message.Split('\'')[1])
-            .ShouldBe(["alpha", "beta", "zeta"]);
-        expected.Count(error => error.Id == SqlDiagnostics.InvalidSettingValue.Id).ShouldBeGreaterThanOrEqualTo(2);
-    }
-
-    private static bool IsInvalidValue(Diagnostic diagnostic) =>
-        IsInvalidValue(diagnostic.Id, diagnostic.GetMessage(CultureInfo.InvariantCulture));
-
-    private static bool IsInvalidValue(string id, string message) =>
-        id == SqlDiagnostics.InvalidDialect.Id
-        || (
-            id == SqlDiagnostics.InvalidSettingValue.Id && message.EndsWith("SqlSourceOutput", StringComparison.Ordinal)
-        );
-
     private static bool IsCompared(DiagnosticDescriptor descriptor) =>
         descriptor.Id == ToolDiagnostics.OutputNeedsDescribableDialect.Id
         || descriptor.Id == ToolDiagnostics.TokenHasNoDefault.Id;
@@ -544,7 +476,7 @@ public sealed class GeneratorParityTests : IDisposable
         ];
 
     // What the generator's own step gives for each attributed type.  The output is left unset, as the tool's side
-    // sets no property.
+    // writes no settings file.
     private static Claimed[] FromGenerator(SourceFile[] sources, string[] sqlFiles, string[] constants)
     {
         var options = GeneratorHarness.ParseOptions.WithPreprocessorSymbols(constants);
@@ -552,7 +484,7 @@ public sealed class GeneratorParityTests : IDisposable
         var driver = GeneratorHarness
             .CreateDriver(
                 sqlFiles.Select(static path => new SqlFile(path, "SELECT 1;").ToAdditionalText()),
-                new TestOptionsProvider(null, null),
+                new TestOptionsProvider(),
                 options
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);

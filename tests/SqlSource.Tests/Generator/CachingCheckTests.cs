@@ -198,50 +198,10 @@ public sealed class CachingCheckTests
         Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
     }
 
-    // A test of the MSBuild path: the output, the dialect and the suffix are the project's properties.
-    [Fact]
-    public void Run_ModelSuffixPropertyChanged_ChecksNothing()
-    {
-        var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = FirstRunOnMSBuild(
-            compilation,
-            new TestOptionsProvider(OutputKind.Models, null, "postgres"),
-            _scene.Users,
-            _scene.Orders,
-            _scene.UsersSidecar,
-            _scene.OrdersSidecar
-        );
-
-        var result = Run(
-            driver.WithUpdatedAnalyzerConfigOptions(
-                new TestOptionsProvider(
-                    OutputKind.Models,
-                    null,
-                    "postgres",
-                    properties: new Dictionary<string, string?> { ["SqlSourceOutputModelSuffix"] = "Row" }
-                )
-            ),
-            compilation
-        );
-
-        // Every type's needs were found again, under the new property, and are the same.
-        AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Modified]);
-        AllReasons(result, TrackingNames.TypeNeeds).ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
-        AllReasons(result, TrackingNames.FileNeeds).ShouldBe([IncrementalStepRunReason.Cached]);
-        AllReasons(result, TrackingNames.SidecarCheckInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-
-        // The types read the property's type override alone, which did not change.
-        AllReasons(result, TrackingNames.FileTypesInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-    }
-
-    // The counterpart of Run_ModelSuffixPropertyChanged_ChecksNothing, by an edit of the project's settings file: every
-    // type's needs are found again and are the same, so nothing is checked.  The suffix is in the files' levels, which
-    // the types of each file gather beside its check, for the type override and the column types, so each file's input
-    // of its types is gathered again and comes out equal, where the property left it Cached, and no file is typed
-    // again.
+    // An edit of the project's settings file's model suffix: every type's needs are found again and are the same, so
+    // nothing is checked.  The suffix is in the files' levels, which the types of each file gather beside its check,
+    // for the type override and the column types, so each file's input of its types is gathered again and comes out
+    // equal, and no file is typed again.
     [Fact]
     public void Run_ModelSuffixOfTheProjectsFileChanged_ChecksNothing()
     {

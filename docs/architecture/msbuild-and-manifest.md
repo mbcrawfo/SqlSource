@@ -65,7 +65,7 @@ The compiler reads a value up to its first `#` or `;`, and `|` parts the folders
 
 ### `SqlSourceSettingsFile`
 
-The SDK writes a section into the file the compiler reads for every item of a type that `CompilerVisibleItemMetadata` names, whether the item has the metadata or not.  Listed for `AdditionalFiles`, that would be a section for every `.sql` file of the project, a cost that [TD-0016](../tech-debt/TD-0016-dialect-of-a-file-added-by-a-late-target-is-lost.md) measures.  So the metadata is listed for `SqlSourceSettingsFile`, and `SqlSourceCollectSettingsFiles` fills that item type with the `AdditionalFiles` items that have any of the ten.  A project has few of them.
+The SDK writes a section into the file the compiler reads for every item of a type that `CompilerVisibleItemMetadata` names, whether the item has the metadata or not.  Listed for `AdditionalFiles`, that would be a section for every `.sql` file of the project.  So the metadata is listed for `SqlSourceSettingsFile`, and `SqlSourceCollectSettingsFiles` fills that item type with the `AdditionalFiles` items that have any of the ten.  A project has few of them.
 
 The collecting depends on `SqlSourceTrimMetadataOfFiles`, so that it copies trimmed values and leaves out a file whose values were only white space.  It has to say so, because MSBuild promises no order for two targets that hook the same one.  `SqlSourceDatabase` is trimmed and not collected, since the compiler is not shown it.
 
@@ -86,7 +86,7 @@ So each value is trimmed with one expression, `Regex.Replace(value, '\s+', ' ').
 
 The trims run before `GenerateMSBuildEditorConfigFileCore`, and not where the file is imported, because `Directory.Build.targets` is imported later and a target can add an item while the build runs.  Every build that writes the file runs them, a design-time build too.
 
-One target is out of their reach: one that hooks `GenerateMSBuildEditorConfigFileCore` itself and is declared after the package's targets, as one in `Directory.Build.targets` is.  MSBuild runs it after the targets of the package, so the metadata of a `.sql` file that it adds does not reach the compiler, as [TD-0016](../tech-debt/TD-0016-dialect-of-a-file-added-by-a-late-target-is-lost.md) records.  A target that adds a `.sql` file hooks `SqlSourceTrimMetadataOfFiles` instead, which runs it first wherever it is declared, and the manual's [known issues](../manual/settings.md#known-issues) give a user the sample target.
+One target is out of their reach: one that hooks `GenerateMSBuildEditorConfigFileCore` itself and is declared after the package's targets, as one in `Directory.Build.targets` is.  MSBuild runs it after the targets of the package, so the metadata of a `.sql` file that it adds does not reach the compiler.  A target that adds a `.sql` file hooks `SqlSourceTrimMetadataOfFiles` instead, which runs it first wherever it is declared, and the manual's [known issues](../manual/settings.md#known-issues) give a user the sample target.
 
 ## The manifest
 

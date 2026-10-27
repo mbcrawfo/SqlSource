@@ -93,7 +93,7 @@ Four exceptions, stated plainly:
 | Written as | Reported as | What happens |
 |----|----|----|
 | A marker | [SQLSRC111](diagnostics.md#sqlsrc111), a dialect included.  A generator parameter that does not exist is [SQLSRC109](diagnostics.md#sqlsrc109); a value that contradicts another in the same place is [SQLSRC112](diagnostics.md#sqlsrc112) | The file produces no members until it is fixed |
-| An MSBuild property or item metadata | [SQLSRC014](diagnostics.md#sqlsrc014), and for a dialect [SQLSRC011](diagnostics.md#sqlsrc011) | The error has no file and line.  The setting is not set, so the place below it wins; a dialect that is wrong is read as `ansi` instead, as [the dialect](#setting-dialect) says |
+| An MSBuild property or item metadata | [SQLSRC014](diagnostics.md), and for a dialect [SQLSRC011](diagnostics.md) | The error has no file and line.  The setting is not set, so the place below it wins; a dialect that is wrong is read as `ansi` instead, as [the dialect](#setting-dialect) says |
 | A property of the attribute | [SQLSRC006](diagnostics.md#sqlsrc006) | The type produces no members until it is fixed |
 
 <a id="setting-output"></a>
@@ -177,7 +177,7 @@ The [dialect](concepts.md#dialect) is the set of rules by which SqlSource reads 
 - **Three places.**  A `-- dialect:` marker in the file, else the `SqlSourceDialect` metadata of the file's item, else the `SqlSourceDialect` property.  Where two item lines match one file, MSBuild applies them in order and the later one wins.
 - **A file has one dialect.**  The marker goes in the file header, before the first SQL, and not inside a query: anywhere else it is [SQLSRC115](diagnostics.md#sqlsrc115).  It takes effect on the line after it, so comments above it are read by the dialect that the metadata or the property gives.
 - **A value replaces the one below it whole.**  A file with `-- dialect: mysql` in a project that sets `mysql,ansi-quotes` is read as plain `mysql`.
-- **A value that is not a dialect** is [SQLSRC111](diagnostics.md#sqlsrc111) in a marker and [SQLSRC011](diagnostics.md#sqlsrc011) in a property or item metadata.  A file whose property or metadata is wrong is read as `ansi` meanwhile.
+- **A value that is not a dialect** is [SQLSRC111](diagnostics.md#sqlsrc111) in a marker and [SQLSRC011](diagnostics.md) in a property or item metadata.  A file whose property or metadata is wrong is read as `ansi` meanwhile.
 - **The tool reads the dialect too.**  It decides which kind of database the tool asks about a query, and whether there is one to ask: `postgres` and `mssql` can be described.  See [database support](dialects.md#database-support).
 
 <a id="setting-generator-parameters"></a>
@@ -221,7 +221,7 @@ The list for a query is the first of these that gives one, whole:
 
 Several `-- generator:` lines in one place are one list: two lines in a query add up.  A list never adds to the list of another place.
 
-In a property, in metadata and on the attribute the list is words separated by spaces or line breaks.  `default` beside another word there makes the whole value wrong: [SQLSRC014](diagnostics.md#sqlsrc014) in a property or metadata, [SQLSRC006](diagnostics.md#sqlsrc006) on the attribute.  A word that is not a generator parameter is reported the same way.  In a property or metadata the other words still apply; on the attribute the type gets no members until the value is fixed.  In a marker an empty `-- generator:` line is [SQLSRC110](diagnostics.md#sqlsrc110), and `default` beside another word in one place is [SQLSRC112](diagnostics.md#sqlsrc112).
+In a property, in metadata and on the attribute the list is words separated by spaces or line breaks.  `default` beside another word there makes the whole value wrong: [SQLSRC014](diagnostics.md) in a property or metadata, [SQLSRC006](diagnostics.md#sqlsrc006) on the attribute.  A word that is not a generator parameter is reported the same way.  In a property or metadata the other words still apply; on the attribute the type gets no members until the value is fixed.  In a marker an empty `-- generator:` line is [SQLSRC110](diagnostics.md#sqlsrc110), and `default` beside another word in one place is [SQLSRC112](diagnostics.md#sqlsrc112).
 
 <a id="setting-model-suffix"></a>
 
@@ -407,7 +407,7 @@ In an item's metadata written as an attribute, a quote is written `&quot;`, as X
 </ItemGroup>
 ```
 
-An entry that is not valid is [SQLSRC014](diagnostics.md#sqlsrc014), and the other entries of the value still apply.
+An entry that is not valid is [SQLSRC014](diagnostics.md), and the other entries of the value still apply.
 
 **In a marker**, a `-- type-override:` line holds one entry, with or without spaces around its `=`.  The lines of one place add up, one for each type.  Two lines that give one type two C# types in the file header, or inside one query, are [SQLSRC112](diagnostics.md#sqlsrc112); the types are compared by how they are named, so `int` and `System.Int32` are two, and so are `UserKey` and `MyApp.UserKey`, while `System.Int32` and `global::System.Int32` are one.  Its key is read by the file's dialect: a SQL Server type's name in an `mssql` file, and a PostgreSQL type's in a file of any other dialect, so `int4` in an `mssql` file, or `nvarchar` in a `postgres` one, is not valid.  A type of a schema of your own, `dbo.Email`, is read in either.  An entry that is not valid is [SQLSRC111](diagnostics.md#sqlsrc111).
 
@@ -509,7 +509,7 @@ A column type gives one column of a table or view the C# type of your choice, in
 
 **What the type does.**  A type that a column type or a `-- param:` marker gives is one you chose, as a type override's is.  A [query method](generator.md#query-methods) reads and sends it through your [converters](#converters) when it has them, so a `UserId` over a `bigint` column is read as a `long` and given to `UserId`'s converter, and a PostgreSQL array mapped to an array of a type of yours, `posts.tag_ids=TagId[]`, is converted as [converters](#converters) says of arrays.  A type that the project cannot find or use is [SQLSRC250](diagnostics.md#sqlsrc250) to [SQLSRC252](diagnostics.md#sqlsrc252), whose message names the key, or the marker, and the place.
 
-**In a property or metadata**, the value is a list of entries separated by spaces or line breaks, each `key=type` with no space around its `=`, by the type override's rules for white space, `<>`, `[]` and the double quotes of a key: see [in a property or metadata](#setting-type-overrides).  An entry that is not valid is [SQLSRC014](diagnostics.md#sqlsrc014), and the other entries of the value still apply.  Of two entries for one key in one value, the last wins, so a project can add to the value that a `Directory.Build.props` gives it: `$(SqlSourceColumnTypes) users.id=MyApp.UserId`.
+**In a property or metadata**, the value is a list of entries separated by spaces or line breaks, each `key=type` with no space around its `=`, by the type override's rules for white space, `<>`, `[]` and the double quotes of a key: see [in a property or metadata](#setting-type-overrides).  An entry that is not valid is [SQLSRC014](diagnostics.md), and the other entries of the value still apply.  Of two entries for one key in one value, the last wins, so a project can add to the value that a `Directory.Build.props` gives it: `$(SqlSourceColumnTypes) users.id=MyApp.UserId`.
 
 **In the file header**, a `-- column:` line holds one entry, `key -> type` or `key -> default`, with or without spaces around its `->`, for every query of the file.  It gives a type and nothing else: a line without `->`, one that says `null` or `not null`, and one whose key has one part are [SQLSRC111](diagnostics.md#sqlsrc111).  Two lines that give one key two C# types are [SQLSRC112](diagnostics.md#sqlsrc112); the types are compared by how they are written, so `UserId` and `MyApp.UserId` are two.
 
@@ -555,7 +555,7 @@ public partial class UserRepository
 
 Under `SqlLocation.Nested`, this names the private class that holds the type's members, those of its queries whose output is `sql` or `models`.  `NestedClass` on the attribute names it for one type, and the `SqlSourceNestedClass` property for every type of the project that does not set it.  Without either, the class is `Sql`.  The setting has no item metadata and no marker, since a type's queries can come from several files.
 
-The value is one C# identifier that is not a keyword: `Queries` is fine, and `class`, `My-Sql` or `App.Sql` is not.  A value that is not valid is [SQLSRC006](diagnostics.md#sqlsrc006) on the attribute, and [SQLSRC014](diagnostics.md#sqlsrc014) as the property.  Under `SqlLocation.Direct` there is no nested class, and the setting has no effect, even on the same attribute.
+The value is one C# identifier that is not a keyword: `Queries` is fine, and `class`, `My-Sql` or `App.Sql` is not.  A value that is not valid is [SQLSRC006](diagnostics.md#sqlsrc006) on the attribute, and [SQLSRC014](diagnostics.md) as the property.  Under `SqlLocation.Direct` there is no nested class, and the setting has no effect, even on the same attribute.
 
 <a id="setting-method-location"></a>
 
@@ -682,7 +682,7 @@ The package removes the white space around the value of each property and each i
 </PropertyGroup>
 ```
 
-A line break inside one word puts a space there.  `App.` and `Models` on two lines are `App. Models`, which is not a namespace and is reported as [SQLSRC014](diagnostics.md#sqlsrc014).
+A line break inside one word puts a space there.  `App.` and `Models` on two lines are `App. Models`, which is not a namespace and is reported as [SQLSRC014](diagnostics.md).
 
 In a [type override](#setting-type-overrides), and in the [column types](#setting-column-types), white space separates the entries, so an entry has no space around its `=`.  Inside the double quotes of a key, too, a run of white space is made one space, and a value is cut at a `;` or a `#`, as the next paragraph says.  So write such a character of a schema or a name with an escape, in [the form with escapes](#setting-type-overrides) of a part in quotes.  A line break, a tab or any other white space but a single space, a control character, the second of two spaces, a `;` and a `#` are each written `\` and four hex digits: `\0009` for a tab, `\0020` for the second of two spaces, `\003B` for `;`, `\0023` for `#` and `\000A` for a line break, which a `-- type-override:` marker needs too, since its line ends there.  When such a type has no C# type, the build's error gives its key written so.
 
@@ -692,18 +692,18 @@ In a [type override](#setting-type-overrides), and in the [column types](#settin
 
 ## Known issues
 
-- **A `.sql` file that one of your own build targets adds is not fully seen.**  This is about a target in your project that adds a `.sql` file to the `AdditionalFiles` items while the build runs, such as one that writes a file or copies it in.  The build compiles the file, but two things go wrong.  `sqlsource` leaves out the file's queries, so it describes none of them, and the build reports [SQLSRC241](diagnostics.md#sqlsrc241) for each that must be described.  And the settings you gave the file as item metadata, its dialect for one, are dropped when the target runs late in the build, so the file is read with the project's settings.  To make both work, tell your target to run before the package reads its settings, wherever the target is declared:
+- **A `.sql` file that one of your own build targets adds is not described.**  This is about a target in your project that adds a `.sql` file to the `AdditionalFiles` items while the build runs, such as one that writes a file or copies it in.  The build compiles the file, but `sqlsource` leaves out the file's queries, so it describes none of them, and the build reports [SQLSRC241](diagnostics.md#sqlsrc241) for each that must be described.  To make it work, tell your target to run before the package lists the project's files, wherever the target is declared:
 
   ```xml
-  <Target Name="AddGeneratedSql" BeforeTargets="SqlSourceTrimMetadataOfFiles">
+  <Target Name="AddGeneratedSql" BeforeTargets="SqlSourceListFiles">
       <ItemGroup>
-          <AdditionalFiles Include="obj/generated/*.sql" SqlSourceDialect="postgres" />
+          <AdditionalFiles Include="obj/generated/*.sql" />
       </ItemGroup>
   </Target>
   ```
 
-  Change the name, the path and the metadata to your own.  `BeforeTargets="SqlSourceTrimMetadataOfFiles"` is the line that matters.
-- **A type override's key cannot be written in brackets.**  T-SQL writes a name `[dbo].[Email]`, and a key written so is not valid: [SQLSRC014](diagnostics.md#sqlsrc014) in a property or metadata, and [SQLSRC111](diagnostics.md#sqlsrc111) in a marker.  Write `dbo.Email`, which matches the type's name in any case, or `"dbo"."Email"`, which matches its case exactly; the message shows both.  See [type overrides](#setting-type-overrides).
+  Change the name and the path to your own.  `BeforeTargets="SqlSourceListFiles"` is the line that matters.  In a project that is not of the .NET SDK, or one that sets `AfterMicrosoftNETSdkTargets` without keeping its value, a target that runs later also leaves the file without the settings of a `sqlsource.json` that only it reaches, such as the one beside it, with no error; the same line fixes that too.
+- **A type override's key cannot be written in brackets.**  T-SQL writes a name `[dbo].[Email]`, and a key written so is not valid: [SQLSRC014](diagnostics.md) in a property or metadata, and [SQLSRC111](diagnostics.md#sqlsrc111) in a marker.  Write `dbo.Email`, which matches the type's name in any case, or `"dbo"."Email"`, which matches its case exactly; the message shows both.  See [type overrides](#setting-type-overrides).
 - **A C# type that is generic can give its model a warning for a `?` inside a type argument**, in a type override, a column type or a `-- param:` marker.  A type argument written with a `?` where a constraint forbids null is [SQLSRC252](diagnostics.md#sqlsrc252) at the query, but a `?` inside a type argument is not.  An override such as `MyApp.Names<System.Collections.Generic.List<string?>>`, where `Names<T>` requires `where T : System.Collections.Generic.IEnumerable<string>`, is accepted, and the generated model gets the compiler's warning CS8631.  Give the type arguments the nullability that the constraints ask for.  See [type overrides](#setting-type-overrides).
 - **A type made by Vogen or StronglyTypedId needs converters written for it.**  SqlSource converts a type only through methods marked `[SqlSourceConverter]`, and never through a type's `Value` property and its `From` method or constructor, so such a type with no converter is given to the driver as it is, which throws `InvalidCastException`.  Write the two converters in a class of your project, each calling the type's own members:
 

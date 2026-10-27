@@ -121,18 +121,6 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor InvalidDialect = new(
-        id: "SQLSRC011",
-        title: "SqlSourceDialect is not valid",
-        messageFormat: "'{0}' is not a SQL dialect.  SqlSourceDialect accepts ansi, mssql, postgres, cockroachdb, "
-            + "mysql, mariadb, sqlite and oracle.",
-        category: Category,
-        defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLinkBase + "sqlsrc011",
-        customTags: WellKnownDiagnosticTags.NotConfigurable
-    );
-
     public static readonly DiagnosticDescriptor UnsupportedLanguageVersion = new(
         id: "SQLSRC012",
         title: "Language version is not supported",
@@ -152,17 +140,6 @@ internal static class SqlDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         helpLinkUri: HelpLinkBase + "sqlsrc013",
-        customTags: WellKnownDiagnosticTags.NotConfigurable
-    );
-
-    public static readonly DiagnosticDescriptor InvalidSettingValue = new(
-        id: "SQLSRC014",
-        title: "MSBuild setting is not valid",
-        messageFormat: "'{0}' is not a valid value of {1}{2}",
-        category: Category,
-        defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLinkBase + "sqlsrc014",
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
@@ -620,9 +597,9 @@ internal static class SqlDiagnostics
     );
 
     // {0} is the column or parameter, as "column 'id'", {1} what is mapped, the type override's key or a parameter
-    // as "@author", {2} the C# type, {3} the place that chose it, as "the property SqlSourceTypeOverrides" or "the
-    // -- param: marker of the parameter", and {4} the types a short name in it could mean, as ", and it could be
-    // App.UserId or Other.UserId", or empty.
+    // as "@author", {2} the C# type, {3} the place that chose it, as "the typeOverrides of the settings file
+    // /app/sqlsource.json" or "the -- param: marker of the parameter", and {4} the types a short name in it could
+    // mean, as ", and it could be App.UserId or Other.UserId", or empty.
     public static readonly DiagnosticDescriptor MappedTypeNotFound = new(
         id: "SQLSRC250",
         title: "Mapped type is not found",
@@ -767,7 +744,7 @@ internal static class SqlDiagnostics
     );
 
     // {0} is the column or parameter, as "column 'id'", {1} the entry's key as written, {2} the place that wrote it,
-    // as "the property SqlSourceTypeOverrides", and {3} the key to write, the element's with [].
+    // as "the typeOverrides of the settings file /app/sqlsource.json", and {3} the key to write, the element's with [].
     public static readonly DiagnosticDescriptor ArrayEntryMapsNothing = new(
         id: "SQLSRC261",
         title: "Entry names an array as the catalog does",
@@ -983,10 +960,8 @@ internal static class SqlDiagnostics
             NestedClassNameTaken,
             DuplicateQueryName,
             QueryNamedLikeContainingType,
-            InvalidDialect,
             UnsupportedLanguageVersion,
             PathDiffersOnlyByCase,
-            InvalidSettingValue,
             SettingsFileNotAnObject,
             SettingsFileUnknownKey,
             SettingsFileDuplicateKey,

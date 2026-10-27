@@ -1,13 +1,12 @@
 using System;
 using System.Linq;
-using System.Text.RegularExpressions;
 using Shouldly;
 using SqlSource.Settings.TypeOverrides;
 using Xunit;
 
 namespace SqlSource.Tests.Settings.TypeOverrides;
 
-public sealed partial class TypeKeyTextTests
+public sealed class TypeKeyTextTests
 {
     [Theory]
     [InlineData("U&\"a\\000Ab\"", "a\nb")]
@@ -82,9 +81,11 @@ public sealed partial class TypeKeyTextTests
     [InlineData("a\nb", "U&\"a\\000Ab\"")]
     [InlineData("a\r\nb", "U&\"a\\000D\\000Ab\"")]
     [InlineData("a\tb", "U&\"a\\0009b\"")]
-    [InlineData("a  b", "U&\"a \\0020b\"")]
-    [InlineData("a\u00A0b", "U&\"a\\00A0b\"")]
-    [InlineData("a;b#c", "U&\"a\\003Bb\\0023c\"")]
+    [InlineData("a  b", "\"a  b\"")]
+    [InlineData("my  schema", "\"my  schema\"")]
+    [InlineData("a\u00A0b", "\"a\u00A0b\"")]
+    [InlineData("x\u2028y", "\"x\u2028y\"")]
+    [InlineData("a;b#c", "\"a;b#c\"")]
     [InlineData("a\u0001b", "U&\"a\\0001b\"")]
     [InlineData("a\0\nb", "U&\"a\0\\000Ab\"")]
     [InlineData("say \"hi\"\n\\", "U&\"say \"\"hi\"\"\\000A\\\\\"")]
@@ -107,25 +108,30 @@ public sealed partial class TypeKeyTextTests
         TypeKeyText.TextOf(TypeKeyText.WritePart(text).AsSpan()).ToString().ShouldBe(text);
     }
 
-    // What the trim of an MSBuild value and the compiler's cut would change is not in the written part.
+    // A control character, which may end the line of a marker, is not in the written part.
     [Theory]
     [InlineData("a\nb")]
     [InlineData("a\tb")]
-    [InlineData("a  b")]
-    [InlineData("a;b")]
-    [InlineData("x\u2028y")]
+    [InlineData("a\r\nb")]
     [InlineData("\uD800\n")]
-    public void WritePart_TextThatNeedsTheEscape_SurvivesTheTrimAndALine(string text)
+    public void WritePart_TextWithAControlCharacter_StaysOnOneLine(string text)
     {
         var part = TypeKeyText.WritePart(text);
 
-        WhitespaceRunPattern().Replace(part, " ").ShouldBe(part);
-        part.Split(';')[0].Split('#')[0].ShouldBe(part);
-        part.Where(char.IsWhiteSpace).ShouldAllBe(character => character == ' ');
-        part.ShouldNotContain("  ");
-        part.ShouldNotContain(";");
-        part.ShouldNotContain("#");
         part.Any(char.IsControl).ShouldBeFalse();
+        TypeKeyText.TextOf(part.AsSpan()).ToString().ShouldBe(text);
+    }
+
+    // White space that is not a control character is kept as it is in the quotes, and read back.
+    [Theory]
+    [InlineData("a  b")]
+    [InlineData("a\u00A0b")]
+    [InlineData("x\u2028y")]
+    public void WritePart_WhiteSpaceThatIsNoControlCharacter_IsKeptInTheQuotes(string text)
+    {
+        var part = TypeKeyText.WritePart(text);
+
+        part.ShouldBe("\"" + text + "\"");
         TypeKeyText.TextOf(part.AsSpan()).ToString().ShouldBe(text);
     }
 
@@ -133,7 +139,4 @@ public sealed partial class TypeKeyTextTests
     [Fact]
     public void WritePart_TextWithANul_IsReadBackAsItsText() =>
         TypeKeyText.TextOf(TypeKeyText.WritePart("a\0\nb").AsSpan()).ToString().ShouldBe("a\0\nb");
-
-    [GeneratedRegex(@"\s+")]
-    private static partial Regex WhitespaceRunPattern();
 }

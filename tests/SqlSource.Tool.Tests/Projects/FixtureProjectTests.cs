@@ -59,15 +59,9 @@ public sealed class FixtureProjectTests : IDisposable
         manifest.TargetFramework.ShouldBe("net10.0");
         manifest.LangVersion.ShouldBe("14.0");
         manifest.DefineConstants.ShouldContain("NET8_0_OR_GREATER");
-        // The project's settings are in its sqlsource.json and its file's header, so of the package's properties it
-        // has the folders of the build alone, which are the machine's and no setting.
-        manifest.Properties.Keys.ShouldBe(["SqlSourceBuildFolders"]);
-        manifest
-            .Properties["SqlSourceBuildFolders"]
-            .ShouldContain(Path.Combine(folder, "obj") + Path.DirectorySeparatorChar);
-        var file = manifest.Files.ShouldHaveSingleItem();
-        file.Path.ShouldBe(Path.Combine(folder, "Queries", "Users.sql"));
-        file.Metadata.ShouldBeEmpty();
+        // The folders of the build are the machine's, and no setting.
+        manifest.BuildFolders.ShouldContain(Path.Combine(folder, "obj") + Path.DirectorySeparatorChar);
+        manifest.Files.ShouldBe([Path.Combine(folder, "Queries", "Users.sql")]);
         manifest.SettingsFiles.ShouldBe([Path.Combine(folder, "sqlsource.json")]);
         manifest.CompileFiles.ShouldBe([Path.Combine(folder, "UserRepository.cs")]);
         // The project was never restored or built, and the tool made it neither.
@@ -89,7 +83,7 @@ public sealed class FixtureProjectTests : IDisposable
         manifest.DefineConstants.ShouldContain("NET8_0");
         manifest.DefineConstants.ShouldNotContain("NET10_0");
         // TD-0026: Later/ is the second framework's alone.
-        manifest.Files.Select(file => file.Path).ShouldBe([Path.Combine(folder, "Queries", "Users.sql")]);
+        manifest.Files.ShouldBe([Path.Combine(folder, "Queries", "Users.sql")]);
         manifest.CompileFiles.ShouldBe([Path.Combine(folder, "Queries.cs")]);
         Directory.Exists(Path.Combine(folder, "obj")).ShouldBeFalse();
     }
@@ -192,7 +186,7 @@ public sealed class FixtureProjectTests : IDisposable
 
         evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
         var manifest = evaluation.Manifest.ShouldNotBeNull();
-        manifest.Files.ShouldHaveSingleItem().Path.ShouldBe(Path.Combine(folder, "a;b=c%41 'é.sql"));
+        manifest.Files.ShouldBe([Path.Combine(folder, "a;b=c%41 'é.sql")]);
         manifest.CompileFiles.ShouldBe([Path.Combine(folder, "a;b=c%41 'é.cs")]);
     }
 

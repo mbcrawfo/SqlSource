@@ -3,8 +3,8 @@ using System;
 namespace SqlSource.Parsing;
 
 /// <summary>
-/// The names a dialect and its options are set by: in the <c>-- dialect:</c> marker, in the <c>SqlSourceDialect</c>
-/// MSBuild property and in the metadata of the same name.  This is the only place the names are known.
+/// The names a dialect and its options are set by: in the <c>-- dialect:</c> marker and in the <c>dialect</c> of a
+/// settings file.  This is the only place the names are known.
 /// </summary>
 /// <remarks>
 /// A value is the name of a dialect, then any options of that dialect, separated by commas:
@@ -13,7 +13,7 @@ namespace SqlSource.Parsing;
 internal static class SqlDialectName
 {
     /// <summary>
-    /// The names as a message lists them.  The text of <c>SQLSRC011</c> repeats this list, and a test compares the two.
+    /// The names as a message lists them: <c>SQLSRC019</c> ends with it for a settings file's <c>dialect</c>.
     /// </summary>
     public const string Accepted = "ansi, mssql, postgres, cockroachdb, mysql, mariadb, sqlite and oracle";
 

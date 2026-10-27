@@ -3,12 +3,6 @@ namespace SqlSource.Settings;
 /// <summary>The kind of place a setting was written in.</summary>
 internal enum SettingPlaceKind
 {
-    /// <summary>A property of the project.</summary>
-    Property,
-
-    /// <summary>The metadata of a file's item.</summary>
-    Metadata,
-
     /// <summary>The attribute of a type.</summary>
     Attribute,
 
@@ -34,12 +28,6 @@ internal enum SettingPlaceKind
 /// </param>
 internal readonly record struct SettingPlace(SettingPlaceKind Kind, string? Path, int Depth)
 {
-    /// <summary>A property of the project.</summary>
-    public static SettingPlace Property => new(SettingPlaceKind.Property, null, 0);
-
-    /// <summary>The metadata of a file's item.</summary>
-    public static SettingPlace Metadata => new(SettingPlaceKind.Metadata, null, 0);
-
     /// <summary>The attribute of a type.</summary>
     public static SettingPlace Attribute => new(SettingPlaceKind.Attribute, null, 0);
 

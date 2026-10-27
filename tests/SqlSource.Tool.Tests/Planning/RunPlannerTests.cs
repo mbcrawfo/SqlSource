@@ -20,23 +20,11 @@ public sealed class RunPlannerTests : IDisposable
 
     public void Dispose() => _folder.Dispose();
 
-    private static (string Name, string Value)[] Metadata(string name, string? value) =>
-        value is null ? [] : [(name, value)];
-
     // A project whose settings file says the dialect is postgres.
     private TestProject Postgres(string name = "App")
     {
         var project = new TestProject(_folder, name);
         project.Settings["dialect"] = "postgres";
-        return project;
-    }
-
-    // A project whose dialect is postgres by the property, for the tests of the MSBuild levels, which no settings file
-    // may outrank.
-    private TestProject PostgresOnMSBuild()
-    {
-        var project = new TestProject(_folder);
-        project.Properties["SqlSourceDialect"] = "postgres";
         return project;
     }
 
@@ -187,105 +175,6 @@ public sealed class RunPlannerTests : IDisposable
         result.Plan.Files.Count.ShouldBe(0);
     }
 
-    [Theory]
-    [InlineData(null, null, null, null, null, true)]
-    [InlineData("sql", null, null, null, null, false)]
-    [InlineData("sql", "models", null, null, null, true)]
-    [InlineData("models", "models", "Sql", null, null, false)]
-    [InlineData("sql", "sql", "Sql", "models", null, true)]
-    [InlineData("models", "models", "Models", "models", "sql", false)]
-    public void Plan_OutputFromEachLevel_IsTakenFromTheMostSpecific(
-        string? property,
-        string? metadata,
-        string? attribute,
-        string? preamble,
-        string? query,
-        bool needsEntry
-    )
-    {
-        var project = PostgresOnMSBuild();
-        if (property is not null)
-        {
-            project.Properties["SqlSourceOutput"] = property;
-        }
-
-        _ = project.AddSource(
-            "Queries.cs",
-            Plans.TypeNamed("Queries", attribute is null ? "" : $"Output = SqlSource.GeneratorOutput.{attribute}")
-        );
-        _ = project.AddSql(
-            "Q.sql",
-            (preamble is null ? "" : $"-- output: {preamble}\n")
-                + "-- name: One\n"
-                + (query is null ? "" : $"-- output: {query}\n")
-                + "SELECT 1;\n",
-            Metadata("SqlSourceOutput", metadata)
-        );
-
-        var planned = Plans.Result(project).Plan.Files.ShouldHaveSingleItem().Queries.ShouldHaveSingleItem();
-
-        planned.NeedsEntry.ShouldBe(needsEntry);
-        (planned.Hash is not null).ShouldBe(needsEntry);
-        (planned.Database is not null).ShouldBe(needsEntry);
-    }
-
-    // A test of the MSBuild path: the dialect and the database are the project's properties and the file's metadata.
-    [Theory]
-    [InlineData(null, null, null, null, "postgres")]
-    [InlineData("main", null, null, null, "main")]
-    [InlineData("main", "files", null, null, "files")]
-    // Metadata that is white space is not set.
-    [InlineData("main", "  ", null, null, "main")]
-    [InlineData("main", "files", "pre", null, "pre")]
-    [InlineData("main", "files", "pre", "own", "own")]
-    public void Plan_DatabaseFromEachLevel_IsTakenFromTheMostSpecificAndElseIsTheDialectsName(
-        string? property,
-        string? metadata,
-        string? preamble,
-        string? query,
-        string expected
-    )
-    {
-        var project = new TestProject(_folder);
-        // An alias: the name of a database is the dialect's first name.
-        project.Properties["SqlSourceDialect"] = "postgresql";
-        if (property is not null)
-        {
-            project.Properties["SqlSourceDatabase"] = property;
-        }
-
-        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
-        _ = project.AddSql(
-            "Q.sql",
-            (preamble is null ? "" : $"-- database: {preamble}\n")
-                + "-- name: One\n"
-                + (query is null ? "" : $"-- database: {query}\n")
-                + "SELECT 1;\n",
-            Metadata("SqlSourceDatabase", metadata)
-        );
-
-        Plans
-            .Result(project)
-            .Plan.Files.ShouldHaveSingleItem()
-            .Queries.ShouldHaveSingleItem()
-            .Database.ShouldBe(expected);
-    }
-
-    [Fact]
-    public void Plan_DialectOfAFile_IsItsMarkerThenItsMetadataThenTheProperty()
-    {
-        var project = PostgresOnMSBuild();
-        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
-        _ = project.AddSql("A.sql", "SELECT 1;");
-        _ = project.AddSql("B.sql", "SELECT 1;", ("SqlSourceDialect", "mssql"));
-        _ = project.AddSql("C.sql", "-- dialect: postgres\nSELECT 1;", ("SqlSourceDialect", "mssql"));
-
-        Plans
-            .Result(project)
-            .Plan.Files.Select(file => file.Dialect)
-            .ShouldBe([SqlDialect.PostgreSql, SqlDialect.SqlServer, SqlDialect.PostgreSql]);
-    }
-
     [Fact]
     public void Plan_FileWithAByteOrderMarkOrCarriageReturns_HashesAsTheFileWithout()
     {
@@ -313,6 +202,20 @@ public sealed class RunPlannerTests : IDisposable
         project.ListSql(project.PathOf("USERS.SQL"));
 
         Plans.Result(project).Plan.Files.ShouldHaveSingleItem().Path.ShouldBe(first);
+    }
+
+    // The project lists the path twice by one spelling: one file, planned once, with its one query.
+    [Fact]
+    public void Plan_PathListedTwiceByOneSpelling_IsPlannedOnce()
+    {
+        var project = Postgres();
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
+        var path = project.AddSql("Q.sql", "-- name: Q\nSELECT 1;\n");
+        project.ListSql(path);
+
+        var file = Plans.Result(project).Plan.Files.ShouldHaveSingleItem();
+        file.Path.ShouldBe(path);
+        file.Queries.ShouldHaveSingleItem().Query.Name.ShouldBe("Q");
     }
 
     [Fact]
@@ -470,42 +373,11 @@ public sealed class RunPlannerTests : IDisposable
             .ShouldBe(["Billing", "Billing"]);
     }
 
-    // The compiler gives a file its metadata by its path, so of two items of one path the last that has any metadata
-    // of the package is the one a build reads.  "Include" where "Update" was meant makes such a second item.  A test of
-    // the MSBuild path: the output is the project's property and the dialect the files' metadata.
-    [Theory]
-    [InlineData(null, "postgres", "PostgreSql")]
-    [InlineData("postgres", null, "PostgreSql")]
-    [InlineData("mssql", "postgres", "PostgreSql")]
-    public void Plan_FileListedTwiceByOnePath_HasTheMetadataOfTheLastItemThatHasAny(
-        string? first,
-        string? second,
-        string expected
-    )
-    {
-        var project = new TestProject(_folder);
-        project.Properties["SqlSourceOutput"] = "sql";
-        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
-        var sql = project.AddSql("Q.sql", "SELECT 1;", Metadata("SqlSourceDialect", first));
-        project.ListSql(sql, Metadata("SqlSourceDialect", second));
-
-        var file = Plans.Result(project).Plan.Files.ShouldHaveSingleItem();
-
-        file.Path.ShouldBe(sql);
-        file.Dialect.ToString().ShouldBe(expected);
-    }
-
     // The settings files of the chain: sqlsource.json files apply to their folder and below.  A project with no
-    // settings of its own, so that a test writes the file at its root as it means to, with the dialect as the property
-    // for a test of the chain's rank over the MSBuild levels.
-    private TestProject Chained(string? dialect = null)
+    // settings of its own, so that a test writes the file at its root as it means to.
+    private TestProject Chained()
     {
         var project = new TestProject(_folder);
-        if (dialect is not null)
-        {
-            project.Properties["SqlSourceDialect"] = dialect;
-        }
-
         _ = project.AddSource("Queries.cs", Plans.Type);
         return project;
     }
@@ -554,39 +426,6 @@ public sealed class RunPlannerTests : IDisposable
         _ = project.AddSql("Q.sql", "-- dialect: postgres\nSELECT 1;");
 
         OnlyFile(project).Dialect.ShouldBe(SqlDialect.PostgreSql);
-    }
-
-    [Fact]
-    public void Plan_ChainsDialect_WinsOverMetadataAndProperty()
-    {
-        var project = Chained("sqlite");
-        _ = project.AddSettings(
-            "sqlsource.json", /*lang=json,strict*/
-            """{"dialect": "postgres"}"""
-        );
-        _ = project.AddSql("Q.sql", "SELECT 1;", ("SqlSourceDialect", "mysql"));
-
-        var result = Plans.Result(project);
-
-        result.Errors.ShouldBeEmpty();
-        result.Plan.Files.ShouldHaveSingleItem().Dialect.ShouldBe(SqlDialect.PostgreSql);
-    }
-
-    // A value of the metadata that is not valid is the build's SQLSRC011 still, whatever the chain says.
-    [Fact]
-    public void Plan_InvalidDialectOfTheMetadata_IsStillSqlsrc011BesideAChain()
-    {
-        var project = Chained();
-        _ = project.AddSettings(
-            "sqlsource.json", /*lang=json,strict*/
-            """{"dialect": "postgres"}"""
-        );
-        _ = project.AddSql("Q.sql", "SELECT 1;", ("SqlSourceDialect", "nope"));
-
-        var result = Plans.Result(project);
-
-        result.Errors.ShouldHaveSingleItem().Descriptor.ShouldBe(SqlDiagnostics.InvalidDialect);
-        result.Plan.Files.ShouldHaveSingleItem().Dialect.ShouldBe(SqlDialect.PostgreSql);
     }
 
     [Fact]

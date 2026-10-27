@@ -17,13 +17,12 @@ using static SqlSource.Testing.Generator.ModelRuns;
 namespace SqlSource.Tests.Generator;
 
 // The settings files, sqlsource.json, that apply to a .sql file's folder and every folder below it.  The dialect comes
-// from the header's marker, then the chain of the file's folder, then the metadata of the file's item, then the
-// project's property, and the parse's keep-comments from the first list of the chain's and the metadata's, then the
-// property's.  Every other setting comes from the markers, then the attribute, then the chain, nearest file first,
-// then the metadata, then the property; the type override and the column types merge per key across them, the nearer
-// file's entry ranking above the farther's.  A type's nested class comes from the attribute, then the chain of the
-// type's C# file, then the property.  A settings file's problems are reported at its line and column when the chain
-// of the folder of some .sql file or C# file reaches it.
+// from the header's marker, then the chain of the file's folder, and the parse's keep-comments from the chain's list.
+// Every other setting comes from the markers, then the attribute, then the chain, nearest file first; the type
+// override and the column types merge per key across them, the nearer file's entry ranking above the farther's.  A
+// type's nested class comes from the attribute, then the chain of the type's C# file.  A settings file's problems are
+// reported at its line and column when the chain of the folder of some .sql file or C# file reaches it.  Nothing that
+// MSBuild tells the generator is a setting.
 public sealed class SettingsFileTests
 {
     // ANSI and MySQL read the backticks as the quotes of an identifier, and the comment starts after it.  PostgreSQL
@@ -47,8 +46,6 @@ public sealed class SettingsFileTests
     private const string FartherSettingsPath = "/app/sqlsource.json";
 
     private const string GetUser = "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n";
-
-    private const string Dto = "App.GetUserDto-Model.g.cs";
 
     // The attribute of the assembly that the SDK writes under obj, here under the intermediate folder of the artifacts
     // layout, outside the project's folder /repo/App.
@@ -109,40 +106,6 @@ public sealed class SettingsFileTests
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + Postgres + "\";");
     }
 
-    // A test of the MSBuild path: the output and the dialect are the project's properties.
-    [Fact]
-    public void Run_DialectInTheFolder_OverridesTheProperty()
-    {
-        var run = RunOnMSBuild(
-            "mysql",
-            GeneratorHarness.SettingsFile(
-                "/app/Repo/sqlsource.json", /*lang=json,strict*/
-                """{"dialect":"postgres"}"""
-            ),
-            new SqlFile(QueryPath, Query)
-        );
-
-        run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + Postgres + "\";");
-    }
-
-    // A test of the MSBuild path: the output is the project's property.
-    [Fact]
-    public void Run_DialectInTheFolder_OverridesTheMetadata()
-    {
-        var run = RunOnMSBuild(
-            null,
-            GeneratorHarness.SettingsFile(
-                "/app/Repo/sqlsource.json", /*lang=json,strict*/
-                """{"dialect":"postgres"}"""
-            ),
-            new SqlFile(QueryPath, Query, "mysql")
-        );
-
-        run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + Postgres + "\";");
-    }
-
     [Fact]
     public void Run_DialectMarker_OverridesTheFolder()
     {
@@ -157,24 +120,6 @@ public sealed class SettingsFileTests
 
         run.ShouldBeClean();
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + NotPostgres + "\";");
-    }
-
-    // The metadata said something, and what it said is wrong, whatever the folder's file says.  A test of the MSBuild
-    // path: the output is the project's property.
-    [Fact]
-    public void Run_InvalidMetadataUnderTheFoldersDialect_IsStillReported()
-    {
-        var run = RunOnMSBuild(
-            null,
-            GeneratorHarness.SettingsFile(
-                "/app/Repo/sqlsource.json", /*lang=json,strict*/
-                """{"dialect":"postgres"}"""
-            ),
-            new SqlFile(QueryPath, Query, "nope")
-        );
-
-        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC011 (1,1)-(1,1): 'nope' is not a SQL dialect.");
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + Postgres + "\";");
     }
 
     // The parse builds the form of the query with its comments, which the folder's list asks for, and the constant is
@@ -230,27 +175,6 @@ public sealed class SettingsFileTests
         run.Sources["App.Sample.g.cs"].ShouldContain(StrippedConstant);
     }
 
-    // A test of the MSBuild path: the output is the project's property.
-    [Fact]
-    public void Run_KeepCommentsInTheFolder_OverridesTheMetadatasListForTheParse()
-    {
-        var run = RunOnMSBuild(
-            null,
-            GeneratorHarness.SettingsFile(
-                "/app/Repo/sqlsource.json", /*lang=json,strict*/
-                """{"generatorParameters":["keep-comments"]}"""
-            ),
-            new SqlFile(
-                QueryPath,
-                Kept,
-                Metadata: new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "sort-input" }
-            )
-        );
-
-        run.Diagnostics.ShouldBeEmpty();
-        StepOutputs.Single<FileParseInput>(run, TrackingNames.FileParseInput).CommentsWanted.ShouldBeTrue();
-    }
-
     // The project asks for models, which need an entry for each query, and the folder's file asks for the constant
     // alone, which needs none.
     [Fact]
@@ -293,40 +217,6 @@ public sealed class SettingsFileTests
         ModelFiles(run).ShouldBe(["App.GetUserArgs-Model.g.cs", "App.GetUserRow-Model.g.cs"]);
     }
 
-    // A test of the MSBuild path: the output and the dialect are the project's properties too.
-    [Fact]
-    public void Run_FolderOverridesTheMetadataAndTheProperty()
-    {
-        var file = new SqlFile(
-            GeneratorHarness.UsersPath,
-            GetUser,
-            Metadata: new Dictionary<string, string> { ["SqlSourceInputModelSuffix"] = "Meta" }
-        );
-
-        var run = GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, Source)],
-            [
-                GeneratorHarness.SettingsFile(
-                    SettingsPath, /*lang=json,strict*/
-                    """{"inputModelSuffix":"In"}"""
-                ),
-                file,
-                Sidecars.Of(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")])),
-            ],
-            references: [NpgsqlReferences.Npgsql10],
-            properties: new Dictionary<string, string?>
-            {
-                ["SqlSourceOutput"] = "Models",
-                ["SqlSourceDialect"] = "postgres",
-                ["SqlSourceInputModelSuffix"] = "Prop",
-            }
-        );
-
-        run.ShouldBeClean();
-        ModelFiles(run).ShouldBe([Dto, "App.GetUserIn-Model.g.cs"]);
-    }
-
     // Each file says the setting, and the farther one says another that the nearer one leaves to it.
     [Fact]
     public void Run_NearerFileOverridesAFartherOne()
@@ -348,17 +238,18 @@ public sealed class SettingsFileTests
         ModelFiles(run).ShouldBe(["App.GetUserNear-Model.g.cs", "App.GetUserRow-Model.g.cs"]);
     }
 
-    // A root file that sets nothing else still hides the file above: its dialect does not parse the query, and its
-    // output, codegen, which would need an entry for the query, does not apply.  The output sql is the project's
-    // property, below every settings file, which no root hides: a test of the MSBuild path.
+    // A root file that sets nothing else still hides the file above: its output, sql, does not apply, and neither does
+    // its dialect.  So the query has the default output, codegen, under ansi, which has no database to describe it.
+    // The run writes no project's file, which the root would hide too.
     [Fact]
     public void Run_RootFileThatSaysNothingElse_HidesTheFilesAbove()
     {
-        var run = RunOnMSBuild(
+        var run = GeneratorHarness.Run(
             null,
+            GeneratorHarness.SampleSource(null),
             GeneratorHarness.SettingsFile(
                 FartherSettingsPath, /*lang=json,strict*/
-                """{"output":"codegen","dialect":"postgres"}"""
+                """{"output":"Sql","dialect":"postgres"}"""
             ),
             GeneratorHarness.SettingsFile(
                 SettingsPath, /*lang=json,strict*/
@@ -367,8 +258,10 @@ public sealed class SettingsFileTests
             new SqlFile(QueryPath, Query)
         );
 
-        run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + NotPostgres + "\";");
+        var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.ShouldStartWith("SQLSRC209 " + QueryPath + "(");
+        diagnostic.ShouldContain("The output 'codegen' needs each query described by its database");
+        diagnostic.ShouldContain("the dialect 'ansi' has no database to ask");
     }
 
     // The root file's own settings apply, and the file above it, the project's, is not read: the root file gives the
@@ -388,6 +281,33 @@ public sealed class SettingsFileTests
 
         run.ShouldBeClean();
         ModelFiles(run).ShouldBe(["App.GetUserParams-Model.g.cs", "App.GetUserRow-Model.g.cs"]);
+    }
+
+    // A project that still sets the old MSBuild properties and metadata, with no settings file: none of them is read,
+    // so nothing of them is reported, and the run is that of a project that sets nothing.  The file is read as ansi,
+    // not as its metadata's postgres, and its query has the default output, codegen, which ansi cannot describe.
+    [Fact]
+    public void Run_ProjectThatStillSetsMSBuildSettings_ReadsNothingOfThem()
+    {
+        var options = new TestOptionsProvider(
+            properties: new Dictionary<string, string?>
+            {
+                ["SqlSourceDialect"] = "nope",
+                ["SqlSourceOutput"] = "Sql",
+                ["SqlSourceGeneratorParameters"] = "bad",
+            },
+            fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                [QueryPath] = new Dictionary<string, string> { ["SqlSourceDialect"] = "postgres" },
+            }
+        );
+
+        var diagnostics = DiagnosticsOfACastUnder(options);
+
+        diagnostics.ShouldNotContain(diagnostic => diagnostic.StartsWith("SQLSRC011", StringComparison.Ordinal));
+        diagnostics.ShouldNotContain(diagnostic => diagnostic.StartsWith("SQLSRC014", StringComparison.Ordinal));
+        diagnostics.ShouldBe(DiagnosticsOfACastUnder(new TestOptionsProvider()));
+        diagnostics.ShouldContain(diagnostic => diagnostic.StartsWith("SQLSRC209 ", StringComparison.Ordinal));
     }
 
     // The nearer list has no keep-comments, so the farther file's does not reach the query.
@@ -449,36 +369,6 @@ public sealed class SettingsFileTests
         column.Text.ShouldBe("global::System.Uri");
         column.Place.ShouldBe("the typeOverrides of the settings file " + SettingsPath);
         column.Key.ShouldBe("public.status");
-    }
-
-    // A test of the MSBuild path: the output and the dialect are the project's properties too.
-    [Fact]
-    public void Run_TypeOverrideInTheFolder_BeatsTheProperty()
-    {
-        var file = new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser);
-
-        var run = GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, Source)],
-            [
-                GeneratorHarness.SettingsFile(
-                    SettingsPath, /*lang=json,strict*/
-                    """{"typeOverrides":{"int4":"short"}}"""
-                ),
-                file,
-                Sidecars.Of(file, Entry(file, "GetUser", [], [Column("c0", Int4)])),
-            ],
-            references: [NpgsqlReferences.Npgsql10],
-            properties: new Dictionary<string, string?>
-            {
-                ["SqlSourceOutput"] = "Models",
-                ["SqlSourceDialect"] = "postgres",
-                ["SqlSourceTypeOverrides"] = "int4=long",
-            }
-        );
-
-        run.ShouldBeClean();
-        ColumnOf(run).Text.ShouldBe("short");
     }
 
     // Within one place a key with a schema beats one without; the nearer file is the more specific place.
@@ -1007,15 +897,21 @@ public sealed class SettingsFileTests
             dialect: dialect
         );
 
-    // The files with the output sql and the dialect, null for none, as the project's properties, for a test of the
-    // MSBuild path.
-    private static GeneratorRun RunOnMSBuild(string? dialect, params SqlFile[] files) =>
-        GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
-            files,
-            properties: new Dictionary<string, string?> { ["SqlSourceOutput"] = "Sql", ["SqlSourceDialect"] = dialect }
-        );
+    // What the generator reports for the type and a query with a PostgreSQL cast, with no settings file, under what
+    // MSBuild tells it.
+    private static IReadOnlyList<string> DiagnosticsOfACastUnder(TestOptionsProvider options) =>
+        [
+            .. GeneratorHarness
+                .CreateDriver([new SqlFile(QueryPath, "-- name: Q\nSELECT 1::int AS a\n").ToAdditionalText()], options)
+                .RunGenerators(
+                    GeneratorHarness.CreateCompilation([
+                        new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null)),
+                    ]),
+                    TestContext.Current.CancellationToken
+                )
+                .GetRunResult()
+                .Diagnostics.Select(GeneratorHarness.Format),
+        ];
 
     // The type and its .sql file in /repo/App, whose settings file is a root that gives the output, since it hides a
     // project's file of the run, and a broken settings file at the repository's root, /repo, with one more C# file at

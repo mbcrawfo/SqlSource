@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis.Diagnostics;
-using SqlSource.Generation.MSBuild;
 using SqlSource.Generation.Paths;
 
 namespace SqlSource.Generation.Chains;
@@ -23,6 +22,9 @@ internal sealed record BuildFolders(EquatableArray<string> Folders)
     /// </summary>
     public const string PropertyName = "SqlSourceBuildFolders";
 
+    // Where the compiler puts the property: build/SqlSource.props shows it as a CompilerVisibleProperty.
+    private const string OptionKey = "build_property." + PropertyName;
+
     private const char Delimiter = '|';
 
     /// <summary>A build that gives no folder, which leaves no compile path out.</summary>
@@ -30,7 +32,7 @@ internal sealed record BuildFolders(EquatableArray<string> Folders)
 
     /// <summary>The folders of the project's property in <paramref name="globalOptions" />.</summary>
     public static BuildFolders Read(AnalyzerConfigOptions globalOptions) =>
-        Of(globalOptions.TryGetValue(MSBuildSettings.PropertyPrefix + PropertyName, out var value) ? value : null);
+        Of(globalOptions.TryGetValue(OptionKey, out var value) ? value : null);
 
     /// <summary>
     /// The folders of the property as the build gives it: entries joined by <c>|</c>, each a full path with a

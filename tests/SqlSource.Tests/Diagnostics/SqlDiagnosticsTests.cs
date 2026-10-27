@@ -99,12 +99,6 @@ public sealed class SqlDiagnosticsTests
             );
 
     [Fact]
-    public void InvalidDialect_Message_ListsTheNamesThatAreAccepted() =>
-        SqlDiagnostics
-            .InvalidDialect.MessageFormat.ToString(CultureInfo.InvariantCulture)
-            .ShouldEndWith("SqlSourceDialect accepts " + SqlDialectName.Accepted + ".");
-
-    [Fact]
     public void SidecarMalformed_Message_HoldsTheReason() =>
         Format(SqlDiagnostics.SidecarMalformed, "'hash' is missing")
             .ShouldBe(

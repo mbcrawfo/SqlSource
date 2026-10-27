@@ -4,7 +4,7 @@ using SqlSource.Settings.TypeOverrides;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// What one source says about the settings: the project's properties, the metadata of a file's item, the attribute
+/// What one source says about the settings: a settings file, or the chain of a folder's settings files, the attribute
 /// of a type, or the markers of a query over those of its file's preamble.
 /// </summary>
 /// <remarks>
@@ -25,8 +25,8 @@ internal sealed record SettingsLevel
     public OutputKind? Output { get; init; }
 
     /// <summary>
-    /// The name of the database a query belongs to.  The generator carries it from a marker and never uses it; the
-    /// tool does.  The generator does not read the property or the metadata, so only the tool has those two levels.
+    /// The name of the database a query belongs to.  The generator carries it, from a marker or a settings file, and
+    /// never uses it; the tool does.
     /// </summary>
     public string? Database { get; init; }
 
@@ -56,7 +56,8 @@ internal sealed record SettingsLevel
 
     /// <summary>
     /// The entries of the type override whose keys SQL Server reads, keyed by its rules, kept as
-    /// <see cref="TypeOverrides" /> is.  An MSBuild value fills both, and a marker the one of its file's engine.
+    /// <see cref="TypeOverrides" /> is.  An object of a settings file fills both, and a marker the one of its file's
+    /// engine.
     /// </summary>
     public EquatableArray<TypeOverride>? SqlServerTypeOverrides { get; init; }
 
@@ -69,8 +70,8 @@ internal sealed record SettingsLevel
 
     /// <summary>
     /// The name of the class that holds a type's members in <see cref="MemberPlacement.Nested" /> placement.  The
-    /// attribute, the chain of the folder of the type's C# file and the property give it; no <c>.sql</c> file's level
-    /// does, since a type's queries can come from several files.
+    /// attribute and the chain of the folder of the type's C# file give it; no <c>.sql</c> file's level does, since a
+    /// type's queries can come from several files.
     /// </summary>
     public string? NestedClass { get; init; }
 

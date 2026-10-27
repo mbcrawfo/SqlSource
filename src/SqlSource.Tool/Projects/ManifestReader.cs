@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 
@@ -12,16 +11,15 @@ namespace SqlSource.Tool.Projects;
 /// <remarks>
 /// The format is a contract with <c>build/SqlSource.targets</c> of the package, which may be of another version than
 /// the tool.  So a key that is not known is passed over, and so is an empty line: both are how a later package adds
-/// to the format.  A manifest of another version is not read at all.
+/// to the format.  A manifest of another version is not read at all: version 1 held the settings of the project and
+/// of each file, as <c>Property.</c> and <c>File.</c> lines, which this tool would read as setting nothing.
 /// </remarks>
 internal static class ManifestReader
 {
     /// <summary>The version of the format that this reader reads.</summary>
-    public const string Version = "1";
+    public const string Version = "2";
 
     private const string VersionKey = "SqlSourceManifest";
-    private const string PropertyPrefix = "Property.";
-    private const string FilePrefix = "File.";
 
     // What the compiler separates constants at.  The target puts the value on one line, so a constant that a
     // project wrote on a line of its own has a space before it.
@@ -40,8 +38,8 @@ internal static class ManifestReader
         var targetFramework = "";
         var langVersion = "";
         var constants = "";
-        var properties = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
-        var files = new List<(string Path, ImmutableDictionary<string, string>.Builder Metadata)>();
+        var buildFolders = "";
+        var files = ImmutableArray.CreateBuilder<string>();
         var settingsFiles = ImmutableArray.CreateBuilder<string>();
         var compileFiles = ImmutableArray.CreateBuilder<string>();
 
@@ -70,55 +68,36 @@ internal static class ManifestReader
                 return No(string.Create(CultureInfo.InvariantCulture, $"line {number} has no '='"));
             }
 
-            var key = line[..separator];
             var value = line[(separator + 1)..].ToString();
-            if (key.StartsWith(FilePrefix, StringComparison.Ordinal))
+            switch (line[..separator])
             {
-                if (files.Count == 0)
-                {
-                    return No(
-                        string.Create(
-                            CultureInfo.InvariantCulture,
-                            $"line {number} gives metadata of a file before any file"
-                        )
-                    );
-                }
-
-                Set(files[^1].Metadata, key[FilePrefix.Length..], value);
-            }
-            else if (key.StartsWith(PropertyPrefix, StringComparison.Ordinal))
-            {
-                Set(properties, key[PropertyPrefix.Length..], value);
-            }
-            else
-            {
-                switch (key)
-                {
-                    case "Project":
-                        project = value;
-                        break;
-                    case "TargetFramework":
-                        targetFramework = value;
-                        break;
-                    case "LangVersion":
-                        langVersion = value;
-                        break;
-                    case "DefineConstants":
-                        constants = value;
-                        break;
-                    case "File":
-                        files.Add((value, ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal)));
-                        break;
-                    case "Settings":
-                        settingsFiles.Add(value);
-                        break;
-                    case "Compile":
-                        compileFiles.Add(value);
-                        break;
-                    default:
-                        // A key of a later package.
-                        break;
-                }
+                case "Project":
+                    project = value;
+                    break;
+                case "TargetFramework":
+                    targetFramework = value;
+                    break;
+                case "LangVersion":
+                    langVersion = value;
+                    break;
+                case "DefineConstants":
+                    constants = value;
+                    break;
+                case "SqlSourceBuildFolders":
+                    buildFolders = value;
+                    break;
+                case "File":
+                    files.Add(value);
+                    break;
+                case "Settings":
+                    settingsFiles.Add(value);
+                    break;
+                case "Compile":
+                    compileFiles.Add(value);
+                    break;
+                default:
+                    // A key of a later package, or a Property. or File. line, which no package of version 2 writes.
+                    break;
             }
         }
 
@@ -145,8 +124,8 @@ internal static class ManifestReader
                         StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
                     ),
                 ],
-                Properties = properties.ToImmutable(),
-                Files = [.. files.ConvertAll(static file => new ManifestFile(file.Path, file.Metadata.ToImmutable()))],
+                BuildFolders = buildFolders,
+                Files = files.ToImmutable(),
                 SettingsFiles = settingsFiles.ToImmutable(),
                 CompileFiles = compileFiles.ToImmutable(),
             }
@@ -176,15 +155,6 @@ internal static class ManifestReader
 
         reason = "";
         return true;
-    }
-
-    // A value that is empty is one that is not set, and is left out.
-    private static void Set(ImmutableDictionary<string, string>.Builder values, ReadOnlySpan<char> name, string value)
-    {
-        if (value.Length > 0)
-        {
-            values[name.ToString()] = value;
-        }
     }
 
     // The next line, without its line break: "\n", or "\r\n" as MSBuild writes it on Windows.

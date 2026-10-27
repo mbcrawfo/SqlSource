@@ -1,6 +1,5 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
-using System.Collections.Generic;
 using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Settings;
@@ -221,31 +220,6 @@ public sealed class NestedClassTests
         run.Sources.Keys.ShouldBe([AttributeOnly]);
     }
 
-    // A value that is not valid is not set, so the class keeps its default name.  A test of the MSBuild path: the
-    // output is the project's property too.
-    [Theory]
-    [InlineData("class")]
-    [InlineData("My-Sql")]
-    [InlineData("App.Sql")]
-    public void Run_NestedClassPropertyThatIsNotValid_IsReportedWithoutAPosition(string value)
-    {
-        var run = RunOnMSBuild(
-            """
-            using SqlSource;
-            namespace App;
-            [SqlSourceGenerate]
-            public partial class Sample
-            {
-                public static string Get() => Sql.GetUser;
-            }
-            """,
-            value
-        );
-
-        run.Diagnostics.ShouldBe([$"SQLSRC014 (1,1)-(1,1): '{value}' is not a valid value of SqlSourceNestedClass"]);
-        run.CompilationErrors.ShouldBeEmpty();
-    }
-
     // The source with Users, and the nested class, or none, in the settings file of the type's folder.
     private static GeneratorRun Run(string source, string? nestedClass) =>
         GeneratorHarness.Run(
@@ -259,18 +233,5 @@ public sealed class NestedClassTests
         GeneratorHarness.SettingsFile(
             TypesFolderSettingsPath,
             GeneratorHarness.Json(new JsonObject { ["nestedClass"] = nestedClass })
-        );
-
-    // The same with the output sql as the project's property, for a test of the MSBuild path.
-    private static GeneratorRun RunOnMSBuild(string source, string nestedClass) =>
-        GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, source)],
-            [GeneratorHarness.UsersFile],
-            properties: new Dictionary<string, string?>
-            {
-                ["SqlSourceOutput"] = "Sql",
-                ["SqlSourceNestedClass"] = nestedClass,
-            }
         );
 }

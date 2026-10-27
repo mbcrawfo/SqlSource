@@ -219,10 +219,9 @@ public sealed class TypeEmitterTests
             new TypeQueries(
                 typeFiles,
                 TestModels.Array(File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"))),
-                TestModels.Array(SettingsLevel.None),
+                TestModels.Array(new SettingsLevel { Output = OutputKind.Sql }),
                 "App.UserRepository.g.cs"
-            ),
-            new SettingsLevel { Output = OutputKind.Sql }
+            )
         );
 
         output.ShouldBe(new TypeOutput("App.UserRepository.g.cs", null, TestModels.Array(problem)));
@@ -459,7 +458,7 @@ public sealed class TypeEmitterTests
     }
 
     [Fact]
-    public void Emit_FourLevels_ResolveForEachQuery()
+    public void Emit_ThreeLevels_ResolveForEachQuery()
     {
         var keep = new SettingsLevel { Parameters = GeneratorParameters.KeepComments };
         var none = new SettingsLevel { Parameters = GeneratorParameters.None };
@@ -476,16 +475,12 @@ public sealed class TypeEmitterTests
                 TestModels.Array(
                     File("Users.sql", Kept("FromTheAttribute", SettingsLevel.None), Kept("FromItsMarker", keep))
                 ),
-                TestModels.Array(keep),
+                TestModels.Array(keep with { Output = OutputKind.Sql }),
                 "App.UserRepository.g.cs"
-            ),
-            keep with
-            {
-                Output = OutputKind.Sql,
-            }
+            )
         );
 
-        // The attribute's empty list beats the metadata and the property; a query's own marker beats the attribute.
+        // The attribute's empty list beats the file's level; a query's own marker beats the attribute.
         output.Source.ShouldNotBeNull().ShouldNotContain("-- FromTheAttribute");
         output.Source.ShouldContain("-- FromItsMarker");
     }
@@ -699,8 +694,8 @@ public sealed class TypeEmitterTests
     }
 
     // The error of a kept form is the type's only when it emits that form: a type that does not keep the comments
-    // uses the file.  The query is in the second file, whose metadata alone decides, and the first file's metadata
-    // says the opposite, so the settings must be those of the query's own file.
+    // uses the file.  The query is in the second file, whose level alone decides, and the first file's level says the
+    // opposite, so the settings must be those of the query's own file.
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -714,7 +709,6 @@ public sealed class TypeEmitterTests
         var output = Emit(
             OutputKind.Sql,
             TestModels.Type(),
-            SettingsLevel.None,
             keepComments ? [none, keep] : [keep, none],
             File("A.sql", TestModels.Query("Kept", "SELECT 3;")),
             File(
@@ -755,31 +749,28 @@ public sealed class TypeEmitterTests
     // A theory cannot take the internal enum as a parameter.
     private static MemberPlacement Placement(bool direct) => direct ? MemberPlacement.Direct : MemberPlacement.Nested;
 
-    // Each test states its output, which goes on the project's level.
+    // Each test states its output, which goes on each file's level.
     private static TypeOutput Emit(OutputKind? output, TargetType type, params ParsedSqlFile[] files) =>
         Emit(output, type, validateTokens: true, files);
 
+    // The files under one level, of no-token-validation unless the tokens are validated.
     private static TypeOutput Emit(
         OutputKind? output,
         TargetType type,
         bool validateTokens,
         params ParsedSqlFile[] files
-    ) =>
-        Emit(
-            output,
-            type,
-            validateTokens
-                ? SettingsLevel.None
-                : new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation },
-            Array.ConvertAll(files, static _ => SettingsLevel.None),
-            files
-        );
+    )
+    {
+        var level = validateTokens
+            ? SettingsLevel.None
+            : new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation };
+        return Emit(output, type, Array.ConvertAll(files, _ => level), files);
+    }
 
-    // The levels of the files' metadata, one for each file, and the level of the project's properties.
+    // The files, each under its level, one for each file, with the output on each.
     private static TypeOutput Emit(
         OutputKind? output,
         TargetType type,
-        SettingsLevel property,
         SettingsLevel[] fileSettings,
         params ParsedSqlFile[] files
     ) =>
@@ -787,13 +778,9 @@ public sealed class TypeEmitterTests
             new TypeQueries(
                 new TypeFiles(type, TestModels.Array<string>(), TestModels.Array<DiagnosticInfo>()),
                 TestModels.Array(files),
-                TestModels.Array(fileSettings),
+                TestModels.Array(Array.ConvertAll(fileSettings, level => level with { Output = output })),
                 HintName.Create(type)
-            ),
-            property with
-            {
-                Output = output,
-            }
+            )
         );
 
     private static ParsedSqlFile File(string fileName, params SqlQuery[] queries) =>

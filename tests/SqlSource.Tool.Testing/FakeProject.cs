@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using SqlSource.Tool.Processes;
+using SqlSource.Tool.Projects;
 
 namespace SqlSource.Tool.Testing;
 
@@ -109,7 +110,10 @@ internal sealed class FakeProject
                 file,
                 ManifestWriter?.Invoke()
                     ?? Manifest
-                    ?? $"SqlSourceManifest=1\nProject={request.Arguments[1]}\nTargetFramework={framework}\n"
+                    ?? (
+                        $"SqlSourceManifest={ManifestReader.Version}\nProject={request.Arguments[1]}\n"
+                        + $"TargetFramework={framework}\n"
+                    )
             );
         }
 

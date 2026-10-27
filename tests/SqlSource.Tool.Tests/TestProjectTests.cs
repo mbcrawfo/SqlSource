@@ -16,22 +16,22 @@ public sealed class TestProjectTests
     public void Manifest_ProjectWithFilesAndSettings_IsReadByTheToolsReader()
     {
         using var folder = new TempFolder();
-        var project = new TestProject(folder) { LangVersion = "12.0" };
+        var project = new TestProject(folder) { LangVersion = "12.0", BuildFolders = "|/work/obj/" };
         project.Constants.AddRange(["DEBUG", "NET10_0"]);
-        project.Properties["SqlSourceDialect"] = "postgres";
+        project.Settings["dialect"] = "postgres";
         var source = project.AddSource("Queries.cs", "internal static partial class Queries;");
-        var sql = project.AddSql("Queries/Users.sql", "SELECT 1;", ("SqlSourceDatabase", "billing"));
+        var sql = project.AddSql("Queries/Users.sql", "SELECT 1;");
+        var settings = project.AddSettings("Queries/sqlsource.json", "{}");
 
         var manifest = project.Manifest();
 
         manifest.ProjectPath.ShouldBe(folder.PathOf("App/App.csproj"));
         manifest.LangVersion.ShouldBe("12.0");
         manifest.DefineConstants.ShouldBe(["DEBUG", "NET10_0"]);
-        manifest.Properties["SqlSourceDialect"].ShouldBe("postgres");
+        manifest.BuildFolders.ShouldBe("|/work/obj/");
+        manifest.Files.ShouldBe([sql]);
+        manifest.SettingsFiles.ShouldBe([project.SettingsPath, settings]);
         manifest.CompileFiles.ShouldBe([source]);
-        var file = manifest.Files.ShouldHaveSingleItem();
-        file.Path.ShouldBe(sql);
-        file.Metadata["SqlSourceDatabase"].ShouldBe("billing");
     }
 
     // The package's target writes the settings files after the .sql files and before the C# files.

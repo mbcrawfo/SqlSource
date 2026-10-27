@@ -43,31 +43,13 @@ public sealed partial class BuildFileTests
     // The target that finds the settings files and gives them to the compiler.
     private const string SearchTarget = "SqlSourceFindSettingsFiles";
 
-    // What the generator reads: each as a property of the project and as metadata of a file's item.
-    private static readonly string[] Settings =
-    [
-        "SqlSourceDialect",
-        "SqlSourceGeneratorParameters",
-        "SqlSourceOutput",
-        "SqlSourceInputModelSuffix",
-        "SqlSourceOutputModelSuffix",
-        "SqlSourceModelNamespace",
-        "SqlSourceInputModelType",
-        "SqlSourceOutputModelType",
-        "SqlSourceCollectionType",
-        "SqlSourceTypeOverrides",
-        "SqlSourceColumnTypes",
-    ];
-
-    // What the targets trim and the generator does not read.
-    private static readonly string[] TrimmedOnly = ["SqlSourceDatabase"];
-
-    // What the generator reads as a property of the project and never as metadata of a file.
-    private static readonly string[] PropertyOnly = ["SqlSourceNestedClass"];
+    // The target that a target of a project hooks when it adds a .sql file, so that the file is searched above and is
+    // in the manifest.
+    private const string ListTarget = "SqlSourceListFiles";
 
     // The folders the build writes into, which the targets set and the compiler is shown.  They are no setting: a
-    // project does not write them, and nothing trims them.
-    private static readonly string[] BuildFolders = ["SqlSourceBuildFolders"];
+    // project does not write them.
+    private const string BuildFolders = "SqlSourceBuildFolders";
 
     // The target that sets them.
     private const string BuildFoldersTarget = "SqlSourceFindBuildFolders";
@@ -94,70 +76,64 @@ public sealed partial class BuildFileTests
         ConditionsAround(marker).ShouldBeEmpty();
     }
 
+    // A source generator sees only the properties that are listed here, and the settings are in settings files, so
+    // the compiler is shown the folders of the build alone.  No metadata is listed: the SDK would write a section
+    // into the file the compiler reads for every item of a type that is.  A project that sets SqlSourceIncludeFiles
+    // to false lists its own .sql files, and still needs the property, so nothing may put a condition on the item.
     [Fact]
-    public void Props_PropertiesOfThePackage_ReachTheCompilerInEveryProject()
+    public void Props_OnlyPropertyTheCompilerIsShown_IsTheBuildsFolders()
     {
         var items = Props.Descendants("CompilerVisibleProperty").ToList();
 
-        items
-            .Select(item => item.Attribute("Include").ShouldNotBeNull().Value)
-            .ShouldBe(Settings.Concat(PropertyOnly).Concat(BuildFolders), ignoreOrder: true);
-
-        // A project that sets SqlSourceIncludeFiles to false lists its own .sql files, and still needs the
-        // properties.  So nothing may put a condition on the items.
+        items.Select(item => item.Attribute("Include").ShouldNotBeNull().Value).ShouldBe([BuildFolders]);
         items.SelectMany(ConditionsAround).ShouldBeEmpty();
+        Props.Descendants("CompilerVisibleItemMetadata").ShouldBeEmpty();
+        Targets.Descendants("CompilerVisibleProperty").ShouldBeEmpty();
+        Targets.Descendants("CompilerVisibleItemMetadata").ShouldBeEmpty();
     }
 
-    // The SDK writes a section into the file the compiler reads for every item of the type that is named here,
-    // whether the item has the metadata or not.  AdditionalFiles would be every .sql file of the project.
-    // SqlSourceSettingsFile holds only the files that have any: see
-    // Targets_FilesWithMetadata_AreTheItemsWhoseMetadataTheCompilerReads.
-    [Fact]
-    public void Props_MetadataOfASqlFile_ReachesTheCompilerInEveryProject()
-    {
-        var items = Props.Descendants("CompilerVisibleItemMetadata").ToList();
-
-        items.ShouldAllBe(item => item.Attribute("Include")!.Value == "SqlSourceSettingsFile");
-        items
-            .Select(item => item.Attribute("MetadataName").ShouldNotBeNull().Value)
-            .ShouldBe(Settings, ignoreOrder: true);
-        items.SelectMany(ConditionsAround).ShouldBeEmpty();
-    }
-
-    // The compiler reads a property, and the metadata of an item, from a file with one line for each.  A value on a
-    // line of its own would arrive empty, and one written over several lines would be cut at its first line break,
-    // so the package trims each one.  GenerateMSBuildEditorConfigFileCore is the target of the SDK that writes the
-    // file.  A trim that runs before it sees a value wherever it was set, in Directory.Build.targets or by another
-    // target, and runs in every build that writes the file, a design-time build too.  A trim outside a target would
-    // see only what is set before NuGet imports the file.  The target that collects the files with metadata runs
-    // there for the same reasons.  The search for settings files and the hash hook it through a property, which
-    // SqlSource.AfterSdk.targets empties to run them later: see
+    // GenerateMSBuildEditorConfigFileCore is the target of the SDK that writes the file the compiler reads.  The
+    // target of the build's folders runs before it, when every property of the SDK and of the artifacts layout is
+    // set, and in every build that writes the file, a design-time build too.  The search for settings files and the
+    // hash hook it through a property, which SqlSource.AfterSdk.targets empties to run them later: see
     // Targets_SettingsSearch_RunsBeforeTheCompilerWhereverItIsHooked.  The target that writes the manifest is the one
-    // that is not of a build: see Targets_ManifestTarget_HooksNothing.
+    // that is not of a build, Targets_ManifestTarget_HooksNothing, and the hook for a target that adds .sql files
+    // hooks nothing either, Targets_HookForFilesThatTargetsAdd_RunsBeforeTheSearchAndTheManifest.
     [Fact]
     public void Targets_EveryTargetOfABuild_RunsBeforeTheBuildWritesTheFileTheCompilerReads()
     {
         var targets = Targets
             .Root.ShouldNotBeNull()
             .Elements("Target")
-            .Where(target => target.Attribute("Name")!.Value != ManifestTarget)
+            .Where(target => target.Attribute("Name")!.Value is not (ManifestTarget or ListTarget))
             .ToList();
 
-        targets.Count.ShouldBe(6);
+        targets.Count.ShouldBe(3);
         targets
             .Select(target => target.Attribute("BeforeTargets")?.Value)
-            .ShouldBe(
-                [
-                    "GenerateMSBuildEditorConfigFileCore",
-                    "GenerateMSBuildEditorConfigFileCore",
-                    "GenerateMSBuildEditorConfigFileCore",
-                    "GenerateMSBuildEditorConfigFileCore",
-                    SearchHook,
-                    SearchHook,
-                ],
-                ignoreOrder: true
-            );
+            .ShouldBe(["GenerateMSBuildEditorConfigFileCore", SearchHook, SearchHook], ignoreOrder: true);
         targets.SelectMany(ConditionsAround).ShouldBeEmpty();
+    }
+
+    // A target of a project that adds a .sql file while the build runs hooks this one with BeforeTargets, wherever it
+    // is declared: the search depends on it, so the file is searched above in a build, and the manifest depends on it
+    // first, so the file is in the manifest that the tool runs by name.  It does nothing itself, and hooks nothing,
+    // so that it runs only as what those two depend on.
+    [Fact]
+    public void Targets_HookForFilesThatTargetsAdd_RunsBeforeTheSearchAndTheManifest()
+    {
+        var hook = Target(ListTarget);
+
+        hook.Attributes().Select(attribute => attribute.Name.LocalName).ShouldBe(["Name"]);
+        hook.HasElements.ShouldBeFalse();
+        Target(SearchTarget).Attribute("DependsOnTargets").ShouldNotBeNull().Value.Split(';').ShouldContain(ListTarget);
+        Targets
+            .Root.ShouldNotBeNull()
+            .Elements("PropertyGroup")
+            .Elements("SqlSourceManifestDependsOn")
+            .First()
+            .Value.Split(';')[0]
+            .ShouldBe(ListTarget);
     }
 
     // A target's DependsOnTargets is read before the target runs, so the list that the manifest target depends on
@@ -184,10 +160,7 @@ public sealed partial class BuildFileTests
         lines[0].Attributes().ShouldBeEmpty();
         lines[0].Value.ShouldBe("GenerateMSBuildEditorConfigFileCore");
         lines[1].Attributes().ShouldBeEmpty();
-        lines[1]
-            .Value.ShouldBe(
-                "SqlSourceTrimProperties;SqlSourceTrimMetadataOfFiles;" + SearchTarget + ";" + BuildFoldersTarget
-            );
+        lines[1].Value.ShouldBe(ListTarget + ";" + SearchTarget + ";" + BuildFoldersTarget);
         // A project that is not of the SDK has no TargetFramework, and no such target to depend on.
         lines[2].Attributes().ShouldHaveSingleItem().Name.LocalName.ShouldBe("Condition");
         lines[2].Attribute("Condition")!.Value.ShouldBe("'$(TargetFramework)' != ''");
@@ -287,9 +260,8 @@ public sealed partial class BuildFileTests
     // to the compiler, as the SDK gives it the .editorconfig files: every folder above a .sql file or a Compile item,
     // to the top of the drive, its full path made distinct (msbuild issue 4392), combined with the name, kept where
     // the file exists.  The search is not under SqlSourceIncludeFiles, so a project that lists its own .sql files
-    // still gets its settings.  It runs before the file the compiler reads is written, so that a .sql file a target
-    // adds is searched above too, and after SqlSourceTrimMetadataOfFiles, the hook such a target is given.  A file
-    // the project lists itself is not given twice.
+    // still gets its settings.  It runs in a target, so that a .sql file a target adds is searched above too, and
+    // after SqlSourceListFiles, the hook such a target is given.  A file the project lists itself is not given twice.
     [Fact]
     public void Targets_SettingsFileSearch_FindsEverySqlsourceJsonAboveTheSqlFilesAndTheCompileFiles()
     {
@@ -303,7 +275,7 @@ public sealed partial class BuildFileTests
                 {
                     ["Name"] = SearchTarget,
                     ["BeforeTargets"] = SearchHook,
-                    ["DependsOnTargets"] = "SqlSourceTrimMetadataOfFiles",
+                    ["DependsOnTargets"] = ListTarget,
                 }
             );
         var items = target.Elements("ItemGroup").ShouldHaveSingleItem().Elements().ToList();
@@ -375,37 +347,28 @@ public sealed partial class BuildFileTests
         target.Attribute("DependsOnTargets")!.Value.ShouldBe("$(SqlSourceManifestDependsOn)");
     }
 
-    // The manifest is what the compiler is given, whole: a setting of the package that is added and has no line
-    // here would be read by the generator and not by the tool.  A property goes through Escape, or a value that
-    // holds a semicolon would be written as several lines.  The lines of a file are one item, so that the metadata
-    // stays under its file.
+    // Version 2 of the format: what the compiler is given, and no setting, since the tool reads the settings from the
+    // files of the Settings lines.  A property goes through Escape, or a value that holds a semicolon would be
+    // written as several lines.  The tool reads the build's folders for the C# files that reach no settings file.
     [Fact]
-    public void Targets_ManifestTarget_WritesEverySettingOfTheProjectAndOfEachFile()
-    {
-        var names = Settings.Concat(TrimmedOnly).ToList();
-        var properties = names.Concat(PropertyOnly).Concat(BuildFolders);
-        var lines = Manifest()
+    public void Targets_ManifestTarget_WritesTheLinesOfVersion2InTheirOrder() =>
+        Manifest()
             .Descendants("SqlSourceManifestLine")
             .Select(line => line.Attribute("Include").ShouldNotBeNull().Value)
-            .ToList();
+            .ShouldBe([
+                "SqlSourceManifest=2",
+                "Project=$([MSBuild]::Escape($(MSBuildProjectFullPath)))",
+                $"TargetFramework=$([MSBuild]::Escape({OnOneLine("TargetFramework")}))",
+                $"LangVersion=$([MSBuild]::Escape({OnOneLine("LangVersion")}))",
+                $"DefineConstants=$([MSBuild]::Escape({OnOneLine("DefineConstants")}))",
+                $"{BuildFolders}=$([MSBuild]::Escape($({BuildFolders})))",
+                "@(SqlSourceManifestSqlFile->'File=%(FullPath)')",
+                "@(SqlSourceManifestSettingsFile->'%(FullPath)'->Distinct()->'Settings=%(Identity)')",
+                "@(Compile->'Compile=%(FullPath)')",
+            ]);
 
-        lines[0].ShouldBe("SqlSourceManifest=1");
-        lines
-            .Where(line => line.StartsWith("Property.", StringComparison.Ordinal))
-            .ShouldBe(properties.Select(name => $"Property.{name}=$([MSBuild]::Escape($({name})))"), ignoreOrder: true);
-
-        const string Start = "@(SqlSourceManifestSqlFile->'";
-        const string End = "')";
-        var file = lines.Where(line => line.StartsWith(Start, StringComparison.Ordinal)).ShouldHaveSingleItem();
-        file.ShouldEndWith(End);
-        var parts = file[Start.Length..^End.Length].Split("%0a");
-        parts[0].ShouldBe("File=%(FullPath)");
-        parts.Skip(1).ShouldBe(names.Select(name => $"File.{name}=%({name})"), ignoreOrder: true);
-    }
-
-    // The trims of the package do not reach a property of the SDK, and a project may write its constants one on
-    // each line.  A line break inside a value would end its line of the manifest, so each of these is put on one
-    // line the way a trim does it.
+    // A project may write its constants one on each line.  A line break inside a value would end its line of the
+    // manifest, so each property of the SDK is put on one line first.
     [Theory]
     [InlineData("TargetFramework")]
     [InlineData("LangVersion")]
@@ -414,7 +377,7 @@ public sealed partial class BuildFileTests
         Manifest()
             .Descendants("SqlSourceManifestLine")
             .Select(line => line.Attribute("Include").ShouldNotBeNull().Value)
-            .ShouldContain($"{name}=$([MSBuild]::Escape({Trimmed(name)}))");
+            .ShouldContain($"{name}=$([MSBuild]::Escape({OnOneLine(name)}))");
 
     [Fact]
     public void Targets_ManifestTarget_ListsTheSqlFilesAndTheCompileFiles()
@@ -488,75 +451,6 @@ public sealed partial class BuildFileTests
             .Except(["AdditionalFiles", "CustomAdditionalCompileInputs", "FileWrites"])
             .ShouldAllBe(name => name.StartsWith(Prefix, StringComparison.Ordinal));
 
-    // The compiler reads one line of a value, so a property written over several lines reaches it only trimmed.  This
-    // pins that SqlSourceTrimProperties trims every property of the package, and only those, with no condition.
-    [Fact]
-    public void Targets_EveryPropertyOfThePackage_IsTrimmed()
-    {
-        var trimmed = Targets
-            .Descendants("Target")
-            .Single(target => target.Attribute("Name")!.Value == "SqlSourceTrimProperties")
-            .Descendants("PropertyGroup")
-            .Elements()
-            .ToList();
-
-        trimmed
-            .Select(element => element.Name.LocalName)
-            .ShouldBe(Settings.Concat(TrimmedOnly).Concat(PropertyOnly), ignoreOrder: true);
-        trimmed.ShouldAllBe(element => element.Value == Trimmed(element.Name.LocalName));
-        trimmed.SelectMany(ConditionsAround).ShouldBeEmpty();
-    }
-
-    // The target runs once for each combination of values that the metadata has, with only the items of that
-    // combination in reach.  Each value goes through a property so that it is never text inside a property
-    // function: see Targets_ItemMetadata_IsNeverTheArgumentOfAPropertyFunction.  Most files have no metadata, and
-    // they are one batch with nothing to trim: nothing is written back to them, and a value that is not set is not
-    // written at all.
-    [Fact]
-    public void Targets_MetadataOfEverySqlFile_IsTrimmed()
-    {
-        var names = Settings.Concat(TrimmedOnly).ToList();
-        var target = Target("SqlSourceTrimMetadataOfFiles");
-        var item = target.Descendants("AdditionalFiles").ShouldHaveSingleItem();
-        target
-            .Attribute("Outputs")
-            .ShouldNotBeNull()
-            .Value.Split('|')
-            .ShouldBe(names.Select(name => $"%(AdditionalFiles.{name})"), ignoreOrder: true);
-        foreach (var name in names)
-        {
-            target.Descendants(name + "AsWritten").ShouldHaveSingleItem().Value.ShouldBe($"%(AdditionalFiles.{name})");
-            var metadata = item.Elements(name).ShouldHaveSingleItem();
-            metadata.Value.ShouldBe(Trimmed(name + "AsWritten"));
-            metadata.Attribute("Condition").ShouldNotBeNull().Value.ShouldBe($"'$({name}AsWritten)' != ''");
-        }
-
-        item.Attributes().ShouldBeEmpty();
-        item.Elements().Count().ShouldBe(names.Count);
-        item.Parent.ShouldNotBeNull()
-            .Attribute("Condition")
-            .ShouldNotBeNull()
-            .Value.ShouldBe("'" + string.Concat(names.Select(name => $"$({name}AsWritten)")) + "' != ''");
-    }
-
-    // The compiler reads the metadata from the items of SqlSourceSettingsFile, and the files without any are not
-    // among them.  The collecting has to come after the trim: the values it copies are trimmed by then, and a file
-    // whose values were only white space is left out.  MSBuild does not promise an order for two targets that hook
-    // the same one, so the target says what it depends on.
-    [Fact]
-    public void Targets_FilesWithMetadata_AreTheItemsWhoseMetadataTheCompilerReads()
-    {
-        var item = Targets.Descendants("SqlSourceSettingsFile").ShouldHaveSingleItem();
-        var target = item.Ancestors("Target").ShouldHaveSingleItem();
-
-        item.Attribute("Include").ShouldNotBeNull().Value.ShouldBe("@(AdditionalFiles)");
-        item.Attribute("Condition")
-            .ShouldNotBeNull()
-            .Value.ShouldBe("'" + string.Concat(Settings.Select(name => $"%(AdditionalFiles.{name})")) + "' != ''");
-        target.Attribute("Name").ShouldNotBeNull().Value.ShouldBe("SqlSourceCollectSettingsFiles");
-        target.Attribute("DependsOnTargets").ShouldNotBeNull().Value.ShouldBe("SqlSourceTrimMetadataOfFiles");
-    }
-
     // A file that is removed has no timestamp left to compare, so the build after it compiles again only when an
     // input of the compiler changed.  The list of AdditionalFiles is not among the inputs the SDK keeps.  The package
     // writes a hash of the list to a file and names the file as an input, and it writes the file only when the hash
@@ -598,7 +492,8 @@ public sealed partial class BuildFileTests
     // The search and the hash run just before the compiler, after every target of the project that hooks
     // CoreCompile, from the file the SDK imports last.  That file empties the property they hook in
     // SqlSource.targets, so they run once, from there.  Where it is not imported, they run before the file the
-    // compiler reads is written, as the trims do.  A design-time build runs CoreCompile, so it runs them either way.
+    // compiler reads is written, as the target of the build's folders does.  A design-time build runs CoreCompile, so
+    // it runs them either way.
     [Fact]
     public void Targets_SettingsSearch_RunsBeforeTheCompilerWhereverItIsHooked()
     {
@@ -624,9 +519,8 @@ public sealed partial class BuildFileTests
         root.Descendants().SelectMany(ConditionsAround).ShouldBeEmpty();
     }
 
-    // MSBuild puts metadata into an expression as text, before it reads the expression.  A value with a quote in it
-    // would end a quoted argument early, and the whole expression would reach the compiler as the value: SQLSRC011
-    // would then quote the expression and not what the project says.
+    // MSBuild puts metadata into an expression as text, before it reads the expression.  A path with a quote in it,
+    // as the fixture OddPaths has, would end a quoted argument early, and the whole expression would be the value.
     [Fact]
     public void Targets_ItemMetadata_IsNeverTheArgumentOfAPropertyFunction() =>
         Values(Targets).ShouldAllBe(value => !MetadataInAPropertyFunction().IsMatch(value));
@@ -689,9 +583,9 @@ public sealed partial class BuildFileTests
     private static IEnumerable<XAttribute> ConditionsAround(XElement element) =>
         element.AncestorsAndSelf().SelectMany(ancestor => ancestor.Attributes("Condition"));
 
-    // What a trim is: the white space around the value goes, and each run of white space inside it, a line break
-    // among it, becomes one space.  The value is then on one line, which is all the compiler reads of it.
-    private static string Trimmed(string property) =>
+    // A property on one line: the white space around the value goes, and each run of white space inside it, a line
+    // break among it, becomes one space.
+    private static string OnOneLine(string property) =>
         $@"$([System.Text.RegularExpressions.Regex]::Replace($({property}), '\s+', ' ').Trim())";
 
     private static XDocument Load(string file) => XDocument.Load(Path.Combine(AppContext.BaseDirectory, "build", file));

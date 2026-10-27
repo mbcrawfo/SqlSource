@@ -1,6 +1,5 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
-using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
@@ -90,25 +89,6 @@ public sealed class TokenValidationTests
         var source = run.Sources["App.Sample.g.cs"];
         source.ShouldNotContain("ThrowIfNullOrWhiteSpace(a);");
         source.ShouldContain("ThrowIfNullOrWhiteSpace(b);");
-    }
-
-    // A test of the MSBuild path: the output and the parameters are the project's properties.
-    [Fact]
-    public void Run_InvalidPropertyInAProjectWithoutAnAttributedType_IsStillAnError()
-    {
-        var run = GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, "public class Sample;")],
-            [],
-            properties: new Dictionary<string, string?>
-            {
-                ["SqlSourceOutput"] = "Sql",
-                ["SqlSourceGeneratorParameters"] = "nope",
-            }
-        );
-
-        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC014 ");
-        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs"]);
     }
 
     // The file under the generator parameters of the project's settings file, or none when they are null.

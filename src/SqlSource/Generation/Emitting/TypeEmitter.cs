@@ -31,8 +31,7 @@ internal static class TypeEmitter
     /// Writes the file of <paramref name="input" />.
     /// </summary>
     /// <param name="input">The type and its parsed files.</param>
-    /// <param name="property">What the project's properties say.</param>
-    public static TypeOutput Emit(TypeQueries input, SettingsLevel property)
+    public static TypeOutput Emit(TypeQueries input)
     {
         var type = input.Type.Type;
         if (input.Type.Diagnostics.Count > 0)
@@ -41,7 +40,7 @@ internal static class TypeEmitter
         }
 
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
-        var members = SelectMembers(type, input.Files, input.FileSettings, property, diagnostics, out var hasCodeGen);
+        var members = SelectMembers(type, input.Files, input.FileSettings, diagnostics, out var hasCodeGen);
         return new TypeOutput(
             input.HintName,
             Write(type, members, hasCodeGen),
@@ -58,16 +57,15 @@ internal static class TypeEmitter
     /// </summary>
     /// <param name="type">The type.</param>
     /// <param name="files">The type's files, in member order.</param>
-    /// <param name="fileSettings">What the metadata of each file's item says, one for each of
-    /// <paramref name="files" />.</param>
-    /// <param name="property">What the project's properties say.</param>
+    /// <param name="fileSettings">
+    /// Each file's level, the chain of its folder, one for each of <paramref name="files" />.
+    /// </param>
     /// <param name="diagnostics">Where the diagnostics go, or null when the caller does not report them.</param>
     /// <returns>One element for each of <paramref name="files" />: whether the type can use it.</returns>
     public static bool[] FindUsableFiles(
         TargetType type,
         EquatableArray<ParsedSqlFile> files,
         EquatableArray<SettingsLevel> fileSettings,
-        SettingsLevel property,
         ImmutableArray<DiagnosticInfo>.Builder? diagnostics
     )
     {
@@ -84,7 +82,7 @@ internal static class TypeEmitter
                 // its method's name.  The settings are resolved only for a query of that name, which is rare.
                 if (
                     string.Equals(query.Name, containingTypeName, StringComparison.Ordinal)
-                    && QuerySettings.Resolve(query.Markers, type.Settings, fileSettings[index], property).Output
+                    && QuerySettings.Resolve(query.Markers, type.Settings, fileSettings[index]).Output
                         != OutputKind.CodeGen
                 )
                 {
@@ -115,7 +113,7 @@ internal static class TypeEmitter
                 // The settings are resolved only for a query whose kept form has an error, which is rare.
                 if (
                     query.KeptErrors.Count > 0
-                    && QuerySettings.Resolve(query.Markers, type.Settings, fileSettings[index], property).KeepComments
+                    && QuerySettings.Resolve(query.Markers, type.Settings, fileSettings[index]).KeepComments
                 )
                 {
                     diagnostics?.AddRange(query.KeptErrors);
@@ -145,12 +143,11 @@ internal static class TypeEmitter
         TargetType type,
         EquatableArray<ParsedSqlFile> files,
         EquatableArray<SettingsLevel> fileSettings,
-        SettingsLevel property,
         ImmutableArray<DiagnosticInfo>.Builder diagnostics,
         out bool hasCodeGen
     )
     {
-        var usable = FindUsableFiles(type, files, fileSettings, property, diagnostics);
+        var usable = FindUsableFiles(type, files, fileSettings, diagnostics);
         var members = new List<(SqlQuery Query, string FileName, QuerySettings Settings)>();
         hasCodeGen = false;
         for (var index = 0; index < files.Count; index++)
@@ -163,7 +160,7 @@ internal static class TypeEmitter
             var file = files[index];
             foreach (var query in file.Queries)
             {
-                var settings = QuerySettings.Resolve(query.Markers, type.Settings, fileSettings[index], property);
+                var settings = QuerySettings.Resolve(query.Markers, type.Settings, fileSettings[index]);
                 if (settings.Output == OutputKind.CodeGen)
                 {
                     hasCodeGen = true;

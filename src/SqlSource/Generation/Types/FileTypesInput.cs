@@ -15,11 +15,8 @@ namespace SqlSource.Generation.Types;
 /// has nothing to type.
 /// </param>
 /// <param name="Level">
-/// The type override and the column types of the file's level, the chain of its folder over the metadata of its item,
-/// as a level that says nothing else.
-/// </param>
-/// <param name="Property">
-/// The type override and the column types of the project's properties, as a level that says nothing else.
+/// The type override and the column types of the file's level, the chain of its folder, as a level that says nothing
+/// else.
 /// </param>
 /// <param name="NpgsqlProbe">The Npgsql the project references, which chooses the column of PostgreSQL's map.</param>
 /// <param name="SqlClientProbe">
@@ -33,22 +30,20 @@ internal sealed record FileTypesInput(
     SidecarCheckResult Check,
     ParsedSqlFile? File,
     SettingsLevel Level,
-    SettingsLevel Property,
     NpgsqlProbe NpgsqlProbe,
     SqlClientProbe SqlClientProbe,
     EquatableArray<MappedType> MappedTypes
 )
 {
     /// <summary>
-    /// Finds the parsed file and the level of <paramref name="check" />'s file.  Both lists are sorted by
-    /// <see cref="SqlPath.Comparer" />.  <paramref name="property" /> is the properties' type override and column types
-    /// alone, as <see cref="TypeSettingsOf" /> gives them.
+    /// Finds the parsed file and the level of <paramref name="check" />'s file, of which it keeps the type override and
+    /// the column types alone, as <see cref="TypeSettingsOf" /> gives them.  Both lists are sorted by
+    /// <see cref="SqlPath.Comparer" />.
     /// </summary>
     public static FileTypesInput Gather(
         SidecarCheckResult check,
         EquatableArray<ParsedSqlFile> files,
         EquatableArray<FileLevel> fileLevels,
-        SettingsLevel property,
         NpgsqlProbe npgsqlProbe,
         SqlClientProbe sqlClientProbe,
         EquatableArray<MappedType> mappedTypes
@@ -64,7 +59,6 @@ internal sealed record FileTypesInput(
                 check,
                 null,
                 SettingsLevel.None,
-                SettingsLevel.None,
                 npgsqlProbe,
                 sqlClientProbe,
                 EquatableArray<MappedType>.Empty
@@ -76,7 +70,6 @@ internal sealed record FileTypesInput(
             check,
             files[fileIndex],
             levelIndex < 0 ? SettingsLevel.None : TypeSettingsOf(fileLevels[levelIndex].Level),
-            property,
             npgsqlProbe,
             sqlClientProbe,
             mappedTypes
