@@ -120,8 +120,18 @@ public sealed class ListedSettingsFileTests
             { SettingsFileKeys.InputModelType, "\"struct\"", true, false },
             { SettingsFileKeys.OutputModelType, "\"struct\"", true, false },
             { SettingsFileKeys.CollectionType, "\"lists\"", true, false },
-            { SettingsFileKeys.TypeOverrides, "{\"int\": \" \"}", true, false },
-            { SettingsFileKeys.ColumnTypes, "{\"accounts.id\": \" \"}", true, false },
+            {
+                SettingsFileKeys.TypeOverrides, /*lang=json,strict*/
+                """{"int": " "}""",
+                true,
+                false
+            },
+            {
+                SettingsFileKeys.ColumnTypes, /*lang=json,strict*/
+                """{"accounts.id": " "}""",
+                true,
+                false
+            },
             { SettingsFileKeys.NestedClass, "\"class\"", true, false },
         };
 
