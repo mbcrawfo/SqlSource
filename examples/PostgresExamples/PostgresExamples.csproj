@@ -20,7 +20,7 @@
         <Nullable>enable</Nullable>
         <!-- Only in this repository: raising VersionPrefix warns until tools/describe-end-to-end.sh runs. -->
         <WarningsNotAsErrors>$(WarningsNotAsErrors);SQLSRC240</WarningsNotAsErrors>
-        <!-- The project's dialect, its type override and its column type are in sqlsource.json, beside this file. -->
+        <!-- The project's SqlSource settings are in sqlsource.json, beside this file. -->
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="Dapper" />

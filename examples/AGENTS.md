@@ -6,7 +6,7 @@ The rules for changing the example projects, `examples/<Engine>Examples`.
 
 1. **Small and representative.**  A few queries in each folder show the common path and a few of the settings a user reaches for.  Coverage belongs in the end-to-end projects under `tests/`, never here.
 2. **No tests, and nothing runs.**  The project is a library in `SqlSource.slnx` that compiles.  Its classes call the generated code as a user's code would, so a stale sidecar or a model that changes shape breaks the build.
-3. **Only what the manual recommends.**  The project file, the queries and the code are what a user may copy, so code read through Dapper follows every point of [the recipe](../docs/manual/recipes.md#models-through-dapper).
+3. **Only what the manual recommends.**  The project file, its `sqlsource.json`, the queries and the code are what a user may copy, so code read through Dapper follows every point of [the recipe](../docs/manual/recipes.md#models-through-dapper).
 4. **One folder per output**, `Sql/`, `Models/` and `CodeGen/`, each with one class whose `[SqlSourceGenerate]` attribute sets the folder's output and claims the folder's `.sql` files.  `CodeGen/` uses the default output.
 5. **Anything only the repository needs is marked.**  The project file references the generator as the package adds it, with `ReferenceOutputAssembly="false"`, imports the package's props and targets by path, and keeps `SQLSRC240` a warning; its comments and the README say what a user writes instead.
 
