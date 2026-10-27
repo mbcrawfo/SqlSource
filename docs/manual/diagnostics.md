@@ -555,7 +555,7 @@ Correct the value, or remove it.  While it is wrong the setting is not set by th
 
 `output` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `inputModelType` and `outputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `collectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`, all matched in the same way.  `inputModelSuffix` and `outputModelSuffix` take characters that can be part of an identifier, `modelNamespace` takes a namespace such as `App.Models`, and `nestedClass` takes one identifier that is not a keyword.  `database` takes one word of letters, digits, `-`, `_` and `.`.
 
-`generatorParameters` takes one generator parameter in each element: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix` or `default`, in any case.  `[]` is the empty list, which gives every default, and so is `["default"]`; beside another word `default` is reported, and the message says to write `[]`.
+`generatorParameters` takes one generator parameter in each element: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `no-array-pool` or `default`, in any case.  `[]` is the empty list, which gives every default, and so is `["default"]`; beside another word `default` is reported, and the message says to write `[]`.
 
 `typeOverrides` takes members `"key": "type"`, and the key and the type of each are trimmed:
 
