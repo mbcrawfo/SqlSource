@@ -235,8 +235,9 @@ public sealed class RunTimeArgumentTests(SqlServerContainer sqlServer)
     // Runs TouchAccount on bob while LockOfBob holds his row, and cancels its token once a second connection sees the
     // method's session waiting on the lock, so that the cancel always falls while the command runs, then asserts
     // SqlClient's exception.  It is an update, which waits before the command answers: a SELECT sends its columns
-    // first, and waits in the read of its first row, whose cancel is a TaskCanceledException.  An open connection's session is its ServerProcessId; a closed one, which the method opens,
-    // is of its own pool, and its session is the one of its program_name.
+    // first, and waits in the read of its first row, whose cancel is a TaskCanceledException.  An open connection's
+    // session is its ServerProcessId; a closed one, which the method opens, is of its own pool, and its session is the
+    // one of its program_name.
     private async Task CancelledWhileItRunsAsync(SqlConnection connection, DbTransaction? transaction)
     {
         var token = TestContext.Current.CancellationToken;
@@ -322,10 +323,10 @@ public sealed class RunTimeArgumentTests(SqlServerContainer sqlServer)
         }
     }
 
-    // Bob's row, changed by an update in a transaction of a connection of its own, so that another update of it waits on
-    // the lock until the lock is disposed, which rolls the update back.  The tests of a command that
-    // runs wait on it: a lock wait has no end of its own, where SQL Server ends a WAITFOR early when it runs short of
-    // threads, as it did on the busy runners of CI, and the method then returned its row.
+    // Bob's row, changed by an update in a transaction of a connection of its own, so that another update of it waits
+    // on the lock until the lock is disposed, which rolls the update back.  The tests of a command that runs wait on
+    // it: a lock wait has no end of its own, where SQL Server ends a WAITFOR early when it runs short of threads, as it
+    // did on the busy runners of CI, and the method then returned its row.
     private sealed class LockOfBob(SqlServerContainer sqlServer) : IAsyncDisposable
     {
         private readonly SqlConnection _connection = EndToEndSources.App(sqlServer);
