@@ -237,6 +237,37 @@ public sealed class CachingCheckTests
             .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
     }
 
+    // The counterpart of Run_ModelSuffixPropertyChanged_ChecksNothing, by an edit of the project's settings file: every
+    // type's needs are found again and are the same, so nothing is checked.  The suffix is in the files' levels, which
+    // the types of each file gather beside its check, for the type override and the column types, so each file's input
+    // of its types is gathered again and comes out equal, where the property left it Cached, and no file is typed
+    // again.
+    [Fact]
+    public void Run_ModelSuffixOfTheProjectsFileChanged_ChecksNothing()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var project = ProjectFile(OutputKind.Models, "postgres");
+        var driver = CreateDriver(project, [_scene.Users, _scene.Orders, _scene.UsersSidecar, _scene.OrdersSidecar])
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+
+        var edited = ProjectFile(
+            OutputKind.Models,
+            "postgres",
+            /*lang=json,strict*/"""{"outputModelSuffix": "Row"}"""
+        );
+        var result = Run(driver.ReplaceAdditionalText(project, edited), compilation);
+
+        AllReasons(result, TrackingNames.TypeNeeds).ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
+        AllReasons(result, TrackingNames.FileNeeds).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.SidecarCheckInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.FileTypesInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
+        AllReasons(result, TrackingNames.FileTypes).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
     // A project at Sql with no sidecar: no query needs an entry, so no check has anything to do and no hash is
     // computed.
     [Fact]

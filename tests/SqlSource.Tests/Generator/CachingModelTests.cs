@@ -589,6 +589,43 @@ public sealed class CachingModelTests
         ModelReasons(result).Count.ShouldBe(3);
     }
 
+    // The counterpart of Run_CollectionTypePropertyChanged_EmitsNoModelAgain, by an edit of the project's settings
+    // file, with the same reasons: no model reads the collection type, so the requests of each type come out equal
+    // and nothing after them runs.
+    [Fact]
+    public void Run_CollectionTypeOfTheProjectsFileChanged_EmitsNoModelAgain()
+    {
+        var compilation = ModelsCompilation();
+        var project = ProjectFile(OutputKind.Models, "postgres");
+        var driver = CreateDriver(
+                project,
+                [
+                    _scene.Users,
+                    _scene.Orders,
+                    _scene.Payments,
+                    TypedSidecar(_scene.Users, "GetUser", "int4"),
+                    TypedSidecar(_scene.Orders, "GetOrder", "int4"),
+                    _scene.PaymentsSidecar,
+                ]
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+
+        var edited = ProjectFile(
+            OutputKind.Models,
+            "postgres",
+            /*lang=json,strict*/"""{"collectionType": "List"}"""
+        );
+        var result = Run(driver.ReplaceAdditionalText(project, edited), compilation);
+
+        AllReasons(result, TrackingNames.TypeModels)
+            .ShouldBe([IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.ModelGroups).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.Models).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.ModelOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        ModelReasons(result).Count.ShouldBe(3);
+    }
+
     // An attribute argument that no model reads: the type is read again, and its requests come out equal.
     [Fact]
     public void Run_AttributeEditedWithoutChangingAModel_EmitsNoModelAgain()

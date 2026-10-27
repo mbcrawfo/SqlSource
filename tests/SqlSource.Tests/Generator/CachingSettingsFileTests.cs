@@ -151,6 +151,40 @@ public sealed class CachingSettingsFileTests
             .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
     }
 
+    // The counterpart of CachingOptionsTests.Run_OptionsReplacedWithoutChangingTheProperty_EmitsNothingAgain: what the
+    // IDE does when a settings file is saved without a change, a new text of the same value.  The file is read again
+    // and gives an equal value, and nothing after it runs: the step named SettingsFile is the one after the filter of
+    // nulls, which reports such a value as taken from the previous run.
+    [Fact]
+    public void Run_SettingsFileReplacedWithTheSameText_EmitsNothingAgain()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = _scene.FirstRunWithSettingsFiles(compilation, _usersSettings, _ordersSettings);
+
+        var again = new InMemoryAdditionalText(
+            _usersSettings.Path,
+            _usersSettings.GetText(TestContext.Current.CancellationToken)!.ToString()
+        );
+        var result = Run(driver.ReplaceAdditionalText(_usersSettings, again), compilation);
+
+        SettingsFileReasons(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_usersSettings.Path] = IncrementalStepRunReason.Cached,
+                    [_ordersSettings.Path] = IncrementalStepRunReason.Cached,
+                    [GeneratorHarness.ProjectSettingsPath] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.SettingsFiles).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.FileParseInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
     // The edit leaves the dialect alone, so no file is parsed again, and the file's new error is reported.
     [Fact]
     public void Run_SettingsFileEditedToAnError_ReportsItWithoutParsing()

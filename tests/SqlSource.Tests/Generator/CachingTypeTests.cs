@@ -178,6 +178,39 @@ public sealed class CachingTypeTests
             .Text.ShouldBe("long");
     }
 
+    // The counterpart of Run_TypeOverridesPropertyChanged_TypesEveryFileAgain, by an edit of the project's settings
+    // file, with the same reasons: each file's map of overrides comes from its level, which the file reaches, so every
+    // file is typed again, and each column of int4 now has the file's type.
+    [Fact]
+    public void Run_TypeOverridesOfTheProjectsFileChanged_TypesEveryFileAgain()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
+        var project = ProjectFileWithTypeOverrides(null);
+        var driver = _scene.FirstRunWithTypes(compilation, project);
+
+        var edited = ProjectFileWithTypeOverrides( /*lang=json,strict*/
+            """{"int4": "long"}"""
+        );
+        var result = Run(driver.ReplaceAdditionalText(project, edited), compilation);
+
+        AllReasons(result, TrackingNames.FileTypesInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Modified,
+                },
+                ignoreOrder: true
+            );
+        TypesOf(result, "app/Orders/Orders.sql")
+            .Queries.ShouldHaveSingleItem()
+            .Columns.ShouldNotBeNull()
+            .ShouldHaveSingleItem()
+            .Text.ShouldBe("long");
+    }
+
     // The probe and the resolution of the settings file's one type run on the new compilation and give equal values,
     // so a project with a type override types no file again either.
     [Fact]
@@ -363,6 +396,62 @@ public sealed class CachingTypeTests
         result.Diagnostics.ShouldBeEmpty();
         ColumnTextOf(result, "app/Users/Users.sql").ShouldBe("global::MyApp.OtherId");
         ColumnTextOf(result, "app/Orders/Orders.sql").ShouldBe("long");
+    }
+
+    // The counterpart of Run_ColumnTypeEdited_RetypesOnlyThatFile, by an edit of the settings file of Users' folder,
+    // with the same reasons: the edit swaps the two types it names, so the mapped types are equal, and Orders, which
+    // the file does not reach, gathers an equal input and is not typed again.
+    [Fact]
+    public void Run_ColumnTypesOfAFolderFileEdited_RetypesOnlyThatFoldersFile()
+    {
+        var compilation = WithIds(GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]));
+        var folder = ColumnTypesFile("MyApp.UserId", "MyApp.OtherId");
+        var driver = CreateDriver(
+                ProjectFileWithTypeOverrides(null),
+                [
+                    _scene.Users,
+                    _scene.Orders,
+                    OriginSidecar(_scene.Users, "GetUser"),
+                    OriginSidecar(_scene.Orders, "GetOrder"),
+                    folder,
+                ]
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+
+        var result = Run(
+            driver.ReplaceAdditionalText(folder, ColumnTypesFile("MyApp.OtherId", "MyApp.UserId")),
+            compilation
+        );
+
+        Reasons<FileTypesInput>(result, TrackingNames.FileTypesInput, input => input.Check.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        result.Diagnostics.ShouldBeEmpty();
+        ColumnTextOf(result, "app/Users/Users.sql").ShouldBe("global::MyApp.OtherId");
+        ColumnTextOf(result, "app/Orders/Orders.sql").ShouldBe("long");
+
+        // The settings file of Users' folder, with these types for users.id and posts.id.
+        static InMemoryAdditionalText ColumnTypesFile(string usersId, string postsId) =>
+            new(
+                "/app/Users/sqlsource.json",
+                "{\"columnTypes\": {\"users.id\": \"" + usersId + "\", \"posts.id\": \"" + postsId + "\"}}"
+            );
     }
 
     // The C# type of a -- column: marker is no part of the hash, so an edit of it checks the sidecar again to an equal

@@ -76,6 +76,65 @@ public sealed class CachingOptionsTests
             .ShouldNotContain("Throw");
     }
 
+    // The counterpart of Run_GeneratorParametersPropertyChanged_EmitsEveryTypeAgainAndParsesNoFile, by an edit of the
+    // project's settings file: it parses no file, emits every type again, and only the one with a method comes out
+    // different.  The parameters are in each file's level of stage two, not in the project's properties, so every
+    // file's level changes, and so does each type's TypeQueries, which holds its files' levels, where the property
+    // changed the project's level alone, which joins at TypeOutput.
+    [Fact]
+    public void Run_GeneratorParametersOfTheProjectsFileChanged_EmitsEveryTypeAgainAndParsesNoFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var users = new InMemoryAdditionalText(
+            _scene.Users.Path,
+            "-- name: GetUser\nSELECT 1;\n-- name: ListFrom\nSELECT * FROM {{table}};\n"
+        );
+        var project = ProjectFile(OutputKind.Sql);
+        var driver = _scene.FirstRun(compilation, users, project);
+
+        var edited = ProjectFile(
+            OutputKind.Sql,
+            settings: /*lang=json,strict*/
+            """{"generatorParameters": ["no-token-validation"]}"""
+        );
+        var result = Run(driver.ReplaceAdditionalText(project, edited), compilation);
+
+        AllReasons(result, TrackingNames.SettingsFile).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Cached]);
+
+        // No file was read.  The set of settings files changed, so every file's input was resolved again from it, and
+        // each came out equal: the parameters are no part of it, and keep-comments, which is, did not change.
+        ParseInputs(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_scene.Users.Path] = IncrementalStepRunReason.Unchanged,
+                    [_scene.Orders.Path] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.FileLevel).ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.TypeQueries)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+
+        // Both types were emitted again.  Only the one with a method came out different.
+        Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Users.UserQueries.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.OrderQueries.g.cs"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        result
+            .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("UserQueries.g.cs", StringComparison.Ordinal))
+            .ToString()
+            .ShouldNotContain("Throw");
+    }
+
     // The class is named again for each type, and each type is emitted again, but no file is read again.  A test of
     // the MSBuild path: the output and the nested class are the project's properties.
     [Fact]
@@ -259,6 +318,36 @@ public sealed class CachingOptionsTests
         result.Diagnostics.ShouldBeEmpty();
     }
 
+    // The counterpart of Run_DialectChangedToOneThatReadsTheFilesTheSameWay_EmitsNothingAgain, by an edit of the
+    // project's settings file.  Every file is parsed again, under the new dialect, and each type's output is worked
+    // out again and comes out equal, so nothing is emitted.
+    [Fact]
+    public void Run_ProjectsFileDialectChangedToOneThatReadsTheFilesTheSameWay_EmitsNothingAgain()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var project = ProjectFile(OutputKind.Sql);
+        var driver = _scene.FirstRun(compilation, _scene.Users, project);
+
+        var result = Run(driver.ReplaceAdditionalText(project, ProjectFile(OutputKind.Sql, "postgres")), compilation);
+
+        AllReasons(result, TrackingNames.SettingsFile).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.FileParseInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.TypeOutput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
+
+        // Two steps that report ran again and reported the same nothing: that of the problems of the files, for files
+        // that are not the ones it had, as under the property, and that of the problems of the settings files, whose
+        // set changed.  The steps that add source did not run.
+        var outputs = OutputReasons(result);
+        outputs.ShouldAllBe(reason =>
+            reason == IncrementalStepRunReason.Cached || reason == IncrementalStepRunReason.Unchanged
+        );
+        outputs.Count(reason => reason == IncrementalStepRunReason.Unchanged).ShouldBe(2);
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
     // Every file is read again.  Orders.sql has no comment to keep, so it gives an equal value: the step named
     // ParsedFile is the one after the read, which reports such a value as taken from the previous run.  A test of the
     // MSBuild path: the output and the parameters are the project's properties.
@@ -278,6 +367,50 @@ public sealed class CachingOptionsTests
             driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(OutputKind.Sql, "keep-comments")),
             compilation
         );
+
+        AllReasons(result, TrackingNames.FileParseInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Users.UserQueries.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.OrderQueries.g.cs"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        result
+            .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("UserQueries.g.cs", StringComparison.Ordinal))
+            .ToString()
+            .ShouldContain("SELECT 1; -- c");
+    }
+
+    // The counterpart of Run_KeepCommentsTurnedOnByTheProperty_ParsesTheFilesAgainAndOnlyThose, by an edit of the
+    // project's settings file, with the same reasons: every file is read again, and Orders.sql, which has no comment
+    // to keep, gives an equal value.
+    [Fact]
+    public void Run_KeepCommentsTurnedOnByTheProjectsFile_ParsesTheFilesAgainAndOnlyThose()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var users = new InMemoryAdditionalText(_scene.Users.Path, "-- name: GetUser\nSELECT 1; -- c\n");
+        var project = ProjectFile(OutputKind.Sql);
+        var driver = _scene.FirstRun(compilation, users, project);
+
+        var edited = ProjectFile(
+            OutputKind.Sql,
+            settings: /*lang=json,strict*/
+            """{"generatorParameters": ["keep-comments"]}"""
+        );
+        var result = Run(driver.ReplaceAdditionalText(project, edited), compilation);
 
         AllReasons(result, TrackingNames.FileParseInput)
             .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
@@ -476,6 +609,43 @@ public sealed class CachingOptionsTests
         );
 
         _scene.ShouldHaveReadOnly(result, _scene.Users, IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
+        Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Users.UserQueries.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.OrderQueries.g.cs"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        result
+            .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("UserQueries.g.cs", StringComparison.Ordinal))
+            .ToString()
+            .ShouldContain("SELECT 1; -- c");
+    }
+
+    // The counterpart of Run_MetadataOfOneFileGainsKeepComments_ParsesOnlyThatFile, by an edit of the settings file of
+    // Users' folder: only Users.sql is read again, and only its type is emitted again.  The set of settings files
+    // changed, so the input of Orders.sql was resolved again from it and came out equal, Unchanged, where a change to
+    // another file's metadata left it Cached.
+    [Fact]
+    public void Run_FolderFileGainsKeepComments_ParsesOnlyThatFoldersFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var users = new InMemoryAdditionalText(_scene.Users.Path, "-- name: GetUser\nSELECT 1; -- c\n");
+        var folder = new InMemoryAdditionalText("/app/Users/sqlsource.json", "{}");
+        var driver = CreateDriver(ProjectFile(OutputKind.Sql), [users, _scene.Orders, folder])
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+
+        var edited = new InMemoryAdditionalText(
+            folder.Path, /*lang=json,strict*/
+            """{"generatorParameters": ["keep-comments"]}"""
+        );
+        var result = Run(driver.ReplaceAdditionalText(folder, edited), compilation);
+
+        _scene.ShouldHaveReadOnly(result, _scene.Users, IncrementalStepRunReason.Unchanged);
         AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
         Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
             .ShouldBe(
