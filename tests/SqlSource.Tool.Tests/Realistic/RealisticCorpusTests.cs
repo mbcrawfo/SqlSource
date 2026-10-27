@@ -35,6 +35,24 @@ public sealed class RealisticCorpusTests
     }
 
     [Fact]
+    public void SettingsFiles_OfEachCorpus_AreTheProjectsAndTheCasesFolders()
+    {
+        RelativeToTheRepository(RealisticCorpus.Postgres.ProjectSettingsFile)
+            .ShouldBe("tests/SqlSource.Tests.Postgres/sqlsource.json");
+        RelativeToTheRepository(RealisticCorpus.Postgres.CasesSettingsFile)
+            .ShouldBe("tests/SqlSource.Tests.Postgres/Realistic/Cases/sqlsource.json");
+        RelativeToTheRepository(RealisticCorpus.SqlServer.ProjectSettingsFile)
+            .ShouldBe("tests/SqlSource.Tests.SqlServer/sqlsource.json");
+        RelativeToTheRepository(RealisticCorpus.SqlServer.CasesSettingsFile)
+            .ShouldBe("tests/SqlSource.Tests.SqlServer/Realistic/Cases/sqlsource.json");
+        foreach (var corpus in new[] { RealisticCorpus.Postgres, RealisticCorpus.SqlServer })
+        {
+            File.Exists(corpus.ProjectSettingsFile).ShouldBeTrue(corpus.ProjectSettingsFile);
+            File.Exists(corpus.CasesSettingsFile).ShouldBeTrue(corpus.CasesSettingsFile);
+        }
+    }
+
+    [Fact]
     public void Engine_OfEachCorpus_HasTheEnginesRecordedMajors()
     {
         RealisticCorpus.Postgres.Engine.Engine.ShouldBe(SidecarValues.Engine.Postgres);

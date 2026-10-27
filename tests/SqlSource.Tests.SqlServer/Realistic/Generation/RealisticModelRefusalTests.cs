@@ -20,23 +20,21 @@ namespace SqlSource.Tests.SqlServer.Realistic.Generation;
 [Collection(UsesSqlServer.Name)]
 public sealed class RealisticModelRefusalTests(SqlServerContainer sqlServer)
 {
-    // Where the generator sees the case's query, beside the class that claims it, as RealisticQueries.cs claims one.
-    private const string QueryPath = "/app/Repo/Cases/query.sql";
+    // Where the generator sees the corpus's settings file and the case's query, in a folder of its own below it, as
+    // Realistic/Cases/<case>/query.sql is below Realistic/Cases/sqlsource.json.
+    private const string CasesSettingsPath = "/app/Repo/Cases/sqlsource.json";
+
+    private const string QueryPath = "/app/Repo/Cases/Case/query.sql";
 
     private const string Source = """
         using SqlSource;
 
         namespace App
         {
-            [SqlSourceGenerate(Path = "Cases/query.sql", Output = GeneratorOutput.Models)]
+            [SqlSourceGenerate(Path = "Cases/Case/query.sql", Output = GeneratorOutput.Models)]
             internal static partial class Refused;
         }
         """;
-
-    // Where the generator sees the settings file of the corpus's folder, beside the case's query.
-    private const string CasesSettingsPath = "/app/Repo/Cases/" + SettingsFileName;
-
-    private const string SettingsFileName = "sqlsource.json";
 
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
@@ -58,17 +56,14 @@ public sealed class RealisticModelRefusalTests(SqlServerContainer sqlServer)
         );
 
         // The repository's own files, as a build of the project gives them to the generator: the project's file is the
-        // harness's, whose keys it takes whole, and the corpus's folder file is beside the query.
+        // harness's, whose keys it takes whole, and the corpus's file is in the folder above the query's.
         var projectSettings = await File.ReadAllTextAsync(
-            Path.Combine(RealisticCases.Corpus.Folder, "..", SettingsFileName),
+            RealisticCases.Corpus.ProjectSettingsFile,
             TestContext.Current.CancellationToken
         );
         var cases = GeneratorHarness.SettingsFile(
             CasesSettingsPath,
-            await File.ReadAllTextAsync(
-                Path.Combine(RealisticCases.Corpus.Cases, SettingsFileName),
-                TestContext.Current.CancellationToken
-            )
+            await File.ReadAllTextAsync(RealisticCases.Corpus.CasesSettingsFile, TestContext.Current.CancellationToken)
         );
         var sidecar = await SidecarOfAsync(found, query);
 
