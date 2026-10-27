@@ -5,8 +5,9 @@ using SqlSource.Settings;
 namespace SqlSource.Generation.Emitting;
 
 /// <summary>
-/// The buffer a method of <see cref="ResultShape.Many" /> reads its rows into when it returns an array or a read-only
-/// interface: a <c>file</c> struct at the end of the file of methods, which rents its arrays from the shared pool.
+/// The buffer a method of <see cref="ResultShape.Many" /> reads its rows into when it returns an array, a list, an
+/// immutable array or one of their interfaces: a <c>file</c> struct at the end of the file of methods, which rents its
+/// arrays from the shared pool.
 /// </summary>
 /// <remarks>
 /// A method names it from <c>global::</c>, so no argument or type of the user's hides it, and only a type of the same
@@ -55,14 +56,47 @@ internal static class RowBuffer
         "        }",
         "",
         "        var result = new T[count];",
+        "        Rows().CopyTo(result);",
+        "        Release();",
+        "        return result;",
+        "    }",
+        "",
+        "    public global::System.Collections.Generic.List<T> ToList()",
+        "    {",
+        "        if (items is null)",
+        "        {",
+        "            return new global::System.Collections.Generic.List<T>();",
+        "        }",
+        "",
+        "        var result = new global::System.Collections.Generic.List<T>(count);",
+        "        global::System.Runtime.InteropServices.CollectionsMarshal.SetCount(result, count);",
+        "        Rows().CopyTo(global::System.Runtime.InteropServices.CollectionsMarshal.AsSpan(result));",
+        "        Release();",
+        "        return result;",
+        "    }",
+        "",
+        "    public global::System.Collections.Immutable.ImmutableArray<T> ToImmutableArray()",
+        "    {",
+        "        if (items is null)",
+        "        {",
+        "            return global::System.Collections.Immutable.ImmutableArray<T>.Empty;",
+        "        }",
+        "",
+        "        return global::System.Runtime.InteropServices.ImmutableCollectionsMarshal.AsImmutableArray("
+            + "ToArray());",
+        "    }",
+        "",
+        "    private global::System.ReadOnlySpan<T> Rows() =>",
         "        global::System.Runtime.InteropServices.MemoryMarshal.CreateReadOnlySpan(",
         "            ref global::System.Runtime.CompilerServices.Unsafe.As<object, T>(",
-        "                ref global::System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(items)),",
-        "            count).CopyTo(result);",
-        "        Return(items);",
+        "                ref global::System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(items!)),",
+        "            count);",
+        "",
+        "    private void Release()",
+        "    {",
+        "        Return(items!);",
         "        items = null;",
         "        count = 0;",
-        "        return result;",
         "    }",
         "",
         "    private void Grow()",
@@ -92,8 +126,9 @@ internal static class RowBuffer
 
     /// <summary>
     /// Whether the method reads its rows into the buffer: a method of <see cref="ResultShape.Many" /> that may use the
-    /// pool and returns an array, <c>IEnumerable&lt;T&gt;</c>, <c>IReadOnlyCollection&lt;T&gt;</c> or
-    /// <c>IReadOnlyList&lt;T&gt;</c>.
+    /// pool and returns an array, <c>IEnumerable&lt;T&gt;</c>, <c>IReadOnlyCollection&lt;T&gt;</c>,
+    /// <c>IReadOnlyList&lt;T&gt;</c>, <c>List&lt;T&gt;</c>, <c>IList&lt;T&gt;</c>, <c>ICollection&lt;T&gt;</c> or
+    /// <c>ImmutableArray&lt;T&gt;</c>: every type but <c>ImmutableList&lt;T&gt;</c> and <c>IImmutableList&lt;T&gt;</c>.
     /// </summary>
     public static bool IsUsedBy(QueryMethod method) =>
         method.Shape == ResultShape.Many
@@ -102,7 +137,11 @@ internal static class RowBuffer
             is CollectionKind.Array
                 or CollectionKind.IEnumerable
                 or CollectionKind.IReadOnlyCollection
-                or CollectionKind.IReadOnlyList;
+                or CollectionKind.IReadOnlyList
+                or CollectionKind.List
+                or CollectionKind.IList
+                or CollectionKind.ICollection
+                or CollectionKind.ImmutableArray;
 
     /// <summary>
     /// The buffer's name in the file of <paramref name="methods" />: <see cref="OtherName" /> when the methods go on a

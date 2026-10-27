@@ -11,9 +11,10 @@ using static SqlSource.Testing.Generator.ModelRuns;
 
 namespace SqlSource.Tests.Generator;
 
-// The buffer a many method reads its rows into when it returns an array or a read-only interface: written once at the
-// end of a file of methods that uses it, at the depth of the namespace, and named from global:: in each method.  Each
-// run is at CodeGen under postgres on Npgsql 10, and every method must compile without a warning.
+// The buffer a many method reads its rows into when it returns an array, a list, an immutable array or one of their
+// interfaces: written once at the end of a file of methods that uses it, at the depth of the namespace, and named from
+// global:: in each method.  Each run is at CodeGen under postgres on Npgsql 10, and every method must compile without
+// a warning.
 public sealed class RowBufferTests
 {
     private const string Struct = "file struct SqlSourceRowBuffer<T>\n";
@@ -23,27 +24,55 @@ public sealed class RowBufferTests
     private static readonly SqlFile ListUsers = new(GeneratorHarness.UsersPath, "-- name: ListUsers\n" + Select);
 
     [Theory]
-    [InlineData("Array")]
-    [InlineData("IEnumerable")]
-    [InlineData("IReadOnlyCollection")]
-    [InlineData("IReadOnlyList")]
-    public void Run_ManyMethodOfEachPooledType_ReadsItsRowsIntoTheBuffer(string collection)
+    [InlineData("Array", "ToArray")]
+    [InlineData("IEnumerable", "ToArray")]
+    [InlineData("IReadOnlyCollection", "ToArray")]
+    [InlineData("IReadOnlyList", "ToArray")]
+    [InlineData("List", "ToList")]
+    [InlineData("IList", "ToList")]
+    [InlineData("ICollection", "ToList")]
+    [InlineData("ImmutableArray", "ToImmutableArray")]
+    public void Run_ManyMethodOfEachPooledType_ReadsItsRowsIntoTheBuffer(string collection, string result)
     {
         var run = RunListUsers("CollectionType = GeneratorCollectionType." + collection);
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldContain("var rows = new global::App.SqlSourceRowBuffer<global::App.ListUsersDto>();\n");
-        methods.ShouldContain("return rows.ToArray();\n");
+        methods.ShouldContain("return rows." + result + "();\n");
         Count(methods, Struct).ShouldBe(1);
     }
 
     [Theory]
-    [InlineData("Array")]
-    [InlineData("IEnumerable")]
-    [InlineData("IReadOnlyCollection")]
-    [InlineData("IReadOnlyList")]
-    public void Run_ManyMethodOfEachPooledTypeUnderNoArrayPool_ReadsItsRowsIntoAList(string collection)
+    [InlineData("Array", "new global::System.Collections.Generic.List<global::App.ListUsersDto>()", "rows.ToArray()")]
+    [InlineData(
+        "IEnumerable",
+        "new global::System.Collections.Generic.List<global::App.ListUsersDto>()",
+        "rows.ToArray()"
+    )]
+    [InlineData(
+        "IReadOnlyCollection",
+        "new global::System.Collections.Generic.List<global::App.ListUsersDto>()",
+        "rows.ToArray()"
+    )]
+    [InlineData(
+        "IReadOnlyList",
+        "new global::System.Collections.Generic.List<global::App.ListUsersDto>()",
+        "rows.ToArray()"
+    )]
+    [InlineData("List", "new global::System.Collections.Generic.List<global::App.ListUsersDto>()", "rows")]
+    [InlineData("IList", "new global::System.Collections.Generic.List<global::App.ListUsersDto>()", "rows")]
+    [InlineData("ICollection", "new global::System.Collections.Generic.List<global::App.ListUsersDto>()", "rows")]
+    [InlineData(
+        "ImmutableArray",
+        "global::System.Collections.Immutable.ImmutableArray.CreateBuilder<global::App.ListUsersDto>()",
+        "rows.DrainToImmutable()"
+    )]
+    public void Run_ManyMethodOfEachPooledTypeUnderNoArrayPool_ReadsItsRowsAsBeforeThePool(
+        string collection,
+        string buffer,
+        string result
+    )
     {
         var run = RunListUsers(
             "CollectionType = GeneratorCollectionType." + collection + ", Parameters = \"no-array-pool\""
@@ -51,9 +80,44 @@ public sealed class RowBufferTests
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain("new global::System.Collections.Generic.List<global::App.ListUsersDto>()");
-        methods.ShouldContain("return rows.ToArray();\n");
+        methods.ShouldContain("var rows = " + buffer + ";\n");
+        methods.ShouldContain("return " + result + ";\n");
         methods.ShouldNotContain("SqlSourceRowBuffer");
+    }
+
+    // One of each pooled type in one file: the struct is written once, and every member of it, ToList and
+    // ToImmutableArray among them, compiles beside a method of each pooled type.
+    [Fact]
+    public void Run_MethodOfEveryPooledType_CompilesWithOneBufferAndNoWarning()
+    {
+        string[] collections =
+        [
+            "Array",
+            "IEnumerable",
+            "IReadOnlyCollection",
+            "IReadOnlyList",
+            "List",
+            "IList",
+            "ICollection",
+            "ImmutableArray",
+        ];
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            string.Join(
+                "\n",
+                collections.Select(collection =>
+                    "-- name: List" + collection + "\n-- collection-type: " + collection + "\n" + Select
+                )
+            )
+        );
+
+        var run = MethodRuns.Run(file, [.. collections.Select(collection => Users(file, "List" + collection))]);
+
+        run.ShouldBeClean();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        Count(methods, Struct).ShouldBe(1);
+        Count(methods, "new global::App.SqlSourceRowBuffer<").ShouldBe(collections.Length);
     }
 
     [Fact]
@@ -85,7 +149,7 @@ public sealed class RowBufferTests
             "-- name: GetUser -> one\n"
                 + Select
                 + "\n-- name: RenameUsers -> rowcount\nUPDATE users SET name = name;\n"
-                + "\n-- name: ListUsers\n-- collection-type: List\n"
+                + "\n-- name: ListUsers\n-- collection-type: ImmutableList\n"
                 + Select
         );
 

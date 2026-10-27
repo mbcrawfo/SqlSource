@@ -278,26 +278,26 @@ public sealed class QueryMethodWriterTests
     [InlineData(
         nameof(CollectionKind.List),
         "global::System.Collections.Generic.List<global::App.GetUserDto>",
-        "List",
-        "rows"
+        "RowBuffer",
+        "rows.ToList()"
     )]
     [InlineData(
         nameof(CollectionKind.IList),
         "global::System.Collections.Generic.IList<global::App.GetUserDto>",
-        "List",
-        "rows"
+        "RowBuffer",
+        "rows.ToList()"
     )]
     [InlineData(
         nameof(CollectionKind.ICollection),
         "global::System.Collections.Generic.ICollection<global::App.GetUserDto>",
-        "List",
-        "rows"
+        "RowBuffer",
+        "rows.ToList()"
     )]
     [InlineData(
         nameof(CollectionKind.ImmutableArray),
         "global::System.Collections.Immutable.ImmutableArray<global::App.GetUserDto>",
-        "ImmutableArray",
-        "rows.DrainToImmutable()"
+        "RowBuffer",
+        "rows.ToImmutableArray()"
     )]
     [InlineData(
         nameof(CollectionKind.ImmutableList),
@@ -350,13 +350,29 @@ public sealed class QueryMethodWriterTests
         );
     }
 
-    // Under no-array-pool the four types the buffer serves read their rows into a list, as before the buffer.
+    // Under no-array-pool the types the buffer serves read their rows as before the buffer.
     [Theory]
-    [InlineData(nameof(CollectionKind.Array))]
-    [InlineData(nameof(CollectionKind.IEnumerable))]
-    [InlineData(nameof(CollectionKind.IReadOnlyCollection))]
-    [InlineData(nameof(CollectionKind.IReadOnlyList))]
-    public void Append_EachPooledCollectionTypeUnderNoArrayPool_BuffersInAList(string collectionName)
+    [InlineData(nameof(CollectionKind.Array), "new global::System.Collections.Generic.List<", "rows.ToArray()")]
+    [InlineData(nameof(CollectionKind.IEnumerable), "new global::System.Collections.Generic.List<", "rows.ToArray()")]
+    [InlineData(
+        nameof(CollectionKind.IReadOnlyCollection),
+        "new global::System.Collections.Generic.List<",
+        "rows.ToArray()"
+    )]
+    [InlineData(nameof(CollectionKind.IReadOnlyList), "new global::System.Collections.Generic.List<", "rows.ToArray()")]
+    [InlineData(nameof(CollectionKind.List), "new global::System.Collections.Generic.List<", "rows")]
+    [InlineData(nameof(CollectionKind.IList), "new global::System.Collections.Generic.List<", "rows")]
+    [InlineData(nameof(CollectionKind.ICollection), "new global::System.Collections.Generic.List<", "rows")]
+    [InlineData(
+        nameof(CollectionKind.ImmutableArray),
+        "global::System.Collections.Immutable.ImmutableArray.CreateBuilder<",
+        "rows.DrainToImmutable()"
+    )]
+    public void Append_EachPooledCollectionTypeUnderNoArrayPool_ReadsItsRowsAsBeforeThePool(
+        string collectionName,
+        string buffer,
+        string result
+    )
     {
         var text = Write(
             GetUser with
@@ -367,10 +383,8 @@ public sealed class QueryMethodWriterTests
             }
         );
 
-        text.ShouldContain(
-            "        var rows = new global::System.Collections.Generic.List<global::App.GetUserDto>();\n"
-        );
-        text.ShouldContain("        return rows.ToArray();\n");
+        text.ShouldContain("        var rows = " + buffer);
+        text.ShouldContain("        return " + result + ";\n");
         text.ShouldNotContain("SqlSourceRowBuffer");
     }
 

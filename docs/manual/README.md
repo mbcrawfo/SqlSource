@@ -54,7 +54,6 @@ SqlSource is in early development.  This table is the one list of what works in 
 | The `Output` setting | Available | [Output](settings.md#setting-output) |
 | The settings for models: model suffixes, namespace, shape and name, and the generator parameters `sort-input`, `sort-output` and `no-table-models` | Available | [All settings](settings.md#all-settings) |
 | The settings for query methods: collection type, `MethodLocation`, and the generator parameters `async-method-suffix` and `no-array-pool` | Available | [All settings](settings.md#all-settings) |
-| Reading the rows of a `List<T>`, `IList<T>`, `ICollection<T>` or `ImmutableArray<T>` through the shared array pool | Coming | [Generator parameters](settings.md#setting-generator-parameters) |
 | `null` or `not null` in a `-- param:` marker | Available | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | Result shapes (`-- name: GetUser -> one`) | Available | [Result shapes](sql-files.md#result-shapes) |
 | Describing queries with the `sqlsource` tool, sidecar files, and `--check` | Available | [The tool](tool.md) |

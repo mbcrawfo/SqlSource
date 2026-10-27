@@ -13,9 +13,9 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // The generator parameter no-array-pool: read at every level a list is, the nearest list replacing the farther ones
-// whole, and carried to the query's method as QueryMethod.UseArrayPool.  A many method that returns an array or a
-// read-only interface reads its rows into a pooled buffer without it and into a list with it; every other method is
-// written the same with it and without it.
+// whole, and carried to the query's method as QueryMethod.UseArrayPool.  A many method that returns an array, a list,
+// an immutable array or one of their interfaces reads its rows into a pooled buffer without it and into a list or a
+// builder with it; every other method is written the same with it and without it.
 public sealed class ArrayPoolParameterTests
 {
     private const string On = "no-array-pool";
@@ -68,10 +68,6 @@ public sealed class ArrayPoolParameterTests
     }
 
     [Theory]
-    [InlineData("ICollection")]
-    [InlineData("IList")]
-    [InlineData("List")]
-    [InlineData("ImmutableArray")]
     [InlineData("ImmutableList")]
     [InlineData("IImmutableList")]
     public void Run_NoArrayPool_LeavesTheGeneratedTextAsItIs(string collection)
@@ -83,17 +79,21 @@ public sealed class ArrayPoolParameterTests
     }
 
     [Theory]
-    [InlineData("Array")]
-    [InlineData("IEnumerable")]
-    [InlineData("IReadOnlyCollection")]
-    [InlineData("IReadOnlyList")]
-    public void Run_NoArrayPool_GivesTodaysTextForThePooledTypes(string collection)
+    [InlineData("Array", "new global::System.Collections.Generic.List<")]
+    [InlineData("IEnumerable", "new global::System.Collections.Generic.List<")]
+    [InlineData("IReadOnlyCollection", "new global::System.Collections.Generic.List<")]
+    [InlineData("IReadOnlyList", "new global::System.Collections.Generic.List<")]
+    [InlineData("List", "new global::System.Collections.Generic.List<")]
+    [InlineData("IList", "new global::System.Collections.Generic.List<")]
+    [InlineData("ICollection", "new global::System.Collections.Generic.List<")]
+    [InlineData("ImmutableArray", "global::System.Collections.Immutable.ImmutableArray.CreateBuilder<")]
+    public void Run_NoArrayPool_GivesTodaysTextForThePooledTypes(string collection, string buffer)
     {
         var (pooled, unpooled) = RunBoth(collection);
 
         var unpooledMethods = unpooled.Sources[MethodRuns.MethodsFile];
         unpooledMethods.ShouldNotBe(pooled.Sources[MethodRuns.MethodsFile]);
-        unpooledMethods.ShouldContain("new global::System.Collections.Generic.List<");
+        unpooledMethods.ShouldContain(buffer);
         unpooledMethods.ShouldNotContain("SqlSourceRowBuffer");
     }
 

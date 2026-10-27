@@ -168,6 +168,170 @@
         }
       ]
     },
+    "NumbersAsList": {
+      "hash": "0028fcfd07c2f3aa15cb6dd63de4891a704e400362f809ded2f9e37fc426a70a",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "n",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "NumbersAsIList": {
+      "hash": "0028fcfd07c2f3aa15cb6dd63de4891a704e400362f809ded2f9e37fc426a70a",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "n",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "NumbersAsICollection": {
+      "hash": "0028fcfd07c2f3aa15cb6dd63de4891a704e400362f809ded2f9e37fc426a70a",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "n",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "NumbersAsImmutableArray": {
+      "hash": "0028fcfd07c2f3aa15cb6dd63de4891a704e400362f809ded2f9e37fc426a70a",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "n",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "NumbersNoPoolAsArray": {
       "hash": "0028fcfd07c2f3aa15cb6dd63de4891a704e400362f809ded2f9e37fc426a70a",
       "engine": "mssql",
@@ -292,6 +456,170 @@
       ]
     },
     "NumbersNoPoolAsIReadOnlyList": {
+      "hash": "0028fcfd07c2f3aa15cb6dd63de4891a704e400362f809ded2f9e37fc426a70a",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "n",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "NumbersNoPoolAsList": {
+      "hash": "0028fcfd07c2f3aa15cb6dd63de4891a704e400362f809ded2f9e37fc426a70a",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "n",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "NumbersNoPoolAsIList": {
+      "hash": "0028fcfd07c2f3aa15cb6dd63de4891a704e400362f809ded2f9e37fc426a70a",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "n",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "NumbersNoPoolAsICollection": {
+      "hash": "0028fcfd07c2f3aa15cb6dd63de4891a704e400362f809ded2f9e37fc426a70a",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
+      "parameters": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": null,
+          "typeSource": "inferred"
+        }
+      ],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "n",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": true,
+          "nullableSource": "server",
+          "origin": null,
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
+    "NumbersNoPoolAsImmutableArray": {
       "hash": "0028fcfd07c2f3aa15cb6dd63de4891a704e400362f809ded2f9e37fc426a70a",
       "engine": "mssql",
       "database": "app",
