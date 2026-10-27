@@ -1,0 +1,10 @@
+{
+  // The queries of billing: sealed class output models, the suffix Row, timestamptz as a DateTime, and their rows in
+  // an IList.
+  "outputModelType": "sealed class",
+  "outputModelSuffix": "Row",
+  "typeOverrides": {
+    "timestamptz": "System.DateTime",
+  },
+  "collectionType": "IList",
+}

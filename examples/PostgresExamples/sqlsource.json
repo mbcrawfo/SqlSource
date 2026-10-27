@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json",
+  // No settings file above this folder applies to the project.
+  "root": true,
+  // The dialect of every query of the project.
+  "dialect": "postgres",
+  "typeOverrides": {
+    // Every timestamptz is a DateTimeOffset, which Dapper reads through UtcDateTimeOffsetHandler.
+    "timestamptz": "System.DateTimeOffset",
+  },
+  "columnTypes": {
+    // order_lines.order_id is an OrderId, by its short name, in every query that reads it.
+    "order_lines.order_id": "OrderId",
+  },
+}

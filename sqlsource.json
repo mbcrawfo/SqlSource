@@ -1,0 +1,6 @@
+{
+  // The end of every search for settings files in this repository.  A settings file above the checkout, such as the
+  // main checkout's when this is a worktree under .claude/worktrees/, would otherwise reach every project here that
+  // has no root file of its own.
+  "root": true,
+}

@@ -42,19 +42,11 @@ public sealed class ManifestTargetTests : IDisposable
 
     public void Dispose() => _fixtures.Dispose();
 
-    // The lines of one file: its File line and the twelve under it, with the values that are not empty.
-    private static string[] FileLines(string path, params (string Name, string Value)[] metadata) =>
-        [
-            "File=" + path,
-            .. Names.Select(name => $"File.{name}=" + metadata.FirstOrDefault(pair => pair.Name == name).Value),
-        ];
+    // The lines of one file with no metadata: its File line and the twelve under it, each empty.
+    private static string[] FileLines(string path) => ["File=" + path, .. Names.Select(name => $"File.{name}=")];
 
-    private static string[] PropertyLines(params (string Name, string Value)[] properties) =>
-        [
-            .. Names
-                .Concat(PropertyOnlyNames)
-                .Select(name => $"Property.{name}=" + properties.FirstOrDefault(pair => pair.Name == name).Value),
-        ];
+    // The line of each setting of a project that sets none, each empty.
+    private static string[] PropertyLines() => [.. Names.Concat(PropertyOnlyNames).Select(name => $"Property.{name}=")];
 
     private static string[] Constants(string[] lines) =>
         lines
@@ -87,9 +79,11 @@ public sealed class ManifestTargetTests : IDisposable
                 "Project=" + project,
                 "TargetFramework=net10.0",
                 "LangVersion=14.0",
-                // Each was written on a line of its own, and is trimmed.
-                .. PropertyLines(("SqlSourceDialect", "postgres")),
-                .. FileLines(Path.Combine(folder, "Queries", "Users.sql"), ("SqlSourceDatabase", "billing")),
+                // The project's settings are in its sqlsource.json and its file's header, so no line of a setting
+                // has a value.
+                .. PropertyLines(),
+                .. FileLines(Path.Combine(folder, "Queries", "Users.sql")),
+                "Settings=" + Path.Combine(folder, "sqlsource.json"),
                 "Compile=" + Path.Combine(folder, "UserRepository.cs"),
             ]);
         lines[4].ShouldStartWith("DefineConstants=");
@@ -189,14 +183,14 @@ public sealed class ManifestTargetTests : IDisposable
     }
 
     [Fact]
-    public async Task WriteManifest_FileAddedByATargetThatHooksTheTrim_IsListedWithTrimmedMetadata()
+    public async Task WriteManifest_FileAddedByATargetThatHooksTheTrim_IsListed()
     {
         var project = _fixtures.Copy("LateFile");
         var folder = Path.GetDirectoryName(project)!;
 
         var lines = await _fixtures.WriteManifestAsync(project);
 
-        var late = FileLines(Path.Combine(folder, "Generated", "Late.sql"), ("SqlSourceDialect", "mssql"));
+        var late = FileLines(Path.Combine(folder, "Generated", "Late.sql"));
         var at = Array.IndexOf(lines, late[0]);
         at.ShouldBeGreaterThan(0);
         lines.Skip(at).Take(late.Length).ShouldBe(late);

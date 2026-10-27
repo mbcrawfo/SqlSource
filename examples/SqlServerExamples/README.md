@@ -25,7 +25,7 @@ dotnet add package Dapper --version 2.1.89
 dotnet add package Microsoft.Data.SqlClient --version 7.1.1
 ```
 
-SqlSource supports Microsoft.Data.SqlClient 6.1 and later: see [which version of Microsoft.Data.SqlClient](../../docs/manual/sqlserver.md#which-sqlclient).  Dapper is for `Sql/` and `Models/` alone: a project that runs every query through its method needs only SqlSource and Microsoft.Data.SqlClient.  The rest of the project file, nullable reference types, the dialect, the type override and the column types, is what your project sets too: see [the settings](../../docs/manual/settings.md#all-settings).  It also keeps [SQLSRC240](../../docs/manual/diagnostics.md#sqlsrc240) a warning, which only this repository needs, so that it builds while its version moves ahead of the committed sidecars.
+SqlSource supports Microsoft.Data.SqlClient 6.1 and later: see [which version of Microsoft.Data.SqlClient](../../docs/manual/sqlserver.md#which-sqlclient).  Dapper is for `Sql/` and `Models/` alone: a project that runs every query through its method needs only SqlSource and Microsoft.Data.SqlClient.  The rest of the project file is nullable reference types, which your project sets too, and the dialect, the type override and the column types are in [`sqlsource.json`](sqlsource.json), which your project keeps beside its project file: see [the settings](../../docs/manual/settings.md#all-settings).  It also keeps [SQLSRC240](../../docs/manual/diagnostics.md#sqlsrc240) a warning, which only this repository needs, so that it builds while its version moves ahead of the committed sidecars.
 
 ## Start the database
 

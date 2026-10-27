@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json",
+  // No settings file above this folder applies to the project.
+  "root": true,
+  // The dialect of every query of the project.
+  "dialect": "mssql",
+  "typeOverrides": {
+    // Every date is a DateOnly, which Dapper reads through DateOnlyHandler.
+    "date": "System.DateOnly",
+  },
+  "columnTypes": {
+    // order_lines.order_id is an OrderId, by its short name, in every query that reads it.
+    "order_lines.order_id": "OrderId",
+  },
+}

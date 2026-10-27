@@ -34,7 +34,7 @@ public sealed class RealisticModelRefusalTests(PostgresContainer postgres)
         }
         """;
 
-    // The metadata that the project gives the corpus's queries.
+    // The settings that Realistic/Cases/sqlsource.json gives the corpus's queries, here as the file's metadata.
     private static readonly IReadOnlyDictionary<string, string> CorpusMetadata = new Dictionary<string, string>
     {
         ["SqlSourceDatabase"] = PostgresContainer.RealisticDatabase,

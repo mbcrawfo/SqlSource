@@ -15,8 +15,8 @@ FIXTURE='tools/package-install'
 PROJECT='Consumer.csproj'
 EXPECTED='expected-output.txt'
 # A .sql file of the project and the member that Program.cs uses from it.
-REMOVED='Queries/ByProperty.sql'
-REMOVED_MEMBER='ByProperty'
+REMOVED='Queries/ByProject.sql'
+REMOVED_MEMBER='ByProject'
 
 if [[ $# -gt 1 ]]; then
     echo 'Usage: check-package-install.sh [directory]' >&2
@@ -114,7 +114,8 @@ fi
 # The sqlsource tool asks a project two things, and the installed package answers both.  SqlSourceImported, which
 # build/SqlSource.props sets, says that the project uses SqlSource: NuGet imported the props, which nothing else in
 # the repository shows.  The target SqlSourceWriteManifest of build/SqlSource.targets writes the project manifest: the
-# tool runs it by name, as here, with a file of its own, and nothing of a build runs before it but the package's trims.
+# tool runs it by name, as here, with a file of its own, and nothing of a build runs before it but the package's own
+# targets that it depends on.
 imported="$(dotnet msbuild "$PROJECT" -nologo -getProperty:SqlSourceImported)"
 if [[ "$imported" != 'true' ]]; then
     echo "check-package-install: a project that references $package does not have SqlSourceImported" >&2
@@ -144,15 +145,10 @@ if ! grep -q '^File=.*/Queries/Users\.sql$' "$manifest"; then
     manifest_fails 'does not list Queries/Users.sql'
 fi
 
-# The project writes this dialect over two lines, and Directory.Build.targets the property over four.  The lines
-# under a File line are the metadata of that file.
-if ! grep -A 10 '^File=.*/Queries/ByOption\.sql$' "$manifest" |
-    grep -qx 'File.SqlSourceDialect=mysql, no-backslash-escapes'; then
-    manifest_fails 'does not hold the trimmed dialect of Queries/ByOption.sql'
-fi
-
-if ! grep -qx 'Property.SqlSourceGeneratorParameters=sort-input no-token-validation' "$manifest"; then
-    manifest_fails 'does not hold the trimmed property of Directory.Build.targets'
+# The settings file of the project, by the physical path of the copy, which is how MSBuild gives it.
+settings="$(pwd -P)/sqlsource.json"
+if ! grep -qxF "Settings=$settings" "$manifest"; then
+    manifest_fails "does not hold Settings=$settings"
 fi
 
 # Directory.Build.targets adds this file from a hook of the build, which a target that is run by name does not run.
@@ -172,7 +168,7 @@ if dotnet build "$PROJECT" --nologo --verbosity quiet >"$work/rebuild.log" 2>&1;
     exit 1
 fi
 
-# No quotes around the member: the compiler writes them as its language does, "ByProperty" in German.
+# No quotes around the member: the compiler writes them as its language does, "ByProject" in German.
 if ! grep -q "error CS0117: .*$REMOVED_MEMBER" "$work/rebuild.log"; then
     cat "$work/rebuild.log" >&2
     echo "check-package-install: the build after $REMOVED was removed failed without reporting $REMOVED_MEMBER" >&2
@@ -189,7 +185,6 @@ cat >"$web/Web.csproj" <<EOF
 <Project Sdk="Microsoft.NET.Sdk.Web">
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
-        <SqlSourceDialect>postgres</SqlSourceDialect>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="$PACKAGE_ID" Version="$version" PrivateAssets="all" />

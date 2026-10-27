@@ -488,9 +488,8 @@ public sealed partial class BuildFileTests
             .Except(["AdditionalFiles", "CustomAdditionalCompileInputs", "FileWrites"])
             .ShouldAllBe(name => name.StartsWith(Prefix, StringComparison.Ordinal));
 
-    // SqlSource.Tests.csproj writes its dialect on a line of its own and its generator parameters one on each line,
-    // and tools/package-install sets the parameters that way in Directory.Build.targets, so the end-to-end tests and
-    // the check of the installed package show the trimming at work; this pins that each property has it.
+    // The compiler reads one line of a value, so a property written over several lines reaches it only trimmed.  This
+    // pins that SqlSourceTrimProperties trims every property of the package, and only those, with no condition.
     [Fact]
     public void Targets_EveryPropertyOfThePackage_IsTrimmed()
     {

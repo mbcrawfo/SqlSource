@@ -49,9 +49,10 @@ public sealed class MethodShapeTests
     public void ReturnType_OfEachCollectionType_IsThatType(string method, Type rows) =>
         ReturnTypeOf(typeof(CollectionQueriesExtensions), method).ShouldBe(rows);
 
-    // The most specific place that gives a collection type wins: a marker inside a query over the property and over
-    // the attribute, the attribute over the property, and the item metadata over the property.  The file header is
-    // left out: Shapes.sql gives its marker inside one query, so that its other queries take the attribute's.
+    // The most specific place that gives a collection type wins: a marker inside a query over the settings files and
+    // over the attribute, the attribute over the settings files, and the folder's settings file over the project's.
+    // The file header is left out: Shapes.sql gives its marker inside one query, so that its other queries take the
+    // attribute's.
     [Fact]
     public void ReturnType_OfEachLevel_IsThatLevels()
     {

@@ -1,10 +1,11 @@
 -- The queries of the notes, claimed by NoteQueries.  The schema's enum and domains are read as C# types of the project:
 -- the enum as a C# enum that the data source maps, and each domain through the converters of its type.  The ids of the
--- accounts are AccountIds, read and sent through its converters: accounts.id by the file's column types in the
--- project, and notes.account_id by the header's -- column: marker.
+-- accounts are AccountIds, read and sent through its converters: accounts.id and notes.account_id by the header's
+-- -- column: markers.
 -- type-override: public.note_kind = SqlSource.Tests.Postgres.EndToEnd.Types.NoteKind
 -- type-override: public.email = SqlSource.Tests.Postgres.EndToEnd.Types.Email
 -- type-override: public.note_ref = SqlSource.Tests.Postgres.EndToEnd.Types.NoteRef
+-- column: accounts.id -> AccountId
 -- column: notes.account_id -> AccountId
 
 -- name: ListAccountNotes

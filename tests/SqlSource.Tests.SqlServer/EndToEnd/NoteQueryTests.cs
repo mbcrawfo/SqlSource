@@ -53,9 +53,9 @@ public sealed class NoteQueryTests(SqlServerContainer sqlServer)
         ]);
     }
 
-    // dbo.accounts.id is an AccountId by the file's column types in the project, and dbo.notes.account_id one by the
-    // header's -- column: marker, nullable on the optional side of the join: each is read from the int that SqlClient
-    // gives, through FromDatabase, and carol's NULL is read as null, never given to it.
+    // dbo.accounts.id and dbo.notes.account_id are AccountIds by the header's -- column: markers, dbo.notes.account_id
+    // nullable on the optional side of the join: each is read from the int that SqlClient gives, through FromDatabase,
+    // and carol's NULL is read as null, never given to it.
     [Fact]
     public async Task ListAccountNotes_EveryRow_ReadsTheIdsAsAccountIds()
     {

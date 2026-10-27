@@ -53,7 +53,7 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
 
         var rows = await connection.ListAllTypes(cancellationToken: token);
 
-        rows.Length.ShouldBe(2);
+        rows.Count.ShouldBe(2);
         AllTypesRows.ShouldBeTheFullRow(rows[0]);
         AllTypesRows.ShouldBeTheNullRow(rows[1]);
     }
@@ -68,7 +68,7 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
         var seeded = await connection.ListAllTypes(transaction, cancellationToken: token);
 
         var full = await connection.InsertEveryType(
-            AllTypesRows.ArgsFrom<InsertEveryTypeParams>(
+            AllTypesRows.ArgsFrom<InsertEveryTypeArgs>(
                 seeded.Single(static row => row.Id == AllTypesRows.FullRowId),
                 FullRowCopyId
             ),
@@ -76,7 +76,7 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
             cancellationToken: token
         );
         var nulls = await connection.InsertEveryType(
-            AllTypesRows.ArgsFrom<InsertEveryTypeParams>(
+            AllTypesRows.ArgsFrom<InsertEveryTypeArgs>(
                 seeded.Single(static row => row.Id == AllTypesRows.NullRowId),
                 NullRowCopyId
             ),
@@ -88,14 +88,14 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
 
         AllTypesRows.ShouldBeTheFullRow(full.ShouldHaveSingleItem(), FullRowCopyId);
         AllTypesRows.ShouldBeTheNullRow(nulls.ShouldHaveSingleItem(), NullRowCopyId);
-        read.Length.ShouldBe(4);
+        read.Count.ShouldBe(4);
         AllTypesRows.ShouldBeTheFullRow(read.Single(static row => row.Id == FullRowCopyId), FullRowCopyId);
         AllTypesRows.ShouldBeTheNullRow(read.Single(static row => row.Id == NullRowCopyId), NullRowCopyId);
     }
 
     // The method of the query that the end-to-end project's Dapper write runs, whose parameters are not nullable, so
     // that each is bound as a value of its type and never as null.  The columns it does not write are the properties of
-    // AllTypesDto that InsertAllTypesParams lacks, found by reflection, since this project has no list of its own.
+    // AllTypesDto that InsertAllTypesArgs lacks, found by reflection, since this project has no list of its own.
     [Fact]
     public async Task InsertAllTypes_FullRow_ReturnsTheValuesWritten()
     {
@@ -108,13 +108,13 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
         );
 
         var rows = await connection.InsertAllTypes(
-            AllTypesRows.ArgsFrom<InsertAllTypesParams>(full, FullRowCopyId),
+            AllTypesRows.ArgsFrom<InsertAllTypesArgs>(full, FullRowCopyId),
             transaction,
             cancellationToken: token
         );
         await transaction.RollbackAsync(token);
 
-        var written = typeof(InsertAllTypesParams).GetProperties().Select(static property => property.Name);
+        var written = typeof(InsertAllTypesArgs).GetProperties().Select(static property => property.Name);
         var notWritten = typeof(AllTypesDto)
             .GetProperties()
             .Select(static property => property.Name)

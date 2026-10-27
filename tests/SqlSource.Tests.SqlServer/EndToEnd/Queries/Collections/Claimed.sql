@@ -1,4 +1,4 @@
--- The query of the collection types of the attribute and of the project's property, claimed by a class of
+-- The query of the collection types of the attribute and of the project's settings file, claimed by a class of
 -- CollectionQueries.cs for each: it says none of its own.
 
 -- name: ListCollectedAccounts

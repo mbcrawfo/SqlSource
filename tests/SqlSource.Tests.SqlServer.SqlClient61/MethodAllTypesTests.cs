@@ -27,7 +27,7 @@ public sealed class MethodAllTypesTests(AppContainer app)
 
         var rows = await connection.ListAllTypes(cancellationToken: TestContext.Current.CancellationToken);
 
-        rows.Length.ShouldBe(2);
+        rows.Count.ShouldBe(2);
         SqlServerAllTypesRows.ShouldBeTheFullRow(rows[0]);
         SqlServerAllTypesRows.ShouldBeTheNullRow(rows[1]);
     }
@@ -43,7 +43,7 @@ public sealed class MethodAllTypesTests(AppContainer app)
                 );
 
                 var written = await connection.WriteAllTypes(
-                    SqlServerAllTypesRows.ArgsOf<WriteAllTypesParams>(InsertedId, full),
+                    SqlServerAllTypesRows.ArgsOf<WriteAllTypesArgs>(InsertedId, full),
                     transaction: transaction,
                     cancellationToken: token
                 );
@@ -60,7 +60,7 @@ public sealed class MethodAllTypesTests(AppContainer app)
             async (connection, transaction) =>
             {
                 var written = await connection.WriteAllTypes(
-                    SqlServerAllTypesRows.ArgsOf<WriteAllTypesParams>(InsertedId, row: null),
+                    SqlServerAllTypesRows.ArgsOf<WriteAllTypesArgs>(InsertedId, row: null),
                     transaction: transaction,
                     cancellationToken: TestContext.Current.CancellationToken
                 );
@@ -77,7 +77,7 @@ public sealed class MethodAllTypesTests(AppContainer app)
         var full = (await connection.ListAllTypes(cancellationToken: token))[0];
 
         var found = await connection.FindByRowversion(
-            new FindByRowversionParams(full.RowversionValue.ShouldNotBeNull()),
+            new FindByRowversionArgs(full.RowversionValue.ShouldNotBeNull()),
             cancellationToken: token
         );
 
@@ -90,7 +90,7 @@ public sealed class MethodAllTypesTests(AppContainer app)
         await using var connection = new SqlConnection(app.ConnectionString);
 
         var levels = await connection.ListTinyintLevels(
-            new ListTinyintLevelsParams(Level.High),
+            new ListTinyintLevelsArgs(Level.High),
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -104,7 +104,7 @@ public sealed class MethodAllTypesTests(AppContainer app)
 
         var rows = await connection.ListNewTypes(cancellationToken: TestContext.Current.CancellationToken);
 
-        rows.Length.ShouldBe(2);
+        rows.Count.ShouldBe(2);
         SqlServerAllTypesRows.ShouldBeTheFullNewTypesRow(rows[0]);
         SqlServerAllTypesRows.ShouldBeTheNullNewTypesRow(rows[1]);
     }
@@ -115,7 +115,7 @@ public sealed class MethodAllTypesTests(AppContainer app)
             async (connection, transaction) =>
             {
                 var written = await connection.WriteNewTypes(
-                    new WriteNewTypesParams(
+                    new WriteNewTypesArgs(
                         InsertedId,
                         /*lang=json,strict*/
                         """{"name":"Zoë","tags":["a","b"]}""",
@@ -135,7 +135,7 @@ public sealed class MethodAllTypesTests(AppContainer app)
             async (connection, transaction) =>
             {
                 var written = await connection.WriteNewTypes(
-                    new WriteNewTypesParams(InsertedId, null, null),
+                    new WriteNewTypesArgs(InsertedId, null, null),
                     transaction: transaction,
                     cancellationToken: TestContext.Current.CancellationToken
                 );
@@ -150,7 +150,7 @@ public sealed class MethodAllTypesTests(AppContainer app)
         await using var connection = new SqlConnection(app.ConnectionString);
 
         var row = await connection.GetNewType(
-            new GetNewTypeParams(SqlServerAllTypesRows.FullRowId),
+            new GetNewTypeArgs(SqlServerAllTypesRows.FullRowId),
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -165,7 +165,7 @@ public sealed class MethodAllTypesTests(AppContainer app)
 
         var thrown = await Should.ThrowAsync<InvalidCastException>(() =>
             connection.GetNewType(
-                new GetNewTypeParams(SqlServerAllTypesRows.NullRowId),
+                new GetNewTypeArgs(SqlServerAllTypesRows.NullRowId),
                 cancellationToken: TestContext.Current.CancellationToken
             )
         );
