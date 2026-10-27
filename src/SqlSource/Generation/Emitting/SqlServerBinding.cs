@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Methods;
-using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.Maps;
 using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Emitting;

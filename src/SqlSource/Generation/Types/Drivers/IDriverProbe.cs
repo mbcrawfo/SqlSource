@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.Drivers;
 
 /// <summary>
 /// One diagnostic that a probe finds in the project's reference to a driver: the descriptor, and the one argument its

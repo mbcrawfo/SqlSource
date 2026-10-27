@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
-using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.Drivers;
 using SqlSource.Parsing;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;

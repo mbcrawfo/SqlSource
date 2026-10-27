@@ -1,4 +1,4 @@
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.Drivers;
 
 /// <summary>The column of the SQL Server base map that a project's Microsoft.Data.SqlClient chooses.</summary>
 internal enum SqlClientColumn

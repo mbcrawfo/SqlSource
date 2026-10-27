@@ -7,6 +7,7 @@ using SqlSource.Diagnostics;
 using SqlSource.Generation.Converters;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.Maps;
 using SqlSource.Settings;
 using Xunit;
 

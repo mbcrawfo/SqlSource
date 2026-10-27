@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.CodeAnalysis;
 
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.MappedTypes;
 
 /// <summary>
 /// Finds the types that a short name can mean: the types of that name and arity, in any namespace and nested in no

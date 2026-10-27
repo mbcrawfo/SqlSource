@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Converters;
-using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.MappedTypes;
 using SqlSource.Testing.Generator;
 using Xunit;
 using static SqlSource.Testing.Generator.CachingScene;

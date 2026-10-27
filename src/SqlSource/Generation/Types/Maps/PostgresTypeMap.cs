@@ -2,10 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using SqlSource.Generation.Types.Drivers;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.Maps;
 
 /// <summary>The type override's answer for <paramref name="type" />, or null when it names none.</summary>
 internal delegate TypeMapping? PostgresOverrideOf(PostgresType type);

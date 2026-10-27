@@ -6,7 +6,7 @@ using System.Text;
 using Shouldly;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
-using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.Maps;
 using SqlSource.Settings;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;

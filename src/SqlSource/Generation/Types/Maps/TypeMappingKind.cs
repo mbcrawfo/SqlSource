@@ -1,4 +1,4 @@
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.Maps;
 
 /// <summary>Whether a database type has a C# type, and if not, why.</summary>
 internal enum TypeMappingKind

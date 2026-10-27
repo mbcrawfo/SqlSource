@@ -1,4 +1,4 @@
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.MappedTypes;
 
 /// <summary>
 /// A C# type that the type override, the column types or a <c>-- param:</c> or <c>-- column:</c> marker names, as the

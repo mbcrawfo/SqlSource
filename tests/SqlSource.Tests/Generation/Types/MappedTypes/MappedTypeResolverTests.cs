@@ -6,12 +6,12 @@ using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Converters;
-using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.MappedTypes;
 using SqlSource.Testing.Generator;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
 
-namespace SqlSource.Tests.Generation.Types;
+namespace SqlSource.Tests.Generation.Types.MappedTypes;
 
 public sealed class MappedTypeResolverTests
 {

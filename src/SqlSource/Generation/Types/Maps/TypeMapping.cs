@@ -1,4 +1,4 @@
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.Maps;
 
 /// <summary>The C# type of a database type, or the reason it has none.</summary>
 /// <param name="Kind">Whether the type has a C# type, and if not, why.</param>

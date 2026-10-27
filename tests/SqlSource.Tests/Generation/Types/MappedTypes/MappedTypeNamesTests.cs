@@ -1,7 +1,7 @@
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Paths;
-using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.MappedTypes;
 using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
@@ -10,7 +10,7 @@ using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using Xunit;
 
-namespace SqlSource.Tests.Generation.Types;
+namespace SqlSource.Tests.Generation.Types.MappedTypes;
 
 public sealed class MappedTypeNamesTests
 {

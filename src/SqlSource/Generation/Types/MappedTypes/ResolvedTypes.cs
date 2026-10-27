@@ -1,6 +1,6 @@
 using SqlSource.Generation.Converters;
 
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.MappedTypes;
 
 /// <summary>
 /// The C# types that the type override, the column types and the markers name, as the compilation resolves them, and

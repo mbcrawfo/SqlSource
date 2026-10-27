@@ -1,5 +1,7 @@
 using SqlSource.Generation.Paths;
 using SqlSource.Generation.Sidecars;
+using SqlSource.Generation.Types.Drivers;
+using SqlSource.Generation.Types.MappedTypes;
 using SqlSource.Settings;
 
 namespace SqlSource.Generation.Types;

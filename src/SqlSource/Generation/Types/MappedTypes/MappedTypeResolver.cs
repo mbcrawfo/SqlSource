@@ -10,7 +10,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Converters;
 using SqlSource.Settings.ClrTypes;
 
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.MappedTypes;
 
 /// <summary>
 /// Resolves the C# types that the type override, the column types and the markers name against the compilation, and

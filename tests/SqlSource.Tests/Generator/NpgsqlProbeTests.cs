@@ -7,6 +7,7 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.Drivers;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;

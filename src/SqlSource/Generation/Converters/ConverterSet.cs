@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using SqlSource.Diagnostics;
-using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.Maps;
 
 namespace SqlSource.Generation.Converters;
 

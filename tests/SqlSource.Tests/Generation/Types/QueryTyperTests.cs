@@ -6,6 +6,8 @@ using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Sidecars;
 using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.Drivers;
+using SqlSource.Generation.Types.MappedTypes;
 using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;

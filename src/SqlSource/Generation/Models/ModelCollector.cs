@@ -7,7 +7,7 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
-using SqlSource.Generation.Types;
+using SqlSource.Generation.Types.Maps;
 
 namespace SqlSource.Generation.Models;
 

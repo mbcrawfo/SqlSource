@@ -1,4 +1,4 @@
-namespace SqlSource.Generation.Types;
+namespace SqlSource.Generation.Types.MappedTypes;
 
 /// <summary>
 /// Whether a C# type that the type override, the column types or a marker names is found, and if not, why.  Of two
