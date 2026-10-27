@@ -2,7 +2,7 @@ namespace SqlSource.Settings;
 
 /// <summary>
 /// Where a type's generated methods go.  The generator's own form of <c>MethodLocation</c>, member for member.  It
-/// is set by the attribute alone, as <c>SqlLocation</c> is: it has no MSBuild property, no metadata and no marker.
+/// is set by the attribute alone, as <c>SqlLocation</c> is: it has no key of a settings file and no marker.
 /// </summary>
 internal enum MethodPlacement
 {

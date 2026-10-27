@@ -229,28 +229,17 @@ public sealed class SqlFileReaderTests
     }
 
     [Fact]
-    public void Read_InvalidDialectOfTheFile_IsCarriedAndTheFileIsStillParsed()
-    {
-        var file = Read("SELECT 1;\n", invalidDialect: "pgsql");
-
-        file.InvalidDialect.ShouldBe("pgsql");
-        file.Queries.Count.ShouldBe(1);
-        Read("SELECT 1;\n").InvalidDialect.ShouldBeNull();
-    }
-
-    [Fact]
-    public void Read_FileParseInput_ReadsTheFileWithItsDialectAndCarriesItsInvalidValue()
+    public void Read_FileParseInput_ReadsTheFileWithItsDialect()
     {
         var text = new InMemoryAdditionalText(GeneratorHarness.UsersPath, "SELECT 1 # c\n");
 
         var file = SqlFileReader.Read(
-            new FileParseInput(text, GeneratorHarness.UsersNormalizedPath, SqlDialect.MySql, "nope", false),
+            new FileParseInput(text, GeneratorHarness.UsersNormalizedPath, SqlDialect.MySql, false),
             TestContext.Current.CancellationToken
         );
 
         file.NormalizedPath.ShouldBe(GeneratorHarness.UsersNormalizedPath);
         file.Queries.ShouldHaveSingleItem().Segments.ShouldBe(TestModels.Array(TestModels.Literal("SELECT 1")));
-        file.InvalidDialect.ShouldBe("nope");
     }
 
     [Fact]
@@ -259,7 +248,7 @@ public sealed class SqlFileReaderTests
         var text = new InMemoryAdditionalText(GeneratorHarness.UsersPath, "SELECT 1; -- c\n");
 
         var file = SqlFileReader.Read(
-            new FileParseInput(text, GeneratorHarness.UsersNormalizedPath, SqlDialect.Ansi, null, true),
+            new FileParseInput(text, GeneratorHarness.UsersNormalizedPath, SqlDialect.Ansi, true),
             TestContext.Current.CancellationToken
         );
 
@@ -271,14 +260,12 @@ public sealed class SqlFileReaderTests
         string? text,
         string path = GeneratorHarness.UsersPath,
         SqlDialect dialect = SqlDialect.Ansi,
-        string? invalidDialect = null,
         bool commentsWanted = false
     ) =>
         SqlFileReader.Read(
             new InMemoryAdditionalText(path, text),
-            SqlPath.Normalize(path)!,
+            SqlPath.Normalize(path),
             dialect,
-            invalidDialect,
             commentsWanted,
             TestContext.Current.CancellationToken
         );

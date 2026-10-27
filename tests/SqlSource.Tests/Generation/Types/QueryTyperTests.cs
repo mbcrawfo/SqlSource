@@ -385,12 +385,12 @@ public sealed class QueryTyperTests
             columns: columns?.Select((type, at) => TestSidecars.Column(at, "c" + at, type)).ToArray()
         );
 
-    // The file Users of the dialect with the one query GetUser and its entry, under the property's level, Npgsql 10
-    // and the SqlClient given, SqlClient 6.1 unless it is.
+    // The file Users of the dialect with the one query GetUser and its entry, under the file's level, Npgsql 10 and the
+    // SqlClient given, SqlClient 6.1 unless it is.
     private static FileTypesInput InputOf(
         SqlDialect dialect,
         SidecarEntry entry,
-        SettingsLevel property,
+        SettingsLevel level,
         SqlClientProbe? sqlClient = null
     )
     {
@@ -398,7 +398,6 @@ public sealed class QueryTyperTests
             new InMemoryAdditionalText(GeneratorHarness.UsersPath, SqlTexts.GetUser),
             GeneratorHarness.UsersNormalizedPath,
             dialect,
-            null,
             false,
             TestContext.Current.CancellationToken
         );
@@ -406,8 +405,7 @@ public sealed class QueryTyperTests
         return new FileTypesInput(
             new SidecarCheckResult(file.NormalizedPath, EquatableArray<DiagnosticInfo>.Empty, TestSidecars.Of(entry)),
             file,
-            SettingsLevel.None,
-            property,
+            level,
             new NpgsqlProbe(true, true, true, new Version(10, 0)),
             sqlClient ?? SqlClient61,
             TestSidecars.Of(Found(Email, false), Found(Version, false), Found(Guid, true), Found("long", true))

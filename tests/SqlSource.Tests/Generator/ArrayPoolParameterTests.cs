@@ -1,6 +1,5 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
-using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Methods;
@@ -118,32 +117,6 @@ public sealed class ArrayPoolParameterTests
         unpooled.ShouldBeClean();
         Method(unpooled).UseArrayPool.ShouldBeFalse();
         unpooled.Sources[MethodRuns.MethodsFile].ShouldBe(pooled.Sources[MethodRuns.MethodsFile]);
-    }
-
-    // A test of the MSBuild path: the output, the dialect and the parameters are the project's properties.
-    [Fact]
-    public void Run_PropertyWithAMisspeltWordBesideNoArrayPool_IsAnErrorAndNoArrayPoolApplies()
-    {
-        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListUsers\nSELECT id, name FROM users;\n");
-
-        var run = GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
-            [file, Sidecars.Of(file, Entries(file, hasRows: true))],
-            references: [NpgsqlReferences.Npgsql10],
-            properties: new Dictionary<string, string?>
-            {
-                ["SqlSourceOutput"] = "CodeGen",
-                ["SqlSourceDialect"] = "postgres",
-                ["SqlSourceGeneratorParameters"] = "no-arraypool no-array-pool",
-            }
-        );
-
-        run.Diagnostics.ShouldBe([
-            "SQLSRC014 (1,1)-(1,1): 'no-arraypool' is not a valid value of SqlSourceGeneratorParameters",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        Method(run).UseArrayPool.ShouldBeFalse();
     }
 
     [Fact]

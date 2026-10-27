@@ -48,10 +48,6 @@ public sealed class TypeOverrideLevelTests
 
     private const string DateTimeOffset = "global::System.DateTimeOffset";
 
-    private const string ThePropertyPlace = "the property SqlSourceTypeOverrides";
-
-    private const string TheMetadataPlace = "the metadata SqlSourceTypeOverrides of the file";
-
     private const string TheProjectFilePlace =
         "the typeOverrides of the settings file " + GeneratorHarness.ProjectSettingsPath;
 
@@ -217,21 +213,6 @@ public sealed class TypeOverrideLevelTests
                     DateTimeBase
                 ),
             ]);
-    }
-
-    // A test of the MSBuild path: the value is the property or the file's metadata.
-    [Theory]
-    [InlineData(true, ThePropertyPlace)]
-    [InlineData(false, TheMetadataPlace)]
-    public void Run_KeyTwiceInOneMSBuildValue_TheLastWins(bool property, string place)
-    {
-        const string Value = "int4=long int4=short";
-        var file = OnMSBuild(new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser), property ? null : Value);
-
-        var run = RunOnMSBuild(property ? Value : null, (file, [Entry(file, "GetUser", Int4)]));
-
-        run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("short", true, true, NoWarnings, "int4", place, IntBase)]);
     }
 
     // An entry for an array is written with its element's key and [], or with its name in the catalog, which is read
@@ -746,32 +727,6 @@ public sealed class TypeOverrideLevelTests
         ]);
     }
 
-    // The quotes let the key name a schema and a type that a plain key cannot, and the MSBuild value splits after
-    // them.  A test of the MSBuild path: the value is the property or the file's metadata.
-    [Theory]
-    [InlineData(true, ThePropertyPlace)]
-    [InlineData(false, TheMetadataPlace)]
-    public void Run_QuotedSchemaAndNameInAnMSBuildValue_MapsTheTypeAndSplitsAfterThem(bool property, string place)
-    {
-        const string Value = QuotedKey + "=System.Guid int4=long";
-        var file = OnMSBuild(
-            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"),
-            property ? null : Value
-        );
-
-        var run = RunOnMSBuild(
-            property ? Value : null,
-            (file, [Entry(file, "GetUser", Composite("my schema", "order-status"), Int4)])
-        );
-
-        run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser")
-            .ShouldBe([
-                new PropertyType("global::System.Guid", true, true, NoWarnings, QuotedKey, place, NoBase),
-                new PropertyType("long", true, true, NoWarnings, "int4", place, IntBase),
-            ]);
-    }
-
     // The quotes let a marker's key name a schema and a type that a plain key cannot.
     [Theory]
     [InlineData(SettingLevel.Header, TheHeaderPlace)]
@@ -981,31 +936,6 @@ public sealed class TypeOverrideLevelTests
             [files[0], Sidecars.Of(files[0], entries), .. files.Skip(1)],
             settings: settings.ProjectSettings
         );
-
-    // The files with their sidecars at Models under postgres, each setting the MSBuild way: the output, the dialect and
-    // the type override, or none, are the project's properties, for a test of the MSBuild path.
-    private static GeneratorRun RunOnMSBuild(string? property, params (SqlFile File, SidecarEntry[] Entries)[] files) =>
-        GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, Source)],
-            [.. files.SelectMany(file => new[] { file.File, Sidecars.Of(file.File, file.Entries) })],
-            references: [NpgsqlReferences.Npgsql10],
-            properties: new Dictionary<string, string?>
-            {
-                ["SqlSourceOutput"] = "Models",
-                ["SqlSourceDialect"] = "postgres",
-                ["SqlSourceTypeOverrides"] = property,
-            }
-        );
-
-    // The file with the type override as its metadata, or the file unchanged when it is null.
-    private static SqlFile OnMSBuild(SqlFile file, string? metadata) =>
-        metadata is null
-            ? file
-            : file with
-            {
-                Metadata = new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = metadata },
-            };
 
     // The entry of the key as its level writes it: in a settings file a JSON object of the one entry, and in a marker
     // with spaces around =.

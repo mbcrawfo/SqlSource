@@ -1,7 +1,7 @@
 namespace SqlSource.Generation;
 
 /// <summary>
-/// A type as <see cref="TargetTypeReader" /> reads it, before the project's properties join.
+/// A type as <see cref="TargetTypeReader" /> reads it, before the settings files join.
 /// </summary>
 /// <param name="Type">The type.</param>
 /// <param name="TakenNames">

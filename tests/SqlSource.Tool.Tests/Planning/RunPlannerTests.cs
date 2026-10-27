@@ -204,6 +204,20 @@ public sealed class RunPlannerTests : IDisposable
         Plans.Result(project).Plan.Files.ShouldHaveSingleItem().Path.ShouldBe(first);
     }
 
+    // The project lists the path twice by one spelling: one file, planned once, with its one query.
+    [Fact]
+    public void Plan_PathListedTwiceByOneSpelling_IsPlannedOnce()
+    {
+        var project = Postgres();
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
+        var path = project.AddSql("Q.sql", "-- name: Q\nSELECT 1;\n");
+        project.ListSql(path);
+
+        var file = Plans.Result(project).Plan.Files.ShouldHaveSingleItem();
+        file.Path.ShouldBe(path);
+        file.Queries.ShouldHaveSingleItem().Query.Name.ShouldBe("Q");
+    }
+
     [Fact]
     public void Plan_SeveralProjects_HasTheFilesOfEachInTheOrderOfTheProjects()
     {

@@ -1,30 +1,17 @@
-using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
-using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Testing.Generator;
 
 // What MSBuild tells a generator, as the compiler hands it over: the project's properties, and the metadata of each
-// .sql file by the file's path, for the tests of the MSBuild path.  A null value is a project that does not set the
-// property, and a path that is not listed is a file without metadata.  A property or a metadata is named as MSBuild
-// names it: SqlSourceOutput.  GeneratorHarness writes a run's output, dialect and generator parameters into the
-// project's settings file instead, and gives a provider only the test's properties and each file's dialect and
-// metadata.
+// .sql file by the file's path.  A null value is a project that does not set the property, and a path that is not
+// listed is a file without metadata.  A property or a metadata is named as MSBuild names it: SqlSourceBuildFolders.
 //
-// The output is the project's SqlSourceOutput, and every test that builds a provider states it: a null output is a
-// project that does not set it, for a test that needs that, of the default, of the output's levels or of a reader.
-// An entry of the same name in the properties wins.
-//
-// The keys and the values of the output are spelled out here, not taken from the generator, so that a change to the
-// generator's spelling fails a test.
+// The generator reads SqlSourceBuildFolders alone, a property of the build and no setting.  The metadata, and any other
+// property, are for a test that the generator reads none of the settings that MSBuild once gave.
 internal sealed class TestOptionsProvider(
-    OutputKind? output,
-    string? generatorParameters,
-    string? dialect = null,
-    IReadOnlyDictionary<string, string>? fileDialects = null,
     IReadOnlyDictionary<string, string?>? properties = null,
     IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? fileMetadata = null
 ) : AnalyzerConfigOptionsProvider
@@ -35,43 +22,29 @@ internal sealed class TestOptionsProvider(
 
     private static readonly Options None = new([]);
 
-    public override AnalyzerConfigOptions GlobalOptions { get; } =
-        CreateGlobal(output, generatorParameters, dialect, properties);
+    public override AnalyzerConfigOptions GlobalOptions { get; } = CreateGlobal(properties);
 
     public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => None;
 
     public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
     {
+        if (fileMetadata is null || !fileMetadata.TryGetValue(textFile.Path, out var metadata))
+        {
+            return None;
+        }
+
         var values = new Dictionary<string, string?>();
-        if (fileDialects is not null && fileDialects.TryGetValue(textFile.Path, out var fileDialect))
+        foreach (var pair in metadata)
         {
-            values[MetadataPrefix + "SqlSourceDialect"] = fileDialect;
+            values[MetadataPrefix + pair.Key] = pair.Value;
         }
 
-        if (fileMetadata is not null && fileMetadata.TryGetValue(textFile.Path, out var metadata))
-        {
-            foreach (var pair in metadata)
-            {
-                values[MetadataPrefix + pair.Key] = pair.Value;
-            }
-        }
-
-        return values.Count == 0 ? None : new Options(values);
+        return new Options(values);
     }
 
-    private static Options CreateGlobal(
-        OutputKind? output,
-        string? generatorParameters,
-        string? dialect,
-        IReadOnlyDictionary<string, string?>? properties
-    )
+    private static Options CreateGlobal(IReadOnlyDictionary<string, string?>? properties)
     {
-        var values = new Dictionary<string, string?>
-        {
-            [PropertyPrefix + "SqlSourceGeneratorParameters"] = generatorParameters,
-            [PropertyPrefix + "SqlSourceDialect"] = dialect,
-            [PropertyPrefix + "SqlSourceOutput"] = Spell(output),
-        };
+        var values = new Dictionary<string, string?>();
         foreach (var pair in properties ?? new Dictionary<string, string?>())
         {
             values[PropertyPrefix + pair.Key] = pair.Value;
@@ -79,16 +52,6 @@ internal sealed class TestOptionsProvider(
 
         return new Options(values);
     }
-
-    private static string? Spell(OutputKind? output) =>
-        output switch
-        {
-            OutputKind.Sql => "Sql",
-            OutputKind.Models => "Models",
-            OutputKind.CodeGen => "CodeGen",
-            null => null,
-            _ => throw new ArgumentOutOfRangeException(nameof(output), output, null),
-        };
 
     private sealed class Options(Dictionary<string, string?> values) : AnalyzerConfigOptions
     {

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using SqlSource.Generation.MSBuild;
 using SqlSource.Settings;
 using SqlSource.Settings.TypeOverrides;
 
@@ -14,24 +13,19 @@ namespace SqlSource.Generation.Types;
 internal static class MappedTypeNames
 {
     /// <summary>
-    /// The distinct types of every entry of the property, of each file's level and of the markers of every query, and
-    /// of each query's parameters and result's columns, in ordinal order.  A file's level is the chain of its folder
-    /// over its metadata.  An entry of <c>default</c> names none.
+    /// The distinct types of every entry of each file's level and of the markers of every query, and of each query's
+    /// parameters and result's columns, in ordinal order.  A file's level is the chain of its folder.  An entry of
+    /// <c>default</c> names none.
     /// </summary>
     /// <remarks>
     /// A query's markers are over its file header's, so the header's entries are read through its queries.  The files
-    /// of a folder without metadata share their chain's level, and are sorted by path, so a level read for the file
-    /// before is not read again.  A list of the names alone, which an edit that leaves them as they were gives again,
+    /// of a folder share their chain's level, and are sorted by path, so a level read for the file before is not read
+    /// again.  A list of the names alone, which an edit that leaves them as they were gives again,
     /// equal.
     /// </remarks>
-    public static EquatableArray<string> Collect(
-        ProjectSettings project,
-        EquatableArray<FileLevel> files,
-        EquatableArray<ParsedSqlFile> parsed
-    )
+    public static EquatableArray<string> Collect(EquatableArray<FileLevel> files, EquatableArray<ParsedSqlFile> parsed)
     {
         var names = new SortedSet<string>(StringComparer.Ordinal);
-        Add(names, project.Level);
         SettingsLevel? previous = null;
         for (var i = 0; i < files.Count; i++)
         {
@@ -70,7 +64,7 @@ internal static class MappedTypeNames
         return names.Count == 0 ? EquatableArray<string>.Empty : new EquatableArray<string>(names.ToImmutableArray());
     }
 
-    // The types of both engines' entries: an entry of an MSBuild value is in each, and names its type once in the set.
+    // The types of both engines' entries: an entry of a settings file is in each, and names its type once in the set.
     private static void Add(SortedSet<string> names, SettingsLevel level)
     {
         Add(names, level.TypeOverrides);

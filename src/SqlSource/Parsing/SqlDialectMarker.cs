@@ -47,8 +47,8 @@ internal static class SqlDialectMarker
 
     /// <summary>
     /// Reads the value of a <c>-- dialect:</c> marker: the rest of its line, as <see cref="SqlDialectName" /> reads
-    /// the MSBuild property.  False for a value that is empty or is not a dialect with its options.  Nothing is
-    /// allocated.
+    /// the <c>dialect</c> of a settings file.  False for a value that is empty or is not a dialect with its options.
+    /// Nothing is allocated.
     /// </summary>
     public static bool TryRead(string text, SqlMarker marker, out SqlDialectChoice dialect) =>
         SqlDialectName.TryParse(text.AsSpan(marker.ValueSpan.Start, marker.ValueSpan.Length), out dialect);

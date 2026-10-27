@@ -3,8 +3,8 @@ using System;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// Reads the values of settings.  A marker, an MSBuild property and the metadata of an item all read through here,
-/// so that one setting has one set of values wherever it is written.
+/// Reads the values of settings.  A marker, the attribute and a settings file all read through here, so that one
+/// setting has one set of values wherever it is written.
 /// </summary>
 internal static class SettingValue
 {

@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using SqlSource.Diagnostics;
-using SqlSource.Generation.MSBuild;
 using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
@@ -215,8 +214,8 @@ internal static class QueryTyper
     private static string ColumnTypePlaceOf(SettingPlace place) =>
         place.Kind switch
         {
-            SettingPlaceKind.Property => "the property " + MSBuildSettings.ColumnTypesName,
-            SettingPlaceKind.Metadata => "the metadata " + MSBuildSettings.ColumnTypesName + " of the file",
+            SettingPlaceKind.Property => "the property SqlSourceColumnTypes",
+            SettingPlaceKind.Metadata => "the metadata SqlSourceColumnTypes of the file",
             SettingPlaceKind.FileHeader => "a -- column: marker in the file header",
             SettingPlaceKind.Query => QueryColumnMarker,
             SettingPlaceKind.SettingsFile => "the columnTypes of the settings file " + place.Path,
@@ -633,10 +632,10 @@ internal static class QueryTyper
             }
         }
 
-        var map = QuerySettings.ResolveTypeOverrides(markers, input.Level, input.Property, engine);
+        var map = QuerySettings.ResolveTypeOverrides(markers, input.Level, engine);
         var made = new LevelTypes(
             map.Count > 0 ? new OverrideLookup(map, input.MappedTypes, engine) : null,
-            QuerySettings.ResolveColumnTypes(markers, input.Level, input.Property)
+            QuerySettings.ResolveColumnTypes(markers, input.Level)
         );
         levels.Add((markers, made));
         return made;
@@ -761,8 +760,8 @@ internal static class QueryTyper
         private static string PlaceOf(SettingPlace place) =>
             place.Kind switch
             {
-                SettingPlaceKind.Property => "the property " + MSBuildSettings.TypeOverridesName,
-                SettingPlaceKind.Metadata => "the metadata " + MSBuildSettings.TypeOverridesName + " of the file",
+                SettingPlaceKind.Property => "the property SqlSourceTypeOverrides",
+                SettingPlaceKind.Metadata => "the metadata SqlSourceTypeOverrides of the file",
                 SettingPlaceKind.FileHeader => "a -- type-override: marker in the file header",
                 SettingPlaceKind.Query => "a -- type-override: marker of the query",
                 SettingPlaceKind.SettingsFile => "the typeOverrides of the settings file " + place.Path,

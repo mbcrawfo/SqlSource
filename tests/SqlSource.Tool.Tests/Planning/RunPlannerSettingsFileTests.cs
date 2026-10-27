@@ -329,7 +329,16 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
         var result = Plans.Result(project);
 
         result
-            .Errors.Select(error => (error.Descriptor.Id, error.Path))
-            .ShouldBe([("SQLSRC208", other), ("SQLSRC016", upper), ("SQLSRC016", lower)]);
+            .Errors.Select(Reported.Of)
+            .ShouldBe([
+                new Reported(
+                    "SQLSRC208",
+                    other,
+                    new LinePosition(0, "[SqlSource.SqlSourceGenerate(Path = ".Length),
+                    "'Path' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here"
+                ),
+                new Reported("SQLSRC016", upper, new LinePosition(0, 1), "'upper' is not a key of a settings file"),
+                new Reported("SQLSRC016", lower, new LinePosition(0, 1), "'lower' is not a key of a settings file"),
+            ]);
     }
 }

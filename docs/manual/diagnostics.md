@@ -15,10 +15,8 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC007](#sqlsrc007) | Type has a member named like its nested class |
 | [SQLSRC008](#sqlsrc008) | Query name is used in two files |
 | [SQLSRC009](#sqlsrc009) | Query is named like its containing type |
-| [SQLSRC011](#sqlsrc011) | SqlSourceDialect is not valid |
 | [SQLSRC012](#sqlsrc012) | Language version is not supported |
 | [SQLSRC013](#sqlsrc013) | SQL file paths differ only by case |
-| [SQLSRC014](#sqlsrc014) | MSBuild setting is not valid |
 
 **Settings files**
 
@@ -202,7 +200,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC279](#sqlsrc279) | Converters do not convert from the database type |
 | [SQLSRC280](#sqlsrc280) | Converter is missing for one direction |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 120 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides` or `columnTypes`, is the build's alone.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 120 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides` or `columnTypes`, is the build's alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
@@ -350,33 +348,6 @@ Rename the query.  A query whose output is `codegen` has a method in place of th
 
 See: [Where the members go](generator.md#locations)
 
-## SQLSRC011
-
-**SqlSourceDialect is not valid**
-
-`SqlSourceDialect` says which database a project's SQL is written for, so that SqlSource finds its comments and strings by that database's rules.  It is set as an MSBuild property for the project, or as metadata on the `AdditionalFiles` item of a `.sql` file, and one of the two has a value that is not a dialect.  The message quotes the value.
-
-The names are `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` and `oracle`, in any case.  `sqlserver` and `tsql` also mean `mssql`, `postgresql` also means `postgres`, and `cockroach` also means `cockroachdb`.
-
-After `mysql` or `mariadb` the value may name options, each after a comma, as in `mysql,ansi-quotes`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  An option that does not exist, an option after any other dialect, and a comma with nothing before it or after it each make the whole value wrong.
-
-```xml
-<PropertyGroup>
-    <SqlSourceDialect>pgsql</SqlSourceDialect>
-</PropertyGroup>
-<ItemGroup>
-    <AdditionalFiles Update="Reporting/**/*.sql" SqlSourceDialect="sql server" />
-</ItemGroup>
-```
-
-The error has no file and line, because the compiler does not tell a generator where a property or the metadata of an item was set: look in the project file, in `Directory.Build.props`, and at a `-p:` argument of the build command.  It is reported once for each wrong value, however many files have it.  A wrong property is always reported; wrong metadata is reported only for a `.sql` file that a type uses.
-
-Correct the name, or remove the setting to get the default, `ansi`.  While a value is wrong the files it covers are read as `ansi`; a file whose own metadata is wrong does not fall back to the project's property.
-
-The compiler hands a generator only the part of a value before the first `;` or `#`, as for [SQLSRC014](#sqlsrc014).
-
-See: [Dialect](settings.md#setting-dialect)
-
 ## SQLSRC012
 
 **Language version is not supported**
@@ -415,43 +386,6 @@ Write `Update` in place of `Include` to change the item the package adds, and sp
 The error is reported only for a `.sql` file that a type uses.
 
 See: [Path](settings.md#setting-path)
-
-## SQLSRC014
-
-**MSBuild setting is not valid**
-
-An MSBuild property of SqlSource, or the metadata of that name on an `AdditionalFiles` item, has a value it does not take.  The message names the setting and the value.  The error has no file and line, because the compiler does not tell a generator where a property or the metadata of an item was set: look in the project file, in `Directory.Build.props` and `Directory.Build.targets`, and at a `-p:` argument of the build command.
-
-```xml
-<PropertyGroup>
-    <SqlSourceGeneratorParameters>keep-coments</SqlSourceGeneratorParameters>
-</PropertyGroup>
-```
-
-Correct the value, or remove it to keep the default.  While it is wrong the setting is not set.  In a list of generator parameters the other words still apply, with one exception: `default` beside another parameter makes the whole list wrong, so `default no-token-validation` is reported whole and sets no list.  The same value in several places is reported once, and the metadata of a file that no type claims is not reported.
-
-`SqlSourceOutput` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `SqlSourceInputModelType` and `SqlSourceOutputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `SqlSourceCollectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`, all matched in the same way.  `SqlSourceInputModelSuffix` and `SqlSourceOutputModelSuffix` take characters that can be part of an identifier, `SqlSourceModelNamespace` takes a namespace such as `App.Models`, and `SqlSourceNestedClass` takes one identifier that is not a keyword.  `SqlSourceDatabase` takes one word of letters, digits, `-`, `_` and `.`.  The generator does not read it, so a build does not report it; the `sqlsource` tool does.  Where a type's methods go is set by the attribute alone, so there is no property for it.
-
-`SqlSourceTypeOverrides` takes entries `key=type`, separated by spaces or line breaks, and each entry that is not valid is reported on its own, while the others still apply.  A space or a line break inside `<>`, `[]` or the double quotes of a key is part of the entry, so a `<`, a `[` or a quote that is never closed makes the rest of the value one entry, which is reported whole, and the entries after it do not apply:
-
-```xml
-<PropertyGroup>
-    <SqlSourceTypeOverrides>timestamp with time zone=DateTimeOffset user_status=MyApp.UserStatus int4=int?</SqlSourceTypeOverrides>
-</PropertyGroup>
-```
-
-- **No space around `=`.**  A space separates entries, so `numeric = double` is three entries, and `timestamp with time zone=...` is four.
-- **The key is a type's one-word name**, `timestamptz` and not `timestamp with time zone`, `float8` and not `double precision`; every built-in type has one.  A type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`: a name without one must be a type SqlSource knows, so `user_status` and the misspelling `timestampz` are reported.  A value serves PostgreSQL and SQL Server alike, so a name of either one's types, `int4` or `nvarchar`, is not reported.  A schema or a name may be in double quotes, `"my schema"."order-status"`, which must close: `"my schema.status=MyApp.Status` is reported with the rest of the value.  A part may also be in `U&"..."` with escapes, its `&` written `&amp;` in a project file, and an escape that is not valid makes the entry not valid.
-- **A key is not written in brackets.**  `[dbo].[Email]=MyApp.Email` is reported, and the message shows the forms that are read: `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
-- **The C# type is a keyword, a full name or a short name**, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end: `int4=int` and not `int4=int?`.  Write a generic's `<` and `>` as `&lt;` and `&gt;` in the project file.
-
-The rules are in [type overrides](settings.md#setting-type-overrides).
-
-`SqlSourceColumnTypes` takes entries `key=type` by the same rules of spaces, `<>`, `[]` and quotes, and each entry that is not valid is reported on its own, while the others still apply.  Its key is the column a value is read from, `table.column` or `schema.table.column`, each part plain or in double quotes, so `id=MyApp.UserId`, of one part, is reported, and so are a key of four parts, a key in brackets and a key with `[]`.  Its C# type is read as a type override's is, or is `default`.  The rules are in [column types](settings.md#setting-column-types).
-
-The compiler hands a generator only the part of a value before the first `;` or `#`.
-
-See: [A value that is wrong](settings.md#a-value-that-is-wrong)
 
 ## SQLSRC015
 
@@ -551,7 +485,7 @@ A value of a settings file is of the JSON type its key takes, but its setting do
 
 Correct the value, or remove it.  While it is wrong the setting is not set by this file, so a farther settings file or the default applies.  In `generatorParameters`, `typeOverrides` and `columnTypes` each element or member that is not valid is reported on its own, and the others still apply, with one exception: `default` beside another generator parameter makes the whole list not set, and each `default` is reported.  For a key that takes a string, a value that is empty or white space sets nothing and is not an error, and such an element of `generatorParameters` is skipped; a member of `typeOverrides` or `columnTypes` whose key or type is empty or white space is reported.
 
-`dialect` takes a dialect's name, `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` or `oracle`, in any case, by the names and with the options of [SQLSRC011](#sqlsrc011), as in `"mysql,ansi-quotes"`.
+`dialect` takes a dialect's name, `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` or `oracle`, in any case.  `sqlserver` and `tsql` also mean `mssql`, `postgresql` also means `postgres`, and `cockroach` also means `cockroachdb`.  After `mysql` or `mariadb` the value may name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  An option that does not exist, an option after any other dialect, and a comma with nothing before it or after it each make the whole value wrong.
 
 `output` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `inputModelType` and `outputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `collectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`, all matched in the same way.  `inputModelSuffix` and `outputModelSuffix` take characters that can be part of an identifier, `modelNamespace` takes a namespace such as `App.Models`, and `nestedClass` takes one identifier that is not a keyword.  `database` takes one word of letters, digits, `-`, `_` and `.`.
 
@@ -748,7 +682,7 @@ A generator parameter has a value it does not take; what follows a name in a `--
 
 - No generator parameter takes a value: `keep-comments=1` is this error.
 - What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
-- `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of [SQLSRC011](#sqlsrc011).  The value is the rest of the line, so nothing else may follow it.
+- `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of a settings file's `dialect`, in [SQLSRC019](#sqlsrc019).  The value is the rest of the line, so nothing else may follow it.
 
 ```sql error
 -- generator: keep-comments=true

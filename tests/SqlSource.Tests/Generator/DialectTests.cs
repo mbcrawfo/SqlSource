@@ -1,6 +1,5 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
-using System.Collections.Generic;
 using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Testing.Generator;
@@ -10,13 +9,8 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // Which dialect a file is read by: the -- dialect: marker at the top of the file decides, then the chain's settings
-// files, nearest first, then on the MSBuild path the SqlSourceDialect metadata of the file's item and then the
-// project's SqlSourceDialect property, and without any of them it is ANSI.  The project's settings file is the
-// harness's dialect, and a folder's file is the sqlsource.json of the .sql file's folder.
-//
-// The tests of what only MSBuild reads, an empty value, a value over several lines, SQLSRC011 and the metadata of a
-// file that no type claims, give their output and dialect as the project's properties and write no settings file,
-// which would rank above them.
+// files, nearest first, and without any of them it is ANSI.  The project's settings file is the harness's dialect, and
+// a folder's file is the sqlsource.json of the .sql file's folder.
 public sealed class DialectTests
 {
     // Three dialects read this line three ways.  ANSI: the # is SQL and the two dashes start a comment.  MySQL: the #
@@ -28,10 +22,6 @@ public sealed class DialectTests
     private const string MySql = "SELECT 1";
 
     private const string SqlServer = "SELECT 1 # x [y--z]";
-
-    private const string Invalid =
-        "' is not a SQL dialect.  SqlSourceDialect accepts ansi, mssql, postgres, cockroachdb, mysql, mariadb, "
-        + "sqlite and oracle.";
 
     // Valid only where a backslash does not escape.  Under plain MySQL the string is never closed.
     private const string PathQuery = "SELECT 'C:\\temp\\' AS p;\n";
@@ -62,24 +52,6 @@ public sealed class DialectTests
     )
     {
         var run = Run(projectFile, Files(QueryPath, Query, marker, folderFile));
-
-        run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + expected + "\";");
-    }
-
-    // Only what MSBuild gives can be empty, which is none, or written over several lines, which are trimmed.
-    [Theory]
-    [InlineData(null, "", Ansi)]
-    [InlineData("", null, Ansi)]
-    [InlineData("", "mysql", MySql)]
-    [InlineData(null, "\n    MySQL\n  ", MySql)]
-    public void Run_MSBuildValueThatIsEmptyOrOverLines_IsNoneOrTheDialectItNames(
-        string? metadata,
-        string? property,
-        string expected
-    )
-    {
-        var run = RunOnMSBuild(property, new SqlFile(QueryPath, Query, metadata));
 
         run.ShouldBeClean();
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + expected + "\";");
@@ -131,15 +103,6 @@ public sealed class DialectTests
         run.ShouldBeClean();
     }
 
-    // A property can be written over several lines, as the server spells the value.
-    [Fact]
-    public void Run_OptionOfADialectInAPropertyOverLines_IsRead()
-    {
-        var run = RunOnMSBuild("\n    MySQL,\n    NO_BACKSLASH_ESCAPES\n  ", new SqlFile(QueryPath, PathQuery));
-
-        run.ShouldBeClean();
-    }
-
     // The value that wins names no option, so the file is read without one: options are not merged.
     [Theory]
     [InlineData("mysql", null, "mysql,no-backslash-escapes")]
@@ -154,18 +117,6 @@ public sealed class DialectTests
         var run = Run(projectFile, Files(QueryPath, PathQuery, marker, folderFile));
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC101 ");
-    }
-
-    [Theory]
-    [InlineData("postgres,ansi-quotes")]
-    [InlineData("mysql,")]
-    [InlineData("mysql,ansi")]
-    public void Run_PropertyWithAnOptionThatIsNotValid_IsAnErrorThatQuotesTheWholeValue(string property)
-    {
-        var run = RunOnMSBuild(property, new SqlFile("/app/Repo/Q.sql", Query));
-
-        run.Diagnostics.ShouldBe(["SQLSRC011 (1,1)-(1,1): '" + property + Invalid]);
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + Ansi + "\";");
     }
 
     [Fact]
@@ -196,106 +147,6 @@ public sealed class DialectTests
         }
     }
 
-    [Theory]
-    [InlineData("pgsql")]
-    [InlineData("sql server")]
-    [InlineData(" Postgres 16 ")]
-    public void Run_PropertyThatIsNotADialect_IsAnErrorWithoutAPositionAndTheFilesAreReadAsAnsi(string property)
-    {
-        var run = RunOnMSBuild(property, new SqlFile("/app/Repo/Q.sql", Query));
-
-        run.Diagnostics.ShouldBe(["SQLSRC011 (1,1)-(1,1): '" + property + Invalid]);
-
-        // The members are still there, so the build reports this error and not one for each use of a query.
-        run.CompilationErrors.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + Ansi + "\";");
-    }
-
-    [Fact]
-    public void Run_MetadataThatIsNotADialect_IsReportedOnceForEachValueAndTheFileIsReadAsAnsi()
-    {
-        var run = RunOnMSBuild(
-            "mysql",
-            new SqlFile("/app/Repo/A.sql", Query, "zeta"),
-            new SqlFile("/app/Repo/B.sql", Query, "alpha"),
-            new SqlFile("/app/Repo/C.sql", Query, "zeta"),
-            new SqlFile("/app/Repo/D.sql", Query)
-        );
-
-        // In ordinal order, whatever the order of the files.
-        run.Diagnostics.ShouldBe(["SQLSRC011 (1,1)-(1,1): 'alpha" + Invalid, "SQLSRC011 (1,1)-(1,1): 'zeta" + Invalid]);
-        run.CompilationErrors.ShouldBeEmpty();
-
-        // Not the project's dialect: the file said something, and what it said is wrong.
-        var source = run.Sources["App.Sample.g.cs"];
-        source.ShouldContain("public const string A = \"" + Ansi + "\";");
-        source.ShouldContain("public const string D = \"" + MySql + "\";");
-    }
-
-    [Fact]
-    public void Run_SameInvalidValueInThePropertyAndInMetadata_IsReportedOnce()
-    {
-        var run = RunOnMSBuild("nope", new SqlFile("/app/Repo/Q.sql", Query, "nope"));
-
-        run.Diagnostics.ShouldBe(["SQLSRC011 (1,1)-(1,1): 'nope" + Invalid]);
-    }
-
-    [Fact]
-    public void Run_InvalidMetadataOfAFileThatNoTypeClaims_IsNotReported()
-    {
-        var run = RunOnMSBuild(
-            null,
-            new SqlFile("/app/Repo/Q.sql", Query),
-            new SqlFile("/app/Migrations/001_init.sql", "SELECT 'x;\n", "nope")
-        );
-
-        run.Diagnostics.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Run_InvalidMetadataOfAFileWithAMarker_IsStillReportedAndTheMarkerIsUsed()
-    {
-        var run = RunOnMSBuild(null, new SqlFile("/app/Repo/Q.sql", "-- dialect: mysql\n" + Query, "nope"));
-
-        run.Diagnostics.ShouldBe(["SQLSRC011 (1,1)-(1,1): 'nope" + Invalid]);
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + MySql + "\";");
-    }
-
-    [Fact]
-    public void Run_InvalidPropertyInAProjectWithoutAnAttributedType_IsStillAnError()
-    {
-        var run = GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, "public class Sample;")],
-            [],
-            properties: new Dictionary<string, string?> { ["SqlSourceOutput"] = "Sql", ["SqlSourceDialect"] = "nope" }
-        );
-
-        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC011 ");
-        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs"]);
-    }
-
-    // The two settings of the project are read apart: a value of one is never taken for the other.
-    [Fact]
-    public void Run_BothPropertiesInvalid_ReportsEachUnderItsOwnId()
-    {
-        var run = GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
-            [new SqlFile("/app/Repo/Q.sql", Query)],
-            properties: new Dictionary<string, string?>
-            {
-                ["SqlSourceOutput"] = "Sql",
-                ["SqlSourceGeneratorParameters"] = "mysql",
-                ["SqlSourceDialect"] = "false",
-            }
-        );
-
-        run.Diagnostics.Count.ShouldBe(2);
-        run.Diagnostics.ShouldContain(diagnostic => diagnostic.StartsWith("SQLSRC014 (1,1)-(1,1): '"));
-        run.Diagnostics.ShouldContain("SQLSRC011 (1,1)-(1,1): 'false" + Invalid);
-    }
-
     // The files at sql under the project's file of the dialect, or of none when it is null.
     private static GeneratorRun Run(string? projectFile, params SqlFile[] files) =>
         GeneratorHarness.Run(
@@ -303,16 +154,6 @@ public sealed class DialectTests
             [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
             files,
             dialect: projectFile
-        );
-
-    // The files with the output sql and the dialect, null for none, as the project's properties, for a test of the
-    // MSBuild path.
-    private static GeneratorRun RunOnMSBuild(string? property, params SqlFile[] files) =>
-        GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
-            files,
-            properties: new Dictionary<string, string?> { ["SqlSourceOutput"] = "Sql", ["SqlSourceDialect"] = property }
         );
 
     // The .sql file at the path, under its marker of the dialect when one is given, and then the settings file of its

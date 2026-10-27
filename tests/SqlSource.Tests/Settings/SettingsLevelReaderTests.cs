@@ -184,7 +184,7 @@ public sealed class SettingsLevelReaderTests
         source.Invalids.ShouldBeEmpty();
     }
 
-    // Each entry that is not valid is SQLSRC014's value, as written, and the others apply.
+    // Each entry that is not valid is recorded, as written, and the others apply.
     [Fact]
     public void Read_ColumnTypeThatIsNotValid_IsRecordedAndTheOthersApply()
     {

@@ -625,8 +625,8 @@ public sealed partial class BuildFileTests
     }
 
     // MSBuild puts metadata into an expression as text, before it reads the expression.  A value with a quote in it
-    // would end a quoted argument early, and the whole expression would reach the compiler as the value: SQLSRC011
-    // would then quote the expression and not what the project says.
+    // would end a quoted argument early, and the whole expression would reach the compiler as the value, in place of
+    // what the project says.
     [Fact]
     public void Targets_ItemMetadata_IsNeverTheArgumentOfAPropertyFunction() =>
         Values(Targets).ShouldAllBe(value => !MetadataInAPropertyFunction().IsMatch(value));

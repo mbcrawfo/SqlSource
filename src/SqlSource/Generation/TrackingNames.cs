@@ -35,10 +35,6 @@ internal static class TrackingNames
 
     public const string CommentPaths = nameof(CommentPaths);
 
-    public const string ProjectDialect = nameof(ProjectDialect);
-
-    public const string ProjectSettings = nameof(ProjectSettings);
-
     public const string FileParseInput = nameof(FileParseInput);
 
     public const string FileClaim = nameof(FileClaim);
@@ -46,10 +42,6 @@ internal static class TrackingNames
     public const string ParsedFile = nameof(ParsedFile);
 
     public const string ParsedFiles = nameof(ParsedFiles);
-
-    public const string FileSettings = nameof(FileSettings);
-
-    public const string FilesSettings = nameof(FilesSettings);
 
     public const string FileLevel = nameof(FileLevel);
 

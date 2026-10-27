@@ -22,8 +22,8 @@ internal static class SqlFileParser
     /// a directory; it names the block of a file that has no <c>-- name:</c> marker.  <paramref name="dialect" /> is
     /// the dialect, with its options, that the project gives the file.  A <c>-- dialect:</c> marker in the file's
     /// header replaces it whole for the text after the marker.  <paramref name="commentsWanted" /> says that a level
-    /// the parser cannot see, a property, the metadata of the file's item or the attribute of a type that claims the
-    /// file, may ask for <c>keep-comments</c>: the SQL of a query with no list of its own is then built with its
+    /// the parser cannot see, the chain of the file's folder or the attribute of a type that claims the file, may ask
+    /// for <c>keep-comments</c>: the SQL of a query with no list of its own is then built with its
     /// comments too.
     /// </summary>
     public static SqlFileParseResult Parse(

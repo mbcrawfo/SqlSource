@@ -29,7 +29,7 @@ public sealed class ToolDiagnosticTests
     [Fact]
     public void AtFile_Arguments_IsAtThePathAndQuotesOnlyWhatItWasGiven()
     {
-        var diagnostic = ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, "/work/App.csproj", "nosuch");
+        var diagnostic = ToolDiagnostic.AtFile(SqlDiagnostics.SettingsFileNotAnObject, "/work/App.csproj", "nosuch");
 
         diagnostic.Path.ShouldBe("/work/App.csproj");
         diagnostic.Position.ShouldBeNull();

@@ -5,7 +5,6 @@ using System.Threading;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Chains;
-using SqlSource.Generation.MSBuild;
 using SqlSource.Generation.Paths;
 using SqlSource.Parsing;
 using SqlSource.Settings;
@@ -111,7 +110,7 @@ internal static class RunPlanner
                     path,
                     text,
                     chain,
-                    FileLevel.Resolve(NoMetadata(text), path, chain)?.Level ?? SettingsLevel.None,
+                    FileLevel.Resolve(path, chain)?.Level ?? SettingsLevel.None,
                     fileClaims.Levels,
                     fileClaims.Types
                 )
@@ -150,9 +149,6 @@ internal static class RunPlanner
 
         return byFile;
     }
-
-    // What the generator's readers still take where a file's MSBuild metadata and a project's dialect were: none.
-    private static FileMetadata NoMetadata(SqlFileText text) => new(text, DialectSetting.Parse(null), null);
 
     // Plans a claimed file once, under the first project that claims it.  A file with a parse error has no query.  When
     // the compiler would read the file in its fallback encoding, another one on Windows, the errors may be of the
@@ -193,19 +189,11 @@ internal static class RunPlanner
     // wanted: the hash comes from the SQL without them.
     private static ParsedSqlFile Parse(ClaimedFile owner, CancellationToken cancellationToken)
     {
-        var input = FileParseInput.Resolve(
-            NoMetadata(owner.Text),
-            owner.NormalizedPath,
-            owner.Chain,
-            DialectSetting.Parse(null),
-            projectKeepsComments: false,
-            EquatableArray<string>.Empty
-        );
+        var input = FileParseInput.Resolve(owner.Text, owner.NormalizedPath, owner.Chain, EquatableArray<string>.Empty);
         return SqlFileReader.Read(
             owner.Text,
             owner.NormalizedPath,
             input.Dialect,
-            input.InvalidDialect,
             commentsWanted: false,
             cancellationToken
         );
@@ -267,12 +255,7 @@ internal static class RunPlanner
         return new PlannedQuery(
             query,
             NeedsEntry: true,
-            QuerySettings.ResolveDatabase(
-                query.Markers,
-                owner.Level,
-                SettingsLevel.None,
-                SqlDialectName.Canonical(dialect)
-            ),
+            QuerySettings.ResolveDatabase(query.Markers, owner.Level, SqlDialectName.Canonical(dialect)),
             SqlQueryHash.Compute(dialect, query.Segments, query.Tokens, query.Parameters),
             problems
         );
@@ -322,7 +305,7 @@ internal static class RunPlanner
         {
             foreach (var claim in claimant.Claims)
             {
-                var output = QuerySettings.Resolve(query.Markers, claim, claimant.Level, SettingsLevel.None).Output;
+                var output = QuerySettings.Resolve(query.Markers, claim, claimant.Level).Output;
                 if (output > greatest)
                 {
                     greatest = output;
@@ -477,7 +460,7 @@ internal static class RunPlanner
     }
 
     // One claimed file as one project sees it.  Chain is that of the file's folder in the project's settings files, and
-    // Level what the generator's FileLevel gives for it.
+    // Level is the chain's, as the generator's FileLevel gives it.
     private sealed record ClaimedFile(
         string ProjectPath,
         string NormalizedPath,
