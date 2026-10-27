@@ -1,2 +1,3 @@
--- The item of this file has the metadata SqlSourceDialect="mysql, no-backslash-escapes", over two lines.
+-- The header of this file says its dialect, with an option.
+-- dialect: mysql, no-backslash-escapes
 SELECT 'C:\temp\' AS path; -- a comment

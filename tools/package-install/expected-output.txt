@@ -1,11 +1,11 @@
 constant: SELECT id, name FROM users   WHERE id = @id;
 validation off: SELECT id, name FROM users ;
 validation on: ArgumentException for whereClause
-comments kept by the item: SELECT 1 /* kept */ AS one;
+comments kept by the file header: SELECT 1 /* kept */ AS one;
 comments kept by the attribute: SELECT id, name FROM users /* by key */ WHERE id = @id;
 dialect of the project: SELECT E'it'
     '\'s -- not a comment' AS note;
-dialect of the item: SELECT 'it\'s' AS note, 5--3 AS eight;
-dialect of the item, with an option on the next line: SELECT 'C:\temp\' AS path;
-dialect of an item that a target adds: SELECT [it's] FROM #orders;
+dialect of the file header: SELECT 'it\'s' AS note, 5--3 AS eight;
+dialect of the file header, with an option: SELECT 'C:\temp\' AS path;
+dialect of a file that a target adds: SELECT [it's] FROM #orders;
 dialect of the file's marker: SELECT [it's] FROM #staged;

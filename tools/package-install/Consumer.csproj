@@ -6,45 +6,13 @@
 
         The target framework is the one the SDK pinned in global.json brings its own reference assemblies for, so that
         the restore needs no package feed other than the folder that holds the package.
+
+        The project's settings are in sqlsource.json beside this file.
     -->
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <!--
-            The value is on a line of its own on purpose.  The compiler would read that as empty, and the package's
-            build/SqlSource.targets is what trims it.  The dialect of ByOption.sql has its option on the next line,
-            and the list of Kept.sql has one word on each line, which the compiler would read as empty too and the
-            same targets put on one line.  Directory.Build.targets sets SqlSourceGeneratorParameters the same way.
-        -->
-        <SqlSourceDialect>
-            postgres
-        </SqlSourceDialect>
-        <!--
-            Every query of this project is generated as SQL alone, the constants and the token methods.  A query
-            with models would need a sidecar beside its file.
-        -->
-        <SqlSourceOutput>Sql</SqlSourceOutput>
     </PropertyGroup>
-    <ItemGroup>
-        <!-- The item exists here only because NuGet imported the package's build/SqlSource.props before this. -->
-        <AdditionalFiles Update="Queries/ByMetadata.sql">
-            <SqlSourceDialect>
-                mysql
-            </SqlSourceDialect>
-        </AdditionalFiles>
-        <AdditionalFiles Update="Queries/ByOption.sql">
-            <SqlSourceDialect>
-                mysql,
-                no-backslash-escapes
-            </SqlSourceDialect>
-        </AdditionalFiles>
-        <AdditionalFiles Update="Queries/Kept.sql">
-            <SqlSourceGeneratorParameters>
-                no-token-validation
-                keep-comments
-            </SqlSourceGeneratorParameters>
-        </AdditionalFiles>
-    </ItemGroup>
 </Project>
