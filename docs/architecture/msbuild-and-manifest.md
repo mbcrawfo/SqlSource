@@ -69,7 +69,7 @@ The compiler reads a value up to its first `#` or `;`, and `|` parts the folders
 
 `SqlSourceWriteManifest` writes what the compiler is given, for the `sqlsource` tool, which runs it by name with `dotnet msbuild` and names the file to write with `SqlSourceManifestFile`.  How the tool runs it and uses what it reads is on [the tool's page](tool.md#evaluating-a-project).
 
-The target hooks nothing: it has no `BeforeTargets`, no `AfterTargets` and no condition.  A hook would make every build write the manifest, and a condition would make a run of the tool find no file.  So nothing of a build runs before it but what it depends on, which is the property `SqlSourceManifestDependsOn`.  That property is set in a `PropertyGroup` at the root of the targets file, because a target's `DependsOnTargets` is read before the target runs; the group also sets `SqlSourceSettingsSearchHook`.  The only elements of the file that are not targets are that group, the [nesting of the sidecars](#nesting-a-sidecar) and the [group of the settings files](#keeping-the-settings-files-out-of-the-output), and the one condition outside a target is on the last line of that group.
+The target hooks nothing: it has no `BeforeTargets`, no `AfterTargets` and no condition.  A hook would make every build write the manifest, and a condition would make a run of the tool find no file.  So nothing of a build runs before it but what it depends on, which is the property `SqlSourceManifestDependsOn`.  That property is set in a `PropertyGroup` at the root of the targets file, because a target's `DependsOnTargets` is read before the target runs; the group also sets `SqlSourceSettingsSearchHook`.  The only elements of the file that are not targets are that group, the [nesting of the sidecars](#nesting-a-sidecar) and the [group of the settings files](#keeping-the-settings-files-out-of-the-output), and the one condition outside a target is on the second element of that `PropertyGroup` that sets `SqlSourceManifestDependsOn`, the one that adds `AddImplicitDefineConstants`.
 
 - `SqlSourceListFiles` comes first, so that a target of the project that hooks it to add a `.sql` file runs before the rest.
 - [The search](#finding-the-settings-files) adds the settings files to the `AdditionalFiles` items.
@@ -92,7 +92,7 @@ The file is lines of `key=value`, and the key ends at the first `=`.  The target
 6. `Settings=` and the full path of each `AdditionalFiles` item named `sqlsource.json`, compared ignoring case, once each: those the search added and any the project lists itself, so that the tool reads exactly the settings files the compiler is given.
 7. `Compile=` and the full path of each `Compile` item.
 
-No line holds a setting: the tool reads the settings from the files of the `Settings` lines, as the generator does.  Version 1 had a `Property.<Name>=` line for each setting of the package and `File.<Name>=` lines for the item metadata of each `.sql` file.  Version 2 dropped them, and so the version rose: a tool of version 1 would read a manifest without them as one that sets nothing, without a word.
+No line holds a setting: the tool reads the settings from the files of the `Settings` lines, as the generator does.  Version 1 had a `Property.<Name>=` line for each setting of the package and `File.<Name>=` lines for the item metadata of each `.sql` file.  Version 2 dropped them, and so the version rose: this tool would read a manifest of version 1, whose settings are on those lines, as setting nothing, without a word.
 
 Two things keep each value on its own line:
 
