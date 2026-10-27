@@ -1,8 +1,10 @@
+using System.Linq;
 using System.Threading;
 using Shouldly;
 using SqlSource.Generation.Chains;
 using SqlSource.Settings;
 using SqlSource.Settings.TypeOverrides;
+using SqlSource.SettingsFiles;
 using SqlSource.Testing.Generator;
 using Xunit;
 
@@ -103,11 +105,28 @@ public sealed class ListedSettingsFileTests
         tool.ShouldNotBeNull().Diagnostics.ShouldHaveSingleItem().Descriptor.Id.ShouldBe("SQLSRC019");
     }
 
+    // A value of each key that gives a setting, of the right JSON type and not valid, with whether the build and the
+    // tool report it.  Every such key has a row, which InvalidValues_OfEveryKeyWithASetting_HaveARow holds.
+    public static TheoryData<string, string, bool, bool> InvalidValues { get; } =
+        new()
+        {
+            { SettingsFileKeys.Dialect, "\"sqlserver2\"", true, true },
+            { SettingsFileKeys.Database, "\" a b \"", false, true },
+            { SettingsFileKeys.Output, "\"bogus\"", true, true },
+            { SettingsFileKeys.GeneratorParameters, "[\"bogus\"]", true, false },
+            { SettingsFileKeys.InputModelSuffix, "\"a-b\"", true, false },
+            { SettingsFileKeys.OutputModelSuffix, "\"a-b\"", true, false },
+            { SettingsFileKeys.ModelNamespace, "\"a..b\"", true, false },
+            { SettingsFileKeys.InputModelType, "\"struct\"", true, false },
+            { SettingsFileKeys.OutputModelType, "\"struct\"", true, false },
+            { SettingsFileKeys.CollectionType, "\"lists\"", true, false },
+            { SettingsFileKeys.TypeOverrides, "{\"int\": \" \"}", true, false },
+            { SettingsFileKeys.ColumnTypes, "{\"accounts.id\": \" \"}", true, false },
+            { SettingsFileKeys.NestedClass, "\"class\"", true, false },
+        };
+
     [Theory]
-    [InlineData("dialect", "sqlserver2", true, true)]
-    [InlineData("output", "bogus", true, true)]
-    [InlineData("modelNamespace", "a..b", true, false)]
-    [InlineData("collectionType", "lists", true, false)]
+    [MemberData(nameof(InvalidValues))]
     public void Read_InvalidValue_IsReportedByTheSidesThatReadItsSetting(
         string key,
         string value,
@@ -115,13 +134,24 @@ public sealed class ListedSettingsFileTests
         bool tool
     )
     {
-        var text = $$"""{"{{key}}": "{{value}}"}""";
+        var text = $$"""{"{{key}}": {{value}}}""";
 
         var byBuild = Read(QueriesPath, text, SettingsFileSide.Build).ShouldNotBeNull();
         var byTool = Read(QueriesPath, text, SettingsFileSide.Tool).ShouldNotBeNull();
 
         byBuild.Diagnostics.Count.ShouldBe(build ? 1 : 0);
         byTool.Diagnostics.Count.ShouldBe(tool ? 1 : 0);
+    }
+
+    [Fact]
+    public void InvalidValues_OfEveryKeyWithASetting_HaveARow()
+    {
+        var keys = InvalidValues.Select(row => row.Data.Item1).ToArray();
+
+        keys.ShouldBe(
+            SettingsFileKeys.All.Where(key => key is not SettingsFileKeys.Schema and not SettingsFileKeys.Root),
+            ignoreOrder: true
+        );
     }
 
     [Fact]
