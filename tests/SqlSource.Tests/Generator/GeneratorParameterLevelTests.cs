@@ -10,9 +10,10 @@ using Xunit;
 namespace SqlSource.Tests.Generator;
 
 // The list of generator parameters in effect for a query, for a type that claims its file, is the one from the most
-// specific level that gives a list, whole: the query's markers, the preamble's, the attribute, the metadata of the
-// file's item, the project's property.  Two parameters change a query's generated code, keep-comments its SQL and
-// no-token-validation its method's checks, and each row shows both.
+// specific level that gives a list, whole: the query's markers, the preamble's, the attribute, the settings file of
+// the file's folder, the project's settings file, and on the MSBuild path the metadata of the file's item and the
+// project's property.  Two parameters change a query's generated code, keep-comments its SQL and no-token-validation
+// its method's checks, and each row shows both.
 public sealed class GeneratorParameterLevelTests
 {
     private const string On = "keep-comments no-token-validation";
@@ -30,7 +31,7 @@ public sealed class GeneratorParameterLevelTests
     private const string Check = "global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);";
 
     [Theory]
-    // property, metadata, attribute, preamble, query
+    // project's file, folder's file, attribute, preamble, query
     [InlineData(null, null, null, null, null, false)]
     [InlineData(On, null, null, null, null, true)]
     [InlineData(On, Default, null, null, null, false)]
@@ -45,32 +46,35 @@ public sealed class GeneratorParameterLevelTests
     [InlineData(On, On, On, On, Other, false)]
     [InlineData(null, null, null, Default, On, true)]
     public void Run_GeneratorParameters_ComeWholeFromTheMostSpecificLevelThatGivesAList(
-        string? property,
-        string? metadata,
+        string? projectFile,
+        string? folderFile,
         string? attribute,
         string? preamble,
         string? query,
         bool expected
     )
     {
+        var settings = new LevelSettings();
+        if (folderFile is not null)
+        {
+            _ = settings.At(
+                SettingLevel.FolderFile,
+                Setting.GeneratorParameters,
+                LevelSettings.WordsAt(SettingLevel.FolderFile, folderFile)
+            );
+        }
+
         var sql =
             (preamble is null ? string.Empty : "-- generator: " + preamble + "\n")
             + "-- name: ListFrom\n"
             + (query is null ? string.Empty : "-- generator: " + query + "\n")
             + "SELECT * FROM {{table}}; -- kept\n";
-        var file = new SqlFile(
-            GeneratorHarness.UsersPath,
-            sql,
-            Metadata: metadata is null
-                ? null
-                : new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = metadata }
-        );
 
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, Source(attribute))],
-            [file],
-            generatorParameters: property
+            settings.Files(new SqlFile(GeneratorHarness.UsersPath, sql)),
+            generatorParameters: projectFile
         );
 
         run.ShouldBeClean();
@@ -238,7 +242,7 @@ public sealed class GeneratorParameterLevelTests
     [Fact]
     public void Run_PropertyWithAWordThatIsNoParameter_IsAnErrorWithoutAPositionAndTheOthersApply()
     {
-        var run = Run(OutputKind.Sql, "keep-comments nope token-validation", null);
+        var run = RunOnMSBuild("keep-comments nope token-validation");
 
         run.Diagnostics.ShouldBe([
             "SQLSRC014 (1,1)-(1,1): 'nope' is not a valid value of SqlSourceGeneratorParameters",
@@ -253,7 +257,7 @@ public sealed class GeneratorParameterLevelTests
     public void Run_MetadataWithAWordThatIsNoParameter_IsAnErrorWithoutAPositionAndTheOthersApply()
     {
         var run = GeneratorHarness.Run(
-            OutputKind.Sql,
+            null,
             [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
             [
                 new SqlFile(
@@ -261,7 +265,8 @@ public sealed class GeneratorParameterLevelTests
                     "-- name: ListFrom\nSELECT * FROM {{table}}; -- kept\n",
                     Metadata: new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "keep-comments nope" }
                 ),
-            ]
+            ],
+            properties: SqlOutput
         );
 
         run.Diagnostics.ShouldBe([
@@ -277,13 +282,17 @@ public sealed class GeneratorParameterLevelTests
         var metadata = new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "nope" };
 
         var run = GeneratorHarness.Run(
-            OutputKind.Sql,
+            null,
             [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
             [
                 new SqlFile("/app/Repo/A.sql", "SELECT 1;\n", Metadata: metadata),
                 new SqlFile("/app/Repo/B.sql", "SELECT 2;\n", Metadata: metadata),
             ],
-            generatorParameters: "nope"
+            properties: new Dictionary<string, string?>
+            {
+                ["SqlSourceOutput"] = "Sql",
+                ["SqlSourceGeneratorParameters"] = "nope",
+            }
         );
 
         run.Diagnostics.ShouldBe([
@@ -296,7 +305,7 @@ public sealed class GeneratorParameterLevelTests
     public void Run_InvalidMetadataOfAFileThatNoTypeClaims_IsNotReported()
     {
         var run = GeneratorHarness.Run(
-            OutputKind.Sql,
+            null,
             [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
             [
                 new SqlFile("/app/Repo/A.sql", "SELECT 1;\n"),
@@ -305,7 +314,8 @@ public sealed class GeneratorParameterLevelTests
                     "SELECT 2;\n",
                     Metadata: new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "nope" }
                 ),
-            ]
+            ],
+            properties: SqlOutput
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -314,7 +324,7 @@ public sealed class GeneratorParameterLevelTests
     [Fact]
     public void Run_DefaultBesideAnotherWordInTheProperty_IsReportedWholeAndGivesNoList()
     {
-        var run = Run(OutputKind.Sql, "default keep-comments", null);
+        var run = RunOnMSBuild("default keep-comments");
 
         run.Diagnostics.ShouldBe([
             "SQLSRC014 (1,1)-(1,1): 'default keep-comments' is not a valid value of SqlSourceGeneratorParameters",
@@ -342,14 +352,32 @@ public sealed class GeneratorParameterLevelTests
         run.Sources["App.Sample.g.cs"].ShouldContain("-- kept");
     }
 
+    // The output sql as the project's property, for a test of the MSBuild path, which writes no settings file.
+    private static Dictionary<string, string?> SqlOutput => new() { ["SqlSourceOutput"] = "Sql" };
+
     private static string Source(string? attribute) =>
         GeneratorHarness.SampleSource(attribute is null ? null : "Parameters = \"" + attribute + "\"");
 
-    private static GeneratorRun Run(OutputKind? output, string? property, string? attribute) =>
+    // The query ListFrom under the generator parameters of the project's settings file and of the attribute.
+    private static GeneratorRun Run(OutputKind? output, string? projectFile, string? attribute) =>
         GeneratorHarness.Run(
             output,
             [new SourceFile(GeneratorHarness.SourcePath, Source(attribute))],
             [new SqlFile(GeneratorHarness.UsersPath, "-- name: ListFrom\nSELECT * FROM {{table}}; -- kept\n")],
-            generatorParameters: property
+            generatorParameters: projectFile
+        );
+
+    // The run of Run at sql with the generator parameters, the MSBuild way: the output and the parameters are the
+    // project's properties, for a test of the MSBuild path.
+    private static GeneratorRun RunOnMSBuild(string property) =>
+        GeneratorHarness.Run(
+            null,
+            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
+            [new SqlFile(GeneratorHarness.UsersPath, "-- name: ListFrom\nSELECT * FROM {{table}}; -- kept\n")],
+            properties: new Dictionary<string, string?>
+            {
+                ["SqlSourceOutput"] = "Sql",
+                ["SqlSourceGeneratorParameters"] = property,
+            }
         );
 }

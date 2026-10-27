@@ -32,7 +32,13 @@ public sealed class TableModelTests
 
     // The levels that give the generator parameters of a query, from the least specific.
     public static TheoryData<SettingLevel> Levels =>
-        [SettingLevel.Property, SettingLevel.Metadata, SettingLevel.Attribute, SettingLevel.Header, SettingLevel.Query];
+        [
+            SettingLevel.ProjectFile,
+            SettingLevel.FolderFile,
+            SettingLevel.Attribute,
+            SettingLevel.Header,
+            SettingLevel.Query,
+        ];
 
     [Fact]
     public void Run_QueryThatMatchesATable_GetsAModelNamedAfterTheTable()
@@ -104,13 +110,18 @@ public sealed class TableModelTests
     [MemberData(nameof(Levels))]
     public void Run_NoTableModelsAtEachLevel_NamesTheModelAfterTheQuery(SettingLevel level)
     {
-        var settings = new LevelSettings().At(level, Setting.GeneratorParameters, "no-table-models");
-        var file = settings.File(Users);
+        var settings = new LevelSettings().At(
+            level,
+            Setting.GeneratorParameters,
+            LevelSettings.WordsAt(level, "no-table-models")
+        );
+        var files = settings.Files(Users);
+        var file = files[0];
 
         var run = Run(
             settings.Source(Source),
-            [file, Sidecars.Of(file, Entry(file, "GetUser", [], [Column("id")], PublicUsers))],
-            settings.Properties
+            [.. files, Sidecars.Of(file, Entry(file, "GetUser", [], [Column("id")], PublicUsers))],
+            settings: settings.ProjectSettings
         );
 
         run.ShouldBeClean();

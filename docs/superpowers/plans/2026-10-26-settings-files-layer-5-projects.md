@@ -148,10 +148,71 @@ The `summary` of a query is a comment to the hash, but check the sidecar does no
 
 ## Part 2: the tests that build their projects in memory
 
-Detailed in this plan before its build starts, once part 1 has merged.  The decisions so far:
+Built once part 1 (#154) merged.  Part 2 moves the generator's and the tool's tests that configure a run through MSBuild properties or metadata (`TestOptionsProvider`, `LevelSettings`, `SqlFile.Dialect`/`Metadata`, `TestProject.Properties` and `AddSql`'s metadata) to settings files and markers.  The tests of the MSBuild path itself stay on properties and metadata, saying so, for layer 6 to delete with the code.
 
-- **The generator harness writes a settings file in place of the properties.**  `GeneratorHarness.Run`'s `output`, `dialect`, `generatorParameters` and `properties` (and `ModelRuns`, `MethodRuns`, `CachingScene`, `CreateReference`, `BuildAsync`) become one project settings file at a path above the test's own files; a `SqlFile`'s `Dialect` and `Metadata` become a settings file in the file's folder.  `null` output still writes no `output`.  `TestOptionsProvider` keeps its properties and metadata only for the tests of the MSBuild path, which layer 6 deletes with it.
-- **Levels:** `SettingLevel.Property` becomes a farther settings file and `SettingLevel.Metadata` a nearer one; the order of the places holds (`SettingPlaces.Specificity`), so the level tests keep their expectations, except the place a diagnostic names ("the typeOverrides of the settings file <path>").
-- **The traps the inventory found:** a harness file beats a test's own property or metadata, so every test of a file moves in one commit; a test's own `"root": true` cuts the harness file off; a test's own file at the harness's path; caching tests that count settings-file steps; `GeneratorParityTests`, whose tool side reads real files.
-- **The tool:** `TestProject` gets project settings rendered into one `sqlsource.json` merged with what a test adds by `AddSettings`, and `Plans.Postgres` uses it.
-- **MSBuild-only tests left for layer 6:** `Generation/MSBuild/`, `TestOptionsProviderTests`, the `SQLSRC011`/`SQLSRC014` tests, the caching tests that swap `AnalyzerConfigOptions`, the manifest format tests of `Property.`/`File.` lines, and the tests of trimming and of a value cut at `;`.
+### Decisions of part 2
+
+- **The project's settings file of a run is `/sqlsource.json`** (`GeneratorHarness.ProjectSettingsPath`), the farthest folder of every path a test uses, so a test's own settings files are nearer and win, as a project property lost to them.  The harness writes it from `output`, `dialect`, `generatorParameters` and a new `settings` argument (a JSON object, as a user writes the file), and writes none when all four are null.  An entry of `settings` wins over the other three, as an entry of `properties` did over them.  A test that gives its own file at `/sqlsource.json` while the harness writes one is refused with an `InvalidOperationException` that says to put the keys in `settings`.  A test whose own file says `"root": true` below `/` cuts the harness's file off, so such a test puts its output and dialect in its own root file.
+- **Spelling stays the tests' own** (`TestOptionsProvider`'s rule): the output is written `"Sql"`, `"Models"` or `"CodeGen"`, `generatorParameters` as the array of the words of the string split at white space, the dialect as given.  The JSON is built with `System.Text.Json.Nodes` (in the shared framework, so RoslynFloor is fine).
+- **A test of the MSBuild path stays on MSBuild, explicitly.**  It passes `output: null` and puts every value, the output and the dialect included, in `properties:` or a `SqlFile`'s `Dialect`/`Metadata`, so that no harness file outranks what it tests.  Such tests are: `tests/SqlSource.Tests/Generation/MSBuild/`, `TestOptionsProviderTests`, the `SQLSRC011`/`SQLSRC014` tests, the tests of trimming, of a cut at `;` or `#`, of the last-wins rule inside an MSBuild value, of "an unclaimed file's metadata is not reported", the caching tests that swap `AnalyzerConfigOptions`, the tests of a settings file ranked over the metadata or the property (`SettingsFileTests`' chain-over-MSBuild tests), `GeneratorParityTests.Errors_OfInvalidValues_AreInTheGeneratorsOrder`, and the tool's tests of the manifest's `Property.`/`File.` lines and of `SQLSRC011`/`SQLSRC014`.  Each is listed in `5-projects-notes.md` for layer 6.
+- **`LevelSettings`' two MSBuild levels become settings files**: `SettingLevel.Property` → `SettingLevel.ProjectFile` (an entry of the harness's `settings`, so `/sqlsource.json`), `SettingLevel.Metadata` → `SettingLevel.FolderFile` (`<the .sql file's folder>/sqlsource.json`, `/app/Repo/sqlsource.json` for `UsersPath`).  `Setting` keeps its marker and attribute names and replaces `MSBuildName` with `Key`, the settings file's key; a value at a file level is written as that file writes it, a JSON value (`"Sql"`, `["keep-comments"]`, `{"int4": "long"}`).  The order of the places is unchanged (`SettingPlaces.Specificity`: settings files rank 2 + depth, above metadata and property), so the level tests keep their expectations, except the place a diagnostic names, which becomes `the typeOverrides of the settings file /sqlsource.json` (or of `/app/Repo/sqlsource.json`).
+- **The tool's `TestProject` gets `Settings`, a `JsonObject`** rendered at `<project folder>/sqlsource.json` and listed first among the `Settings=` lines whenever it has a key; `AddSettings` at that same path while `Settings` has a key is refused, as in the harness.  `Plans.Postgres` sets `Settings["dialect"] = "postgres"` in place of the property.  `TestProject.Properties` and `AddSql`'s metadata stay for the tool's MSBuild-path tests.
+
+### Review Focus (part 2)
+
+1. **A test's own `"root": true` file** cuts the harness's project file off: its output and dialect must be in its own root file, or its expectation changes silently.  Checked by every `SettingsFileTests` root test still asserting its old outcome.
+2. **A test's own file at `/sqlsource.json`** beside the harness's: refused, not silently dropped (`GeneratorHarnessTests` or the harness's own test asserts the refusal).
+3. **A level test whose value moves to a file** keeps its expected winner at every row (output, collection type, generator parameters, type overrides), and the place a diagnostic names is the file's.
+4. **A caching test that only configures through options** now reads a settings file: its step reasons still say what the test claims, with `StepReasons.AllReasons`' exemptions still true.
+5. **The tool's parity tests** give the generator side the same settings files, by path and text, that the tool side reads from disk, with no harness file the tool cannot see.
+
+### Task 8: The generator harness writes the project's settings file
+
+**Files:**
+- Modify: `tests/SqlSource.Testing/Generator/GeneratorHarness.cs` (`ProjectSettingsPath`, `Run`'s new `string? settings` argument after `properties`, the file written from `output`/`dialect`/`generatorParameters`/`settings`, the refusal; `CreateReference` and `BuildAsync` write the output the same way), `ModelRuns.cs` and `MethodRuns.cs` (a `settings` argument beside `properties`; their output and dialect reach the file), `TestOptionsProvider.cs` (its comment: MSBuild's values, for the tests of the MSBuild path), `LevelSettings.cs` (the levels and `Setting` as decided).
+- Modify: every test of `tests/SqlSource.Tests/Generator/`, `Generation/`, `Diagnostics/` and of `tests/SqlSource.Tool.Tests/Planning/GeneratorParityTests.cs` that the change breaks: the `SettingsFileTests` root and `/sqlsource.json` tests, the tests that set a dialect or generator parameters by metadata beside a harness dialect (`MethodDriverTests`, `SqlClientProbeTests`, `ColumnTypeTests`' dialect metadata), the level tests (`SettingLevelTests`, `GeneratorParameterLevelTests`, `TypeOverrideLevelTests`, `ModelTests`' and `TableModelTests`' level theories), and the MSBuild-path tests, which switch to explicit `properties:` and `output: null` as decided.
+- Modify: `tests/AGENTS.md` (the rule "Every test that runs the generator or its emitter states its output": the harness writes it into the project's settings file, `null` writes no `output`), `tests/SqlSource.Tests/Generator/AGENTS.md` if it names what changed.
+- Test: a test of the harness's file and of its refusal, beside the harness's other tests (`TestOptionsProviderTests` is the model: `tests/SqlSource.Tests/Generator/GeneratorHarnessTests.cs`, with the shared first line).
+
+**Interfaces:**
+- Produces: `GeneratorHarness.ProjectSettingsPath` (`"/sqlsource.json"`); `GeneratorHarness.Run(OutputKind? output, SourceFile[] sources, SqlFile[] sqlFiles, …, string? generatorParameters = null, string? dialect = null, IReadOnlyDictionary<string, string?>? properties = null, string? settings = null)`; `ModelRuns.Run(…, string? settings = null)` and `MethodRuns.Run(…, string? settings = null)`; `SettingLevel { ProjectFile, FolderFile, Attribute, Header, Query }`; `Setting.Key`; `LevelSettings.ProjectSettings` (`string?`, the JSON object of the project-file level) and `LevelSettings.Files(SqlFile file, params string[] queries) -> SqlFile[]` (the file with its markers, then its folder's settings file when the folder level has a setting).
+
+- [ ] **Step 1: Write the harness's tests** in `GeneratorHarnessTests`: `Run_OutputAndDialect_AreTheProjectsSettingsFile` (a run at `Models` under `postgres` reads a query as postgres and needs an entry), `Run_SettingsEntry_WinsOverTheOutput` (`settings: """{"output": "Sql"}"""` with `OutputKind.CodeGen` needs no entry), `Run_NothingGiven_WritesNoSettingsFile` (no `SettingsFile` step output), `Run_OwnFileAtTheProjectsPath_IsRefused`.  Run them: they fail.
+- [ ] **Step 2: Change the harness, `ModelRuns`, `MethodRuns`, `LevelSettings`**, then run `dotnet test --project tests/SqlSource.Tests -- --filter-namespace '*Generator'` and the other namespaces, and `tests/SqlSource.Tests.RoslynFloor`; fix every test that fails by the decisions above (never by changing an expectation the decisions do not change; a failure that the decisions do not explain is reported, not fixed).
+- [ ] **Step 3: Format, validate, commit** ("Write the harness's project settings into a settings file").
+
+### Task 9: The generator tests' other settings move to files and markers
+
+**Files:** the generator tests that still pass `properties:` or a `SqlFile`'s `Dialect`/`Metadata` only to configure a run (inventory: `ModelTests`, `TableModelTests`, `ColumnTypeTests`, `NestedClassTests` (`nestedClass` in the type's folder's file), `TokenValidationTests`, `MethodTests`, `ConverterDiagnosticsTests`, `ShortNameTests`, `NpgsqlProbeTests`, `SidecarTests`, `SqlServerModelTests`, `SqlClientProbeTests`, `CachingMappedTypeTests`' `properties:`, `TypeOverrideLevelTests`' `Run(property, …)`, `GeneratorParameterLevelTests`, `ArrayPoolParameterTests`, `SettingsFileTests`' remaining property and metadata uses), each to `settings:` or a folder file (`GeneratorHarness.SettingsFile(path, json)`) or a header marker, with the place a diagnostic names updated.  A test of the MSBuild path stays, as decided.
+
+- [ ] **Step 1: Move each file's uses**, one test class at a time, running that class after each.
+- [ ] **Step 2: Search**: `git grep -nE 'properties:|Metadata = |Dialect: "|new Dictionary<string, string\??>' -- tests/SqlSource.Tests tests/SqlSource.Testing` lists only tests of the MSBuild path and the harness itself.
+- [ ] **Step 3: Format, validate, commit** ("Move the generator tests' settings into settings files and markers").
+
+### Task 10: The caching tests read settings files
+
+**Files:** `tests/SqlSource.Testing/Generator/CachingScene.cs` (its runs' output, dialect and type overrides become the project's settings file, an additional text of the driver; `OptionsWithTypeOverrides` becomes a settings file of the type overrides), `StepReasons.cs` (its exemptions' comment, if a step it names now always has a settings file), and the `Caching*Tests` that use them.  The tests that swap `AnalyzerConfigOptions` to change a property or metadata are of the MSBuild path: they build their own `TestOptionsProvider` with the property, and stay for layer 6.  A test whose subject is an edit of a settings file already exists in `CachingSettingsFileTests` and `CachingOptionsTests`; an option-swap test with such a counterpart is named in the notes with it.
+
+- [ ] **Step 1: Change `CachingScene`, run every `Caching*Tests` class, and fix each by the rule** (a reason that changes because a settings file is now an input is stated in the test, not hidden).
+- [ ] **Step 2: Format, validate, commit** ("Give the caching tests their settings in settings files").
+
+### Task 11: The realistic models and the refusal tests
+
+**Files:** `tests/SqlSource.Tests.Postgres/Realistic/Generation/RealisticModelRefusalTests.cs` and SQL Server's (their corpus settings, `CorpusMetadata`, become the in-memory `Cases/sqlsource.json` with the values of `Realistic/Cases/sqlsource.json` and the project's file; read the repository's files rather than repeating their values when the test can), `tests/SqlSource.Tool.Testing/Realistic/RealisticModels.cs` (its `InputSuffix` comment says where the project's suffix is now).
+
+- [ ] **Step 1: Make the change; run both projects' `Realistic` tests** (Docker running).
+- [ ] **Step 2: Format, validate, commit** ("Give the realistic refusal tests the corpus's settings files").
+
+### Task 12: The tool's tests read settings files
+
+**Files:** `tests/SqlSource.Tool.Testing/TestProject.cs` (`Settings`), `Plans.cs` (`Postgres`), and the tool tests that set `Properties` or `AddSql` metadata only to configure a plan: `RunPlannerTests`, `RunPlannerErrorTests`, `RunPlannerSettingsFileTests`, `GeneratorParityTests` (both sides read the same files), `FilterTests`, `FilterRunTests`, `DescribeTests`, `DescribeRunTests`, `VerboseTests`, `RunLogTests`, `FileOutcomesTests`, `RunDecisionsTests`, `tests/SqlSource.Tests.Postgres/Describer/DescribeCommandTests.cs`, `DescribeScene`, `DatabaseRunsScene`.  A test that overrides `Plans.Postgres`' dialect by a property moves in the same commit (the file outranks the property).  The MSBuild-path tests stay, as decided: they build their project without `Plans.Postgres`' file or clear `Settings`.  A header marker that moves a position a test asserts moves the expected position with it.
+- Test: `TestProjectTests` for `Settings` (rendered, listed first, refused beside an `AddSettings` at its path).
+
+- [ ] **Step 1: Write `TestProjectTests`' new tests; see them fail; build `Settings`.**
+- [ ] **Step 2: Move the sites; run `tests/SqlSource.Tool.Tests` and the container projects' tool tests.**
+- [ ] **Step 3: Format, validate, commit** ("Give the tool's in-memory projects settings files").
+
+### Task 13: No setting left but the MSBuild path's, and the notes
+
+- [ ] **Step 1: Search** the tests for `SqlSource<Setting>` names, `properties:`, `Properties[`, `Metadata =` and `AddSql(..., (` and confirm every hit is a test of the MSBuild path or its helper.
+- [ ] **Step 2: Update** `tests/README.md` and `tests/AGENTS.md` where part 2 made them wrong, and add part 2's list of MSBuild-path tests to `5-projects-notes.md`.

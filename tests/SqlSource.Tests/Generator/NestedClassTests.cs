@@ -218,14 +218,15 @@ public sealed class NestedClassTests
         run.Sources.Keys.ShouldBe([AttributeOnly]);
     }
 
-    // A value that is not valid is not set, so the class keeps its default name.
+    // A value that is not valid is not set, so the class keeps its default name.  A test of the MSBuild path: the
+    // output is the project's property too.
     [Theory]
     [InlineData("class")]
     [InlineData("My-Sql")]
     [InlineData("App.Sql")]
     public void Run_NestedClassPropertyThatIsNotValid_IsReportedWithoutAPosition(string value)
     {
-        var run = Run(
+        var run = RunOnMSBuild(
             """
             using SqlSource;
             namespace App;
@@ -248,5 +249,18 @@ public sealed class NestedClassTests
             [new SourceFile(GeneratorHarness.SourcePath, source)],
             [GeneratorHarness.UsersFile],
             properties: new Dictionary<string, string?> { ["SqlSourceNestedClass"] = nestedClass }
+        );
+
+    // The same with the output sql as the project's property, for a test of the MSBuild path.
+    private static GeneratorRun RunOnMSBuild(string source, string nestedClass) =>
+        GeneratorHarness.Run(
+            null,
+            [new SourceFile(GeneratorHarness.SourcePath, source)],
+            [GeneratorHarness.UsersFile],
+            properties: new Dictionary<string, string?>
+            {
+                ["SqlSourceOutput"] = "Sql",
+                ["SqlSourceNestedClass"] = nestedClass,
+            }
         );
 }

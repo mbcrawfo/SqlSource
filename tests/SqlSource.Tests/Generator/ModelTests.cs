@@ -200,7 +200,7 @@ public sealed class ModelTests
 
     // The levels that give a setting of a model, from the least specific.
     public static TheoryData<SettingLevel> Levels =>
-        [SettingLevel.Property, SettingLevel.Metadata, SettingLevel.Attribute, SettingLevel.Header];
+        [SettingLevel.ProjectFile, SettingLevel.FolderFile, SettingLevel.Attribute, SettingLevel.Header];
 
     [Fact]
     public void Run_RowsAndParameters_EmitsBothModels()
@@ -336,14 +336,15 @@ public sealed class ModelTests
     public void Run_SuffixesAtEachLevel_NameTheModels(SettingLevel level)
     {
         var settings = new LevelSettings()
-            .At(level, Setting.InputModelSuffix, "Key")
-            .At(level, Setting.OutputModelSuffix, "Row");
-        var file = settings.File(Users);
+            .At(level, Setting.InputModelSuffix, LevelSettings.StringAt(level, "Key"))
+            .At(level, Setting.OutputModelSuffix, LevelSettings.StringAt(level, "Row"));
+        var files = settings.Files(Users);
+        var file = files[0];
 
         var run = Run(
             settings.Source(Source),
-            [file, Sidecars.Of(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")]))],
-            settings.Properties
+            [.. files, Sidecars.Of(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")]))],
+            settings: settings.ProjectSettings
         );
 
         run.ShouldBeClean();
@@ -388,13 +389,18 @@ public sealed class ModelTests
     [MemberData(nameof(Levels))]
     public void Run_ModelNamespaceAtEachLevel_HoldsTheModels(SettingLevel level)
     {
-        var settings = new LevelSettings().At(level, Setting.ModelNamespace, "App.Models");
-        var file = settings.File(Users);
+        var settings = new LevelSettings().At(
+            level,
+            Setting.ModelNamespace,
+            LevelSettings.StringAt(level, "App.Models")
+        );
+        var files = settings.Files(Users);
+        var file = files[0];
 
         var run = Run(
             settings.Source(Source),
-            [file, Sidecars.Of(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")]))],
-            settings.Properties
+            [.. files, Sidecars.Of(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")]))],
+            settings: settings.ProjectSettings
         );
 
         run.ShouldBeClean();

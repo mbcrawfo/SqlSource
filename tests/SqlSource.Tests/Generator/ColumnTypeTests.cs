@@ -250,7 +250,10 @@ public sealed class ColumnTypeTests
     public void Run_PropertyColumnType_MapsBothEngines()
     {
         var posts = new SqlFile(GeneratorHarness.UsersPath, ListPosts);
-        var orders = new SqlFile("/app/Repo/Orders.sql", "-- name: ListOrders\nSELECT id FROM users;\n", "mssql");
+        var orders = new SqlFile(
+            "/app/Repo/Orders.sql",
+            "-- dialect: mssql\n-- name: ListOrders\nSELECT id FROM users;\n"
+        );
         var ordersEntry = MethodRuns.SqlServerEntry(
             orders,
             "ListOrders",

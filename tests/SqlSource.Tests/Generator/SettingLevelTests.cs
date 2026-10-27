@@ -6,7 +6,6 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Testing.Generator;
 using Xunit;
-using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -63,16 +62,17 @@ public sealed class SettingLevelTests
             },
         };
 
-    // Each level with each output.  The property is the least specific level, and codegen is both the default and the
-    // output MethodRuns gives the project, so a property of codegen would decide nothing: that row is left out.
+    // Each level with each output.  The project's file is the least specific level, and codegen is both the default and
+    // the output MethodRuns gives the project, so a project's file of codegen would decide nothing: that row is left
+    // out.
     public static TheoryData<SettingLevel, string> OutputLevels =>
         new()
         {
-            { SettingLevel.Property, "Sql" },
-            { SettingLevel.Property, "Models" },
-            { SettingLevel.Metadata, "Sql" },
-            { SettingLevel.Metadata, "Models" },
-            { SettingLevel.Metadata, "CodeGen" },
+            { SettingLevel.ProjectFile, "Sql" },
+            { SettingLevel.ProjectFile, "Models" },
+            { SettingLevel.FolderFile, "Sql" },
+            { SettingLevel.FolderFile, "Models" },
+            { SettingLevel.FolderFile, "CodeGen" },
             { SettingLevel.Attribute, "Sql" },
             { SettingLevel.Attribute, "Models" },
             { SettingLevel.Attribute, "CodeGen" },
@@ -86,7 +86,13 @@ public sealed class SettingLevelTests
 
     // Every level of a setting that the attribute has too.
     public static TheoryData<SettingLevel> Levels =>
-        [SettingLevel.Property, SettingLevel.Metadata, SettingLevel.Attribute, SettingLevel.Header, SettingLevel.Query];
+        [
+            SettingLevel.ProjectFile,
+            SettingLevel.FolderFile,
+            SettingLevel.Attribute,
+            SettingLevel.Header,
+            SettingLevel.Query,
+        ];
 
     // The output's row reads the default's query, whose diagnostic names the output read.  Every other row's query is
     // at sql by its marker, so that the two runs' type files have a constant to compare.
@@ -307,15 +313,20 @@ public sealed class SettingLevelTests
         run.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
     }
 
-    // At sql, so that the query has a constant, which shows the marker's line stripped as a comment.
+    // At sql, so that the query has a constant, which shows the marker's line stripped as a comment.  A test of the
+    // MSBuild path: the output is the project's property too.
     [Fact]
     public void Run_MethodLocationAsAPropertyOrAMarker_IsNotASetting()
     {
         var run = GeneratorHarness.Run(
-            OutputKind.Sql,
+            null,
             [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
             [new SqlFile("/app/Repo/Q.sql", "-- name: Q\n-- method-location: public\nSELECT 1; -- c\n")],
-            properties: new Dictionary<string, string?> { ["SqlSourceMethodLocation"] = "nope" }
+            properties: new Dictionary<string, string?>
+            {
+                ["SqlSourceOutput"] = "Sql",
+                ["SqlSourceMethodLocation"] = "nope",
+            }
         );
 
         // The property is not read, and the line is an ordinary comment.
@@ -323,30 +334,36 @@ public sealed class SettingLevelTests
         run.Sources["App.Sample.g.cs"].ShouldContain("\"SELECT 1;\"");
     }
 
-    // Below the level the project's property says another output, sql for codegen and codegen otherwise, so that the
+    // Below the level the project's file says another output, sql for codegen and codegen otherwise, so that the
     // level is what decides.
     [Theory]
     [MemberData(nameof(OutputLevels))]
     public void Run_OutputAtEachLevel_DecidesBetweenConstantAndMethod(SettingLevel level, string output)
     {
         var settings = new LevelSettings();
-        if (level != SettingLevel.Property)
+        if (level != SettingLevel.ProjectFile)
         {
-            _ = settings.At(SettingLevel.Property, Setting.Output, output == "CodeGen" ? "Sql" : "CodeGen");
+            _ = settings.At(
+                SettingLevel.ProjectFile,
+                Setting.Output,
+                LevelSettings.StringAt(SettingLevel.ProjectFile, output == "CodeGen" ? "Sql" : "CodeGen")
+            );
         }
 
-        _ = settings.At(level, Setting.Output, output);
-        var file = settings.File(Users);
+        _ = settings.At(level, Setting.Output, LevelSettings.StringAt(level, output));
+        var files = settings.Files(Users);
+        var file = files[0];
 
-        // A property among the settings' replaces the output that MethodRuns gives the project, codegen.  At sql the
-        // query needs no entry, and one would be SQLSRC245.
+        // An output of the project's file among the settings replaces the one MethodRuns gives the project, codegen.
+        // At sql the query needs no entry, and one would be SQLSRC245.
         var run = MethodRuns.Run(
             file,
             output == "Sql"
                 ? []
                 : [ModelRuns.Entry(file, "GetUser", [ModelRuns.Parameter("id")], [ModelRuns.Column("id")])],
             settings.Source(MethodRuns.Source),
-            properties: settings.Properties
+            settings: settings.ProjectSettings,
+            otherFiles: files[1..]
         );
 
         run.ShouldBeClean();
@@ -371,14 +388,16 @@ public sealed class SettingLevelTests
     [MemberData(nameof(Levels))]
     public void Run_CollectionTypeAtEachLevel_IsTheMethodsReturnType(SettingLevel level)
     {
-        var settings = new LevelSettings().At(level, Setting.CollectionType, "List");
-        var file = settings.File(Users);
+        var settings = new LevelSettings().At(level, Setting.CollectionType, LevelSettings.StringAt(level, "List"));
+        var files = settings.Files(Users);
+        var file = files[0];
 
         var run = MethodRuns.Run(
             file,
             [ModelRuns.Entry(file, "GetUser", [ModelRuns.Parameter("id")], [ModelRuns.Column("id")])],
             settings.Source(MethodRuns.Source),
-            properties: settings.Properties
+            settings: settings.ProjectSettings,
+            otherFiles: files[1..]
         );
 
         run.ShouldBeClean();

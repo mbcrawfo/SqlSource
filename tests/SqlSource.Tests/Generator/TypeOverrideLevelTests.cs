@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Types;
@@ -50,6 +51,11 @@ public sealed class TypeOverrideLevelTests
 
     private const string TheMetadataPlace = "the metadata SqlSourceTypeOverrides of the file";
 
+    private const string TheProjectFilePlace =
+        "the typeOverrides of the settings file " + GeneratorHarness.ProjectSettingsPath;
+
+    private const string TheFolderFilePlace = "the typeOverrides of the settings file /app/Repo/sqlsource.json";
+
     private const string TheHeaderPlace = "a -- type-override: marker in the file header";
 
     private const string TheQueryPlace = "a -- type-override: marker of the query";
@@ -74,8 +80,14 @@ public sealed class TypeOverrideLevelTests
     // A key of timestamptz at each level below a default's, from the least specific, each as its level writes it.
     private static readonly (SettingLevel Level, string Value)[] KeysBelowADefault =
     [
-        (SettingLevel.Property, "timestamptz=System.DateTimeOffset"),
-        (SettingLevel.Metadata, "timestamptz=long"),
+        (
+            SettingLevel.ProjectFile, /*lang=json,strict*/
+            """{"timestamptz": "System.DateTimeOffset"}"""
+        ),
+        (
+            SettingLevel.FolderFile, /*lang=json,strict*/
+            """{"timestamptz": "long"}"""
+        ),
         (SettingLevel.Header, "timestamptz = string"),
     ];
 
@@ -83,8 +95,8 @@ public sealed class TypeOverrideLevelTests
     public static TheoryData<SettingLevel, string> Places =>
         new()
         {
-            { SettingLevel.Property, ThePropertyPlace },
-            { SettingLevel.Metadata, TheMetadataPlace },
+            { SettingLevel.ProjectFile, TheProjectFilePlace },
+            { SettingLevel.FolderFile, TheFolderFilePlace },
             { SettingLevel.Header, TheHeaderPlace },
             { SettingLevel.Query, TheQueryPlace },
         };
@@ -129,8 +141,14 @@ public sealed class TypeOverrideLevelTests
 
     // Each level's default hides the key of every level below it, and the base map answers.
     [Theory]
-    [InlineData(SettingLevel.Property, "timestamptz=default")]
-    [InlineData(SettingLevel.Metadata, "timestamptz=default")]
+    [InlineData(
+        SettingLevel.ProjectFile, /*lang=json,strict*/
+        """{"timestamptz": "default"}"""
+    )]
+    [InlineData(
+        SettingLevel.FolderFile, /*lang=json,strict*/
+        """{"timestamptz": "default"}"""
+    )]
     [InlineData(SettingLevel.Header, "timestamptz = default")]
     [InlineData(SettingLevel.Query, "timestamptz = default")]
     public void Run_DefaultAtALevel_GivesTheBaseMapsType(SettingLevel level, string value)
@@ -139,9 +157,10 @@ public sealed class TypeOverrideLevelTests
             .Where(key => key.Level < level)
             .Aggregate(new LevelSettings(), (settings, key) => settings.At(key.Level, Setting.TypeOverrides, key.Value))
             .At(level, Setting.TypeOverrides, value);
-        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+        var files = settings.Files(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+        var file = files[0];
 
-        var run = Run(settings.PropertyOf(Setting.TypeOverrides), (file, [Entry(file, "GetUser", Timestamptz)]));
+        var run = Run(settings, files, Entry(file, "GetUser", Timestamptz));
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
@@ -169,15 +188,16 @@ public sealed class TypeOverrideLevelTests
             ]);
     }
 
+    // A test of the MSBuild path: the value is the property or the file's metadata.
     [Theory]
-    [InlineData(SettingLevel.Property, ThePropertyPlace)]
-    [InlineData(SettingLevel.Metadata, TheMetadataPlace)]
-    public void Run_KeyTwiceInOneMSBuildValue_TheLastWins(SettingLevel level, string place)
+    [InlineData(true, ThePropertyPlace)]
+    [InlineData(false, TheMetadataPlace)]
+    public void Run_KeyTwiceInOneMSBuildValue_TheLastWins(bool property, string place)
     {
-        var settings = new LevelSettings().At(level, Setting.TypeOverrides, "int4=long int4=short");
-        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser));
+        const string Value = "int4=long int4=short";
+        var file = OnMSBuild(new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser), property ? null : Value);
 
-        var run = Run(settings.PropertyOf(Setting.TypeOverrides), (file, [Entry(file, "GetUser", Int4)]));
+        var run = RunOnMSBuild(property ? Value : null, (file, [Entry(file, "GetUser", Int4)]));
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("short", true, true, NoWarnings, "int4", place, IntBase)]);
@@ -262,12 +282,10 @@ public sealed class TypeOverrideLevelTests
             Setting.TypeOverrides,
             EntryAt(level, "public._user_status", "System.Guid")
         );
-        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+        var files = settings.Files(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+        var file = files[0];
 
-        var run = Run(
-            settings.PropertyOf(Setting.TypeOverrides),
-            (file, [Entry(file, "GetUser", ArrayOf(EnumType("user_status"), "_user_status"))])
-        );
+        var run = Run(settings, files, Entry(file, "GetUser", ArrayOf(EnumType("user_status"), "_user_status")));
 
         run.Diagnostics.ShouldBe([ArrayEntryError(file.Text!, "public._user_status", place, "public.user_status[]")]);
         TextsOf(run).ShouldBeEmpty();
@@ -627,17 +645,20 @@ public sealed class TypeOverrideLevelTests
     }
 
     // The quotes let the key name a schema and a type that a plain key cannot, and the MSBuild value splits after
-    // them.
+    // them.  A test of the MSBuild path: the value is the property or the file's metadata.
     [Theory]
-    [InlineData(SettingLevel.Property, ThePropertyPlace)]
-    [InlineData(SettingLevel.Metadata, TheMetadataPlace)]
-    public void Run_QuotedSchemaAndNameInAnMSBuildValue_MapsTheTypeAndSplitsAfterThem(SettingLevel level, string place)
+    [InlineData(true, ThePropertyPlace)]
+    [InlineData(false, TheMetadataPlace)]
+    public void Run_QuotedSchemaAndNameInAnMSBuildValue_MapsTheTypeAndSplitsAfterThem(bool property, string place)
     {
-        var settings = new LevelSettings().At(level, Setting.TypeOverrides, QuotedKey + "=System.Guid int4=long");
-        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+        const string Value = QuotedKey + "=System.Guid int4=long";
+        var file = OnMSBuild(
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"),
+            property ? null : Value
+        );
 
-        var run = Run(
-            settings.PropertyOf(Setting.TypeOverrides),
+        var run = RunOnMSBuild(
+            property ? Value : null,
             (file, [Entry(file, "GetUser", Composite("my schema", "order-status"), Int4)])
         );
 
@@ -656,12 +677,9 @@ public sealed class TypeOverrideLevelTests
     public void Run_QuotedSchemaAndNameInAMarker_MapsTheType(SettingLevel level, string place)
     {
         var settings = new LevelSettings().At(level, Setting.TypeOverrides, QuotedKey + " = System.Guid");
-        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+        var files = settings.Files(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
 
-        var run = Run(
-            settings.PropertyOf(Setting.TypeOverrides),
-            (file, [Entry(file, "GetUser", Composite("my schema", "order-status"))])
-        );
+        var run = Run(settings, files, Entry(files[0], "GetUser", Composite("my schema", "order-status")));
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
@@ -695,7 +713,7 @@ public sealed class TypeOverrideLevelTests
     public void Run_MappedTypeNotFound_IsSqlsrc250AtEachQueryThatUsesItNamingThePlace(SettingLevel level, string place)
     {
         var settings = new LevelSettings().At(level, Setting.TypeOverrides, EntryAt(level, "int4", "MyApp.Missing"));
-        var file = settings.File(
+        var files = settings.Files(
             new SqlFile(
                 GeneratorHarness.UsersPath,
                 "-- name: GetFirst\nSELECT 1;\n\n-- name: GetSecond\nSELECT 2;\n\n-- name: GetText\nSELECT 3;\n"
@@ -703,14 +721,15 @@ public sealed class TypeOverrideLevelTests
             "GetFirst",
             "GetSecond"
         );
+        var file = files[0];
         var text = file.Text!;
 
         var run = Run(
-            settings.PropertyOf(Setting.TypeOverrides),
-            (
-                file,
-                [Entry(file, "GetFirst", Int4), Entry(file, "GetSecond", Int4), Entry(file, "GetText", Catalog("text"))]
-            )
+            settings,
+            files,
+            Entry(file, "GetFirst", Int4),
+            Entry(file, "GetSecond", Int4),
+            Entry(file, "GetText", Catalog("text"))
         );
 
         string[] reported = ["GetFirst", "GetSecond"];
@@ -838,10 +857,44 @@ public sealed class TypeOverrideLevelTests
             new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = property }
         );
 
-    // The entry of the key as its level writes it: in an MSBuild value without spaces around =, and in a marker with
-    // them.
+    // The first of the files, a .sql file, with its sidecar of the entries, and the others, under the project's
+    // settings of the level settings.
+    private static GeneratorRun Run(LevelSettings settings, SqlFile[] files, params SidecarEntry[] entries) =>
+        ModelRuns.Run(
+            Source,
+            [files[0], Sidecars.Of(files[0], entries), .. files.Skip(1)],
+            settings: settings.ProjectSettings
+        );
+
+    // The files with their sidecars at Models under postgres, each setting the MSBuild way: the output, the dialect and
+    // the type override, or none, are the project's properties, for a test of the MSBuild path.
+    private static GeneratorRun RunOnMSBuild(string? property, params (SqlFile File, SidecarEntry[] Entries)[] files) =>
+        GeneratorHarness.Run(
+            null,
+            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [.. files.SelectMany(file => new[] { file.File, Sidecars.Of(file.File, file.Entries) })],
+            references: [NpgsqlReferences.Npgsql10],
+            properties: new Dictionary<string, string?>
+            {
+                ["SqlSourceOutput"] = "Models",
+                ["SqlSourceDialect"] = "postgres",
+                ["SqlSourceTypeOverrides"] = property,
+            }
+        );
+
+    // The file with the type override as its metadata, or the file unchanged when it is null.
+    private static SqlFile OnMSBuild(SqlFile file, string? metadata) =>
+        metadata is null
+            ? file
+            : file with
+            {
+                Metadata = new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = metadata },
+            };
+
+    // The entry of the key as its level writes it: in a settings file a JSON object of the one entry, and in a marker
+    // with spaces around =.
     private static string EntryAt(SettingLevel level, string key, string type) =>
-        level is SettingLevel.Property or SettingLevel.Metadata ? key + "=" + type : key + " = " + type;
+        LevelSettings.IsFile(level) ? GeneratorHarness.Json(new JsonObject { [key] = type }) : key + " = " + type;
 
     // An entry of the query for its current hash, with a column of each type, named c0, c1 and so on.
     private static SidecarEntry Entry(SqlFile file, string name, params PostgresType[] columns) =>

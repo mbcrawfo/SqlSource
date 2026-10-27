@@ -24,7 +24,8 @@ internal static class MethodRuns
     public const string MethodsFile = "App.Sample-Methods.g.cs";
 
     // The source and the file with its sidecar of these entries, at CodeGen under postgres, on Npgsql 10 unless the
-    // references are given.
+    // references are given.  The output and the dialect are the project's settings file, with the settings' entries
+    // over them, and the other files are the run's beside the file and its sidecar.
     public static GeneratorRun Run(
         SqlFile file,
         SidecarEntry[] entries,
@@ -32,16 +33,19 @@ internal static class MethodRuns
         MetadataReference[]? references = null,
         string dialect = "postgres",
         IReadOnlyDictionary<string, string?>? properties = null,
-        LanguageVersion languageVersion = LanguageVersion.CSharp12
+        LanguageVersion languageVersion = LanguageVersion.CSharp12,
+        string? settings = null,
+        SqlFile[]? otherFiles = null
     ) =>
         GeneratorHarness.Run(
             OutputKind.CodeGen,
             [new SourceFile(GeneratorHarness.SourcePath, source)],
-            [file, Sidecars.Of(file, entries)],
+            [file, Sidecars.Of(file, entries), .. otherFiles ?? []],
             languageVersion: languageVersion,
             references: references ?? [NpgsqlReferences.Npgsql10],
             dialect: dialect,
-            properties: properties
+            properties: properties,
+            settings: settings
         );
 
     // The source and these files, each sidecar among them, at CodeGen under postgres on Npgsql 10: the run of a test
@@ -61,8 +65,18 @@ internal static class MethodRuns
         SidecarEntry[] entries,
         string source = Source,
         MetadataReference[]? references = null,
-        IReadOnlyDictionary<string, string?>? properties = null
-    ) => Run(file, entries, source, references ?? [SqlClientReferences.SqlClient7], "mssql", properties);
+        IReadOnlyDictionary<string, string?>? properties = null,
+        string? settings = null
+    ) =>
+        Run(
+            file,
+            entries,
+            source,
+            references ?? [SqlClientReferences.SqlClient7],
+            "mssql",
+            properties,
+            settings: settings
+        );
 
     // An entry of an mssql query for its current hash: with rows when it has columns, and without when they are null.
     // The parameters and columns are numbered by their place.

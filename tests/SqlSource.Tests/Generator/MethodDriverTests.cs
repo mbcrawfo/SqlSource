@@ -78,8 +78,7 @@ public sealed class MethodDriverTests
     {
         var orders = new SqlFile(
             "/app/Repo/Orders.sql",
-            "-- name: GetOrder\nSELECT id FROM orders;\n",
-            Dialect: "mssql"
+            "-- dialect: mssql\n-- name: GetOrder\nSELECT id FROM orders;\n"
         );
         var ordersEntry = MethodRuns.SqlServerEntry(
             orders,

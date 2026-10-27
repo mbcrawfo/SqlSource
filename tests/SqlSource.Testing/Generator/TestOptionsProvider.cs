@@ -8,8 +8,11 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Testing.Generator;
 
 // What MSBuild tells a generator, as the compiler hands it over: the project's properties, and the metadata of each
-// .sql file by the file's path.  A null value is a project that does not set the property, and a path that is not
-// listed is a file without metadata.  A property or a metadata is named as MSBuild names it: SqlSourceOutput.
+// .sql file by the file's path, for the tests of the MSBuild path.  A null value is a project that does not set the
+// property, and a path that is not listed is a file without metadata.  A property or a metadata is named as MSBuild
+// names it: SqlSourceOutput.  GeneratorHarness writes a run's output, dialect and generator parameters into the
+// project's settings file instead, and gives a provider only the test's properties and each file's dialect and
+// metadata.
 //
 // The output is the project's SqlSourceOutput, and every test that builds a provider states it: a null output is a
 // project that does not set it, for a test that needs that, of the default, of the output's levels or of a reader.

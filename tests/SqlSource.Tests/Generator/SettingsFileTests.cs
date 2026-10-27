@@ -109,10 +109,11 @@ public sealed class SettingsFileTests
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + Postgres + "\";");
     }
 
+    // A test of the MSBuild path: the output and the dialect are the project's properties.
     [Fact]
     public void Run_DialectInTheFolder_OverridesTheProperty()
     {
-        var run = Run(
+        var run = RunOnMSBuild(
             "mysql",
             GeneratorHarness.SettingsFile(
                 "/app/Repo/sqlsource.json", /*lang=json,strict*/
@@ -125,10 +126,11 @@ public sealed class SettingsFileTests
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + Postgres + "\";");
     }
 
+    // A test of the MSBuild path: the output is the project's property.
     [Fact]
     public void Run_DialectInTheFolder_OverridesTheMetadata()
     {
-        var run = Run(
+        var run = RunOnMSBuild(
             null,
             GeneratorHarness.SettingsFile(
                 "/app/Repo/sqlsource.json", /*lang=json,strict*/
@@ -157,11 +159,12 @@ public sealed class SettingsFileTests
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + NotPostgres + "\";");
     }
 
-    // The metadata said something, and what it said is wrong, whatever the folder's file says.
+    // The metadata said something, and what it said is wrong, whatever the folder's file says.  A test of the MSBuild
+    // path: the output is the project's property.
     [Fact]
     public void Run_InvalidMetadataUnderTheFoldersDialect_IsStillReported()
     {
-        var run = Run(
+        var run = RunOnMSBuild(
             null,
             GeneratorHarness.SettingsFile(
                 "/app/Repo/sqlsource.json", /*lang=json,strict*/
@@ -197,8 +200,8 @@ public sealed class SettingsFileTests
         run.Sources["App.Sample.g.cs"].ShouldContain(KeptConstant);
     }
 
-    // The nearer file's list replaces the farther one's and the property's whole, so no level outside the file can
-    // ask for comments, the form with them is not built and the constant has none.
+    // The nearer file's list replaces the farther files' whole, the project's file's among them, so no level outside
+    // the nearer file can ask for comments, the form with them is not built and the constant has none.
     [Fact]
     public void Run_EmptyListInANearerFile_ParsesAndEmitsNoFormWithComments()
     {
@@ -227,10 +230,11 @@ public sealed class SettingsFileTests
         run.Sources["App.Sample.g.cs"].ShouldContain(StrippedConstant);
     }
 
+    // A test of the MSBuild path: the output is the project's property.
     [Fact]
     public void Run_KeepCommentsInTheFolder_OverridesTheMetadatasListForTheParse()
     {
-        var run = Run(
+        var run = RunOnMSBuild(
             null,
             GeneratorHarness.SettingsFile(
                 "/app/Repo/sqlsource.json", /*lang=json,strict*/
@@ -279,7 +283,6 @@ public sealed class SettingsFileTests
                 StringComparison.Ordinal
             ),
             null,
-            null,
             GeneratorHarness.SettingsFile(
                 SettingsPath, /*lang=json,strict*/
                 """{"inputModelSuffix":"In","outputModelSuffix":"Row"}"""
@@ -290,17 +293,34 @@ public sealed class SettingsFileTests
         ModelFiles(run).ShouldBe(["App.GetUserArgs-Model.g.cs", "App.GetUserRow-Model.g.cs"]);
     }
 
+    // A test of the MSBuild path: the output and the dialect are the project's properties too.
     [Fact]
     public void Run_FolderOverridesTheMetadataAndTheProperty()
     {
-        var run = RunUsers(
-            Source,
-            new Dictionary<string, string> { ["SqlSourceInputModelSuffix"] = "Meta" },
-            new Dictionary<string, string?> { ["SqlSourceInputModelSuffix"] = "Prop" },
-            GeneratorHarness.SettingsFile(
-                SettingsPath, /*lang=json,strict*/
-                """{"inputModelSuffix":"In"}"""
-            )
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            GetUser,
+            Metadata: new Dictionary<string, string> { ["SqlSourceInputModelSuffix"] = "Meta" }
+        );
+
+        var run = GeneratorHarness.Run(
+            null,
+            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [
+                GeneratorHarness.SettingsFile(
+                    SettingsPath, /*lang=json,strict*/
+                    """{"inputModelSuffix":"In"}"""
+                ),
+                file,
+                Sidecars.Of(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")])),
+            ],
+            references: [NpgsqlReferences.Npgsql10],
+            properties: new Dictionary<string, string?>
+            {
+                ["SqlSourceOutput"] = "Models",
+                ["SqlSourceDialect"] = "postgres",
+                ["SqlSourceInputModelSuffix"] = "Prop",
+            }
         );
 
         run.ShouldBeClean();
@@ -313,7 +333,6 @@ public sealed class SettingsFileTests
     {
         var run = RunUsers(
             Source,
-            null,
             null,
             GeneratorHarness.SettingsFile(
                 FartherSettingsPath, /*lang=json,strict*/
@@ -330,11 +349,12 @@ public sealed class SettingsFileTests
     }
 
     // A root file that sets nothing else still hides the file above: its dialect does not parse the query, and its
-    // output, codegen, which would need an entry for the query, does not apply.
+    // output, codegen, which would need an entry for the query, does not apply.  The output sql is the project's
+    // property, below every settings file, which no root hides: a test of the MSBuild path.
     [Fact]
     public void Run_RootFileThatSaysNothingElse_HidesTheFilesAbove()
     {
-        var run = Run(
+        var run = RunOnMSBuild(
             null,
             GeneratorHarness.SettingsFile(
                 FartherSettingsPath, /*lang=json,strict*/
@@ -351,21 +371,18 @@ public sealed class SettingsFileTests
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + NotPostgres + "\";");
     }
 
-    // The root file's own settings apply, and the file above it is not read.
+    // The root file's own settings apply, and the file above it, the project's, is not read: the root file gives the
+    // output and the dialect that the project's file gives the others.
     [Fact]
     public void Run_RootFileHidesTheFilesAbove()
     {
         var run = RunUsers(
             Source,
-            null,
-            null,
-            GeneratorHarness.SettingsFile(
-                "/sqlsource.json", /*lang=json,strict*/
-                """{"inputModelSuffix":"Above"}"""
-            ),
+            /*lang=json,strict*/
+            """{"inputModelSuffix":"Above"}""",
             GeneratorHarness.SettingsFile(
                 FartherSettingsPath, /*lang=json,strict*/
-                """{"root":true,"outputModelSuffix":"Row"}"""
+                """{"root":true,"output":"Models","dialect":"postgres","outputModelSuffix":"Row"}"""
             )
         );
 
@@ -434,15 +451,30 @@ public sealed class SettingsFileTests
         column.Key.ShouldBe("public.status");
     }
 
+    // A test of the MSBuild path: the output and the dialect are the project's properties too.
     [Fact]
     public void Run_TypeOverrideInTheFolder_BeatsTheProperty()
     {
-        var run = RunInt4(
-            "int4=long",
-            GeneratorHarness.SettingsFile(
-                SettingsPath, /*lang=json,strict*/
-                """{"typeOverrides":{"int4":"short"}}"""
-            )
+        var file = new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser);
+
+        var run = GeneratorHarness.Run(
+            null,
+            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [
+                GeneratorHarness.SettingsFile(
+                    SettingsPath, /*lang=json,strict*/
+                    """{"typeOverrides":{"int4":"short"}}"""
+                ),
+                file,
+                Sidecars.Of(file, Entry(file, "GetUser", [], [Column("c0", Int4)])),
+            ],
+            references: [NpgsqlReferences.Npgsql10],
+            properties: new Dictionary<string, string?>
+            {
+                ["SqlSourceOutput"] = "Models",
+                ["SqlSourceDialect"] = "postgres",
+                ["SqlSourceTypeOverrides"] = "int4=long",
+            }
         );
 
         run.ShouldBeClean();
@@ -489,7 +521,6 @@ public sealed class SettingsFileTests
     public void Run_MappedTypeNotFound_NamesTheSettingsFile()
     {
         var run = RunInt4(
-            null,
             GeneratorHarness.SettingsFile(
                 SettingsPath, /*lang=json,strict*/
                 """{"typeOverrides":{"int4":"MyApp.Missing"}}"""
@@ -620,16 +651,18 @@ public sealed class SettingsFileTests
 
     // Every item is under /app, whose file ends each chain, so no chain reaches the file at the root.  The attribute's
     // file has a path that is not rooted where the compiler sets no folder for generated files, as the test driver
-    // does, so it is no item; in a build it is under the intermediate folder, which reaches nothing either.
+    // does, so it is no item; in a build it is under the intermediate folder, which reaches nothing either.  The root
+    // file gives the output, so the run writes no project's file, and the broken one is at its path.
     [Fact]
     public void Run_FileAboveARoot_IsNotReported()
     {
-        var run = Run(
+        var run = GeneratorHarness.Run(
             null,
-            GeneratorHarness.SettingsFile("/sqlsource.json", "{"),
+            GeneratorHarness.SampleSource(null),
+            GeneratorHarness.SettingsFile(GeneratorHarness.ProjectSettingsPath, "{"),
             GeneratorHarness.SettingsFile(
                 FartherSettingsPath, /*lang=json,strict*/
-                """{"root": true}"""
+                """{"root": true, "output": "Sql"}"""
             ),
             new SqlFile(QueryPath, Query)
         );
@@ -638,12 +671,13 @@ public sealed class SettingsFileTests
     }
 
     // A tree whose path is not rooted, as another generator's file is where the compiler sets no folder for generated
-    // files, is no C# file of the project, so its chain reaches nothing, not even the file at the root.
+    // files, is no C# file of the project, so its chain reaches nothing, not even the file at the root.  The root file
+    // gives the output, so the run writes no project's file, and the broken one is at its path.
     [Fact]
     public void Run_TreeOfAnotherGenerator_ReachesNoSettingsFile()
     {
         var run = GeneratorHarness.Run(
-            OutputKind.Sql,
+            null,
             [
                 new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null)),
                 new SourceFile(
@@ -652,10 +686,10 @@ public sealed class SettingsFileTests
                 ),
             ],
             [
-                GeneratorHarness.SettingsFile("/sqlsource.json", "{"),
+                GeneratorHarness.SettingsFile(GeneratorHarness.ProjectSettingsPath, "{"),
                 GeneratorHarness.SettingsFile(
                     FartherSettingsPath, /*lang=json,strict*/
-                    """{"root": true}"""
+                    """{"root": true, "output": "Sql"}"""
                 ),
                 new SqlFile(QueryPath, Query),
             ]
@@ -751,12 +785,13 @@ public sealed class SettingsFileTests
     }
 
     // The targets escape a folder's # and ;, at which the compiler would cut the value, and the generator decodes them,
-    // so a project under /repo/My#App keeps its build's files out.
+    // so a project under /repo/My#App keeps its build's files out.  The project's root file gives the output, since it
+    // hides a project's file of the run.
     [Fact]
     public void Run_CompileItemUnderAnEscapedIntermediateFolder_ReachesNoSettingsFile()
     {
         var run = GeneratorHarness.Run(
-            OutputKind.Sql,
+            null,
             [
                 new SourceFile("/repo/My#App/App/Sample.cs", GeneratorHarness.SampleSource(null)),
                 new SourceFile(
@@ -768,7 +803,7 @@ public sealed class SettingsFileTests
                 GeneratorHarness.SettingsFile("/repo/sqlsource.json", "{"),
                 GeneratorHarness.SettingsFile(
                     "/repo/My#App/App/sqlsource.json", /*lang=json,strict*/
-                    """{"root": true}"""
+                    """{"root": true, "output": "Sql"}"""
                 ),
                 new SqlFile("/repo/My#App/App/Q.sql", Query),
             ],
@@ -810,18 +845,18 @@ public sealed class SettingsFileTests
     }
 
     // A .sql file is an item of the project wherever it is, so one under the intermediate folder still reaches the
-    // files above it.
+    // files above it.  The project's root file gives the output, since it hides a project's file of the run.
     [Fact]
     public void Run_SqlFileUnderTheIntermediateFolder_ReachesTheFileAboveTheRoot()
     {
         var run = GeneratorHarness.Run(
-            OutputKind.Sql,
+            null,
             [new SourceFile("/repo/App/Sample.cs", GeneratorHarness.SampleSource(null))],
             [
                 GeneratorHarness.SettingsFile("/repo/sqlsource.json", "{"),
                 GeneratorHarness.SettingsFile(
                     "/repo/App/sqlsource.json", /*lang=json,strict*/
-                    """{"root": true}"""
+                    """{"root": true, "output": "Sql"}"""
                 ),
                 new SqlFile("/repo/App/Q.sql", Query),
                 new SqlFile("/repo/artifacts/obj/App/Generated.sql", Query),
@@ -833,15 +868,17 @@ public sealed class SettingsFileTests
     }
 
     // The text of /app's file is not JSON, so its root is unknown and the chain goes on to the root's file.  Both are
-    // reported, in the order of their folders.
+    // reported, in the order of their folders.  The root's file gives the output, so the run writes no project's file,
+    // and the test's own is at its path.
     [Fact]
     public void Run_FileAboveAFileThatIsNotJson_IsReported()
     {
-        var run = Run(
+        var run = GeneratorHarness.Run(
             null,
+            GeneratorHarness.SampleSource(null),
             GeneratorHarness.SettingsFile(
-                "/sqlsource.json", /*lang=json,strict*/
-                """{"bogus":1}"""
+                GeneratorHarness.ProjectSettingsPath, /*lang=json,strict*/
+                """{"output":"Sql","bogus":1}"""
             ),
             GeneratorHarness.SettingsFile(FartherSettingsPath, "{"),
             new SqlFile(QueryPath, Query)
@@ -970,14 +1007,24 @@ public sealed class SettingsFileTests
             dialect: dialect
         );
 
-    // The type and its .sql file in /repo/App, whose settings file is a root, and a broken settings file at the
-    // repository's root, /repo, with one more C# file at the path given, under the properties given.
+    // The files at sql under the dialect, null for none, each the project's property, for a test of the MSBuild path.
+    private static GeneratorRun RunOnMSBuild(string? dialect, params SqlFile[] files) =>
+        GeneratorHarness.Run(
+            null,
+            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
+            files,
+            properties: new Dictionary<string, string?> { ["SqlSourceOutput"] = "Sql", ["SqlSourceDialect"] = dialect }
+        );
+
+    // The type and its .sql file in /repo/App, whose settings file is a root that gives the output, since it hides a
+    // project's file of the run, and a broken settings file at the repository's root, /repo, with one more C# file at
+    // the path given, under the properties given.
     private static GeneratorRun RunOutsideTheProject(
         string compilePath,
         IReadOnlyDictionary<string, string?>? properties
     ) =>
         GeneratorHarness.Run(
-            OutputKind.Sql,
+            null,
             [
                 new SourceFile("/repo/App/Sample.cs", GeneratorHarness.SampleSource(null)),
                 new SourceFile(compilePath, "[assembly: System.Reflection.AssemblyMetadata(\"Built\", \"yes\")]\n"),
@@ -986,39 +1033,32 @@ public sealed class SettingsFileTests
                 GeneratorHarness.SettingsFile("/repo/sqlsource.json", "{"),
                 GeneratorHarness.SettingsFile(
                     "/repo/App/sqlsource.json", /*lang=json,strict*/
-                    """{"root": true}"""
+                    """{"root": true, "output": "Sql"}"""
                 ),
                 new SqlFile("/repo/App/Q.sql", Query),
             ],
             properties: properties
         );
 
-    // GetUser of Users, at Models under postgres, with an entry of one parameter and one column, both id, and the
-    // metadata of its item, the properties and the settings files given.
-    private static GeneratorRun RunUsers(
-        string source,
-        IReadOnlyDictionary<string, string>? metadata,
-        IReadOnlyDictionary<string, string?>? properties,
-        params SqlFile[] settingsFiles
-    )
+    // GetUser of Users, at Models under postgres, with an entry of one parameter and one column, both id, the
+    // project's settings and the settings files given.
+    private static GeneratorRun RunUsers(string source, string? settings, params SqlFile[] settingsFiles)
     {
-        var file = new SqlFile(GeneratorHarness.UsersPath, GetUser, Metadata: metadata);
+        var file = new SqlFile(GeneratorHarness.UsersPath, GetUser);
         return ModelRuns.Run(
             source,
             [.. settingsFiles, file, Sidecars.Of(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")]))],
-            properties
+            settings: settings
         );
     }
 
-    // GetUser of Users, at Models under postgres, with an entry of one column of int4, under the property's type
-    // override and the settings files given.
-    private static GeneratorRun RunInt4(string? typeOverrides, params SqlFile[] settingsFiles)
+    // GetUser of Users, at Models under postgres, with an entry of one column of int4, under the settings files given.
+    private static GeneratorRun RunInt4(params SqlFile[] settingsFiles)
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser);
         return ModelRuns.Run(
             Source,
-            [.. settingsFiles, file, Sidecars.Of(file, Entry(file, "GetUser", [], [Column("c0", Int4)]))],
-            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = typeOverrides }
+            [.. settingsFiles, file, Sidecars.Of(file, Entry(file, "GetUser", [], [Column("c0", Int4)]))]
         );
     }
 

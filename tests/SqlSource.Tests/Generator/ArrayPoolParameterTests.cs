@@ -25,7 +25,7 @@ public sealed class ArrayPoolParameterTests
     private const string Default = "default";
 
     [Theory]
-    // property, metadata, attribute, preamble, query
+    // project's file, folder's file, attribute, preamble, query
     [InlineData(null, null, null, null, null, true)]
     [InlineData(On, null, null, null, null, false)]
     [InlineData(On, Default, null, null, null, true)]
@@ -40,28 +40,31 @@ public sealed class ArrayPoolParameterTests
     [InlineData(On, On, On, On, Default, true)]
     [InlineData(null, null, null, Default, On, false)]
     public void Run_NoArrayPool_ComesWholeFromTheMostSpecificLevelThatGivesAList(
-        string? property,
-        string? metadata,
+        string? projectFile,
+        string? folderFile,
         string? attribute,
         string? preamble,
         string? query,
         bool expected
     )
     {
+        var settings = new LevelSettings();
+        if (folderFile is not null)
+        {
+            _ = settings.At(
+                SettingLevel.FolderFile,
+                Setting.GeneratorParameters,
+                LevelSettings.WordsAt(SettingLevel.FolderFile, folderFile)
+            );
+        }
+
         var sql =
             (preamble is null ? string.Empty : "-- generator: " + preamble + "\n")
             + "-- name: ListUsers\n"
             + (query is null ? string.Empty : "-- generator: " + query + "\n")
             + "SELECT id, name FROM users;\n";
-        var file = new SqlFile(
-            GeneratorHarness.UsersPath,
-            sql,
-            Metadata: metadata is null
-                ? null
-                : new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = metadata }
-        );
 
-        var run = Run(file, attribute, property);
+        var run = Run(settings.Files(new SqlFile(GeneratorHarness.UsersPath, sql)), attribute, projectFile);
 
         run.ShouldBeClean();
         Method(run).UseArrayPool.ShouldBe(expected);
@@ -108,8 +111,8 @@ public sealed class ArrayPoolParameterTests
         var sql = hasRows ? "SELECT id, name FROM users;\n" : "UPDATE users SET name = name;\n";
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListUsers -> " + shape + "\n" + sql);
 
-        var pooled = Run(file, null, null, hasRows: hasRows);
-        var unpooled = Run(file, "no-array-pool", null, hasRows: hasRows);
+        var pooled = Run([file], null, null, hasRows: hasRows);
+        var unpooled = Run([file], "no-array-pool", null, hasRows: hasRows);
 
         pooled.ShouldBeClean();
         unpooled.ShouldBeClean();
@@ -117,12 +120,24 @@ public sealed class ArrayPoolParameterTests
         unpooled.Sources[MethodRuns.MethodsFile].ShouldBe(pooled.Sources[MethodRuns.MethodsFile]);
     }
 
+    // A test of the MSBuild path: the output, the dialect and the parameters are the project's properties.
     [Fact]
     public void Run_PropertyWithAMisspeltWordBesideNoArrayPool_IsAnErrorAndNoArrayPoolApplies()
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListUsers\nSELECT id, name FROM users;\n");
 
-        var run = Run(file, null, "no-arraypool no-array-pool");
+        var run = GeneratorHarness.Run(
+            null,
+            [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
+            [file, Sidecars.Of(file, Entries(file, hasRows: true))],
+            references: [NpgsqlReferences.Npgsql10],
+            properties: new Dictionary<string, string?>
+            {
+                ["SqlSourceOutput"] = "CodeGen",
+                ["SqlSourceDialect"] = "postgres",
+                ["SqlSourceGeneratorParameters"] = "no-arraypool no-array-pool",
+            }
+        );
 
         run.Diagnostics.ShouldBe([
             "SQLSRC014 (1,1)-(1,1): 'no-arraypool' is not a valid value of SqlSourceGeneratorParameters",
@@ -136,7 +151,7 @@ public sealed class ArrayPoolParameterTests
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListUsers\nSELECT id, name FROM users;\n");
 
-        var run = Run(file, "no-array-pool nope", null);
+        var run = Run([file], "no-array-pool nope", null);
 
         var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
         diagnostic.ShouldStartWith("SQLSRC006 /app/Repo/Sample.cs(");
@@ -150,8 +165,8 @@ public sealed class ArrayPoolParameterTests
         var collectionType = "CollectionType = GeneratorCollectionType." + collection;
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListUsers\nSELECT id, name FROM users;\n");
 
-        var pooled = Run(file, collectionType, null, attributeArguments: true);
-        var unpooled = Run(file, collectionType + ", Parameters = \"no-array-pool\"", null, attributeArguments: true);
+        var pooled = Run([file], collectionType, null, attributeArguments: true);
+        var unpooled = Run([file], collectionType + ", Parameters = \"no-array-pool\"", null, attributeArguments: true);
 
         pooled.ShouldBeClean();
         unpooled.ShouldBeClean();
@@ -164,31 +179,32 @@ public sealed class ArrayPoolParameterTests
     private static QueryMethod Method(GeneratorRun run) =>
         StepOutputs.Single<TypeMethods>(run, TrackingNames.TypeMethods).Methods.ShouldHaveSingleItem();
 
-    // The file and its sidecar at CodeGen under postgres on Npgsql 10, on App.Sample with the attribute's Parameters,
-    // or with the attribute's arguments as they are, and the property.  The entry of ListUsers has the rows id and
-    // name, or none.
+    // The first of the files, a .sql file, with its sidecar, and the others, at CodeGen under postgres on Npgsql 10, on
+    // App.Sample with the attribute's Parameters, or with the attribute's arguments as they are, and the generator
+    // parameters of the project's settings file.  The entry of ListUsers has the rows id and name, or none.
     private static GeneratorRun Run(
-        SqlFile file,
+        SqlFile[] files,
         string? attribute,
-        string? property,
+        string? projectFile,
         bool attributeArguments = false,
         bool hasRows = true
     )
     {
-        SidecarEntry[] entries =
-        [
-            Entry(file, "ListUsers", [], hasRows ? [Column("id"), Column("name", Text, nullable: true)] : null),
-        ];
+        var file = files[0];
         var arguments = attributeArguments ? attribute : "Parameters = \"" + attribute + "\"";
         var source = attribute is null ? MethodRuns.Source : MethodRuns.SampleSource(arguments!);
 
         return GeneratorHarness.Run(
             OutputKind.CodeGen,
             [new SourceFile(GeneratorHarness.SourcePath, source)],
-            [file, Sidecars.Of(file, entries)],
+            [.. files, Sidecars.Of(file, Entries(file, hasRows))],
             references: [NpgsqlReferences.Npgsql10],
-            generatorParameters: property,
+            generatorParameters: projectFile,
             dialect: "postgres"
         );
     }
+
+    // The entry of ListUsers, with the rows id and name, or none.
+    private static SidecarEntry[] Entries(SqlFile file, bool hasRows) =>
+        [Entry(file, "ListUsers", [], hasRows ? [Column("id"), Column("name", Text, nullable: true)] : null)];
 }
