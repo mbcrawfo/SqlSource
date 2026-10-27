@@ -96,7 +96,7 @@ public sealed class RunPlannerErrorTests : IDisposable
     {
         var project = ProjectOnMSBuild("nosuch");
         // Nothing needs an entry, so that the dialect is all that is wrong.
-        project.Settings["output"] = "sql";
+        project.Properties["SqlSourceOutput"] = "sql";
         _ = project.AddSql("Q/One.sql", "SELECT 1;");
 
         var result = Plans.Result(project);
@@ -109,7 +109,7 @@ public sealed class RunPlannerErrorTests : IDisposable
     public void Plan_MetadataThatIsNoDialect_IsSqlsrc011OnceForEachValueOfAClaimedFile()
     {
         var project = ProjectOnMSBuild();
-        project.Settings["output"] = "sql";
+        project.Properties["SqlSourceOutput"] = "sql";
         _ = project.AddSql("Q/A.sql", "SELECT 1;", ("SqlSourceDialect", "bad-one"));
         _ = project.AddSql("Q/B.sql", "SELECT 1;", ("SqlSourceDialect", "bad-one"));
         _ = project.AddSql("Q/C.sql", "SELECT 1;", ("SqlSourceDialect", "another"));

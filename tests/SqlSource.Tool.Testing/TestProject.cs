@@ -38,8 +38,7 @@ internal sealed class TestProject
 
     // The project's own settings file, sqlsource.json in the folder of the project file, as a user writes it.  Whenever
     // it has a key, the file is written from it each time the manifest is, so that a change made after the runner was
-    // told of the project still reaches the run, and listed before every other settings file, as the build lists the
-    // files of the farther folders first.
+    // told of the project still reaches the run, and listed before the files a test adds or lists.
     public JsonObject Settings { get; } = [];
 
     // The path of the project's own settings file.
@@ -153,7 +152,8 @@ internal sealed class TestProject
         return this;
     }
 
-    // A path in any case is the same file on a disk that ignores case, as the disks of macOS and Windows do.
+    // Ignores case on every platform, so that a test refused on one disk is refused on all: a path in another case is
+    // the same file on a disk that ignores case, as the disks of macOS and Windows do.
     private bool IsSettingsPath(string path) =>
         string.Equals(Path.GetFullPath(path), Path.GetFullPath(SettingsPath), StringComparison.OrdinalIgnoreCase);
 
