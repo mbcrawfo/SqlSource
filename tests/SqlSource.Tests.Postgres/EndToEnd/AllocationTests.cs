@@ -46,8 +46,8 @@ public sealed class AllocationTests(PostgresContainer postgres)
     // of their own state, on every run: through the pool, the generated GetAccountName allocated 16 bytes more than the
     // hand-written one, ListAccounts the same and ListClosedBefore 8 bytes less; under no-array-pool, GetAccountName 8
     // bytes more, ListAccounts 8 bytes less and ListClosedBefore 16 bytes less.  The numbers queries at 3 rows
-    // allocated 1.6 to 2.2 KB a call, and the generated method of each of their eight pairs, NumbersAsList, IList,
-    // ICollection and ImmutableArray through the pool and under no-array-pool, allocated 16 bytes more than the
+    // allocated about 1.6 to 2.3 KB a call, and the generated method of each of their eight pairs, NumbersAsList,
+    // IList, ICollection and ImmutableArray through the pool and under no-array-pool, allocated 16 bytes more than the
     // hand-written one on every run.  A boxed value is 24 bytes.  The binding's own cost, the driver's for each
     // parameter and its DataTypeName, is in both sides alike.  So an extra boxed value, array or closure on each call
     // shows, a few of them exceed the margin, and the commonest difference does not move with the driver's share of a
@@ -394,8 +394,8 @@ public sealed class AllocationTests(PostgresContainer postgres)
     }
 
     // Many rows, where the pool matters: a list that grows by doubling to hold 300 rows allocates arrays of 4 to 512
-    // elements, about 8.4 KB beyond the 300 rows and the final array, and the pooled method rents a buffer of 512 from
-    // the pool and allocates the 300 rows and the final array alone.  So the generated method allocates less than the
+    // elements, about 8.4 KB beyond the 300 rows and the final array, and the pooled method rents its buffers from the
+    // pool, so it allocates the 300 rows and the final array alone.  So the generated method allocates less than the
     // hand-written one, by about the growth arrays.
     [Fact]
     public async Task NumbersAsArray_PerCallOfAFewHundredRows_AllocatesLessThanAListCopiedToAnArray()
@@ -1081,8 +1081,8 @@ public sealed class AllocationTests(PostgresContainer postgres)
         }
     }
 
-    // NumbersNoPoolAsArray of Queries/RowBuffers.sql, by hand, the rows into a List, copied to an array: what the
-    // pooled NumbersAsArray is held against for a few hundred rows.
+    // NumbersAsArray of Queries/RowBuffers.sql, by hand, the rows into a List, copied to an array: the baseline of
+    // List and ToArray() that the pooled NumbersAsArray is held against for a few hundred rows.
     [SuppressMessage(
         "Performance",
         "CA1849:Call async methods when in an async method",

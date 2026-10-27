@@ -112,13 +112,19 @@ public sealed class RowBufferQueryTests(PostgresContainer postgres)
         ShouldReadOneToTheCountAsync<ImmutableArray<CountedNumber>>(
             count,
             (connection, token) =>
-                ImmutableRows(connection.NumbersAsImmutableArray(new(count), cancellationToken: token), count),
+                ImmutableRowsNeverDefault(
+                    connection.NumbersAsImmutableArray(new(count), cancellationToken: token),
+                    count
+                ),
             (connection, token) =>
-                ImmutableRows(connection.NumbersNoPoolAsImmutableArray(new(count), cancellationToken: token), count)
+                ImmutableRowsNeverDefault(
+                    connection.NumbersNoPoolAsImmutableArray(new(count), cancellationToken: token),
+                    count
+                )
         );
 
-    // The pooled method's rows are what the shape of TRows says and the numbers from 1 to the count, in order, and so
-    // are its twin's.  Reads both on one connection and gives the rows of the pooled method to afterwards.
+    // Reads the pooled method and its twin under no-array-pool on one connection, and asserts that both return a TRows
+    // and the numbers from 1 to the count, in order.  Then passes the pooled result, as the TRows it is, to afterwards.
     private async Task ShouldReadOneToTheCountAsync<TRows>(
         int count,
         Func<NpgsqlConnection, CancellationToken, Task<IEnumerable<CountedNumber>>> pooled,
@@ -158,18 +164,19 @@ public sealed class RowBufferQueryTests(PostgresContainer postgres)
 
         var second = await again();
 
-        second.ShouldBeOfType<List<CountedNumber>>().ShouldNotBeSameAs(rows);
-        second.ShouldBe(Enumerable.Range(1, count).Select(n => new CountedNumber(n)));
-        ((List<CountedNumber>)second).Capacity.ShouldBe(count);
+        var secondList = second.ShouldBeOfType<List<CountedNumber>>();
+        secondList.ShouldNotBeSameAs(rows);
+        secondList.ShouldBe(Enumerable.Range(1, count).Select(n => new CountedNumber(n)));
+        secondList.Capacity.ShouldBe(count);
     }
 
     // The rows of a method that declares another type, as the IEnumerable that the readers return.
     private static async Task<IEnumerable<CountedNumber>> Rows<T>(Task<T> rows)
         where T : IEnumerable<CountedNumber> => await rows;
 
-    // The rows of a method that declares an ImmutableArray, boxed as the IEnumerable that the readers return, which is
-    // never the default and, for no rows, ImmutableArray.Empty.
-    private static async Task<IEnumerable<CountedNumber>> ImmutableRows(
+    // The rows of a method that declares an ImmutableArray, boxed as the IEnumerable that the readers return.  It
+    // asserts that the array is never the default and, for no rows, is ImmutableArray.Empty.
+    private static async Task<IEnumerable<CountedNumber>> ImmutableRowsNeverDefault(
         Task<ImmutableArray<CountedNumber>> rows,
         int count
     )
