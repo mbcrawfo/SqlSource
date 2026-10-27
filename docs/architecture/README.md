@@ -6,7 +6,7 @@ These pages explain how SqlSource's code works and how its parts hand work to ea
 
 SqlSource ships two packages.
 
-- **`SqlSource`** is the generator.  Its assembly, built from `src/SqlSource`, targets `netstandard2.0` because the C# compiler loads it.  It holds `SqlSourceGenerator`, an `IIncrementalGenerator`, and the package's one suppressor, `AttributeConflictSuppressor`.  The package also carries `src/SqlSource/build/SqlSource.props` and `src/SqlSource/build/SqlSource.targets`, which NuGet imports into every project that references it: they hand the project's `.sql` files and settings to the compiler, and hold the target `SqlSourceWriteManifest`, which writes the manifest.
+- **`SqlSource`** is the generator.  Its assembly, built from `src/SqlSource`, targets `netstandard2.0` because the C# compiler loads it.  It holds `SqlSourceGenerator`, an `IIncrementalGenerator`, and the package's one suppressor, `AttributeConflictSuppressor`.  The package also carries `src/SqlSource/build/SqlSource.props` and `src/SqlSource/build/SqlSource.targets`, which NuGet imports into every project that references it: they hand the project's `.sql` files and settings files to the compiler, and hold the target `SqlSourceWriteManifest`, which writes the manifest.
 - **`SqlSource.Tool`** is the `sqlsource` command, packed as a .NET tool.  Its assembly, built from `src/SqlSource.Tool`, targets `net8.0` and has one command, `describe`, which asks a database about each query and writes the query's sidecar.  The tool's package carries the generator assembly too, since the tool runs the generator's code.
 
 ## How a query flows
@@ -29,7 +29,7 @@ flowchart LR
     sidecar -->|"checked and read"| generator
 ```
 
-In a build, the compiler gives the generator the project's `.sql` files and their sidecars as additional files, its settings as MSBuild properties and item metadata, and the types that carry `[SqlSourceGenerate]`, an attribute the generator itself adds to the compilation.  The generator parses each file that a type claims and writes the type's file: a constant for each query whose output is `Sql` or `Models`, or a method for such a query that has tokens.  It also reads the sidecar of each claimed file, and reports a query that needs an entry and has no current one, as [sidecars](generator.md#sidecars) describes.  From each entry that passed the checks it gives the query's parameters and columns their C# types, and writes the query's models, once for each full name across the project, as [models](generator.md#models) describes.  For each query whose output is `CodeGen` and that has what it needs, it writes a method that runs the query, in place of its constant, in a file of the type's methods, as [query methods](generator.md#query-methods) describes, and reads and binds a type that a type override, a column type or a marker chose through the project's [converters](generator.md#converters).
+In a build, the compiler gives the generator the project's `.sql` files, their sidecars and its settings files as additional files, one MSBuild property, `SqlSourceBuildFolders`, which names the folders the build writes into, and the types that carry `[SqlSourceGenerate]`, an attribute the generator itself adds to the compilation.  The generator parses each file that a type claims and writes the type's file: a constant for each query whose output is `Sql` or `Models`, or a method for such a query that has tokens.  It also reads the sidecar of each claimed file, and reports a query that needs an entry and has no current one, as [sidecars](generator.md#sidecars) describes.  From each entry that passed the checks it gives the query's parameters and columns their C# types, and writes the query's models, once for each full name across the project, as [models](generator.md#models) describes.  For each query whose output is `CodeGen` and that has what it needs, it writes a method that runs the query, in place of its constant, in a file of the type's methods, as [query methods](generator.md#query-methods) describes, and reads and binds a type that a type override, a column type or a marker chose through the project's [converters](generator.md#converters).
 
 Outside a build, `sqlsource describe` finds the run unit and evaluates its projects with `dotnet msbuild`, which runs `SqlSourceWriteManifest`.  It finds `[SqlSourceGenerate]` in a manifest's `Compile` files by syntax, with `AttributeReader`, and reads the manifest's `.sql` files that a type claims.  From those it plans the run with the generator's own code, asks each query's database through a describer, and writes a sidecar beside each `.sql` file.
 
@@ -39,7 +39,7 @@ The models and the query methods are the parts of the generated code that a side
 
 Code that both the generator and the tool use lives in the generator assembly.  The tool references `src/SqlSource/SqlSource.csproj` by a plain `ProjectReference`, and the generator's project lists `SqlSource.Tool` under `InternalsVisibleTo`, so the tool calls the generator's internal types directly and copies none of them.
 
-The tool plans a run with the generator's path resolver, settings readers, readers of settings files, parser and hash, among them `PathResolver`, `ListedSettingsFile`, `SettingsFileSet`, `SqlFileReader`, `QuerySettings` and `SqlQueryHash`, so that it claims the same files and computes the same hashes as a build.  [`GeneratorParityTests`](../../tests/SqlSource.Tool.Tests/Planning/GeneratorParityTests.cs) holds the two to the same claims, to the same `SQLSRC209` and `SQLSRC210`, to the same order of `SQLSRC011` and `SQLSRC014`, which both report, and to the same `SQLSRC015` to `SQLSRC020` of the settings files a case reaches.  The tool also reads, compares and writes sidecars with the generator assembly's `SidecarReader`, `SidecarComparer` and `SidecarWriter`, the generator reads them with the same `SidecarReader`, and the tool reports its errors with the descriptors of `ToolDiagnostics`.
+The tool plans a run with the generator's path resolver, readers of settings files, parser and hash, among them `PathResolver`, `ListedSettingsFile`, `SettingsFileSet`, `SqlFileReader`, `QuerySettings` and `SqlQueryHash`, so that it claims the same files and computes the same hashes as a build.  [`GeneratorParityTests`](../../tests/SqlSource.Tool.Tests/Planning/GeneratorParityTests.cs) holds the two to the same claims, to the same `SQLSRC209` and `SQLSRC210`, and to the same `SQLSRC015` to `SQLSRC020` of the settings files a case reaches.  The tool also reads, compares and writes sidecars with the generator assembly's `SidecarReader`, `SidecarComparer` and `SidecarWriter`, the generator reads them with the same `SidecarReader`, and the tool reports its errors with the descriptors of `ToolDiagnostics`.
 
 ## Glossary
 
@@ -71,7 +71,7 @@ The name of a generated file, which `HintName` builds from identifier values: `<
 
 ### Manifest
 
-What the compiler is given for one project, which the target `SqlSourceWriteManifest` writes to a file for the tool: the project's `.sql` files with their metadata, the package's properties, the settings files, the `Compile` files and a few properties of the SDK.  The tool reads it with `ManifestReader` into a `ProjectManifest`.
+What the compiler is given for one project, which the target `SqlSourceWriteManifest` writes to a file for the tool: the project's `.sql` files, the settings files, the `Compile` files, the folders the build writes into and a few properties of the SDK.  It holds no setting.  The tool reads it with `ManifestReader` into a `ProjectManifest`.
 
 ### Origin
 
@@ -87,7 +87,7 @@ The one solution or project that a `describe` run is on, a `RunUnit`.  `RunUnitF
 
 ### Settings level
 
-A `SettingsLevel`: what one source says about the settings, whether the markers of a query and its file, a type's attribute, the metadata of a file's item, the project's properties or a settings file.  `QuerySettings.Resolve` puts the levels together, the most specific first.
+A `SettingsLevel`: what one source says about the settings, whether the markers of a query and its file, a type's attribute or a settings file.  `QuerySettings.Resolve` puts the levels together, the most specific first.
 
 ### Sidecar
 
@@ -96,7 +96,7 @@ The `<file>.sql.json` file that `sqlsource describe` writes beside a `.sql` file
 ## Reading guide
 
 - [The generator](generator.md): the incremental pipeline and its steps, how the settings are read and resolved in two stages, how a settings file is read, how a `.sql` file is parsed, how each claimed file's sidecar is read and checked, the C# types, the converters and the models of a query, what is written for a type and for a model, how diagnostics travel, and the sidecar model the assembly holds.
-- [The MSBuild files and the manifest](msbuild-and-manifest.md): what the props and targets hand the compiler, how they trim each value, and the manifest, whose format is the contract between the package and the tool, with its known limits.
+- [The MSBuild files and the manifest](msbuild-and-manifest.md): what the props and targets hand the compiler, how they find the settings files, and the manifest, whose format is the contract between the package and the tool, with its known limits.
 - [The tool](tool.md): how `sqlsource` reads a command line and ends a run, the steps of a `describe` run from the run unit to the sidecars, what each folder does and uses of the generator, and how a run reports and logs.
 - [The PostgreSQL describer](postgres-describer.md): the contract every describer implements, the exchange its calls go through and how a capture is recorded and replayed, then how the PostgreSQL describer describes one query, builds its parameters and columns, matches a table and chooses each error, and why no query can make it run a statement.
 - [PostgreSQL nullability](postgres-nullability.md): how the describer decides whether a column can be null, from the catalog, the outer-join gate and the generic plan, and how the plan walk reads a plan's joins, outputs, expressions and set operations.

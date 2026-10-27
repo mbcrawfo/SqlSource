@@ -19,7 +19,7 @@ Each page is in this folder.
 | `src/SqlSource/Diagnostics` | `generator.md` | `## Diagnostics` |
 | `src/SqlSource/Snapshot`, with `Reading/` | `generator.md` | `## Snapshot` |
 | `src/SqlSource/Polyfills` | None | It holds the types that `netstandard2.0` lacks, and no design |
-| `src/SqlSource/build` | `msbuild-and-manifest.md` | `## What the props and targets do`, `## Trimming`, `## The manifest`, `## Known limits` |
+| `src/SqlSource/build` | `msbuild-and-manifest.md` | `## What the props and targets do`, `## The manifest`, `## Known limits` |
 | `src/SqlSource.Tool`, its root | `tool.md` | `## The command line`, `## A describe run` |
 | `src/SqlSource.Tool/Projects` | `tool.md` | `## A describe run`, `## Folders`; the manifest's reader in `msbuild-and-manifest.md`, `## The manifest` |
 | `src/SqlSource.Tool/Planning` | `tool.md` | `## A describe run`, `## Folders` |
