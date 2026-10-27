@@ -55,13 +55,13 @@ public sealed class DescribeCommandTests : IDisposable
         _postgres = postgres;
         _run.Describers.Add(new PostgresDescriber());
         _project = Plans.Postgres(_run.Folder, directory: "").AnsweredBy(_run.Processes);
+        _project.Settings["database"] = Database;
     }
 
     public void Dispose() => _run.Dispose();
 
-    // A .sql file of the project, of the database "app".
-    private string AddSql(string relativePath, string text) =>
-        _project.AddSql(relativePath, text, ("SqlSourceDatabase", Database));
+    // A .sql file of the project, of the database "app", which the project's settings file gives.
+    private string AddSql(string relativePath, string text) => _project.AddSql(relativePath, text);
 
     // Each case's query as a file of its own, by the case's name.
     private Dictionary<FixtureCase, string> AddCases() =>

@@ -270,7 +270,7 @@ public sealed class DescribeRunTests : IDisposable
     [Fact]
     public async Task Run_FileThatIsNotReady_FailsItsQueriesWithThePlansErrorAlone()
     {
-        _scene.Project.Properties["SqlSourceDialect"] = "ansi";
+        _scene.Project.Settings["dialect"] = "ansi";
 
         var result = await _scene.DescribeAsync();
 
@@ -282,13 +282,15 @@ public sealed class DescribeRunTests : IDisposable
     }
 
     // The plan reports SQLSRC016 for a settings file that the .sql file reaches, at its line and column.  The queries
-    // are described all the same, and the exit code is 1.
+    // are described all the same, and the exit code is 1.  The file is the project's own, written as the test gives
+    // it, with the dialect after the key that is not one.
     [Fact]
     public async Task Run_SettingsFileWithAnError_IsReportedAtItsPlaceAndFailsTheRun()
     {
+        _scene.Project.Settings.Clear();
         var settings = _scene.Project.AddSettings(
             "sqlsource.json", /*lang=json,strict*/
-            "{\n  \"Dialect\": \"postgres\"\n}"
+            "{\n  \"Dialect\": \"postgres\",\n  \"dialect\": \"postgres\"\n}"
         );
 
         var result = await _scene.DescribeAsync();

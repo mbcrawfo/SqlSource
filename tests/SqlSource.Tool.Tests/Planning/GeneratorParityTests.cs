@@ -332,19 +332,16 @@ public sealed class GeneratorParityTests : IDisposable
     {
         var (dialect, output, sqlFiles) = ErrorCases[name];
         var project = new TestProject(_folder) { LangVersion = "12.0" };
-        project.Properties["SqlSourceDialect"] = dialect;
-        project.Properties["SqlSourceOutput"] = SettingValue.NameOf(output);
+        project.Settings["dialect"] = dialect;
+        project.Settings["output"] = SettingValue.NameOf(output);
         var source = new SourceFile(project.AddSource("Queries.cs", Plans.Type), Plans.Type);
         var listed = sqlFiles.Select(file => new SqlFile(project.AddSql(file.Path, file.Text), file.Text)).ToArray();
 
-        // The generator is given the tool's properties, and no settings file that the tool's side cannot read.
-        var run = GeneratorHarness.Run(
-            null,
-            [source],
-            listed,
-            properties: project.Properties.ToDictionary(pair => pair.Key, string? (pair) => pair.Value)
-        );
+        // The manifest writes the project's settings file, and the generator is given that file, by its path and its
+        // text, and none that the tool's side cannot read.
         var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
+        var settings = GeneratorHarness.SettingsFile(project.SettingsPath, File.ReadAllText(project.SettingsPath));
+        var run = GeneratorHarness.Run(null, [source], [.. listed, settings]);
 
         // Each side is compared by its message, as Reported.MessageOf says.
         var expected = ReportedByGenerator(run, IsCompared);

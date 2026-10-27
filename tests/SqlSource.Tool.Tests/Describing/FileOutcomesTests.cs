@@ -252,7 +252,7 @@ public sealed class FileOutcomesTests : IDisposable
     [Fact]
     public void Decide_FileThatIsNotReady_IsNotTouched()
     {
-        _project.Properties["SqlSourceDialect"] = "ansi";
+        _project.Settings["dialect"] = "ansi";
         var plan = Plans.Of(_project);
         File.WriteAllText(SidecarFormat.PathFor(plan.Files[0].Path), "anything");
 

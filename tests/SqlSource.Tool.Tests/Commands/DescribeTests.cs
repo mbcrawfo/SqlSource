@@ -278,7 +278,7 @@ public sealed class DescribeTests : IDisposable
     public async Task Run_ProjectWhoseQueriesNeedNoEntry_PrintsNothing()
     {
         var project = Plans.Postgres(_run.Folder).AnsweredBy(_run.Processes);
-        project.Properties["SqlSourceOutput"] = "sql";
+        project.Settings["output"] = "sql";
         _ = project.AddSql("One.sql", "-- name: One\nSELECT 1;\n");
 
         var result = await _run.RunAsync("describe", project.ProjectPath);

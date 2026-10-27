@@ -19,7 +19,7 @@ public sealed class FilterTests : IDisposable
     {
         // The project file is in the working directory, so a run that names no unit finds it.
         var project = new TestProject(_run.Folder, directory: "").AnsweredBy(_run.Processes);
-        project.Properties["SqlSourceDialect"] = "postgres";
+        project.Settings["dialect"] = "postgres";
         _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"Q\""));
         _ = project.AddSql("Q/Invoices.sql", "-- database: billing\n-- name: ListInvoices\nSELECT 4;\n");
         _users = project.AddSql("Q/Users.sql", SqlTexts.UsersAndPlain);

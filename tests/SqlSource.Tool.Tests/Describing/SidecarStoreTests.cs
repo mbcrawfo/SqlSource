@@ -70,7 +70,8 @@ public sealed class SidecarStoreTests : IDisposable
         return path;
     }
 
-    // The names of what is in the project's folder, to see that nothing else was left there.
+    // The names of what is in the project's folder, its settings file among them, to see that nothing else was left
+    // there.
     private string[] Left() =>
         [
             .. Directory
@@ -85,7 +86,7 @@ public sealed class SidecarStoreTests : IDisposable
         Apply(Outcome(FileAction.Write, "{\n}\n"));
 
         File.ReadAllBytes(_sidecar).ShouldBe("{\n}\n"u8.ToArray());
-        Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql", "Users.sql.json"]);
+        Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql", "Users.sql.json", "sqlsource.json"]);
         _error.ToString().ShouldBeEmpty();
     }
 
@@ -97,7 +98,7 @@ public sealed class SidecarStoreTests : IDisposable
         Apply(Outcome(FileAction.Write, "new"));
 
         File.ReadAllText(_sidecar).ShouldBe("new");
-        Left().Length.ShouldBe(4);
+        Left().Length.ShouldBe(5);
     }
 
     [Theory]
@@ -167,7 +168,7 @@ public sealed class SidecarStoreTests : IDisposable
         _error.ToString().ShouldStartWith($"{_sidecar} : error SQLSRC218: '{_sidecar}' could not be written: ");
         _error.ToString().ShouldEndWith(Expected.See("SQLSRC218"));
         Directory.Exists(_sidecar).ShouldBeTrue();
-        Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql", "Users.sql.json"]);
+        Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql", "Users.sql.json", "sqlsource.json"]);
     }
 
     [Fact]
@@ -224,7 +225,7 @@ public sealed class SidecarStoreTests : IDisposable
             )
         );
 
-        Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql"]);
+        Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql", "sqlsource.json"]);
     }
 
     [Fact]

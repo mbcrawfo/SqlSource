@@ -127,7 +127,7 @@ public sealed class VerboseTests : IDisposable
     public async Task Run_VerboseWithFilesThatAreNotReady_SaysWhatIsWrongWithEach()
     {
         var broken = _scene.Project.AddSql("Broken.sql", "-- name: One\nSELECT 'open\n");
-        var ansi = _scene.Project.AddSql("Ansi.sql", "-- name: Two\nSELECT 2;\n", ("SqlSourceDialect", "ansi"));
+        var ansi = _scene.Project.AddSql("Ansi.sql", "-- dialect: ansi\n-- name: Two\nSELECT 2;\n");
         var latin1 = _scene.Project.AddSqlBytes(
             "Latin1.sql",
             Encoding.Latin1.GetBytes("-- name: Three\nSELECT 'café';\n")
