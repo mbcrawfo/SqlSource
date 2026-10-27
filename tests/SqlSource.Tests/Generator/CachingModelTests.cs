@@ -30,7 +30,7 @@ public sealed class CachingModelTests
     {
         var compilation = ModelsCompilation();
         var ordersSidecar = TypedSidecar(_scene.Orders, "GetOrder", "int4");
-        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, ordersSidecar);
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, [ordersSidecar]);
 
         // The column of Orders is now text.
         var result = Run(
@@ -121,7 +121,7 @@ public sealed class CachingModelTests
         );
         var usersSidecar = TypedSidecar(users, "GetUser", "int4");
         var ordersSidecar = TypedSidecar(orders, "GetOrder", "int4");
-        var driver = _scene.FirstRunOfModels(compilation, users, orders, usersSidecar, ordersSidecar);
+        var driver = _scene.FirstRunOfModels(compilation, users, orders, [usersSidecar, ordersSidecar]);
         var before = driver.GetRunResult().GeneratedTrees.Single(IsShared).ToString();
         before.ShouldContain("queries <c>GetOrder</c> from <c>Orders.sql</c> and <c>GetUser</c> from <c>Users.sql</c>");
         before.ShouldContain("Row(int Value)");
@@ -208,7 +208,7 @@ public sealed class CachingModelTests
     {
         var compilation = ModelsCompilation();
         var ordersSidecar = TypedSidecar(_scene.Orders, "GetOrder", "int4");
-        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, ordersSidecar);
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, [ordersSidecar]);
 
         var result = Run(driver.RemoveAdditionalTexts([_scene.Orders, ordersSidecar]), compilation);
 
@@ -233,7 +233,7 @@ public sealed class CachingModelTests
     {
         var compilation = ModelsCompilation();
         var ordersSidecar = TypedSidecar(_scene.Orders, "GetOrder", "int4");
-        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, ordersSidecar);
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, [ordersSidecar]);
         var receipts = new InMemoryAdditionalText(
             "/app/Orders/Receipts.sql",
             _scene.Orders.GetText(TestContext.Current.CancellationToken)!.ToString()
@@ -349,7 +349,7 @@ public sealed class CachingModelTests
         var compilation = ModelsCompilation();
         var orders = new InMemoryAdditionalText(_scene.Orders.Path, "-- name: GetOrder\nSELECT 2 WHERE 1 = @id;\n");
         var ordersSidecar = TypedSidecar(orders, "GetOrder", "int4");
-        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, orders, ordersSidecar);
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, orders, [ordersSidecar]);
 
         var result = Run(
             driver.ReplaceAdditionalText(
@@ -394,7 +394,7 @@ public sealed class CachingModelTests
         );
         var usersSidecar = TypedSidecar(users, "GetUser", "int4");
         var ordersSidecar = TypedSidecar(orders, "GetOrder", "int4");
-        var driver = _scene.FirstRunOfModels(compilation, users, orders, usersSidecar, ordersSidecar);
+        var driver = _scene.FirstRunOfModels(compilation, users, orders, [usersSidecar, ordersSidecar]);
 
         var result = Run(driver.RemoveAdditionalTexts([orders, ordersSidecar]), compilation);
 
@@ -429,8 +429,8 @@ public sealed class CachingModelTests
             _scene.Orders.Path,
             _scene.Orders.GetText(TestContext.Current.CancellationToken)!.ToString()
         );
-        var driver = GeneratorHarness
-            .CreateDriver(
+        var driver = CreateDriver(
+                ProjectFileWithTypeOverrides(null),
                 [
                     _scene.Users,
                     _scene.Orders,
@@ -439,8 +439,7 @@ public sealed class CachingModelTests
                     TypedSidecar(_scene.Users, "GetUser", "int4"),
                     TypedSidecar(_scene.Orders, "GetOrder", "int4"),
                     _scene.PaymentsSidecar,
-                ],
-                OptionsWithTypeOverrides(null)
+                ]
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
         var first = driver.GetRunResult();
@@ -500,8 +499,8 @@ public sealed class CachingModelTests
     public void Run_FileListedTwice_ReportsItsTypeAndNameErrorsOnce(bool byCase)
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = GeneratorHarness
-            .CreateDriver(
+        var driver = CreateDriver(
+                ProjectFileWithTypeOverrides(null),
                 [
                     _scene.Users,
                     Again(_scene.Users, byCase),
@@ -509,8 +508,7 @@ public sealed class CachingModelTests
                     Again(_scene.Orders, byCase),
                     TypedSidecar(_scene.Users, "GetUser", "date"),
                     TypedSidecar(_scene.Orders, "GetOrder", "int4", columnName: "api-url"),
-                ],
-                OptionsWithTypeOverrides(null)
+                ]
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
         var first = driver.GetRunResult();
@@ -553,26 +551,22 @@ public sealed class CachingModelTests
         OutputReasons(result).Distinct().ShouldBe([IncrementalStepRunReason.Cached]);
     }
 
-    // No model reads the collection type, so the requests of each type come out equal and nothing after them runs.
+    // An edit of the project's settings file's collection type: no model reads it, so the requests of each type come
+    // out equal and nothing after them runs.
     [Fact]
-    public void Run_CollectionTypePropertyChanged_EmitsNoModelAgain()
+    public void Run_CollectionTypeOfTheProjectsFileChanged_EmitsNoModelAgain()
     {
         var compilation = ModelsCompilation();
-        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders);
+        var project = ProjectFile(OutputKind.Models, "postgres");
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, projectFile: project);
 
-        var result = Run(
-            driver.WithUpdatedAnalyzerConfigOptions(
-                new TestOptionsProvider(
-                    OutputKind.Models,
-                    null,
-                    "postgres",
-                    properties: new Dictionary<string, string?> { ["SqlSourceCollectionType"] = "List" }
-                )
-            ),
-            compilation
+        var edited = ProjectFile(
+            OutputKind.Models,
+            "postgres",
+            /*lang=json,strict*/"""{"collectionType": "List"}"""
         );
+        var result = Run(driver.ReplaceAdditionalText(project, edited), compilation);
 
-        AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Modified]);
         AllReasons(result, TrackingNames.TypeModels)
             .ShouldBe([IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.ModelGroups).ShouldBe([IncrementalStepRunReason.Cached]);

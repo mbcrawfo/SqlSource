@@ -121,18 +121,6 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor InvalidDialect = new(
-        id: "SQLSRC011",
-        title: "SqlSourceDialect is not valid",
-        messageFormat: "'{0}' is not a SQL dialect.  SqlSourceDialect accepts ansi, mssql, postgres, cockroachdb, "
-            + "mysql, mariadb, sqlite and oracle.",
-        category: Category,
-        defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLinkBase + "sqlsrc011",
-        customTags: WellKnownDiagnosticTags.NotConfigurable
-    );
-
     public static readonly DiagnosticDescriptor UnsupportedLanguageVersion = new(
         id: "SQLSRC012",
         title: "Language version is not supported",
@@ -155,14 +143,69 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor InvalidSettingValue = new(
-        id: "SQLSRC014",
-        title: "MSBuild setting is not valid",
+    public static readonly DiagnosticDescriptor SettingsFileNotAnObject = new(
+        id: "SQLSRC015",
+        title: "Settings file is not a JSON object",
+        messageFormat: "This settings file is not one JSON object: {0}",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc015",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SettingsFileUnknownKey = new(
+        id: "SQLSRC016",
+        title: "Settings file key is not known",
+        messageFormat: "'{0}' is not a key of a settings file",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc016",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SettingsFileDuplicateKey = new(
+        id: "SQLSRC017",
+        title: "Settings file key is written twice",
+        messageFormat: "'{0}' is written twice in this settings file, and the first applies",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc017",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SettingsFileWrongType = new(
+        id: "SQLSRC018",
+        title: "Settings file value has the wrong type",
+        messageFormat: "'{0}' takes {1}",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc018",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SettingsFileInvalidValue = new(
+        id: "SQLSRC019",
+        title: "Settings file value is not valid",
         messageFormat: "'{0}' is not a valid value of {1}{2}",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        helpLinkUri: HelpLinkBase + "sqlsrc014",
+        helpLinkUri: HelpLinkBase + "sqlsrc019",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SettingsFileRepeatedKey = new(
+        id: "SQLSRC020",
+        title: "Settings file entry repeats a key",
+        messageFormat: "'{0}' is the same key as '{1}' in {2}, and the first applies",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc020",
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
@@ -554,9 +597,9 @@ internal static class SqlDiagnostics
     );
 
     // {0} is the column or parameter, as "column 'id'", {1} what is mapped, the type override's key or a parameter
-    // as "@author", {2} the C# type, {3} the place that chose it, as "the property SqlSourceTypeOverrides" or "the
-    // -- param: marker of the parameter", and {4} the types a short name in it could mean, as ", and it could be
-    // App.UserId or Other.UserId", or empty.
+    // as "@author", {2} the C# type, {3} the place that chose it, as "the typeOverrides of the settings file
+    // /app/sqlsource.json" or "the -- param: marker of the parameter", and {4} the types a short name in it could
+    // mean, as ", and it could be App.UserId or Other.UserId", or empty.
     public static readonly DiagnosticDescriptor MappedTypeNotFound = new(
         id: "SQLSRC250",
         title: "Mapped type is not found",
@@ -701,7 +744,7 @@ internal static class SqlDiagnostics
     );
 
     // {0} is the column or parameter, as "column 'id'", {1} the entry's key as written, {2} the place that wrote it,
-    // as "the property SqlSourceTypeOverrides", and {3} the key to write, the element's with [].
+    // as "the typeOverrides of the settings file /app/sqlsource.json", and {3} the key to write, the element's with [].
     public static readonly DiagnosticDescriptor ArrayEntryMapsNothing = new(
         id: "SQLSRC261",
         title: "Entry names an array as the catalog does",
@@ -917,10 +960,14 @@ internal static class SqlDiagnostics
             NestedClassNameTaken,
             DuplicateQueryName,
             QueryNamedLikeContainingType,
-            InvalidDialect,
             UnsupportedLanguageVersion,
             PathDiffersOnlyByCase,
-            InvalidSettingValue,
+            SettingsFileNotAnObject,
+            SettingsFileUnknownKey,
+            SettingsFileDuplicateKey,
+            SettingsFileWrongType,
+            SettingsFileInvalidValue,
+            SettingsFileRepeatedKey,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,

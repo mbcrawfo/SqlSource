@@ -20,11 +20,12 @@ public sealed class RunPlannerErrorTests : IDisposable
 
     public void Dispose() => _folder.Dispose();
 
-    // A project of the given dialect, postgres unless a test names another, with one type that claims the folder "Q".
+    // A project whose settings file gives the dialect, postgres unless a test names another, with one type that claims
+    // the folder "Q".
     private TestProject Project(string name = "App", string dialect = "postgres")
     {
         var project = new TestProject(_folder, name);
-        project.Properties["SqlSourceDialect"] = dialect;
+        project.Settings["dialect"] = dialect;
         _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"Q\""));
         return project;
     }
@@ -81,108 +82,10 @@ public sealed class RunPlannerErrorTests : IDisposable
     }
 
     [Fact]
-    public void Plan_PropertyThatIsNoDialect_IsSqlsrc011AtTheProjectAndTheFileIsReadAsAnsi()
-    {
-        var project = Project(dialect: "nosuch");
-        // Nothing needs an entry, so that the dialect is all that is wrong.
-        project.Properties["SqlSourceOutput"] = "sql";
-        _ = project.AddSql("Q/One.sql", "SELECT 1;");
-
-        var result = Plans.Result(project);
-
-        result.Errors.ShouldBe([ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, project.ProjectPath, "nosuch")]);
-        result.Plan.Files.ShouldHaveSingleItem().Dialect.ShouldBe(SqlDialect.Ansi);
-    }
-
-    [Fact]
-    public void Plan_MetadataThatIsNoDialect_IsSqlsrc011OnceForEachValueOfAClaimedFile()
-    {
-        var project = Project();
-        project.Properties["SqlSourceOutput"] = "sql";
-        _ = project.AddSql("Q/A.sql", "SELECT 1;", ("SqlSourceDialect", "bad-one"));
-        _ = project.AddSql("Q/B.sql", "SELECT 1;", ("SqlSourceDialect", "bad-one"));
-        _ = project.AddSql("Q/C.sql", "SELECT 1;", ("SqlSourceDialect", "another"));
-        _ = project.AddSql("Unclaimed/D.sql", "SELECT 1;", ("SqlSourceDialect", "never-read"));
-
-        var result = Plans.Result(project);
-
-        result.Errors.ShouldBe([
-            ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, project.ProjectPath, "another"),
-            ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, project.ProjectPath, "bad-one"),
-        ]);
-        result.Plan.Files.Count.ShouldBe(3);
-        result.Plan.Files.Select(file => file.Dialect).ShouldAllBe(dialect => dialect == SqlDialect.Ansi);
-    }
-
-    [Fact]
-    public void Plan_OutputAndDatabaseThatAreNotValid_AreSqlsrc014AtTheProjectAndAreNotSet()
-    {
-        var project = Project();
-        project.Properties["SqlSourceOutput"] = "everything";
-        project.Properties["SqlSourceDatabase"] = "not a name";
-        _ = project.AddSql("Q/One.sql", "SELECT 1;");
-
-        var result = Plans.Result(project);
-
-        result.Errors.ShouldBe([
-            ToolDiagnostic.AtFile(
-                SqlDiagnostics.InvalidSettingValue,
-                project.ProjectPath,
-                "not a name",
-                "SqlSourceDatabase",
-                ""
-            ),
-            ToolDiagnostic.AtFile(
-                SqlDiagnostics.InvalidSettingValue,
-                project.ProjectPath,
-                "everything",
-                "SqlSourceOutput",
-                ""
-            ),
-        ]);
-        var query = result.Plan.Files.ShouldHaveSingleItem().Queries.ShouldHaveSingleItem();
-        query.NeedsEntry.ShouldBeTrue();
-        query.Database.ShouldBe("postgres");
-    }
-
-    [Fact]
-    public void Plan_MetadataThatIsNotValid_IsSqlsrc014ForAClaimedFileAlone()
-    {
-        var project = Project();
-        _ = project.AddSql("Q/One.sql", "SELECT 1;", ("SqlSourceOutput", "bad"), ("SqlSourceDatabase", "a b"));
-        _ = project.AddSql("Unclaimed/Two.sql", "SELECT 1;", ("SqlSourceOutput", "never-read"));
-
-        Plans
-            .Result(project)
-            .Errors.Select(error => (error.Descriptor.Id, error.Arguments[0], error.Arguments[1]))
-            .ShouldBe([("SQLSRC014", "a b", "SqlSourceDatabase"), ("SQLSRC014", "bad", "SqlSourceOutput")]);
-    }
-
-    // The build reports the settings that the tool does not read.
-    [Fact]
-    public void Plan_SettingTheToolDoesNotRead_IsNotReportedThoughItIsNotValid()
-    {
-        var project = Project();
-        project.Properties["SqlSourceGeneratorParameters"] = "keep-coments";
-        project.Properties["SqlSourceInputModelSuffix"] = "a b";
-        project.Properties["SqlSourceTypeOverrides"] = "timestampz=int";
-        project.Properties["SqlSourceColumnTypes"] = "id=UserId";
-        _ = project.AddSql(
-            "Q/One.sql",
-            "SELECT 1;",
-            ("SqlSourceCollectionType", "bag"),
-            ("SqlSourceTypeOverrides", "int4=int?"),
-            ("SqlSourceColumnTypes", "users.id=int?")
-        );
-
-        Plans.Result(project).Errors.ShouldBeEmpty();
-    }
-
-    [Fact]
     public void Plan_AttributeArgumentThatIsNoLiteral_IsSqlsrc208AndItsTypeClaimsNothing()
     {
         var project = new TestProject(_folder);
-        project.Properties["SqlSourceDialect"] = "postgres";
+        project.Settings["dialect"] = "postgres";
         _ = project.AddSource("A.cs", Plans.TypeNamed("A", "Path = Folder"));
         _ = project.AddSource("B.cs", Plans.TypeNamed("B", "Path = \"Other\""));
         _ = project.AddSql("One.sql", "SELECT 1;");
@@ -194,21 +97,22 @@ public sealed class RunPlannerErrorTests : IDisposable
         result.Plan.Files.Select(file => file.Path).ShouldBe([other]);
     }
 
-    // The errors of a project come in one order, each value once though the property and a file's metadata both
-    // give it, and before the errors of its files: the file is read as ansi, which cannot be described.
+    // The errors of a project come in one order, and before the errors of its files: the claims, then the settings
+    // files, then the file, which is read as ansi and cannot be described.
     [Fact]
-    public void Plan_ProjectWithEveryKindOfError_ReportsThemInOrderAndEachValueOnce()
+    public void Plan_ProjectWithEveryKindOfError_ReportsThemInOrder()
     {
-        var project = Project(dialect: "nosuch");
-        project.Properties["SqlSourceOutput"] = "everything";
+        var project = Project(dialect: "ansi");
         _ = project.AddSource("Other.cs", Plans.TypeNamed("Other", "Path = Folder"));
-        _ = project.AddSql("Q/One.sql", "SELECT 1;", ("SqlSourceDialect", "nosuch"), ("SqlSourceOutput", "everything"));
+        _ = project.AddSettings(
+            "Q/sqlsource.json", /*lang=json,strict*/
+            """{"unknown": 1}"""
+        );
+        _ = project.AddSql("Q/One.sql", "SELECT 1;");
 
         var result = Plans.Result(project);
 
-        result
-            .Errors.Select(error => error.Descriptor.Id)
-            .ShouldBe(["SQLSRC208", "SQLSRC011", "SQLSRC014", "SQLSRC209"]);
+        result.Errors.Select(error => error.Descriptor.Id).ShouldBe(["SQLSRC208", "SQLSRC016", "SQLSRC209"]);
     }
 
     private const string Name = "-- name: ";
@@ -275,7 +179,7 @@ public sealed class RunPlannerErrorTests : IDisposable
     public void Plan_FileNotUtf8WhoseQueriesNeedNoEntry_IsReadyWithNoError()
     {
         var project = Project();
-        project.Properties["SqlSourceOutput"] = "sql";
+        project.Settings["output"] = "sql";
         _ = project.AddSqlBytes("Q/One.sql", Encoding.Latin1.GetBytes("-- name: One\nSELECT 'café';\n"));
 
         var result = Plans.Result(project);
@@ -397,7 +301,7 @@ public sealed class RunPlannerErrorTests : IDisposable
     public void Plan_TwoClaimsWithTwoOutputs_NameTheGreaterInAMessage(string first, string second, string named)
     {
         var project = new TestProject(_folder);
-        project.Properties["SqlSourceDialect"] = "ansi";
+        project.Settings["dialect"] = "ansi";
         _ = project.AddSource(
             "A.cs",
             Plans.TypeNamed("A", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{first}")
@@ -425,8 +329,8 @@ public sealed class RunPlannerErrorTests : IDisposable
         var second = project.AddSql(
             "Q/B.sql",
             InMain
-                + "-- name: Plain\n-- output: sql\nSELECT 0;\n\n-- name: Two\nSELECT 2;\n\n-- name: Three\nSELECT 3;\n",
-            ("SqlSourceDialect", "mssql")
+                + "-- dialect: mssql\n"
+                + "-- name: Plain\n-- output: sql\nSELECT 0;\n\n-- name: Two\nSELECT 2;\n\n-- name: Three\nSELECT 3;\n"
         );
 
         var result = Plans.Result(project);
@@ -435,7 +339,7 @@ public sealed class RunPlannerErrorTests : IDisposable
             ToolDiagnostic.At(
                 ToolDiagnostics.DatabaseHasTwoDialects,
                 second,
-                new LinePosition(5, Name.Length),
+                new LinePosition(6, Name.Length),
                 "main",
                 "mssql",
                 "postgres",
@@ -475,11 +379,7 @@ public sealed class RunPlannerErrorTests : IDisposable
     {
         var project = Project();
         _ = project.AddSql("Q/A.sql", InMain + "-- name: One\nSELECT 1;\n");
-        _ = project.AddSql(
-            "Q/B.sql",
-            InMain + "-- output: sql\n-- name: Two\nSELECT 2;\n",
-            ("SqlSourceDialect", "mssql")
-        );
+        _ = project.AddSql("Q/B.sql", InMain + "-- dialect: mssql\n-- output: sql\n-- name: Two\nSELECT 2;\n");
 
         Plans.Result(project).Errors.ShouldBeEmpty();
     }
@@ -489,7 +389,7 @@ public sealed class RunPlannerErrorTests : IDisposable
     {
         var project = Project();
         // The first file of the database in the plan's order is the one that cannot be described.
-        _ = project.AddSql("Q/A.sql", InMain + "-- name: One\nSELECT 1;\n", ("SqlSourceDialect", "ansi"));
+        _ = project.AddSql("Q/A.sql", InMain + "-- dialect: ansi\n-- name: One\nSELECT 1;\n");
         _ = project.AddSql("Q/B.sql", InMain + "-- name: Two\nSELECT 2;\n");
 
         var result = Plans.Result(project);
@@ -513,7 +413,7 @@ public sealed class RunPlannerErrorTests : IDisposable
     {
         var project = Project();
         _ = project.AddSql("Q/A.sql", InMain + "-- name: One\nSELECT 1;\n");
-        _ = project.AddSql("Q/B.sql", InMain + "-- name: Two\nSELECT 2 {{tail}};\n", ("SqlSourceDialect", "mssql"));
+        _ = project.AddSql("Q/B.sql", InMain + "-- dialect: mssql\n-- name: Two\nSELECT 2 {{tail}};\n");
 
         var result = Plans.Result(project);
 
@@ -534,9 +434,9 @@ public sealed class RunPlannerErrorTests : IDisposable
         );
         _ = project.AddSql(
             "Q/B.sql",
-            "-- name: Three\n-- database: ONE\nSELECT 3;\n\n-- name: Four\n-- database: two\nSELECT 4;\n\n"
-                + "-- name: Five\n-- database: one\nSELECT 5;\n",
-            ("SqlSourceDialect", "mssql")
+            "-- dialect: mssql\n"
+                + "-- name: Three\n-- database: ONE\nSELECT 3;\n\n-- name: Four\n-- database: two\nSELECT 4;\n\n"
+                + "-- name: Five\n-- database: one\nSELECT 5;\n"
         );
 
         Plans.Result(project).Errors.Select(error => error.Arguments[0]).ShouldBe(["one", "two"]);

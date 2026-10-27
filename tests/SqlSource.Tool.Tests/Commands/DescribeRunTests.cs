@@ -266,11 +266,11 @@ public sealed class DescribeRunTests : IDisposable
         _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe("Host=other;Port=5433");
     }
 
-    // The plan reported SQLSRC209 for the file.  Its queries count as failed, and the run adds no error of its own.
+    // The plan reports SQLSRC209 for the file.  Its queries count as failed, and the run adds no error of its own.
     [Fact]
     public async Task Run_FileThatIsNotReady_FailsItsQueriesWithThePlansErrorAlone()
     {
-        _scene.Project.Properties["SqlSourceDialect"] = "ansi";
+        _scene.Project.Settings["dialect"] = "ansi";
 
         var result = await _scene.DescribeAsync();
 
@@ -279,6 +279,31 @@ public sealed class DescribeRunTests : IDisposable
         result.Error.Split("error SQLSRC").Length.ShouldBe(2);
         result.Error.ShouldContain("error SQLSRC209: ");
         _scene.Describer.Opened.ShouldBeEmpty();
+    }
+
+    // The plan reports SQLSRC016 for a settings file that the .sql file reaches, at its line and column.  The queries
+    // are described all the same, and the exit code is 1.  The file is the project's own, written as the test gives
+    // it, with the dialect after the key that is not one.
+    [Fact]
+    public async Task Run_SettingsFileWithAnError_IsReportedAtItsPlaceAndFailsTheRun()
+    {
+        _scene.Project.Settings.Clear();
+        var settings = _scene.Project.AddSettings(
+            "sqlsource.json", /*lang=json,strict*/
+            "{\n  \"Dialect\": \"postgres\",\n  \"dialect\": \"postgres\"\n}"
+        );
+
+        var result = await _scene.DescribeAsync();
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "postgres (postgres): 2 described, 0 skipped, 0 failed\n",
+                $"{settings}(2,3): error SQLSRC016: 'Dialect' is not a key of a settings file\n"
+                    + Expected.See("SQLSRC016")
+                    + DescribeScene.RunAgain
+            )
+        );
     }
 
     // A database that no query of the run can be described for is none that the variable could be meant for.

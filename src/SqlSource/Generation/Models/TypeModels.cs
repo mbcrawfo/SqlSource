@@ -23,12 +23,7 @@ internal static class TypeModels
     /// </summary>
     /// <param name="type">The type with its parsed files.</param>
     /// <param name="files">The models of every claimed file, sorted by path.</param>
-    /// <param name="property">What the project's properties say.</param>
-    public static EquatableArray<ModelRequest> Of(
-        TypeQueries type,
-        EquatableArray<FileModels> files,
-        SettingsLevel property
-    )
+    public static EquatableArray<ModelRequest> Of(TypeQueries type, EquatableArray<FileModels> files)
     {
         var target = type.Type.Type;
         if (type.Type.Diagnostics.Count > 0 || type.Files.Count == 0)
@@ -36,7 +31,7 @@ internal static class TypeModels
             return EquatableArray<ModelRequest>.Empty;
         }
 
-        var usable = TypeEmitter.FindUsableFiles(target, type.Files, type.FileSettings, property, null);
+        var usable = TypeEmitter.FindUsableFiles(target, type.Files, type.FileSettings, null);
         var requests = ImmutableArray.CreateBuilder<ModelRequest>();
         (string Key, string Name)? claimingType = null;
         for (var index = 0; index < type.Files.Count; index++)
@@ -64,8 +59,7 @@ internal static class TypeModels
                 var settings = QuerySettings.Resolve(
                     parsed.Queries[query.Index].Markers,
                     target.Settings,
-                    type.FileSettings[index],
-                    property
+                    type.FileSettings[index]
                 );
                 if (settings.Output is not (OutputKind.Models or OutputKind.CodeGen))
                 {

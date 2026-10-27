@@ -6,7 +6,6 @@ using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Models;
 using SqlSource.Generation.Paths;
-using SqlSource.Settings;
 using SqlSource.Settings.ClrTypes;
 
 namespace SqlSource.Generation.Methods;
@@ -16,7 +15,6 @@ namespace SqlSource.Generation.Methods;
 /// project gives, so that it compares equal until something of this type changes.
 /// </summary>
 /// <param name="Type">The type with its parsed files.</param>
-/// <param name="Property">What the project's properties say.</param>
 /// <param name="Files">
 /// The models of each of the type's files: <c>Files[i]</c> is that of <c>Type.Files[i]</c>, or one with no queries when
 /// it has none.
@@ -37,7 +35,6 @@ namespace SqlSource.Generation.Methods;
 /// </param>
 internal sealed record MethodsInput(
     TypeQueries Type,
-    SettingsLevel Property,
     EquatableArray<FileModels> Files,
     EquatableArray<ModelAssignment> Assignments,
     EquatableArray<string> MemberNames,
@@ -50,7 +47,6 @@ internal sealed record MethodsInput(
     /// for its names, so that the cost does not grow with the other types.
     /// </summary>
     /// <param name="type">The type with its parsed files.</param>
-    /// <param name="property">What the project's properties say.</param>
     /// <param name="allFileModels">The models of every claimed file, sorted by path.</param>
     /// <param name="assignments">Every assignment, ordered by <see cref="ModelAssignment.Order" />.</param>
     /// <param name="memberNames">The names of every type whose methods go on itself, sorted by key ordinally.</param>
@@ -58,7 +54,6 @@ internal sealed record MethodsInput(
     /// <param name="converters">Every converter of the project.</param>
     public static MethodsInput Gather(
         TypeQueries type,
-        SettingsLevel property,
         EquatableArray<FileModels> allFileModels,
         EquatableArray<ModelAssignment> assignments,
         EquatableArray<TypeMemberNames> memberNames,
@@ -78,7 +73,6 @@ internal sealed record MethodsInput(
         var slice = new EquatableArray<FileModels>(files.MoveToImmutable());
         return new MethodsInput(
             type,
-            property,
             slice,
             SliceOf(assignments, key),
             names < 0 ? EquatableArray<string>.Empty : memberNames[names].Names,

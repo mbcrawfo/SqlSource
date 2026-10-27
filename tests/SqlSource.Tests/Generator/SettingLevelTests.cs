@@ -1,7 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using SqlSource.Testing.Generator;
@@ -63,16 +62,17 @@ public sealed class SettingLevelTests
             },
         };
 
-    // Each level with each output.  The property is the least specific level, and codegen is both the default and the
-    // output MethodRuns gives the project, so a property of codegen would decide nothing: that row is left out.
+    // Each level with each output.  The project's file is the least specific level, and codegen is both the default and
+    // the output MethodRuns gives the project, so a project's file of codegen would decide nothing: that row is left
+    // out.
     public static TheoryData<SettingLevel, string> OutputLevels =>
         new()
         {
-            { SettingLevel.Property, "Sql" },
-            { SettingLevel.Property, "Models" },
-            { SettingLevel.Metadata, "Sql" },
-            { SettingLevel.Metadata, "Models" },
-            { SettingLevel.Metadata, "CodeGen" },
+            { SettingLevel.ProjectFile, "Sql" },
+            { SettingLevel.ProjectFile, "Models" },
+            { SettingLevel.FolderFile, "Sql" },
+            { SettingLevel.FolderFile, "Models" },
+            { SettingLevel.FolderFile, "CodeGen" },
             { SettingLevel.Attribute, "Sql" },
             { SettingLevel.Attribute, "Models" },
             { SettingLevel.Attribute, "CodeGen" },
@@ -86,134 +86,13 @@ public sealed class SettingLevelTests
 
     // Every level of a setting that the attribute has too.
     public static TheoryData<SettingLevel> Levels =>
-        [SettingLevel.Property, SettingLevel.Metadata, SettingLevel.Attribute, SettingLevel.Header, SettingLevel.Query];
-
-    // The output's row reads the default's query, whose diagnostic names the output read.  Every other row's query is
-    // at sql by its marker, so that the two runs' type files have a constant to compare.
-    [Theory]
-    [InlineData("SqlSourceOutput", " Code-Gen ", "codegen")]
-    [InlineData("SqlSourceDatabase", "not read by the generator, so never wrong", null)]
-    [InlineData("SqlSourceInputModelSuffix", "Args", null)]
-    [InlineData("SqlSourceOutputModelSuffix", "Row", null)]
-    [InlineData("SqlSourceModelNamespace", "App.Models", null)]
-    [InlineData("SqlSourceInputModelType", "sealed record", null)]
-    [InlineData("SqlSourceOutputModelType", "Class", null)]
-    [InlineData("SqlSourceTypeOverrides", "timestamptz=System.DateTimeOffset  int4[]=int?[]", null)]
-    public void Run_ValidSettingAsPropertyAndAsMetadata_ChangesNoGeneratedCode(
-        string name,
-        string value,
-        string? output
-    )
-    {
-        var text = output is null ? SqlAtSql : Sql;
-        var plain = GeneratorHarness.Run(
-            null,
-            GeneratorHarness.SampleSource(null),
-            new SqlFile("/app/Repo/Q.sql", text)
-        );
-
-        var run = GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
-            [new SqlFile("/app/Repo/Q.sql", text, Metadata: new Dictionary<string, string> { [name] = value })],
-            properties: new Dictionary<string, string?> { [name] = value }
-        );
-
-        plain.Diagnostics.ShouldBe(output is null ? [] : Default);
-        run.Diagnostics.ShouldBe(output is null ? [] : [NotDescribable(output, 1)]);
-        if (output is null)
-        {
-            plain.Sources["App.Sample.g.cs"].ShouldContain(Constant);
-        }
-
-        run.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
-    }
-
-    [Theory]
-    [InlineData("SqlSourceOutput", "model")]
-    [InlineData("SqlSourceOutput", "sql models")]
-    [InlineData("SqlSourceInputModelSuffix", "A B")]
-    [InlineData("SqlSourceOutputModelSuffix", "A.B")]
-    [InlineData("SqlSourceModelNamespace", "App.")]
-    [InlineData("SqlSourceInputModelType", "struct")]
-    [InlineData("SqlSourceOutputModelType", "sealed")]
-    [InlineData("SqlSourceCollectionType", "HashSet")]
-    [InlineData("SqlSourceTypeOverrides", "timestampz=System.DateTimeOffset")]
-    [InlineData("SqlSourceTypeOverrides", "int4=int?")]
-    public void Run_InvalidSettingAsPropertyAndAsMetadata_IsReportedOnceWithoutAPosition(string name, string value)
-    {
-        var run = GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
-            [new SqlFile("/app/Repo/Q.sql", Sql, Metadata: new Dictionary<string, string> { [name] = value })],
-            properties: new Dictionary<string, string?> { [name] = value }
-        );
-
-        // A value that is not valid is not set, and the output is the default.
-        run.Diagnostics.ShouldBe(
-            ["SQLSRC014 (1,1)-(1,1): '" + value + "' is not a valid value of " + name, .. Default],
-            ignoreOrder: true
-        );
-        run.CompilationErrors.ShouldBeEmpty();
-        run.Sources.Keys.ShouldContain("App.Sample.g.cs");
-    }
-
-    // An entry of the type override that is not valid is reported alone.  That the other entries apply is
-    // SettingsLevelReaderTests.Read_TypeOverrideThatIsNotValid_IsRecordedAndTheOthersApply.
-    [Fact]
-    public void Run_TypeOverridesWithAnEntryThatIsNotValid_ReportThatEntryOnce()
-    {
-        const string Value = "int4=long\n  timestampz=System.DateTimeOffset date=System.DateOnly";
-
-        var run = GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
-            [
-                new SqlFile(
-                    "/app/Repo/Q.sql",
-                    Sql,
-                    Metadata: new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = Value }
-                ),
-            ],
-            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = Value }
-        );
-
-        run.Diagnostics.ShouldBe(
-            [
-                "SQLSRC014 (1,1)-(1,1): 'timestampz=System.DateTimeOffset' is not a valid value of "
-                    + "SqlSourceTypeOverrides",
-                .. Default,
-            ],
-            ignoreOrder: true
-        );
-        run.CompilationErrors.ShouldBeEmpty();
-    }
-
-    // A key in brackets, as T-SQL writes a name, is not read, and the error shows the forms that are.
-    [Fact]
-    public void Run_TypeOverrideWithAKeyInBrackets_IsSqlsrc014ShowingTheFormsThatAreRead()
-    {
-        var run = GeneratorHarness.Run(
-            null,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
-            [new SqlFile("/app/Repo/Q.sql", Sql)],
-            properties: new Dictionary<string, string?>
-            {
-                ["SqlSourceTypeOverrides"] = "[dbo].[Email]=MyApp.Email nvarchar=string",
-            }
-        );
-
-        run.Diagnostics.ShouldBe(
-            [
-                "SQLSRC014 (1,1)-(1,1): '[dbo].[Email]=MyApp.Email' is not a valid value of SqlSourceTypeOverrides.  "
-                    + "A key is not written in brackets: write dbo.Email, or \"dbo\".\"Email\" to match its case "
-                    + "exactly",
-                .. Default,
-            ],
-            ignoreOrder: true
-        );
-        run.CompilationErrors.ShouldBeEmpty();
-    }
+        [
+            SettingLevel.ProjectFile,
+            SettingLevel.FolderFile,
+            SettingLevel.Attribute,
+            SettingLevel.Header,
+            SettingLevel.Query,
+        ];
 
     [Theory]
     [InlineData("InputModelSuffix = \"Args\", OutputModelSuffix = \"Row\", ModelNamespace = \"App.Models\"")]
@@ -309,44 +188,49 @@ public sealed class SettingLevelTests
 
     // At sql, so that the query has a constant, which shows the marker's line stripped as a comment.
     [Fact]
-    public void Run_MethodLocationAsAPropertyOrAMarker_IsNotASetting()
+    public void Run_MethodLocationAsAMarker_IsNotASetting()
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, GeneratorHarness.SampleSource(null))],
-            [new SqlFile("/app/Repo/Q.sql", "-- name: Q\n-- method-location: public\nSELECT 1; -- c\n")],
-            properties: new Dictionary<string, string?> { ["SqlSourceMethodLocation"] = "nope" }
+            GeneratorHarness.SampleSource(null),
+            new SqlFile("/app/Repo/Q.sql", "-- name: Q\n-- method-location: public\nSELECT 1; -- c\n")
         );
 
-        // The property is not read, and the line is an ordinary comment.
+        // The line is an ordinary comment.
         run.Diagnostics.ShouldBeEmpty();
         run.Sources["App.Sample.g.cs"].ShouldContain("\"SELECT 1;\"");
     }
 
-    // Below the level the project's property says another output, sql for codegen and codegen otherwise, so that the
+    // Below the level the project's file says another output, sql for codegen and codegen otherwise, so that the
     // level is what decides.
     [Theory]
     [MemberData(nameof(OutputLevels))]
     public void Run_OutputAtEachLevel_DecidesBetweenConstantAndMethod(SettingLevel level, string output)
     {
         var settings = new LevelSettings();
-        if (level != SettingLevel.Property)
+        if (level != SettingLevel.ProjectFile)
         {
-            _ = settings.At(SettingLevel.Property, Setting.Output, output == "CodeGen" ? "Sql" : "CodeGen");
+            _ = settings.At(
+                SettingLevel.ProjectFile,
+                Setting.Output,
+                LevelSettings.StringAt(SettingLevel.ProjectFile, output == "CodeGen" ? "Sql" : "CodeGen")
+            );
         }
 
-        _ = settings.At(level, Setting.Output, output);
-        var file = settings.File(Users);
+        _ = settings.At(level, Setting.Output, LevelSettings.StringAt(level, output));
+        var files = settings.Files(Users);
+        var file = files[0];
 
-        // A property among the settings' replaces the output that MethodRuns gives the project, codegen.  At sql the
-        // query needs no entry, and one would be SQLSRC245.
+        // An output of the project's file among the settings replaces the one MethodRuns gives the project, codegen.
+        // At sql the query needs no entry, and one would be SQLSRC245.
         var run = MethodRuns.Run(
             file,
             output == "Sql"
                 ? []
                 : [ModelRuns.Entry(file, "GetUser", [ModelRuns.Parameter("id")], [ModelRuns.Column("id")])],
             settings.Source(MethodRuns.Source),
-            properties: settings.Properties
+            settings: settings.ProjectSettings,
+            otherFiles: files[1..]
         );
 
         run.ShouldBeClean();
@@ -371,14 +255,16 @@ public sealed class SettingLevelTests
     [MemberData(nameof(Levels))]
     public void Run_CollectionTypeAtEachLevel_IsTheMethodsReturnType(SettingLevel level)
     {
-        var settings = new LevelSettings().At(level, Setting.CollectionType, "List");
-        var file = settings.File(Users);
+        var settings = new LevelSettings().At(level, Setting.CollectionType, LevelSettings.StringAt(level, "List"));
+        var files = settings.Files(Users);
+        var file = files[0];
 
         var run = MethodRuns.Run(
             file,
             [ModelRuns.Entry(file, "GetUser", [ModelRuns.Parameter("id")], [ModelRuns.Column("id")])],
             settings.Source(MethodRuns.Source),
-            properties: settings.Properties
+            settings: settings.ProjectSettings,
+            otherFiles: files[1..]
         );
 
         run.ShouldBeClean();

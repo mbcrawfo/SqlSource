@@ -1,0 +1,4 @@
+{
+    // Beside a C# file and no .sql file.
+    "nestedClass": "Queries"
+}

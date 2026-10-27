@@ -1,0 +1,4 @@
+{
+    // Beside a .sql file that the project links from outside its folder.
+    "database": "shared"
+}

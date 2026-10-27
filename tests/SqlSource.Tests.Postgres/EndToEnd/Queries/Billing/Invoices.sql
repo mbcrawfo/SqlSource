@@ -1,5 +1,5 @@
--- The queries of the database billing, claimed by InvoiceQueries.  The project's metadata gives this folder its model
--- shape, its output suffix and its type override.
+-- The queries of the database billing, claimed by InvoiceQueries.  The folder's settings file gives them their model
+-- shape, their output suffix, their type override and their collection type.
 -- database: billing
 -- model-namespace: SqlSource.Tests.Postgres.EndToEnd.Billing
 

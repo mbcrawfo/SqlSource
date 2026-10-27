@@ -5,11 +5,21 @@ namespace SqlSource.Generation;
 /// </summary>
 internal static class TrackingNames
 {
+    public const string SettingsFile = nameof(SettingsFile);
+
+    public const string SettingsFiles = nameof(SettingsFiles);
+
     public const string TargetTypes = nameof(TargetTypes);
 
     public const string NestedClassCheck = nameof(NestedClassCheck);
 
     public const string SqlPaths = nameof(SqlPaths);
+
+    public const string CompilePaths = nameof(CompilePaths);
+
+    public const string BuildFolders = nameof(BuildFolders);
+
+    public const string ReachedSettingsFiles = nameof(ReachedSettingsFiles);
 
     public const string CaseCollisions = nameof(CaseCollisions);
 
@@ -25,10 +35,6 @@ internal static class TrackingNames
 
     public const string CommentPaths = nameof(CommentPaths);
 
-    public const string ProjectDialect = nameof(ProjectDialect);
-
-    public const string ProjectSettings = nameof(ProjectSettings);
-
     public const string FileParseInput = nameof(FileParseInput);
 
     public const string FileClaim = nameof(FileClaim);
@@ -37,9 +43,9 @@ internal static class TrackingNames
 
     public const string ParsedFiles = nameof(ParsedFiles);
 
-    public const string FileSettings = nameof(FileSettings);
+    public const string FileLevel = nameof(FileLevel);
 
-    public const string FilesSettings = nameof(FilesSettings);
+    public const string FileLevels = nameof(FileLevels);
 
     public const string AmbiguousHintNames = nameof(AmbiguousHintNames);
 

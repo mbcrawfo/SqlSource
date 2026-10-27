@@ -3,11 +3,11 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // The collection type of each level that sets it, each class with its methods on itself, so that the claims of one file
 // do not give one extension method twice.  The files share the output model CollectedAccount.
 
-// The project's property, IReadOnlyList: neither the attribute, the metadata nor a marker sets one.
+// The project's settings file, IReadOnlyList: neither the attribute, a header nor a marker sets one.
 [SqlSourceGenerate(Path = "Queries/Collections/Claimed.sql", MethodLocation = MethodLocation.Public)]
 internal static partial class CollectionQueries;
 
-// The attribute's, over the project's property.
+// The attribute's, over the project's settings file.
 [SqlSourceGenerate(
     Path = "Queries/Collections/Claimed.sql",
     MethodLocation = MethodLocation.Public,
@@ -43,10 +43,10 @@ internal static partial class ListCollectionQueries;
 )]
 internal static partial class ImmutableListCollectionQueries;
 
-// The item metadata of the file, ImmutableArray, over the project's property.
+// The file header of ByMetadata.sql, ImmutableArray, over the project's settings file.
 [SqlSourceGenerate(Path = "Queries/Collections/ByMetadata.sql", MethodLocation = MethodLocation.Public)]
-internal static partial class MetadataCollectionQueries;
+internal static partial class HeaderCollectionQueries;
 
-// The markers of the file header and of the queries, over the project's property.
+// The markers of the file header and of the queries, over the project's settings file.
 [SqlSourceGenerate(Path = "Queries/Collections/ByMarkers.sql", MethodLocation = MethodLocation.Public)]
 internal static partial class MarkerCollectionQueries;

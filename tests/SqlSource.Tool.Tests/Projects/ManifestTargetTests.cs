@@ -3,6 +3,9 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Generation.Chains;
+using SqlSource.Generation.Paths;
+using SqlSource.Tool.Projects;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
@@ -12,47 +15,32 @@ namespace SqlSource.Tool.Tests.Projects;
 // projects of Fixtures/Projects.  Each test starts MSBuild once or twice, which takes a second or two.
 public sealed class ManifestTargetTests : IDisposable
 {
-    private static readonly string[] Names =
-    [
-        "SqlSourceDialect",
-        "SqlSourceDatabase",
-        "SqlSourceOutput",
-        "SqlSourceGeneratorParameters",
-        "SqlSourceInputModelSuffix",
-        "SqlSourceOutputModelSuffix",
-        "SqlSourceModelNamespace",
-        "SqlSourceInputModelType",
-        "SqlSourceOutputModelType",
-        "SqlSourceCollectionType",
-        "SqlSourceTypeOverrides",
-        "SqlSourceColumnTypes",
-    ];
-
-    // The settings that are properties of the project and never metadata of a file.
-    private static readonly string[] PropertyOnlyNames = ["SqlSourceNestedClass"];
+    // The line of the folders the build writes into and the package folders, which is no setting and holds paths of
+    // the machine.
+    private const string BuildFoldersLine = "SqlSourceBuildFolders=";
 
     private readonly FixtureProjects _fixtures = new();
 
     public void Dispose() => _fixtures.Dispose();
 
-    // The lines of one file: its File line and the twelve under it, with the values that are not empty.
-    private static string[] FileLines(string path, params (string Name, string Value)[] metadata) =>
-        [
-            "File=" + path,
-            .. Names.Select(name => $"File.{name}=" + metadata.FirstOrDefault(pair => pair.Name == name).Value),
-        ];
-
-    private static string[] PropertyLines(params (string Name, string Value)[] properties) =>
-        [
-            .. Names
-                .Concat(PropertyOnlyNames)
-                .Select(name => $"Property.{name}=" + properties.FirstOrDefault(pair => pair.Name == name).Value),
-        ];
-
     private static string[] Constants(string[] lines) =>
         lines
             .Single(line => line.StartsWith("DefineConstants=", StringComparison.Ordinal))["DefineConstants=".Length..]
             .Split(';');
+
+    // The folders of the build that the manifest holds, decoded as the generator decodes them.
+    private async Task<string[]> BuildFoldersOfAsync(string project)
+    {
+        var read = ManifestReader.Read(string.Join('\n', await _fixtures.WriteManifestAsync(project)));
+        read.Succeeded.ShouldBeTrue(read.Failure);
+        return [.. BuildFolders.Of(read.Value.ShouldNotBeNull().BuildFolders).Folders];
+    }
+
+    // The value of the line of the folders, escaped as the target writes it.
+    private async Task<string> BuildFoldersValueOfAsync(string project) =>
+        (await _fixtures.WriteManifestAsync(project)).Single(line =>
+            line.StartsWith(BuildFoldersLine, StringComparison.Ordinal)
+        )[BuildFoldersLine.Length..];
 
     [Fact]
     public async Task WriteManifest_ProjectWithOneFramework_HoldsWhatTheCompilerIsGiven()
@@ -63,18 +51,28 @@ public sealed class ManifestTargetTests : IDisposable
         var lines = await _fixtures.WriteManifestAsync(project);
 
         lines
-            .Where(line => !line.StartsWith("DefineConstants=", StringComparison.Ordinal))
+            .Where(line =>
+                !line.StartsWith("DefineConstants=", StringComparison.Ordinal)
+                && !line.StartsWith(BuildFoldersLine, StringComparison.Ordinal)
+            )
             .ShouldBe([
-                "SqlSourceManifest=1",
+                "SqlSourceManifest=2",
                 "Project=" + project,
                 "TargetFramework=net10.0",
                 "LangVersion=14.0",
-                // Each was written on a line of its own, and is trimmed.
-                .. PropertyLines(("SqlSourceDialect", "postgres")),
-                .. FileLines(Path.Combine(folder, "Queries", "Users.sql"), ("SqlSourceDatabase", "billing")),
+                "File=" + Path.Combine(folder, "Queries", "Users.sql"),
+                "Settings=" + Path.Combine(folder, "sqlsource.json"),
                 "Compile=" + Path.Combine(folder, "UserRepository.cs"),
             ]);
         lines[4].ShouldStartWith("DefineConstants=");
+        // Its value is the machine's: WriteManifest_ProjectWithOneFramework_HoldsTheBuildsFolders reads it.
+        lines[5].ShouldStartWith(BuildFoldersLine);
+        lines.Count(line => line.StartsWith(BuildFoldersLine, StringComparison.Ordinal)).ShouldBe(1);
+        // The project's settings are in its sqlsource.json and its file's header, and no line holds a setting.
+        lines.ShouldAllBe(line =>
+            !line.StartsWith("Property.", StringComparison.Ordinal)
+            && !line.StartsWith("File.", StringComparison.Ordinal)
+        );
     }
 
     // The SDK adds the constants of the framework only on the way to a compile, so the manifest target depends on
@@ -93,8 +91,7 @@ public sealed class ManifestTargetTests : IDisposable
         constants.ShouldAllBe(constant => constant.Length > 0);
     }
 
-    // A line break inside a value would end its line of the manifest, and the next line would have no key.  The
-    // trims of the package do not reach a property of the SDK.
+    // A line break inside a value would end its line of the manifest, and the next line would have no key.
     [Fact]
     public async Task WriteManifest_ConstantsWrittenOverSeveralLines_AreOnOneLine()
     {
@@ -121,7 +118,7 @@ public sealed class ManifestTargetTests : IDisposable
             .GetFiles(obj, "App.csproj.SqlSource.manifest", SearchOption.AllDirectories)
             .ShouldHaveSingleItem();
         Path.GetFileName(Path.GetDirectoryName(file)).ShouldBe("net10.0");
-        (await File.ReadAllLinesAsync(file, TestContext.Current.CancellationToken))[0].ShouldBe("SqlSourceManifest=1");
+        (await File.ReadAllLinesAsync(file, TestContext.Current.CancellationToken))[0].ShouldBe("SqlSourceManifest=2");
     }
 
     [Fact]
@@ -168,18 +165,16 @@ public sealed class ManifestTargetTests : IDisposable
             .ShouldBe(["Compile=" + Path.Combine(folder, "Queries.cs")]);
     }
 
+    // The fixture's target hooks SqlSourceListFiles, which the manifest's target depends on first.
     [Fact]
-    public async Task WriteManifest_FileAddedByATargetThatHooksTheTrim_IsListedWithTrimmedMetadata()
+    public async Task WriteManifest_FileAddedByATargetThatHooksSqlSourceListFiles_IsListed()
     {
         var project = _fixtures.Copy("LateFile");
         var folder = Path.GetDirectoryName(project)!;
 
         var lines = await _fixtures.WriteManifestAsync(project);
 
-        var late = FileLines(Path.Combine(folder, "Generated", "Late.sql"), ("SqlSourceDialect", "mssql"));
-        var at = Array.IndexOf(lines, late[0]);
-        at.ShouldBeGreaterThan(0);
-        lines.Skip(at).Take(late.Length).ShouldBe(late);
+        lines.ShouldContain("File=" + Path.Combine(folder, "Generated", "Late.sql"));
         lines.ShouldContain("File=" + Path.Combine(folder, "Queries", "Users.sql"));
     }
 
@@ -213,6 +208,36 @@ public sealed class ManifestTargetTests : IDisposable
             ]);
     }
 
+    // Every sqlsource.json above a .sql file or a Compile item, to the top of the drive, and none in a folder that
+    // holds neither: above the project, in its folder and below, beside a .sql file linked from outside the folder,
+    // beside a C# file, and beside a .sql file that a target adds from the hook the package names.  The project
+    // lists the one above it itself, by a relative path, and it is listed once.  The lines come after the File lines
+    // and before the Compile lines.
+    [Fact]
+    public async Task WriteManifest_SettingsFilesAboveTheFiles_AreListedBetweenTheSqlFilesAndTheCompileFiles()
+    {
+        var project = _fixtures.Copy("SettingsFiles", "App/App.csproj");
+        var fixture = Path.GetDirectoryName(Path.GetDirectoryName(project))!;
+
+        var lines = await _fixtures.WriteManifestAsync(project);
+
+        lines
+            .Where(line => line.StartsWith("Settings=", StringComparison.Ordinal))
+            .ShouldBe(
+                [
+                    .. SettingsFileSearchTests.Found.Select(file =>
+                        "Settings=" + Path.Combine(fixture, file.Replace('/', Path.DirectorySeparatorChar))
+                    ),
+                ],
+                ignoreOrder: true
+            );
+        var settings = Array.FindIndex(lines, line => line.StartsWith("Settings=", StringComparison.Ordinal));
+        settings.ShouldBe(Array.FindLastIndex(lines, line => line.StartsWith("File=", StringComparison.Ordinal)) + 1);
+        Array
+            .FindLastIndex(lines, line => line.StartsWith("Settings=", StringComparison.Ordinal))
+            .ShouldBe(Array.FindIndex(lines, line => line.StartsWith("Compile=", StringComparison.Ordinal)) - 1);
+    }
+
     // MSBuild splits a list at a semicolon and reads "%41" as "A".  A path is none of its lists.
     [Fact]
     public async Task WriteManifest_PathsWithCharactersThatMSBuildReads_AreListedWhole()
@@ -224,21 +249,83 @@ public sealed class ManifestTargetTests : IDisposable
         var lines = await _fixtures.WriteManifestAsync(project);
 
         lines.ShouldContain("File=" + Path.Combine(folder, "a;b=c%41 'é.sql"));
+        lines.ShouldContain("Settings=" + Path.Combine(folder, "sqlsource.json"));
         lines.ShouldContain("Compile=" + Path.Combine(folder, "a;b=c%41 'é.cs"));
     }
 
+    // The tool reads the folders of the build from the manifest as the generator reads them from the compiler's
+    // options: the line holds the obj and bin folders of the project.
     [Fact]
-    public async Task WriteManifest_ValuesThatHoldASemicolon_AreEachOneLine()
+    public async Task WriteManifest_ProjectWithOneFramework_HoldsTheBuildsFolders()
     {
         var project = _fixtures.Copy("Single");
+        var folder = Path.GetDirectoryName(project)!;
 
-        var lines = await _fixtures.WriteManifestAsync(
+        var folders = await BuildFoldersOfAsync(project);
+
+        folders.ShouldContain(SqlPath.Normalize(Path.Combine(folder, "obj") + Path.DirectorySeparatorChar));
+        folders.ShouldContain(SqlPath.Normalize(Path.Combine(folder, "bin") + Path.DirectorySeparatorChar));
+    }
+
+    // A package that ships C# files as content adds Compile items under the folder NuGet restored it to, and their
+    // chain would climb past the project's root file, so the line holds the NuGet package folders too: the global
+    // packages folder, NuGetPackageRoot, once, though NuGetPackageFolders names it as well, and each fallback folder
+    // of NuGetPackageFolders, which the targets split at its ;, with a # that they escape.  A restore writes both
+    // properties into a file under obj that the project imports; without one they have no value.
+    [Fact]
+    public async Task WriteManifest_RestoredProject_HoldsTheNuGetPackageFolders()
+    {
+        var project = _fixtures.Copy("Single");
+        var packages = _fixtures.PathOf("Packages") + Path.DirectorySeparatorChar;
+        var fallback = _fixtures.PathOf("Fallback#1");
+        var other = _fixtures.PathOf("Fallback 2");
+        var (exitCode, output) = await FixtureProjects.RunMSBuildAsync(
             project,
-            "SqlSourceGeneratorParameters=a%3Bb",
-            "SqlSourceModelNamespace=A=B"
+            ["-t:Restore", $"-p:RestorePackagesPath={packages}", $"-p:RestoreFallbackFolders={fallback}%3B{other}"]
         );
+        exitCode.ShouldBe(0, output);
 
-        lines.ShouldContain("Property.SqlSourceGeneratorParameters=a;b");
-        lines.ShouldContain("Property.SqlSourceModelNamespace=A=B");
+        var value = await BuildFoldersValueOfAsync(project);
+
+        value.ShouldContain("Fallback%231" + Path.DirectorySeparatorChar);
+        var folders = BuildFolders.Of(value).Folders;
+        folders.Count(folder => folder == SqlPath.Normalize(packages)).ShouldBe(1);
+        folders.ShouldContain(SqlPath.Normalize(fallback + Path.DirectorySeparatorChar));
+        folders.ShouldContain(SqlPath.Normalize(other + Path.DirectorySeparatorChar));
+    }
+
+    // Before a restore, NuGet has set neither property, and the line holds only the folders the build writes into,
+    // all in the project's folder, and no empty entry: an empty property would be made the project's folder itself,
+    // which holds every file of the project.
+    [Fact]
+    public async Task WriteManifest_ProjectNeverRestored_HoldsNoPackageFolder()
+    {
+        var project = _fixtures.Copy("Single");
+        var folder = SqlPath.Normalize(Path.GetDirectoryName(project)!).ShouldNotBeNull();
+
+        var value = await BuildFoldersValueOfAsync(project);
+
+        value.ShouldNotContain("||");
+        value.ShouldNotEndWith("|");
+        var folders = BuildFolders.Of(value).Folders;
+        folders.ShouldNotBeEmpty();
+        folders.ShouldNotContain(folder);
+        folders.ShouldAllBe(path => SqlPath.IsInFolder(path, folder));
+    }
+
+    // The folder of the project holds a semicolon, "%41" that MSBuild would read as "A", an equals sign, a quote and
+    // an accented letter.  The target escapes the folder's %, |, # and ;, and the manifest line then writes the
+    // property through Escape, which WriteLinesToFile undoes, so the line holds the target's escapes and BuildFolders
+    // decodes them.
+    [Fact]
+    public async Task WriteManifest_BuildFoldersOfAnOddPath_DecodeToTheRealFolders()
+    {
+        var project = _fixtures.Copy("OddPaths", folder: "q;=%41 'é");
+        var folder = Path.GetDirectoryName(project)!;
+
+        var folders = await BuildFoldersOfAsync(project);
+
+        folders.ShouldContain(SqlPath.Normalize(Path.Combine(folder, "obj") + Path.DirectorySeparatorChar));
+        folders.ShouldContain(SqlPath.Normalize(Path.Combine(folder, "bin") + Path.DirectorySeparatorChar));
     }
 }

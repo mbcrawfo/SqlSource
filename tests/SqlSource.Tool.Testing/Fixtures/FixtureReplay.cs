@@ -96,7 +96,6 @@ internal static class FixtureReplay
             new SqlFileText(fixture.QueryPath),
             fixture.QueryPath,
             engine,
-            invalidDialect: null,
             commentsWanted: false,
             token
         );

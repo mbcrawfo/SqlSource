@@ -31,8 +31,9 @@ public sealed class AttributeReaderTests : IDisposable
             TargetFramework = "net10.0",
             LangVersion = langVersion,
             DefineConstants = [.. constants],
-            Properties = [],
+            BuildFolders = "",
             Files = [],
+            SettingsFiles = [],
             CompileFiles = [.. compile],
         };
 

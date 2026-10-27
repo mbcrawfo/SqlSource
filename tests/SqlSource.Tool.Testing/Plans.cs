@@ -14,11 +14,12 @@ internal static class Plans
     public static string TypeNamed(string name, string arguments = "") =>
         $"[SqlSource.SqlSourceGenerate({arguments})]\ninternal static partial class {name};\n";
 
-    // A project whose dialect is postgres, with that type at its root: a .sql file added at the root is claimed.
+    // A project whose settings file says the dialect is postgres, with that type at its root: a .sql file added at the
+    // root is claimed.
     public static TestProject Postgres(TempFolder folder, string name = "App", string? directory = null)
     {
         var project = new TestProject(folder, name, directory);
-        project.Properties["SqlSourceDialect"] = "postgres";
+        project.Settings["dialect"] = "postgres";
         _ = project.AddSource("Queries.cs", Type);
         return project;
     }

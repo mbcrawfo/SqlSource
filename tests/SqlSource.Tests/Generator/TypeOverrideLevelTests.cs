@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Types;
@@ -13,6 +14,7 @@ using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
 using static SqlSource.Testing.Generator.ModelRuns;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -46,9 +48,10 @@ public sealed class TypeOverrideLevelTests
 
     private const string DateTimeOffset = "global::System.DateTimeOffset";
 
-    private const string ThePropertyPlace = "the property SqlSourceTypeOverrides";
+    private const string TheProjectFilePlace =
+        "the typeOverrides of the settings file " + GeneratorHarness.ProjectSettingsPath;
 
-    private const string TheMetadataPlace = "the metadata SqlSourceTypeOverrides of the file";
+    private const string TheFolderFilePlace = "the typeOverrides of the settings file /app/Repo/sqlsource.json";
 
     private const string TheHeaderPlace = "a -- type-override: marker in the file header";
 
@@ -74,8 +77,14 @@ public sealed class TypeOverrideLevelTests
     // A key of timestamptz at each level below a default's, from the least specific, each as its level writes it.
     private static readonly (SettingLevel Level, string Value)[] KeysBelowADefault =
     [
-        (SettingLevel.Property, "timestamptz=System.DateTimeOffset"),
-        (SettingLevel.Metadata, "timestamptz=long"),
+        (
+            SettingLevel.ProjectFile, /*lang=json,strict*/
+            """{"timestamptz": "System.DateTimeOffset"}"""
+        ),
+        (
+            SettingLevel.FolderFile, /*lang=json,strict*/
+            """{"timestamptz": "long"}"""
+        ),
         (SettingLevel.Header, "timestamptz = string"),
     ];
 
@@ -83,22 +92,32 @@ public sealed class TypeOverrideLevelTests
     public static TheoryData<SettingLevel, string> Places =>
         new()
         {
-            { SettingLevel.Property, ThePropertyPlace },
-            { SettingLevel.Metadata, TheMetadataPlace },
+            { SettingLevel.ProjectFile, TheProjectFilePlace },
+            { SettingLevel.FolderFile, TheFolderFilePlace },
             { SettingLevel.Header, TheHeaderPlace },
             { SettingLevel.Query, TheQueryPlace },
         };
 
-    // The property maps timestamptz for the project.  B's metadata replaces it for B, C's header for C, and the
-    // marker of C's second query for that query alone.
+    // The project's file maps timestamptz for the project.  The settings file of B's folder replaces it for B, C's
+    // header for C, and the marker of C's second query for that query alone.  B's folder has a type of its own that
+    // claims B, since a type claims the files of its own folder.
     [Fact]
-    public void Run_EachLevel_ReplacesThePropertysTypeForItsScopeAlone()
+    public void Run_EachLevel_ReplacesTheProjectFilesTypeForItsScopeAlone()
     {
+        const string BSource = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class BQueries;
+            }
+            """;
         var a = new SqlFile("/app/Repo/A.sql", "-- name: GetA\nSELECT 1;\n");
-        var b = new SqlFile(
-            "/app/Repo/B.sql",
-            "-- name: GetB\nSELECT 1;\n",
-            Metadata: new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = "timestamptz=long" }
+        var b = new SqlFile("/app/Repo/B/B.sql", "-- name: GetB\nSELECT 1;\n");
+        var bFolder = GeneratorHarness.SettingsFile(
+            "/app/Repo/B/sqlsource.json", /*lang=json,strict*/
+            """{"typeOverrides": {"timestamptz": "long"}}"""
         );
         var c = new SqlFile(
             "/app/Repo/C.sql",
@@ -106,11 +125,22 @@ public sealed class TypeOverrideLevelTests
                 + "-- type-override: timestamptz = decimal\nSELECT 2;\n"
         );
 
-        var run = Run(
-            "timestamptz=System.DateTimeOffset",
-            (a, [Entry(a, "GetA", Timestamptz)]),
-            (b, [Entry(b, "GetB", Timestamptz)]),
-            (c, [Entry(c, "GetC1", Timestamptz), Entry(c, "GetC2", Timestamptz)])
+        var run = GeneratorHarness.Run(
+            OutputKind.Models,
+            [new SourceFile(GeneratorHarness.SourcePath, Source), new SourceFile("/app/Repo/B/BQueries.cs", BSource)],
+            [
+                a,
+                Sidecars.Of(a, Entry(a, "GetA", Timestamptz)),
+                b,
+                Sidecars.Of(b, Entry(b, "GetB", Timestamptz)),
+                bFolder,
+                c,
+                Sidecars.Of(c, Entry(c, "GetC1", Timestamptz), Entry(c, "GetC2", Timestamptz)),
+            ],
+            references: [NpgsqlReferences.Npgsql10],
+            dialect: "postgres",
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"timestamptz": "System.DateTimeOffset"}}"""
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -129,8 +159,14 @@ public sealed class TypeOverrideLevelTests
 
     // Each level's default hides the key of every level below it, and the base map answers.
     [Theory]
-    [InlineData(SettingLevel.Property, "timestamptz=default")]
-    [InlineData(SettingLevel.Metadata, "timestamptz=default")]
+    [InlineData(
+        SettingLevel.ProjectFile, /*lang=json,strict*/
+        """{"timestamptz": "default"}"""
+    )]
+    [InlineData(
+        SettingLevel.FolderFile, /*lang=json,strict*/
+        """{"timestamptz": "default"}"""
+    )]
     [InlineData(SettingLevel.Header, "timestamptz = default")]
     [InlineData(SettingLevel.Query, "timestamptz = default")]
     public void Run_DefaultAtALevel_GivesTheBaseMapsType(SettingLevel level, string value)
@@ -139,9 +175,10 @@ public sealed class TypeOverrideLevelTests
             .Where(key => key.Level < level)
             .Aggregate(new LevelSettings(), (settings, key) => settings.At(key.Level, Setting.TypeOverrides, key.Value))
             .At(level, Setting.TypeOverrides, value);
-        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+        var files = settings.Files(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+        var file = files[0];
 
-        var run = Run(settings.PropertyOf(Setting.TypeOverrides), (file, [Entry(file, "GetUser", Timestamptz)]));
+        var run = Run(settings, files, Entry(file, "GetUser", Timestamptz));
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
@@ -149,7 +186,7 @@ public sealed class TypeOverrideLevelTests
     }
 
     [Fact]
-    public void Run_QueryThatMapsOneKey_KeepsTheOthersOfTheProperty()
+    public void Run_QueryThatMapsOneKey_KeepsTheOthersOfTheProjectsFile()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -157,7 +194,8 @@ public sealed class TypeOverrideLevelTests
         );
 
         var run = Run(
-            "int4=long timestamptz=System.DateTimeOffset",
+            /*lang=json,strict*/
+            """{"int4": "long", "timestamptz": "System.DateTimeOffset"}""",
             (file, [Entry(file, "GetUser", Int4, Timestamptz)])
         );
 
@@ -165,32 +203,42 @@ public sealed class TypeOverrideLevelTests
         ColumnsOf(run, "GetUser")
             .ShouldBe([
                 new PropertyType("short", true, true, NoWarnings, "int4", TheQueryPlace, IntBase),
-                new PropertyType(DateTimeOffset, true, true, NoWarnings, "timestamptz", ThePropertyPlace, DateTimeBase),
+                new PropertyType(
+                    DateTimeOffset,
+                    true,
+                    true,
+                    NoWarnings,
+                    "timestamptz",
+                    TheProjectFilePlace,
+                    DateTimeBase
+                ),
             ]);
-    }
-
-    [Theory]
-    [InlineData(SettingLevel.Property, ThePropertyPlace)]
-    [InlineData(SettingLevel.Metadata, TheMetadataPlace)]
-    public void Run_KeyTwiceInOneMSBuildValue_TheLastWins(SettingLevel level, string place)
-    {
-        var settings = new LevelSettings().At(level, Setting.TypeOverrides, "int4=long int4=short");
-        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, SqlTexts.GetUser));
-
-        var run = Run(settings.PropertyOf(Setting.TypeOverrides), (file, [Entry(file, "GetUser", Int4)]));
-
-        run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("short", true, true, NoWarnings, "int4", place, IntBase)]);
     }
 
     // An entry for an array is written with its element's key and [], or with its name in the catalog, which is read
     // as the same key for a type of pg_catalog, and for an extension's type in any schema when it is bare.  It wins
     // over the element's entry, which without it gives the array its element type.
     [Theory]
-    [InlineData("int4", "int4=long int4[]=System.Collections.Generic.List<int>", "int4[]")]
-    [InlineData("int4", "int4=long _int4=System.Collections.Generic.List<int>", "int4[]")]
-    [InlineData("citext", "citext=System.Uri citext[]=System.Collections.Generic.List<int>", "citext[]")]
-    [InlineData("citext", "citext=System.Uri _citext=System.Collections.Generic.List<int>", "citext[]")]
+    [InlineData(
+        "int4", /*lang=json,strict*/
+        """{"int4": "long", "int4[]": "System.Collections.Generic.List<int>"}""",
+        "int4[]"
+    )]
+    [InlineData(
+        "int4", /*lang=json,strict*/
+        """{"int4": "long", "_int4": "System.Collections.Generic.List<int>"}""",
+        "int4[]"
+    )]
+    [InlineData(
+        "citext", /*lang=json,strict*/
+        """{"citext": "System.Uri", "citext[]": "System.Collections.Generic.List<int>"}""",
+        "citext[]"
+    )]
+    [InlineData(
+        "citext", /*lang=json,strict*/
+        """{"citext": "System.Uri", "_citext": "System.Collections.Generic.List<int>"}""",
+        "citext[]"
+    )]
     public void Run_ArraysKey_WinsOverItsElements(string element, string overrides, string key)
     {
         var file = GeneratorHarness.UsersFile;
@@ -203,7 +251,15 @@ public sealed class TypeOverrideLevelTests
             element: TestSidecars.Postgres(name: element, schema: schema, internalName: element)
         );
         var (elementOverride, elementType) =
-            element == "citext" ? ("citext=System.Uri", "global::System.Uri[]") : ("int4=long", "long[]");
+            element == "citext"
+                ? ( /*lang=json,strict*/
+                    """{"citext": "System.Uri"}""",
+                    "global::System.Uri[]"
+                )
+                : ( /*lang=json,strict*/
+                    """{"int4": "long"}""",
+                    "long[]"
+                );
         var database =
             element == "citext" ? new DatabaseType("string[]", false, false) : new DatabaseType("int[]", false, true);
 
@@ -219,15 +275,15 @@ public sealed class TypeOverrideLevelTests
                     true,
                     NoWarnings,
                     key,
-                    ThePropertyPlace,
+                    TheProjectFilePlace,
                     database
                 ),
             ]);
         ColumnsOf(ofTheElement, "GetUser")
-            .ShouldBe([new PropertyType(elementType, false, true, NoWarnings, element, ThePropertyPlace, database)]);
+            .ShouldBe([new PropertyType(elementType, false, true, NoWarnings, element, TheProjectFilePlace, database)]);
     }
 
-    // _int4 and int4[] are one key, so the query's entry replaces the property's whichever spelling each has, and
+    // _int4 and int4[] are one key, so the query's entry replaces the project's file's whichever spelling each has, and
     // the query's default gives the array back to the base map.
     [Theory]
     [InlineData(
@@ -245,7 +301,10 @@ public sealed class TypeOverrideLevelTests
             element: Int4
         );
 
-        var run = Run("_int4=System.Collections.Generic.List<int>", (file, [Entry(file, "GetUser", array)]));
+        var run = Run( /*lang=json,strict*/
+            """{"_int4": "System.Collections.Generic.List<int>"}""",
+            (file, [Entry(file, "GetUser", array)])
+        );
 
         run.Diagnostics.ShouldBeEmpty();
         TextsOf(run)["GetUser"].ShouldBe(expected);
@@ -262,12 +321,10 @@ public sealed class TypeOverrideLevelTests
             Setting.TypeOverrides,
             EntryAt(level, "public._user_status", "System.Guid")
         );
-        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+        var files = settings.Files(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+        var file = files[0];
 
-        var run = Run(
-            settings.PropertyOf(Setting.TypeOverrides),
-            (file, [Entry(file, "GetUser", ArrayOf(EnumType("user_status"), "_user_status"))])
-        );
+        var run = Run(settings, files, Entry(file, "GetUser", ArrayOf(EnumType("user_status"), "_user_status")));
 
         run.Diagnostics.ShouldBe([ArrayEntryError(file.Text!, "public._user_status", place, "public.user_status[]")]);
         TextsOf(run).ShouldBeEmpty();
@@ -281,12 +338,13 @@ public sealed class TypeOverrideLevelTests
         var file = new SqlFile(GeneratorHarness.UsersPath, Text);
 
         var run = Run(
-            "public._user_status=default",
+            /*lang=json,strict*/
+            """{"public._user_status": "default"}""",
             (file, [Entry(file, "GetUser", ArrayOf(EnumType("user_status"), "_user_status"))])
         );
 
         run.Diagnostics.ShouldBe([
-            ArrayEntryError(Text, "public._user_status", ThePropertyPlace, "public.user_status[]"),
+            ArrayEntryError(Text, "public._user_status", TheProjectFilePlace, "public.user_status[]"),
         ]);
     }
 
@@ -300,16 +358,18 @@ public sealed class TypeOverrideLevelTests
         var file = new SqlFile(GeneratorHarness.UsersPath, Text);
 
         var run = Run(
-            "public._user_status=System.Guid",
+            /*lang=json,strict*/
+            """{"public._user_status": "System.Guid"}""",
             (file, [Entry(file, "GetUser", ArrayOf(EnumType("user_status"), "_user_status"))])
         );
 
         run.Diagnostics.ShouldBe([
-            ArrayEntryError(Text, "public._user_status", ThePropertyPlace, "public.user_status[]"),
+            ArrayEntryError(Text, "public._user_status", TheProjectFilePlace, "public.user_status[]"),
         ]);
     }
 
-    // The element's key with [] is the array's one key, so a query's default replaces the property's entry for it.
+    // The element's key with [] is the array's one key, so a query's default replaces the project's file's entry for
+    // it.
     [Fact]
     public void Run_ElementsKeyWithBrackets_IsTheArraysOneKeyAtEveryLevel()
     {
@@ -321,7 +381,8 @@ public sealed class TypeOverrideLevelTests
         var array = ArrayOf(EnumType("user_status"), "_user_status");
 
         var run = Run(
-            "public.user_status[]=System.Collections.Generic.List<string>",
+            /*lang=json,strict*/
+            """{"public.user_status[]": "System.Collections.Generic.List<string>"}""",
             (file, [Entry(file, "GetFirst", array), Entry(file, "GetSecond", array)])
         );
 
@@ -346,11 +407,12 @@ public sealed class TypeOverrideLevelTests
         var citext = TestSidecars.Postgres(name: "citext", schema: "public", internalName: "citext");
 
         var run = Run(
-            "public._citext=System.Collections.Generic.List<int>",
+            /*lang=json,strict*/
+            """{"public._citext": "System.Collections.Generic.List<int>"}""",
             (file, [Entry(file, "GetUser", ArrayOf(citext, "_citext"))])
         );
 
-        run.Diagnostics.ShouldBe([ArrayEntryError(Text, "public._citext", ThePropertyPlace, "public.citext[]")]);
+        run.Diagnostics.ShouldBe([ArrayEntryError(Text, "public._citext", TheProjectFilePlace, "public.citext[]")]);
     }
 
     // The parameter is named in the message as a column is.
@@ -369,13 +431,16 @@ public sealed class TypeOverrideLevelTests
             parameters: [TestSidecars.Parameter(0, "statuses", ArrayOf(EnumType("user_status"), "_user_status"))]
         );
 
-        var run = Run("public._user_status=System.Guid", (file, [entry]));
+        var run = Run( /*lang=json,strict*/
+            """{"public._user_status": "System.Guid"}""",
+            (file, [entry])
+        );
 
         run.Diagnostics.ShouldBe([
             ArrayEntryError(
                 Text,
                 "public._user_status",
-                ThePropertyPlace,
+                TheProjectFilePlace,
                 "public.user_status[]",
                 "parameter 'statuses'"
             ),
@@ -390,7 +455,10 @@ public sealed class TypeOverrideLevelTests
         var file = GeneratorHarness.UsersFile;
         var tag = Composite("public", "_tag");
 
-        var run = Run("public._tag=System.Uri", (file, [Entry(file, "GetUser", tag, ArrayOf(tag, "__tag"))]));
+        var run = Run( /*lang=json,strict*/
+            """{"public._tag": "System.Uri"}""",
+            (file, [Entry(file, "GetUser", tag, ArrayOf(tag, "__tag"))])
+        );
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
@@ -412,10 +480,13 @@ public sealed class TypeOverrideLevelTests
             baseType: ArrayOf(EnumType("user_status"), "_user_status")
         );
 
-        var run = Run("public._user_status=System.Guid", (file, [Entry(file, "GetUser", statuses)]));
+        var run = Run( /*lang=json,strict*/
+            """{"public._user_status": "System.Guid"}""",
+            (file, [Entry(file, "GetUser", statuses)])
+        );
 
         run.Diagnostics.ShouldBe([
-            ArrayEntryError(Text, "public._user_status", ThePropertyPlace, "public.user_status[]"),
+            ArrayEntryError(Text, "public._user_status", TheProjectFilePlace, "public.user_status[]"),
         ]);
     }
 
@@ -454,8 +525,14 @@ public sealed class TypeOverrideLevelTests
             baseType: Int4
         );
 
-        var own = Run("int4=long public.user_id=System.Guid", (file, [Entry(file, "GetUser", userId, Int4)]));
-        var ofTheBase = Run("int4=long", (file, [Entry(file, "GetUser", userId)]));
+        var own = Run( /*lang=json,strict*/
+            """{"int4": "long", "public.user_id": "System.Guid"}""",
+            (file, [Entry(file, "GetUser", userId, Int4)])
+        );
+        var ofTheBase = Run( /*lang=json,strict*/
+            """{"int4": "long"}""",
+            (file, [Entry(file, "GetUser", userId)])
+        );
 
         own.Diagnostics.ShouldBeEmpty();
         ColumnsOf(own, "GetUser")
@@ -466,13 +543,13 @@ public sealed class TypeOverrideLevelTests
                     true,
                     NoWarnings,
                     "public.user_id",
-                    ThePropertyPlace,
+                    TheProjectFilePlace,
                     IntBase
                 ),
-                new PropertyType("long", true, true, NoWarnings, "int4", ThePropertyPlace, IntBase),
+                new PropertyType("long", true, true, NoWarnings, "int4", TheProjectFilePlace, IntBase),
             ]);
         ColumnsOf(ofTheBase, "GetUser")
-            .ShouldBe([new PropertyType("long", true, true, NoWarnings, "int4", ThePropertyPlace, IntBase)]);
+            .ShouldBe([new PropertyType("long", true, true, NoWarnings, "int4", TheProjectFilePlace, IntBase)]);
     }
 
     [Fact]
@@ -486,7 +563,10 @@ public sealed class TypeOverrideLevelTests
             subtype: Int4
         );
 
-        var run = Run("int4=long", (file, [Entry(file, "GetUser", range)]));
+        var run = Run( /*lang=json,strict*/
+            """{"int4": "long"}""",
+            (file, [Entry(file, "GetUser", range)])
+        );
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
@@ -503,7 +583,10 @@ public sealed class TypeOverrideLevelTests
         var inPublic = TestSidecars.Postgres(name: "citext", schema: "public", internalName: "citext");
         var inExt = TestSidecars.Postgres(name: "ext.citext", schema: "ext", internalName: "citext");
 
-        var run = Run("citext=System.Uri public.citext=System.Guid", (file, [Entry(file, "GetUser", inPublic, inExt)]));
+        var run = Run( /*lang=json,strict*/
+            """{"citext": "System.Uri", "public.citext": "System.Guid"}""",
+            (file, [Entry(file, "GetUser", inPublic, inExt)])
+        );
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
@@ -514,10 +597,18 @@ public sealed class TypeOverrideLevelTests
                     true,
                     NoWarnings,
                     "public.citext",
-                    ThePropertyPlace,
+                    TheProjectFilePlace,
                     StringBase
                 ),
-                new PropertyType("global::System.Uri", false, true, NoWarnings, "citext", ThePropertyPlace, StringBase),
+                new PropertyType(
+                    "global::System.Uri",
+                    false,
+                    true,
+                    NoWarnings,
+                    "citext",
+                    TheProjectFilePlace,
+                    StringBase
+                ),
             ]);
     }
 
@@ -530,7 +621,8 @@ public sealed class TypeOverrideLevelTests
         var lower = EnumType("status");
 
         var run = Run(
-            "public.Status=System.Guid public.status=System.Uri",
+            /*lang=json,strict*/
+            """{"public.Status": "System.Guid", "public.status": "System.Uri"}""",
             (file, [Entry(file, "GetUser", upper, lower)])
         );
 
@@ -543,7 +635,7 @@ public sealed class TypeOverrideLevelTests
                     true,
                     NoWarnings,
                     "public.Status",
-                    ThePropertyPlace,
+                    TheProjectFilePlace,
                     StringBase
                 ),
                 new PropertyType(
@@ -552,16 +644,16 @@ public sealed class TypeOverrideLevelTests
                     true,
                     NoWarnings,
                     "public.status",
-                    ThePropertyPlace,
+                    TheProjectFilePlace,
                     StringBase
                 ),
             ]);
     }
 
-    // The query's default of the type's key takes the type out of the property's entry whose key differs from it by
-    // case, so the domain gets its base's C# type.
+    // The query's default of the type's key takes the type out of the project's file's entry whose key differs from it
+    // by case, so the domain gets its base's C# type.
     [Fact]
-    public void Run_DefaultOfAQueryThatDiffersByCase_HidesThePropertysEntry()
+    public void Run_DefaultOfAQueryThatDiffersByCase_HidesTheProjectFilesEntry()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -575,23 +667,29 @@ public sealed class TypeOverrideLevelTests
             baseType: Int4
         );
 
-        var run = Run("public.Status=System.Guid", (file, [Entry(file, "GetUser", status)]));
+        var run = Run( /*lang=json,strict*/
+            """{"public.Status": "System.Guid"}""",
+            (file, [Entry(file, "GetUser", status)])
+        );
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("int", true, true, NoWarnings, "int4", null)]);
     }
 
-    // The query's entry replaces the property's for the type, though the property's key is spelled exactly as the
+    // The query's entry replaces the project's file's for the type, though the file's key is spelled exactly as the
     // type's and the query's differs from it by case.
     [Fact]
-    public void Run_EntryOfAQueryThatDiffersByCase_ReplacesThePropertysExactOne()
+    public void Run_EntryOfAQueryThatDiffersByCase_ReplacesTheProjectFilesExactOne()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
             "-- name: GetUser\n-- type-override: public.User_Status = System.Uri\nSELECT 1;\n"
         );
 
-        var run = Run("public.user_status=System.Guid", (file, [Entry(file, "GetUser", EnumType("user_status"))]));
+        var run = Run( /*lang=json,strict*/
+            """{"public.user_status": "System.Guid"}""",
+            (file, [Entry(file, "GetUser", EnumType("user_status"))])
+        );
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
@@ -617,36 +715,16 @@ public sealed class TypeOverrideLevelTests
         var upper = Composite("public", "Status");
         var lower = Composite("public", "status");
 
-        var run = Run("public.\"Status\"=System.Guid", (file, [Entry(file, "GetUser", upper, lower)]));
+        var run = Run( /*lang=json,strict*/
+            """{"public.\"Status\"": "System.Guid"}""",
+            (file, [Entry(file, "GetUser", upper, lower)])
+        );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {NameOf(Text, "GetUser")}: The column 'c1' has the type 'status', "
                 + "which SqlSource cannot give a C# type.  Map it with the type override, as "
                 + "public.status=<a C# type>.",
         ]);
-    }
-
-    // The quotes let the key name a schema and a type that a plain key cannot, and the MSBuild value splits after
-    // them.
-    [Theory]
-    [InlineData(SettingLevel.Property, ThePropertyPlace)]
-    [InlineData(SettingLevel.Metadata, TheMetadataPlace)]
-    public void Run_QuotedSchemaAndNameInAnMSBuildValue_MapsTheTypeAndSplitsAfterThem(SettingLevel level, string place)
-    {
-        var settings = new LevelSettings().At(level, Setting.TypeOverrides, QuotedKey + "=System.Guid int4=long");
-        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
-
-        var run = Run(
-            settings.PropertyOf(Setting.TypeOverrides),
-            (file, [Entry(file, "GetUser", Composite("my schema", "order-status"), Int4)])
-        );
-
-        run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser")
-            .ShouldBe([
-                new PropertyType("global::System.Guid", true, true, NoWarnings, QuotedKey, place, NoBase),
-                new PropertyType("long", true, true, NoWarnings, "int4", place, IntBase),
-            ]);
     }
 
     // The quotes let a marker's key name a schema and a type that a plain key cannot.
@@ -656,12 +734,9 @@ public sealed class TypeOverrideLevelTests
     public void Run_QuotedSchemaAndNameInAMarker_MapsTheType(SettingLevel level, string place)
     {
         var settings = new LevelSettings().At(level, Setting.TypeOverrides, QuotedKey + " = System.Guid");
-        var file = settings.File(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+        var files = settings.Files(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
 
-        var run = Run(
-            settings.PropertyOf(Setting.TypeOverrides),
-            (file, [Entry(file, "GetUser", Composite("my schema", "order-status"))])
-        );
+        var run = Run(settings, files, Entry(files[0], "GetUser", Composite("my schema", "order-status")));
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
@@ -695,7 +770,7 @@ public sealed class TypeOverrideLevelTests
     public void Run_MappedTypeNotFound_IsSqlsrc250AtEachQueryThatUsesItNamingThePlace(SettingLevel level, string place)
     {
         var settings = new LevelSettings().At(level, Setting.TypeOverrides, EntryAt(level, "int4", "MyApp.Missing"));
-        var file = settings.File(
+        var files = settings.Files(
             new SqlFile(
                 GeneratorHarness.UsersPath,
                 "-- name: GetFirst\nSELECT 1;\n\n-- name: GetSecond\nSELECT 2;\n\n-- name: GetText\nSELECT 3;\n"
@@ -703,14 +778,15 @@ public sealed class TypeOverrideLevelTests
             "GetFirst",
             "GetSecond"
         );
+        var file = files[0];
         var text = file.Text!;
 
         var run = Run(
-            settings.PropertyOf(Setting.TypeOverrides),
-            (
-                file,
-                [Entry(file, "GetFirst", Int4), Entry(file, "GetSecond", Int4), Entry(file, "GetText", Catalog("text"))]
-            )
+            settings,
+            files,
+            Entry(file, "GetFirst", Int4),
+            Entry(file, "GetSecond", Int4),
+            Entry(file, "GetText", Catalog("text"))
         );
 
         string[] reported = ["GetFirst", "GetSecond"];
@@ -742,11 +818,11 @@ public sealed class TypeOverrideLevelTests
     {
         var file = GeneratorHarness.UsersFile;
 
-        var run = Run("int4=" + type, (file, [Entry(file, "GetUser", Int4)]));
+        var run = Run($$"""{"int4": "{{type}}"}""", (file, [Entry(file, "GetUser", Int4)]));
 
         run.Diagnostics.ShouldBe([
             $"{id} {GeneratorHarness.UsersPath}(1,10)-(1,17): 'int4' is mapped to '{type}' for column "
-                + $"'c0', in the property SqlSourceTypeOverrides, {reason}",
+                + $"'c0', in {TheProjectFilePlace}, {reason}",
         ]);
     }
 
@@ -765,12 +841,15 @@ public sealed class TypeOverrideLevelTests
             parameters: [TestSidecars.Parameter(0, "id", Int4)]
         );
 
-        var run = Run("int4=MyApp.Missing", (file, [entry]));
+        var run = Run( /*lang=json,strict*/
+            """{"int4": "MyApp.Missing"}""",
+            (file, [entry])
+        );
 
         run.Diagnostics.ShouldHaveSingleItem()
             .ShouldStartWith(
                 $"SQLSRC250 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'int4' is mapped to "
-                    + "'MyApp.Missing' for parameter 'id', in the property SqlSourceTypeOverrides,"
+                    + $"'MyApp.Missing' for parameter 'id', in {TheProjectFilePlace},"
             );
     }
 
@@ -781,7 +860,10 @@ public sealed class TypeOverrideLevelTests
     {
         var file = GeneratorHarness.UsersFile;
 
-        var run = Run("uuid=MyApp.Missing int4=System.Math", (file, [Entry(file, "GetUser", Catalog("text"))]));
+        var run = Run( /*lang=json,strict*/
+            """{"uuid": "MyApp.Missing", "int4": "System.Math"}""",
+            (file, [Entry(file, "GetUser", Catalog("text"))])
+        );
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("string", false, true, NoWarnings, "text", null)]);
@@ -792,13 +874,16 @@ public sealed class TypeOverrideLevelTests
     {
         var file = GeneratorHarness.UsersFile;
 
-        var run = Run("int4=MyApp.OldThing", (file, [Entry(file, "GetUser", Int4)]));
+        var run = Run( /*lang=json,strict*/
+            """{"int4": "MyApp.OldThing"}""",
+            (file, [Entry(file, "GetUser", Int4)])
+        );
 
         run.Diagnostics.ShouldBeEmpty();
         var column = ColumnsOf(run, "GetUser").ShouldHaveSingleItem();
         column.WarningIds.ShouldBe(["CS0612", "CS0618"]);
         (column with { WarningIds = NoWarnings }).ShouldBe(
-            new PropertyType("global::MyApp.OldThing", false, true, NoWarnings, "int4", ThePropertyPlace, IntBase)
+            new PropertyType("global::MyApp.OldThing", false, true, NoWarnings, "int4", TheProjectFilePlace, IntBase)
         );
     }
 
@@ -814,34 +899,48 @@ public sealed class TypeOverrideLevelTests
             StringComparison.Ordinal
         );
 
-        var run = Run(source, "int4=MyApp.Inner", (file, [Entry(file, "GetUser", Int4)]));
+        var run = Run(
+            source, /*lang=json,strict*/
+            """{"int4": "MyApp.Inner"}""",
+            (file, [Entry(file, "GetUser", Int4)])
+        );
 
         run.ShouldBeClean();
         ColumnsOf(run, "GetUser")
             .ShouldBe([
-                new PropertyType("global::MyApp.Inner", true, false, NoWarnings, "int4", ThePropertyPlace, IntBase),
+                new PropertyType("global::MyApp.Inner", true, false, NoWarnings, "int4", TheProjectFilePlace, IntBase),
             ]);
     }
 
-    // The files with their sidecars, under the property's type override, or none.
-    private static GeneratorRun Run(string? property, params (SqlFile File, SidecarEntry[] Entries)[] files) =>
-        Run(Source, property, files);
+    // The files with their sidecars, under the type overrides of the project's settings file, a JSON object of their
+    // entries, or none.
+    private static GeneratorRun Run(string? typeOverrides, params (SqlFile File, SidecarEntry[] Entries)[] files) =>
+        Run(Source, typeOverrides, files);
 
     private static GeneratorRun Run(
         string source,
-        string? property,
+        string? typeOverrides,
         params (SqlFile File, SidecarEntry[] Entries)[] files
     ) =>
         ModelRuns.Run(
             source,
             [.. files.SelectMany(file => new[] { file.File, Sidecars.Of(file.File, file.Entries) })],
-            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = property }
+            typeOverrides is null ? null : "{\"typeOverrides\": " + typeOverrides + "}"
         );
 
-    // The entry of the key as its level writes it: in an MSBuild value without spaces around =, and in a marker with
-    // them.
+    // The first of the files, a .sql file, with its sidecar of the entries, and the others, under the project's
+    // settings of the level settings.
+    private static GeneratorRun Run(LevelSettings settings, SqlFile[] files, params SidecarEntry[] entries) =>
+        ModelRuns.Run(
+            Source,
+            [files[0], Sidecars.Of(files[0], entries), .. files.Skip(1)],
+            settings: settings.ProjectSettings
+        );
+
+    // The entry of the key as its level writes it: in a settings file a JSON object of the one entry, and in a marker
+    // with spaces around =.
     private static string EntryAt(SettingLevel level, string key, string type) =>
-        level is SettingLevel.Property or SettingLevel.Metadata ? key + "=" + type : key + " = " + type;
+        LevelSettings.IsFile(level) ? GeneratorHarness.Json(new JsonObject { [key] = type }) : key + " = " + type;
 
     // An entry of the query for its current hash, with a column of each type, named c0, c1 and so on.
     private static SidecarEntry Entry(SqlFile file, string name, params PostgresType[] columns) =>

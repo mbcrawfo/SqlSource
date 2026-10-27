@@ -90,9 +90,9 @@ internal static class TargetTypeReader
     }
 
     // A nested class, or a method on the type, cannot share its name with a member of the type, with the type itself
-    // or with one of the type's parameters.  The nested class's name is not known until the project's property joins,
-    // so every one of them is kept, sorted, for NestedClassCheck and for the methods' check.  MemberNames leaves out
-    // the nested types.
+    // or with one of the type's parameters.  The nested class's name is not known until the settings files join, so
+    // every one of them is kept, sorted, for NestedClassCheck and for the methods' check.
+    // MemberNames leaves out the nested types.
     private static EquatableArray<string> GetTakenNames(INamedTypeSymbol symbol) =>
         new(
             symbol
@@ -198,6 +198,11 @@ internal static class TargetTypeReader
                 ? written
                 : null;
 
+        // The attribute writes every setting as text or as a choice.
+        public IReadOnlyList<string>? Elements(SettingId setting) => null;
+
+        public IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting) => null;
+
         public T? Choice<T>(SettingId setting)
             where T : struct, Enum => PropertyOf(setting) is { } property ? Choice<T>(property) : null;
 
@@ -228,6 +233,10 @@ internal static class TargetTypeReader
                 Report(property, value);
             }
         }
+
+        public void InvalidPart(SettingId setting, int index) { }
+
+        public void RepeatedKey(SettingId setting, int index, int first) { }
 
         private void Report(string property, string value) =>
             diagnostics.Add(

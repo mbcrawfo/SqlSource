@@ -59,10 +59,10 @@ public sealed class FixtureProjectTests : IDisposable
         manifest.TargetFramework.ShouldBe("net10.0");
         manifest.LangVersion.ShouldBe("14.0");
         manifest.DefineConstants.ShouldContain("NET8_0_OR_GREATER");
-        manifest.Properties.ShouldHaveSingleItem().ShouldBe(new("SqlSourceDialect", "postgres"));
-        var file = manifest.Files.ShouldHaveSingleItem();
-        file.Path.ShouldBe(Path.Combine(folder, "Queries", "Users.sql"));
-        file.Metadata.ShouldHaveSingleItem().ShouldBe(new("SqlSourceDatabase", "billing"));
+        // The folders of the build are the machine's, and no setting.
+        manifest.BuildFolders.ShouldContain(Path.Combine(folder, "obj") + Path.DirectorySeparatorChar);
+        manifest.Files.ShouldBe([Path.Combine(folder, "Queries", "Users.sql")]);
+        manifest.SettingsFiles.ShouldBe([Path.Combine(folder, "sqlsource.json")]);
         manifest.CompileFiles.ShouldBe([Path.Combine(folder, "UserRepository.cs")]);
         // The project was never restored or built, and the tool made it neither.
         Directory.Exists(Path.Combine(folder, "obj")).ShouldBeFalse();
@@ -83,7 +83,7 @@ public sealed class FixtureProjectTests : IDisposable
         manifest.DefineConstants.ShouldContain("NET8_0");
         manifest.DefineConstants.ShouldNotContain("NET10_0");
         // TD-0026: Later/ is the second framework's alone.
-        manifest.Files.Select(file => file.Path).ShouldBe([Path.Combine(folder, "Queries", "Users.sql")]);
+        manifest.Files.ShouldBe([Path.Combine(folder, "Queries", "Users.sql")]);
         manifest.CompileFiles.ShouldBe([Path.Combine(folder, "Queries.cs")]);
         Directory.Exists(Path.Combine(folder, "obj")).ShouldBeFalse();
     }
@@ -158,7 +158,7 @@ public sealed class FixtureProjectTests : IDisposable
 
         evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
         // Shared.props, which the project imports through SolutionDir, sets it.
-        evaluation.Manifest.ShouldNotBeNull().Properties["SqlSourceDialect"].ShouldBe("mssql");
+        evaluation.Manifest.ShouldNotBeNull().DefineConstants.ShouldContain("FROM_SOLUTION");
     }
 
     [Fact]
@@ -186,7 +186,7 @@ public sealed class FixtureProjectTests : IDisposable
 
         evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
         var manifest = evaluation.Manifest.ShouldNotBeNull();
-        manifest.Files.ShouldHaveSingleItem().Path.ShouldBe(Path.Combine(folder, "a;b=c%41 'é.sql"));
+        manifest.Files.ShouldBe([Path.Combine(folder, "a;b=c%41 'é.sql")]);
         manifest.CompileFiles.ShouldBe([Path.Combine(folder, "a;b=c%41 'é.cs")]);
     }
 
@@ -236,12 +236,12 @@ public sealed class FixtureProjectTests : IDisposable
     public async Task Evaluate_ProjectWithAResponseFile_IsReadWithWhatTheFileSets()
     {
         var project = _fixtures.Copy("Single");
-        _ = _fixtures.WriteFile("Single/Directory.Build.rsp", "-v:diag\n-p:SqlSourceOutput=sql\n");
+        _ = _fixtures.WriteFile("Single/Directory.Build.rsp", "-v:diag\n-p:LangVersion=12.0\n");
 
         var evaluation = await EvaluateAsync(project);
 
         evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
-        evaluation.Manifest.ShouldNotBeNull().Properties["SqlSourceOutput"].ShouldBe("sql");
+        evaluation.Manifest.ShouldNotBeNull().LangVersion.ShouldBe("12.0");
     }
 
     // A solution may list a project that is not on the disk, as after a branch was switched: the file alone is
@@ -258,40 +258,5 @@ public sealed class FixtureProjectTests : IDisposable
         evaluation.State.ShouldBe(ProjectState.Failed);
         evaluation.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC205");
         Failure(evaluation).ShouldBe("the project file does not exist");
-    }
-
-    // Each value written over several lines, as the test project of the generator writes its own: the package's
-    // targets put a value on one line, and the manifest holds what they made of it.
-    [Fact]
-    public async Task Evaluate_ProjectWhoseValuesAreWrittenOverSeveralLines_GivesEachOnOneLine()
-    {
-        var project = _fixtures.Copy("SeveralLines");
-        var folder = Path.GetDirectoryName(project)!;
-
-        var evaluation = await EvaluateAsync(project);
-
-        evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
-        var manifest = evaluation.Manifest.ShouldNotBeNull();
-        manifest.Properties["SqlSourceDialect"].ShouldBe("postgres");
-        manifest.Properties["SqlSourceGeneratorParameters"].ShouldBe("sort-input no-token-validation");
-        manifest
-            .Properties["SqlSourceTypeOverrides"]
-            .ShouldBe(
-                "timestamptz=System.DateTimeOffset hstore=System.Collections.Generic.Dictionary<string, string?>"
-            );
-
-        string Query(params string[] parts) => Path.Combine([folder, "Queries", .. parts]);
-        var files = manifest.Files.ToDictionary(file => file.Path, file => file.Metadata);
-        files.Count.ShouldBe(4);
-        files[Query("Users.sql")].ShouldBeEmpty();
-        files[Query("Dialects", "ByMetadata.sql")]["SqlSourceDialect"].ShouldBe("mysql");
-        files[Query("Dialects", "ByOption.sql")]["SqlSourceDialect"].ShouldBe("mysql, no-backslash-escapes");
-        files[Query("Parameters", "Kept.sql")]
-            ["SqlSourceGeneratorParameters"]
-            .ShouldBe("no-token-validation keep-comments");
-        files[Query("Parameters", "Kept.sql")]
-            ["SqlSourceTypeOverrides"]
-            .ShouldBe("int4[]=System.Collections.Generic.List<int?> date=default");
-        manifest.CompileFiles.ShouldBe([Path.Combine(folder, "UserQueries.cs")]);
     }
 }

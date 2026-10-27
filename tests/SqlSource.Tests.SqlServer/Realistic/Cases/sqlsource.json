@@ -1,0 +1,7 @@
+{
+  // The realistic corpus: the database realistic, and the type map's own C# type for date.
+  "database": "realistic",
+  "typeOverrides": {
+    "date": "default",
+  },
+}

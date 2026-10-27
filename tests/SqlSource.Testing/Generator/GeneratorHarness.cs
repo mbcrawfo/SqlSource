@@ -5,12 +5,16 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
+using SqlSource.Generation.Paths;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
 
@@ -25,6 +29,11 @@ internal static class GeneratorHarness
 {
     public const string SourcePath = "/app/Repo/Sample.cs";
 
+    // The project's settings file of a run, in the farthest folder of every path the tests use, so that a test's own
+    // settings file is nearer and wins.  The harness writes it from a run's output, dialect, generator parameters and
+    // settings.
+    public const string ProjectSettingsPath = "/sqlsource.json";
+
     // The path of the .sql file that most tests use.
     public const string UsersPath = "/app/Repo/Users.sql";
 
@@ -33,6 +42,20 @@ internal static class GeneratorHarness
 
     // The file that most tests give the generator: one query, GetUser, at UsersPath.
     public static readonly SqlFile UsersFile = new(UsersPath, SqlTexts.GetUser);
+
+    // A settings file's text as the generator reads it: with comments and trailing commas.
+    private static readonly JsonDocumentOptions SettingsText = new()
+    {
+        CommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true,
+    };
+
+    private static readonly JsonSerializerOptions Written = new()
+    {
+        WriteIndented = true,
+        NewLine = "\n",
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
 
     // The newest language version that Roslyn 4.8.0 parses.  Documentation comments are checked, as they are in a
     // project that builds a documentation file, so that a malformed or missing one in generated code is reported.
@@ -60,8 +83,12 @@ internal static class GeneratorHarness
         + (arguments is null ? string.Empty : ", " + arguments)
         + ")]\npublic partial class Sample;\n";
 
-    // Every run states its output, the project's SqlSourceOutput: null leaves it unset, for a test that needs the
-    // project not to set it, of the default or of the output's levels.
+    // A settings file at the path, with this JSON.  The compiler gives one to the generator as an additional file, as
+    // it gives a .sql file, so a test passes it among the .sql files.
+    public static SqlFile SettingsFile(string path, string json) => new(path, json);
+
+    // Every run states its output, the output of the project's settings file: null writes none, for a test that needs
+    // the project not to set it, of the default or of the output's levels.
     public static GeneratorRun Run(OutputKind? output, string source, params SqlFile[] sqlFiles) =>
         Run(output, [new SourceFile(SourcePath, source)], sqlFiles);
 
@@ -74,20 +101,18 @@ internal static class GeneratorHarness
         MetadataReference[]? references = null,
         string? generatorParameters = null,
         string? dialect = null,
-        IReadOnlyDictionary<string, string?>? properties = null
+        IReadOnlyDictionary<string, string?>? properties = null,
+        string? settings = null
     )
     {
         var parseOptions = ParseOptions.WithLanguageVersion(languageVersion);
         var compilation = CreateCompilation(sources, supportedFramework, parseOptions, references);
-        var options = new TestOptionsProvider(
-            output,
-            generatorParameters,
-            dialect,
-            sqlFiles.Where(file => file.Dialect is not null).ToDictionary(file => file.Path, file => file.Dialect!),
-            properties,
-            sqlFiles.Where(file => file.Metadata is not null).ToDictionary(file => file.Path, file => file.Metadata!)
-        );
-        var driver = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()), options, parseOptions)
+
+        // The properties are what MSBuild tells the generator, for the tests of SqlSourceBuildFolders.
+        var options = new TestOptionsProvider(properties);
+        var projectSettings = ProjectSettings(output, dialect, generatorParameters, settings);
+        var files = WithProjectSettings(sqlFiles, projectSettings);
+        var driver = CreateDriver(files.Select(file => file.ToAdditionalText()), options, parseOptions)
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
                 out var updated,
@@ -115,8 +140,103 @@ internal static class GeneratorHarness
                     .Select(Format),
             ],
             result
-        );
+        )
+        {
+            ProjectSettings = projectSettings,
+        };
     }
+
+    // The JSON of the project's settings file: the output, spelled as a user writes it, the dialect as given, the
+    // generator parameters as the array of their words, and then each entry of settings, a JSON object as a user
+    // writes the file, which replaces the key it names.  Null when all four are null.  The spelling is the tests' own,
+    // not taken from the generator, so that a change to the generator's spelling fails a test.  CachingScene writes
+    // the project's file of its drivers with it too.
+    public static string? ProjectSettings(
+        OutputKind? output,
+        string? dialect = null,
+        string? generatorParameters = null,
+        string? settings = null
+    )
+    {
+        if (output is null && dialect is null && generatorParameters is null && settings is null)
+        {
+            return null;
+        }
+
+        var json = new JsonObject();
+        if (output is { } kind)
+        {
+            json["output"] = Spell(kind);
+        }
+
+        if (dialect is not null)
+        {
+            json["dialect"] = dialect;
+        }
+
+        if (generatorParameters is not null)
+        {
+            json["generatorParameters"] = Words(generatorParameters);
+        }
+
+        if (settings is not null)
+        {
+            var entries =
+                JsonNode.Parse(settings, documentOptions: SettingsText) as JsonObject
+                ?? throw new ArgumentException("The settings are not a JSON object.", nameof(settings));
+            foreach (var entry in entries.ToList())
+            {
+                json[entry.Key] = entry.Value?.DeepClone();
+            }
+        }
+
+        return Json(json);
+    }
+
+    // The text of a settings file's JSON, indented, with < and > as a user writes them in a type's name.
+    public static string Json(JsonNode json) => json.ToJsonString(Written);
+
+    // Generator parameters as a settings file writes them: the array of their words, split at white space.
+    public static JsonArray Words(string words) =>
+        [
+            .. words
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+                .Select(word => (JsonNode?)JsonValue.Create(word)),
+        ];
+
+    // The files with the project's settings file after them, or the files alone when it is null.  A file of the test's
+    // own at its path is refused: the generator reads one file of a folder, so one of the two would be dropped unseen.
+    private static SqlFile[] WithProjectSettings(SqlFile[] files, string? projectSettings)
+    {
+        if (projectSettings is null)
+        {
+            return files;
+        }
+
+        RefuseTheProjectsPath(files.Select(file => file.Path));
+        return [.. files, SettingsFile(ProjectSettingsPath, projectSettings)];
+    }
+
+    // A file of the test's own at the path of the project's settings file, beside the one the run writes, is refused.
+    public static void RefuseTheProjectsPath(IEnumerable<string> paths)
+    {
+        if (paths.Any(path => SqlPath.Normalize(path) == SqlPath.Normalize(ProjectSettingsPath)))
+        {
+            throw new InvalidOperationException(
+                $"The run writes the project's settings file {ProjectSettingsPath}, and a file of the test is at that "
+                    + "path.  Put its keys in the run's settings instead."
+            );
+        }
+    }
+
+    private static string Spell(OutputKind output) =>
+        output switch
+        {
+            OutputKind.Sql => "Sql",
+            OutputKind.Models => "Models",
+            OutputKind.CodeGen => "CodeGen",
+            _ => throw new ArgumentOutOfRangeException(nameof(output), output, null),
+        };
 
     // Without the runtime's references the compilation has no System.ArgumentException, which is how the generator
     // sees a project that targets a framework older than .NET 8.
@@ -143,7 +263,7 @@ internal static class GeneratorHarness
         );
 
     // Step tracking is on, so that a test can read why each step of the pipeline ran.  The options are what MSBuild
-    // tells the generator, the output among them.
+    // tells the generator.
     public static GeneratorDriver CreateDriver(
         IEnumerable<AdditionalText> sqlFiles,
         TestOptionsProvider options,
@@ -163,7 +283,7 @@ internal static class GeneratorHarness
         CreateProject(output, assemblyName, source).Reference;
 
     // The same with the .sql files the generator reads, the references and the dialect of the project, and the code the
-    // generator gave it by name.
+    // generator gave it by name.  The output and the dialect are its settings file, as a run's are.
     public static (MetadataReference Reference, IReadOnlyDictionary<string, string> Sources) CreateProject(
         OutputKind? output,
         string assemblyName,
@@ -179,8 +299,9 @@ internal static class GeneratorHarness
             assemblyName: assemblyName
         );
         var driver = CreateDriver(
-                (sqlFiles ?? []).Select(file => file.ToAdditionalText()),
-                new TestOptionsProvider(output, null, dialect)
+                WithProjectSettings(sqlFiles ?? [], ProjectSettings(output, dialect))
+                    .Select(file => file.ToAdditionalText()),
+                new TestOptionsProvider()
             )
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
@@ -242,8 +363,8 @@ internal static class GeneratorHarness
         }
 
         var driver = CreateDriver(
-                sqlFiles.Select(file => file.ToAdditionalText()),
-                new TestOptionsProvider(output, null, dialect)
+                WithProjectSettings(sqlFiles, ProjectSettings(output, dialect)).Select(file => file.ToAdditionalText()),
+                new TestOptionsProvider()
             )
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
@@ -276,7 +397,7 @@ internal static class GeneratorHarness
 
     // "SQLSRC001 /app/Repo/Sample.cs(3,14)-(3,20): message", with lines and columns counted from one as an IDE
     // shows them.
-    private static string Format(Diagnostic diagnostic)
+    public static string Format(Diagnostic diagnostic)
     {
         var span = diagnostic.Location.GetLineSpan();
         var start = Format(span.StartLinePosition);
@@ -298,14 +419,8 @@ internal sealed class LoadedAssembly : IAnalyzerAssemblyLoader
     public Assembly LoadFromPath(string fullPath) => typeof(SqlSourceGenerator).Assembly;
 }
 
-// Dialect is the SqlSourceDialect metadata of the file's AdditionalFiles item, and Metadata its other metadata by
-// MSBuild name.  Null is a file without it.
-internal sealed record SqlFile(
-    string Path,
-    string? Text,
-    string? Dialect = null,
-    IReadOnlyDictionary<string, string>? Metadata = null
-)
+// A .sql file, or any other additional file, as the compiler gives it to the generator.
+internal sealed record SqlFile(string Path, string? Text)
 {
     public AdditionalText ToAdditionalText() => new InMemoryAdditionalText(Path, Text);
 }
@@ -323,6 +438,9 @@ internal sealed record GeneratorRun(
     GeneratorDriverRunResult Result
 )
 {
+    // The text of the project's settings file that the harness wrote, or null when it wrote none.
+    public string? ProjectSettings { get; init; }
+
     // The generator reported nothing, and the compiler found no error and no warning in what it generated.
     public void ShouldBeClean()
     {

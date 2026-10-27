@@ -2,19 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.Json.Nodes;
+using SqlSource.Testing.Generator;
 using SqlSource.Tool.Projects;
 
 namespace SqlSource.Tool.Testing;
 
-// A project in a temporary folder: C# and .sql files on the disk, and the manifest that the package's target would
-// write for them, built here.  A test of the plan gives RunPlanner the manifest; a test of the command gives the
+// A project in a temporary folder: C#, .sql and settings files on the disk, and the manifest that the package's target
+// would write for them, built here.  A test of the plan gives RunPlanner the manifest; a test of the command gives the
 // runner the project, and the two runs of "dotnet msbuild" are answered from it.
 internal sealed class TestProject
 {
     private readonly TempFolder _folder;
     private readonly string _directory;
     private readonly List<string> _compile = [];
-    private readonly List<(string Path, (string Name, string Value)[] Metadata)> _sql = [];
+    private readonly List<string> _sql = [];
+    private readonly List<string> _settings = [];
 
     public TestProject(TempFolder folder, string name = "App", string? directory = null)
     {
@@ -29,8 +32,18 @@ internal sealed class TestProject
 
     public List<string> Constants { get; } = [];
 
-    // The properties of the package, by the name MSBuild knows them by.
-    public Dictionary<string, string> Properties { get; } = [with(StringComparer.Ordinal)];
+    // The folders the build writes into and the NuGet package folders, as the package's target writes
+    // SqlSourceBuildFolders: each after a |, with a separator at its end.  No setting: a test gives its settings in
+    // Settings or in a settings file.
+    public string BuildFolders { get; set; } = "";
+
+    // The project's own settings file, sqlsource.json in the folder of the project file, as a user writes it.  Whenever
+    // it has a key, the file is written from it each time the manifest is, so that a change made after the runner was
+    // told of the project still reaches the run, and listed before the files a test adds or lists.
+    public JsonObject Settings { get; } = [];
+
+    // The path of the project's own settings file.
+    public string SettingsPath => PathOf("sqlsource.json");
 
     // The full path of a file of the project, from a path with forward slashes.
     public string PathOf(string relativePath) => _folder.PathOf(Relative(relativePath));
@@ -43,11 +56,14 @@ internal sealed class TestProject
         return path;
     }
 
-    // A .sql file on the disk that the project lists, with the metadata of its item.
-    public string AddSql(string relativePath, string text, params (string Name, string Value)[] metadata)
+    // A C# file that the project compiles and this helper does not write: one outside the project, as a package's.
+    public void ListSource(string fullPath) => _compile.Add(fullPath);
+
+    // A .sql file on the disk that the project lists.
+    public string AddSql(string relativePath, string text)
     {
         var path = _folder.WriteFile(Relative(relativePath), text);
-        _sql.Add((path, metadata));
+        _sql.Add(path);
         return path;
     }
 
@@ -56,34 +72,58 @@ internal sealed class TestProject
     {
         var path = _folder.WriteFile(Relative(relativePath));
         File.WriteAllBytes(path, bytes);
-        _sql.Add((path, []));
+        _sql.Add(path);
         return path;
     }
 
     // A .sql file that the project lists and this helper does not write: another project's, or one that is gone.
-    public void ListSql(string fullPath, params (string Name, string Value)[] metadata) =>
-        _sql.Add((fullPath, metadata));
+    public void ListSql(string fullPath) => _sql.Add(fullPath);
+
+    // A settings file on the disk that the project lists, as the build lists one above a .sql file or a C# file.
+    public string AddSettings(string relativePath, string json)
+    {
+        if (Settings.Count > 0 && IsSettingsPath(PathOf(relativePath)))
+        {
+            throw AtSettingsPath();
+        }
+
+        var path = _folder.WriteFile(Relative(relativePath), json);
+        _settings.Add(path);
+        return path;
+    }
+
+    // A settings file that the project lists and this helper does not write: one above the project, or one that is
+    // gone.
+    public void ListSettings(string fullPath) => _settings.Add(fullPath);
 
     public string ManifestText()
     {
         var text = new StringBuilder();
-        _ = text.Append("SqlSourceManifest=1\n");
+        _ = text.Append("SqlSourceManifest=" + ManifestReader.Version + "\n");
         _ = text.Append("Project=").Append(ProjectPath).Append('\n');
         _ = text.Append("TargetFramework=net10.0\n");
         _ = text.Append("LangVersion=").Append(LangVersion).Append('\n');
         _ = text.Append("DefineConstants=").AppendJoin(';', Constants).Append('\n');
-        foreach (var (name, value) in Properties)
-        {
-            _ = text.Append("Property.").Append(name).Append('=').Append(value).Append('\n');
-        }
-
-        foreach (var (path, metadata) in _sql)
+        _ = text.Append("SqlSourceBuildFolders=").Append(BuildFolders).Append('\n');
+        foreach (var path in _sql)
         {
             _ = text.Append("File=").Append(path).Append('\n');
-            foreach (var (name, value) in metadata)
+        }
+
+        if (Settings.Count > 0)
+        {
+            if (_settings.Exists(IsSettingsPath))
             {
-                _ = text.Append("File.").Append(name).Append('=').Append(value).Append('\n');
+                throw AtSettingsPath();
             }
+
+            File.WriteAllText(SettingsPath, GeneratorHarness.Json(Settings));
+            _ = text.Append("Settings=").Append(SettingsPath).Append('\n');
+        }
+
+        foreach (var path in _settings)
+        {
+            _ = text.Append("Settings=").Append(path).Append('\n');
         }
 
         foreach (var path in _compile)
@@ -106,6 +146,17 @@ internal sealed class TestProject
         runner.Projects[ProjectPath] = new FakeProject { ManifestWriter = ManifestText };
         return this;
     }
+
+    // Ignores case on every platform, so that a test refused on one disk is refused on all: a path in another case is
+    // the same file on a disk that ignores case, as the disks of macOS and Windows do.
+    private bool IsSettingsPath(string path) =>
+        string.Equals(Path.GetFullPath(path), Path.GetFullPath(SettingsPath), StringComparison.OrdinalIgnoreCase);
+
+    private static InvalidOperationException AtSettingsPath() =>
+        new(
+            "The project writes its own settings file from Settings, and the test gives a file at that path.  Put its "
+                + "keys in Settings instead."
+        );
 
     private string Relative(string relativePath) =>
         _directory.Length == 0 ? relativePath : _directory + "/" + relativePath;

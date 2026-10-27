@@ -1,0 +1,7 @@
+{
+  // The realistic corpus: the database realistic, and the type map's own C# type for timestamptz.
+  "database": "realistic",
+  "typeOverrides": {
+    "timestamptz": "default",
+  },
+}

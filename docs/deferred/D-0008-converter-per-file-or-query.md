@@ -10,11 +10,11 @@ A converter is an edge between two C# types for the whole project: [`ConverterSe
 
 ## Why deferred
 
-The research judged a converter per file a rare need, and the suffix costly: a new part of the grammar of the property, the metadata and both markers, a member of `TypeOverride`, `SQLSRC112` comparing converters too, and a converter to repeat on every key that maps to the type, a domain, its array and other domains.  It recommended it as a later extension that the attribute leaves room for.
+The research judged a converter per file a rare need, and naming one in the entry costly: a new part of the grammar of the settings files and both markers, a member of `TypeOverride`, `SQLSRC112` comparing converters too, and a converter to repeat on every key that maps to the type, a domain, its array and other domains.  It recommended it as a later extension that the attribute leaves room for.
 
 ## Remaining work
 
-- **The grammar**: a suffix after the C# type of an entry, with a character that the values allow, `|` for one, since white space separates entries, the compiler cuts a value at `;` or `#`, `:` is taken by `global::` and `,` and `<>` by type arguments; `SQLSRC014` and `SQLSRC111` for a suffix that is not valid.
+- **The grammar**: in a settings file, a member of `typeOverrides` or `columnTypes` whose value is an object, `{"type": "MyApp.Email", "converter": "MyApp.EmailConverter"}`, which needs no suffix; in a marker, a suffix after the C# type of the entry, with a character that the value allows, `|` for one, since `:` is taken by `global::` and `,` and `<>` by type arguments; `SQLSRC019` and `SQLSRC111` for a converter that is not valid.
 - **The levels**: `TypeOverride` gains the converter type, merged by the override's precedence, and `SQLSRC112` compares it.
 - **Resolution and use**: the converter type resolved as a mapped type is, its static methods read by `ConverterReader` and checked as `SQLSRC277`, and its edges used before the project's and the mapped type's for the properties that entry types, which `PropertyType` or the slice of `MethodsInput` must then carry.
 - **The manual**: the suffix in [type overrides](../manual/settings.md#setting-type-overrides) and [converters](../manual/settings.md#converters), and the known issue removed.

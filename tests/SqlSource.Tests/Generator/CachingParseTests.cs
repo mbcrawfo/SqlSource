@@ -79,24 +79,27 @@ public sealed class CachingParseTests
         AllReasons(result, TrackingNames.NpgsqlProbe).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.SqlClientProbe).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.ResolvedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.CompilePaths).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        // The project's settings file, which gives the output, is the one settings file, and is not read again.
+        AllReasons(result, TrackingNames.SettingsFile).ShouldBe([IncrementalStepRunReason.Cached]);
         string[] steps =
         [
+            TrackingNames.SettingsFiles,
             TrackingNames.TargetTypes,
             TrackingNames.NestedClassCheck,
             TrackingNames.SqlPaths,
+            TrackingNames.ReachedSettingsFiles,
             TrackingNames.CaseCollisions,
             TrackingNames.UnsupportedLanguageVersion,
             TrackingNames.TypeFiles,
             TrackingNames.ClaimedPaths,
             TrackingNames.CommentPaths,
-            TrackingNames.ProjectDialect,
-            TrackingNames.ProjectSettings,
             TrackingNames.FileParseInput,
             TrackingNames.FileClaim,
             TrackingNames.ParsedFile,
             TrackingNames.ParsedFiles,
-            TrackingNames.FileSettings,
-            TrackingNames.FilesSettings,
+            TrackingNames.FileLevel,
+            TrackingNames.FileLevels,
             TrackingNames.TypeQueries,
             TrackingNames.TypeOutput,
             TrackingNames.SidecarInput,

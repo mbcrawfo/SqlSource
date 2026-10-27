@@ -157,10 +157,9 @@ public sealed class CachingCheckTests
         );
         var stale = Sidecars.Of(ToSqlFile(_scene.Users), Sidecars.Entry("GetUser", "stale"));
         var staleSidecar = new InMemoryAdditionalText(stale.Path, stale.Text);
-        var driver = GeneratorHarness
-            .CreateDriver(
-                [_scene.Users, usersAgain, _scene.Orders, _scene.OrdersSidecar, staleSidecar],
-                new TestOptionsProvider(OutputKind.Models, null, "postgres")
+        var driver = CreateDriver(
+                ProjectFile(OutputKind.Models, "postgres"),
+                [_scene.Users, usersAgain, _scene.Orders, _scene.OrdersSidecar, staleSidecar]
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
         var collides = spelling != _scene.Users.Path;
@@ -199,35 +198,32 @@ public sealed class CachingCheckTests
         Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
     }
 
+    // An edit of the project's settings file's model suffix: every type's needs are found again and are the same, so
+    // nothing is checked.  The suffix is in the files' levels, which the types of each file gather beside its check,
+    // for the type override and the column types, so each file's input of its types is gathered again and comes out
+    // equal, and no file is typed again.
     [Fact]
-    public void Run_ModelSuffixPropertyChanged_ChecksNothing()
+    public void Run_ModelSuffixOfTheProjectsFileChanged_ChecksNothing()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = _scene.FirstRunWithSidecars(compilation);
+        var project = ProjectFile(OutputKind.Models, "postgres");
+        var driver = _scene.FirstRunWithSidecars(compilation, project);
 
-        var result = Run(
-            driver.WithUpdatedAnalyzerConfigOptions(
-                new TestOptionsProvider(
-                    OutputKind.Models,
-                    null,
-                    "postgres",
-                    properties: new Dictionary<string, string?> { ["SqlSourceOutputModelSuffix"] = "Row" }
-                )
-            ),
-            compilation
+        var edited = ProjectFile(
+            OutputKind.Models,
+            "postgres",
+            /*lang=json,strict*/"""{"outputModelSuffix": "Row"}"""
         );
+        var result = Run(driver.ReplaceAdditionalText(project, edited), compilation);
 
-        // Every type's needs were found again, under the new property, and are the same.
-        AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Modified]);
         AllReasons(result, TrackingNames.TypeNeeds).ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
         AllReasons(result, TrackingNames.FileNeeds).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.SidecarCheckInput)
             .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-
-        // The types read the property's type override alone, which did not change.
         AllReasons(result, TrackingNames.FileTypesInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
+        AllReasons(result, TrackingNames.FileTypes).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
     }
 
     // A project at Sql with no sidecar: no query needs an entry, so no check has anything to do and no hash is

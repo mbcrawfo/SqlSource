@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using SqlSource.Diagnostics;
-using SqlSource.Generation.MSBuild;
 using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
@@ -213,13 +212,12 @@ internal static class QueryTyper
     // The place that wrote an entry of the column types, as SQLSRC250 to SQLSRC252 name it.  The attribute has no
     // level for them.
     private static string ColumnTypePlaceOf(SettingPlace place) =>
-        place switch
+        place.Kind switch
         {
-            SettingPlace.Property => "the property " + MSBuildSettings.ColumnTypesName,
-            SettingPlace.Metadata => "the metadata " + MSBuildSettings.ColumnTypesName + " of the file",
-            SettingPlace.FileHeader => "a -- column: marker in the file header",
-            SettingPlace.Query => QueryColumnMarker,
-            SettingPlace.Attribute or _ => "the attribute",
+            SettingPlaceKind.FileHeader => "a -- column: marker in the file header",
+            SettingPlaceKind.Query => QueryColumnMarker,
+            SettingPlaceKind.SettingsFile => "the columnTypes of the settings file " + place.Path,
+            SettingPlaceKind.Attribute or _ => "the attribute",
         };
 
     // The query's parameter of the name, ignoring case, when its marker gives it a C# type, or null.
@@ -632,10 +630,10 @@ internal static class QueryTyper
             }
         }
 
-        var map = QuerySettings.ResolveTypeOverrides(markers, input.Metadata, input.Property, engine);
+        var map = QuerySettings.ResolveTypeOverrides(markers, input.Level, engine);
         var made = new LevelTypes(
             map.Count > 0 ? new OverrideLookup(map, input.MappedTypes, engine) : null,
-            QuerySettings.ResolveColumnTypes(markers, input.Metadata, input.Property)
+            QuerySettings.ResolveColumnTypes(markers, input.Level)
         );
         levels.Add((markers, made));
         return made;
@@ -758,13 +756,12 @@ internal static class QueryTyper
         // The place that wrote an entry, as SQLSRC250 to SQLSRC252 and SQLSRC261 name it.  The attribute has no level
         // for the type override.
         private static string PlaceOf(SettingPlace place) =>
-            place switch
+            place.Kind switch
             {
-                SettingPlace.Property => "the property " + MSBuildSettings.TypeOverridesName,
-                SettingPlace.Metadata => "the metadata " + MSBuildSettings.TypeOverridesName + " of the file",
-                SettingPlace.FileHeader => "a -- type-override: marker in the file header",
-                SettingPlace.Query => "a -- type-override: marker of the query",
-                SettingPlace.Attribute or _ => "the attribute",
+                SettingPlaceKind.FileHeader => "a -- type-override: marker in the file header",
+                SettingPlaceKind.Query => "a -- type-override: marker of the query",
+                SettingPlaceKind.SettingsFile => "the typeOverrides of the settings file " + place.Path,
+                SettingPlaceKind.Attribute or _ => "the attribute",
             };
     }
 }

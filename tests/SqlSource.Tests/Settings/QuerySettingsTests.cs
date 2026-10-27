@@ -16,15 +16,13 @@ public sealed class QuerySettingsTests
 
     private static readonly SettingsLevel Empty = new() { Parameters = GeneratorParameters.None };
 
+    // The place of a settings file, which a file's level holds.
+    private static readonly SettingPlace SettingsFile = SettingPlace.OfSettingsFile("/app/sqlsource.json", 1);
+
     [Fact]
     public void Resolve_NoLevelSaysAnything_GivesTheDefaults()
     {
-        var settings = QuerySettings.Resolve(
-            SettingsLevel.None,
-            SettingsLevel.None,
-            SettingsLevel.None,
-            SettingsLevel.None
-        );
+        var settings = QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None);
 
         settings.Parameters.ShouldBe(GeneratorParameters.None);
         settings.KeepComments.ShouldBeFalse();
@@ -35,28 +33,22 @@ public sealed class QuerySettingsTests
     [Fact]
     public void Resolve_Parameters_ComeWholeFromTheMostSpecificLevelThatGivesAList()
     {
-        QuerySettings
-            .Resolve(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None, Keep)
-            .KeepComments.ShouldBeTrue();
-        QuerySettings
-            .Resolve(SettingsLevel.None, SettingsLevel.None, Sort, Keep)
-            .Parameters.ShouldBe(GeneratorParameters.SortInput);
-        QuerySettings
-            .Resolve(SettingsLevel.None, Keep, Sort, Sort)
-            .Parameters.ShouldBe(GeneratorParameters.KeepComments);
-        QuerySettings.Resolve(Empty, Keep, Keep, Keep).Parameters.ShouldBe(GeneratorParameters.None);
+        QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None, Keep).KeepComments.ShouldBeTrue();
+        QuerySettings.Resolve(SettingsLevel.None, Sort, Keep).Parameters.ShouldBe(GeneratorParameters.SortInput);
+        QuerySettings.Resolve(Keep, Sort, Sort).Parameters.ShouldBe(GeneratorParameters.KeepComments);
+        QuerySettings.Resolve(Empty, Keep, Keep).Parameters.ShouldBe(GeneratorParameters.None);
     }
 
     [Fact]
     public void Resolve_NoTokenValidation_TurnsValidationOff() =>
         QuerySettings
-            .Resolve(new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation }, Keep, Keep, Keep)
+            .Resolve(new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation }, Keep, Keep)
             .ValidateTokens.ShouldBeFalse();
 
     [Fact]
     public void Resolve_NoArrayPool_TurnsThePoolOff() =>
         QuerySettings
-            .Resolve(new SettingsLevel { Parameters = GeneratorParameters.NoArrayPool }, Keep, Keep, Keep)
+            .Resolve(new SettingsLevel { Parameters = GeneratorParameters.NoArrayPool }, Keep, Keep)
             .UseArrayPool.ShouldBeFalse();
 
     [Fact]
@@ -77,14 +69,11 @@ public sealed class QuerySettingsTests
         var models = new SettingsLevel { Output = OutputKind.Models };
 
         QuerySettings
-            .Resolve(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None, SettingsLevel.None)
+            .Resolve(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None)
             .Output.ShouldBe(OutputKind.CodeGen);
-        QuerySettings
-            .Resolve(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None, sql)
-            .Output.ShouldBe(OutputKind.Sql);
-        QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None, models, sql).Output.ShouldBe(OutputKind.Models);
-        QuerySettings.Resolve(SettingsLevel.None, sql, models, models).Output.ShouldBe(OutputKind.Sql);
-        QuerySettings.Resolve(models, sql, sql, sql).Output.ShouldBe(OutputKind.Models);
+        QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None, sql).Output.ShouldBe(OutputKind.Sql);
+        QuerySettings.Resolve(SettingsLevel.None, models, sql).Output.ShouldBe(OutputKind.Models);
+        QuerySettings.Resolve(models, sql, sql).Output.ShouldBe(OutputKind.Models);
     }
 
     [Fact]
@@ -99,12 +88,7 @@ public sealed class QuerySettingsTests
     [Fact]
     public void Resolve_ModelSettings_HaveTheirDefaults()
     {
-        var settings = QuerySettings.Resolve(
-            SettingsLevel.None,
-            SettingsLevel.None,
-            SettingsLevel.None,
-            SettingsLevel.None
-        );
+        var settings = QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None);
 
         settings.InputModelSuffix.ShouldBe("Params");
         settings.OutputModelSuffix.ShouldBe("Dto");
@@ -117,20 +101,19 @@ public sealed class QuerySettingsTests
     [Fact]
     public void Resolve_EachModelSetting_ComesFromTheMostSpecificLevelThatHasIt()
     {
-        var property = new SettingsLevel
+        var file = new SettingsLevel
         {
             InputModelSuffix = "In",
-            OutputModelSuffix = "Out",
-            ModelNamespace = "P",
+            OutputModelSuffix = "Row",
+            ModelNamespace = "M",
             InputModelType = ModelKind.Class,
             OutputModelType = ModelKind.Class,
             CollectionType = CollectionKind.List,
         };
-        var metadata = new SettingsLevel { OutputModelSuffix = "Row", ModelNamespace = "M" };
         var attribute = new SettingsLevel { ModelNamespace = "A", InputModelType = ModelKind.Record };
         var markers = new SettingsLevel { CollectionType = CollectionKind.IReadOnlyList };
 
-        var settings = QuerySettings.Resolve(markers, attribute, metadata, property);
+        var settings = QuerySettings.Resolve(markers, attribute, file);
 
         settings.InputModelSuffix.ShouldBe("In");
         settings.OutputModelSuffix.ShouldBe("Row");
@@ -145,22 +128,18 @@ public sealed class QuerySettingsTests
     [Fact]
     public void ResolveTypeOverrides_Levels_MergePerKeyAcrossTheLevels()
     {
-        var property = Overrides(
-            new TypeOverride("int4", "long", SettingPlace.Property),
-            new TypeOverride("text", "string", SettingPlace.Property),
-            new TypeOverride("timestamptz", "global::System.DateTimeOffset", SettingPlace.Property)
-        );
-        var metadata = Overrides(
-            new TypeOverride("int4", "int", SettingPlace.Metadata),
-            new TypeOverride("text", null, SettingPlace.Metadata)
+        var file = Overrides(
+            new TypeOverride("int4", "int", SettingsFile),
+            new TypeOverride("text", null, SettingsFile),
+            new TypeOverride("timestamptz", "global::System.DateTimeOffset", SettingsFile)
         );
         var markers = Overrides(new TypeOverride("timestamptz", "global::System.DateTime", SettingPlace.Query));
 
         QuerySettings
-            .ResolveTypeOverrides(markers, metadata, property, DatabaseEngine.PostgreSql)
+            .ResolveTypeOverrides(markers, file, DatabaseEngine.PostgreSql)
             .ShouldBe([
-                new TypeOverride("int4", "int", SettingPlace.Metadata),
-                new TypeOverride("text", null, SettingPlace.Metadata),
+                new TypeOverride("int4", "int", SettingsFile),
+                new TypeOverride("text", null, SettingsFile),
                 new TypeOverride("timestamptz", "global::System.DateTime", SettingPlace.Query),
             ]);
     }
@@ -168,42 +147,32 @@ public sealed class QuerySettingsTests
     [Fact]
     public void ResolveTypeOverrides_NoLevelSetsOne_IsEmpty() =>
         QuerySettings
-            .ResolveTypeOverrides(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None, DatabaseEngine.PostgreSql)
+            .ResolveTypeOverrides(SettingsLevel.None, SettingsLevel.None, DatabaseEngine.PostgreSql)
             .ShouldBeEmpty();
 
     [Theory]
-    [InlineData("a", "b", "c", "a")]
-    [InlineData(null, "b", "c", "b")]
-    [InlineData(null, null, "c", "c")]
-    [InlineData(null, null, null, "postgres")]
-    public void ResolveDatabase_EachLevel_WinsOverTheLevelsBelowIt(
-        string? markers,
-        string? metadata,
-        string? property,
-        string expected
-    ) =>
+    [InlineData("a", "b", "a")]
+    [InlineData(null, "b", "b")]
+    [InlineData(null, null, "postgres")]
+    public void ResolveDatabase_EachLevel_WinsOverTheLevelsBelowIt(string? markers, string? file, string expected) =>
         QuerySettings
             .ResolveDatabase(
                 new SettingsLevel { Database = markers },
-                new SettingsLevel { Database = metadata },
-                new SettingsLevel { Database = property },
+                new SettingsLevel { Database = file },
                 "postgres"
             )
             .ShouldBe(expected);
 
     [Theory]
     [InlineData("Statements", "Queries", "Statements")]
+    [InlineData("Statements", null, "Statements")]
     [InlineData(null, "Queries", "Queries")]
     [InlineData(null, null, "Sql")]
-    public void ResolveNestedClass_TheAttribute_WinsOverTheProperty(
-        string? attribute,
-        string? property,
-        string expected
-    ) =>
+    public void ResolveNestedClass_TheAttribute_WinsOverTheChain(string? attribute, string? chain, string expected) =>
         QuerySettings
             .ResolveNestedClass(
                 new SettingsLevel { NestedClass = attribute },
-                new SettingsLevel { NestedClass = property }
+                new SettingsLevel { NestedClass = chain }
             )
             .ShouldBe(expected);
 
@@ -238,17 +207,13 @@ public sealed class QuerySettingsTests
     [Fact]
     public void ResolveTypeOverrides_SqlServer_MergesSqlServersEntriesAcrossTheLevels()
     {
-        var property = new SettingsLevel
+        var file = new SettingsLevel
         {
-            TypeOverrides = Array(new TypeOverride("int4", "long", SettingPlace.Property)),
+            TypeOverrides = Array(new TypeOverride("int4", "long", SettingsFile)),
             SqlServerTypeOverrides = Array(
-                new TypeOverride("int", "long", SettingPlace.Property),
-                new TypeOverride("nvarchar", "string", SettingPlace.Property)
+                new TypeOverride("int", "short", SettingsFile),
+                new TypeOverride("nvarchar", "string", SettingsFile)
             ),
-        };
-        var metadata = new SettingsLevel
-        {
-            SqlServerTypeOverrides = Array(new TypeOverride("int", "short", SettingPlace.Metadata)),
         };
         var markers = new SettingsLevel
         {
@@ -256,14 +221,14 @@ public sealed class QuerySettingsTests
         };
 
         QuerySettings
-            .ResolveTypeOverrides(markers, metadata, property, DatabaseEngine.SqlServer)
+            .ResolveTypeOverrides(markers, file, DatabaseEngine.SqlServer)
             .ShouldBe([
-                new TypeOverride("int", "short", SettingPlace.Metadata),
+                new TypeOverride("int", "short", SettingsFile),
                 new TypeOverride("nvarchar", null, SettingPlace.Query),
             ]);
         QuerySettings
-            .ResolveTypeOverrides(markers, metadata, property, DatabaseEngine.PostgreSql)
-            .ShouldBe([new TypeOverride("int4", "long", SettingPlace.Property)]);
+            .ResolveTypeOverrides(markers, file, DatabaseEngine.PostgreSql)
+            .ShouldBe([new TypeOverride("int4", "long", SettingsFile)]);
     }
 
     [Fact]
@@ -296,28 +261,25 @@ public sealed class QuerySettingsTests
     [Fact]
     public void ResolveColumnTypes_Levels_MergePerKeyAcrossTheLevels()
     {
-        var property = Columns(
-            new ColumnType("posts.id", "PostId", SettingPlace.Property),
-            new ColumnType("users.id", "UserId", SettingPlace.Property)
-        );
-        var metadata = Columns(
-            new ColumnType("posts.id", null, SettingPlace.Metadata),
-            new ColumnType("auth.users.id", "AuthUserId", SettingPlace.Metadata)
+        var file = Columns(
+            new ColumnType("posts.id", null, SettingsFile),
+            new ColumnType("users.id", "UserId", SettingsFile),
+            new ColumnType("auth.users.id", "AuthUserId", SettingsFile)
         );
         var markers = Columns(new ColumnType("users.id", "global::App.UserId", SettingPlace.FileHeader));
 
         QuerySettings
-            .ResolveColumnTypes(markers, metadata, property)
+            .ResolveColumnTypes(markers, file)
             .ShouldBe([
-                new ColumnType("posts.id", null, SettingPlace.Metadata),
+                new ColumnType("posts.id", null, SettingsFile),
                 new ColumnType("users.id", "global::App.UserId", SettingPlace.FileHeader),
-                new ColumnType("auth.users.id", "AuthUserId", SettingPlace.Metadata),
+                new ColumnType("auth.users.id", "AuthUserId", SettingsFile),
             ]);
     }
 
     [Fact]
     public void ResolveColumnTypes_NoLevelSetsOne_IsEmpty() =>
-        QuerySettings.ResolveColumnTypes(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None).ShouldBeEmpty();
+        QuerySettings.ResolveColumnTypes(SettingsLevel.None, SettingsLevel.None).ShouldBeEmpty();
 
     [Fact]
     public void Over_ColumnTypes_MergePerKey()

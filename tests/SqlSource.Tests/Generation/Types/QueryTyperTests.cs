@@ -8,6 +8,7 @@ using SqlSource.Generation.Sidecars;
 using SqlSource.Generation.Types;
 using SqlSource.Parsing;
 using SqlSource.Settings;
+using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 using SqlSource.Testing;
@@ -57,7 +58,11 @@ public sealed class QueryTyperTests
                 new SettingsLevel
                 {
                     TypeOverrides = TestSidecars.Of(
-                        new TypeOverride("public._user_status", Guid, SettingPlace.Property)
+                        new TypeOverride(
+                            "public._user_status",
+                            Guid,
+                            SettingPlace.OfSettingsFile("/app/sqlsource.json", 1)
+                        )
                     ),
                 }
             )
@@ -246,21 +251,22 @@ public sealed class QueryTyperTests
             "Map it with the type override, as dbo.\"Money\"=<a C# type>"
         );
 
-    // The property serves both engines: a name both have reaches each engine's own type of that name, and a name one
-    // engine alone reads reaches that engine's files alone, so timestamp, which both engines have, is mapped only in
-    // the file of the engine whose key it is.
+    // An object of a settings file serves both engines: a name both have reaches each engine's own type of that name,
+    // and a name one engine alone reads reaches that engine's files alone, so timestamp, which both engines have, is
+    // mapped only in the file of the engine whose key it is.
     [Theory]
-    [InlineData("int=long", "long", "long", "byte[]")]
-    [InlineData("int4=long", "long", "int", "byte[]")]
-    [InlineData("rowversion=MyApp.Version", "int", "int", Version)]
-    public void Type_SharedNameInTheProperty_ReachesEachEngine(
-        string property,
+    [InlineData("int", "long", "long", "long", "byte[]")]
+    [InlineData("int4", "long", "long", "int", "byte[]")]
+    [InlineData("rowversion", "MyApp.Version", "int", "int", Version)]
+    public void Type_SharedNameInASettingsFile_ReachesEachEngine(
+        string key,
+        string type,
         string postgresInt,
         string sqlServerInt,
         string sqlServerTimestamp
     )
     {
-        var level = PropertyOf(property);
+        var level = SettingsFileLevelOf(key, type);
         var postgres = Entry(
             SidecarValues.Engine.Postgres,
             columns:
@@ -285,16 +291,61 @@ public sealed class QueryTyperTests
 
     // A plain part of a user's key matches the type's name in any case, and a quoted part its own case alone.
     [Theory]
-    [InlineData("DBO.EMAIL=MyApp.Email", Email)]
-    [InlineData("\"dbo\".\"email\"=MyApp.Email", "string")]
-    public void Type_UserKeyInAnotherCase_Matches(string property, string expected)
+    [InlineData("DBO.EMAIL", Email)]
+    [InlineData("\"dbo\".\"email\"", "string")]
+    public void Type_UserKeyInAnotherCase_Matches(string key, string expected)
     {
         var entry = Entry(SidecarValues.Engine.SqlServer, columns: [EmailType()]);
 
-        var types = QueryTyper.Type(InputOf(SqlDialect.SqlServer, entry, PropertyOf(property)));
+        var types = QueryTyper.Type(InputOf(SqlDialect.SqlServer, entry, SettingsFileLevelOf(key, "MyApp.Email")));
 
         types.Diagnostics.ShouldBeEmpty();
         ColumnTexts(types).ShouldBe([expected]);
+    }
+
+    // A settings file names itself in a diagnostic about a type it mapped: its path, and the setting it wrote.
+    [Fact]
+    public void Type_TypeOverrideOfASettingsFile_NamesTheFileInSqlsrc250()
+    {
+        var entry = Entry(SidecarValues.Engine.Postgres, columns: [TestSidecars.Postgres()]);
+        var level = new SettingsLevel
+        {
+            TypeOverrides = TestSidecars.Of(
+                new TypeOverride("int4", "MyApp.Missing", SettingPlace.OfSettingsFile("/app/sqlsource.json", 1))
+            ),
+        };
+
+        var types = QueryTyper.Type(InputOf(SqlDialect.PostgreSql, entry, level));
+
+        var diagnostic = types.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.MappedTypeNotFound);
+        diagnostic.Arguments[3].ShouldBe("the typeOverrides of the settings file /app/sqlsource.json");
+    }
+
+    [Fact]
+    public void Type_ColumnTypeOfASettingsFile_NamesTheFileInSqlsrc250()
+    {
+        var origin = new SidecarOrigin("public", "users", "id");
+        var entry = TestSidecars.Entry(
+            "GetUser",
+            columns: [TestSidecars.Column(0, "id", TestSidecars.Postgres(), origin: origin)]
+        );
+        var level = new SettingsLevel
+        {
+            ColumnTypes = TestSidecars.Of(
+                new ColumnType(
+                    "public.users.id",
+                    "MyApp.Missing",
+                    SettingPlace.OfSettingsFile("/app/sqlsource.json", 1)
+                )
+            ),
+        };
+
+        var types = QueryTyper.Type(InputOf(SqlDialect.PostgreSql, entry, level));
+
+        var diagnostic = types.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.MappedTypeNotFound);
+        diagnostic.Arguments[3].ShouldBe("the columnTypes of the settings file /app/sqlsource.json");
     }
 
     // The entry under mssql, with no type override, gives no query and SQLSRC246 with the subject, the type's name and
@@ -321,11 +372,16 @@ public sealed class QueryTyperTests
     private static IEnumerable<string> ColumnTexts(FileTypes types) =>
         types.Queries.ShouldHaveSingleItem().Columns.ShouldNotBeNull().Select(type => type.Text);
 
-    // The property's level, read as an MSBuild value is, by each engine's rules.
-    private static SettingsLevel PropertyOf(string value)
+    // The level of a settings file whose type override has the one member, read by each engine's rules.
+    private static SettingsLevel SettingsFileLevelOf(string key, string type)
     {
-        var invalid = new List<string>();
-        var lists = TypeOverrideGrammar.ReadList(value, SettingPlace.Property, invalid);
+        var invalid = new List<int>();
+        var lists = TypeOverrideGrammar.ReadMembers(
+            [new KeyValuePair<string, string>(key, type)],
+            SettingPlace.OfSettingsFile("/app/sqlsource.json", 1),
+            invalid,
+            []
+        );
         invalid.ShouldBeEmpty();
         return new SettingsLevel { TypeOverrides = lists.PostgreSql, SqlServerTypeOverrides = lists.SqlServer };
     }
@@ -339,12 +395,12 @@ public sealed class QueryTyperTests
             columns: columns?.Select((type, at) => TestSidecars.Column(at, "c" + at, type)).ToArray()
         );
 
-    // The file Users of the dialect with the one query GetUser and its entry, under the property's level, Npgsql 10
-    // and the SqlClient given, SqlClient 6.1 unless it is.
+    // The file Users of the dialect with the one query GetUser and its entry, under the file's level, Npgsql 10 and the
+    // SqlClient given, SqlClient 6.1 unless it is.
     private static FileTypesInput InputOf(
         SqlDialect dialect,
         SidecarEntry entry,
-        SettingsLevel property,
+        SettingsLevel level,
         SqlClientProbe? sqlClient = null
     )
     {
@@ -352,7 +408,6 @@ public sealed class QueryTyperTests
             new InMemoryAdditionalText(GeneratorHarness.UsersPath, SqlTexts.GetUser),
             GeneratorHarness.UsersNormalizedPath,
             dialect,
-            null,
             false,
             TestContext.Current.CancellationToken
         );
@@ -360,8 +415,7 @@ public sealed class QueryTyperTests
         return new FileTypesInput(
             new SidecarCheckResult(file.NormalizedPath, EquatableArray<DiagnosticInfo>.Empty, TestSidecars.Of(entry)),
             file,
-            SettingsLevel.None,
-            property,
+            level,
             new NpgsqlProbe(true, true, true, new Version(10, 0)),
             sqlClient ?? SqlClient61,
             TestSidecars.Of(Found(Email, false), Found(Version, false), Found(Guid, true), Found("long", true))

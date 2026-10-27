@@ -1,6 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
-using System.Collections.Generic;
+using System.Text.Json.Nodes;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
@@ -9,13 +9,17 @@ using Xunit;
 namespace SqlSource.Tests.Generator;
 
 // The name of the class that holds a type's members under SqlLocation.Nested: the attribute's NestedClass, else the
-// project's SqlSourceNestedClass, else Sql.
+// nestedClass of the chain of the folder of the type's C# file, which these tests give in the settings file of that
+// folder, else Sql.
 public sealed class NestedClassTests
 {
     private const string AttributeOnly = "SqlSourceGenerateAttribute.g.cs";
 
+    // The settings file of the folder of the type's C# file, GeneratorHarness.SourcePath.
+    private const string TypesFolderSettingsPath = "/app/Repo/sqlsource.json";
+
     [Fact]
-    public void Run_NestedClassProperty_NamesTheClass()
+    public void Run_NestedClassOfTheTypesFolder_NamesTheClass()
     {
         var run = Run(
             """
@@ -37,7 +41,7 @@ public sealed class NestedClassTests
     }
 
     [Fact]
-    public void Run_NestedClassOnTheAttribute_WinsOverTheProperty()
+    public void Run_NestedClassOnTheAttribute_WinsOverTheTypesFolder()
     {
         var run = Run(
             """
@@ -58,7 +62,7 @@ public sealed class NestedClassTests
     }
 
     [Fact]
-    public void Run_NestedClassOnTheAttributeWithoutTheProperty_NamesTheClass()
+    public void Run_NestedClassOnTheAttributeWithoutTheTypesFolder_NamesTheClass()
     {
         var run = Run(
             """
@@ -182,8 +186,7 @@ public sealed class NestedClassTests
                     """
                 ),
             ],
-            [new SqlFile(GeneratorHarness.UsersPath, "-- name: Queries\nSELECT 1;\n")],
-            properties: new Dictionary<string, string?> { ["SqlSourceNestedClass"] = "Queries" }
+            [new SqlFile(GeneratorHarness.UsersPath, "-- name: Queries\nSELECT 1;\n"), TypesFolder("Queries")]
         );
 
         run.Diagnostics.ShouldHaveSingleItem()
@@ -217,35 +220,18 @@ public sealed class NestedClassTests
         run.Sources.Keys.ShouldBe([AttributeOnly]);
     }
 
-    // A value that is not valid is not set, so the class keeps its default name.
-    [Theory]
-    [InlineData("class")]
-    [InlineData("My-Sql")]
-    [InlineData("App.Sql")]
-    public void Run_NestedClassPropertyThatIsNotValid_IsReportedWithoutAPosition(string value)
-    {
-        var run = Run(
-            """
-            using SqlSource;
-            namespace App;
-            [SqlSourceGenerate]
-            public partial class Sample
-            {
-                public static string Get() => Sql.GetUser;
-            }
-            """,
-            value
-        );
-
-        run.Diagnostics.ShouldBe([$"SQLSRC014 (1,1)-(1,1): '{value}' is not a valid value of SqlSourceNestedClass"]);
-        run.CompilationErrors.ShouldBeEmpty();
-    }
-
+    // The source with Users, and the nested class, or none, in the settings file of the type's folder.
     private static GeneratorRun Run(string source, string? nestedClass) =>
         GeneratorHarness.Run(
             OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, source)],
-            [GeneratorHarness.UsersFile],
-            properties: new Dictionary<string, string?> { ["SqlSourceNestedClass"] = nestedClass }
+            nestedClass is null ? [GeneratorHarness.UsersFile] : [GeneratorHarness.UsersFile, TypesFolder(nestedClass)]
+        );
+
+    // The settings file of the type's folder, which names the nested class.
+    private static SqlFile TypesFolder(string nestedClass) =>
+        GeneratorHarness.SettingsFile(
+            TypesFolderSettingsPath,
+            GeneratorHarness.Json(new JsonObject { ["nestedClass"] = nestedClass })
         );
 }

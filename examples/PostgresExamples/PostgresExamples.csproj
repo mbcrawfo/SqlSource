@@ -20,12 +20,7 @@
         <Nullable>enable</Nullable>
         <!-- Only in this repository: raising VersionPrefix warns until tools/describe-end-to-end.sh runs. -->
         <WarningsNotAsErrors>$(WarningsNotAsErrors);SQLSRC240</WarningsNotAsErrors>
-        <!-- The dialect of every query of the project. -->
-        <SqlSourceDialect>postgres</SqlSourceDialect>
-        <!-- Every timestamptz is a DateTimeOffset, which Dapper reads through UtcDateTimeOffsetHandler. -->
-        <SqlSourceTypeOverrides>timestamptz=System.DateTimeOffset</SqlSourceTypeOverrides>
-        <!-- order_lines.order_id is an OrderId, by its short name, in every query that reads it. -->
-        <SqlSourceColumnTypes>order_lines.order_id=OrderId</SqlSourceColumnTypes>
+        <!-- The project's SqlSource settings are in sqlsource.json, beside this file. -->
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="Dapper" />

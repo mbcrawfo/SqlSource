@@ -130,23 +130,25 @@ fi
 # A project of one mssql query, and a connection to the port 1 of this machine, which refuses at once.  The tool loads
 # SqlClient to connect, and its copy for the platform must be the one it loads: the copy outside runtimes/ throws
 # PlatformNotSupportedException at the first use, which the tool reports as SQLSRC224 with another text.  The project
-# imports SqlSource.props and .targets, copied from src/SqlSource/build/ with the repository's global.json beside it,
-# and is never restored.
+# imports SqlSource.props and .targets, copied from src/SqlSource/build/ with SqlSource.AfterSdk.targets, which the
+# props have the SDK import, and the repository's global.json beside them, and is never restored.
 mssql="$work/mssql"
 mkdir -p "$mssql/build" "$mssql/App"
 cp "$repo_root/global.json" "$mssql/"
-cp "$repo_root/src/SqlSource/build/SqlSource.props" "$repo_root/src/SqlSource/build/SqlSource.targets" "$mssql/build/"
+cp "$repo_root/src/SqlSource/build/SqlSource.props" "$repo_root/src/SqlSource/build/SqlSource.targets" \
+    "$repo_root/src/SqlSource/build/SqlSource.AfterSdk.targets" "$mssql/build/"
 cat >"$mssql/App/App.csproj" <<'PROJECT'
 <Project Sdk="Microsoft.NET.Sdk">
     <Import Project="../build/SqlSource.props" />
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
-        <SqlSourceDialect>mssql</SqlSourceDialect>
-        <SqlSourceDatabase>orders</SqlSourceDatabase>
     </PropertyGroup>
     <Import Project="../build/SqlSource.targets" />
 </Project>
 PROJECT
+# The project's settings.  "root" ends the chain at the project, so that no settings file above the temporary
+# directory applies.
+echo '{ "root": true, "dialect": "mssql", "database": "orders" }' >"$mssql/App/sqlsource.json"
 printf -- '-- name: GetOrders\nSELECT 1 AS one;\n' >"$mssql/App/Orders.sql"
 printf '[SqlSource.SqlSourceGenerate]\ninternal static partial class Queries;\n' >"$mssql/App/Queries.cs"
 cd "$mssql"

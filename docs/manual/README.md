@@ -51,6 +51,7 @@ SqlSource is in early development.  This table is the one list of what works in 
 | Methods for queries with tokens | Available | [Token methods](generator.md#token-methods) |
 | Reading `.sql` files by the rules of your database's dialect | Available | [Dialects](dialects.md) |
 | Settings, and an error for a value that is wrong | Available | [Settings](settings.md#all-settings) |
+| Settings files: `sqlsource.json` in a folder, for it and every folder below | Available | [Settings files](settings.md#settings-files) |
 | The `Output` setting | Available | [Output](settings.md#setting-output) |
 | The settings for models: model suffixes, namespace, shape and name, and the generator parameters `sort-input`, `sort-output` and `no-table-models` | Available | [All settings](settings.md#all-settings) |
 | The settings for query methods: collection type, `MethodLocation`, and the generator parameters `async-method-suffix` and `no-array-pool` | Available | [All settings](settings.md#all-settings) |
@@ -68,8 +69,8 @@ SqlSource is in early development.  This table is the one list of what works in 
 | Each parameter of a query method sent as the database type it was described with | Available | [How a parameter is sent](generator.md#method-parameters), [PostgreSQL](postgresql.md#query-methods), [SQL Server](sqlserver.md#method-parameters) |
 | Converters: methods of your own that convert between a C# type of your choice and one the driver reads and sends, for the query methods | Available | [Converters](settings.md#converters), [the recipe](recipes.md#strongly-typed-id) |
 | Library maps for the types of libraries such as NodaTime | Coming | Not documented until it is delivered |
-| Custom type mapping: the type override, `SqlSourceTypeOverrides` and `-- type-override:` | Available | [Type overrides](settings.md#setting-type-overrides); for a PostgreSQL type that cannot be sent as a parameter, see [SQLSRC232](diagnostics.md#sqlsrc232) |
-| Column types: a C# type for one column, by the column it is read from, with `SqlSourceColumnTypes` or a `-- column:` in the file header, or by a `-- column:` inside a query, and for one parameter by `-- param: @id -> Type` | Available | [Column types](settings.md#setting-column-types), [giving a parameter a type](parameters-and-tokens.md#param-marker) |
+| Custom type mapping: the type override, `typeOverrides` in a settings file and `-- type-override:` | Available | [Type overrides](settings.md#setting-type-overrides); for a PostgreSQL type that cannot be sent as a parameter, see [SQLSRC232](diagnostics.md#sqlsrc232) |
+| Column types: a C# type for one column, by the column it is read from, with `columnTypes` in a settings file or a `-- column:` in the file header, or by a `-- column:` inside a query, and for one parameter by `-- param: @id -> Type` | Available | [Column types](settings.md#setting-column-types), [giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | C# types written by their short names, `UserId` for `MyApp.UserId`, wherever SqlSource takes a C# type | Available | [Type overrides](settings.md#setting-type-overrides) |
 | Build integration: the tool running in your build | Coming | Not documented until it is delivered; today you run the tool yourself: [install the tool](tool.md#install-the-tool) |
 | Bug-report bundles | Coming | Not documented until it is delivered; today attach a [log](tool.md#logs) |

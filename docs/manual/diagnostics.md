@@ -1,6 +1,6 @@
 # Diagnostics
 
-Every problem SqlSource finds is an error, and none can be turned off or made a warning, except two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `codegen` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
+Every problem SqlSource finds is an error, and none can be turned off or made a warning, except two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `codegen` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  An error in a settings file, `sqlsource.json`, is reported at its line and column in that file.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
 
 **Project and attribute**
 
@@ -15,10 +15,19 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC007](#sqlsrc007) | Type has a member named like its nested class |
 | [SQLSRC008](#sqlsrc008) | Query name is used in two files |
 | [SQLSRC009](#sqlsrc009) | Query is named like its containing type |
-| [SQLSRC011](#sqlsrc011) | SqlSourceDialect is not valid |
 | [SQLSRC012](#sqlsrc012) | Language version is not supported |
 | [SQLSRC013](#sqlsrc013) | SQL file paths differ only by case |
-| [SQLSRC014](#sqlsrc014) | MSBuild setting is not valid |
+
+**Settings files**
+
+| Id | Title |
+|----|----|
+| [SQLSRC015](#sqlsrc015) | Settings file is not a JSON object |
+| [SQLSRC016](#sqlsrc016) | Settings file key is not known |
+| [SQLSRC017](#sqlsrc017) | Settings file key is written twice |
+| [SQLSRC018](#sqlsrc018) | Settings file value has the wrong type |
+| [SQLSRC019](#sqlsrc019) | Settings file value is not valid |
+| [SQLSRC020](#sqlsrc020) | Settings file entry repeats a key |
 
 **`.sql` files**
 
@@ -191,7 +200,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC279](#sqlsrc279) | Converters do not convert from the database type |
 | [SQLSRC280](#sqlsrc280) | Converter is missing for one direction |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 120 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 120 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides` or `columnTypes`, is the build's alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
@@ -309,7 +318,7 @@ public partial class UserRepository
 }
 ```
 
-Rename the member, the type or the type parameter, give the nested class another name with `NestedClass` on the attribute or the `SqlSourceNestedClass` property, or set `SqlLocation = SqlLocation.Direct` so that the queries become members of the type itself.
+Rename the member, the type or the type parameter, give the nested class another name with `NestedClass` on the attribute or `nestedClass` in a settings file, or set `SqlLocation = SqlLocation.Direct` so that the queries become members of the type itself.
 
 See: [Where the members go](generator.md#locations)
 
@@ -338,33 +347,6 @@ SELECT 1;
 Rename the query.  A query whose output is `codegen` has a method in place of the member, and may have either name when its method can: what its method cannot be named is [SQLSRC274](#sqlsrc274).
 
 See: [Where the members go](generator.md#locations)
-
-## SQLSRC011
-
-**SqlSourceDialect is not valid**
-
-`SqlSourceDialect` says which database a project's SQL is written for, so that SqlSource finds its comments and strings by that database's rules.  It is set as an MSBuild property for the project, or as metadata on the `AdditionalFiles` item of a `.sql` file, and one of the two has a value that is not a dialect.  The message quotes the value.
-
-The names are `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` and `oracle`, in any case.  `sqlserver` and `tsql` also mean `mssql`, `postgresql` also means `postgres`, and `cockroach` also means `cockroachdb`.
-
-After `mysql` or `mariadb` the value may name options, each after a comma, as in `mysql,ansi-quotes`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  An option that does not exist, an option after any other dialect, and a comma with nothing before it or after it each make the whole value wrong.
-
-```xml
-<PropertyGroup>
-    <SqlSourceDialect>pgsql</SqlSourceDialect>
-</PropertyGroup>
-<ItemGroup>
-    <AdditionalFiles Update="Reporting/**/*.sql" SqlSourceDialect="sql server" />
-</ItemGroup>
-```
-
-The error has no file and line, because the compiler does not tell a generator where a property or the metadata of an item was set: look in the project file, in `Directory.Build.props`, and at a `-p:` argument of the build command.  It is reported once for each wrong value, however many files have it.  A wrong property is always reported; wrong metadata is reported only for a `.sql` file that a type uses.
-
-Correct the name, or remove the setting to get the default, `ansi`.  While a value is wrong the files it covers are read as `ansi`; a file whose own metadata is wrong does not fall back to the project's property.
-
-The compiler hands a generator only the part of a value before the first `;` or `#`, as for [SQLSRC014](#sqlsrc014).
-
-See: [Dialect](settings.md#setting-dialect)
 
 ## SQLSRC012
 
@@ -395,52 +377,154 @@ A project that lists one file twice, with spellings that differ by case, gets th
 
 ```xml
 <ItemGroup>
-    <AdditionalFiles Include="queries/users.sql" SqlSourceDialect="postgres" />
+    <AdditionalFiles Include="queries/users.sql" />
 </ItemGroup>
 ```
 
-Write `Update` in place of `Include` to change the item the package adds, and spell the path as it is on disk.
+Remove the item, since the package already includes the file.  To change the item the package adds, write `Update` in place of `Include`, and spell the path as it is on disk.
 
 The error is reported only for a `.sql` file that a type uses.
 
 See: [Path](settings.md#setting-path)
 
-## SQLSRC014
+## SQLSRC015
 
-**MSBuild setting is not valid**
+**Settings file is not a JSON object**
 
-An MSBuild property of SqlSource, or the metadata of that name on an `AdditionalFiles` item, has a value it does not take.  The message names the setting and the value.  The error has no file and line, because the compiler does not tell a generator where a property or the metadata of an item was set: look in the project file, in `Directory.Build.props` and `Directory.Build.targets`, and at a `-p:` argument of the build command.
+A settings file, `sqlsource.json`, holds one JSON object, and this one does not: its text is not JSON, or it is JSON whose top level is an array, a string or another value that is not an object.  The message says which.  The JSON of a settings file may have `//` and `/* */` comments, and a comma after the last member of an object or the last element of an array; anything else that JSON does not allow is this error, a missing comma or a key without quotes among them, and so is a value nested more than 64 levels deep.  The error is at the first character that breaks the JSON, or at the end of a file that is cut short; for a top level that is not an object, it is at the whole value.
 
-```xml
-<PropertyGroup>
-    <SqlSourceGeneratorParameters>keep-coments</SqlSourceGeneratorParameters>
-</PropertyGroup>
+```jsonc
+{
+    // A comma is missing after "models".
+    "output": "models"
+    "dialect": "postgres",
+}
 ```
 
-Correct the value, or remove it to keep the default.  While it is wrong the setting is not set.  In a list of generator parameters the other words still apply, with one exception: `default` beside another parameter makes the whole list wrong, so `default no-token-validation` is reported whole and sets no list.  The same value in several places is reported once, and the metadata of a file that no type claims is not reported.
+Correct the JSON.  While it is wrong the file gives nothing: none of its settings applies, and neither does its `root`.
 
-`SqlSourceOutput` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `SqlSourceInputModelType` and `SqlSourceOutputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `SqlSourceCollectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`, all matched in the same way.  `SqlSourceInputModelSuffix` and `SqlSourceOutputModelSuffix` take characters that can be part of an identifier, `SqlSourceModelNamespace` takes a namespace such as `App.Models`, and `SqlSourceNestedClass` takes one identifier that is not a keyword.  `SqlSourceDatabase` takes one word of letters, digits, `-`, `_` and `.`.  The generator does not read it, so a build does not report it; the `sqlsource` tool does.  Where a type's methods go is set by the attribute alone, so there is no property for it.
+See: [Settings files](settings.md#settings-files)
 
-`SqlSourceTypeOverrides` takes entries `key=type`, separated by spaces or line breaks, and each entry that is not valid is reported on its own, while the others still apply.  A space or a line break inside `<>`, `[]` or the double quotes of a key is part of the entry, so a `<`, a `[` or a quote that is never closed makes the rest of the value one entry, which is reported whole, and the entries after it do not apply:
+## SQLSRC016
 
-```xml
-<PropertyGroup>
-    <SqlSourceTypeOverrides>timestamp with time zone=DateTimeOffset user_status=MyApp.UserStatus int4=int?</SqlSourceTypeOverrides>
-</PropertyGroup>
+**Settings file key is not known**
+
+A key of the top-level object of a settings file is not one of its keys.  Keys are matched exactly, case included, so `Dialect` is reported.  The message quotes the key, and the error is at it.
+
+```jsonc
+{
+    "Dialect": "postgres",
+    "outptu": "models",
+}
 ```
 
-- **No space around `=`.**  A space separates entries, so `numeric = double` is three entries, and `timestamp with time zone=...` is four.
-- **The key is a type's one-word name**, `timestamptz` and not `timestamp with time zone`, `float8` and not `double precision`; every built-in type has one.  A type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`: a name without one must be a type SqlSource knows, so `user_status` and the misspelling `timestampz` are reported.  A value serves PostgreSQL and SQL Server alike, so a name of either one's types, `int4` or `nvarchar`, is not reported.  A schema or a name may be in double quotes, `"my schema"."order-status"`, which must close: `"my schema.status=MyApp.Status` is reported with the rest of the value.  A part may also be in `U&"..."` with escapes, its `&` written `&amp;` in a project file, and an escape that is not valid makes the entry not valid.
-- **A key is not written in brackets.**  `[dbo].[Email]=MyApp.Email` is reported, and the message shows the forms that are read: `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
-- **The C# type is a keyword, a full name or a short name**, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end: `int4=int` and not `int4=int?`.  Write a generic's `<` and `>` as `&lt;` and `&gt;` in the project file.
+The keys are `$schema`, `root`, `dialect`, `database`, `output`, `generatorParameters`, `inputModelSuffix`, `outputModelSuffix`, `modelNamespace`, `inputModelType`, `outputModelType`, `collectionType`, `typeOverrides`, `columnTypes` and `nestedClass`.  Correct the key, or remove the member.  While it is wrong its value is not read, and the other members still apply.
+
+See: [Settings files](settings.md#settings-files)
+
+## SQLSRC017
+
+**Settings file key is written twice**
+
+A key is written twice in the top-level object of a settings file.  The first member applies, and each later one is reported at its key, whatever its value.
+
+```jsonc
+{
+    "output": "models",
+    "dialect": "postgres",
+    "output": "codegen",
+}
+```
+
+Remove one of the two members, and keep the value you want.
+
+See: [Settings files](settings.md#settings-files)
+
+## SQLSRC018
+
+**Settings file value has the wrong type**
+
+A value of a settings file is not of the JSON type its key takes.  `root` takes `true` or `false`, `generatorParameters` an array of strings, `typeOverrides` and `columnTypes` an object whose values are strings, and every other key a string.  `null` is of the wrong type for every key.  The message names the key and what it takes, and the error is at the value.
+
+```jsonc
+{
+    "root": "true",
+    "output": null,
+    "generatorParameters": ["keep-comments", 1],
+    "typeOverrides": {
+        "int4": "int",
+        "int8": false,
+    },
+}
+```
+
+Write the value as its key takes it: `"root": true`, `"generatorParameters": ["keep-comments"]`.  While a value is of the wrong type its setting is not set by the file.  An element of `generatorParameters`, or a member of `typeOverrides` or `columnTypes`, of the wrong type is reported on its own and left out, and the others still apply; an array that has elements, none of them a string, sets nothing, while `[]` is the empty list.  To leave a setting unset, remove its member: an empty string, or one of white space, also sets nothing for a key that takes a string, and is not an error.
+
+See: [Settings files](settings.md#settings-files)
+
+## SQLSRC019
+
+**Settings file value is not valid**
+
+A value of a settings file is of the JSON type its key takes, but its setting does not take it.  The message quotes the value, trimmed, and names the key; for a member of `typeOverrides` or `columnTypes` it quotes the member as `key: type`.  The error is at the string, or for a member from its key to its value.
+
+```jsonc
+{
+    "dialect": "pgsql",
+    "output": "model",
+    "generatorParameters": ["keep-comments", "keep-coments"],
+    "typeOverrides": {
+        "[dbo].[Email]": "MyApp.Email",
+        "int4": "int?",
+    },
+    "columnTypes": {
+        "id": "MyApp.UserId",
+    },
+}
+```
+
+Correct the value, or remove it.  While it is wrong the setting is not set by this file, so a farther settings file or the default applies.  In `generatorParameters`, `typeOverrides` and `columnTypes` each element or member that is not valid is reported on its own, and the others still apply, with one exception: `default` beside another generator parameter makes the whole list not set, and each `default` is reported.  For a key that takes a string, a value that is empty or white space sets nothing and is not an error, and such an element of `generatorParameters` is skipped; a member of `typeOverrides` or `columnTypes` whose key or type is empty or white space is reported.
+
+`dialect` takes a dialect's name, `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` or `oracle`, in any case.  `sqlserver` and `tsql` also mean `mssql`, `postgresql` also means `postgres`, and `cockroach` also means `cockroachdb`.  After `mysql` or `mariadb` the value may name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  An option that does not exist, an option after any other dialect, and a comma with nothing before it or after it each make the whole value wrong.
+
+`output` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `inputModelType` and `outputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `collectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`, all matched in the same way.  `inputModelSuffix` and `outputModelSuffix` take characters that can be part of an identifier, `modelNamespace` takes a namespace such as `App.Models`, and `nestedClass` takes one identifier that is not a keyword.  `database` takes one word of letters, digits, `-`, `_` and `.`.
+
+`generatorParameters` takes one generator parameter in each element: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `no-array-pool` or `default`, in any case.  `[]` is the empty list, which gives every default, and so is `["default"]`; beside another word `default` is reported, and the message says to write `[]`.
+
+`typeOverrides` takes members `"key": "type"`, and the key and the type of each are trimmed:
+
+- **The key is a type's one-word name**, `timestamptz` and not `timestamp with time zone`, `float8` and not `double precision`; every built-in type has one.  A type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`: a name without one must be a type SqlSource knows, so `user_status` and the misspelling `timestampz` are reported.  A value serves PostgreSQL and SQL Server alike, so a name of either one's types, `int4` or `nvarchar`, is not reported.  A schema or a name may be in double quotes, each written `\"` in JSON, as in `"\"my schema\".\"order-status\""`, and a part may be in `U&"..."` with escapes, an escape that is not valid making the member not valid.
+- **A key is not written in brackets.**  `"[dbo].[Email]"` is reported, and the message shows the forms that are read: `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly and is written `"\"dbo\".\"Email\""` as a JSON key.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
+- **The C# type is a keyword, a full name or a short name**, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end: `"int4": "int"` and not `"int4": "int?"`.  It may also be `default`.
 
 The rules are in [type overrides](settings.md#setting-type-overrides).
 
-`SqlSourceColumnTypes` takes entries `key=type` by the same rules of spaces, `<>`, `[]` and quotes, and each entry that is not valid is reported on its own, while the others still apply.  Its key is the column a value is read from, `table.column` or `schema.table.column`, each part plain or in double quotes, so `id=MyApp.UserId`, of one part, is reported, and so are a key of four parts, a key in brackets and a key with `[]`.  Its C# type is read as a type override's is, or is `default`.  The rules are in [column types](settings.md#setting-column-types).
+`columnTypes` takes members `"key": "type"`, trimmed in the same way.  Its key is the column a value is read from, `table.column` or `schema.table.column`, each part plain or in double quotes, so `id`, of one part, is reported, and so are a key of four parts, a key in brackets and a key with `[]`.  Its C# type is read as a type override's is, or is `default`.  The rules are in [column types](settings.md#setting-column-types).
 
-The compiler hands a generator only the part of a value before the first `;` or `#`.
+See: [Settings files](settings.md#settings-files)
 
-See: [A value that is wrong](settings.md#a-value-that-is-wrong)
+## SQLSRC020
+
+**Settings file entry repeats a key**
+
+Two members of `typeOverrides`, or two of `columnTypes`, have one key.  Two keys are one when they are the same once their quotes and escapes are read and their aliases resolved: `integer` and `int4` name one PostgreSQL type, `"users".id` and `users.id` one column, and an unqualified built-in type name is one in any case, so `timestamptz` and `TIMESTAMPTZ` are one key.  Keys that differ only in the case of a plain part of a qualified name are two keys and nothing is reported: `users.id` and `Users.ID`, or `dbo.Email` and `DBO.EMAIL`, both apply, and a type or column whose name matches one of them exactly takes that one.  The first member of two that are one applies, and the second is reported at its key; the message quotes both keys and names the setting.
+
+```jsonc
+{
+    "typeOverrides": {
+        "integer": "long",
+        "int4": "int",
+    },
+    "columnTypes": {
+        "users.id": "MyApp.UserId",
+        "\"users\".id": "UserId",
+    },
+}
+```
+
+Remove one of the two members, and keep the C# type you want.
+
+See: [Settings files](settings.md#settings-files)
 
 ## SQLSRC101
 
@@ -598,7 +682,7 @@ A generator parameter has a value it does not take; what follows a name in a `--
 
 - No generator parameter takes a value: `keep-comments=1` is this error.
 - What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
-- `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of [SQLSRC011](#sqlsrc011).  The value is the rest of the line, so nothing else may follow it.
+- `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of a settings file's `dialect`, in [SQLSRC019](#sqlsrc019).  The value is the rest of the line, so nothing else may follow it.
 
 ```sql error
 -- generator: keep-comments=true
@@ -1003,7 +1087,17 @@ A query whose output is `models` or `codegen` is described by a database, and th
 /work/App/Queries/Users.sql(1,10): error SQLSRC209: The output 'codegen' needs each query described by its database, and the dialect 'ansi' has no database to ask.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.
 ```
 
-For PostgreSQL or SQL Server files, set the dialect: `<SqlSourceDialect>postgres</SqlSourceDialect>` or `<SqlSourceDialect>mssql</SqlSourceDialect>` for the project, the metadata of the same name for a file, or `-- dialect: postgres` or `-- dialect: mssql` at the top of the file.  For any other database, and for queries that only want their SQL, set the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>`, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types.  Until it is mended, no query of the file is described, and none gets an error about its entry in the sidecar; under the output `models` the file's constants and token methods are generated as before, and under `codegen` its queries get no method.
+For PostgreSQL or SQL Server files, set the dialect, `postgres` or `mssql`: in the [settings file](settings.md#settings-files) of the project's folder for every file under it, in that of the files' own folder for those files alone, or with `-- dialect: postgres` or `-- dialect: mssql` at the top of the file:
+
+```jsonc
+// sqlsource.json, in the project's folder
+{
+    "root": true,
+    "dialect": "postgres",
+}
+```
+
+For any other database, and for queries that only want their SQL, set the output to `sql`: `"output": "sql"` in a settings file, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types.  Until it is mended, no query of the file is described, and none gets an error about its entry in the sidecar; under the output `models` the file's constants and token methods are generated as before, and under `codegen` its queries get no method.
 
 See: [Database support](dialects.md#database-support)
 
@@ -1031,7 +1125,7 @@ See: [Defaults](parameters-and-tokens.md#token-defaults)
 
 **Database has two dialects**
 
-Each query that is described belongs to one logical database: the one its `-- database:` marker names, or else the `SqlSourceDatabase` metadata of its file, or else the property of that name, or else the name of its file's dialect.  A name is one database across the whole run, with one connection, and the dialect picks the driver of that connection.  Here two files give one name two dialects.  Names are compared ignoring case.
+Each query that is described belongs to one logical database: the one its `-- database:` marker names, or else the `database` of the nearest [settings file](settings.md#settings-files) of its file's folder, or of a folder above it, that sets one, or else the name of its file's dialect.  A name is one database across the whole run, with one connection, and the dialect picks the driver of that connection.  Here two files give one name two dialects.  Names are compared ignoring case.
 
 ```console
 /work/App/Queries/Reports.sql(1,10): error SQLSRC211: The database 'main' has the dialect 'mssql' here and 'postgres' in '/work/App/Queries/Users.sql'
@@ -1753,7 +1847,7 @@ The query's output is `models` or `codegen`, which needs a description of the qu
 /work/App/Queries/Users.sql(1,10): error SQLSRC241: The query 'GetUser' has no entry in the sidecar of its file, and its output 'codegen' needs one.  Run 'sqlsource describe'.
 ```
 
-Run `dotnet sqlsource describe` and commit the sidecar it writes.  The default output is `codegen`, so a project that only wants each query's SQL as a constant sets the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>` for the project, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  When the tool reports [SQLSRC271](#sqlsrc271) for the file, saving it as UTF-8 and describing again is the fix.  The error is reported once for a query, however many types use its file, and under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
+Run `dotnet sqlsource describe` and commit the sidecar it writes.  The default output is `codegen`, so a project that only wants each query's SQL as a constant sets the output to `sql`: `"output": "sql"` in the [settings file](settings.md#settings-files) of the project's folder, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  When the tool reports [SQLSRC271](#sqlsrc271) for the file, saving it as UTF-8 and describing again is the fix.  The error is reported once for a query, however many types use its file, and under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
 
 See: [Output](settings.md#setting-output)
 
@@ -1832,7 +1926,7 @@ What to do depends on the type:
 - **A SQL Server type that this version of SqlSource does not know, and a CLR type of your own assembly.**  Map it with the type override to the C# type that your application reads it as, as the message says: `sys.newtype=MyApp.NewType` for a type of a newer SQL Server, or `dbo."Money"=MyApp.Money` for a CLR type of the schema `dbo`.
 - **A parameter with no type, `record`, `unknown`, `void`, a kind of type that this version of SqlSource does not know, or a SQL Server type with no name.**  The `sqlsource` tool never writes these, so the sidecar was edited by hand or written by a newer tool.  Run `dotnet sqlsource describe`.
 
-When the message says to map the type, it names the key of the type with its schema: `public.address`, or `pg_catalog.pg_class` for the row type of a catalog table, or `sys.newtype` for a type of SQL Server, since a key without a schema must be a type that SqlSource knows.  A schema or a name that needs quotes is in them, `"my schema"."Order Item"`, and one with a line break, a tab or any other white space but a single space, a control character, two spaces in a row, a `;` or a `#` is written with escapes, `"my schema".U&"Order\000AItem"`, so that the key can be written in a marker and in a project file alike, with its `&` written `&amp;` there.  A name with a capital letter is quoted too, `public."Status"`, so an entry for it maps that type alone, and not one whose name differs only by case.  For an array or a domain, the key is of the element or base that has no C# type, and an entry for it maps the array or domain too.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
+When the message says to map the type, it names the key of the type with its schema: `public.address`, or `pg_catalog.pg_class` for the row type of a catalog table, or `sys.newtype` for a type of SQL Server, since a key without a schema must be a type that SqlSource knows.  A schema or a name that needs quotes is in them, `"my schema"."Order Item"`, and one with a line break, a tab or any other control character is written with escapes, `"my schema".U&"Order\000AItem"`, so that the key can be written in a marker, which is one line.  A name with a capital letter is quoted too, `public."Status"`, so an entry for it maps that type alone, and not one whose name differs only by case.  For an array or a domain, the key is of the element or base that has no C# type, and an entry for it maps the array or domain too.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
 
 See: [PostgreSQL types](postgresql.md#type-map), [SQL Server types](sqlserver.md#types)
 
@@ -1882,7 +1976,7 @@ The project does not reference Npgsql, and a column or a parameter of the query 
 /work/App/Queries/Users.sql(1,10): error SQLSRC249: The column 'born' has the type 'date', whose C# type depends on Npgsql, and this project does not reference it.  Reference Npgsql, or map it with the type override for the Npgsql the application runs on: date=System.DateTime on Npgsql 8 and 9, date=System.DateOnly on Npgsql 10.
 ```
 
-Reference the `Npgsql` package from the project, at the version the application runs on: every type then gets the C# type of that version.  A project that keeps its queries apart from the driver can map each type that differs with the [type override](settings.md#setting-type-overrides) instead, for the version the application runs on, as the message says: `<SqlSourceTypeOverrides>date=System.DateOnly time=System.TimeOnly</SqlSourceTypeOverrides>` for Npgsql 10.  An entry for `date` maps an array or a domain of `date` too.  The message offers only C# types that a project without Npgsql can name: for `cidr`, `System.Net.IPNetwork` on Npgsql 10, since Npgsql 8 and 9 read it as a type of `NpgsqlTypes`.  `daterange` and `datemultirange` are read as a type of `NpgsqlTypes` on every version, so for them, as for every other type of the `NpgsqlTypes` namespace, the message says to reference Npgsql, which they need.  Every other type has the same C# type on every version of Npgsql, and needs neither.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
+Reference the `Npgsql` package from the project, at the version the application runs on: every type then gets the C# type of that version.  A project that keeps its queries apart from the driver can map each type that differs with the [type override](settings.md#setting-type-overrides) instead, for the version the application runs on, as the message says: `"typeOverrides": { "date": "System.DateOnly", "time": "System.TimeOnly" }` in the [settings file](settings.md#settings-files) of the project's folder for Npgsql 10.  An entry for `date` maps an array or a domain of `date` too.  The message offers only C# types that a project without Npgsql can name: for `cidr`, `System.Net.IPNetwork` on Npgsql 10, since Npgsql 8 and 9 read it as a type of `NpgsqlTypes`.  `daterange` and `datemultirange` are read as a type of `NpgsqlTypes` on every version, so for them, as for every other type of the `NpgsqlTypes` namespace, the message says to reference Npgsql, which they need.  Every other type has the same C# type on every version of Npgsql, and needs neither.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
 
 See: [Which version of Npgsql](postgresql.md#which-npgsql)
 
@@ -1890,11 +1984,11 @@ See: [Which version of Npgsql](postgresql.md#which-npgsql)
 
 **Mapped type is not found**
 
-A C# type that you chose cannot be found.  It is a type that the [type override](settings.md#setting-type-overrides) gives a database type, that the [column types](settings.md#setting-column-types) give a column, or that a `-- param:` or `-- column:` marker gives after `->`, and either no type of that name and number of type arguments is in the project or its references; or the name is a short name, of one part, and more than one type of it, in different namespaces, is one that the project can see; or more than one reference has a type of the full name that the project can see and the project has none.  A type of a reference that the project cannot see does not count, so a name that one reference has as `public` and another as `internal` is the public one.  The message names the column or parameter; what is mapped: the type override's key, the column types' key, the name of a `-- column:` marker of the query, or the parameter of a `-- param:` marker; the C# type; and the place that chose it: the property `SqlSourceTypeOverrides` or `SqlSourceColumnTypes`, the metadata of the file, a `-- type-override:` or `-- column:` marker in the file header or one of the query, or the `-- param:` marker of the parameter.  For a short name that several types have, it names their full names, the first three and a count of the rest.
+A C# type that you chose cannot be found.  It is a type that the [type override](settings.md#setting-type-overrides) gives a database type, that the [column types](settings.md#setting-column-types) give a column, or that a `-- param:` or `-- column:` marker gives after `->`, and either no type of that name and number of type arguments is in the project or its references; or the name is a short name, of one part, and more than one type of it, in different namespaces, is one that the project can see; or more than one reference has a type of the full name that the project can see and the project has none.  A type of a reference that the project cannot see does not count, so a name that one reference has as `public` and another as `internal` is the public one.  The message names the column or parameter; what is mapped: the type override's key, the column types' key, the name of a `-- column:` marker of the query, or the parameter of a `-- param:` marker; the C# type; and the place that chose it: the `typeOverrides` or the `columnTypes` of a settings file, which it names by its full path, a `-- type-override:` or `-- column:` marker in the file header or one of the query, or the `-- param:` marker of the parameter.  For a short name that several types have, it names their full names, the first three and a count of the rest.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC250: 'uuid' is mapped to 'MyApp.UserKey' for column 'id', in the property SqlSourceTypeOverrides, and no type of that name is found, or more than one that this project can see.  Correct the name, with its namespace and type arguments, or for a name that two references have, map to a type of this project.
-/work/App/Queries/Posts.sql(1,10): error SQLSRC250: 'users.id' is mapped to 'UserId' for column 'author_id', in the property SqlSourceColumnTypes, and no type of that name is found, or more than one that this project can see, and it could be MyApp.UserId or Legacy.UserId.  Correct the name, with its namespace and type arguments, or for a name that two references have, map to a type of this project.
+/work/App/Queries/Users.sql(1,10): error SQLSRC250: 'uuid' is mapped to 'MyApp.UserKey' for column 'id', in the typeOverrides of the settings file /work/App/sqlsource.json, and no type of that name is found, or more than one that this project can see.  Correct the name, with its namespace and type arguments, or for a name that two references have, map to a type of this project.
+/work/App/Queries/Posts.sql(1,10): error SQLSRC250: 'users.id' is mapped to 'UserId' for column 'author_id', in the columnTypes of the settings file /work/App/sqlsource.json, and no type of that name is found, or more than one that this project can see, and it could be MyApp.UserId or Legacy.UserId.  Correct the name, with its namespace and type arguments, or for a name that two references have, map to a type of this project.
 ```
 
 Write the name of a type that the project has, with its type arguments: `UserKey`, `MyApp.Ids.UserKey`, or `System.Collections.Generic.List<int>`.  For a short name that several types have, write the full name, from its namespace, of the one you mean: `MyApp.UserId`.  A nested type is written with its full name, with a `.` before its name, as in C#: `MyApp.Outer.Inner`.  When two references have a type of the full name that the project can see, map to a type of the project's own, which is always chosen first.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
@@ -1916,7 +2010,7 @@ Make the type, and each type it is nested in, `public`.  A type of the project i
 The same error is reported when the type is not `public` and the model that would have the column or parameter as a property is: a model is `public` when a `public` type claims its query, as [accessibility](generator.md#model-accessibility) says, and a `public` type cannot have a property of a type that is not.  Each such property is an error of its own, and the message then also names the model.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC251: 'uuid' is mapped to 'App.UserKey' for column 'id', in the property SqlSourceTypeOverrides, and that type is not public, and the model 'App.Queries.GetUserDto' is.  Make the type public, or make each type that claims the query's file internal.
+/work/App/Queries/Users.sql(1,10): error SQLSRC251: 'uuid' is mapped to 'App.UserKey' for column 'id', in the typeOverrides of the settings file /work/App/sqlsource.json, and that type is not public, and the model 'App.Queries.GetUserDto' is.  Make the type public, or make each type that claims the query's file internal.
 ```
 
 Make the type `public`, or make each type that claims the query's file `internal`, which makes its models `internal`.  The model is not generated until then.  Under the output `models` the query's constant or token method still is; under `codegen` the query gets no method.
@@ -1930,7 +2024,7 @@ See: [Type overrides](settings.md#setting-type-overrides), [column types](settin
 A C# type that you chose, by the type override, the column types or a marker, is one that no property of a model can have: a `static` class, a `ref struct` such as `System.Span<T>`, `System.Void`, or `System.Nullable<T>` as the whole type.  A type argument or an array's element that is a `static` class, a `ref struct` or `System.Void` is refused too, as is a type argument that is an interface with a `static abstract` member, such as `System.Numerics.INumber<int>`, and so is `System.Nullable<T>` with a `?` after it, as a type argument or an array's element: `System.Nullable<int>?[]`.  So is a type when it, a type it is nested in or one of its type arguments is marked `[Obsolete]` as an error, as `[Obsolete("Use UserKey.", true)]`, since no code can use it without an error; and so is one marked `[Obsolete]` or `[Experimental]` under a diagnostic id that is not an identifier, such as `MY-001` or `1234`, since a model could not turn off the warning, or the error of `[Experimental]`, that its use gives.  `[Experimental]` on the assembly or module that declares the type counts as on the type.  So is a generic type with a type argument that breaks a constraint of its type parameter, as `System.Collections.Generic.List<System.Nullable<string>>`, whose `System.Nullable<T>` takes only a value type, or `MyApp.Box<string>` where `Box<T>` requires `where T : struct`.  A type argument written with a `?` breaks a constraint that forbids null: `notnull`, `class` without a `?`, or a base type or interface written without a `?`, as `System.Collections.Generic.Dictionary<string?, int>` does, whose key is `notnull`.  A type marked `[Obsolete]` or `[Experimental]` otherwise is accepted, and its model compiles without a warning.  The message names the column or parameter, what is mapped, the C# type and the place that chose it, as [SQLSRC250](#sqlsrc250)'s does.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC252: 'int4' is mapped to 'System.Nullable<int>' for column 'id', in the metadata SqlSourceTypeOverrides of the file, and no property can have that type.  Choose another type, and for System.Nullable<T> name T, since a column that can be null makes its property nullable.
+/work/App/Queries/Users.sql(1,10): error SQLSRC252: 'int4' is mapped to 'System.Nullable<int>' for column 'id', in the typeOverrides of the settings file /work/App/Queries/sqlsource.json, and no property can have that type.  Choose another type, and for System.Nullable<T> name T, since a column that can be null makes its property nullable.
 ```
 
 Choose another C# type.  For `System.Nullable<T>`, choose `T`: a column that can be null already gets a nullable property, and one that cannot gets `T`.  For a type marked `[Obsolete]` as an error, map it to the type that replaces it.  For a generic type, give it type arguments that meet the constraints of its declaration.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
@@ -2171,10 +2265,10 @@ See: [Setting a column's nullability or type with a marker](generator.md#column-
 The type override has an entry for the name the database gives an array type, and a column or a parameter of the query has that array type, or is of a domain over it.  PostgreSQL names the array of a type with `_` before the type's name, so the array of `public.user_status` is `public._user_status`.  An entry for that name maps nothing, `default` included, since the type override names an array of a type outside `pg_catalog` as its element's key with `[]`: `public.user_status[]`.  A type whose own name starts with `_` and is no array, such as a composite type `public._tag`, is still mapped by its own name, and its array by `public._tag[]`.  The message names the column or parameter, the entry, the place that wrote it and the key to write.  It is reported once for the query, for its first column or parameter that has no C# type, as `SQLSRC246` and `SQLSRC249` to `SQLSRC252` are, and the query has no models until it is fixed.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC261: The type override's entry for 'public._user_status', in the property SqlSourceTypeOverrides, maps nothing: 'public._user_status' is the database's own name of the array type of column 'statuses', and an entry names that array as its element's key with [].  Write the entry for 'public.user_status[]' instead.
+/work/App/Queries/Users.sql(1,10): error SQLSRC261: The type override's entry for 'public._user_status', in the typeOverrides of the settings file /work/App/sqlsource.json, maps nothing: 'public._user_status' is the database's own name of the array type of column 'statuses', and an entry names that array as its element's key with [].  Write the entry for 'public.user_status[]' instead.
 ```
 
-Rename the entry to the key the message gives: `public.user_status[]=System.Collections.Generic.List<string>`.  When the type override already has an entry for that key, remove the one the message names.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
+Rename the entry to the key the message gives: the member `"public.user_status[]": "System.Collections.Generic.List<string>"` in a settings file's `typeOverrides`, or `-- type-override: public.user_status[]=System.Collections.Generic.List<string>` in a marker.  When the type override already has an entry for that key, remove the one the message names.  Under the output `models` the query's constant or token method is still generated; under `codegen` the query gets no method until the error is fixed.
 
 See: [Type overrides](settings.md#setting-type-overrides)
 
@@ -2551,7 +2645,7 @@ The error has a second form, when the column's or parameter's database type has 
 /work/App/Queries/Users.sql(1,10): error SQLSRC279: The column 'address' has type 'App.Address', which has converters, but the database type 'public.address' has no C# type to convert from.  Choose a C# type without converters for it, or remove the converters of 'App.Address'.
 ```
 
-For an array whose element type a type override, a column type or a `-- param:` marker chose, such as `email[]` under `public.email=App.Email` or `posts.tag_ids=TagId[]`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
+For an array whose element type a type override, a column type or a `-- param:` marker chose, such as `email[]` under `"public.email": "App.Email"` or `posts.tag_ids` under `"posts.tag_ids": "TagId[]"`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
 
 See: [Converters](settings.md#converters)
 

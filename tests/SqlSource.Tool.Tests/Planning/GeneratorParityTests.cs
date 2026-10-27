@@ -1,17 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Generation.Chains;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
-using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Testing;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
@@ -21,8 +21,9 @@ namespace SqlSource.Tool.Tests.Planning;
 // The plan must agree with the generator on which type claims which file with which output: a query the tool does
 // not describe is a build error, SQLSRC241, and one it describes for nothing costs a description.  The generator
 // reads symbols and the tool reads syntax, so each case runs both over the same sources and file list and compares
-// what they find.  Both report SQLSRC209 and SQLSRC210, which must be at the same places with the same text, and
-// SQLSRC011 and SQLSRC014, which must come in the same order.
+// what they find.  Both report SQLSRC209 and SQLSRC210, which must be at the same places with the same text.  The
+// errors of the settings files, SQLSRC015 to SQLSRC020, are compared the same way, where the two reach the same
+// files.
 public sealed class GeneratorParityTests : IDisposable
 {
     private const string Using = "using SqlSource;\n";
@@ -203,11 +204,104 @@ public sealed class GeneratorParityTests : IDisposable
         ),
     };
 
+    // The errors of the settings files that both report, with the files that the case reaches them from.  The paths
+    // are from the folder of the temporary files, where the project's own file is App.csproj, and none has a
+    // dialect, a database or a type override, which only one side reads.
+    private static readonly Dictionary<string, SettingsCase> SettingsCases = new()
+    {
+        ["errors of the file"] = new(
+            3,
+            [("App/Queries.cs", Plans.Type)],
+            [],
+            [
+                (
+                    "App/sqlsource.json", /*lang=json*/
+                    "{\n  \"Dialect\": \"postgres\",\n  \"output\": 1,\n  \"output\": \"sql\",\n}"
+                ),
+            ]
+        ),
+        ["invalid dialect and output"] = new(
+            2,
+            [("App/Queries.cs", Plans.Type)],
+            [],
+            [
+                (
+                    "App/sqlsource.json", /*lang=json,strict*/
+                    "{\"dialect\": \"pgsql\", \"output\": \"model\"}"
+                ),
+            ]
+        ),
+        ["text that is not JSON, and the farther file through it"] = new(
+            2,
+            [],
+            ["App/Queries/X.sql"],
+            [
+                ("App/Queries/sqlsource.json", "{ nope"),
+                (
+                    "App/sqlsource.json", /*lang=json,strict*/
+                    "{\"unknown\": 1}"
+                ),
+            ]
+        ),
+        ["a file above the root file"] = new(
+            1,
+            [("App/Queries.cs", Plans.Type)],
+            [],
+            [
+                ("sqlsource.json", "{ nope"),
+                (
+                    "App/sqlsource.json", /*lang=json,strict*/
+                    "{\"root\": true, \"Root\": 1}"
+                ),
+            ]
+        ),
+        ["reached by a C# file alone"] = new(
+            1,
+            [("App/Code/Repository.cs", "internal sealed class Repository;\n")],
+            [],
+            [
+                (
+                    "App/Code/sqlsource.json", /*lang=json,strict*/
+                    "{\"unknown\": 1}"
+                ),
+            ]
+        ),
+        ["reached by an unclaimed .sql file"] = new(
+            1,
+            [("App/Queries.cs", Plans.TypeNamed("Queries", "Path = \"Queries\""))],
+            ["App/Other/X.sql"],
+            [
+                (
+                    "App/Other/sqlsource.json", /*lang=json,strict*/
+                    "{\"unknown\": 1}"
+                ),
+            ]
+        ),
+        ["a C# file under a build folder"] = new(
+            1,
+            [("App/obj/Gen.cs", "internal sealed class Gen;\n"), ("App/Queries.cs", Plans.Type)],
+            [],
+            [
+                (
+                    "App/obj/sqlsource.json", /*lang=json,strict*/
+                    "{\"obj\": 1}"
+                ),
+                (
+                    "App/sqlsource.json", /*lang=json,strict*/
+                    "{\"unknown\": 1}"
+                ),
+            ],
+            ["App/obj"]
+        ),
+    };
+
     private readonly TempFolder _folder = new();
 
     public static TheoryData<string> CaseNames => [with(Cases.Keys)];
 
     public static TheoryData<string> ErrorCaseNames => [with(ErrorCases.Keys)];
+
+    public static TheoryData<string> SettingsCaseNames => [with(SettingsCases.Keys)];
 
     public void Dispose() => _folder.Dispose();
 
@@ -239,17 +333,123 @@ public sealed class GeneratorParityTests : IDisposable
     {
         var (dialect, output, sqlFiles) = ErrorCases[name];
         var project = new TestProject(_folder) { LangVersion = "12.0" };
-        project.Properties["SqlSourceDialect"] = dialect;
-        project.Properties["SqlSourceOutput"] = SettingValue.NameOf(output);
+        project.Settings["dialect"] = dialect;
+        project.Settings["output"] = SettingValue.NameOf(output);
         var source = new SourceFile(project.AddSource("Queries.cs", Plans.Type), Plans.Type);
         var listed = sqlFiles.Select(file => new SqlFile(project.AddSql(file.Path, file.Text), file.Text)).ToArray();
 
-        var run = GeneratorHarness.Run(output, [source], listed, dialect: dialect);
+        // The manifest writes the project's settings file, and the generator is given that file, by its path and its
+        // text, and none that the tool's side cannot read.
+        var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
+        var settings = GeneratorHarness.SettingsFile(project.SettingsPath, File.ReadAllText(project.SettingsPath));
+        var run = GeneratorHarness.Run(null, [source], [.. listed, settings]);
+
+        // Each side is compared by its message, as Reported.MessageOf says.
+        var expected = ReportedByGenerator(run, IsCompared);
+        var actual = ReportedByTool(plan, IsCompared);
+
+        actual.ShouldBe(expected);
+        // A case in which neither reports an error would prove nothing, and each case has one of the two ids.
+        expected.ShouldNotBeEmpty();
+        // Only the two errors are compared; neither side has another for these files.
+        run.Diagnostics.Count.ShouldBe(expected.Length);
+        plan.Errors.Count.ShouldBe(actual.Length);
+    }
+
+    // The errors of the settings files, with the files each side reaches them from and the build's folders that a
+    // compile file reaches nothing under.  Neither side reports a value that only the other reads, so the two lists
+    // are compared whole.
+    [Theory]
+    [MemberData(nameof(SettingsCaseNames))]
+    public void Errors_OfSettingsFiles_AreTheGeneratorsAtTheSamePlaces(string name)
+    {
+        var (errors, sources, sqlFiles, settingsFiles, buildFolders) = SettingsCases[name];
+        var project = new TestProject(_folder, directory: "") { LangVersion = "12.0" };
+        if (buildFolders is not null)
+        {
+            // The package's format: each folder after a bar, with a separator at its end.
+            project.BuildFolders = string.Concat(
+                buildFolders.Select(folder => "|" + project.PathOf(folder) + Path.DirectorySeparatorChar)
+            );
+        }
+
+        var written = sources
+            .Select(source => new SourceFile(project.AddSource(source.Path, source.Text), source.Text))
+            .ToArray();
+        const string Query = "SELECT 1;";
+        var listed = sqlFiles.Select(path => new SqlFile(project.AddSql(path, Query), Query)).ToArray();
+        var settings = settingsFiles
+            .Select(file => GeneratorHarness.SettingsFile(project.AddSettings(file.Path, file.Json), file.Json))
+            .ToArray();
+
+        var run = GeneratorHarness.Run(
+            null,
+            written,
+            [.. listed, .. settings],
+            properties: new Dictionary<string, string?> { [BuildFolders.PropertyName] = project.BuildFolders }
+        );
         var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
 
-        // Each side is compared by its message, as MessageOf says.
-        var expected = InOrder(
-            run.Result.Diagnostics.Where(IsCompared)
+        var expected = ReportedByGenerator(run, IsSettingsFileError);
+        var actual = ReportedByTool(plan, IsSettingsFileError);
+
+        actual.ShouldBe(expected);
+        // A case in which neither side reports would prove nothing.
+        expected.Length.ShouldBe(errors);
+    }
+
+    // The errors that the files' dialects and outputs make: the dialect and the output of a folder's file are the
+    // generator's own, so the two sides give the same SQLSRC209 and SQLSRC210 for the queries of each folder.
+    [Fact]
+    public void Errors_OfDialectAndOutputFromSettingsFiles_AreTheGeneratorsSqlsrc209And210()
+    {
+        var project = new TestProject(_folder, directory: "") { LangVersion = "12.0" };
+        var source = new SourceFile(project.AddSource("App/Queries.cs", Plans.Type), Plans.Type);
+        // A type claims the files of its own folder alone, so the file of the folder below has a type of its own.
+        var lite = Plans.TypeNamed("Lite");
+        var liteSource = new SourceFile(project.AddSource("App/Lite/Lite.cs", lite), lite);
+        const string Ansi = "-- name: First\nSELECT 1 {{where}};\n";
+        const string Lite = "-- name: Second\nSELECT 2 {{where}} {{order:ORDER BY 1}};\n";
+        const string Json = /*lang=json,strict*/
+            "{\"dialect\": \"ansi\", \"output\": \"models\"}";
+        const string LiteJson = /*lang=json,strict*/
+            "{\"dialect\": \"sqlite\"}";
+        SqlFile[] files =
+        [
+            new(project.AddSql("App/First.sql", Ansi), Ansi),
+            new(project.AddSql("App/Lite/Second.sql", Lite), Lite),
+            GeneratorHarness.SettingsFile(project.AddSettings("App/sqlsource.json", Json), Json),
+            GeneratorHarness.SettingsFile(project.AddSettings("App/Lite/sqlsource.json", LiteJson), LiteJson),
+        ];
+
+        var run = GeneratorHarness.Run(null, [source, liteSource], files);
+        var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
+
+        var expected = ReportedByGenerator(run, IsCompared);
+        var actual = ReportedByTool(plan, IsCompared);
+
+        actual.ShouldBe(expected);
+        // A case in which neither reports an error would prove nothing, and the file of each folder has both.
+        expected
+            .Select(error => $"{error.Id} {Path.GetFileName(error.Path)}")
+            .Distinct()
+            .Order(StringComparer.Ordinal)
+            .ShouldBe(["SQLSRC209 First.sql", "SQLSRC209 Second.sql", "SQLSRC210 First.sql", "SQLSRC210 Second.sql"]);
+    }
+
+    private static bool IsCompared(DiagnosticDescriptor descriptor) =>
+        descriptor.Id == ToolDiagnostics.OutputNeedsDescribableDialect.Id
+        || descriptor.Id == ToolDiagnostics.TokenHasNoDefault.Id;
+
+    // The errors of the settings files, SQLSRC015 to SQLSRC020.
+    private static bool IsSettingsFileError(DiagnosticDescriptor descriptor) =>
+        string.CompareOrdinal(descriptor.Id, "SQLSRC015") >= 0
+        && string.CompareOrdinal(descriptor.Id, "SQLSRC020") <= 0;
+
+    // What the generator reported of the kind, as each is compared: by its place and its message.
+    private static Reported[] ReportedByGenerator(GeneratorRun run, Func<DiagnosticDescriptor, bool> compared) =>
+        InOrder(
+            run.Result.Diagnostics.Where(diagnostic => compared(diagnostic.Descriptor))
                 .Select(diagnostic =>
                 {
                     var span = diagnostic.Location.GetLineSpan();
@@ -261,102 +461,9 @@ public sealed class GeneratorParityTests : IDisposable
                     );
                 })
         );
-        var actual = InOrder(
-            plan.Errors.Where(error => IsCompared(error.Descriptor))
-                .Select(error => new Reported(error.Descriptor.Id, error.Path, error.Position, MessageOf(error)))
-        );
 
-        actual.ShouldBe(expected);
-        // A case in which neither reports an error would prove nothing, and each case has one of the two ids.
-        expected.ShouldNotBeEmpty();
-        // Only the two errors are compared; neither side has another for these files.
-        run.Diagnostics.Count.ShouldBe(expected.Length);
-        plan.Errors.Count.ShouldBe(actual.Length);
-    }
-
-    // The values that are not valid are reported in an order, and it is the generator's: the dialects in ordinal
-    // order, then the settings by name and value.  The files list the dialects out of that order and one twice, and
-    // each side's errors are compared as they come, never sorted.  The generator never sees SqlSourceDatabase, so
-    // only SqlSourceOutput is compared among the settings.
-    [Fact]
-    public void Errors_OfInvalidValues_AreInTheGeneratorsOrder()
-    {
-        var project = new TestProject(_folder) { LangVersion = "12.0" };
-        project.Properties["SqlSourceDialect"] = "zeta";
-        project.Properties["SqlSourceOutput"] = "nothing";
-        var source = new SourceFile(project.AddSource("Queries.cs", Plans.Type), Plans.Type);
-        const string Text = "-- name: Q\nSELECT 1;\n";
-        (string Name, string Value)[][] metadata =
-        [
-            [("SqlSourceDialect", "beta")],
-            [("SqlSourceDialect", "alpha")],
-            [("SqlSourceDialect", "beta")],
-            [("SqlSourceOutput", "bad")],
-        ];
-        var listed = metadata
-            .Select(
-                (pairs, index) =>
-                {
-                    var name = "Q" + index.ToString(CultureInfo.InvariantCulture) + ".sql";
-                    return new SqlFile(
-                        project.AddSql(name, Text, pairs),
-                        Text,
-                        Metadata: pairs.ToDictionary(pair => pair.Name, pair => pair.Value)
-                    );
-                }
-            )
-            .ToArray();
-
-        var run = GeneratorHarness.Run(
-            null,
-            [source],
-            listed,
-            dialect: "zeta",
-            properties: new Dictionary<string, string?> { ["SqlSourceOutput"] = "nothing" }
-        );
-        var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
-
-        var expected = run
-            .Result.Diagnostics.Where(IsInvalidValue)
-            .Select(diagnostic => (diagnostic.Id, Message: diagnostic.GetMessage(CultureInfo.InvariantCulture)))
-            .ToArray();
-        var actual = plan
-            .Errors.Select(error => (error.Descriptor.Id, Message: MessageOf(error)))
-            .Where(error => IsInvalidValue(error.Id, error.Message))
-            .ToArray();
-
-        actual.ShouldBe(expected);
-        // A case in which the two agree on nothing would prove nothing.
-        expected
-            .Where(error => error.Id == SqlDiagnostics.InvalidDialect.Id)
-            .Select(error => error.Message.Split('\'')[1])
-            .ShouldBe(["alpha", "beta", "zeta"]);
-        expected.Count(error => error.Id == SqlDiagnostics.InvalidSettingValue.Id).ShouldBeGreaterThanOrEqualTo(2);
-    }
-
-    private static bool IsInvalidValue(Diagnostic diagnostic) =>
-        IsInvalidValue(diagnostic.Id, diagnostic.GetMessage(CultureInfo.InvariantCulture));
-
-    private static bool IsInvalidValue(string id, string message) =>
-        id == SqlDiagnostics.InvalidDialect.Id
-        || (
-            id == SqlDiagnostics.InvalidSettingValue.Id && message.EndsWith("SqlSourceOutput", StringComparison.Ordinal)
-        );
-
-    // A diagnostic of the compiler keeps its arguments to itself, so a tool error is compared by its message: the
-    // descriptor's format with the error's arguments.
-    private static string MessageOf(ToolDiagnostic error) =>
-        string.Format(
-            CultureInfo.InvariantCulture,
-            error.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
-            [.. error.Arguments]
-        );
-
-    private static bool IsCompared(Diagnostic diagnostic) => IsCompared(diagnostic.Descriptor);
-
-    private static bool IsCompared(DiagnosticDescriptor descriptor) =>
-        descriptor.Id == ToolDiagnostics.OutputNeedsDescribableDialect.Id
-        || descriptor.Id == ToolDiagnostics.TokenHasNoDefault.Id;
+    private static Reported[] ReportedByTool(RunPlanResult plan, Func<DiagnosticDescriptor, bool> compared) =>
+        InOrder(plan.Errors.Where(error => compared(error.Descriptor)).Select(Reported.Of));
 
     private static Reported[] InOrder(IEnumerable<Reported> reported) =>
         [
@@ -369,7 +476,7 @@ public sealed class GeneratorParityTests : IDisposable
         ];
 
     // What the generator's own step gives for each attributed type.  The output is left unset, as the tool's side
-    // sets no property.
+    // writes no settings file.
     private static Claimed[] FromGenerator(SourceFile[] sources, string[] sqlFiles, string[] constants)
     {
         var options = GeneratorHarness.ParseOptions.WithPreprocessorSymbols(constants);
@@ -377,7 +484,7 @@ public sealed class GeneratorParityTests : IDisposable
         var driver = GeneratorHarness
             .CreateDriver(
                 sqlFiles.Select(static path => new SqlFile(path, "SELECT 1;").ToAdditionalText()),
-                new TestOptionsProvider(null, null),
+                new TestOptionsProvider(),
                 options
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
@@ -425,10 +532,15 @@ public sealed class GeneratorParityTests : IDisposable
     // files it claims, in member order.
     private sealed record Claimed(string SourcePath, int Line, string? Path, string? Output, string Files);
 
-    // One error as either side reports it: the id, the file, where in it, counted from zero, and the message.
-    private sealed record Reported(string Id, string? Path, LinePosition? Position, string Message);
-
     private sealed record ErrorCase(string Dialect, OutputKind Output, (string Path, string Text)[] SqlFiles);
+
+    private sealed record SettingsCase(
+        int Errors,
+        (string Path, string Text)[] Sources,
+        string[] SqlFiles,
+        (string Path, string Json)[] SettingsFiles,
+        string[]? BuildFolders = null
+    );
 
     private sealed record Case(
         int Types,

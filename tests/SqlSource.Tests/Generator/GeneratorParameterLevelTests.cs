@@ -1,6 +1,5 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
-using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Settings;
@@ -10,9 +9,9 @@ using Xunit;
 namespace SqlSource.Tests.Generator;
 
 // The list of generator parameters in effect for a query, for a type that claims its file, is the one from the most
-// specific level that gives a list, whole: the query's markers, the preamble's, the attribute, the metadata of the
-// file's item, the project's property.  Two parameters change a query's generated code, keep-comments its SQL and
-// no-token-validation its method's checks, and each row shows both.
+// specific level that gives a list, whole: the query's markers, the preamble's, the attribute, the settings file of
+// the file's folder, then the project's settings file.  Two parameters change a query's generated code, keep-comments
+// its SQL and no-token-validation its method's checks, and each row shows both.
 public sealed class GeneratorParameterLevelTests
 {
     private const string On = "keep-comments no-token-validation";
@@ -30,7 +29,7 @@ public sealed class GeneratorParameterLevelTests
     private const string Check = "global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);";
 
     [Theory]
-    // property, metadata, attribute, preamble, query
+    // project's file, folder's file, attribute, preamble, query
     [InlineData(null, null, null, null, null, false)]
     [InlineData(On, null, null, null, null, true)]
     [InlineData(On, Default, null, null, null, false)]
@@ -45,32 +44,35 @@ public sealed class GeneratorParameterLevelTests
     [InlineData(On, On, On, On, Other, false)]
     [InlineData(null, null, null, Default, On, true)]
     public void Run_GeneratorParameters_ComeWholeFromTheMostSpecificLevelThatGivesAList(
-        string? property,
-        string? metadata,
+        string? projectFile,
+        string? folderFile,
         string? attribute,
         string? preamble,
         string? query,
         bool expected
     )
     {
+        var settings = new LevelSettings();
+        if (folderFile is not null)
+        {
+            _ = settings.At(
+                SettingLevel.FolderFile,
+                Setting.GeneratorParameters,
+                LevelSettings.WordsAt(SettingLevel.FolderFile, folderFile)
+            );
+        }
+
         var sql =
             (preamble is null ? string.Empty : "-- generator: " + preamble + "\n")
             + "-- name: ListFrom\n"
             + (query is null ? string.Empty : "-- generator: " + query + "\n")
             + "SELECT * FROM {{table}}; -- kept\n";
-        var file = new SqlFile(
-            GeneratorHarness.UsersPath,
-            sql,
-            Metadata: metadata is null
-                ? null
-                : new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = metadata }
-        );
 
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, Source(attribute))],
-            [file],
-            generatorParameters: property
+            settings.Files(new SqlFile(GeneratorHarness.UsersPath, sql)),
+            generatorParameters: projectFile
         );
 
         run.ShouldBeClean();
@@ -122,13 +124,13 @@ public sealed class GeneratorParameterLevelTests
         run.Sources["App.Kept.g.cs"].ShouldContain("public static string Q(string note)");
     }
 
-    // The project, or the metadata of the file's item, keeps comments and one type turns them off.  The keyword
-    // stands only in a comment, so it is an error only for the type that keeps it, whose file then gives no members,
-    // and the other type uses the file.
+    // The project's settings file, or the settings file of the file's folder, keeps comments and one type turns them
+    // off.  The keyword stands only in a comment, so it is an error only for the type that keeps it, whose file then
+    // gives no members, and the other type uses the file.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Run_ReservedTokenInAComment_IsReportedOnlyForATypeThatKeepsComments(bool fromMetadata)
+    public void Run_ReservedTokenInAComment_IsReportedOnlyForATypeThatKeepsComments(bool fromFolderFile)
     {
         const string Source = """
             using SqlSource;
@@ -144,19 +146,23 @@ public sealed class GeneratorParameterLevelTests
             [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class Kept { }
             """;
-        var file = new SqlFile(
-            "/app/Repo/Q.sql",
-            ReservedTokenInAComment,
-            Metadata: fromMetadata
-                ? new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "keep-comments" }
-                : null
-        );
+        var file = new SqlFile("/app/Repo/Q.sql", ReservedTokenInAComment);
+        SqlFile[] files = fromFolderFile
+            ?
+            [
+                file,
+                GeneratorHarness.SettingsFile(
+                    "/app/Repo/sqlsource.json", /*lang=json,strict*/
+                    """{"generatorParameters": ["keep-comments"]}"""
+                ),
+            ]
+            : [file];
 
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, Source)],
-            [file],
-            generatorParameters: fromMetadata ? null : "keep-comments"
+            files,
+            generatorParameters: fromFolderFile ? null : "keep-comments"
         );
 
         run.Diagnostics.ShouldBe([
@@ -236,93 +242,6 @@ public sealed class GeneratorParameterLevelTests
     }
 
     [Fact]
-    public void Run_PropertyWithAWordThatIsNoParameter_IsAnErrorWithoutAPositionAndTheOthersApply()
-    {
-        var run = Run(OutputKind.Sql, "keep-comments nope token-validation", null);
-
-        run.Diagnostics.ShouldBe([
-            "SQLSRC014 (1,1)-(1,1): 'nope' is not a valid value of SqlSourceGeneratorParameters",
-            "SQLSRC014 (1,1)-(1,1): 'token-validation' is not a valid value of SqlSourceGeneratorParameters",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("-- kept");
-    }
-
-    // The metadata of a file that a type claims, with no property beside it.
-    [Fact]
-    public void Run_MetadataWithAWordThatIsNoParameter_IsAnErrorWithoutAPositionAndTheOthersApply()
-    {
-        var run = GeneratorHarness.Run(
-            OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
-            [
-                new SqlFile(
-                    GeneratorHarness.UsersPath,
-                    "-- name: ListFrom\nSELECT * FROM {{table}}; -- kept\n",
-                    Metadata: new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "keep-comments nope" }
-                ),
-            ]
-        );
-
-        run.Diagnostics.ShouldBe([
-            "SQLSRC014 (1,1)-(1,1): 'nope' is not a valid value of SqlSourceGeneratorParameters",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("-- kept");
-    }
-
-    [Fact]
-    public void Run_TheSameInvalidWordInThePropertyAndInTwoFiles_IsReportedOnce()
-    {
-        var metadata = new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "nope" };
-
-        var run = GeneratorHarness.Run(
-            OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
-            [
-                new SqlFile("/app/Repo/A.sql", "SELECT 1;\n", Metadata: metadata),
-                new SqlFile("/app/Repo/B.sql", "SELECT 2;\n", Metadata: metadata),
-            ],
-            generatorParameters: "nope"
-        );
-
-        run.Diagnostics.ShouldBe([
-            "SQLSRC014 (1,1)-(1,1): 'nope' is not a valid value of SqlSourceGeneratorParameters",
-        ]);
-    }
-
-    // A file that no type claims is never read, and neither is what MSBuild says about it.
-    [Fact]
-    public void Run_InvalidMetadataOfAFileThatNoTypeClaims_IsNotReported()
-    {
-        var run = GeneratorHarness.Run(
-            OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
-            [
-                new SqlFile("/app/Repo/A.sql", "SELECT 1;\n"),
-                new SqlFile(
-                    "/app/Migrations/001.sql",
-                    "SELECT 2;\n",
-                    Metadata: new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "nope" }
-                ),
-            ]
-        );
-
-        run.Diagnostics.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Run_DefaultBesideAnotherWordInTheProperty_IsReportedWholeAndGivesNoList()
-    {
-        var run = Run(OutputKind.Sql, "default keep-comments", null);
-
-        run.Diagnostics.ShouldBe([
-            "SQLSRC014 (1,1)-(1,1): 'default keep-comments' is not a valid value of SqlSourceGeneratorParameters",
-        ]);
-        run.Sources["App.Sample.g.cs"].ShouldNotContain("-- kept");
-    }
-
-    [Fact]
     public void Run_AttributeWithAWordThatIsNoParameter_IsAnErrorAtTheAttribute()
     {
         var run = Run(OutputKind.Sql, null, "keep-comments nope");
@@ -345,11 +264,12 @@ public sealed class GeneratorParameterLevelTests
     private static string Source(string? attribute) =>
         GeneratorHarness.SampleSource(attribute is null ? null : "Parameters = \"" + attribute + "\"");
 
-    private static GeneratorRun Run(OutputKind? output, string? property, string? attribute) =>
+    // The query ListFrom under the generator parameters of the project's settings file and of the attribute.
+    private static GeneratorRun Run(OutputKind? output, string? projectFile, string? attribute) =>
         GeneratorHarness.Run(
             output,
             [new SourceFile(GeneratorHarness.SourcePath, Source(attribute))],
             [new SqlFile(GeneratorHarness.UsersPath, "-- name: ListFrom\nSELECT * FROM {{table}}; -- kept\n")],
-            generatorParameters: property
+            generatorParameters: projectFile
         );
 }

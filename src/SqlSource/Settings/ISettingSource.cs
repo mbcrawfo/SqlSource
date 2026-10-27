@@ -1,10 +1,11 @@
 using System;
+using System.Collections.Generic;
 
 namespace SqlSource.Settings;
 
 /// <summary>
-/// One place that settings are written in, other than a marker: the attribute of a type, the properties of a
-/// project, the metadata of a file's item.  It says how a raw value is found and where one that is not valid goes;
+/// One place that settings are written in, other than a marker: the attribute of a type or a settings file.  It finds
+/// a raw value as text, as elements or as members, and says where one that is not valid goes;
 /// <see cref="SettingsLevelReader" /> says everything else.
 /// </summary>
 /// <remarks>
@@ -19,12 +20,36 @@ internal interface ISettingSource
     string? Text(SettingId setting);
 
     /// <summary>
+    /// The elements of a setting written as an array of strings, as a settings file writes the generator parameters,
+    /// or null when the source writes it as text or not at all.
+    /// </summary>
+    IReadOnlyList<string>? Elements(SettingId setting);
+
+    /// <summary>
+    /// The key and the value of each member of a setting written as an object of strings, as a settings file writes
+    /// the type override and the column types, as written and in order, or null when the source writes it as text or
+    /// not at all.
+    /// </summary>
+    IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting);
+
+    /// <summary>
     /// The choice, or null when it is not set.  A value that is no member is recorded by the source, which alone
-    /// knows how it was written: a number in an attribute, a word in a property.
+    /// knows how it was written: a number in an attribute, a word in a settings file.
     /// </summary>
     T? Choice<T>(SettingId setting)
         where T : struct, Enum;
 
     /// <summary>Records a value that is not valid.  The setting is then not set.</summary>
     void Invalid(SettingId setting, string value);
+
+    /// <summary>
+    /// Records that the element or member at <paramref name="index" /> is not valid.  The others apply.
+    /// </summary>
+    void InvalidPart(SettingId setting, int index);
+
+    /// <summary>
+    /// Records that the member at <paramref name="index" /> has the key of the member at <paramref name="first" />, by
+    /// the identity of the setting's map.  It is left out, and the first applies.
+    /// </summary>
+    void RepeatedKey(SettingId setting, int index, int first);
 }

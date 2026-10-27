@@ -1,7 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -37,7 +36,7 @@ public sealed class CachingMappedTypeTests
 
     private readonly CachingScene _scene = new();
 
-    // A project whose property maps a type: the resolution runs on the new compilation, gives an equal value, and
+    // A project whose settings file maps a type: the resolution runs on the new compilation, gives an equal value, and
     // nothing after it runs again.
     [Fact]
     public void Run_CSharpEdit_ResolvesTheMappedTypesAndNothingAfterThem()
@@ -46,10 +45,10 @@ public sealed class CachingMappedTypeTests
         var driver = _scene.FirstRun(
             compilation,
             _scene.Users,
-            new TestOptionsProvider(
+            ProjectFile(
                 OutputKind.Sql,
-                null,
-                properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "uuid=System.Guid" }
+                settings: /*lang=json,strict*/
+                """{"typeOverrides": {"uuid": "System.Guid"}}"""
             )
         );
         var before = Outputs(driver.GetRunResult(), TrackingNames.MappedTypes).ShouldHaveSingleItem().Value;
@@ -74,10 +73,10 @@ public sealed class CachingMappedTypeTests
         var driver = _scene.FirstRun(
             compilation,
             _scene.Users,
-            new TestOptionsProvider(
+            ProjectFile(
                 OutputKind.Sql,
-                null,
-                properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "uuid=Guid" }
+                settings: /*lang=json,strict*/
+                """{"typeOverrides": {"uuid": "Guid"}}"""
             )
         );
         var before = Outputs(driver.GetRunResult(), TrackingNames.MappedTypes).ShouldHaveSingleItem().Value;
@@ -121,7 +120,7 @@ public sealed class CachingMappedTypeTests
             _scene.Users.Path,
             "-- name: GetUser\n-- type-override: uuid = System.Guid\nSELECT 1;\n"
         );
-        var driver = _scene.FirstRun(compilation, users, new TestOptionsProvider(OutputKind.Sql, null));
+        var driver = _scene.FirstRun(compilation, users, ProjectFile(OutputKind.Sql));
 
         var edited = new InMemoryAdditionalText(
             _scene.Users.Path,
@@ -139,8 +138,9 @@ public sealed class CachingMappedTypeTests
         ]);
     }
 
-    // The property maps a type of a library with converters.  An edit of a comment in the project's source resolves
-    // the type and reads its converters again, equal, so neither they nor the project's converters run again.
+    // The project's settings file maps a type of a library with converters.  An edit of a comment in the project's
+    // source resolves the type and reads its converters again, equal, so neither they nor the project's converters run
+    // again.
     [Fact]
     public void Run_EditOfACommentOutsideTheMappedType_LeavesMappedTypeConvertersUnchanged()
     {
@@ -190,11 +190,12 @@ public sealed class CachingMappedTypeTests
             .ShouldBe(["global::Lib.Email.ToText", "global::Lib.Email.From"]);
     }
 
-    private static TestOptionsProvider EmailOverride() =>
-        new(
+    // The project's settings file at Sql, whose type override maps text to the library's type.
+    private static InMemoryAdditionalText EmailOverride() =>
+        ProjectFile(
             OutputKind.Sql,
-            null,
-            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "text=Lib.Email" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"text": "Lib.Email"}}"""
         );
 
     // The compilation with UserQueries' file replaced by the source.

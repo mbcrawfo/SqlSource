@@ -1,0 +1,23 @@
+<Project>
+    <!--
+        Imported after the targets of the SDK, Directory.Build.targets among them: SqlSource.props adds this file to
+        AfterMicrosoftNETSdkTargets, which the SDK imports last.  NuGet imports SqlSource.targets before
+        Directory.Build.targets, and MSBuild runs the targets that hook the same one in the order they are declared,
+        so a target here runs after every target of the project that hooks CoreCompile.
+
+        The search for settings files and the hash of the AdditionalFiles items run here, just before the compiler, so
+        that a .sql file that any earlier target adds is searched above and hashed.  They are defined in
+        SqlSource.targets, where they hook GenerateMSBuildEditorConfigFileCore through SqlSourceSettingsSearchHook
+        when this file is not imported: in a project that is not of the SDK, or one that sets
+        AfterMicrosoftNETSdkTargets without keeping its value.  Here the property is emptied, so they run once, here.
+        A design-time build of an IDE runs CoreCompile, with the compiler skipped, and so runs them too.
+    -->
+    <PropertyGroup>
+        <SqlSourceSettingsSearchHook />
+    </PropertyGroup>
+    <Target
+        Name="SqlSourceSettingsFilesBeforeCompile"
+        BeforeTargets="CoreCompile"
+        DependsOnTargets="SqlSourceFindSettingsFiles;SqlSourceTrackAdditionalFiles"
+    />
+</Project>

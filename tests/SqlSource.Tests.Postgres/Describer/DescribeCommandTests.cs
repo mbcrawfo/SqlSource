@@ -16,9 +16,9 @@ using Xunit;
 namespace SqlSource.Tests.Postgres.Describer;
 
 // The whole "describe" command in process, as Cli.Run runs it, with the PostgreSQL describer against the container:
-// one postgres project in the run's folder whose .sql files name the database "app", and a connection for "app" on
-// the command line to the container's database "fixtures", the one the describer's fixtures were recorded on.  The
-// tool's own tests run the same command with a describer of their own.
+// one postgres project in the run's folder whose settings file names the database "app" for its .sql files, and a
+// connection for "app" on the command line to the container's database "fixtures", the one the describer's fixtures
+// were recorded on.  The tool's own tests run the same command with a describer of their own.
 [Collection(UsesPostgres.Name)]
 public sealed class DescribeCommandTests : IDisposable
 {
@@ -55,17 +55,14 @@ public sealed class DescribeCommandTests : IDisposable
         _postgres = postgres;
         _run.Describers.Add(new PostgresDescriber());
         _project = Plans.Postgres(_run.Folder, directory: "").AnsweredBy(_run.Processes);
+        _project.Settings["database"] = Database;
     }
 
     public void Dispose() => _run.Dispose();
 
-    // A .sql file of the project, of the database "app".
-    private string AddSql(string relativePath, string text) =>
-        _project.AddSql(relativePath, text, ("SqlSourceDatabase", Database));
-
     // Each case's query as a file of its own, by the case's name.
     private Dictionary<FixtureCase, string> AddCases() =>
-        Cases.ToDictionary(static found => found, found => AddSql(found.Name + ".sql", found.Query));
+        Cases.ToDictionary(static found => found, found => _project.AddSql(found.Name + ".sql", found.Query));
 
     private Task<CliResult> DescribeAsync(params string[] args) => DescribeWithAsync(_postgres.ConnectionString, args);
 
@@ -143,7 +140,7 @@ public sealed class DescribeCommandTests : IDisposable
         await _postgres.ExecuteAsync("CREATE TABLE command_widgets (id integer PRIMARY KEY, name text NOT NULL)");
         try
         {
-            var widgets = AddSql("widgets.sql", "-- name: GetWidgets\nSELECT * FROM command_widgets;\n");
+            var widgets = _project.AddSql("widgets.sql", "-- name: GetWidgets\nSELECT * FROM command_widgets;\n");
             var described = await DescribeAsync();
             described.ExitCode.ShouldBe(0, described.Error);
             await _postgres.ExecuteAsync("ALTER TABLE command_widgets ADD COLUMN note text");
@@ -169,7 +166,7 @@ public sealed class DescribeCommandTests : IDisposable
     [Fact]
     public async Task Describe_RejectedQueryBesideAnAcceptedOne_IsSqlsrc225AndSqlsrc217()
     {
-        var users = AddSql(
+        var users = _project.AddSql(
             "users.sql",
             "-- name: Broken\nSELECT no_such_column FROM users;\n\n-- name: Fine\nSELECT id FROM users;\n"
         );
@@ -189,7 +186,7 @@ public sealed class DescribeCommandTests : IDisposable
     public async Task Describe_WithLog_HoldsDriverEventsAndNoConnectionWord()
     {
         await CreateLogRoleAndDatabaseAsync();
-        _ = AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
+        _ = _project.AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
         var connection = new NpgsqlConnectionStringBuilder(_postgres.ConnectionString)
         {
             Username = ScratchSchema.LogRoleName,
@@ -231,7 +228,7 @@ public sealed class DescribeCommandTests : IDisposable
     [Fact]
     public async Task Describe_LogParametersWithLog_DriverEventsHoldNoParameter()
     {
-        _ = AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
+        _ = _project.AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
         var connection = new NpgsqlConnectionStringBuilder(_postgres.ConnectionString) { LogParameters = true };
         var log = _run.Folder.PathOf("run.log");
 
@@ -253,7 +250,7 @@ public sealed class DescribeCommandTests : IDisposable
     [Fact]
     public async Task Describe_ConnectionRefusedWithLog_IsSqlsrc224AndNothingPrintedOrLoggedHoldsTheHostOrTheUser()
     {
-        _ = AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
+        _ = _project.AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
         var host = new NpgsqlConnectionStringBuilder(_postgres.ConnectionString).Host.ShouldNotBeNull();
         var connection = new NpgsqlConnectionStringBuilder
         {
@@ -279,7 +276,7 @@ public sealed class DescribeCommandTests : IDisposable
     public async Task Describe_WrongPasswordWithLog_IsSqlsrc224AndNothingPrintedOrLoggedHoldsTheUserOrTheHost()
     {
         await CreateLogRoleAndDatabaseAsync();
-        _ = AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
+        _ = _project.AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
         var connection = new NpgsqlConnectionStringBuilder(_postgres.ConnectionString)
         {
             Username = ScratchSchema.LogRoleName,

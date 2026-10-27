@@ -1,0 +1,18 @@
+{
+  // The dialect of every query of the project.
+  "dialect": "postgres",
+  // The logical database that a query is described against, unless its file names another.
+  "database": "app",
+  // What a query generates: its method and its models, which need an entry in the sidecar beside its file.
+  "output": "CodeGen",
+  // The suffix of the model of a query's parameters.
+  "inputModelSuffix": "Args",
+  // The kind of type that a query's input model is.
+  "inputModelType": "record",
+  // The collection that a method returns the rows of a query whose shape is many in.
+  "collectionType": "IReadOnlyList",
+  "typeOverrides": {
+    // The C# type that timestamptz is read as, in place of the default of the type map.
+    "timestamptz": "System.DateTimeOffset",
+  },
+}

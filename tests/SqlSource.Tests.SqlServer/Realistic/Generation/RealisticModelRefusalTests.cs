@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,37 +8,33 @@ using SqlSource.Testing.Generator;
 using SqlSource.Tests.SqlServer.Describer;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
-using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.SqlServer.Realistic.Generation;
 
 // Each case whose models the generator refuses is refused as its case.json says: its query is described against the
-// database "realistic" into a sidecar held in memory, never written, and the generator, at Models under mssql,
-// gives exactly one error, of the id its models names.  So a case the generator comes to accept, or to refuse
-// otherwise, fails naming itself, and its models member cannot go stale.  No case of the corpus has one today, so every
-// case skips, until one comes to need it.
+// database "realistic" into a sidecar held in memory, never written, and the generator, given the settings files of
+// a build (the project's, which says mssql, and the corpus's own, which gives the database realistic) and the
+// attribute's Models, gives exactly one error, of the id its models names.  So a case the generator comes to accept,
+// or to refuse otherwise, fails naming itself, and its models member cannot go stale.  No case of the corpus has one
+// today, so every case skips, until one comes to need it.
 [Collection(UsesSqlServer.Name)]
 public sealed class RealisticModelRefusalTests(SqlServerContainer sqlServer)
 {
-    // Where the generator sees the case's query, beside the class that claims it, as RealisticQueries.cs claims one.
-    private const string QueryPath = "/app/Repo/Cases/query.sql";
+    // Where the generator sees the corpus's settings file and the case's query, in a folder of its own below it, as
+    // Realistic/Cases/<case>/query.sql is below Realistic/Cases/sqlsource.json.
+    private const string CasesSettingsPath = "/app/Repo/Cases/sqlsource.json";
+
+    private const string QueryPath = "/app/Repo/Cases/Case/query.sql";
 
     private const string Source = """
         using SqlSource;
 
         namespace App
         {
-            [SqlSourceGenerate(Path = "Cases/query.sql", Output = GeneratorOutput.Models)]
+            [SqlSourceGenerate(Path = "Cases/Case/query.sql", Output = GeneratorOutput.Models)]
             internal static partial class Refused;
         }
         """;
-
-    // The metadata that the project gives the corpus's queries.
-    private static readonly IReadOnlyDictionary<string, string> CorpusMetadata = new Dictionary<string, string>
-    {
-        ["SqlSourceDatabase"] = SqlServerContainer.RealisticDatabase,
-        ["SqlSourceTypeOverrides"] = "date=default",
-    };
 
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
@@ -57,17 +52,27 @@ public sealed class RealisticModelRefusalTests(SqlServerContainer sqlServer)
 
         var query = new SqlFile(
             QueryPath,
-            await File.ReadAllTextAsync(found.AsFixture.QueryPath, TestContext.Current.CancellationToken),
-            Metadata: CorpusMetadata
+            await File.ReadAllTextAsync(found.AsFixture.QueryPath, TestContext.Current.CancellationToken)
+        );
+
+        // The repository's own files, as a build of the project gives them to the generator: the project's file is the
+        // harness's, whose keys it takes whole, and the corpus's file is in the folder above the query's.
+        var projectSettings = await File.ReadAllTextAsync(
+            RealisticCases.Corpus.ProjectSettingsFile,
+            TestContext.Current.CancellationToken
+        );
+        var cases = GeneratorHarness.SettingsFile(
+            CasesSettingsPath,
+            await File.ReadAllTextAsync(RealisticCases.Corpus.CasesSettingsFile, TestContext.Current.CancellationToken)
         );
         var sidecar = await SidecarOfAsync(found, query);
 
         var run = GeneratorHarness.Run(
-            OutputKind.Models,
+            output: null,
             [new SourceFile(GeneratorHarness.SourcePath, Source)],
-            [query, sidecar],
+            [query, sidecar, cases],
             references: [SqlClientReferences.SqlClient7],
-            dialect: "mssql"
+            settings: projectSettings
         );
 
         var errors = run

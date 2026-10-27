@@ -1,0 +1,23 @@
+<Project>
+    <!--
+        Two targets that add a .sql file while they run.  The first hooks SqlSourceListFiles, the target the package
+        names, so it runs before the manifest and before the search for settings files wherever the search runs.  The
+        second hooks CoreCompile and is declared after the package's targets, as a target of Directory.Build.targets
+        is: a build still finds the settings file beside its file, since the search runs after it, and the manifest
+        does not list either, since the tool runs no hook of a build.
+    -->
+    <ItemGroup>
+        <AdditionalFiles Remove="Generated/Late.sql" />
+        <AdditionalFiles Remove="Compiled/Late.sql" />
+    </ItemGroup>
+    <Target Name="AddSqlFile" BeforeTargets="SqlSourceListFiles">
+        <ItemGroup>
+            <AdditionalFiles Include="Generated/Late.sql" />
+        </ItemGroup>
+    </Target>
+    <Target Name="AddSqlFileBeforeCompile" BeforeTargets="CoreCompile">
+        <ItemGroup>
+            <AdditionalFiles Include="Compiled/Late.sql" />
+        </ItemGroup>
+    </Target>
+</Project>

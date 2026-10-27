@@ -1,8 +1,7 @@
 using Microsoft.CodeAnalysis;
-using SqlSource.Generation.MSBuild;
+using SqlSource.Generation.Chains;
 using SqlSource.Generation.Paths;
 using SqlSource.Parsing;
-using SqlSource.Settings;
 
 namespace SqlSource.Generation;
 
@@ -15,46 +14,36 @@ namespace SqlSource.Generation;
 /// </param>
 /// <param name="NormalizedPath">The file's path as <see cref="SqlPath.Normalize" /> gives it, or null.</param>
 /// <param name="Dialect">
-/// The dialect the file is parsed with, unless a marker in it names another: its own metadata, or else the
-/// project's property, or else <see cref="SqlDialect.Ansi" />.
+/// The dialect the file is parsed with, unless a marker in it names another: the chain of its folder's, or else
+/// <see cref="SqlDialect.Ansi" />.
 /// </param>
-/// <param name="InvalidDialect">The file's metadata as written when it is not a dialect, and null otherwise.</param>
 /// <param name="CommentsWanted">
-/// Whether a level the parser cannot see may ask for <c>keep-comments</c>: the metadata's list, or the property's
-/// when the metadata gives none, or the attribute of a type that claims the file.  It may be true where no query
-/// ends up keeping its comments; it is never false where one does, apart from two paths that differ only by
-/// case, with the metadata on the later one: that is <c>SQLSRC013</c>, and the emitter falls back to the stripped
-/// form.
+/// Whether a level the parser cannot see may ask for <c>keep-comments</c>: the chain's list, or the attribute of a
+/// type that claims the file.  It may be true where no query ends up keeping its comments; it is never false where one
+/// does.
 /// </param>
 internal sealed record FileParseInput(
     AdditionalText File,
     string? NormalizedPath,
     SqlDialectChoice Dialect,
-    string? InvalidDialect,
     bool CommentsWanted
 )
 {
     /// <summary>
-    /// A file's own metadata comes before the project's property, whether or not it is valid: a file with metadata
-    /// that is not a dialect is read as <see cref="SqlDialect.Ansi" />, and its value is reported.
+    /// The input of <paramref name="file" />, whose path <see cref="SqlPath.Normalize" /> gives as
+    /// <paramref name="normalizedPath" />, under <paramref name="chain" />, the chain of its folder.
+    /// <paramref name="commentPaths" /> are the files of the types whose attribute asks for comments, sorted by
+    /// <see cref="SqlPath.Comparer" />.
     /// </summary>
     public static FileParseInput Resolve(
-        FileMetadata metadata,
-        DialectSetting projectDialect,
-        bool projectKeepsComments,
+        AdditionalText file,
+        string? normalizedPath,
+        SettingsChain chain,
         EquatableArray<string> commentPaths
     )
     {
-        var path = SqlPath.Normalize(metadata.File.Path);
         var commentsWanted =
-            (
-                metadata.Settings?.Level.Parameters is { } list
-                    ? (list & GeneratorParameters.KeepComments) != 0
-                    : projectKeepsComments
-            ) || (path is not null && SqlPath.Contains(commentPaths, path));
-
-        return metadata.Dialect.Dialect is { } dialect
-            ? new FileParseInput(metadata.File, path, dialect, metadata.Dialect.InvalidValue, commentsWanted)
-            : new FileParseInput(metadata.File, path, projectDialect.Dialect ?? default, null, commentsWanted);
+            chain.Level.KeepsComments || (normalizedPath is not null && SqlPath.Contains(commentPaths, normalizedPath));
+        return new FileParseInput(file, normalizedPath, chain.Dialect ?? default, commentsWanted);
     }
 }

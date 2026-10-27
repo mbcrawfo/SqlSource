@@ -9,7 +9,6 @@
     </ImportGroup>
     <PropertyGroup>
         <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-        <SqlSourceDialect>postgres</SqlSourceDialect>
     </PropertyGroup>
     <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
         <AdditionalFiles Remove="Later/**" />

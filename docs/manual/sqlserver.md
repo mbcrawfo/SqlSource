@@ -2,10 +2,12 @@
 
 SqlSource reads SQL Server and Azure SQL files by the `mssql` [dialect](dialects.md), and the `sqlsource` tool can describe their queries: it asks your database what each query's parameters and columns are, and writes the answer to the query's [sidecar](tool.md#sidecar-files).  This page is about describing, about the C# types that a described query's columns and parameters get, about the models built from them, and about the query methods that run them.  How SqlSource reads a T-SQL file, its comments, strings and `[bracketed]` names, is on [the dialects page](dialects.md).
 
-```xml
-<PropertyGroup>
-    <SqlSourceDialect>mssql</SqlSourceDialect>
-</PropertyGroup>
+```jsonc
+// sqlsource.json, in the project's folder
+{
+    "root": true,
+    "dialect": "mssql",
+}
 ```
 
 ```console
@@ -152,7 +154,7 @@ WHERE id = @id;
 
 Each column and each parameter of a described SQL Server query gets a C# type: the type that Microsoft.Data.SqlClient reads a value of its SQL Server type as.  If `id` is a `bigint`, `placed_at` a `datetime2(7)`, `total` a `decimal(12,2)`, `notes` an `nvarchar(max)` and `row_version` a `rowversion`, they are `long`, `System.DateTime`, `decimal`, `string` and `byte[]`; `@id` is a `long`.  A column that can be null gets its type with `?`: a `bigint` column that can be null is a `long?`, and an `nvarchar` one a `string?`.
 
-The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for `geography`.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides): `date=System.DateOnly`.  To give one column another, use a [column type](settings.md#setting-column-types), `users.id=MyApp.UserId`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Microsoft.Data.SqlClient does not read, such as an id or an `Email` over an alias type, needs [converters](settings.md#converters) to and from the type of the table below.  Rows read through Dapper with a type of your choice need a type handler: see [the recipe](recipes.md#dapper-with-sql-server).
+The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for `geography`.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides), `"date": "System.DateOnly"` in a settings file's `typeOverrides`.  To give one column another, use a [column type](settings.md#setting-column-types), `"users.id": "MyApp.UserId"` in its `columnTypes`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Microsoft.Data.SqlClient does not read, such as an id or an `Email` over an alias type, needs [converters](settings.md#converters) to and from the type of the table below.  Rows read through Dapper with a type of your choice need a type handler: see [the recipe](recipes.md#dapper-with-sql-server).
 
 <a id="which-sqlclient"></a>
 

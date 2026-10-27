@@ -297,8 +297,8 @@ internal static class AttributeSource
 
                 /// <summary>
                 /// The name of the class that holds the generated members under
-                /// <see cref="global::SqlSource.SqlLocation.Nested" />.  The default is the project's
-                /// <c>SqlSourceNestedClass</c>, else <c>Sql</c>.
+                /// <see cref="global::SqlSource.SqlLocation.Nested" />.  The default is the <c>nestedClass</c> of the
+                /// settings files of the folder of this type's file, else <c>Sql</c>.
                 /// </summary>
                 public string NestedClass { get; set; }
 

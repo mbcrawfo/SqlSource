@@ -1,0 +1,8 @@
+{
+  // The queries of billing: sealed class output models, the suffix Row, and date as a DateTime.
+  "outputModelType": "sealed class",
+  "outputModelSuffix": "Row",
+  "typeOverrides": {
+    "date": "default",
+  },
+}

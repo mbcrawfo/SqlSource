@@ -48,6 +48,12 @@ The tool's record of what the database said about each query's parameters and co
 
 The generator builds the [models](generator.md#models) and the [query method](#query-method) of a query from its entry in the sidecar.
 
+<a id="settings-file"></a>
+
+#### Settings file
+
+A file named `sqlsource.json` that sets [settings](settings.md#all-settings), such as the dialect and the output, for the `.sql` files of its folder and of every folder below it.  A file in a folder sets what differs there, and one that says `"root": true` keeps the settings files of the folders above it out.  See [settings files](settings.md#settings-files).
+
 ### What a query gets
 
 <a id="output"></a>
@@ -82,7 +88,7 @@ A value you pass when you run a query, written in the SQL as `@` and a name: `@i
 
 #### Generator parameter
 
-A word that changes what the generator does with a query, such as `keep-comments`.  A list of them is given in a `-- generator:` marker, on the attribute, or in an MSBuild property.  It has nothing to do with the parameters of the SQL.  See [generator parameters](settings.md#setting-generator-parameters).
+A word that changes what the generator does with a query, such as `keep-comments`.  A list of them is given in a `-- generator:` marker, on the attribute, or in a [settings file](#settings-file).  It has nothing to do with the parameters of the SQL.  See [generator parameters](settings.md#setting-generator-parameters).
 
 <a id="token"></a>
 

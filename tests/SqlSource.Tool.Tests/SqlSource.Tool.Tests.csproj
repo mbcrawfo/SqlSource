@@ -37,6 +37,11 @@
             Link="Fixtures/build/SqlSource.targets"
             CopyToOutputDirectory="PreserveNewest"
         />
+        <None
+            Include="../../src/SqlSource/build/SqlSource.AfterSdk.targets"
+            Link="Fixtures/build/SqlSource.AfterSdk.targets"
+            CopyToOutputDirectory="PreserveNewest"
+        />
         <None Include="../../global.json" Link="Fixtures/global.json" CopyToOutputDirectory="PreserveNewest" />
         <!--
             Fixtures/Describers holds the cases of the describers, under a folder for each engine: a query, the

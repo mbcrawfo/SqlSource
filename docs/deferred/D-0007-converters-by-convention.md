@@ -15,7 +15,7 @@ The research found that a convention guesses silently: a constructor or a `Value
 ## Remaining work
 
 - **Discovery**: in `MappedTypeResolver`, for a mapped type with no marked converter, its members of the convention, as a `Converter` of a new `ConverterOrigin`, for the project's own types as well as a reference's.
-- **The rule**: both halves required, read and write, and their `P` equal to the base map's type, so that a type that only looks like an id is never converted; an opt-in, a property of the `SqlSource` prefix or an attribute on the type, and whether it is on by default.
+- **The rule**: both halves required, read and write, and their `P` equal to the base map's type, so that a type that only looks like an id is never converted; an opt-in, a key of the settings files or an attribute on the type, and whether it is on by default.
 - **Validation**: whether a validating `From` is used on read, or a member that skips validation as Vogen's own Dapper handler does, and the diagnostics of a convention that matches in part.
 - **The manual**: the convention in [converters](../manual/settings.md#converters), and its known issue removed.
 

@@ -77,7 +77,7 @@ public sealed class SqlMarkerScopeTests
     [InlineData("WholeFile", "Query")]
     public void Read_TypeOverrides_AreTheLevelsSortedByKeyAtThePlaceOfTheScope(string kind, string placeName)
     {
-        var place = Enum.Parse<SettingPlace>(placeName);
+        var place = new SettingPlace(Enum.Parse<SettingPlaceKind>(placeName), null, 0);
         var (scope, errors) = Scope(
             Enum.Parse<SqlScopeKind>(kind),
             "-- type-override: timestamptz = default",

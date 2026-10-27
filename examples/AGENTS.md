@@ -6,7 +6,7 @@ The rules for changing the example projects, `examples/<Engine>Examples`.
 
 1. **Small and representative.**  A few queries in each folder show the common path and a few of the settings a user reaches for.  Coverage belongs in the end-to-end projects under `tests/`, never here.
 2. **No tests, and nothing runs.**  The project is a library in `SqlSource.slnx` that compiles.  Its classes call the generated code as a user's code would, so a stale sidecar or a model that changes shape breaks the build.
-3. **Only what the manual recommends.**  The project file, the queries and the code are what a user may copy, so code read through Dapper follows every point of [the recipe](../docs/manual/recipes.md#models-through-dapper).
+3. **Only what the manual recommends.**  The project file, its `sqlsource.json`, the queries and the code are what a user may copy, so code read through Dapper follows every point of [the recipe](../docs/manual/recipes.md#models-through-dapper).
 4. **One folder per output**, `Sql/`, `Models/` and `CodeGen/`, each with one class whose `[SqlSourceGenerate]` attribute sets the folder's output and claims the folder's `.sql` files.  `CodeGen/` uses the default output.
 5. **Anything only the repository needs is marked.**  The project file references the generator as the package adds it, with `ReferenceOutputAssembly="false"`, imports the package's props and targets by path, and keeps `SQLSRC240` a warning; its comments and the README say what a user writes instead.
 
@@ -14,7 +14,7 @@ The rules for changing the example projects, `examples/<Engine>Examples`.
 
 1. **A change to what a user writes, gets or sees updates the examples that show it**, in the same pull request, by rule 4 of the root `AGENTS.md`.  A phase that delivers a feature adds an example of it to each project the feature applies to.
 2. **The sidecars are written by `tools/describe-end-to-end.sh`, never by hand.**  Run it after a change to a query or to a project's `schema.sql`, and read its diff.
-3. **A project sets no `SqlSourceDatabase`.**  Its queries belong to the default logical database of its dialect, `postgres` or `mssql`, so a run has one database: the README's `SQLSOURCE_CONNECTION` and the connection `postgres=` or `mssql=` in `tools/describe-end-to-end.sh` both depend on it.
+3. **A project sets no `database`.**  Its queries belong to the default logical database of its dialect, `postgres` or `mssql`, so a run has one database: the README's `SQLSOURCE_CONNECTION` and the connection `postgres=` or `mssql=` in `tools/describe-end-to-end.sh` both depend on it.
 4. **`schema.sql` names no owner, role or database.**  The Compose file and the script each run it in a database of their own, PostgreSQL's Compose file as its own user and the script as `postgres`, SQL Server's both as `sa` in a database `examples`, and both must give the sidecars the same answer.  SQL Server's Compose file applies it from a second service, with `sqlcmd -I` and `-d examples`, only when it creates the database.
 5. **Each Compose file's image is its engine's default image for the tests**, `DefaultImages.Postgres` or `DefaultImages.SqlServer` of `tests/SqlSource.Testing/DefaultImages.cs`, and moves with it by rule 5 of the root `AGENTS.md`.
 6. **Each README lists the versions of Dapper and of its driver**, Npgsql or Microsoft.Data.SqlClient, that `Directory.Packages.props` pins.  A change to one updates the READMEs that list it.

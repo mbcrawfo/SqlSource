@@ -29,10 +29,15 @@ public sealed class ToolDiagnosticTests
     [Fact]
     public void AtFile_Arguments_IsAtThePathAndQuotesOnlyWhatItWasGiven()
     {
-        var diagnostic = ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, "/work/App.csproj", "nosuch");
+        var diagnostic = ToolDiagnostic.AtFile(
+            ToolDiagnostics.SidecarOutOfDate,
+            "/work/Users.sql.json",
+            "/work/Users.sql",
+            "an entry is missing"
+        );
 
-        diagnostic.Path.ShouldBe("/work/App.csproj");
+        diagnostic.Path.ShouldBe("/work/Users.sql.json");
         diagnostic.Position.ShouldBeNull();
-        diagnostic.Arguments.ToArray().ShouldBe(["nosuch"]);
+        diagnostic.Arguments.ToArray().ShouldBe(["/work/Users.sql", "an entry is missing"]);
     }
 }

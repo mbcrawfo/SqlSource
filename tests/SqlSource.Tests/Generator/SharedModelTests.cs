@@ -1,7 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using SqlSource.Generation;
@@ -26,6 +25,9 @@ public sealed class SharedModelTests
 
     // The name of GetUser in Users, of GetA in A and of GetB in B.
     private const string GetUserName = $"{GeneratorHarness.UsersPath}(1,10)-(1,17)";
+
+    private const string TheProjectFilePlace =
+        "the typeOverrides of the settings file " + GeneratorHarness.ProjectSettingsPath;
 
     private const string GetAName = "/app/Repo/A.sql(1,10)-(1,14)";
 
@@ -247,11 +249,8 @@ public sealed class SharedModelTests
         var run = Run(
             Source,
             [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [Parameter("id")], [Column("id")]))],
-            new Dictionary<string, string?>
-            {
-                ["SqlSourceInputModelSuffix"] = "Model",
-                ["SqlSourceOutputModelSuffix"] = "Model",
-            }
+            settings: /*lang=json,strict*/
+            """{"inputModelSuffix": "Model", "outputModelSuffix": "Model"}"""
         );
 
         run.Diagnostics.ShouldBe([
@@ -481,7 +480,8 @@ public sealed class SharedModelTests
         var run = Run(
             source,
             [Users, Sidecar(Users, "GetUser", [Column("id")])],
-            new Dictionary<string, string?> { ["SqlSourceModelNamespace"] = "App.Queries" }
+            settings: /*lang=json,strict*/
+            """{"modelNamespace": "App.Queries"}"""
         );
 
         AssertUnusable(
@@ -575,14 +575,15 @@ public sealed class SharedModelTests
         var run = Run(
             Source + "\n\nnamespace MyApp\n{\n    internal readonly struct Inner;\n}\n",
             [Users, Sidecar(Users, "GetUser", [Column("id")])],
-            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "int4=MyApp.Inner" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"int4": "MyApp.Inner"}}"""
         );
 
         AssertUnusable(
             run,
-            $"SQLSRC251 {GetUserName}: 'int4' is mapped to 'MyApp.Inner' for column 'id', in the property "
-                + "SqlSourceTypeOverrides, and that type is not public, and the model 'App.GetUserDto' is.  Make the "
-                + "type public, or make each type that claims the query's file internal."
+            $"SQLSRC251 {GetUserName}: 'int4' is mapped to 'MyApp.Inner' for column 'id', in {TheProjectFilePlace}, "
+                + "and that type is not public, and the model 'App.GetUserDto' is.  Make the type public, or make "
+                + "each type that claims the query's file internal."
         );
     }
 
@@ -597,16 +598,17 @@ public sealed class SharedModelTests
                 + "\n\nnamespace MyApp\n{\n    internal readonly struct Inner;\n\n"
                 + "    internal sealed class Secret;\n}\n",
             [file, Sidecar(file, "GetUser", [Column("id"), Column("name", Text)])],
-            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "int4=MyApp.Inner text=MyApp.Secret" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"int4": "MyApp.Inner", "text": "MyApp.Secret"}}"""
         );
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC251 {GetUserName}: 'int4' is mapped to 'MyApp.Inner' for column 'id', in the property "
-                + "SqlSourceTypeOverrides, and that type is not public, and the model 'App.GetUserDto' is.  Make the "
+            $"SQLSRC251 {GetUserName}: 'int4' is mapped to 'MyApp.Inner' for column 'id', in {TheProjectFilePlace}, "
+                + "and that type is not public, and the model 'App.GetUserDto' is.  Make the type public, or make "
+                + "each type that claims the query's file internal.",
+            $"SQLSRC251 {GetUserName}: 'text' is mapped to 'MyApp.Secret' for column 'name', in "
+                + $"{TheProjectFilePlace}, and that type is not public, and the model 'App.GetUserDto' is.  Make the "
                 + "type public, or make each type that claims the query's file internal.",
-            $"SQLSRC251 {GetUserName}: 'text' is mapped to 'MyApp.Secret' for column 'name', in the "
-                + "property SqlSourceTypeOverrides, and that type is not public, and the model 'App.GetUserDto' is.  "
-                + "Make the type public, or make each type that claims the query's file internal.",
         ]);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
@@ -626,16 +628,17 @@ public sealed class SharedModelTests
         var run = Run(
             Source + "\n\nnamespace App\n{\n    internal readonly struct UserKey;\n}\n",
             [a, Sidecar(a, "GetA", [Column("id")]), b, Sidecar(b, "GetB", [Column("Id", Text)])],
-            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "text=App.UserKey" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"text": "App.UserKey"}}"""
         );
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC251 {GetAName}: 'int4' is mapped to 'App.UserKey' for column 'id', in a "
                 + "-- type-override: marker of the query, and that type is not public, and the model 'App.UserRow' "
                 + "is.  Make the type public, or make each type that claims the query's file internal.",
-            $"SQLSRC251 {GetBName}: 'text' is mapped to 'App.UserKey' for column 'Id', in the property "
-                + "SqlSourceTypeOverrides, and that type is not public, and the model 'App.UserRow' is.  Make the type "
-                + "public, or make each type that claims the query's file internal.",
+            $"SQLSRC251 {GetBName}: 'text' is mapped to 'App.UserKey' for column 'Id', in {TheProjectFilePlace}, "
+                + "and that type is not public, and the model 'App.UserRow' is.  Make the type public, or make each "
+                + "type that claims the query's file internal.",
         ]);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
@@ -668,7 +671,8 @@ public sealed class SharedModelTests
         var run = Run(
             source + "\n\nnamespace MyApp\n{\n    internal readonly struct Inner;\n}\n",
             [Users, Sidecar(Users, "GetUser", [Column("id")])],
-            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "int4=MyApp.Inner" }
+            settings: /*lang=json,strict*/
+            """{"typeOverrides": {"int4": "MyApp.Inner"}}"""
         );
 
         run.ShouldBeClean();

@@ -22,11 +22,23 @@ internal sealed class ProjectManifest
     /// <summary>The constants the project's code is compiled with.</summary>
     public required ImmutableArray<string> DefineConstants { get; init; }
 
-    /// <summary>The properties of the package that have a value, by name, trimmed.</summary>
-    public required ImmutableDictionary<string, string> Properties { get; init; }
+    /// <summary>
+    /// The folders the build writes C# files and its outputs into and the NuGet package folders, as the package's
+    /// target escapes them and the compiler is given them: <c>BuildFolders.Of</c> reads it.  Empty when the manifest
+    /// has no such line.
+    /// </summary>
+    public required string BuildFolders { get; init; }
 
-    /// <summary>The <c>.sql</c> files of the project, in the order of its items.</summary>
-    public required ImmutableArray<ManifestFile> Files { get; init; }
+    /// <summary>
+    /// The full paths of the <c>.sql</c> files of the project, as MSBuild gives them, in the order of its items.
+    /// </summary>
+    public required ImmutableArray<string> Files { get; init; }
+
+    /// <summary>
+    /// The full paths of the settings files the compiler is given, each <c>sqlsource.json</c> above a <c>.sql</c> file
+    /// or a <c>Compile</c> item and any the project lists itself, once each, in the order of the manifest.
+    /// </summary>
+    public required ImmutableArray<string> SettingsFiles { get; init; }
 
     /// <summary>The full paths of the project's <c>Compile</c> items.</summary>
     public required ImmutableArray<string> CompileFiles { get; init; }

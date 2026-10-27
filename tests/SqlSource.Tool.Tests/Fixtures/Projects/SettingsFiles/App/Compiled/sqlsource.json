@@ -1,0 +1,4 @@
+{
+    // Beside a .sql file that a target adds just before the compiler.
+    "dialect": "mssql"
+}

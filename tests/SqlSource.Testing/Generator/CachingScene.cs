@@ -18,6 +18,11 @@ namespace SqlSource.Testing.Generator;
 // files that they claim and the sidecars of those files, the first run of the generator over them, and the edits that
 // a test makes to the compilation.
 //
+// A run's output, dialect and type overrides are the project's settings file, at GeneratorHarness.ProjectSettingsPath,
+// an additional text of the driver beside the .sql files, as GeneratorHarness writes it, and MSBuild tells the
+// generator nothing.  So every run has a settings file, which SettingsFile reads, and every .sql file a level of stage
+// two from it, at FileLevel.
+//
 // Like the other files of this folder, it stays within Roslyn 4.8.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
 internal sealed class CachingScene
@@ -64,13 +69,15 @@ internal sealed class CachingScene
     public static CSharpCompilation ModelsCompilation() =>
         GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
 
-    // Both types at Models under postgres, with Users, Orders and Payments, each with a current sidecar whose entry has
-    // one column, of int4.  A sidecar given is used in place of the one of its file.
+    // Both types at Models under postgres, or with this settings file of the project when one is given, with Users,
+    // Orders and Payments, each with a current sidecar whose entry has one column, of int4.  A sidecar given is used in
+    // place of the one of its file.
     public GeneratorDriver FirstRunOfModels(
         Compilation compilation,
         InMemoryAdditionalText users,
         InMemoryAdditionalText orders,
-        params InMemoryAdditionalText[] given
+        InMemoryAdditionalText[]? given = null,
+        InMemoryAdditionalText? projectFile = null
     )
     {
         var sidecars = new List<InMemoryAdditionalText>
@@ -79,17 +86,16 @@ internal sealed class CachingScene
             TypedSidecar(orders, "GetOrder", "int4"),
             PaymentsSidecar,
         };
-        foreach (var sidecar in given)
+        foreach (var sidecar in given ?? [])
         {
             _ = sidecars.RemoveAll(other => other.Path == sidecar.Path);
             sidecars.Add(sidecar);
         }
 
-        var driver = GeneratorHarness
-            .CreateDriver([users, orders, Payments, .. sidecars], OptionsWithTypeOverrides(null))
-            .RunGenerators(compilation, TestContext.Current.CancellationToken);
-        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
-        return driver;
+        return Checked(
+            CreateDriver(projectFile ?? ProjectFileWithTypeOverrides(null), [users, orders, Payments, .. sidecars]),
+            compilation
+        );
     }
 
     // The source of an attributed type in the namespace, with these arguments on its attribute when they are given
@@ -149,8 +155,7 @@ internal sealed class CachingScene
             sidecars.Add(sidecar);
         }
 
-        return GeneratorHarness
-            .CreateDriver([users, Orders, .. sidecars], new TestOptionsProvider(OutputKind.CodeGen, null, "postgres"))
+        return CreateDriver(ProjectFile(OutputKind.CodeGen, "postgres"), [users, Orders, .. sidecars])
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
     }
 
@@ -166,79 +171,119 @@ internal sealed class CachingScene
             )
         );
 
-    public GeneratorDriver FirstRun(OutputKind? output, Compilation compilation) =>
-        FirstRun(compilation, Users, new TestOptionsProvider(output, null));
+    // Both types at this output, with Users and Orders.
+    public GeneratorDriver FirstRun(OutputKind output, Compilation compilation) =>
+        FirstRun(compilation, Users, ProjectFile(output));
 
-    public GeneratorDriver FirstRun(Compilation compilation, InMemoryAdditionalText users, TestOptionsProvider options)
-    {
-        var driver = GeneratorHarness
-            .CreateDriver([users, Orders], options: options)
-            .RunGenerators(compilation, TestContext.Current.CancellationToken);
-        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
-        return driver;
-    }
+    // Both types with this file in place of Users, Orders, the project's settings file, and this settings file of a
+    // folder when one is given.
+    public GeneratorDriver FirstRun(
+        Compilation compilation,
+        InMemoryAdditionalText users,
+        InMemoryAdditionalText projectFile,
+        InMemoryAdditionalText? folderFile = null
+    ) => Checked(CreateDriver(projectFile, [users, Orders, .. Given(folderFile)]), compilation);
 
-    // Both types at Models under postgres, and each file with its current sidecar.
-    public GeneratorDriver FirstRunWithSidecars(Compilation compilation)
-    {
-        var driver = GeneratorHarness
-            .CreateDriver(
-                [Users, Orders, UsersSidecar, OrdersSidecar],
-                new TestOptionsProvider(OutputKind.Models, null, "postgres")
-            )
-            .RunGenerators(compilation, TestContext.Current.CancellationToken);
-        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
-        return driver;
-    }
+    // Both types at Sql, with Users, Orders and these settings files, nearer than the project's.
+    public GeneratorDriver FirstRunWithSettingsFiles(
+        Compilation compilation,
+        params InMemoryAdditionalText[] settingsFiles
+    ) => Checked(CreateDriver(ProjectFile(OutputKind.Sql), [Users, Orders, .. settingsFiles]), compilation);
+
+    // Both types at Models under postgres, or with this settings file of the project when one is given, and each file
+    // with its current sidecar.
+    public GeneratorDriver FirstRunWithSidecars(Compilation compilation, InMemoryAdditionalText? projectFile = null) =>
+        Checked(
+            CreateDriver(
+                projectFile ?? ProjectFile(OutputKind.Models, "postgres"),
+                [Users, Orders, UsersSidecar, OrdersSidecar]
+            ),
+            compilation
+        );
 
     // Both types at Models under mssql, and each file with its current sidecar.
-    public GeneratorDriver FirstRunWithSqlServerSidecars(Compilation compilation)
-    {
-        var driver = GeneratorHarness
-            .CreateDriver(
+    public GeneratorDriver FirstRunWithSqlServerSidecars(Compilation compilation) =>
+        Checked(
+            CreateDriver(
+                ProjectFile(OutputKind.Models, "mssql"),
                 [
                     Users,
                     Orders,
                     CurrentSidecar(Users, "GetUser", SqlDialect.SqlServer),
                     CurrentSidecar(Orders, "GetOrder", SqlDialect.SqlServer),
-                ],
-                new TestOptionsProvider(OutputKind.Models, null, "mssql")
-            )
-            .RunGenerators(compilation, TestContext.Current.CancellationToken);
-        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
-        return driver;
-    }
+                ]
+            ),
+            compilation
+        );
 
-    // Both types at Models under postgres, and each file with a current sidecar whose entry has a column of int4,
-    // Users with this one when it is given.
+    // Both types, with this settings file of the project, and each file with a current sidecar whose entry has a
+    // column of int4, Users and Orders with these ones when they are given, and this settings file of a folder when
+    // one is given.
     public GeneratorDriver FirstRunWithTypes(
         Compilation compilation,
-        TestOptionsProvider options,
-        InMemoryAdditionalText? usersSidecar = null
-    )
-    {
-        var driver = GeneratorHarness
-            .CreateDriver(
+        InMemoryAdditionalText projectFile,
+        InMemoryAdditionalText? usersSidecar = null,
+        InMemoryAdditionalText? ordersSidecar = null,
+        InMemoryAdditionalText? folderFile = null
+    ) =>
+        Checked(
+            CreateDriver(
+                projectFile,
                 [
                     Users,
                     Orders,
                     usersSidecar ?? TypedSidecar(Users, "GetUser", "int4"),
-                    TypedSidecar(Orders, "GetOrder", "int4"),
-                ],
-                options
-            )
-            .RunGenerators(compilation, TestContext.Current.CancellationToken);
-        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
-        return driver;
+                    ordersSidecar ?? TypedSidecar(Orders, "GetOrder", "int4"),
+                    .. Given(folderFile),
+                ]
+            ),
+            compilation
+        );
+
+    // The project's settings file at this output, under this dialect when one is given, and with these settings, a
+    // JSON object as a user writes the file, when they are given: the file GeneratorHarness writes for a run.
+    public static InMemoryAdditionalText ProjectFile(
+        OutputKind output,
+        string? dialect = null,
+        string? settings = null
+    ) =>
+        new(
+            GeneratorHarness.ProjectSettingsPath,
+            GeneratorHarness.ProjectSettings(output, dialect, settings: settings)
+        );
+
+    // The project's settings file at Models under postgres, with these type overrides, a JSON object such as
+    // {"int4": "long"}, when they are given.
+    public static InMemoryAdditionalText ProjectFileWithTypeOverrides(string? typeOverrides) =>
+        ProjectFile(
+            OutputKind.Models,
+            "postgres",
+            typeOverrides is null ? null : "{\"typeOverrides\": " + typeOverrides + "}"
+        );
+
+    // A driver over these files and the project's settings file after them, which gives the run its settings, so
+    // MSBuild tells the generator nothing.  A file of the test's own at the project's path is refused, as
+    // GeneratorHarness refuses it.
+    public static GeneratorDriver CreateDriver(
+        InMemoryAdditionalText projectFile,
+        IEnumerable<InMemoryAdditionalText> files
+    )
+    {
+        var given = files.ToList();
+        GeneratorHarness.RefuseTheProjectsPath(given.Select(file => file.Path));
+        return GeneratorHarness.CreateDriver([.. given, projectFile], new TestOptionsProvider());
     }
 
-    public static TestOptionsProvider OptionsWithTypeOverrides(string? overrides) =>
-        new(
-            OutputKind.Models,
-            null,
-            "postgres",
-            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = overrides }
-        );
+    // The file, when it is given, as the files it adds to a run.
+    private static InMemoryAdditionalText[] Given(InMemoryAdditionalText? file) => file is null ? [] : [file];
+
+    // The driver run over the compilation, which reports nothing.
+    private static GeneratorDriver Checked(GeneratorDriver driver, Compilation compilation)
+    {
+        var run = driver.RunGenerators(compilation, TestContext.Current.CancellationToken);
+        run.GetRunResult().Diagnostics.ShouldBeEmpty();
+        return run;
+    }
 
     // A current sidecar whose entry has one column, of the type of pg_catalog, named value unless another name is
     // given, and these parameters when given.

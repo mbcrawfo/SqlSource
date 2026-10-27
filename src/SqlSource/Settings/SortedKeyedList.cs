@@ -80,20 +80,6 @@ internal static class SortedKeyedList
         return low < entries.Count && order(keyOf(entries[low]), key) == 0 ? low : ~low;
     }
 
-    /// <summary>Puts <paramref name="entry" /> in its place in a sorted list, over the entry of its key.</summary>
-    public static void Put<T>(List<T> entries, T entry, Comparison<string> order, Func<T, string> keyOf)
-    {
-        var at = IndexOf(entries, keyOf(entry), order, keyOf);
-        if (at >= 0)
-        {
-            entries[at] = entry;
-        }
-        else
-        {
-            entries.Insert(~at, entry);
-        }
-    }
-
     /// <summary>
     /// Adds <paramref name="entry" /> in its place in a sorted list and gives null, or, when the list has an entry of
     /// its key, gives that entry and leaves the list as it is: a marker's entries add up, and the first of a key

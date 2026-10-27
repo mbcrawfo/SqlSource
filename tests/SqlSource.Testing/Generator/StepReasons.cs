@@ -102,20 +102,15 @@ internal static class StepReasons
         Reasons<FileClaim>(result, TrackingNames.FileClaim, claim => claim.Input.File.Path);
 
     // A step that is not among the tracked steps fails the test: it has lost its name.  The exceptions are the steps
-    // that give nothing, and so are not tracked, in a run without what they read: FileSettings where no file has
-    // metadata, SidecarInput and SidecarFile where there is no sidecar, and TypeNeeds where no query needs an entry.
-    // CachingOptionsTests.Run_MetadataOfOneFileGainsAParameter_ParsesNoFileAndEmitsOnlyItsType reads the first in a run
-    // where a file has metadata, and CachingSidecarTests.Run_MethodBodyEdited_ReadsNoSidecar, with the other tests of
-    // sidecars, the other three.
+    // that give nothing, and so are not tracked, in a run without what they read: SidecarInput and SidecarFile where
+    // there is no sidecar, and TypeNeeds where no query needs an entry.  Every driver of CachingScene has the project's
+    // settings file, so SettingsFile and FileLevel always give something.
+    // CachingSidecarTests.Run_MethodBodyEdited_ReadsNoSidecar, with the other tests of sidecars, reads the three.
     public static IncrementalStepRunReason[] AllReasons(GeneratorDriverRunResult result, string step)
     {
         var steps = result.Results.Single().TrackedSteps;
         return
-            step
-                is TrackingNames.FileSettings
-                    or TrackingNames.SidecarInput
-                    or TrackingNames.SidecarFile
-                    or TrackingNames.TypeNeeds
+            step is TrackingNames.SidecarInput or TrackingNames.SidecarFile or TrackingNames.TypeNeeds
             && !steps.ContainsKey(step)
             ? []
             : [.. steps[step].SelectMany(run => run.Outputs).Select(output => output.Reason)];

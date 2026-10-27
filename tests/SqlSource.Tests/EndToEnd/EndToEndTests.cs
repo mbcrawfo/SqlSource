@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using Shouldly;
@@ -68,10 +66,8 @@ public sealed class EndToEndTests
     public void NestedLocation_QueryWithEightTokens_ReplacesEachInItsPlace() =>
         TokenQueries.Eight("1", "2", "3", "4", "5", "6", "7", "8").ShouldBe("SELECT 12, 3, 4, 5, 6, 7, 8, 1;");
 
-    // SqlSource.Tests.csproj sets SqlSourceGeneratorParameters to sort-input and no-token-validation, one on each
-    // line, and Search has no list of its own.  That its method checks nothing shows the property reaching the
-    // generator through the MSBuild files the package ships, trimmed and whole: cut at its first line break, the
-    // list would be sort-input alone.
+    // The sqlsource.json of this folder lists sort-input and no-token-validation as the generator parameters, and
+    // Search has no list of its own.  That its method checks nothing shows the settings file reaching the generator.
     [Theory]
     [InlineData("")]
     [InlineData("  ")]
@@ -98,75 +94,32 @@ public sealed class EndToEndTests
     public void ProjectWithValidationOff_QueryWithItsOwnList_ReturnsTheSqlForArgumentsWithText() =>
         TokenQueries.Checked("users", "id = @id").ShouldBe("SELECT id FROM users WHERE id = @id;");
 
-    // SqlSource.Tests.csproj sets the SqlSourceDialect property to postgres, on a line of its own.  ANSI would end the
-    // string at the quote after the backslash and take the rest of the line for a comment.
+    // The sqlsource.json of this folder sets the dialect to postgres.  ANSI would end the string at the quote after the
+    // backslash and take the rest of the line for a comment.
     [Fact]
-    public void ProjectWithADialect_FileWithoutItsOwn_IsReadByTheDialectOfTheProject() =>
-        DialectQueries.ByProperty.ShouldBe("SELECT E'it'\n    '\\'s -- not a comment' AS note;");
+    public void ProjectWithADialect_FileWithoutItsOwn_IsReadByTheDialectOfTheSettingsFile() =>
+        DialectQueries.ByProject.ShouldBe("SELECT E'it'\n    '\\'s -- not a comment' AS note;");
 
-    // The item of ByMetadata.sql has SqlSourceDialect metadata, written over several lines.  That the file is read as
-    // MySQL shows the metadata reaching the generator through the MSBuild files the package ships, trimmed.
+    // The header of ByHeader.sql says mysql.  That the file is read as MySQL shows the header over the settings file.
     [Fact]
-    public void ProjectWithADialect_FileWithMetadata_IsReadByTheDialectOfItsItem() =>
-        DialectQueries.ByMetadata.ShouldBe("SELECT 'it\\'s' AS note, 5--3 AS eight;");
+    public void ProjectWithADialect_FileWithAHeader_IsReadByTheDialectOfItsHeader() =>
+        DialectQueries.ByHeader.ShouldBe("SELECT 'it\\'s' AS note, 5--3 AS eight;");
 
-    // The item of ByOption.sql names an option after the dialect, with a comma, on a line of its own.  Cut at the
-    // line break the value would end at the comma and be no dialect, and plain MySQL would not close the string:
-    // either way this project would not build.
+    // The header of ByOption.sql names an option after the dialect, with a comma.  Plain MySQL would not close the
+    // string, so this project would not build.
     [Fact]
-    public void ProjectWithADialect_FileWithAnOptionInItsMetadata_IsReadByThatOption() =>
+    public void ProjectWithADialect_FileWithAnOptionInItsHeader_IsReadByThatOption() =>
         DialectQueries.ByOption.ShouldBe("SELECT 'C:\\temp\\' AS path;");
-
-    // The build copies the file it wrote for the compiler of this project to the output folder.  It has a section for
-    // each item whose metadata the package shows to the compiler.  A section for every .sql file would make the file,
-    // and the build, grow with files that set nothing.  A value with an option arrives whole, comma included, and
-    // one that the project writes over several lines arrives on one line, with one space for each line break.
-    [Fact]
-    public void ProjectWithMetadata_FileTheBuildWritesForTheCompiler_NamesOnlyTheFilesWithMetadata()
-    {
-        var lines = File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "build", "compiler.editorconfig"));
-
-        var values = new List<string>();
-        var section = string.Empty;
-        foreach (var line in lines)
-        {
-            if (line.StartsWith('['))
-            {
-                section = line.EndsWith(".sql]", StringComparison.Ordinal)
-                    ? line[line.LastIndexOf('/')..]
-                    : string.Empty;
-            }
-            else if (
-                section.Length > 0
-                && line.Contains(" = ", StringComparison.Ordinal)
-                && !line.EndsWith(" = ", StringComparison.Ordinal)
-            )
-            {
-                values.Add(section + " " + line);
-            }
-        }
-
-        values.ShouldBe(
-            [
-                "/ByMetadata.sql] build_metadata.SqlSourceSettingsFile.SqlSourceDialect = mysql",
-                "/ByOption.sql] build_metadata.SqlSourceSettingsFile.SqlSourceDialect = mysql, no-backslash-escapes",
-                "/Kept.sql] build_metadata.SqlSourceSettingsFile.SqlSourceGeneratorParameters = "
-                    + "no-token-validation keep-comments",
-            ],
-            ignoreOrder: true
-        );
-    }
 
     [Fact]
     public void ProjectWithADialect_FileWithAMarker_IsReadByTheDialectItNames() =>
         DialectQueries.ByMarker.ShouldBe("SELECT [it's] FROM #orders;");
 
-    // The item of Kept.sql has SqlSourceGeneratorParameters metadata, with keep-comments as the second of two words
-    // and one word on each line.  That the comment is there shows the metadata reaching the generator through the
-    // MSBuild files the package ships, trimmed and whole, and replacing the project's list.
+    // The header of Kept.sql lists no-token-validation and keep-comments as the generator parameters.  That the comment
+    // is there shows the header reaching the generator and replacing the settings file's list.
     [Fact]
-    public void ProjectWithParameters_FileWithMetadata_UsesTheListOfItsItem() =>
-        ParameterQueries.Kept.ShouldBe("SELECT 1 /* kept by the metadata */ AS one;");
+    public void ProjectWithParameters_FileWithAHeader_UsesTheListOfItsHeader() =>
+        ParameterQueries.Kept.ShouldBe("SELECT 1 /* kept by the header */ AS one;");
 
     [Fact]
     public void ProjectWithParameters_TwoTypesClaimOneFile_EachUsesItsOwnAttribute()

@@ -4,15 +4,16 @@ namespace SqlSource.Settings;
 internal static class SettingPlaces
 {
     /// <summary>
-    /// How specific a place is, the most specific highest: the query, the file's header, the metadata, then the
-    /// property.  Neither setting has an attribute level, which ranks with the property.
+    /// How specific a place is, the most specific highest: the query, the file's header, the settings files, then the
+    /// attribute.  The nearer a settings file's folder to the file's the higher it ranks, and all rank above the
+    /// attribute, which neither setting has a level of.
     /// </summary>
     public static int Specificity(SettingPlace place) =>
-        place switch
+        place.Kind switch
         {
-            SettingPlace.Query => 3,
-            SettingPlace.FileHeader => 2,
-            SettingPlace.Metadata => 1,
-            SettingPlace.Property or SettingPlace.Attribute or _ => 0,
+            SettingPlaceKind.Query => int.MaxValue,
+            SettingPlaceKind.FileHeader => int.MaxValue - 1,
+            SettingPlaceKind.SettingsFile => 1 + place.Depth,
+            SettingPlaceKind.Attribute or _ => 0,
         };
 }

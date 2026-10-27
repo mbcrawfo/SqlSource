@@ -75,6 +75,58 @@ public sealed class SidecarTokenizerTests
         tokens.Next().Kind.ShouldBe(SidecarTokenKind.End);
     }
 
+    [Fact]
+    public void Next_CommentsInLenientMode_AreSkippedAsWhiteSpace() =>
+        Tokens("// a\n/* b */ 1 /* c\n d */ // e", lenient: true).ShouldBe(["Number:1"]);
+
+    [Theory]
+    [InlineData("/ 1")]
+    [InlineData("// a\n1")]
+    public void Next_CommentInStrictMode_IsInvalidAtTheSlash(string text) =>
+        new SidecarTokenizer(text).Next().ShouldBe(new SidecarToken(SidecarTokenKind.Invalid, new TextSpan(0, 1)));
+
+    // A comment of the shortest forms, and a line comment that a carriage return or the end of the text closes.
+    [Theory]
+    [InlineData("/**/ 1")]
+    [InlineData("/***/ 1")]
+    [InlineData("// a\r1")]
+    [InlineData("1 //")]
+    public void Next_ShortComment_IsSkippedAsWhiteSpace(string text) =>
+        Tokens(text, lenient: true).ShouldBe(["Number:1"]);
+
+    // The slash and the star of `/*/` are not also its closing `*/`.
+    [Theory]
+    [InlineData("1 /* a", 6)]
+    [InlineData("/*/", 3)]
+    public void Next_BlockCommentNotClosed_IsInvalidAtTheEnd(string text, int end)
+    {
+        var tokens = new SidecarTokenizer(text, lenient: true);
+
+        if (text[0] == '1')
+        {
+            tokens.Next().Kind.ShouldBe(SidecarTokenKind.Number);
+        }
+
+        tokens.Next().ShouldBe(new SidecarToken(SidecarTokenKind.Invalid, new TextSpan(end, 0)));
+        tokens.Next().Kind.ShouldBe(SidecarTokenKind.End);
+    }
+
+    [Theory]
+    [InlineData("/x", 0)]
+    [InlineData("1 /", 2)]
+    public void Next_SlashThatStartsNoComment_IsInvalidAtTheSlash(string text, int slash)
+    {
+        var tokens = new SidecarTokenizer(text, lenient: true);
+
+        if (text[0] == '1')
+        {
+            tokens.Next().Kind.ShouldBe(SidecarTokenKind.Number);
+        }
+
+        tokens.Next().ShouldBe(new SidecarToken(SidecarTokenKind.Invalid, new TextSpan(slash, 1)));
+        tokens.Next().Kind.ShouldBe(SidecarTokenKind.End);
+    }
+
     [Theory]
     [InlineData("\"\"", "")]
     [InlineData("\"abc\"", "abc")]
@@ -231,6 +283,51 @@ public sealed class SidecarTokenizerTests
     }
 
     [Theory]
+    [InlineData( /*lang=json*/
+        "{\"a\":1,}"
+    )]
+    [InlineData("[1,]")]
+    [InlineData( /*lang=json*/
+        "{\"a\":[1,2,],}"
+    )]
+    // A comment between the comma and the bracket.
+    [InlineData("[1, // c\n]")]
+    [InlineData("[1, /* c */ ]")]
+    public void TrySkipValue_TrailingCommaInLenientMode_IsAccepted(string json)
+    {
+        var tokens = new SidecarTokenizer(json, lenient: true);
+
+        tokens.TrySkipValue(tokens.Next(), 0, out _).ShouldBeTrue();
+
+        tokens.Position.ShouldBe(json.Length);
+    }
+
+    [Fact]
+    public void TrySkipValue_TrailingCommaInStrictMode_IsTheClosingBracket()
+    {
+        var tokens = new SidecarTokenizer("[1,]");
+
+        tokens.TrySkipValue(tokens.Next(), 0, out var error).ShouldBeFalse();
+
+        error.ShouldBe(new TextSpan(3, 1));
+    }
+
+    // One comma may close a container; a comma with no member before it may not.
+    [Theory]
+    [InlineData("{,}", 1)]
+    [InlineData("[,]", 1)]
+    [InlineData("[1,,]", 3)]
+    [InlineData("{\"a\":1,,}", 7)]
+    public void TrySkipValue_CommaWithNoMemberInLenientMode_IsInvalid(string json, int comma)
+    {
+        var tokens = new SidecarTokenizer(json, lenient: true);
+
+        tokens.TrySkipValue(tokens.Next(), 0, out var error).ShouldBeFalse();
+
+        error.ShouldBe(new TextSpan(comma, 1));
+    }
+
+    [Theory]
     [InlineData('[', ']', "")]
     [InlineData('{', '}', "\"a\":")]
     public void TrySkipValue_SixtyFourLevels_IsRead(char open, char close, string key)
@@ -254,6 +351,29 @@ public sealed class SidecarTokenizerTests
         tokens.TrySkipValue(tokens.Next(), 0, out var error).ShouldBeFalse();
 
         error.ShouldBe(new TextSpan(SidecarTokenizer.MaxDepth * (1 + key.Length), 1));
+    }
+
+    // Trailing commas make no level of nesting free.
+    [Fact]
+    public void TrySkipValue_SixtyFourLevelsWithTrailingCommasInLenientMode_IsRead()
+    {
+        var json = NestedWithTrailingCommas(SidecarTokenizer.MaxDepth);
+        var tokens = new SidecarTokenizer(json, lenient: true);
+
+        tokens.TrySkipValue(tokens.Next(), 0, out _).ShouldBeTrue();
+
+        tokens.Position.ShouldBe(json.Length);
+    }
+
+    [Fact]
+    public void TrySkipValue_SixtyFiveLevelsWithTrailingCommasInLenientMode_FailsAtTheBracketThatOpensTheLast()
+    {
+        var json = NestedWithTrailingCommas(SidecarTokenizer.MaxDepth + 1);
+        var tokens = new SidecarTokenizer(json, lenient: true);
+
+        tokens.TrySkipValue(tokens.Next(), 0, out var error).ShouldBeFalse();
+
+        error.ShouldBe(new TextSpan(SidecarTokenizer.MaxDepth, 1));
     }
 
     // The depth an outer reader has already opened counts.
@@ -304,9 +424,13 @@ public sealed class SidecarTokenizerTests
         return text.Append(close, levels).ToString();
     }
 
-    private static List<string> Tokens(string text)
+    // `levels` arrays, each inside the one before, each but the innermost with a trailing comma: [[[],],].
+    private static string NestedWithTrailingCommas(int levels) =>
+        new string('[', levels) + "]" + string.Concat(System.Linq.Enumerable.Repeat(",]", levels - 1));
+
+    private static List<string> Tokens(string text, bool lenient = false)
     {
-        var tokens = new SidecarTokenizer(text);
+        var tokens = new SidecarTokenizer(text, lenient: lenient);
         var found = new List<string>();
         for (var token = tokens.Next(); token.Kind != SidecarTokenKind.End; token = tokens.Next())
         {

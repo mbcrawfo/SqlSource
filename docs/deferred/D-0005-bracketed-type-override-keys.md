@@ -10,11 +10,11 @@ Phase 6 of the [query generation epic](../superpowers/specs/2026-10-07-query-gen
 
 ## Why deferred
 
-The owner chose not to take brackets for now.  `[]` after a key already means an array, and `TypeOverrideGrammar` reads `[`…`]` as one run when it splits an MSBuild list, so brackets would make the grammar harder to read and to explain for a form that only one engine uses and that two other forms already cover.
+The owner chose not to take brackets for now.  `[]` after a key already means an array, so brackets would make the grammar harder to read and to explain for a form that only one engine uses and that two other forms already cover.
 
 ## Remaining work
 
-A bracketed part, `]]` for a bracket inside it, in `TypeKeyText.TryReadPart` and the list splitter, without changing what a plain, a quoted or an array key means: decide whether a bracketed part is compared exactly, as a double-quoted one is, or ignoring case, as SQL Server compares names by default; tests for each form at each level of the override, and a key such as `[int[]]` that mixes the two meanings of brackets; the manual's override section and its known issue.
+A bracketed part, `]]` for a bracket inside it, in `TypeKeyText.TryReadPart`, without changing what a plain, a quoted or an array key means: decide whether a bracketed part is compared exactly, as a double-quoted one is, or ignoring case, as SQL Server compares names by default; tests for each form at each level of the override, and a key such as `[int[]]` that mixes the two meanings of brackets; the manual's override section and its known issue.
 
 ## Trigger
 

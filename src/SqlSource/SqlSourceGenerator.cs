@@ -7,11 +7,11 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Generation.Chains;
 using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Models;
-using SqlSource.Generation.MSBuild;
 using SqlSource.Generation.Paths;
 using SqlSource.Generation.Sidecars;
 using SqlSource.Generation.Types;
@@ -36,45 +36,23 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         RegisterAttribute(context);
-        var project = ReadProjectSettings(context);
-        var claims = ClaimFiles(context, project.Level);
-        var settings = ReadSettings(context, project, claims.SqlFiles);
-        var parsedFiles = ParseFiles(
-            context,
-            settings.FileMetadata,
-            settings.ProjectDialect,
-            settings.ProjectSettings,
-            claims.CommentPaths,
-            claims.ClaimedPaths
-        );
-        ReportInvalidSettings(context, settings.ProjectSettings, settings.FilesSettings, claims.ClaimedPaths);
-        var typeQueries = SelectTypeQueries(claims.ClaimingTypes, parsedFiles.Sorted, settings.FilesSettings);
-        var sidecars = CheckSidecars(
-            context,
-            claims.ClaimedPaths,
-            typeQueries,
-            settings.ProjectLevel,
-            parsedFiles,
-            claims.RepeatedPaths
-        );
-        var typing = TypeFiles(
-            context,
-            sidecars.Checks,
-            parsedFiles.Sorted,
-            settings.FilesSettings,
-            settings.ProjectSettings,
-            settings.ProjectLevel
-        );
+        var settingsFiles = ReadSettingsFiles(context);
+        var claims = ClaimFiles(context, settingsFiles);
+        ReportSettingsFiles(context, settingsFiles, claims.SqlPaths);
+        var fileLevels = ReadSettings(claims.SqlFiles, settingsFiles);
+        var parsedFiles = ParseFiles(context, claims.SqlFiles, settingsFiles, claims.CommentPaths, claims.ClaimedPaths);
+        var typeQueries = SelectTypeQueries(claims.ClaimingTypes, parsedFiles.Sorted, fileLevels);
+        var sidecars = CheckSidecars(context, claims.ClaimedPaths, typeQueries, parsedFiles, claims.RepeatedPaths);
+        var typing = TypeFiles(context, sidecars.Checks, parsedFiles.Sorted, fileLevels);
         var converters = FindConverters(context, typing.MappedTypeConverters);
-        var models = CollectModels(context, typing.Files, typeQueries, settings.ProjectLevel);
+        var models = CollectModels(context, typing.Files, typeQueries);
         ReportDrivers(context, typing.NpgsqlProbe, typing.SqlClientProbe, sidecars.Needs, parsedFiles.Sorted);
         ReportProblems(context, sidecars.Checks, typing.FileTypes, models.FileModels, models.Models);
         RegisterModelSources(context, models.Models, parsedFiles.EachFile, claims.RepeatedPaths);
-        RegisterTypeSources(context, typeQueries, settings.ProjectLevel);
+        RegisterTypeSources(context, typeQueries);
         RegisterMethodSources(
             context,
             typeQueries,
-            settings.ProjectLevel,
             models.AllFileModels,
             models.Models,
             models.ModelNames,
@@ -91,20 +69,27 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             output.AddSource(AttributeSource.HintName, SourceText.From(AttributeSource.Text, Encoding.UTF8))
         );
 
-    // What the project's properties say about the settings, which is the same value until one of them changes, and
-    // their level alone, which never reaches the parse of a file.
-    private static ProjectProperties ReadProjectSettings(IncrementalGeneratorInitializationContext context)
-    {
-        var projectSettings = context
-            .AnalyzerConfigOptionsProvider.Select(static (options, _) => ProjectSettings.Read(options.GlobalOptions))
-            .WithTrackingName(TrackingNames.ProjectSettings);
-        return new ProjectProperties(projectSettings, projectSettings.Select(static (settings, _) => settings.Level));
-    }
+    // The project's settings files, each read once, with the chain of every folder.  Their problems are reported by
+    // ReportSettingsFiles, for the files that a chain reaches.
+    private static IncrementalValueProvider<SettingsFileSet> ReadSettingsFiles(
+        IncrementalGeneratorInitializationContext context
+    ) =>
+        context
+            .AdditionalTextsProvider.Where(static file => ListedSettingsFile.IsSettingsFile(file.Path))
+            .Select(
+                static (file, cancellationToken) =>
+                    ListedSettingsFile.Read(file, SettingsFileSide.Build, cancellationToken)
+            )
+            .WhereNotNull()
+            .WithTrackingName(TrackingNames.SettingsFile)
+            .Collect()
+            .Select(static (files, _) => SettingsFileSet.Of(files))
+            .WithTrackingName(TrackingNames.SettingsFiles);
 
     // The files each type claims, from the declarations that carry the attribute and the list of paths alone.
     private static ClaimedFiles ClaimFiles(
         IncrementalGeneratorInitializationContext context,
-        IncrementalValueProvider<SettingsLevel> projectLevel
+        IncrementalValueProvider<SettingsFileSet> settingsFiles
     )
     {
         var declaredTypes = context
@@ -116,10 +101,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .WhereNotNull()
             .WithTrackingName(TrackingNames.TargetTypes);
 
-        // The nested class named once the project's properties are known.  An edit that adds a member to a type
-        // changes its declaration and runs this again, and goes no further unless the member takes the name.
+        // The nested class named once the settings files are known, from the chain of the folder of the type's C# file.
+        // An edit that adds a member to a type changes its declaration and runs this again, and goes no further unless
+        // the member takes the name.  An edit to a settings file runs it for every type, and goes no further for a type
+        // whose name it leaves alone.
         var targetTypes = declaredTypes
-            .Combine(projectLevel)
+            .Combine(settingsFiles)
             .Select(static (input, _) => NestedClassCheck.Apply(input.Left, input.Right))
             .WithTrackingName(TrackingNames.NestedClassCheck);
 
@@ -212,64 +199,108 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         );
 
-        return new ClaimedFiles(sqlFiles, typeFiles, claimedPaths, commentPaths, repeatedPaths, typeMemberNames);
+        return new ClaimedFiles(
+            sqlFiles,
+            sqlPaths,
+            typeFiles,
+            claimedPaths,
+            commentPaths,
+            repeatedPaths,
+            typeMemberNames
+        );
     }
 
-    // What the project's properties and each file's metadata say.
-    private static ProjectAndFileSettings ReadSettings(
+    // The problems of each settings file that the chain of the folder of some .sql file or C# file reaches, whether or
+    // not a type claims that .sql file or that C# file declares one.  A file beyond the first root file of every such
+    // chain is never reported.
+    private static void ReportSettingsFiles(
         IncrementalGeneratorInitializationContext context,
-        ProjectProperties project,
-        IncrementalValuesProvider<AdditionalText> sqlFiles
+        IncrementalValueProvider<SettingsFileSet> settingsFiles,
+        IncrementalValueProvider<EquatableArray<string>> sqlPaths
     )
     {
-        // The project's dialect, which is the same value until the property itself changes.
-        var projectDialect = context
-            .AnalyzerConfigOptionsProvider.Select(
-                static (options, _) => DialectSetting.ReadProperty(options.GlobalOptions)
+        // The paths of the C# files, which are equal until one is added, removed or renamed.  Like the framework check,
+        // it runs on every compilation, and a project without a settings file looks at no tree.
+        var compilePaths = context
+            .CompilationProvider.Combine(settingsFiles)
+            .Select(static (input, _) => CompilePathsOf(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.CompilePaths);
+
+        // The folders the build writes into and the NuGet package folders, whose files are the build's or a package's
+        // and reach nothing.  They are equal until a property changes.
+        var buildFolders = context
+            .AnalyzerConfigOptionsProvider.Select(static (options, _) => BuildFolders.Read(options.GlobalOptions))
+            .WithTrackingName(TrackingNames.BuildFolders);
+
+        // Each rooted path of the compilation's trees that is under no folder of the build, normalised when it is read.
+        // The compiler gives a Compile item its full path, and a generator's post-initialization file, the attribute's
+        // among them, a path of the generator's assembly, type and hint name under its base folder for generated
+        // files.  In a build that is the compiler's output folder, which is under the intermediate folder, as the SDK's
+        // own Compile items in obj are, so neither reaches anything, wherever the project puts obj.  Where the
+        // compiler sets no base folder, as the test driver does, the path is relative, and a path that is not rooted
+        // reaches nothing.
+        var reachedSettingsFiles = settingsFiles
+            .Combine(sqlPaths)
+            .Combine(compilePaths.Combine(buildFolders))
+            .Select(
+                static (input, _) =>
+                    input.Left.Left.Reached(input.Left.Right.Concat(input.Right.Right.ReachingPaths(input.Right.Left)))
             )
-            .WithTrackingName(TrackingNames.ProjectDialect);
+            .WithTrackingName(TrackingNames.ReachedSettingsFiles);
 
-        // What the metadata of each file's item says: its dialect and its settings.
-        var fileMetadata = sqlFiles
-            .Combine(context.AnalyzerConfigOptionsProvider)
-            .Select(static (input, _) => FileMetadata.Read(input.Left, input.Right.GetOptions(input.Left)));
-
-        // Stage two of the settings: the metadata of the files that have any, which are few.  It never reaches the
-        // parse of a file.
-        var filesSettings = fileMetadata
-            .Select(static (metadata, _) => metadata.Settings)
-            .WhereNotNull()
-            .WithTrackingName(TrackingNames.FileSettings)
-            .Collect()
-            .Select(static (settings, _) => ToSorted(settings, static file => file.NormalizedPath))
-            .WithTrackingName(TrackingNames.FilesSettings);
-
-        return new ProjectAndFileSettings(projectDialect, project.Settings, project.Level, fileMetadata, filesSettings);
+        context.RegisterSourceOutput(
+            settingsFiles.Combine(reachedSettingsFiles),
+            static (output, input) =>
+            {
+                foreach (var file in input.Left.FilesIn(input.Right))
+                {
+                    ReportAll(output, file.Diagnostics);
+                }
+            }
+        );
     }
 
-    // Each claimed file parsed, by itself and sorted by path, with its parse errors and the dialects that are not valid
-    // reported.
+    // Stage two of the settings: the level of each file that the chain of its folder gives one.  It never reaches the
+    // parse of a file.  An edit to a settings file resolves every file's level again, and each file whose level it
+    // leaves alone gives an equal value.
+    private static IncrementalValueProvider<EquatableArray<FileLevel>> ReadSettings(
+        IncrementalValuesProvider<AdditionalText> sqlFiles,
+        IncrementalValueProvider<SettingsFileSet> settingsFiles
+    ) =>
+        sqlFiles
+            .Combine(settingsFiles)
+            .Select(static (input, _) => LevelOf(input.Left, input.Right))
+            .WhereNotNull()
+            .WithTrackingName(TrackingNames.FileLevel)
+            .Collect()
+            .Select(static (levels, _) => ToSorted(levels, static file => file.NormalizedPath))
+            .WithTrackingName(TrackingNames.FileLevels);
+
+    // Each claimed file parsed, by itself and sorted by path, with its parse errors reported.
     private static ParsedFiles ParseFiles(
         IncrementalGeneratorInitializationContext context,
-        IncrementalValuesProvider<FileMetadata> fileMetadata,
-        IncrementalValueProvider<DialectSetting> projectDialect,
-        IncrementalValueProvider<ProjectSettings> projectSettings,
+        IncrementalValuesProvider<AdditionalText> sqlFiles,
+        IncrementalValueProvider<SettingsFileSet> settingsFiles,
         IncrementalValueProvider<EquatableArray<string>> commentPaths,
         IncrementalValueProvider<EquatableArray<string>> claimedPaths
     )
     {
-        // Whether the property's list asks for comments.  It is an input of the parse, so it is a value of its own
-        // that changes only when the answer does.
-        var projectKeepsComments = projectSettings.Select(static (settings, _) => settings.Level.KeepsComments);
-
-        // Stage one of the settings: each file with what its parse depends on.  It is resolved here, before the
-        // parse, so that a change to a property parses only the files whose input it changes.
-        var fileInputs = fileMetadata
-            .Combine(projectDialect)
-            .Combine(projectKeepsComments.Combine(commentPaths))
+        // Stage one of the settings: each file with what its parse depends on, from the chain of its folder and the
+        // types whose attribute asks for comments.  It is resolved here, before the parse, so that a change to a
+        // settings file parses only the files whose input it changes.
+        var fileInputs = sqlFiles
+            .Combine(settingsFiles.Combine(commentPaths))
             .Select(
                 static (input, _) =>
-                    FileParseInput.Resolve(input.Left.Left, input.Left.Right, input.Right.Left, input.Right.Right)
+                {
+                    var path = SqlPath.Normalize(input.Left.Path);
+                    return FileParseInput.Resolve(
+                        input.Left,
+                        path,
+                        path is null ? SettingsChain.None : input.Right.Left.ChainOf(path),
+                        input.Right.Right
+                    );
+                }
             )
             .WithTrackingName(TrackingNames.FileParseInput);
 
@@ -294,21 +325,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (files, _) => ToSorted(files, static file => file.NormalizedPath))
             .WithTrackingName(TrackingNames.ParsedFiles);
 
-        // Reported from the collected files, so that a file the project lists twice is reported once.  A dialect that
-        // is not valid is reported here too, once for each value: the compiler does not say where an MSBuild
-        // property or the metadata of an item was set, so it has no position.
+        // Reported from the collected files, so that a file the project lists twice is reported once.
         context.RegisterSourceOutput(
-            parsedFiles.Combine(projectDialect),
-            static (output, input) =>
+            parsedFiles,
+            static (output, files) =>
             {
-                foreach (var error in input.Left.SelectMany(static file => file.Errors))
+                foreach (var error in files.SelectMany(static file => file.Errors))
                 {
                     output.ReportDiagnostic(error.ToDiagnostic());
-                }
-
-                foreach (var value in FindInvalidDialects(input.Left, input.Right))
-                {
-                    output.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.InvalidDialect, Location.None, value));
                 }
             }
         );
@@ -316,37 +340,11 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         return new ParsedFiles(parsedFile, parsedFiles);
     }
 
-    // Each setting and value that is not valid, once and with no position, of the project and the claimed files alone.
-    private static void ReportInvalidSettings(
-        IncrementalGeneratorInitializationContext context,
-        IncrementalValueProvider<ProjectSettings> projectSettings,
-        IncrementalValueProvider<EquatableArray<FileSettings>> filesSettings,
-        IncrementalValueProvider<EquatableArray<string>> claimedPaths
-    ) =>
-        context.RegisterSourceOutput(
-            projectSettings.Combine(filesSettings).Combine(claimedPaths),
-            static (output, input) =>
-            {
-                foreach (var setting in FindInvalidSettings(input.Left.Left, input.Left.Right, input.Right))
-                {
-                    output.ReportDiagnostic(
-                        Diagnostic.Create(
-                            SqlDiagnostics.InvalidSettingValue,
-                            Location.None,
-                            setting.Value,
-                            setting.Name,
-                            setting.Help
-                        )
-                    );
-                }
-            }
-        );
-
-    // Each type with the parsed files it claims, the settings of their metadata, and the name of its file.
+    // Each type with the parsed files it claims, their levels, and the name of its file.
     private static IncrementalValuesProvider<TypeQueries> SelectTypeQueries(
         IncrementalValuesProvider<TypeFiles> typeFiles,
         IncrementalValueProvider<EquatableArray<ParsedSqlFile>> parsedFiles,
-        IncrementalValueProvider<EquatableArray<FileSettings>> filesSettings
+        IncrementalValueProvider<EquatableArray<FileLevel>> fileLevels
     )
     {
         // Two types whose files would have names equal ignoring case.  Almost always none, so this value almost
@@ -359,7 +357,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         return typeFiles
             .Combine(parsedFiles)
-            .Combine(ambiguousHintNames.Combine(filesSettings))
+            .Combine(ambiguousHintNames.Combine(fileLevels))
             .Select(
                 static (input, _) => SelectFiles(input.Left.Left, input.Left.Right, input.Right.Left, input.Right.Right)
             )
@@ -371,7 +369,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalGeneratorInitializationContext context,
         IncrementalValueProvider<EquatableArray<string>> claimedPaths,
         IncrementalValuesProvider<TypeQueries> typeQueries,
-        IncrementalValueProvider<SettingsLevel> projectLevel,
         ParsedFiles parsedFiles,
         IncrementalValueProvider<EquatableArray<string>> repeatedPaths
     )
@@ -393,8 +390,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // What every type needs of each file, merged and sorted by path, so that a file finds its needs with a search.
         // A change to a type that leaves what it needs alone gives an equal value and checks nothing again.
         var fileNeeds = typeQueries
-            .Combine(projectLevel)
-            .Select(static (input, _) => SidecarNeeds.OfType(input.Left, input.Right))
+            .Select(static (type, _) => SidecarNeeds.OfType(type))
             .WithTrackingName(TrackingNames.TypeNeeds)
             .SelectMany(static (files, _) => files)
             .Collect()
@@ -436,9 +432,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalGeneratorInitializationContext context,
         FileNodes<SidecarCheckResult> sidecarChecks,
         IncrementalValueProvider<EquatableArray<ParsedSqlFile>> parsedFiles,
-        IncrementalValueProvider<EquatableArray<FileSettings>> filesSettings,
-        IncrementalValueProvider<ProjectSettings> projectSettings,
-        IncrementalValueProvider<SettingsLevel> projectLevel
+        IncrementalValueProvider<EquatableArray<FileLevel>> fileLevels
     )
     {
         // The Npgsql the project references, which chooses the column of the base map.  Like the framework check, it
@@ -455,10 +449,9 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         // The C# types that the type override names at any level, as a sorted list of their names, which an edit that
         // leaves the names alone gives again, equal.
-        var mappedTypeNames = projectSettings
-            .Combine(filesSettings)
+        var mappedTypeNames = fileLevels
             .Combine(parsedFiles)
-            .Select(static (input, _) => MappedTypeNames.Collect(input.Left.Left, input.Left.Right, input.Right))
+            .Select(static (input, _) => MappedTypeNames.Collect(input.Left, input.Right))
             .WithTrackingName(TrackingNames.MappedTypeNames);
 
         // Those types resolved against the compilation, with the converters declared on those of a referenced
@@ -479,16 +472,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (resolved, _) => resolved.Types)
             .WithTrackingName(TrackingNames.MappedTypes);
 
-        // The properties' type override and column types alone, so that a change to another property types no file
-        // again.
-        var projectTypeSettings = projectLevel.Select(static (level, _) => FileTypesInput.TypeSettingsOf(level));
-
         // The C# types of each claimed file's usable entries, a node for each file after its check, so that an edit to
         // one file or one sidecar types that file alone.  A file with no usable entry carries nothing to type.  Each
-        // file keeps its input beside its types, so that the models read its entries without typing it again.
+        // file keeps its input beside its types, so that the models read its entries without typing it again.  The
+        // input keeps the type override and the column types of the file's level alone, so that a change to another
+        // setting types no file again.
         var typedFiles = sidecarChecks.Then(each =>
-            each.Combine(parsedFiles.Combine(filesSettings))
-                .Combine(projectTypeSettings.Combine(npgsqlProbe.Combine(sqlClientProbe.Combine(mappedTypes))))
+            each.Combine(parsedFiles.Combine(fileLevels))
+                .Combine(npgsqlProbe.Combine(sqlClientProbe.Combine(mappedTypes)))
                 .Select(
                     static (input, _) =>
                         FileTypesInput.Gather(
@@ -497,8 +488,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                             input.Left.Right.Right,
                             input.Right.Left,
                             input.Right.Right.Left,
-                            input.Right.Right.Right.Left,
-                            input.Right.Right.Right.Right
+                            input.Right.Right.Right
                         )
                 )
                 .WithTrackingName(TrackingNames.FileTypesInput)
@@ -552,8 +542,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     private static CollectedModels CollectModels(
         IncrementalGeneratorInitializationContext context,
         FileNodes<TypedFile> typedFiles,
-        IncrementalValuesProvider<TypeQueries> typeQueries,
-        IncrementalValueProvider<SettingsLevel> projectLevel
+        IncrementalValuesProvider<TypeQueries> typeQueries
     )
     {
         // The properties of each file's models and the errors of their names, once for each file, whatever the number
@@ -573,8 +562,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // to a file's models that leaves the type's requests alone gives an equal value, and nothing after it runs.
         var typeModels = typeQueries
             .Combine(allFileModels)
-            .Combine(projectLevel)
-            .Select(static (input, _) => TypeModels.Of(input.Left.Left, input.Left.Right, input.Right))
+            .Select(static (input, _) => TypeModels.Of(input.Left, input.Right))
             .WithTrackingName(TrackingNames.TypeModels);
 
         // Every type's requests together, by full name, since two types or two queries can ask for one model.
@@ -724,13 +712,11 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     // The file of each type, and its diagnostics.
     private static void RegisterTypeSources(
         IncrementalGeneratorInitializationContext context,
-        IncrementalValuesProvider<TypeQueries> typeQueries,
-        IncrementalValueProvider<SettingsLevel> projectLevel
+        IncrementalValuesProvider<TypeQueries> typeQueries
     )
     {
         var typeOutputs = typeQueries
-            .Combine(projectLevel)
-            .Select(static (input, _) => TypeEmitter.Emit(input.Left, input.Right))
+            .Select(static (type, _) => TypeEmitter.Emit(type))
             .WithTrackingName(TrackingNames.TypeOutput);
 
         context.RegisterSourceOutput(
@@ -752,7 +738,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     private static void RegisterMethodSources(
         IncrementalGeneratorInitializationContext context,
         IncrementalValuesProvider<TypeQueries> typeQueries,
-        IncrementalValueProvider<SettingsLevel> projectLevel,
         IncrementalValueProvider<EquatableArray<FileModels>> allFileModels,
         IncrementalValueProvider<ModelSet> models,
         IncrementalValueProvider<EquatableArray<string>> modelNames,
@@ -774,14 +759,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // queries, its files' models, the models its queries got, its names, the drivers or the converters of the
         // types that its type overrides, column types and markers chose.
         var typeMethods = typeQueries
-            .Combine(projectLevel)
             .Combine(allFileModels.Combine(assignments))
             .Combine(typeMemberNames.Combine(drivers.Combine(converters)))
             .Select(
                 static (input, _) =>
                     MethodsInput.Gather(
-                        input.Left.Left.Left,
-                        input.Left.Left.Right,
+                        input.Left.Left,
                         input.Left.Right.Left,
                         input.Left.Right.Right,
                         input.Right.Left,
@@ -971,39 +954,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 .ToImmutableArray()
         );
 
-    // Each setting and value once, in the order of InvalidValues.
-    private static IEnumerable<InvalidSetting> FindInvalidSettings(
-        ProjectSettings project,
-        EquatableArray<FileSettings> files,
-        EquatableArray<string> claimedPaths
-    )
-    {
-        var invalid = new InvalidValues();
-        invalid.AddSettings(project.Invalid);
-        foreach (var file in files.Where(file => SqlPath.Contains(claimedPaths, file.NormalizedPath)))
-        {
-            invalid.AddSettings(file.Invalid);
-        }
-
-        return invalid.Settings;
-    }
-
-    // Each value once, in the order of InvalidValues.
-    private static IReadOnlyCollection<string> FindInvalidDialects(
-        EquatableArray<ParsedSqlFile> files,
-        DialectSetting project
-    )
-    {
-        var invalid = new InvalidValues();
-        invalid.AddDialect(project.InvalidValue);
-        foreach (var file in files)
-        {
-            invalid.AddDialect(file.InvalidDialect);
-        }
-
-        return invalid.Dialects;
-    }
-
     // Whether a file with needs is read as this dialect.  A search for each file with needs, so that the cost does not
     // grow with the files that have none.
     private static bool UsesEntriesOf(
@@ -1041,11 +991,26 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         }
     }
 
+    // The path of each of the compilation's trees, and none when the project has no settings file.
+    private static EquatableArray<string> CompilePathsOf(Compilation compilation, SettingsFileSet settingsFiles) =>
+        settingsFiles.Files.Count == 0
+            ? EquatableArray<string>.Empty
+            : new EquatableArray<string>(
+                compilation.SyntaxTrees.Select(static tree => tree.FilePath).ToImmutableArray()
+            );
+
+    // The file's level under the chain of its folder.  A project without a settings file gives no file a level, and
+    // normalises no path here.
+    private static FileLevel? LevelOf(AdditionalText file, SettingsFileSet settingsFiles) =>
+        settingsFiles.Files.Count > 0 && SqlPath.Normalize(file.Path) is { } path
+            ? FileLevel.Resolve(path, settingsFiles.ChainOf(path))
+            : null;
+
     private static TypeQueries SelectFiles(
         TypeFiles type,
         EquatableArray<ParsedSqlFile> parsedFiles,
         EquatableArray<string> ambiguousHintNames,
-        EquatableArray<FileSettings> filesSettings
+        EquatableArray<FileLevel> fileLevels
     )
     {
         var files = ImmutableArray.CreateBuilder<ParsedSqlFile>(type.Files.Count);
@@ -1061,8 +1026,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
 
             files.Add(parsedFiles[index]);
-            var settingsIndex = SqlPath.IndexOf(filesSettings, path, static file => file.NormalizedPath);
-            settings.Add(settingsIndex < 0 ? SettingsLevel.None : filesSettings[settingsIndex].Level);
+            var levelIndex = SqlPath.IndexOf(fileLevels, path, static file => file.NormalizedPath);
+            settings.Add(levelIndex < 0 ? SettingsLevel.None : fileLevels[levelIndex].Level);
         }
 
         return new TypeQueries(
@@ -1073,16 +1038,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
-    // What the project's properties say, whole and as a level.
-    private readonly record struct ProjectProperties(
-        IncrementalValueProvider<ProjectSettings> Settings,
-        IncrementalValueProvider<SettingsLevel> Level
-    );
-
-    // The project's .sql files, each type with the files it claims, every claimed path, those that keep comments, the
-    // paths the project lists more than once, and the names of the types whose methods go on themselves.
+    // The project's .sql files and their paths, each type with the files it claims, every claimed path, those that
+    // keep comments, the paths the project lists more than once, and the names of the types whose methods go on
+    // themselves.
     private readonly record struct ClaimedFiles(
         IncrementalValuesProvider<AdditionalText> SqlFiles,
+        IncrementalValueProvider<EquatableArray<string>> SqlPaths,
         IncrementalValuesProvider<TypeFiles> ClaimingTypes,
         IncrementalValueProvider<EquatableArray<string>> ClaimedPaths,
         IncrementalValueProvider<EquatableArray<string>> CommentPaths,
@@ -1095,15 +1056,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     private readonly record struct ParsedFiles(
         IncrementalValuesProvider<ParsedSqlFile> EachFile,
         IncrementalValueProvider<EquatableArray<ParsedSqlFile>> Sorted
-    );
-
-    // What the project's properties say, and the metadata of each file and of the files that have settings.
-    private readonly record struct ProjectAndFileSettings(
-        IncrementalValueProvider<DialectSetting> ProjectDialect,
-        IncrementalValueProvider<ProjectSettings> ProjectSettings,
-        IncrementalValueProvider<SettingsLevel> ProjectLevel,
-        IncrementalValuesProvider<FileMetadata> FileMetadata,
-        IncrementalValueProvider<EquatableArray<FileSettings>> FilesSettings
     );
 
     // What every type needs of each file, and the check of each claimed file's sidecar.

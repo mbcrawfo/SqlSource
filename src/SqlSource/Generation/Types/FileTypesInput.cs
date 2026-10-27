@@ -1,4 +1,3 @@
-using SqlSource.Generation.MSBuild;
 using SqlSource.Generation.Paths;
 using SqlSource.Generation.Sidecars;
 using SqlSource.Settings;
@@ -15,11 +14,9 @@ namespace SqlSource.Generation.Types;
 /// The parsed file, or null when no entry of it is usable.  Such a file carries nothing else but the probes, since it
 /// has nothing to type.
 /// </param>
-/// <param name="Metadata">
-/// The type override and the column types of the metadata of the file's item, as a level that says nothing else.
-/// </param>
-/// <param name="Property">
-/// The type override and the column types of the project's properties, as a level that says nothing else.
+/// <param name="Level">
+/// The type override and the column types of the file's level, the chain of its folder, as a level that says nothing
+/// else.
 /// </param>
 /// <param name="NpgsqlProbe">The Npgsql the project references, which chooses the column of PostgreSQL's map.</param>
 /// <param name="SqlClientProbe">
@@ -32,23 +29,21 @@ namespace SqlSource.Generation.Types;
 internal sealed record FileTypesInput(
     SidecarCheckResult Check,
     ParsedSqlFile? File,
-    SettingsLevel Metadata,
-    SettingsLevel Property,
+    SettingsLevel Level,
     NpgsqlProbe NpgsqlProbe,
     SqlClientProbe SqlClientProbe,
     EquatableArray<MappedType> MappedTypes
 )
 {
     /// <summary>
-    /// Finds the parsed file and the metadata of <paramref name="check" />'s file.  Both lists are sorted by
-    /// <see cref="SqlPath.Comparer" />.  <paramref name="property" /> is the properties' type override and column types
-    /// alone, as <see cref="TypeSettingsOf" /> gives them.
+    /// Finds the parsed file and the level of <paramref name="check" />'s file, of which it keeps the type override and
+    /// the column types alone, as <see cref="TypeSettingsOf" /> gives them.  Both lists are sorted by
+    /// <see cref="SqlPath.Comparer" />.
     /// </summary>
     public static FileTypesInput Gather(
         SidecarCheckResult check,
         EquatableArray<ParsedSqlFile> files,
-        EquatableArray<FileSettings> filesSettings,
-        SettingsLevel property,
+        EquatableArray<FileLevel> fileLevels,
         NpgsqlProbe npgsqlProbe,
         SqlClientProbe sqlClientProbe,
         EquatableArray<MappedType> mappedTypes
@@ -64,19 +59,17 @@ internal sealed record FileTypesInput(
                 check,
                 null,
                 SettingsLevel.None,
-                SettingsLevel.None,
                 npgsqlProbe,
                 sqlClientProbe,
                 EquatableArray<MappedType>.Empty
             );
         }
 
-        var settingsIndex = SqlPath.IndexOf(filesSettings, check.NormalizedPath, static file => file.NormalizedPath);
+        var levelIndex = SqlPath.IndexOf(fileLevels, check.NormalizedPath, static file => file.NormalizedPath);
         return new FileTypesInput(
             check,
             files[fileIndex],
-            settingsIndex < 0 ? SettingsLevel.None : TypeSettingsOf(filesSettings[settingsIndex].Level),
-            property,
+            levelIndex < 0 ? SettingsLevel.None : TypeSettingsOf(fileLevels[levelIndex].Level),
             npgsqlProbe,
             sqlClientProbe,
             mappedTypes

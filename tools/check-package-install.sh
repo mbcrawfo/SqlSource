@@ -2,7 +2,8 @@
 # Installs the SqlSource package into a project the way a consumer does, runs the project and checks what it prints.
 # Then asks the project what the sqlsource tool asks one: whether it uses SqlSource, and for its project manifest.
 # Then removes a .sql file the project uses and checks that the next build, an incremental one, fails for it.
-# Last, publishes a web project that references the package, and checks that no .sql file and no sidecar is copied.
+# Last, publishes a web project that references the package, and checks that no .sql file, no sidecar and no settings
+# file is copied.
 # The project is tools/package-install.  It is copied out of the repository first, so that nothing of the repository's
 # own build applies to it, and it restores from the folder that holds the package and from nowhere else.
 # Usage: check-package-install.sh [directory]   The directory holds one SqlSource.<version>.nupkg, and may hold the
@@ -14,8 +15,8 @@ FIXTURE='tools/package-install'
 PROJECT='Consumer.csproj'
 EXPECTED='expected-output.txt'
 # A .sql file of the project and the member that Program.cs uses from it.
-REMOVED='Queries/ByProperty.sql'
-REMOVED_MEMBER='ByProperty'
+REMOVED='Queries/ByProject.sql'
+REMOVED_MEMBER='ByProject'
 
 if [[ $# -gt 1 ]]; then
     echo 'Usage: check-package-install.sh [directory]' >&2
@@ -113,7 +114,8 @@ fi
 # The sqlsource tool asks a project two things, and the installed package answers both.  SqlSourceImported, which
 # build/SqlSource.props sets, says that the project uses SqlSource: NuGet imported the props, which nothing else in
 # the repository shows.  The target SqlSourceWriteManifest of build/SqlSource.targets writes the project manifest: the
-# tool runs it by name, as here, with a file of its own, and nothing of a build runs before it but the package's trims.
+# tool runs it by name, as here, with a file of its own, and nothing of a build runs before it but the package's own
+# targets that it depends on.
 imported="$(dotnet msbuild "$PROJECT" -nologo -getProperty:SqlSourceImported)"
 if [[ "$imported" != 'true' ]]; then
     echo "check-package-install: a project that references $package does not have SqlSourceImported" >&2
@@ -134,7 +136,7 @@ manifest_fails() {
     exit 1
 }
 
-if [[ "$(head -n 1 "$manifest")" != 'SqlSourceManifest=1' ]]; then
+if [[ "$(head -n 1 "$manifest")" != 'SqlSourceManifest=2' ]]; then
     manifest_fails 'does not start with its version'
 fi
 
@@ -143,15 +145,10 @@ if ! grep -q '^File=.*/Queries/Users\.sql$' "$manifest"; then
     manifest_fails 'does not list Queries/Users.sql'
 fi
 
-# The project writes this dialect over two lines, and Directory.Build.targets the property over four.  The lines
-# under a File line are the metadata of that file.
-if ! grep -A 10 '^File=.*/Queries/ByOption\.sql$' "$manifest" |
-    grep -qx 'File.SqlSourceDialect=mysql, no-backslash-escapes'; then
-    manifest_fails 'does not hold the trimmed dialect of Queries/ByOption.sql'
-fi
-
-if ! grep -qx 'Property.SqlSourceGeneratorParameters=sort-input no-token-validation' "$manifest"; then
-    manifest_fails 'does not hold the trimmed property of Directory.Build.targets'
+# The settings file of the project, by the physical path of the copy, which is how MSBuild gives it.
+settings="$(pwd -P)/sqlsource.json"
+if ! grep -qxF "Settings=$settings" "$manifest"; then
+    manifest_fails "does not hold Settings=$settings"
 fi
 
 # Directory.Build.targets adds this file from a hook of the build, which a target that is run by name does not run.
@@ -171,16 +168,16 @@ if dotnet build "$PROJECT" --nologo --verbosity quiet >"$work/rebuild.log" 2>&1;
     exit 1
 fi
 
-# No quotes around the member: the compiler writes them as its language does, "ByProperty" in German.
+# No quotes around the member: the compiler writes them as its language does, "ByProject" in German.
 if ! grep -q "error CS0117: .*$REMOVED_MEMBER" "$work/rebuild.log"; then
     cat "$work/rebuild.log" >&2
     echo "check-package-install: the build after $REMOVED was removed failed without reporting $REMOVED_MEMBER" >&2
     exit 1
 fi
 
-# A sidecar is an input of the generator alone.  The Web SDK lists a .json file as Content, which it copies to the
-# output and publish folders, and the nesting group of build/SqlSource.targets says Never for it.  The project claims
-# no file, so the generator reads neither, and nothing else would copy a .sql file.
+# A sidecar and a settings file are inputs of the generator alone.  The Web SDK lists a .json file as Content, which it
+# copies to the output and publish folders, and build/SqlSource.targets says Never for both.  The project claims no
+# file, so the generator reads neither the sidecar nor the .sql file, and nothing else would copy a .sql file.
 web="$work/web"
 mkdir -p "$web/Queries"
 cp global.json nuget.config "$web/"
@@ -188,7 +185,6 @@ cat >"$web/Web.csproj" <<EOF
 <Project Sdk="Microsoft.NET.Sdk.Web">
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
-        <SqlSourceDialect>postgres</SqlSourceDialect>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="$PACKAGE_ID" Version="$version" PrivateAssets="all" />
@@ -198,6 +194,7 @@ EOF
 echo 'System.Console.WriteLine();' >"$web/Program.cs"
 echo 'SELECT 1 AS one;' >"$web/Queries/Users.sql"
 echo '{}' >"$web/Queries/Users.sql.json"
+echo '{}' >"$web/Queries/sqlsource.json"
 
 dotnet publish "$web/Web.csproj" --output "$work/published" --nologo --verbosity quiet >"$work/publish.log" 2>&1 || {
     cat "$work/publish.log" >&2
@@ -206,7 +203,7 @@ dotnet publish "$web/Web.csproj" --output "$work/published" --nologo --verbosity
 }
 
 for folder in "$web/bin" "$work/published"; do
-    copied="$(find "$folder" -name '*.sql' -o -name '*.sql.json')"
+    copied="$(find "$folder" -name '*.sql' -o -name '*.sql.json' -o -name 'sqlsource.json')"
     if [[ -n "$copied" ]]; then
         echo "$copied" >&2
         echo "check-package-install: a web project that references $package copies its queries to $folder" >&2
@@ -217,4 +214,4 @@ done
 echo "check-package-install: $package installs into a project, which builds and prints $FIXTURE/$EXPECTED,"
 echo "check-package-install: which has SqlSourceImported and writes its project manifest,"
 echo "check-package-install: and whose next build compiles again after a .sql file is removed,"
-echo "check-package-install: and into a web project, whose build and publish copy no .sql file and no sidecar"
+echo "check-package-install: and into a web project, whose build and publish copy no .sql, sidecar or settings file"

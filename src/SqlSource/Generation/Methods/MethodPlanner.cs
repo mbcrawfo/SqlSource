@@ -95,13 +95,7 @@ internal static class MethodPlanner
     {
         var typeQueries = input.Type;
         var type = typeQueries.Type.Type;
-        var usable = TypeEmitter.FindUsableFiles(
-            type,
-            typeQueries.Files,
-            typeQueries.FileSettings,
-            input.Property,
-            null
-        );
+        var usable = TypeEmitter.FindUsableFiles(type, typeQueries.Files, typeQueries.FileSettings, null);
         var queries = Resolve(input, usable);
         var written = WrittenNames(queries);
         var planned = new List<Planned>();
@@ -147,12 +141,7 @@ internal static class MethodPlanner
             for (var queryIndex = 0; queryIndex < file.Queries.Count; queryIndex++)
             {
                 var query = file.Queries[queryIndex];
-                var settings = QuerySettings.Resolve(
-                    query.Markers,
-                    type.Settings,
-                    typeQueries.FileSettings[fileIndex],
-                    input.Property
-                );
+                var settings = QuerySettings.Resolve(query.Markers, type.Settings, typeQueries.FileSettings[fileIndex]);
                 queries.Add((fileIndex, queryIndex, query, settings));
             }
         }

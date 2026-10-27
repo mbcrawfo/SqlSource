@@ -8,8 +8,8 @@ using Xunit;
 
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
-// Each of the ten collection types of a many query, set by the project's property, the attribute, the item metadata,
-// the file header and a query's marker, run through the methods of the classes of CollectionQueries.cs on the seed of
+// Each of the ten collection types of a many query, set by the project's settings file, the attribute, the file
+// header and a query's marker, run through the methods of the classes of CollectionQueries.cs on the seed of
 // "app".  Each test reads the type the method returns, the collection that holds the rows, and the rows.
 [Collection(UsesSqlServer.Name)]
 public sealed class MethodCollectionTests(SqlServerContainer sqlServer)
@@ -17,7 +17,7 @@ public sealed class MethodCollectionTests(SqlServerContainer sqlServer)
     private static readonly CollectedAccount[] Accounts = [new(1, "alice"), new(2, "bob"), new(3, "carol")];
 
     [Fact]
-    public async Task ListCollectedAccounts_IReadOnlyListByTheProperty_HoldsAnArray()
+    public async Task ListCollectedAccounts_IReadOnlyListByTheProjectFile_HoldsAnArray()
     {
         await using var connection = EndToEndSources.App(sqlServer);
 
@@ -119,18 +119,18 @@ public sealed class MethodCollectionTests(SqlServerContainer sqlServer)
     }
 
     [Fact]
-    public async Task ListAccountsByMetadata_ImmutableArrayByTheMetadata_HoldsAnImmutableArray()
+    public async Task ListAccountsByMetadata_ImmutableArrayByTheFileHeader_HoldsAnImmutableArray()
     {
         await using var connection = EndToEndSources.App(sqlServer);
 
-        var rows = await MetadataCollectionQueries.ListAccountsByMetadata(
+        var rows = await HeaderCollectionQueries.ListAccountsByMetadata(
             connection,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
         ShouldHold<ImmutableArray<CollectedAccount>, ImmutableArray<CollectedAccount>>(
-            typeof(MetadataCollectionQueries),
-            nameof(MetadataCollectionQueries.ListAccountsByMetadata),
+            typeof(HeaderCollectionQueries),
+            nameof(HeaderCollectionQueries.ListAccountsByMetadata),
             rows
         );
     }

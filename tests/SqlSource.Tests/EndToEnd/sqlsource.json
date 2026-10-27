@@ -1,0 +1,9 @@
+{
+  // The dialect of every query of the project, unless its file names another.
+  "dialect": "postgres",
+  // Every query of this project is generated as SQL alone, the constants and the token methods.  A query with models
+  // would need a sidecar beside its file.
+  "output": "Sql",
+  // Token validation is off, so that a query without a list of its own does not check its arguments.
+  "generatorParameters": ["sort-input", "no-token-validation"],
+}

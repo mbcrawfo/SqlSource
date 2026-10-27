@@ -30,10 +30,17 @@ internal static class SqlPath
 
     private static readonly char[] Separators = [Separator, '\\'];
 
+    private static bool IsAsciiLetter(char c) => c is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z');
+
     /// <summary>
-    /// Compares two normalised paths.
+    /// Compares two normalised paths.  Its order is that of <see cref="Comparison" />.
     /// </summary>
     public static StringComparer Comparer => StringComparer.OrdinalIgnoreCase;
+
+    /// <summary>
+    /// The comparison of <see cref="Comparer" />, for a search that compares a part of a path in place.
+    /// </summary>
+    public const StringComparison Comparison = StringComparison.OrdinalIgnoreCase;
 
     public static bool IsSqlFile(string path) => path.EndsWith(SqlExtension, StringComparison.OrdinalIgnoreCase);
 
@@ -68,6 +75,14 @@ internal static class SqlPath
     /// </summary>
     public static EquatableArray<string> ToSortedSet(IEnumerable<string> paths) =>
         new(paths.Distinct(Comparer).OrderBy(static path => path, Comparer).ToImmutableArray());
+
+    /// <summary>
+    /// Whether <paramref name="path" /> starts at a root: at a separator, either one, or at an ASCII drive letter and
+    /// <c>:</c>.  Read from the text alone, the same on every operating system.
+    /// </summary>
+    public static bool IsRooted(string path) =>
+        path.Length > 0
+        && (Array.IndexOf(Separators, path[0]) >= 0 || (path.Length > 1 && path[1] == ':' && IsAsciiLetter(path[0])));
 
     /// <summary>
     /// Returns <paramref name="path" /> with <c>/</c> as its only separator, without empty and <c>.</c> segments,
@@ -140,6 +155,14 @@ internal static class SqlPath
     public static string GetFileName(string path) => path.Substring(path.LastIndexOfAny(Separators) + 1);
 
     /// <summary>
+    /// Whether <paramref name="normalizedPath" /> is under <paramref name="normalizedFolder" />, at any depth: it is
+    /// the folder's segments and more, compared by <see cref="Comparison" />, so <c>a/objx/b</c> is not under
+    /// <c>a/obj</c>.  Every path is under the root, which is empty.  It compares in place and allocates nothing.
+    /// </summary>
+    public static bool IsInFolder(string normalizedPath, string normalizedFolder) =>
+        CompareToFolder(normalizedPath, normalizedFolder, normalizedFolder.Length) == 0;
+
+    /// <summary>
     /// Whether <paramref name="sortedPaths" />, which is ordered by <see cref="Comparer" />, holds
     /// <paramref name="normalizedPath" />.
     /// </summary>
@@ -153,6 +176,20 @@ internal static class SqlPath
     /// </summary>
     public static int IndexOf<T>(EquatableArray<T> sortedItems, string normalizedPath, Func<T, string> getPath)
         where T : IEquatable<T> => SortedSearch.IndexOf(sortedItems, normalizedPath, getPath, Comparer);
+
+    /// <summary>
+    /// The index in <paramref name="sortedItems" />, which is ordered by <see cref="Comparer" /> on the path that
+    /// <paramref name="getPath" /> gives, of the item whose path is the first <paramref name="length" /> characters of
+    /// <paramref name="normalizedPath" />, such as one of its folders.  Negative when there is none.  It compares in
+    /// place and allocates nothing.
+    /// </summary>
+    public static int IndexOf<T>(
+        EquatableArray<T> sortedItems,
+        string normalizedPath,
+        int length,
+        Func<T, string> getPath
+    )
+        where T : IEquatable<T> => SortedSearch.IndexOf(sortedItems, normalizedPath, length, getPath, Comparison);
 
     /// <summary>
     /// The paths of <paramref name="sortedPaths" />, which is ordered by <see cref="Comparer" />, that more than one

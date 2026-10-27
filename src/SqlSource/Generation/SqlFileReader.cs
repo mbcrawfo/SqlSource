@@ -14,28 +14,22 @@ namespace SqlSource.Generation;
 internal static class SqlFileReader
 {
     /// <summary>
-    /// Parses <paramref name="file" />, whose path a type claims, with what MSBuild gives it.  A
+    /// Parses <paramref name="file" />, whose path a type claims, with what its input gives it.  A
     /// <c>-- dialect:</c> marker in the file replaces the dialect.
     /// </summary>
     public static ParsedSqlFile Read(FileParseInput file, CancellationToken cancellationToken) =>
-        Read(
-            file.File,
-            file.NormalizedPath ?? string.Empty,
-            file.Dialect,
-            file.InvalidDialect,
-            file.CommentsWanted,
-            cancellationToken
-        );
+        Read(file.File, file.NormalizedPath, file.Dialect, file.CommentsWanted, cancellationToken);
 
     /// <summary>
-    /// Parses <paramref name="file" />.  <paramref name="commentsWanted" /> says that a level the parser cannot see
-    /// may ask for <c>keep-comments</c>; <see cref="SqlFileParser.Parse" /> says what the parser then builds.
+    /// Parses <paramref name="file" />, whose path <see cref="SqlPath.Normalize" /> gives as
+    /// <paramref name="normalizedPath" />; a claimed file always has one.  <paramref name="commentsWanted" /> says
+    /// that a level the parser cannot see may ask for <c>keep-comments</c>; <see cref="SqlFileParser.Parse" /> says
+    /// what the parser then builds.
     /// </summary>
     public static ParsedSqlFile Read(
         AdditionalText file,
-        string normalizedPath,
+        string? normalizedPath,
         SqlDialectChoice dialect,
-        string? invalidDialect,
         bool commentsWanted,
         CancellationToken cancellationToken
     )
@@ -68,12 +62,11 @@ internal static class SqlFileReader
         }
 
         return new ParsedSqlFile(
-            normalizedPath,
+            normalizedPath ?? string.Empty,
             fileName,
             new EquatableArray<SqlQuery>(queries.ToImmutable()),
             DiagnosticsOf(file.Path, text, result.Errors),
-            result.Dialect,
-            invalidDialect
+            result.Dialect
         );
     }
 
