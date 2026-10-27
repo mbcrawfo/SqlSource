@@ -407,10 +407,9 @@ public sealed class CachingMethodTests
             references: [SqlClientReferences.SqlClient7]
         );
         var usersSidecar = SqlServerSidecar(users, "GetUser", TestSidecars.SqlServer("nvarchar(50)", 100, 0));
-        var driver = GeneratorHarness
-            .CreateDriver(
-                [users, _scene.Orders, usersSidecar, SqlServerSidecar(_scene.Orders, "GetOrder", null)],
-                new TestOptionsProvider(OutputKind.CodeGen, null, "mssql")
+        var driver = CreateDriver(
+                ProjectFile(OutputKind.CodeGen, "mssql"),
+                [users, _scene.Orders, usersSidecar, SqlServerSidecar(_scene.Orders, "GetOrder", null)]
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
         driver.GetRunResult().Diagnostics.ShouldBeEmpty();

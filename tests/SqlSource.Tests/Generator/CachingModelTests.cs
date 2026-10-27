@@ -429,8 +429,8 @@ public sealed class CachingModelTests
             _scene.Orders.Path,
             _scene.Orders.GetText(TestContext.Current.CancellationToken)!.ToString()
         );
-        var driver = GeneratorHarness
-            .CreateDriver(
+        var driver = CreateDriver(
+                ProjectFileWithTypeOverrides(null),
                 [
                     _scene.Users,
                     _scene.Orders,
@@ -439,8 +439,7 @@ public sealed class CachingModelTests
                     TypedSidecar(_scene.Users, "GetUser", "int4"),
                     TypedSidecar(_scene.Orders, "GetOrder", "int4"),
                     _scene.PaymentsSidecar,
-                ],
-                OptionsWithTypeOverrides(null)
+                ]
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
         var first = driver.GetRunResult();
@@ -500,8 +499,8 @@ public sealed class CachingModelTests
     public void Run_FileListedTwice_ReportsItsTypeAndNameErrorsOnce(bool byCase)
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = GeneratorHarness
-            .CreateDriver(
+        var driver = CreateDriver(
+                ProjectFileWithTypeOverrides(null),
                 [
                     _scene.Users,
                     Again(_scene.Users, byCase),
@@ -509,8 +508,7 @@ public sealed class CachingModelTests
                     Again(_scene.Orders, byCase),
                     TypedSidecar(_scene.Users, "GetUser", "date"),
                     TypedSidecar(_scene.Orders, "GetOrder", "int4", columnName: "api-url"),
-                ],
-                OptionsWithTypeOverrides(null)
+                ]
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
         var first = driver.GetRunResult();
@@ -553,12 +551,22 @@ public sealed class CachingModelTests
         OutputReasons(result).Distinct().ShouldBe([IncrementalStepRunReason.Cached]);
     }
 
-    // No model reads the collection type, so the requests of each type come out equal and nothing after them runs.
+    // No model reads the collection type, so the requests of each type come out equal and nothing after them runs.  A
+    // test of the MSBuild path: the output, the dialect and the collection type are the project's properties.
     [Fact]
     public void Run_CollectionTypePropertyChanged_EmitsNoModelAgain()
     {
         var compilation = ModelsCompilation();
-        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders);
+        var driver = FirstRunOnMSBuild(
+            compilation,
+            new TestOptionsProvider(OutputKind.Models, null, "postgres"),
+            _scene.Users,
+            _scene.Orders,
+            _scene.Payments,
+            TypedSidecar(_scene.Users, "GetUser", "int4"),
+            TypedSidecar(_scene.Orders, "GetOrder", "int4"),
+            _scene.PaymentsSidecar
+        );
 
         var result = Run(
             driver.WithUpdatedAnalyzerConfigOptions(

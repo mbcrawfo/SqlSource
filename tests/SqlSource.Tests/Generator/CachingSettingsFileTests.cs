@@ -9,7 +9,6 @@ using SqlSource.Testing.Generator;
 using Xunit;
 using static SqlSource.Testing.Generator.CachingScene;
 using static SqlSource.Testing.Generator.StepReasons;
-using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -43,14 +42,16 @@ public sealed class CachingSettingsFileTests
         );
         var result = Run(driver.ReplaceAdditionalText(_usersSettings, edited), compilation);
 
-        // Only the edited settings file was read again.  Every file's input was resolved again from the new set, and
-        // only the input of the file in the edited folder changed.
+        // Only the edited settings file was read again: the other folder's and the project's, which gives the output,
+        // were not.  Every file's input was resolved again from the new set, and only the input of the file in the
+        // edited folder changed.
         SettingsFileReasons(result)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
                 {
                     [_usersSettings.Path] = IncrementalStepRunReason.Modified,
                     [_ordersSettings.Path] = IncrementalStepRunReason.Cached,
+                    [GeneratorHarness.ProjectSettingsPath] = IncrementalStepRunReason.Cached,
                 },
                 ignoreOrder: true
             );
@@ -94,12 +95,14 @@ public sealed class CachingSettingsFileTests
 
         var result = Run(driver.AddAdditionalTexts([_usersSettings]), compilation);
 
+        // The added file alone is read: the other folder's and the project's, which gives the output, are not.
         SettingsFileReasons(result)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
                 {
                     [_usersSettings.Path] = IncrementalStepRunReason.New,
                     [_ordersSettings.Path] = IncrementalStepRunReason.Cached,
+                    [GeneratorHarness.ProjectSettingsPath] = IncrementalStepRunReason.Cached,
                 },
                 ignoreOrder: true
             );
@@ -123,7 +126,8 @@ public sealed class CachingSettingsFileTests
     }
 
     // A folder of the build that holds no C# file of the scene: the folders are read again and changed, and the same
-    // settings files are reached, so nothing is reported again and no file is parsed.
+    // settings files are reached, so nothing is reported again and no file is parsed.  The folders of the build are a
+    // property, an input of the build and no setting, and the output stays the project's settings file's.
     [Fact]
     public void Run_BuildFolderChanged_ReachesTheSameSettingsFiles()
     {
@@ -133,7 +137,7 @@ public sealed class CachingSettingsFileTests
         var result = Run(
             driver.WithUpdatedAnalyzerConfigOptions(
                 new TestOptionsProvider(
-                    OutputKind.Sql,
+                    null,
                     null,
                     properties: new Dictionary<string, string?> { ["SqlSourceBuildFolders"] = "/app/obj/" }
                 )

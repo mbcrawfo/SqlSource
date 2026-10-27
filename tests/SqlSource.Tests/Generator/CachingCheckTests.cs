@@ -157,10 +157,9 @@ public sealed class CachingCheckTests
         );
         var stale = Sidecars.Of(ToSqlFile(_scene.Users), Sidecars.Entry("GetUser", "stale"));
         var staleSidecar = new InMemoryAdditionalText(stale.Path, stale.Text);
-        var driver = GeneratorHarness
-            .CreateDriver(
-                [_scene.Users, usersAgain, _scene.Orders, _scene.OrdersSidecar, staleSidecar],
-                new TestOptionsProvider(OutputKind.Models, null, "postgres")
+        var driver = CreateDriver(
+                ProjectFile(OutputKind.Models, "postgres"),
+                [_scene.Users, usersAgain, _scene.Orders, _scene.OrdersSidecar, staleSidecar]
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
         var collides = spelling != _scene.Users.Path;
@@ -199,11 +198,19 @@ public sealed class CachingCheckTests
         Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
     }
 
+    // A test of the MSBuild path: the output, the dialect and the suffix are the project's properties.
     [Fact]
     public void Run_ModelSuffixPropertyChanged_ChecksNothing()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = _scene.FirstRunWithSidecars(compilation);
+        var driver = FirstRunOnMSBuild(
+            compilation,
+            new TestOptionsProvider(OutputKind.Models, null, "postgres"),
+            _scene.Users,
+            _scene.Orders,
+            _scene.UsersSidecar,
+            _scene.OrdersSidecar
+        );
 
         var result = Run(
             driver.WithUpdatedAnalyzerConfigOptions(

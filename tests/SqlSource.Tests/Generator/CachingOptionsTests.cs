@@ -16,10 +16,14 @@ namespace SqlSource.Tests.Generator;
 
 // The caching of the settings: what a change to the generator parameters, the dialect or keep-comments, at each level
 // that gives it, and to a setting of stage two in a settings file, makes the generator parse and emit again.
+//
+// The tests that swap the options for others are of the MSBuild path: their first run, FirstRunOnMSBuild, has no
+// settings file, and the output, the dialect and the parameters are the project's properties and the files' metadata.
 public sealed class CachingOptionsTests
 {
     private readonly CachingScene _scene = new();
 
+    // A test of the MSBuild path: the output and the parameters are the project's properties.
     [Fact]
     public void Run_GeneratorParametersPropertyChanged_EmitsEveryTypeAgainAndParsesNoFile()
     {
@@ -28,7 +32,12 @@ public sealed class CachingOptionsTests
             _scene.Users.Path,
             "-- name: GetUser\nSELECT 1;\n-- name: ListFrom\nSELECT * FROM {{table}};\n"
         );
-        var driver = _scene.FirstRun(compilation, users, new TestOptionsProvider(OutputKind.Sql, null));
+        var driver = FirstRunOnMSBuild(
+            compilation,
+            new TestOptionsProvider(OutputKind.Sql, null),
+            users,
+            _scene.Orders
+        );
 
         var result = Run(
             driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(OutputKind.Sql, "no-token-validation")),
@@ -67,12 +76,18 @@ public sealed class CachingOptionsTests
             .ShouldNotContain("Throw");
     }
 
-    // The class is named again for each type, and each type is emitted again, but no file is read again.
+    // The class is named again for each type, and each type is emitted again, but no file is read again.  A test of
+    // the MSBuild path: the output and the nested class are the project's properties.
     [Fact]
     public void Run_NestedClassPropertyChanged_EmitsEveryTypeAgainAndParsesNoFile()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = _scene.FirstRun(OutputKind.Sql, compilation);
+        var driver = FirstRunOnMSBuild(
+            compilation,
+            new TestOptionsProvider(OutputKind.Sql, null),
+            _scene.Users,
+            _scene.Orders
+        );
 
         var result = Run(
             driver.WithUpdatedAnalyzerConfigOptions(
@@ -96,11 +111,17 @@ public sealed class CachingOptionsTests
             .ShouldContain("private static class Queries\n");
     }
 
+    // A test of the MSBuild path: the output is the project's property.
     [Fact]
     public void Run_OptionsReplacedWithoutChangingTheProperty_EmitsNothingAgain()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = _scene.FirstRun(OutputKind.Sql, compilation);
+        var driver = FirstRunOnMSBuild(
+            compilation,
+            new TestOptionsProvider(OutputKind.Sql, null),
+            _scene.Users,
+            _scene.Orders
+        );
 
         // What the IDE does when any other property or an .editorconfig changes: new options, the same value.
         var result = Run(
@@ -117,16 +138,19 @@ public sealed class CachingOptionsTests
         OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
     }
 
+    // A test of the MSBuild path: the output and the dialect are the project's properties, and Orders' dialect its
+    // metadata.
     [Fact]
     public void Run_DialectPropertyChanged_ParsesOnlyTheFilesThatFallBackToIt()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var users = new InMemoryAdditionalText(_scene.Users.Path, "-- name: GetUser\nSELECT 1; # c\n");
         var orderDialect = new Dictionary<string, string> { [_scene.Orders.Path] = "mssql" };
-        var driver = _scene.FirstRun(
+        var driver = FirstRunOnMSBuild(
             compilation,
+            new TestOptionsProvider(OutputKind.Sql, null, null, orderDialect),
             users,
-            new TestOptionsProvider(OutputKind.Sql, null, null, orderDialect)
+            _scene.Orders
         );
 
         var result = Run(
@@ -156,20 +180,22 @@ public sealed class CachingOptionsTests
             .ShouldContain("\"SELECT 1;\"");
     }
 
+    // A test of the MSBuild path: the output is the project's property, and Users' dialect its metadata.
     [Fact]
     public void Run_DialectMetadataOfOneFileChanged_ParsesOnlyThatFile()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var users = new InMemoryAdditionalText(_scene.Users.Path, "-- name: GetUser\nSELECT 1; # c\n");
-        var driver = _scene.FirstRun(
+        var driver = FirstRunOnMSBuild(
             compilation,
-            users,
             new TestOptionsProvider(
                 OutputKind.Sql,
                 null,
                 null,
                 new Dictionary<string, string> { [_scene.Users.Path] = "mssql" }
-            )
+            ),
+            users,
+            _scene.Orders
         );
 
         var result = Run(
@@ -198,11 +224,17 @@ public sealed class CachingOptionsTests
             );
     }
 
+    // A test of the MSBuild path: the output and the dialect are the project's properties.
     [Fact]
     public void Run_DialectChangedToOneThatReadsTheFilesTheSameWay_EmitsNothingAgain()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = _scene.FirstRun(OutputKind.Sql, compilation);
+        var driver = FirstRunOnMSBuild(
+            compilation,
+            new TestOptionsProvider(OutputKind.Sql, null),
+            _scene.Users,
+            _scene.Orders
+        );
 
         var result = Run(
             driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(OutputKind.Sql, null, "postgres")),
@@ -228,13 +260,19 @@ public sealed class CachingOptionsTests
     }
 
     // Every file is read again.  Orders.sql has no comment to keep, so it gives an equal value: the step named
-    // ParsedFile is the one after the read, which reports such a value as taken from the previous run.
+    // ParsedFile is the one after the read, which reports such a value as taken from the previous run.  A test of the
+    // MSBuild path: the output and the parameters are the project's properties.
     [Fact]
     public void Run_KeepCommentsTurnedOnByTheProperty_ParsesTheFilesAgainAndOnlyThose()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var users = new InMemoryAdditionalText(_scene.Users.Path, "-- name: GetUser\nSELECT 1; -- c\n");
-        var driver = _scene.FirstRun(compilation, users, new TestOptionsProvider(OutputKind.Sql, null));
+        var driver = FirstRunOnMSBuild(
+            compilation,
+            new TestOptionsProvider(OutputKind.Sql, null),
+            users,
+            _scene.Orders
+        );
 
         var result = Run(
             driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(OutputKind.Sql, "keep-comments")),
@@ -267,11 +305,17 @@ public sealed class CachingOptionsTests
             .ShouldContain("SELECT 1; -- c");
     }
 
+    // A test of the MSBuild path: the output and the parameters are the project's properties.
     [Fact]
     public void Run_PropertyGainsAParameterThatIsNotKeepComments_ParsesNoFile()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = _scene.FirstRun(OutputKind.Sql, compilation);
+        var driver = FirstRunOnMSBuild(
+            compilation,
+            new TestOptionsProvider(OutputKind.Sql, null),
+            _scene.Users,
+            _scene.Orders
+        );
 
         var result = Run(
             driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(OutputKind.Sql, "sort-input")),
@@ -296,11 +340,17 @@ public sealed class CachingOptionsTests
             .ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
     }
 
+    // A test of the MSBuild path: the output is the project's property, and the parameters Users' metadata.
     [Fact]
     public void Run_MetadataOfOneFileGainsAParameter_ParsesNoFileAndEmitsOnlyItsType()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = _scene.FirstRun(OutputKind.Sql, compilation);
+        var driver = FirstRunOnMSBuild(
+            compilation,
+            new TestOptionsProvider(OutputKind.Sql, null),
+            _scene.Users,
+            _scene.Orders
+        );
         var metadata = new Dictionary<string, IReadOnlyDictionary<string, string>>
         {
             [_scene.Users.Path] = new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "sort-input" },
@@ -401,12 +451,18 @@ public sealed class CachingOptionsTests
             );
     }
 
+    // A test of the MSBuild path: the output is the project's property, and the parameters Users' metadata.
     [Fact]
     public void Run_MetadataOfOneFileGainsKeepComments_ParsesOnlyThatFile()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var users = new InMemoryAdditionalText(_scene.Users.Path, "-- name: GetUser\nSELECT 1; -- c\n");
-        var driver = _scene.FirstRun(compilation, users, new TestOptionsProvider(OutputKind.Sql, null));
+        var driver = FirstRunOnMSBuild(
+            compilation,
+            new TestOptionsProvider(OutputKind.Sql, null),
+            users,
+            _scene.Orders
+        );
         var metadata = new Dictionary<string, IReadOnlyDictionary<string, string>>
         {
             [_scene.Users.Path] = new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "keep-comments" },

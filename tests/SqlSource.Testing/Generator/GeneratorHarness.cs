@@ -157,8 +157,9 @@ internal static class GeneratorHarness
     // The JSON of the project's settings file: the output, spelled as a user writes it, the dialect as given, the
     // generator parameters as the array of their words, and then each entry of settings, a JSON object as a user
     // writes the file, which replaces the key it names.  Null when all four are null.  The spelling is the tests' own,
-    // not taken from the generator, so that a change to the generator's spelling fails a test.
-    private static string? ProjectSettings(
+    // not taken from the generator, so that a change to the generator's spelling fails a test.  CachingScene writes
+    // the project's file of its drivers with it too.
+    public static string? ProjectSettings(
         OutputKind? output,
         string? dialect = null,
         string? generatorParameters = null,
@@ -220,15 +221,20 @@ internal static class GeneratorHarness
             return files;
         }
 
-        if (files.Any(file => SqlPath.Normalize(file.Path) == SqlPath.Normalize(ProjectSettingsPath)))
+        RefuseTheProjectsPath(files.Select(file => file.Path));
+        return [.. files, SettingsFile(ProjectSettingsPath, projectSettings)];
+    }
+
+    // A file of the test's own at the path of the project's settings file, beside the one the run writes, is refused.
+    public static void RefuseTheProjectsPath(IEnumerable<string> paths)
+    {
+        if (paths.Any(path => SqlPath.Normalize(path) == SqlPath.Normalize(ProjectSettingsPath)))
         {
             throw new InvalidOperationException(
                 $"The run writes the project's settings file {ProjectSettingsPath}, and a file of the test is at that "
                     + "path.  Put its keys in the run's settings instead."
             );
         }
-
-        return [.. files, SettingsFile(ProjectSettingsPath, projectSettings)];
     }
 
     private static string Spell(OutputKind output) =>
