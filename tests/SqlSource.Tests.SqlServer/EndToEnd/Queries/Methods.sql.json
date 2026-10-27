@@ -735,34 +735,6 @@
         }
       ]
     },
-    "WaitFiveSeconds": {
-      "hash": "766e5ccf0bedab26a6d790ca7210b5c0272b4480a88c4e99436433aafecf444c",
-      "engine": "mssql",
-      "database": "app",
-      "serverVersion": "17.0.5015.4",
-      "resultKind": "rows",
-      "matchesTable": null,
-      "plan": "skipped",
-      "tableMatch": "no-origin",
-      "parameters": [],
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "n",
-          "type": {
-            "name": "int",
-            "maxLength": 4,
-            "precision": 10,
-            "scale": 0
-          },
-          "nullable": false,
-          "nullableSource": "server",
-          "origin": null,
-          "identity": false,
-          "computed": true
-        }
-      ]
-    },
     "ListAccountIdsCancellingOnRead": {
       "hash": "59cc8ee4f653af5397751c8aaead1cf9df7d25d492cdc81cec9a4b48f0fcacf5",
       "engine": "mssql",
