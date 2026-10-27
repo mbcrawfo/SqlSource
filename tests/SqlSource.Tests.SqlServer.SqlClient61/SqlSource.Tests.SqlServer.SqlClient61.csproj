@@ -12,13 +12,13 @@
         <IsPackable>false</IsPackable>
         <!-- SQLSRC240 stays a warning: raising VersionPrefix warns until tools/describe-end-to-end.sh runs. -->
         <WarningsNotAsErrors>$(WarningsNotAsErrors);SQLSRC240</WarningsNotAsErrors>
-        <!-- The dialect of every query of the project. -->
-        <SqlSourceDialect>mssql</SqlSourceDialect>
-        <!-- What a query generates: its SQL and its models, which need an entry in the sidecar beside its file. -->
-        <SqlSourceOutput>Models</SqlSourceOutput>
     </PropertyGroup>
     <ItemGroup>
-        <!-- The queries and the sidecars of the end-to-end project, kept at their own paths for the generator. -->
+        <!--
+            The queries and the sidecars of the end-to-end project, kept at their own paths for the generator.  The
+            linked queries take the settings files of their own folder, so they are generated with the end-to-end
+            project's settings.
+        -->
         <AdditionalFiles
             Include="../SqlSource.Tests.SqlServer/EndToEnd/Queries/AllTypes.sql"
             Link="Queries/%(Filename)%(Extension)"

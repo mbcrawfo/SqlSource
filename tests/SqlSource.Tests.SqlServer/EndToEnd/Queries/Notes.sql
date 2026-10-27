@@ -1,9 +1,9 @@
 -- The queries of the notes, claimed by NoteQueries.  The schema's alias type dbo.Email is read and sent as a C# type of
 -- the project, through its converters, and time as a TimeOnly.  The ids of the accounts are AccountIds, read and sent
--- through its converters: dbo.accounts.id by the file's column types in the project, and dbo.notes.account_id by the
--- header's -- column: marker.
+-- through its converters: dbo.accounts.id and dbo.notes.account_id by the header's -- column: markers.
 -- type-override: dbo.Email = SqlSource.Tests.SqlServer.EndToEnd.Types.Email
 -- type-override: time = System.TimeOnly
+-- column: accounts.id -> AccountId
 -- column: notes.account_id -> AccountId
 
 -- name: ListAccountNotes
