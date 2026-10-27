@@ -27,9 +27,11 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 // hand-written method that does the same.  The numbers queries of RowBufferQueries have a pair of each kind for the
 // List, IList, ICollection and ImmutableArray, at 3 rows: the pooled method against rows read into RowBufferByHand and
 // copied by ToList or ToImmutableArray, and its twin under no-array-pool against a List that is returned as it is or an
-// ImmutableArray builder that is drained, since those are what the generated method returns.  One more test holds the
-// pooled NumbersAsArray, at 300 rows, to allocating less than a List copied to an array by at least a given number of
-// bytes, since a pooled buffer exists to save a list's growth arrays.  In each pair the two make the same calls, so
+// ImmutableArray builder that is drained, since those are what the generated method returns.  Three more tests hold
+// the pooled NumbersAsArray, NumbersAsList and NumbersAsImmutableArray, at 300 rows, to allocating less than a List
+// copied to an array, a List grown by doubling and an ImmutableArray builder that is drained, each by at least a given
+// number of bytes, since a pooled buffer exists to save a list's growth arrays and the pairs above, against
+// RowBufferByHand, cannot see what the buffer itself costs.  In each pair the two make the same calls, so
 // what the generated method allocates beyond the hand-written one is the difference of their own state, which the
 // margin holds, and an object that it allocates on each call shows.  Both run on the same open connection of one data
 // source, with the same token, and ConfigureAwait(false) on each await.  The two are compared by the commonest
@@ -83,6 +85,28 @@ public sealed class AllocationTests(PostgresContainer postgres)
     // the largest growth array, of 512 elements, itself.  It is raised when the pool saves more and never lowered to
     // make a change pass.
     private const long LeastSavingInBytesPerCall = 8_000;
+
+    // The bytes for each call that the pooled NumbersAsList must save on a few hundred rows against a List that grows
+    // by doubling and is returned as it is, by the commonest difference of a pair of calls.  The hand-written list ends
+    // with an array of 512 elements and has allocated the growth arrays of 4 to 256 before it, 8,352 bytes in all with
+    // their headers; the pooled method allocates the one array of 300 elements that its list holds, so the saving is
+    // the growth arrays less that array.  The commonest difference was -5,904 bytes, in 496 to 500 of 500 pairs, on
+    // each of five runs.  So 5,500 is 404 bytes below what was measured, room for the driver's paths and not for a
+    // buffer of 64 elements.  A ToList that did not return its last buffer to the pool, the 512 elements of 4,120
+    // bytes, saved 1,784 bytes only, which is far below 5,500 and fails the test.  It is raised when the pool saves
+    // more and never lowered to make a change pass.
+    private const long LeastListSavingInBytesPerCall = 5_500;
+
+    // The bytes for each call that the pooled NumbersAsImmutableArray must save on a few hundred rows against an
+    // ImmutableArray builder that is drained, by the commonest difference of a pair of calls.  The builder grows
+    // through arrays of 16 to 512 elements, 8,208 bytes with their headers, then copies the rows into an array of 300
+    // elements when it is drained; the pooled method allocates that array alone, which the immutable array wraps.  The
+    // commonest difference was -8,304 bytes, in 494 to 500 of 500 pairs, on four of five runs, and -8,368, in 489, on
+    // the fifth.  So 8,000 is 304 bytes below the least measured, room for the driver's paths and not for a growth
+    // array.  A ToImmutableArray that copied the 300 rows a second time, an array of 2,424 bytes, saved 5,880 bytes
+    // only, which is far below 8,000 and fails the test, as does one that did not return its last buffer.  It is
+    // raised when the pool saves more and never lowered to make a change pass.
+    private const long LeastImmutableArraySavingInBytesPerCall = 8_000;
 
     private const string NumbersSql = "SELECT n FROM generate_series(1, @count) AS n ORDER BY n;";
 
@@ -416,6 +440,56 @@ public sealed class AllocationTests(PostgresContainer postgres)
         pairs.Generated.Bytes.ShouldBeGreaterThan(0);
         pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
         pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-LeastSavingInBytesPerCall);
+    }
+
+    // Many rows, for the list: the pooled NumbersAsList rents its buffers and copies the rows into a List of the exact
+    // size, so it allocates that list and its array of 300 elements.  A List that grows by doubling to hold the rows,
+    // returned as it is, allocates growth arrays of 4 to 512 elements and ends with the array of 512.
+    [Fact]
+    public async Task NumbersAsList_PerCallOfAFewHundredRows_AllocatesLessThanAGrownList()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        var parameters = new NumbersAsListArgs(FewHundredRows);
+        var expected = Enumerable.Range(1, FewHundredRows).Select(n => new CountedNumber(n)).ToArray();
+        (await connection.NumbersAsList(parameters, cancellationToken: token)).ShouldBe(expected);
+        (await NumbersAsListUnpooledByHand(connection, FewHundredRows, cancellationToken: token)).ShouldBe(expected);
+
+        var pairs = await MeasureAsync(
+            () => connection.NumbersAsList(parameters, cancellationToken: token),
+            () => NumbersAsListUnpooledByHand(connection, FewHundredRows, cancellationToken: token)
+        );
+
+        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
+        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
+        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-LeastListSavingInBytesPerCall);
+    }
+
+    // Many rows, for the immutable array: the pooled NumbersAsImmutableArray rents its buffers and wraps the exact
+    // array of 300 elements that it copies the rows into, and a builder that is drained grows through arrays of 16 to
+    // 512 elements, then copies the rows into an array of the exact size.
+    [Fact]
+    public async Task NumbersAsImmutableArray_PerCallOfAFewHundredRows_AllocatesLessThanABuilder()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        var parameters = new NumbersAsImmutableArrayArgs(FewHundredRows);
+        var expected = Enumerable.Range(1, FewHundredRows).Select(n => new CountedNumber(n)).ToArray();
+        (await connection.NumbersAsImmutableArray(parameters, cancellationToken: token)).ShouldBe(expected);
+        (await NumbersAsImmutableArrayUnpooledByHand(connection, FewHundredRows, cancellationToken: token)).ShouldBe(
+            expected
+        );
+
+        var pairs = await MeasureAsync(
+            () => connection.NumbersAsImmutableArray(parameters, cancellationToken: token),
+            () => NumbersAsImmutableArrayUnpooledByHand(connection, FewHundredRows, cancellationToken: token)
+        );
+
+        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
+        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
+        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-LeastImmutableArraySavingInBytesPerCall);
     }
 
     // The pairs of calls of the two methods, after both are warmed up, written to the test's output.

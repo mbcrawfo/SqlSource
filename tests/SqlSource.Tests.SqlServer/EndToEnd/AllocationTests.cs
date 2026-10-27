@@ -18,8 +18,8 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // ShapeQueries.SearchAccounts, with two parameters and three rows of the seed of "app".  The hand-written method makes
 // the generated method's calls, one by one: the open/close rule of the methods, the command and its arguments, the
 // binding of each parameter, the reads of each column, and the same rows in the same collection, an IReadOnlyList with
-// an array behind it, which it can only build by copying what it read the rows into, since the count of the rows is
-// not known until they are read.  It reads them into what the generated method does, so there are two pairs:
+// an array behind it, which it can only build by copying what it read the rows into, since the count of the rows is not
+// known until they are read.  It reads them into what the generated method does, so there are two pairs:
 // SearchAccounts, which reads its rows into the pooled buffer, against a hand-written method that reads them into
 // RowBufferByHand of tests/SqlSource.Testing, the same buffer by hand; and SearchAccountsUnpooled, a copy of the query
 // under no-array-pool, which reads them into a List, against a hand-written method that does the same.  The copy is a
@@ -28,13 +28,14 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // have a pair of each kind for the List, IList, ICollection and ImmutableArray, at 3 rows: the pooled method against
 // rows read into RowBufferByHand and copied by ToList or ToImmutableArray, and its twin under no-array-pool against a
 // List that is returned as it is or an ImmutableArray builder that is drained, since those are what the generated
-// method returns.  One more test holds the pooled NumbersAsArray, at 300 rows, to allocating less than a List copied to
-// an array by at least a given number of bytes, since a pooled buffer exists to save a list's growth arrays.  In each
-// pair the two make the same calls, so any object that the generated method allocates on each call and the
-// hand-written one does not fails the test.  The two are compared by the commonest difference of pairs of calls, one
-// of each method, which CallAllocations explains.  GC.GetTotalAllocatedBytes(true) counts every thread, where the
-// driver completes the continuations of an asynchronous call, so the test runs in MeasuresAllocations, alone and on a
-// server of its own.
+// method returns.  Three more tests hold the pooled NumbersAsArray, NumbersAsList and NumbersAsImmutableArray, at 300
+// rows, to allocating less than a List copied to an array, a List grown by doubling and an ImmutableArray builder that
+// is drained, each by at least a given number of bytes, since a pooled buffer exists to save a list's growth arrays and
+// the pairs above, against RowBufferByHand, cannot see what the buffer itself costs.  In each pair the two make the
+// same calls, so any object that the generated method allocates on each call and the hand-written one does not fails
+// the test.  The two are compared by the commonest difference of pairs of calls, one of each method, which
+// CallAllocations explains.  GC.GetTotalAllocatedBytes(true) counts every thread, where the driver completes the
+// continuations of an asynchronous call, so the test runs in MeasuresAllocations, alone and on a server of its own.
 [Collection(MeasuresAllocations.Name)]
 public sealed class AllocationTests(SqlServerContainer sqlServer)
 {
@@ -92,6 +93,30 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
     // for a growth array, and far above 4,256, the saving of a pooled method that allocated even the largest growth
     // array, of 512 elements, itself.  It is raised when the pool saves more and never lowered to make a change pass.
     private const long LeastSavingInBytesPerCall = 8_000;
+
+    // The bytes for each call that the pooled NumbersAsList must save on a few hundred rows against a List that grows
+    // by doubling and is returned as it is, by the commonest difference of a pair of calls.  The hand-written list ends
+    // with an array of 512 elements and has allocated the growth arrays of 4 to 256 before it, 8,352 bytes in all with
+    // their headers; the pooled method allocates the one array of 300 elements that its list holds, so the saving is
+    // the growth arrays less that array.  The commonest difference was -5,920 bytes, in 444 to 478 of 500 pairs, on
+    // each of six runs on both connections, three on SQL Server 2025 and three on 2017; the next were -5,624 and
+    // -6,216, in some ten to thirty pairs each.  So 5,500 is 420 bytes below the commonest and 124 below the least of
+    // the next, room for the driver's paths and not for a buffer of 64 elements.  A ToList that did not return its last
+    // buffer to the pool, the 512 elements of 4,120 bytes, saved 1,800 bytes only, at the commonest, which is far below
+    // 5,500 and fails the test.  It is raised when the pool saves more and never lowered to make a change pass.
+    private const long LeastListSavingInBytesPerCall = 5_500;
+
+    // The bytes for each call that the pooled NumbersAsImmutableArray must save on a few hundred rows against an
+    // ImmutableArray builder that is drained, by the commonest difference of a pair of calls.  The builder grows
+    // through arrays of 16 to 512 elements, 8,208 bytes with their headers, then copies the rows into an array of 300
+    // elements when it is drained; the pooled method allocates that array alone, which the immutable array wraps.  The
+    // commonest difference was -8,320 bytes, in 434 to 477 of 500 pairs, on each of six runs on both connections, three
+    // on SQL Server 2025 and three on 2017; the next were -8,616 and -8,024, in some ten to thirty pairs each.  So
+    // 8,000 is 320 bytes below the commonest and 24 below the least of the next, room for the driver's paths and not
+    // for a growth array.  A ToImmutableArray that copied the 300 rows a second time, an array of 2,424 bytes, saved
+    // 5,896 bytes only, at the commonest, which is far below 8,000 and fails the test, as does one that did not return
+    // its last buffer.  It is raised when the pool saves more and never lowered to make a change pass.
+    private const long LeastImmutableArraySavingInBytesPerCall = 8_000;
 
     // "%o%" matches bob and carol, and the id alice.
     private static readonly SearchAccountsFilter Filter = new() { Name = "%o%", AccountId = 1 };
@@ -446,6 +471,76 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
         pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
         pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
         pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-LeastSavingInBytesPerCall);
+    }
+
+    // Many rows, for the list: the pooled NumbersAsList rents its buffers and copies the rows into a List of the exact
+    // size, so it allocates that list and its array of 300 elements.  A List that grows by doubling to hold the rows,
+    // returned as it is, allocates growth arrays of 4 to 512 elements and ends with the array of 512.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NumbersAsList_ManyCallsOfAFewHundredRows_AllocatesLessThanAGrownList(bool open)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        if (open)
+        {
+            await connection.OpenAsync(token);
+        }
+
+        var parameters = new NumbersCount(FewHundredRows);
+        var expected = Enumerable.Range(1, FewHundredRows).Select(n => new CountedNumber(n)).ToArray();
+        (await connection.NumbersAsList(parameters, cancellationToken: token)).ShouldBe(expected);
+        (await NumbersAsListUnpooledByHandAsync(connection, parameters, cancellationToken: token)).ShouldBe(expected);
+
+        var pairs = await CallAllocations.MeasureAsync(
+            () => connection.NumbersAsList(parameters, cancellationToken: token),
+            () => NumbersAsListUnpooledByHandAsync(connection, parameters, cancellationToken: token),
+            WarmUpCalls,
+            Pairs
+        );
+        TestContext.Current.TestOutputHelper?.WriteLine($"NumbersAsList, of {Pairs} pairs of calls, {pairs}.");
+
+        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
+        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
+        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-LeastListSavingInBytesPerCall);
+    }
+
+    // Many rows, for the immutable array: the pooled NumbersAsImmutableArray rents its buffers and wraps the exact
+    // array of 300 elements that it copies the rows into, and a builder that is drained grows through arrays of 16 to
+    // 512 elements, then copies the rows into an array of the exact size.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NumbersAsImmutableArray_ManyCallsOfAFewHundredRows_AllocatesLessThanABuilder(bool open)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        if (open)
+        {
+            await connection.OpenAsync(token);
+        }
+
+        var parameters = new NumbersCount(FewHundredRows);
+        var expected = Enumerable.Range(1, FewHundredRows).Select(n => new CountedNumber(n)).ToArray();
+        (await connection.NumbersAsImmutableArray(parameters, cancellationToken: token)).ShouldBe(expected);
+        (await NumbersAsImmutableArrayUnpooledByHandAsync(connection, parameters, cancellationToken: token)).ShouldBe(
+            expected
+        );
+
+        var pairs = await CallAllocations.MeasureAsync(
+            () => connection.NumbersAsImmutableArray(parameters, cancellationToken: token),
+            () => NumbersAsImmutableArrayUnpooledByHandAsync(connection, parameters, cancellationToken: token),
+            WarmUpCalls,
+            Pairs
+        );
+        TestContext.Current.TestOutputHelper?.WriteLine(
+            $"NumbersAsImmutableArray, of {Pairs} pairs of calls, {pairs}."
+        );
+
+        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
+        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
+        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-LeastImmutableArraySavingInBytesPerCall);
     }
 
     // SearchAccounts by hand: the arguments of the generated method, and its calls, the rows into RowBufferByHand.
