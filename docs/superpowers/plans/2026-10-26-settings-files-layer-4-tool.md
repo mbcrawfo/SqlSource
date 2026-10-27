@@ -54,8 +54,8 @@
 - [ ] **Step 1: Write the failing tests**
   - `BuildFileTests.Targets_Root_HoldsTargetsTheManifestsListTheNestingAndTheSettingsFiles`: the second line's value becomes `"SqlSourceTrimProperties;SqlSourceTrimMetadataOfFiles;" + SearchTarget + ";" + BuildFoldersTarget`.
   - `BuildFileTests.Targets_ManifestTarget_WritesEverySettingOfTheProjectAndOfEachFile`: the `Property.` lines are `properties.Concat(BuildFolders)`, each `$"Property.{name}=$([MSBuild]::Escape($({name})))"` (the `File.` lines unchanged, without it).
-  - `ManifestTargetTests.Manifest_BuildFolders_AreTheFoldersOfTheProject`: run the target on the `Plain` fixture; `BuildFolders.Read(ManifestOptions.ForProject(manifest)).Folders` contains `SqlPath.Normalize` of `<project folder>/obj/` and of `<project folder>/bin/`.
-  - `ManifestTargetTests.Manifest_BuildFoldersOfAnOddPath_DecodeToTheRealFolders`: the same on the `OddPaths` fixture, whose folder holds `;`, `=`, `%41`, `'` and `é`; the decoded `obj/` folder equals the real one.  Any existing test that asserts the exact set of `Property.` lines a real manifest holds adds `SqlSourceBuildFolders` to it.
+  - `ManifestTargetTests.WriteManifest_ProjectWithOneFramework_HoldsTheBuildsFolders`: run the target on the `Single` fixture (`Plain` imports no package targets); `BuildFolders.Read(ManifestOptions.ForProject(manifest)).Folders` contains `SqlPath.Normalize` of `<project folder>/obj/` and of `<project folder>/bin/`.
+  - `ManifestTargetTests.WriteManifest_BuildFoldersOfAnOddPath_DecodeToTheRealFolders`: the same on the `OddPaths` fixture copied into a folder whose name holds `;`, `=`, `%41`, `'` and `é`; the decoded `obj/` folder equals the real one.  Any existing test that asserts the exact set of `Property.` lines a real manifest holds adds `SqlSourceBuildFolders` to it.
 
 - [ ] **Step 2: Run them to see them fail**
 

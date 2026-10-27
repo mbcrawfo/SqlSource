@@ -93,7 +93,7 @@ public sealed class ManifestTargetTests : IDisposable
                 "Compile=" + Path.Combine(folder, "UserRepository.cs"),
             ]);
         lines[4].ShouldStartWith("DefineConstants=");
-        // Its value is the machine's: Manifest_BuildFolders_AreTheFoldersOfTheProject reads it.
+        // Its value is the machine's: WriteManifest_ProjectWithOneFramework_HoldsTheBuildsFolders reads it.
         lines.Count(line => line.StartsWith(BuildFoldersLine, StringComparison.Ordinal)).ShouldBe(1);
     }
 
@@ -281,7 +281,7 @@ public sealed class ManifestTargetTests : IDisposable
     // The tool reads the folders of the build from the manifest as the generator reads them from the compiler's
     // options: the line holds the obj and bin folders of the project.
     [Fact]
-    public async Task Manifest_BuildFolders_AreTheFoldersOfTheProject()
+    public async Task WriteManifest_ProjectWithOneFramework_HoldsTheBuildsFolders()
     {
         var project = _fixtures.Copy("Single");
         var folder = Path.GetDirectoryName(project)!;
@@ -297,7 +297,7 @@ public sealed class ManifestTargetTests : IDisposable
     // property through Escape, which WriteLinesToFile undoes, so the line holds the target's escapes and BuildFolders
     // decodes them.
     [Fact]
-    public async Task Manifest_BuildFoldersOfAnOddPath_DecodeToTheRealFolders()
+    public async Task WriteManifest_BuildFoldersOfAnOddPath_DecodeToTheRealFolders()
     {
         var project = _fixtures.Copy("OddPaths", folder: "q;=%41 'é");
         var folder = Path.GetDirectoryName(project)!;
