@@ -20,7 +20,7 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // closes again a connection that the method opened.  Then a query whose rows fail past the row where a loop stops,
 // whose error the disposal does not report, and the queries of several statements, whose later statements run when
 // the reader is disposed; under SET XACT_ABORT ON either error rolls back the caller's transaction, still unreported,
-// and with it off a failed conversion after the rows does too.
+// and with it off a failed conversion after the rows does too, where an overflow leaves it to commit.
 [Collection(UsesSqlServer.Name)]
 public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
 {
@@ -619,6 +619,38 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
 
         var streamed = await session
             .Connection.StreamThenFailConversion(transaction: session.Transaction, cancellationToken: token)
+            .ToListAsync(token);
+
+        streamed.ShouldBe(Accounts);
+        await session.ShouldHaveRolledBackUnreportedAsync(token);
+    }
+
+    // An overflow after the rows, a value too large for tinyint, ends its statement alone with XACT_ABORT off, as a
+    // divide by zero does, so the transaction stays open and commits, where the failed conversion rolls it back.
+    [Fact]
+    public async Task StreamThenOverflow_ErrorAfterTheRowsInATransaction_TheTransactionCommits()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+
+        var streamed = await session
+            .Connection.StreamThenOverflow(transaction: session.Transaction, cancellationToken: token)
+            .ToListAsync(token);
+
+        streamed.ShouldBe(Accounts);
+        await session.ShouldCommitAsync(token);
+    }
+
+    // Under SET XACT_ABORT ON the same overflow rolls the transaction back, still unreported, which shows that the
+    // overflow is raised: the transaction that commits with XACT_ABORT off survived an error, not its absence.
+    [Fact]
+    public async Task StreamThenOverflow_ErrorAfterTheRowsInATransactionUnderXactAbort_RollsItBackUnreported()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: true, token);
+
+        var streamed = await session
+            .Connection.StreamThenOverflow(transaction: session.Transaction, cancellationToken: token)
             .ToListAsync(token);
 
         streamed.ShouldBe(Accounts);

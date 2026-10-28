@@ -78,6 +78,16 @@ FROM dbo.accounts
 ORDER BY id;
 SELECT CAST('x' AS int);
 
+-- name: StreamThenOverflow
+-- summary: The accounts, and then a value too large for its type, an error that the method does not report.
+-- StreamThenFailConversion with an overflow, error 220, in the place of the failed conversion: with XACT_ABORT off
+-- SQL Server ends that statement alone and leaves the transaction open, and under XACT_ABORT ON rolls it back.
+-- output-model: CollectedAccount
+SELECT id, name
+FROM dbo.accounts
+ORDER BY id;
+SELECT CAST(300 AS tinyint);
+
 -- name: StreamNumbersThenMark
 -- summary: The numbers from 1 to a count, and then a statement that marks the session once the numbers are read.
 -- This is StreamNumbers with the mark after it, and the two are meant to match.

@@ -8,8 +8,10 @@ using Shouldly;
 namespace SqlSource.Tests.SqlServer.EndToEnd;
 
 // A transaction of a session with XACT_ABORT on or off, for the tests of an error that SqlClient does not report and
-// that rolls the transaction back with nothing thrown: under XACT_ABORT ON nearly any error does, and with it off an
-// error that SQL Server makes abort the batch, such as a failed conversion.  The connection is not pooled, so the
+// that may roll the transaction back with nothing thrown: under XACT_ABORT ON nearly any error does, and with it off
+// an error that SQL Server makes abort the batch, such as a conversion of text that is not a number, while an overflow
+// leaves it open.  The session's setting is checked before the transaction begins, since a failed conversion rolls
+// back under either setting and could not show which one the test ran under.  The connection is not pooled, so the
 // setting ends with its session when the test disposes it.  The temporary table #outside is made before the
 // transaction, so it outlives a rollback and holds what was committed: 7 is written in the transaction before the
 // method is called, and 8 with the transaction after it.
@@ -39,6 +41,13 @@ internal sealed class UnpooledTransaction : IAsyncDisposable
             _ = await create.ExecuteNonQueryAsync(token);
         }
 
+        // XACT_ABORT is the bit 16384 of @@OPTIONS; SESSIONPROPERTY does not know it, and returns NULL for it.
+        const string XactAbortOfSession = "SELECT CASE WHEN @@OPTIONS & 16384 = 0 THEN 0 ELSE 1 END";
+        await using (var setting = new SqlCommand(XactAbortOfSession, connection))
+        {
+            (await setting.ExecuteScalarAsync(token)).ShouldBe(xactAbort ? 1 : 0, "XACT_ABORT of the session");
+        }
+
         var transaction = (SqlTransaction)await connection.BeginTransactionAsync(token);
         await using (var insert = new SqlCommand("INSERT INTO #outside (n) VALUES (7)", connection, transaction))
         {
@@ -64,6 +73,29 @@ internal sealed class UnpooledTransaction : IAsyncDisposable
 
         thrown.Message.ShouldBe("This SqlTransaction has completed; it is no longer usable.");
         await using var select = new SqlCommand("SELECT n FROM #outside ORDER BY n", Connection);
+        (await ReadAsync(select, token)).ShouldBe([8]);
+    }
+
+    // What a caller sees after the method when the error left the transaction open: its Connection is still set, the
+    // commit succeeds, and #outside holds the 7 that the transaction wrote.
+    public async Task ShouldCommitAsync(CancellationToken token)
+    {
+        _ = Transaction.Connection.ShouldNotBeNull();
+
+        await Transaction.CommitAsync(token);
+
+        await using var select = new SqlCommand("SELECT n FROM #outside ORDER BY n", Connection);
+        (await ReadAsync(select, token)).ShouldBe([7]);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Transaction.DisposeAsync();
+        await Connection.DisposeAsync();
+    }
+
+    private static async Task<List<int>> ReadAsync(SqlCommand select, CancellationToken token)
+    {
         await using var reader = await select.ExecuteReaderAsync(token);
         var committed = new List<int>();
         while (await reader.ReadAsync(token))
@@ -71,12 +103,6 @@ internal sealed class UnpooledTransaction : IAsyncDisposable
             committed.Add(reader.GetInt32(0));
         }
 
-        committed.ShouldBe([8]);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await Transaction.DisposeAsync();
-        await Connection.DisposeAsync();
+        return committed;
     }
 }
