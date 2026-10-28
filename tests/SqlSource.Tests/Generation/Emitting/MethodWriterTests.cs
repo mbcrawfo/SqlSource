@@ -419,6 +419,8 @@ public sealed class MethodWriterTests
         methods.ShouldContain(" ProbeOne(\n");
         methods.ShouldContain(" ProbeStream(\n");
         methods.ShouldContain("yield return ");
+        // The iterator takes the name ReadRows unless a token has it, and then ReadRows1.
+        methods.ShouldContain(name == "ReadRows" ? "return ReadRows1(" : "return ReadRows(");
         methods.ShouldContain(" ? global::App.UserId.ToDatabase(");
         methods.ShouldContain("global::App.UserId.FromDatabase(");
         methods.ShouldContain("global::System.Array.ConvertAll<int?, global::App.UserId>(");

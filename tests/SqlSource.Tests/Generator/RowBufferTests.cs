@@ -193,6 +193,13 @@ public sealed class RowBufferTests
         var methods = run.Sources[MethodRuns.MethodsFile];
         Count(methods, Struct).ShouldBe(1);
         Count(methods, "new global::App.SqlSourceRowBuffer<").ShouldBe(1);
+        // The one buffer is read by the array method, which follows the streaming method in the file.
+        var streaming = methods.IndexOf(" StreamUsers(\n", StringComparison.Ordinal);
+        var array = methods.IndexOf(" ListUsers(\n", StringComparison.Ordinal);
+        streaming.ShouldBeGreaterThan(-1);
+        array.ShouldBeGreaterThan(streaming);
+        methods[streaming..array].ShouldNotContain("SqlSourceRowBuffer");
+        methods[array..].ShouldContain("new global::App.SqlSourceRowBuffer<");
     }
 
     [Fact]
