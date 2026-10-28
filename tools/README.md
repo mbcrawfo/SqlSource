@@ -86,7 +86,7 @@ To change it, edit the file and run the tests; `tests/SqlSource.Tests/Validation
 
 ## Pulling the test images
 
-`tools/pull-test-images.sh [image ...]` is a step of `build.yml` and no check, and `pre-commit-validation.sh` does not run it.  It runs `docker pull` once for the default image of each engine, which it reads from the lines of `tests/DatabaseTests/TestHarness/DefaultImages.cs` that declare `Postgres` and `SqlServer`, and once for each image given as an argument, and prints `<image>: <n> s` for each.  The `build` job of the workflow runs it with no argument, after its build; each floor job pulls its own floor image with `docker pull`.  A person can run it to have every image before a first run of the tests, which on Apple silicon saves minutes of the first test.
+`tools/pull-test-images.sh [image ...]` is a step of the `build` job of `build.yml` and of the `allocation-postgres` and `allocation-sqlserver` jobs of `nightly.yml`, and no check, and `pre-commit-validation.sh` does not run it.  It runs `docker pull` once for the default image of each engine, which it reads from the lines of `tests/DatabaseTests/TestHarness/DefaultImages.cs` that declare `Postgres` and `SqlServer`, and once for each image given as an argument, and prints `<image>: <n> s` for each.  The `build` job of the workflow runs it with no argument, after its build; each floor job pulls its own floor image with `docker pull`.  A person can run it to have every image before a first run of the tests, which on Apple silicon saves minutes of the first test.
 
 ## Recording scripts
 

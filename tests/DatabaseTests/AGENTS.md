@@ -9,7 +9,7 @@
 
 ## Containers
 
-- **A test that needs the server is in the project's collection** (`UsesPostgres`, `UsesSqlServer` or `UsesApp`), whose fixture is the project's public sealed subclass of the harness's `PostgresContainer` or `SqlServerContainer`, started once for the run through `EngineImage`; the project gives it its driver's `DbProviderFactory`, its image and its databases with their scripts, and the harness brings no driver.
+- **A test that needs the server is in the project's collection** (`UsesPostgres`, `UsesSqlServer` or `UsesApp`, and `MeasuresPostgres` or `MeasuresSqlServer` in `QueryMethodAllocation`), whose fixture is the project's public sealed subclass of the harness's `PostgresContainer` or `SqlServerContainer`, started once for the run through `EngineImage`; the project gives it its driver's `DbProviderFactory`, its image and its databases with their scripts, and the harness brings no driver.
 - **A change here is run on both of the engine's images before it is pushed**, since `pre-commit-validation.sh` runs the default image alone ([the commands](README.md#running)).
 - **The allocation tests of the generated methods are in `QueryMethodAllocation` and run only in the nightly's `allocation-postgres` and `allocation-sqlserver` jobs**, never in `dotnet test --solution`, `pre-commit-validation.sh` or `build.yml`: its `.csproj` is a test project only under `RunQueryMethodAllocation=true` ([why](QueryMethodAllocation/README.md)).
 

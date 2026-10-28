@@ -74,7 +74,8 @@ jobs:
 
       # Each project but tests/DatabaseTests/Postgres, tests/DatabaseTests/Postgres.Npgsql8,
       # tests/DatabaseTests/SqlServer and tests/DatabaseTests/SqlServer.SqlClient61, whose containers these runners
-      # cannot start.  Every project runs even when an earlier one failed.
+      # cannot start, and tests/DatabaseTests/QueryMethodAllocation, which the allocation jobs below run.  Every
+      # project runs even when an earlier one failed.
       - name: Test
         run: |
           status=0
@@ -188,9 +189,6 @@ jobs:
     name: Allocation tests on PostgreSQL
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      # One engine's failure says nothing of the other.
-      fail-fast: false
     env:
       PROJECT: tests/DatabaseTests/QueryMethodAllocation
     steps:
@@ -228,9 +226,6 @@ jobs:
     name: Allocation tests on SQL Server
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      # One engine's failure says nothing of the other.
-      fail-fast: false
     env:
       PROJECT: tests/DatabaseTests/QueryMethodAllocation
     steps:
