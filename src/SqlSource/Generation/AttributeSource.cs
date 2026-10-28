@@ -150,7 +150,8 @@ internal static class AttributeSource
             }
 
             /// <summary>
-            /// The type a generated method returns many rows in.  Every one is filled before the method returns.
+            /// The type a generated method returns many rows in.  Every one but IAsyncEnumerable is filled before the
+            /// method returns.
             /// </summary>
             internal enum GeneratorCollectionType
             {

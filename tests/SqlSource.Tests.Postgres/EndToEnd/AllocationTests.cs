@@ -54,12 +54,12 @@ public sealed class AllocationTests(PostgresContainer postgres)
     // bytes more, ListAccounts 8 bytes less and ListClosedBefore 16 bytes less.  The numbers queries at 3 rows
     // allocated about 1.6 to 2.3 KB a call, and the generated method of each of their eight pairs, NumbersAsList,
     // IList, ICollection and ImmutableArray through the pool and under no-array-pool, allocated 16 bytes more than the
-    // hand-written one on every run.  A boxed value is 24 bytes.  The binding's own cost, the driver's for each
+    // hand-written one on every run.  The streaming StreamAccounts allocated about 2.1 KB a call, the same as its
+    // hand-written iterator on every run.  A boxed value is 24 bytes.  The binding's own cost, the driver's for each
     // parameter and its DataTypeName, is in both sides alike.  So an extra boxed value, array or closure on each call
     // shows, a few of them exceed the margin, and the commonest difference does not move with the driver's share of a
     // call: an array of 64 bytes, 88 with its header, on each call of the generated methods failed every test of both
-    // pairs, at differences of 72 to 104 bytes.  The streaming StreamAccounts allocated about 2.1 KB a call, the same
-    // as its hand-written iterator on every run.  Never above 128.
+    // pairs, at differences of 72 to 104 bytes.  Never above 128.
     private const long MarginInBytesPerCall = 64;
 
     // The first calls pay for one-off work: JIT compilation, static initialisers, the pools of the driver and of the

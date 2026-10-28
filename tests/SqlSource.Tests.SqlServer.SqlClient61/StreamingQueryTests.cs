@@ -40,6 +40,7 @@ public sealed class StreamingQueryTests(AppContainer app)
         var token = TestContext.Current.CancellationToken;
         await using var connection = new SqlConnection(app.ConnectionString);
         await connection.OpenAsync(token);
+        // Keep this clear and the read below in step with tests/SqlSource.Tests.SqlServer/EndToEnd/SessionMark.cs.
         await using (var clear = new SqlCommand("SET CONTEXT_INFO 0x00", connection))
         {
             _ = await clear.ExecuteNonQueryAsync(token);

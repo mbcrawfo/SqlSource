@@ -201,7 +201,38 @@ public sealed class MethodShapeTests(SqlServerContainer sqlServer)
         (await SessionMark.ReadAsync(connection, token)).ShouldBe(3);
     }
 
-    // The same batch under none, which reads no rows, reports the error of the THROW.
+    // The error after the row is lost by one as by many: the row is returned and nothing is thrown, though the batch
+    // ran as far as the THROW.  A fix that reports the error flips this test.
+    [Fact]
+    public async Task GetThenRaise_ErrorAfterTheRow_ReturnsTheRowAndIsNotThrown()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(token);
+        await SessionMark.ClearAsync(connection, token);
+
+        var account = await connection.GetThenRaise(cancellationToken: token);
+
+        account.ShouldBe(new CollectedAccount(1, "alice"));
+        (await SessionMark.ReadAsync(connection, token)).ShouldBe(5);
+    }
+
+    // The same under one-optional.  A fix that reports the error flips this test.
+    [Fact]
+    public async Task FindThenRaise_ErrorAfterTheRow_ReturnsTheRowAndIsNotThrown()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(token);
+        await SessionMark.ClearAsync(connection, token);
+
+        var account = await connection.FindThenRaise(cancellationToken: token);
+
+        account.ShouldBe(new CollectedAccount(1, "alice"));
+        (await SessionMark.ReadAsync(connection, token)).ShouldBe(6);
+    }
+
+    // The batch of ListThenRaise under none, which reads no rows, reports the error of the THROW.
     [Fact]
     public async Task RunThenRaise_ErrorAfterTheRows_ThrowsTheError()
     {
@@ -215,5 +246,21 @@ public sealed class MethodShapeTests(SqlServerContainer sqlServer)
         thrown.Number.ShouldBe(50000);
         thrown.Message.ShouldBe("after the rows");
         (await SessionMark.ReadAsync(connection, token)).ShouldBe(4);
+    }
+
+    // The same batch under rowcount, which reads no rows either, reports the error too.
+    [Fact]
+    public async Task CountThenRaise_ErrorAfterTheRows_ThrowsTheError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(token);
+        await SessionMark.ClearAsync(connection, token);
+
+        var thrown = await Should.ThrowAsync<SqlException>(() => connection.CountThenRaise(cancellationToken: token));
+
+        thrown.Number.ShouldBe(50000);
+        thrown.Message.ShouldBe("after the rows");
+        (await SessionMark.ReadAsync(connection, token)).ShouldBe(7);
     }
 }

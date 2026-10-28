@@ -16,8 +16,9 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // returning an IAsyncEnumerable that yields a row as the reader reads it.  The method itself is not async: it checks
 // its arguments at the call, and the iterator it returns opens a closed connection on its first MoveNextAsync and
 // closes it again when the loop ends, however it ends.  The tests hold the connection's state in each of those ways,
-// that a stream can be enumerated twice, and that a break, a throw and a cancellation leave a usable connection.  Then
-// the queries of several statements, whose later statements run when the reader is disposed.
+// that a stream can be enumerated twice, that a break leaves the connection usable, and that a throw or a cancellation
+// closes again a connection that the method opened.  Then the queries of several statements, whose later statements
+// run when the reader is disposed.
 [Collection(UsesSqlServer.Name)]
 public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
 {
@@ -393,8 +394,8 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
     }
 
     // The same stream by hand, to see which calls would throw: the MoveNextAsync that ends the loop returns false, and
-    // so does the DisposeAsync after it, on an open connection that the disposal leaves usable, with the mark of the
-    // statement before the THROW set.
+    // the DisposeAsync after it returns normally, on an open connection that the disposal leaves usable, with the mark
+    // of the statement before the THROW set.
     [Fact]
     public async Task StreamThenRaise_ErrorAfterTheRows_ThrowsFromNeitherMoveNextAsyncNorDisposeAsync()
     {

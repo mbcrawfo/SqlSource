@@ -64,13 +64,13 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
     // no-array-pool, on both connections, on every one of six runs when this was set, three on SQL Server 2025 and
     // three on 2017.  (The numbers pairs were 8 while their hand-written methods took the count and not the input model
     // that the generated methods take; given the model, they fell to 0.)  It does not move with the driver's share of
-    // a call or with another thread's work.  The margin is below the 24 bytes of the smallest object of a 64-bit
-    // process, so that any object the generated method allocates for each call and the hand-written does not fails the
-    // test, and an extra object did, at 24 bytes, and an array of 64 bytes, at 88, failed both pairs of SearchAccounts.
-    // It lets the generated method's state machine hold up to two more fields of 8 bytes than the hand-written one's.
-    // The streaming StreamAccounts allocated about 5.0 KB a call on an open connection and 5.4 KB on a closed one, the
-    // same as its hand-written iterator: 0 by the commonest difference, in more than four pairs in five, on every one
-    // of four runs, three on SQL Server 2025 and one on 2017.  Never raise it to make a change pass.
+    // a call or with another thread's work.  The streaming StreamAccounts allocated about 5.0 KB a call on an open
+    // connection and 5.4 KB on a closed one, the same as its hand-written iterator: 0 by the commonest difference, in
+    // more than four pairs in five, on every one of four runs, three on SQL Server 2025 and one on 2017.  The margin is
+    // below the 24 bytes of the smallest object of a 64-bit process, so that any object the generated method allocates
+    // for each call and the hand-written does not fails the test, and an extra object did, at 24 bytes, and an array of
+    // 64 bytes, at 88, failed both pairs of SearchAccounts.  It lets the generated method's state machine hold up to
+    // two more fields of 8 bytes than the hand-written one's.  Never raise it to make a change pass.
     private const long MarginInBytesPerCall = 16;
 
     // A call allocates its command, its parameters, its reader and its rows: some kilobytes on the drivers that the

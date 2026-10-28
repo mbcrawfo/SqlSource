@@ -109,6 +109,37 @@ ORDER BY id;
 SET CONTEXT_INFO 0x04;
 THROW 50000, 'after the rows', 1;
 
+-- name: GetThenRaise -> one
+-- summary: The first account, a mark on the session, and then an error that the method does not report.
+-- ListThenRaise under one, which reads its row and then reads again to see that there is no second: its test pins that
+-- the error is lost by a method that reads one row too.
+-- output-model: CollectedAccount
+SELECT id, name
+FROM dbo.accounts
+WHERE id = 1;
+SET CONTEXT_INFO 0x05;
+THROW 50000, 'after the rows', 1;
+
+-- name: FindThenRaise -> one-optional
+-- summary: The first account, a mark on the session, and then an error that the method does not report.
+-- ListThenRaise under one-optional, which reads its row and then reads again to see that there is no second: its test
+-- pins that the error is lost by a method that reads at most one row too.
+-- output-model: CollectedAccount
+SELECT id, name
+FROM dbo.accounts
+WHERE id = 1;
+SET CONTEXT_INFO 0x06;
+THROW 50000, 'after the rows', 1;
+
+-- name: CountThenRaise -> rowcount
+-- summary: The accounts, a mark on the session, and then an error, which a method that reads no rows reports.
+-- RunThenRaise under rowcount, which reads no rows either.
+SELECT id, name
+FROM dbo.accounts
+ORDER BY id;
+SET CONTEXT_INFO 0x07;
+THROW 50000, 'after the rows', 1;
+
 -- name: MergeAccountStatuses -> rowcount
 -- summary: Sets the status of the accounts up to an id by MERGE, whose OUTPUT the count includes.
 MERGE dbo.accounts AS a

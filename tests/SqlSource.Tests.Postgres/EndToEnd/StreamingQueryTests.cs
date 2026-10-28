@@ -15,7 +15,8 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 // returning an IAsyncEnumerable that yields a row as the reader reads it.  The method itself is not async: it checks
 // its arguments at the call, and the iterator it returns opens a closed connection on its first MoveNextAsync and
 // closes it again when the loop ends, however it ends.  The tests hold the connection's state in each of those ways,
-// that a stream can be enumerated twice, and that a break, a throw and a cancellation leave a usable connection.
+// that a stream can be enumerated twice, that a break leaves the connection usable, and that a throw or a cancellation
+// closes again a connection that the method opened.
 [Collection(UsesPostgres.Name)]
 public sealed class StreamingQueryTests(PostgresContainer postgres)
 {
@@ -295,7 +296,7 @@ public sealed class StreamingQueryTests(PostgresContainer postgres)
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await using var source = EndToEndSources.App(postgres);
         await using var connection = source.CreateConnection();
-        var stream = connection.StreamNumbers(new StreamNumbersArgs(1_000_000), cancellationToken: cancellation.Token);
+        var stream = connection.StreamNumbers(new StreamNumbersArgs(ManyRows), cancellationToken: cancellation.Token);
 
         _ = await Should.ThrowAsync<OperationCanceledException>(async () =>
         {
@@ -316,7 +317,7 @@ public sealed class StreamingQueryTests(PostgresContainer postgres)
         await using var source = EndToEndSources.App(postgres);
         await using var connection = source.CreateConnection();
         var stream = connection.StreamNumbers(
-            new StreamNumbersArgs(1_000_000),
+            new StreamNumbersArgs(ManyRows),
             cancellationToken: TestContext.Current.CancellationToken
         );
 
