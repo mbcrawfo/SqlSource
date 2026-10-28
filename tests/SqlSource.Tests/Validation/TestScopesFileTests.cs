@@ -1,0 +1,83 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using Shouldly;
+using SqlSource.Testing;
+using Xunit;
+
+namespace SqlSource.Tests.Validation;
+
+// tools/test-scopes.txt itself.  pre-commit-validation.sh trusts it to decide which database tests a change can skip,
+// so a line that matches nothing, left behind by a renamed folder, would skip tests it should run.
+public sealed class TestScopesFileTests
+{
+    // Folders that hold output or tooling state and no file the scopes sort.  Git is not asked, so that no test runs
+    // it; a folder is skipped by its name, and the worktrees of an agent session by their place.
+    private static readonly string[] SkippedFolders = [".git", "bin", "obj", "TestResults", "artifacts"];
+
+    private const string AgentWorktrees = ".claude/worktrees";
+
+    [Fact]
+    public void RepositoryFile_EveryPattern_MatchesAFile()
+    {
+        var files = FilesOfTheRepository().ToList();
+
+        var dead = TestScopes
+            .Repository.Lines.Select(line => line.Pattern)
+            .Where(pattern => !files.Any(file => TestScopes.Matches(pattern, file)))
+            .ToList();
+
+        dead.ShouldBeEmpty("These patterns match no file of the repository: " + string.Join(", ", dead));
+    }
+
+    [Fact]
+    public void RepositoryFile_EveryProjectFile_Exists()
+    {
+        foreach (var projectFile in TestScopes.Repository.ProjectFiles)
+        {
+            File.Exists(Path.Combine(RepositoryRoot.Folder, projectFile)).ShouldBeTrue(projectFile);
+        }
+    }
+
+    [Fact]
+    public void RepositoryFile_Projects_AreTheFourContainerProjects() =>
+        TestScopes.Repository.Projects.Keys.ShouldBe(
+            [
+                "SqlSource.Tests.Postgres",
+                "SqlSource.Tests.Postgres.Npgsql8",
+                "SqlSource.Tests.SqlServer",
+                "SqlSource.Tests.SqlServer.SqlClient61",
+            ],
+            ignoreOrder: true
+        );
+
+    // Every file under the root, as a path from it with `/` as the separator.
+    private static IEnumerable<string> FilesOfTheRepository()
+    {
+        var root = new DirectoryInfo(RepositoryRoot.Folder);
+        var pending = new Stack<DirectoryInfo>([root]);
+        while (pending.Count > 0)
+        {
+            var folder = pending.Pop();
+            foreach (var file in folder.EnumerateFiles())
+            {
+                yield return RelativePath(root, file.FullName);
+            }
+
+            foreach (var child in folder.EnumerateDirectories())
+            {
+                if (
+                    !SkippedFolders.Contains(child.Name, StringComparer.Ordinal)
+                    && RelativePath(root, child.FullName) != AgentWorktrees
+                )
+                {
+                    pending.Push(child);
+                }
+            }
+        }
+    }
+
+    private static string RelativePath(DirectoryInfo root, string path) =>
+        Path.GetRelativePath(root.FullName, path).Replace('\\', '/');
+}

@@ -1,0 +1,35 @@
+# Which database test projects a change to a path can affect.  pre-commit-validation.sh reads this file to skip the
+# container projects that an uncommitted change cannot reach, and tests/SqlSource.Tests/Validation/ checks it.
+#
+# A line is `<scope> <pattern>`, where the scope is none (neither engine's projects), postgres, sqlserver or both, and
+# the pattern is a path from the repository root with `/` as the separator.  `*` matches any run of characters, `/`
+# included; every other character is literal, and `?` and brackets are refused.  The first line that matches a path
+# decides its scope, so an exception goes before the broad line it carves out of.  A path that no line matches is both.
+#
+# A `project <postgres|sqlserver> <path>` line names a container project and the engine that runs it.
+
+project postgres tests/SqlSource.Tests.Postgres/SqlSource.Tests.Postgres.csproj
+project postgres tests/SqlSource.Tests.Postgres.Npgsql8/SqlSource.Tests.Postgres.Npgsql8.csproj
+project sqlserver tests/SqlSource.Tests.SqlServer/SqlSource.Tests.SqlServer.csproj
+project sqlserver tests/SqlSource.Tests.SqlServer.SqlClient61/SqlSource.Tests.SqlServer.SqlClient61.csproj
+
+postgres src/SqlSource.Tool/Describing/Postgres/*
+postgres tests/SqlSource.Tests.Postgres/*
+postgres tests/SqlSource.Tests.Postgres.Npgsql8/*
+postgres tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/*
+postgres tests/SqlSource.Tool.Tests/Fixtures/Projects/Single/*
+
+sqlserver src/SqlSource.Tool/Describing/SqlServer/*
+sqlserver tests/SqlSource.Tests.SqlServer/*
+sqlserver tests/SqlSource.Tests.SqlServer.SqlClient61/*
+sqlserver tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql/*
+sqlserver tests/SqlSource.Tool.Tests/Fixtures/Projects/SqlServer/*
+
+none docs/*
+none examples/*
+none tools/*
+none .github/*
+none tests/SqlSource.Tests/*
+none tests/SqlSource.Tests.RoslynFloor/*
+none tests/SqlSource.Tool.Tests/*
+none *.md
