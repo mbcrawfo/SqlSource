@@ -6,7 +6,7 @@ Corrected on 2026-10-27 from the end-to-end tests: what a query of several state
 
 Corrected on 2026-10-28 from the end-to-end tests: what leaving the loop early does when a row still to come fails, in "Behaviour the user sees".
 
-Corrected on 2026-10-28 from a branch review's reproduction and the end-to-end tests: on SQL Server under `SET XACT_ABORT ON`, an error that is not reported rolls back the caller's transaction with nothing thrown, in "Behaviour the user sees".  Corrected again the same day from a second review's probes: whether such an error rolls back the transaction depends on the error as well as on `XACT_ABORT`, since with it off a conversion of text that is not a valid value of its type rolls the transaction back too, and an overflow does not.
+Corrected on 2026-10-28 from a branch review's reproduction and the end-to-end tests: on SQL Server under `SET XACT_ABORT ON`, an error that is not reported rolls back the caller's transaction with nothing thrown, in "Behaviour the user sees".  Corrected again the same day from a second review's probes: whether such an error rolls back the transaction depends on the error as well as on `XACT_ABORT`, since with it off some errors, such as `CAST('x' AS int)`, roll the transaction back too, and others, such as an overflow, do not.
 
 A feature outside the [query generation epic](2026-10-07-query-generation-epic-design.md), which listed `IAsyncEnumerable<T>` as out of its scope.  It lets the generated method of a `many` query hand its rows to the caller one at a time, as an `IAsyncEnumerable<T>`, instead of reading them all into a collection first.
 

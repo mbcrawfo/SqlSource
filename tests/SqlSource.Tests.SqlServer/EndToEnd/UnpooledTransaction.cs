@@ -9,9 +9,9 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 
 // A transaction of a session with XACT_ABORT on or off, for the tests of an error that SqlClient does not report and
 // that may roll the transaction back with nothing thrown: under XACT_ABORT ON nearly any error does, and with it off
-// an error that SQL Server makes abort the batch, such as a conversion of text that is not a number, while an overflow
-// leaves it open.  The session's setting is checked before the transaction begins, since a failed conversion rolls
-// back under either setting and could not show which one the test ran under.  The connection is not pooled, so the
+// some errors do, such as CAST('x' AS int), and others, such as an overflow, do not.  The session's setting is checked
+// before the transaction begins, since CAST('x' AS int) rolls back under either setting and could not show which one
+// the test ran under.  The connection is not pooled, so the
 // setting ends with its session when the test disposes it.  The temporary table #outside is made before the
 // transaction, so it outlives a rollback and holds what was committed: 7 is written in the transaction before the
 // method is called, and 8 with the transaction after it.

@@ -20,7 +20,7 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // closes again a connection that the method opened.  Then a query whose rows fail past the row where a loop stops,
 // whose error the disposal does not report, and the queries of several statements, whose later statements run when
 // the reader is disposed; under SET XACT_ABORT ON either error rolls back the caller's transaction, still unreported,
-// and with it off a failed conversion after the rows does too, where an overflow leaves it to commit.
+// and with it off CAST('x' AS int) after the rows does too, where an overflow leaves it to commit.
 [Collection(UsesSqlServer.Name)]
 public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
 {
