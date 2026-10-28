@@ -23,8 +23,7 @@ public sealed class RowBufferTests
 
     // The hand-written copy of the buffer that the allocation tests of both end-to-end projects read their rows into,
     // and its declaration, in place of the generated one's.
-    private static readonly string HandWrittenCopy = Path.Combine(
-        RepositoryRoot.Folder,
+    private static readonly string HandWrittenCopy = RepositoryRoot.Path(
         "tests",
         "SqlSource.Testing",
         "EndToEnd",

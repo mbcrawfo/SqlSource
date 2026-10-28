@@ -15,10 +15,7 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class FixtureCasesTests(PostgresContainer postgres)
 {
-    private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.Of(
-        SidecarValues.Engine.Postgres,
-        RepositoryPaths.DescriberFixtures
-    );
+    private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.InFolder(RepositoryPaths.DescriberFixtures);
 
     public static TheoryData<string> Cases => [with(Found.Select(static found => found.Name))];
 
