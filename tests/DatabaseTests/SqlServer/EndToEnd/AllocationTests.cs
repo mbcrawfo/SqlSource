@@ -22,24 +22,24 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // an array behind it, which it can only build by copying what it read the rows into, since the count of the rows is not
 // known until they are read.  It reads them into what the generated method does, so there are two pairs:
 // SearchAccounts, which reads its rows into the pooled buffer, against a hand-written method that reads them into
-// RowBufferByHand of tests/SqlSource.Testing, the same buffer by hand; and SearchAccountsUnpooled, a copy of the query
-// under no-array-pool, which reads them into a List, against a hand-written method that does the same.  The copy is a
-// query of its own because SearchAccounts' own list of generator parameters, sort-input, replaces the list of any
-// claim's attribute, and UnpooledCopyTests holds its SQL to SearchAccounts'.  The numbers queries of RowBufferQueries
-// have a pair of each kind for the List, IList, ICollection and ImmutableArray, at 3 rows: the pooled method against
-// rows read into RowBufferByHand and copied by ToList or ToImmutableArray, and its twin under no-array-pool against a
-// List that is returned as it is or an ImmutableArray builder that is drained, since those are what the generated
-// method returns.  Three more tests hold the pooled NumbersAsArray, NumbersAsList and NumbersAsImmutableArray, at 300
-// rows, to allocating less than a List copied to an array, a List grown by doubling and an ImmutableArray builder that
-// is drained, each by at least a given number of bytes, since a pooled buffer exists to save a list's growth arrays and
-// the pairs above, against RowBufferByHand, cannot see what the buffer itself costs.  The streaming StreamAccounts of
-// StreamingQueries has a pair of its own, against a hand-written static local async iterator that makes the same calls
-// and yields each row, for the whole of a call, from the first MoveNextAsync to the disposal.  In each pair the two
-// make the same calls, so any object that the generated method allocates on each call and the hand-written one does
-// not fails the test.  The two are compared by the commonest difference of pairs of calls, one of each method, which
-// CallAllocations explains.  GC.GetTotalAllocatedBytes(true) counts every thread, where the driver completes the
-// continuations of an asynchronous call, so the test runs in MeasuresAllocations, alone and on a server of its own, and
-// skips under coverage, whose collector allocates in the process too.
+// RowBufferByHand of tests/DatabaseTests/TestHarness, the same buffer by hand; and SearchAccountsUnpooled, a copy of
+// the query under no-array-pool, which reads them into a List, against a hand-written method that does the same.  The
+// copy is a query of its own because SearchAccounts' own list of generator parameters, sort-input, replaces the list of
+// any claim's attribute, and UnpooledCopyTests holds its SQL to SearchAccounts'.  The numbers queries of
+// RowBufferQueries have a pair of each kind for the List, IList, ICollection and ImmutableArray, at 3 rows: the pooled
+// method against rows read into RowBufferByHand and copied by ToList or ToImmutableArray, and its twin under
+// no-array-pool against a List that is returned as it is or an ImmutableArray builder that is drained, since those are
+// what the generated method returns.  Three more tests hold the pooled NumbersAsArray, NumbersAsList and
+// NumbersAsImmutableArray, at 300 rows, to allocating less than a List copied to an array, a List grown by doubling and
+// an ImmutableArray builder that is drained, each by at least a given number of bytes, since a pooled buffer exists to
+// save a list's growth arrays and the pairs above, against RowBufferByHand, cannot see what the buffer itself costs.
+// The streaming StreamAccounts of StreamingQueries has a pair of its own, against a hand-written static local async
+// iterator that makes the same calls and yields each row, for the whole of a call, from the first MoveNextAsync to the
+// disposal.  In each pair the two make the same calls, so any object that the generated method allocates on each call
+// and the hand-written one does not fails the test.  The two are compared by the commonest difference of pairs of
+// calls, one of each method, which CallAllocations explains.  GC.GetTotalAllocatedBytes(true) counts every thread,
+// where the driver completes the continuations of an asynchronous call, so the test runs in MeasuresAllocations, alone
+// and on a server of its own, and skips under coverage, whose collector allocates in the process too.
 [Collection(MeasuresAllocations.Name)]
 public sealed class AllocationTests(SqlServerDatabases sqlServer)
 {

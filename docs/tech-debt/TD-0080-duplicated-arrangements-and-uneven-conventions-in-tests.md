@@ -18,7 +18,7 @@ The maintainability review of 2026-10-27 found these in `tests/`.  The tests tha
 12. **Theories whose row changes the arrangement and the assertions**: `Generation/Emitting/TypeEmitterTests.cs` picks between two sets of assertions with an `if`; `Generator/GeneratorParameterLevelTests.cs`, `Generator/CachingModelTests.cs` (two) and `SqlSource.Tool.Tests/Describing/Postgres/PostgresSessionParameterTests.cs` pick between arrangements.
 13. **Test names are uneven**: a diagnostic id is `IsSQLSRC111` in about 30 names, mostly `Generation/Methods/ConversionPlannerTests.cs` and `Parsing/SqlFileParserMarkerTests.cs`, against `IsSqlsrc250` in about 370; and about 50 names do not have the three parts of `Method_Scenario_Outcome`, such as most of `Generator/ShortNameTests.cs`.
 14. **A log event's name is read by hand**: `GetProperty("event").GetString()` about 27 times across the tool's tests, 15 of them in `Logging/RunLogRedactionTests.cs`, and a local `NameOf` in `DatabaseTests/Postgres/Describer/DescribeCommandTests.cs`, where `LogReader` has only `Names(path)`.
-15. **Literals that one place should hold**: the default image tags are written again in `SqlSource.Tests/EngineImageTests.cs` and `DatabaseTests/SqlServer/SqlServerStartTests.cs`, though `tests/DatabaseTests/Postgres/AGENTS.md` and `tests/DatabaseTests/SqlServer/AGENTS.md` make `DefaultImages` the one place that names them, and they go stale when an image moves; `RepositoryPaths.DescriberFixtures` is the same path in both container projects.
+15. **Literals that one place should hold**: the default image tags are written again in `SqlSource.Tests/TestHarness/EngineImageTests.cs` and `SqlSource.Tests/TestHarness/SqlServerStartTests.cs`, though `tests/DatabaseTests/Postgres/AGENTS.md` and `tests/DatabaseTests/SqlServer/AGENTS.md` make `DefaultImages` the one place that names them, and they go stale when an image moves; `RepositoryPaths.DescriberFixtures` is the same path in both container projects.
 16. **Shared SQL texts are written out**: `"-- name: ListInvoices\n-- database: billing\nSELECT 3;\n"` four times and `"-- name: Plain\n-- output: sql\nSELECT 4;\n"` six times in the tool's `Commands/` and `Logging/` tests, and `Generator/TypeOverrideLevelTests.cs` writes `GeneratorHarness.UsersFile` out three times.
 17. **The list of describer fixture cases is checked as a subset**: `Cases_OfPostgres_HoldEveryCase` and `Cases_OfSqlServer_HoldEveryCase` of `SqlSource.Tool.Tests/Fixtures/DescriberFixtureTests.cs` check that the listed cases exist, not that no other does, so a case recorded later is left out of the list without a failure (four were, until this review).
 18. **The fixture build files are linked by the same block in three projects**: `SqlSource.Tool.Tests`, `DatabaseTests/Postgres` and `DatabaseTests/SqlServer` each copy the `Fixtures/build/` and `Fixtures/global.json` items word for word.
@@ -38,7 +38,7 @@ Low each, Medium together: a fix to one copy leaves the other wrong, as the comp
 
 One item at a time, each in its own pull request:
 
-1. and 2. Move each body into `SqlSource.Tool.Testing/Realistic/` or `SqlSource.Testing/EndToEnd/` behind an engine binding, as `ErrorPaths` and `ToolProcess` are, and leave one-line facts in each engine.
+1. and 2. Move each body into `SqlSource.Tool.Testing/Realistic/` or `DatabaseTests/TestHarness/EndToEnd/` behind an engine binding, as `ErrorPaths` and `ToolProcess` are, and leave one-line facts in each engine.
 3. One `ShouldAllocateNoMoreThanByHandAsync(generated, byHand, expected)` and one scheme of names for both engines.
 4. and 8. Move the helpers into `SqlSource.Testing/Generator/` (`StepReasons`, `CachingScene`, `GeneratorRun`, `StepOutputs`, a widened `ModelRuns.Catalog`).
 5. `GeneratorHarness.SampleFile` and `ModelRuns.GetUserDtoFile`.
@@ -50,7 +50,7 @@ One item at a time, each in its own pull request:
 12. Split each theory into facts.
 13. Rename to `Sqlsrc` and to three parts.
 14. `LogReader.EventOf(JsonElement)` and `LogReader.Events(path, name)`.
-15. Use `DefaultImages`, or a tag that is plainly fake, and one `RepositoryPaths.DescriberFixtures` in `SqlSource.Testing`.
+15. Use `DefaultImages`, or a tag that is plainly fake, and one `RepositoryPaths.DescriberFixtures` in `DatabaseTests/TestHarness`.
 16. Add the two texts to `SqlTexts`, and use `GeneratorHarness.UsersFile`.
 17. Compare the list with the case folders whole.
 18. A `tests/Fixtures.props` that the three projects import.

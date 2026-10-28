@@ -30,9 +30,9 @@ public sealed class TestLayoutTests
             .Where(name => !name!.EndsWith("Tests.cs", StringComparison.Ordinal))
             .ShouldBeEmpty();
 
-    // A test project shares code through SqlSource.Testing or SqlSource.Tool.Testing, never by compiling another
-    // project's file.  RoslynFloor's compile of the generator's tests is the one exception.  The database projects
-    // sit one level down, in tests/DatabaseTests/.
+    // A test project shares code through a library, SqlSource.Testing, tests/DatabaseTests/TestHarness or
+    // SqlSource.Tool.Testing, never by compiling another project's file.  RoslynFloor's compile of the generator's
+    // tests is the one exception.  The database projects sit one level down, in tests/DatabaseTests/.
     [Fact]
     public void TestProjects_CompileIncludes_ReachNoFileOfAnotherProject() =>
         Directory
