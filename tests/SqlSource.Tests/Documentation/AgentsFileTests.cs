@@ -56,7 +56,7 @@ public sealed partial class AgentsFileTests
             .SelectMany(file =>
                 Rules(File.ReadAllText(Path.Combine(RepositoryRoot.Folder, file))).Select(rule => (file, rule))
             )
-            .Where(found => found.rule.Words > MaxWords)
+            .Where(found => IsTooLong(found.rule))
             .Select(found => $"{found.file}:{found.rule.Line}: {found.rule.Words} words: {found.rule.Start}")
             .ShouldBeEmpty();
 
@@ -64,7 +64,7 @@ public sealed partial class AgentsFileTests
     public void Size_OfEveryAgentsFile_IsWithinItsLimit() =>
         Files
             .Select(file => (file, bytes: new FileInfo(Path.Combine(RepositoryRoot.Folder, file)).Length))
-            .Where(found => found.bytes > (found.file == "AGENTS.md" ? MaxRootBytes : MaxBytes))
+            .Where(found => IsTooLarge(found.file, found.bytes))
             .Select(found => $"{found.file}: {found.bytes} bytes")
             .ShouldBeEmpty();
 
@@ -84,12 +84,36 @@ public sealed partial class AgentsFileTests
                 var ignored = "a fenced block counts no words";
                 ```
             1. Three rule.
+            | a | table | row of words |
+            ~~~
+            words in a tilde fence
+            ~~~
+            Four rule.
 
             > Maintenance: a footer.
             """;
 
-        Rules(Text).Select(rule => (rule.Line, rule.Words)).ShouldBe([(3, 7), (6, 7), (8, 2), (12, 2)]);
+        Rules(Text).Select(rule => (rule.Line, rule.Words)).ShouldBe([(3, 7), (6, 7), (8, 2), (12, 2), (17, 2)]);
     }
+
+    // The checks above run over the real files, none of which is at a limit, so the limits are pinned here.
+    [Theory]
+    [InlineData(80, false)]
+    [InlineData(81, true)]
+    public void IsTooLong_RuleOfWords_IsTrueOnlyOver80(int words, bool expected) =>
+        IsTooLong(Rules("- " + string.Join(' ', Enumerable.Repeat("word", words))).Single()).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("src/SqlSource/AGENTS.md", 8192, false)]
+    [InlineData("src/SqlSource/AGENTS.md", 8193, true)]
+    [InlineData("AGENTS.md", 16384, false)]
+    [InlineData("AGENTS.md", 16385, true)]
+    public void IsTooLarge_FileOfBytes_IsTrueOnlyOverItsLimit(string file, long bytes, bool expected) =>
+        IsTooLarge(file, bytes).ShouldBe(expected);
+
+    private static bool IsTooLong(Rule rule) => rule.Words > MaxWords;
+
+    private static bool IsTooLarge(string file, long bytes) => bytes > (file == "AGENTS.md" ? MaxRootBytes : MaxBytes);
 
     private static IEnumerable<string> Find(string folder, string relative)
     {
