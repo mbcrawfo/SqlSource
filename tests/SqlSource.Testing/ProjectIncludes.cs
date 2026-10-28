@@ -62,8 +62,8 @@ internal static class ProjectIncludes
     // One line for each file that a container project includes or imports from outside its folder and that the scopes
     // let it skip, as "<project>: <path> is <scope>", and one for each path it cannot resolve.  A ProjectReference
     // counts as the .csproj it names.  The files read are those whose items reach the project: its .csproj, each
-    // Directory.Build.props and .targets from its folder up to the root, and the projects under tests/ that it
-    // references, directly or not, each of which is judged from its own folder.
+    // Directory.Build.props and .targets from its folder up to the root, and the same of each project under tests/
+    // that it references, directly or not, each of which is judged from its own folder.
     public static IReadOnlyList<string> Refused(TestScopes scopes, string repositoryRoot)
     {
         var refused = new List<string>();
@@ -97,41 +97,52 @@ internal static class ProjectIncludes
         return refused;
     }
 
-    // Each file read for the project, with the folder of the project that it is read for.  MSBuild imports only the
-    // nearest Directory.Build.props, but one may import the next, so every one up to the root is read.
+    // Each file read for the project, with the folder of the project that it is read for: the .csproj and the
+    // Directory.Build files above it, of the project and of each library under tests/ that it references.  A project
+    // outside tests/ is code under test, which reaches the project through its scope.  MSBuild imports only the nearest
+    // Directory.Build.props, but one may import the next, so every one up to the root is read.  A file above two
+    // projects is read for each, since its items resolve from the project's folder.
     private static IEnumerable<(string File, string ProjectFolder)> Inputs(string repositoryRoot, string projectFile)
     {
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(repositoryRoot));
-        var folder = Path.GetDirectoryName(projectFile)!;
-        yield return (projectFile, folder);
-        for (var up = new DirectoryInfo(folder); up is not null; up = up.Parent)
-        {
-            foreach (var file in DirectoryBuildFiles.Select(name => Path.Combine(up.FullName, name)).Where(File.Exists))
-            {
-                yield return (file, folder);
-            }
-
-            if (up.FullName == root)
-            {
-                break;
-            }
-        }
-
-        // Only a library of the tests is read: a project outside tests/ is code under test, which reaches the project
-        // through its scope.
         var tests = Path.Combine(root, "tests") + Path.DirectorySeparatorChar;
+        var read = new HashSet<(string, string)>();
         var seen = new HashSet<string>(StringComparer.Ordinal) { projectFile };
         var pending = new Queue<string>([projectFile]);
         while (pending.TryDequeue(out var current))
         {
-            var currentFolder = Path.GetDirectoryName(current)!;
-            foreach (var (_, reference) in Outside(currentFolder, currentFolder, XDocument.Load(current), IsReference))
+            var folder = Path.GetDirectoryName(current)!;
+            foreach (var file in DirectoryBuildChain(root, folder).Prepend(current))
+            {
+                if (read.Add((file, folder)))
+                {
+                    yield return (file, folder);
+                }
+            }
+
+            foreach (var (_, reference) in Outside(folder, folder, XDocument.Load(current), IsReference))
             {
                 if (reference?.StartsWith(tests, StringComparison.Ordinal) == true && seen.Add(reference))
                 {
                     pending.Enqueue(reference);
-                    yield return (reference, Path.GetDirectoryName(reference)!);
                 }
+            }
+        }
+    }
+
+    // Every Directory.Build.props and .targets from the folder up to the root.
+    private static IEnumerable<string> DirectoryBuildChain(string root, string folder)
+    {
+        for (var up = new DirectoryInfo(folder); up is not null; up = up.Parent)
+        {
+            foreach (var file in DirectoryBuildFiles.Select(name => Path.Combine(up.FullName, name)).Where(File.Exists))
+            {
+                yield return file;
+            }
+
+            if (up.FullName == root)
+            {
+                yield break;
             }
         }
     }

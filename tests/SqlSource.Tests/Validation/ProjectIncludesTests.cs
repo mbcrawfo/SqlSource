@@ -127,11 +127,39 @@ public sealed class ProjectIncludesTests : IDisposable
         ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/Shared.targets is None"]);
     }
 
+    // The library is a level deeper than the project, so only resolving from the library's folder finds the file.
     [Fact]
-    public void Refused_ItemOfAReferencedLibrary_NamesIt()
+    public void Refused_ItemOfAReferencedLibrary_IsJudgedFromTheLibrary()
     {
         var scopes = Scopes("none tests/Other/*");
-        WriteProject("tests/Library/Library.csproj", Item("None", "../Other/File.cs"));
+        WriteProject("tests/Libs/Library/Library.csproj", Item("None", "../../Other/File.cs"));
+        WriteProject(Item("ProjectReference", "../Libs/Library/Library.csproj"));
+
+        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/File.cs is None"]);
+    }
+
+    // The props is above the library and not above the project, and its item resolves from the library's folder.
+    [Fact]
+    public void Refused_ItemOfADirectoryBuildPropsAboveALibrary_IsJudgedFromTheLibrary()
+    {
+        var scopes = Scopes("none tests/Other/*");
+        WriteProject("tests/Libs/Directory.Build.props", Item("None", "../../Other/File.cs"));
+        WriteProject("tests/Libs/Library/Library.csproj");
+        WriteProject(Item("ProjectReference", "../Libs/Library/Library.csproj"));
+
+        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/File.cs is None"]);
+    }
+
+    [Fact]
+    public void Refused_ReferenceCycle_Terminates()
+    {
+        var scopes = Scopes("none tests/Other/*");
+        WriteProject("tests/Library/Library.csproj", Item("ProjectReference", "../Second/Second.csproj"));
+        WriteProject(
+            "tests/Second/Second.csproj",
+            Item("ProjectReference", "../Library/Library.csproj"),
+            Item("None", "../Other/File.cs")
+        );
         WriteProject(Item("ProjectReference", "../Library/Library.csproj"));
 
         ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/File.cs is None"]);
