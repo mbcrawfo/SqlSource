@@ -9,6 +9,6 @@ See [snapshot](../../../docs/architecture/generator.md#snapshot).
 - **Every name of a key is in `SidecarKeys`, and every value the tool writes in `SidecarValues`.**  A test compares each list of `SidecarValues` with the schema's.
 - **The writer goes by the condition, not by the value**, as the remarks of `SidecarWriter` say.  It checks nothing and never throws.
 - **`Snapshot/` uses `EquatableArray<T>` and `TextSpan` and nothing of `Parsing/`, `Generation/`, `Settings/` or `Diagnostics/`.**  A test holds `SidecarValues.Engine` and `Parsing/SqlDialectName.cs` together.
-- **`SidecarComparer` compares what `describe --check` compares, and no more**, as section 3 of the format design lists.  A new key is not compared, unless it is a key of a type object.
+- **`SidecarComparer` compares what `describe --check` compares, and no more**: the keys its summary lists.  A new key is not compared, unless it is a key of a type object.
 
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.

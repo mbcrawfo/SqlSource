@@ -1,9 +1,9 @@
 namespace SqlSource.Snapshot;
 
 /// <summary>
-/// Writes a sidecar as the text of its file, in the layout and the key order of the sidecar format design.  What it
-/// gives is a contract with every committed file: a change here is a change to the format design, to the schema and
-/// to the examples.
+/// Writes a sidecar as the text of its file, in the layout and the key order that the examples of
+/// tests/SqlSource.Tests/Snapshot/Examples/ show.  What it gives is a contract with every committed file: a change
+/// here is a change to the schema, schemas/sidecar-v1.schema.json, and to the examples.
 /// </summary>
 /// <remarks>
 /// A key the format marks "always" is written with <c>null</c> when it has no value.  A key with a condition is

@@ -19,7 +19,7 @@
         <PackageReference Include="xunit.v3" />
     </ItemGroup>
     <ItemGroup>
-        <!-- Snapshot/SidecarExamples.cs reads the examples of the sidecar format design from the output folder. -->
+        <!-- Snapshot/SidecarExamples.cs reads the sample sidecars from the output folder. -->
         <None Update="Snapshot/Examples/*.json" CopyToOutputDirectory="PreserveNewest" />
         <!-- Snapshot/SidecarSchemaTests.cs reads the schema from the output folder. -->
         <None
