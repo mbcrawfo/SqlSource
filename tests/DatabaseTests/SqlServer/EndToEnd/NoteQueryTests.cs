@@ -15,7 +15,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // the reads give the method an open connection and half a closed one, which the method opens.  A write runs in a
 // transaction that is rolled back.
 [Collection(UsesSqlServer.Name)]
-public sealed class NoteQueryTests(SqlServerContainer sqlServer)
+public sealed class NoteQueryTests(SqlServerDatabases sqlServer)
 {
     // The length of dbo.Email, nvarchar(320), in characters.
     private const int EmailLength = 320;

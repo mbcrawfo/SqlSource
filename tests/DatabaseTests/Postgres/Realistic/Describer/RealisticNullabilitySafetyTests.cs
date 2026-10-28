@@ -11,7 +11,7 @@ namespace SqlSource.DatabaseTests.Postgres.Realistic.Describer;
 // committed sidecar holds of the case, so a committed wrong not null still fails here.  A case is described once in
 // a run, and each theory reads the one description.
 [Collection(UsesPostgres.Name)]
-public sealed class RealisticNullabilitySafetyTests(PostgresContainer postgres)
+public sealed class RealisticNullabilitySafetyTests(PostgresDatabases postgres)
 {
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]

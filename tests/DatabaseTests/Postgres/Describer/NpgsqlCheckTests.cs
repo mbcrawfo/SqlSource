@@ -11,7 +11,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // The check of the tool's lexer against Npgsql, with a real driver and a real server.  Every describe of
 // ParameterTests and of ColumnTests runs the check too, so each of their cases is one that passes it.
 [Collection(UsesPostgres.Name)]
-public sealed class NpgsqlCheckTests(PostgresContainer postgres)
+public sealed class NpgsqlCheckTests(PostgresDatabases postgres)
 {
     // The name the server gives the array of ScratchSchema.LongTypeName: "_" and its name, cut to 63 bytes.
     private const string LongArrayName = "_check_enum_with_a_name_of_exactly_sixty_three_characters_long0";

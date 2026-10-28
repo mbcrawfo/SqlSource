@@ -18,7 +18,7 @@ namespace SqlSource.DatabaseTests.Postgres.Realistic.Generation;
 // attribute's Models, gives exactly one error, of the id its models names.  So a case the generator comes to accept,
 // or to refuse otherwise, fails naming itself, and its models member cannot go stale.
 [Collection(UsesPostgres.Name)]
-public sealed class RealisticModelRefusalTests(PostgresContainer postgres)
+public sealed class RealisticModelRefusalTests(PostgresDatabases postgres)
 {
     // Where the generator sees the corpus's settings file and the case's query, in a folder of its own below it, as
     // Realistic/Cases/<case>/query.sql is below Realistic/Cases/sqlsource.json.
@@ -91,7 +91,7 @@ public sealed class RealisticModelRefusalTests(PostgresContainer postgres)
     {
         var opened = await Sessions.OpenAsync(
             postgres.RealisticConnectionString,
-            database: PostgresContainer.RealisticDatabase
+            database: PostgresDatabases.RealisticDatabase
         );
         if (!opened.Succeeded)
         {

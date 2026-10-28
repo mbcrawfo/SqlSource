@@ -11,7 +11,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // which runs the SQL of NewTypesDapperQueries, the claim of Queries/NewTypes.sql at the output models.  The table is
 // made on a server of major 17 or later alone, so the test skips below it.
 [Collection(UsesSqlServer.Name)]
-public sealed class NewTypesQueryTests(SqlServerContainer sqlServer)
+public sealed class NewTypesQueryTests(SqlServerDatabases sqlServer)
 {
     [Fact]
     public async Task QueryAsync_ListNewTypes_ReadsBothRows()

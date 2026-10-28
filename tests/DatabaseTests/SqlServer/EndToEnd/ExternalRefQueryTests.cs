@@ -10,7 +10,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // a column, nullable or not, and as a parameter.  Two queries read every column of external_refs, into its table
 // model.  Each id is beyond the range of an int, so a value cut to one would not match.  A write is rolled back.
 [Collection(UsesSqlServer.Name)]
-public sealed class ExternalRefQueryTests(SqlServerContainer sqlServer)
+public sealed class ExternalRefQueryTests(SqlServerDatabases sqlServer)
 {
     // The parameter is sent as the long that ToDatabase returns, and the column read from the long that SqlClient
     // gives, through FromDatabase.

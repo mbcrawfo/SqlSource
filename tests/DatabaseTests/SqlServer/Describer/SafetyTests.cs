@@ -13,7 +13,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 // answer.  "operands", whose text is the query's own tokens rearranged, is sent the same way, and runs none of it
 // either.
 [Collection(UsesSqlServer.Name)]
-public sealed class SafetyTests(SqlServerContainer sqlServer)
+public sealed class SafetyTests(SqlServerDatabases sqlServer)
 {
     [Theory]
     [InlineData("SELECT 1 AS a; DROP TABLE dbo.victim")]

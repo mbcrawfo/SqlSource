@@ -10,7 +10,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Realistic.Describer;
 // checked against the case's truth and against the seed by RealisticNullabilityOracle.  A case is described once in a
 // run, and each theory reads the one description.
 [Collection(UsesSqlServer.Name)]
-public sealed class RealisticNullabilitySafetyTests(SqlServerContainer sqlServer)
+public sealed class RealisticNullabilitySafetyTests(SqlServerDatabases sqlServer)
 {
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]

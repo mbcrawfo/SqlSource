@@ -20,7 +20,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // caller's alone: its capacity is the count, and clearing it changes no later call.  An even count runs on an open
 // connection and an odd one on a closed one, which the methods open.
 [Collection(UsesSqlServer.Name)]
-public sealed class RowBufferQueryTests(SqlServerContainer sqlServer)
+public sealed class RowBufferQueryTests(SqlServerDatabases sqlServer)
 {
     public static TheoryData<int> Counts => [0, 1, 16, 17, 1024, 1025, 3000];
 

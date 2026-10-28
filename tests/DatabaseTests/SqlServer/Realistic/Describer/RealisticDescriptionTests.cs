@@ -11,7 +11,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Realistic.Describer;
 // and for a case with models the entry its committed sidecar holds, every field of it.  Whether its nullability is
 // safe is RealisticNullabilitySafetyTests'.
 [Collection(UsesSqlServer.Name)]
-public sealed class RealisticDescriptionTests(SqlServerContainer sqlServer)
+public sealed class RealisticDescriptionTests(SqlServerDatabases sqlServer)
 {
     // The script that writes the sidecars of the realistic cases.
     private const string SidecarScript = "tools/describe-end-to-end.sh";

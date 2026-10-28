@@ -20,7 +20,7 @@ internal static class Sessions
         string connection,
         IDescribeExchange? exchange = null,
         IRunLog? log = null,
-        string database = SqlServerContainer.Database,
+        string database = SqlServerDatabases.Database,
         CancellationToken? cancellationToken = null
     ) => new SqlServerDescriber().OpenAsync(database, connection, exchange, log, cancellationToken: cancellationToken);
 

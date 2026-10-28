@@ -14,7 +14,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 // released tool, against the container: a copy of the fixture project SqlServer, whose sqlsource.json gives its one
 // file the dialect mssql and the database "fixtures", and a connection for it on the command line.
 [Collection(UsesSqlServer.Name)]
-public sealed class DescribeCommandTests(SqlServerContainer sqlServer) : IDisposable
+public sealed class DescribeCommandTests(SqlServerDatabases sqlServer) : IDisposable
 {
     private readonly FixtureProjects _fixtures = new();
 
@@ -29,7 +29,7 @@ public sealed class DescribeCommandTests(SqlServerContainer sqlServer) : IDispos
             "describe",
             project,
             "--connection",
-            SqlServerContainer.Database + "=" + sqlServer.ConnectionString,
+            SqlServerDatabases.Database + "=" + sqlServer.ConnectionString,
             .. args,
         ]);
     }

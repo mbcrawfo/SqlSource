@@ -17,7 +17,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // "describe --check" on the project, with the real MSBuild and a connection to each database, finds every entry the
 // same as its sidecar's.  The counts it prints are those of the entries the committed sidecars hold for each database.
 [Collection(UsesPostgres.Name)]
-public sealed class CheckTests(PostgresContainer postgres)
+public sealed class CheckTests(PostgresDatabases postgres)
 {
     // The number of entries of the sidecars under EndToEnd/ and Realistic/Cases/, by the database each was described
     // against.
@@ -32,9 +32,9 @@ public sealed class CheckTests(PostgresContainer postgres)
     [Fact]
     public async Task Check_Project_EveryEntryIsTheSame()
     {
-        var app = ProjectEntries(PostgresContainer.AppDatabase);
-        var billing = ProjectEntries(PostgresContainer.BillingDatabase);
-        var realistic = ProjectEntries(PostgresContainer.RealisticDatabase);
+        var app = ProjectEntries(PostgresDatabases.AppDatabase);
+        var billing = ProjectEntries(PostgresDatabases.BillingDatabase);
+        var realistic = ProjectEntries(PostgresDatabases.RealisticDatabase);
         app.ShouldBeGreaterThan(0);
         billing.ShouldBeGreaterThan(0);
         realistic.ShouldBeGreaterThan(0);
@@ -47,9 +47,9 @@ public sealed class CheckTests(PostgresContainer postgres)
         if (checkedHere.Count == withModels.Count)
         {
             var result = await CheckAsync([
-                .. Connection(PostgresContainer.AppDatabase),
-                .. Connection(PostgresContainer.BillingDatabase),
-                .. Connection(PostgresContainer.RealisticDatabase),
+                .. Connection(PostgresDatabases.AppDatabase),
+                .. Connection(PostgresDatabases.BillingDatabase),
+                .. Connection(PostgresDatabases.RealisticDatabase),
             ]);
 
             result.ExitCode.ShouldBe(0, result.Error);
@@ -65,22 +65,22 @@ public sealed class CheckTests(PostgresContainer postgres)
         checkedHere.ShouldNotBeEmpty();
         var checkedEntries = CommittedEntries.Count(
             checkedHere.Select(static found => found.SidecarPath),
-            PostgresContainer.RealisticDatabase
+            PostgresDatabases.RealisticDatabase
         );
         checkedEntries.ShouldBeLessThan(realistic);
         var realisticResult = await CheckAsync([
             "--database",
-            PostgresContainer.RealisticDatabase,
-            .. Connection(PostgresContainer.RealisticDatabase),
+            PostgresDatabases.RealisticDatabase,
+            .. Connection(PostgresDatabases.RealisticDatabase),
             .. checkedHere.Select(static found => Path.Combine(found.Folder, RealisticCase.QueryFile)),
         ]);
         var othersResult = await CheckAsync([
             "--database",
-            PostgresContainer.AppDatabase,
+            PostgresDatabases.AppDatabase,
             "--database",
-            PostgresContainer.BillingDatabase,
-            .. Connection(PostgresContainer.AppDatabase),
-            .. Connection(PostgresContainer.BillingDatabase),
+            PostgresDatabases.BillingDatabase,
+            .. Connection(PostgresDatabases.AppDatabase),
+            .. Connection(PostgresDatabases.BillingDatabase),
         ]);
 
         realisticResult.ExitCode.ShouldBe(0, realisticResult.Error);

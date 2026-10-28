@@ -11,7 +11,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // table, a foreign table and a root that is not the scan, and an expression the walk follows to the node that computes
 // it; and the shapes near them that keep what they had.
 [Collection(UsesPostgres.Name)]
-public sealed class ScanTests(PostgresContainer postgres)
+public sealed class ScanTests(PostgresDatabases postgres)
 {
     private async Task<(bool? Nullable, string? Source)[]> WalkedAsync(string sql)
     {

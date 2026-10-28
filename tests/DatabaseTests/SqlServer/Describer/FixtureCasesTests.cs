@@ -13,7 +13,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 // expected.json and compares nothing: tools/record-fixtures.sh runs it so.  The cases are in the repository, in
 // tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql, where the tool's tests replay them with no database.
 [Collection(UsesSqlServer.Name)]
-public sealed class FixtureCasesTests(SqlServerContainer sqlServer)
+public sealed class FixtureCasesTests(SqlServerDatabases sqlServer)
 {
     private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.InFolder(RepositoryPaths.DescriberFixtures);
 

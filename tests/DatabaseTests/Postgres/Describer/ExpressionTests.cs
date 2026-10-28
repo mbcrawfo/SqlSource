@@ -10,7 +10,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // A column of no origin answered from the plan, against a real server: the forms the plan shows cannot be NULL, and
 // the shapes where the same text can be, which keep no-origin.
 [Collection(UsesPostgres.Name)]
-public sealed class ExpressionTests(PostgresContainer postgres)
+public sealed class ExpressionTests(PostgresDatabases postgres)
 {
     private async Task<(bool? Nullable, string? Source)[]> AnswersAsync(string sql, string? connection = null)
     {

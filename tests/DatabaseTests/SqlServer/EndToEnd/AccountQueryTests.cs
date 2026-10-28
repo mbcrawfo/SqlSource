@@ -11,7 +11,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // namespace, and Reporting.AccountReports', in the extension class of its own namespace.  Each method opens the
 // connection it is given and closes it again.
 [Collection(UsesSqlServer.Name)]
-public sealed class AccountQueryTests(SqlServerContainer sqlServer)
+public sealed class AccountQueryTests(SqlServerDatabases sqlServer)
 {
     private static readonly DateTimeOffset AliceCreatedAt = new(2024, 1, 1, 9, 0, 0, TimeSpan.Zero);
     private static readonly DateTimeOffset BobCreatedAt = new(2024, 2, 1, 9, 30, 0, TimeSpan.Zero);

@@ -12,7 +12,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // the folder's collection type.  One test gives the method an open connection and the other a closed one, which the
 // method opens.
 [Collection(UsesPostgres.Name)]
-public sealed class InvoiceQueryTests(PostgresContainer postgres)
+public sealed class InvoiceQueryTests(PostgresDatabases postgres)
 {
     [Fact]
     public async Task ListInvoices_EveryInvoice_ReadsTheTableModel()

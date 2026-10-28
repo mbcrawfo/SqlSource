@@ -9,7 +9,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 
 // "relations" against a real server: a row for each relation that exists, in the shape "tables" answers.
 [Collection(UsesPostgres.Name)]
-public sealed class RelationsCallTests(PostgresContainer postgres)
+public sealed class RelationsCallTests(PostgresDatabases postgres)
 {
     [Fact]
     public async Task RelationsAsync_RelationsThatExist_AnswerTheirRowsAsTablesDoes()

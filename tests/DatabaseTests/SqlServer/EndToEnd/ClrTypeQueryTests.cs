@@ -12,7 +12,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // each is bound as a Udt of the type's name; bound by its value alone, every call with a value throws
 // ArgumentException, "UdtTypeName property must be set for UDT parameters.".  The rows are those of a table variable.
 [Collection(UsesSqlServer.Name)]
-public sealed class ClrTypeQueryTests(SqlServerContainer sqlServer)
+public sealed class ClrTypeQueryTests(SqlServerDatabases sqlServer)
 {
     [Fact]
     public async Task WriteClrTypes_AValueOfEach_ReadsThemBack()

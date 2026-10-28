@@ -9,7 +9,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // InternalLocationQueries and through the wrapper of PrivateLocationQueries' private one.  MethodShapeTests reads the
 // accessibility of a method of each place.
 [Collection(UsesPostgres.Name)]
-public sealed class LocationQueryTests(PostgresContainer postgres)
+public sealed class LocationQueryTests(PostgresDatabases postgres)
 {
     [Fact]
     public async Task GetLocatedName_Internal_ReadsTheAccount()

@@ -11,7 +11,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // test makes the table of the query on the database "fixtures" and drops it again.  ErrorPaths of
 // tests/SqlSource.Tool.Testing holds the steps, and this class the statements of PostgreSQL.
 [Collection(UsesPostgres.Name)]
-public sealed class ErrorPathTests(PostgresContainer postgres) : IDisposable
+public sealed class ErrorPathTests(PostgresDatabases postgres) : IDisposable
 {
     private const string Table = "error_path_widgets";
 

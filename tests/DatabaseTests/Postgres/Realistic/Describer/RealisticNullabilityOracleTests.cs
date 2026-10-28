@@ -8,7 +8,7 @@ namespace SqlSource.DatabaseTests.Postgres.Realistic.Describer;
 // The oracle's runs against the server: a query that writes leaves the seed as it was, a column that held a NULL in a
 // row is seen, and a query that ends its own connection fails with its own error.
 [Collection(UsesPostgres.Name)]
-public sealed class RealisticNullabilityOracleTests(PostgresContainer postgres)
+public sealed class RealisticNullabilityOracleTests(PostgresDatabases postgres)
 {
     [Fact]
     public async Task RunAsync_InsertReturning_LeavesTheTableAsItWas()

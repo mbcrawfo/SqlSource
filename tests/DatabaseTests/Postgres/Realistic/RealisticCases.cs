@@ -19,5 +19,5 @@ internal static class RealisticCases
         );
 
     public static RealisticDescribe Describe { get; } =
-        new(Corpus, PostgresContainer.RealisticDatabase, static () => new PostgresDescriber());
+        new(Corpus, PostgresDatabases.RealisticDatabase, static () => new PostgresDescriber());
 }

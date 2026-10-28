@@ -22,7 +22,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // the reader is disposed; under SET XACT_ABORT ON either error rolls back the caller's transaction, still unreported,
 // and with it off CAST('x' AS int) after the rows does too, where an overflow leaves it to commit.
 [Collection(UsesSqlServer.Name)]
-public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
+public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
 {
     // The seed's three accounts.
     private static readonly CollectedAccount[] Accounts = [new(1, "alice"), new(2, "bob"), new(3, "carol")];

@@ -41,7 +41,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // continuations of an asynchronous call, so the test runs in MeasuresAllocations, alone and on a server of its own, and
 // skips under coverage, whose collector allocates in the process too.
 [Collection(MeasuresAllocations.Name)]
-public sealed class AllocationTests(SqlServerContainer sqlServer)
+public sealed class AllocationTests(SqlServerDatabases sqlServer)
 {
     // The SQL of SearchAccounts, as the generated method sends it.
     private const string SearchAccountsSql =

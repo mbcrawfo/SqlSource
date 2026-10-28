@@ -12,7 +12,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // connection, and the first result set of a batch of two statements.  A write runs in a transaction that is rolled
 // back.
 [Collection(UsesSqlServer.Name)]
-public sealed class RowCountTests(SqlServerContainer sqlServer)
+public sealed class RowCountTests(SqlServerDatabases sqlServer)
 {
     [Fact]
     public async Task AddTwoNotes_InsertWithOutput_CountsItsRows()
@@ -64,7 +64,7 @@ public sealed class RowCountTests(SqlServerContainer sqlServer)
     public async Task TouchAccountsQuietly_NoCountInABatch_IsMinusOneUntilThePoolResetsTheSession()
     {
         var token = TestContext.Current.CancellationToken;
-        var pool = new SqlConnectionStringBuilder(sqlServer.ConnectionStringOf(SqlServerContainer.AppDatabase))
+        var pool = new SqlConnectionStringBuilder(sqlServer.ConnectionStringOf(SqlServerDatabases.AppDatabase))
         {
             ApplicationName = nameof(TouchAccountsQuietly_NoCountInABatch_IsMinusOneUntilThePoolResetsTheSession),
         }.ConnectionString;

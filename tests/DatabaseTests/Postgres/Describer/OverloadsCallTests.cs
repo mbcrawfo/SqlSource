@@ -9,7 +9,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // "overloads" against a real server: which of the names asked for a schema other than pg_catalog holds, or
 // pg_catalog holds as an object that is not built in.
 [Collection(UsesPostgres.Name)]
-public sealed class OverloadsCallTests(PostgresContainer postgres)
+public sealed class OverloadsCallTests(PostgresDatabases postgres)
 {
     // Every test that makes the schema "shadow" drops it, so the server holds none of these names but in pg_catalog.
     [Fact]

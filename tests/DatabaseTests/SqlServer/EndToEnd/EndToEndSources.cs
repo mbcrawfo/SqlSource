@@ -25,23 +25,23 @@ internal static class EndToEndSources
         SqlMapper.AddTypeHandler(new TimeOnlyHandler());
     }
 
-    public static SqlConnection App(SqlServerContainer sqlServer) =>
-        new(sqlServer.ConnectionStringOf(SqlServerContainer.AppDatabase));
+    public static SqlConnection App(SqlServerDatabases sqlServer) =>
+        new(sqlServer.ConnectionStringOf(SqlServerDatabases.AppDatabase));
 
     // A connection to "app" that is not pooled, for a test that changes a setting of the session that the pool would
     // hand to the next test: disposing it ends the session.
-    public static SqlConnection AppUnpooled(SqlServerContainer sqlServer) =>
+    public static SqlConnection AppUnpooled(SqlServerDatabases sqlServer) =>
         new(
-            new SqlConnectionStringBuilder(sqlServer.ConnectionStringOf(SqlServerContainer.AppDatabase))
+            new SqlConnectionStringBuilder(sqlServer.ConnectionStringOf(SqlServerDatabases.AppDatabase))
             {
                 Pooling = false,
             }.ConnectionString
         );
 
-    public static SqlConnection Billing(SqlServerContainer sqlServer) =>
-        new(sqlServer.ConnectionStringOf(SqlServerContainer.BillingDatabase));
+    public static SqlConnection Billing(SqlServerDatabases sqlServer) =>
+        new(sqlServer.ConnectionStringOf(SqlServerDatabases.BillingDatabase));
 
-    public static SqlConnection Realistic(SqlServerContainer sqlServer) => new(sqlServer.RealisticConnectionString);
+    public static SqlConnection Realistic(SqlServerDatabases sqlServer) => new(sqlServer.RealisticConnectionString);
 
     // Opens the connection and runs the write in a transaction that is rolled back, so that the seed is as it was.  The
     // write gives the transaction to every call, since SqlClient refuses a command on a connection whose transaction it

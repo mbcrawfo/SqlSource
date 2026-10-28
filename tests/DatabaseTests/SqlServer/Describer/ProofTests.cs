@@ -19,7 +19,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 // count of NULL rows reads.  The facts of docs/superpowers/specs/2026-10-23-sql-server-nullability-noise-design.md that
 // the proofs stand on, its "fact N" below, are pinned beside them.
 [Collection(UsesSqlServer.Name)]
-public sealed class ProofTests(SqlServerContainer sqlServer)
+public sealed class ProofTests(SqlServerDatabases sqlServer)
 {
     // GREATEST, LEAST, JSON_OBJECT, JSON_ARRAY and the WINDOW clause came with SQL Server 2022.
     private const int NewFunctions = 16;
@@ -340,7 +340,7 @@ public sealed class ProofTests(SqlServerContainer sqlServer)
     private async Task<int> RowsAsync(string sql)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = sqlServer.SourceOf(SqlServerContainer.Database);
+        await using var source = sqlServer.SourceOf(SqlServerDatabases.Database);
         await using var command = source.CreateCommand($"SELECT COUNT(*) FROM ({sql}) AS counted");
         if (sql.Contains("@style", StringComparison.Ordinal))
         {

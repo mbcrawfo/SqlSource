@@ -16,7 +16,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Realistic.Generation;
 // SqlClient refuses a command on a connection that holds a transaction it was not given.  The sample's values are
 // read on the same connection before the transaction begins.
 [Collection(UsesSqlServer.Name)]
-public sealed class RealisticDapperTests(SqlServerContainer sqlServer)
+public sealed class RealisticDapperTests(SqlServerDatabases sqlServer)
 {
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]

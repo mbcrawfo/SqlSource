@@ -23,7 +23,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Realistic.Generation;
 // are read on the same connection before the transaction begins, since SqlClient refuses a command that is not given
 // the transaction its connection holds.
 [Collection(UsesSqlServer.Name)]
-public sealed class RealisticMethodTests(SqlServerContainer sqlServer)
+public sealed class RealisticMethodTests(SqlServerDatabases sqlServer)
 {
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]

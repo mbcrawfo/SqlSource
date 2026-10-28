@@ -20,5 +20,5 @@ internal static class RealisticCases
         );
 
     public static RealisticDescribe Describe { get; } =
-        new(Corpus, SqlServerContainer.RealisticDatabase, static () => new SqlServerDescriber());
+        new(Corpus, SqlServerDatabases.RealisticDatabase, static () => new SqlServerDescriber());
 }

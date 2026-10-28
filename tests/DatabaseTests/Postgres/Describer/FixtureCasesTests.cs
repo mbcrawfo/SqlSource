@@ -13,7 +13,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // expected.json and compares nothing: tools/record-fixtures.sh runs it so.  The cases are in the repository, in
 // tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres, where the tool's tests replay them with no database.
 [Collection(UsesPostgres.Name)]
-public sealed class FixtureCasesTests(PostgresContainer postgres)
+public sealed class FixtureCasesTests(PostgresDatabases postgres)
 {
     private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.InFolder(RepositoryPaths.DescriberFixtures);
 

@@ -13,7 +13,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // read by the method, and cube, which all_types leaves out, by EchoCube.  Each insert runs in a transaction that is
 // rolled back.  Map_EveryKey_IsWrittenAndReadOrNamed of ModelShapeTests holds the map's keys to these tests.
 [Collection(UsesPostgres.Name)]
-public sealed class EveryTypeTests(PostgresContainer postgres)
+public sealed class EveryTypeTests(PostgresDatabases postgres)
 {
     private const int FullRowCopyId = 3;
 

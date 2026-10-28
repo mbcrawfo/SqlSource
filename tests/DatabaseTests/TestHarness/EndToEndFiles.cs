@@ -25,7 +25,7 @@ internal static partial class EndToEndFiles
 
     // Reads the file and runs each of its batches as one command, in order, on one connection of the source, as
     // sqlcmd runs a script in one session.
-    public static async Task RunAsync(
+    private static async Task RunAsync(
         DbDataSource source,
         string path,
         EndToEndEngine engine,
@@ -65,22 +65,9 @@ internal static partial class EndToEndFiles
         }
     }
 
-    // Creates the end-to-end database of that name from its schema and its seed, in that order.
-    public static Task CreateAsync(
-        DbDataSource server,
-        EndToEndEngine engine,
-        string database,
-        Func<string, DbDataSource> sourceOf,
-        CancellationToken cancellationToken
-    ) =>
-        CreateAsync(
-            server,
-            engine,
-            database,
-            sourceOf,
-            [Schema(engine, database), Seed(engine, database)],
-            cancellationToken
-        );
+    // The files that build the end-to-end database of that name, in order: its schema, then its seed.
+    public static IReadOnlyList<string> SchemaAndSeed(EndToEndEngine engine, string database) =>
+        [Schema(engine, database), Seed(engine, database)];
 
     // The batches of a script of SQL Server in order, as sqlcmd splits it: a batch ends at a line that holds GO alone,
     // ignoring case and the white space around it.  Each batch keeps its line endings, and none holds only white

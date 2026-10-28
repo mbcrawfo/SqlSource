@@ -20,7 +20,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // outside its precision, and the null of a vector where the server takes no other NULL.  The methods of NewTypes.sql
 // need SQL Server 2025, and skip below it.
 [Collection(UsesSqlServer.Name)]
-public sealed class MethodAllTypesTests(SqlServerContainer sqlServer)
+public sealed class MethodAllTypesTests(SqlServerDatabases sqlServer)
 {
     private const int InsertedId = 3;
 

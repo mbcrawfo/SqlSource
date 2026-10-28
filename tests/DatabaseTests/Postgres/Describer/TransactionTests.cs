@@ -14,7 +14,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // A describe runs every call from "prepare" to "deallocate" in one transaction, which a pooler in transaction mode
 // keeps on one backend, and which is rolled back whatever happens.
 [Collection(UsesPostgres.Name)]
-public sealed class TransactionTests(PostgresContainer postgres)
+public sealed class TransactionTests(PostgresDatabases postgres)
 {
     private const string Statement = "sqlsource_1";
 

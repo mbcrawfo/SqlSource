@@ -21,7 +21,7 @@ internal static class Sessions
         string connection,
         IDescribeExchange? exchange = null,
         IRunLog? log = null,
-        string database = PostgresContainer.Database,
+        string database = PostgresDatabases.Database,
         IReadOnlyList<string>? plannerSettings = null
     ) => new PostgresDescriber(plannerSettings ?? PlannerSettings.None).OpenAsync(database, connection, exchange, log);
 

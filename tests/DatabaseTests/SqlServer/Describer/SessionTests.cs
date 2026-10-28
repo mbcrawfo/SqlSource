@@ -21,7 +21,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 // A session against a real server: what "open" knows of it, and each way a session is not opened.  SqlClient's own
 // texts name the host, the login and the database, so a failure keeps the numbers and a fixed text alone.
 [Collection(UsesSqlServer.Name)]
-public sealed class SessionTests(SqlServerContainer sqlServer)
+public sealed class SessionTests(SqlServerDatabases sqlServer)
 {
     [Fact]
     public async Task OpenAsync_Container_GivesTheVersionTheDriverAndTheSettings()
@@ -233,7 +233,7 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         [
             connection.Password,
             connection.DataSource.Split(',')[0],
-            connection.InitialCatalog == SqlServerContainer.Database ? string.Empty : connection.InitialCatalog,
+            connection.InitialCatalog == SqlServerDatabases.Database ? string.Empty : connection.InitialCatalog,
         ];
         foreach (var word in words.Where(static word => word.Length > 0))
         {
@@ -252,7 +252,7 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         opened.Value.ShouldBeNull();
         var failure = opened.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC224");
-        failure.Arguments.ShouldBe([SqlServerContainer.Database]);
+        failure.Arguments.ShouldBe([SqlServerDatabases.Database]);
         failure.Step.ShouldBeNull();
         Failures
             .TextsOf(failure)

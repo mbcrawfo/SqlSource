@@ -17,7 +17,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 // server: lines, unless "parameters" failed first and "columns" gave no cause.  The tests hold the ids and the
 // numbers, not the server's texts.
 [Collection(UsesSqlServer.Name)]
-public sealed class FailureTests(SqlServerContainer sqlServer)
+public sealed class FailureTests(SqlServerDatabases sqlServer)
 {
     // "parameters" refuses the batch with 208 and 11501, and "columns", asked with the declared parameters alone, gives
     // its cause by its type, TEMPORARY_TABLE: the lines are the rows of "columns", not the errors of "parameters".

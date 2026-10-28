@@ -28,7 +28,7 @@ internal sealed class UnpooledTransaction : IAsyncDisposable
     public SqlTransaction Transaction { get; }
 
     public static async Task<UnpooledTransaction> BeginAsync(
-        SqlServerContainer sqlServer,
+        SqlServerDatabases sqlServer,
         bool xactAbort,
         CancellationToken token
     )

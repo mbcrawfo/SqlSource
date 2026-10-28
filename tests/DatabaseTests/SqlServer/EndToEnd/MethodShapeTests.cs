@@ -11,7 +11,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // their shape does not allow, and a token is given the text of its default or another fragment.  A write runs in a
 // transaction that is rolled back.
 [Collection(UsesSqlServer.Name)]
-public sealed class MethodShapeTests(SqlServerContainer sqlServer)
+public sealed class MethodShapeTests(SqlServerDatabases sqlServer)
 {
     [Fact]
     public async Task TouchAccount_NoRows_IsRowCountByDefault()

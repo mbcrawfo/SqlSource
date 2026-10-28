@@ -44,7 +44,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // the process's own background work, which the commonest difference leaves out, and the class skips under coverage,
 // whose collector allocates in the process too often for it to leave out.
 [Collection(MeasuresAllocations.Name)]
-public sealed class AllocationTests(PostgresContainer postgres)
+public sealed class AllocationTests(PostgresDatabases postgres)
 {
     // The bytes for each call that the generated method may allocate beyond the hand-written one, by the commonest
     // difference of a pair of calls, the same for every pair.  A call of the accounts queries allocated about 1.6 to

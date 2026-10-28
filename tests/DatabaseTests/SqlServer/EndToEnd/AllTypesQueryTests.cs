@@ -17,7 +17,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // inserted with InsertAllTypesArgs, built from the values of row 1, and read back by OUTPUT, for every type that Dapper
 // sends exactly.  Each insert runs in a transaction that is rolled back.
 [Collection(UsesSqlServer.Name)]
-public sealed class AllTypesQueryTests(SqlServerContainer sqlServer)
+public sealed class AllTypesQueryTests(SqlServerDatabases sqlServer)
 {
     private const int InsertedId = 3;
 

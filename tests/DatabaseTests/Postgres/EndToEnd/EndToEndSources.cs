@@ -19,18 +19,18 @@ internal static class EndToEndSources
         SqlMapper.AddTypeHandler(new UtcDateTimeOffsetHandler());
     }
 
-    public static NpgsqlDataSource App(PostgresContainer postgres)
+    public static NpgsqlDataSource App(PostgresDatabases postgres)
     {
-        var builder = new NpgsqlDataSourceBuilder(postgres.ConnectionStringOf(PostgresContainer.AppDatabase));
+        var builder = new NpgsqlDataSourceBuilder(postgres.ConnectionStringOf(PostgresDatabases.AppDatabase));
         _ = builder.MapEnum<NoteKind>();
         return builder.Build();
     }
 
-    public static NpgsqlDataSource Billing(PostgresContainer postgres) =>
-        NpgsqlDataSource.Create(postgres.ConnectionStringOf(PostgresContainer.BillingDatabase));
+    public static NpgsqlDataSource Billing(PostgresDatabases postgres) =>
+        NpgsqlDataSource.Create(postgres.ConnectionStringOf(PostgresDatabases.BillingDatabase));
 
     // The realistic corpus's database, which the runs through the methods and through Dapper read with the same
     // settings and no mapping: its models take the base type map, so an enum is a string.
-    public static NpgsqlDataSource Realistic(PostgresContainer postgres) =>
+    public static NpgsqlDataSource Realistic(PostgresDatabases postgres) =>
         NpgsqlDataSource.Create(postgres.RealisticConnectionString);
 }
