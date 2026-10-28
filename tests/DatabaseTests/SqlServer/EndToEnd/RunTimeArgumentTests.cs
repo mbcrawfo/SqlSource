@@ -19,7 +19,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // SqlClient raises it.  Then the connection rule: the method opens a closed connection and closes it again, however
 // it ends, and leaves an open one open, with its transaction.
 [Collection(UsesSqlServer.Name)]
-public sealed class RunTimeArgumentTests(SqlServerContainer sqlServer)
+public sealed class RunTimeArgumentTests(SqlServerDatabases sqlServer)
 {
     // How a call of the connection rule's tests ends.
     public enum Outcome
@@ -226,7 +226,7 @@ public sealed class RunTimeArgumentTests(SqlServerContainer sqlServer)
     // ServerProcessId it cannot read before the call.  Each has a pool of its own, which no other test is given.
     private SqlConnection OfItsOwnPool() =>
         new(
-            new SqlConnectionStringBuilder(sqlServer.ConnectionStringOf(SqlServerContainer.AppDatabase))
+            new SqlConnectionStringBuilder(sqlServer.ConnectionStringOf(SqlServerDatabases.AppDatabase))
             {
                 ApplicationName = $"{nameof(RunTimeArgumentTests)}-{Guid.NewGuid():N}",
             }.ConnectionString
@@ -327,12 +327,12 @@ public sealed class RunTimeArgumentTests(SqlServerContainer sqlServer)
     // on the lock until the lock is disposed, which rolls the update back.  The tests of a command that runs wait on
     // it: a lock wait has no end of its own, where SQL Server ends a WAITFOR early when it runs short of threads, as it
     // did on the busy runners of CI, and the method then returned its row.
-    private sealed class LockOfBob(SqlServerContainer sqlServer) : IAsyncDisposable
+    private sealed class LockOfBob(SqlServerDatabases sqlServer) : IAsyncDisposable
     {
         private readonly SqlConnection _connection = EndToEndSources.App(sqlServer);
         private DbTransaction? _transaction;
 
-        public static async Task<LockOfBob> TakeAsync(SqlServerContainer sqlServer, CancellationToken cancellationToken)
+        public static async Task<LockOfBob> TakeAsync(SqlServerDatabases sqlServer, CancellationToken cancellationToken)
         {
             var lockOfBob = new LockOfBob(sqlServer);
             try

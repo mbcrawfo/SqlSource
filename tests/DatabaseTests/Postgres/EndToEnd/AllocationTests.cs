@@ -10,7 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
-using SqlSource.Testing.EndToEnd;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
@@ -23,7 +23,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // both sides; and it reads each column by its ordinal with GetFieldValue into the same model, and the rows into an
 // array, the collection the method returns, through what the generated method reads them into.  So each query has two
 // pairs: its method of AccountQueries, which reads its rows into the pooled buffer, against a hand-written method that
-// reads them into RowBufferByHand of tests/SqlSource.Testing, the same buffer by hand; and its method of
+// reads them into RowBufferByHand of tests/DatabaseTests/TestHarness, the same buffer by hand; and its method of
 // UnpooledAccountQueries, the same query under no-array-pool, which reads them into a List and copies it, against a
 // hand-written method that does the same.  The numbers queries of RowBufferQueries have a pair of each kind for the
 // List, IList, ICollection and ImmutableArray, at 3 rows: the pooled method against rows read into RowBufferByHand and
@@ -44,7 +44,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // the process's own background work, which the commonest difference leaves out, and the class skips under coverage,
 // whose collector allocates in the process too often for it to leave out.
 [Collection(MeasuresAllocations.Name)]
-public sealed class AllocationTests(PostgresContainer postgres)
+public sealed class AllocationTests(PostgresDatabases postgres)
 {
     // The bytes for each call that the generated method may allocate beyond the hand-written one, by the commonest
     // difference of a pair of calls, the same for every pair.  A call of the accounts queries allocated about 1.6 to

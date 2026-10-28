@@ -14,7 +14,7 @@ namespace SqlSource.DatabaseTests.Postgres.Realistic.Generation;
 // no value, which is the oracle's business, but that some sample reads a row, so that a run that reads nothing cannot
 // pass.  A case runs in a transaction that is rolled back, since some write.
 [Collection(UsesPostgres.Name)]
-public sealed class RealisticDapperTests(PostgresContainer postgres)
+public sealed class RealisticDapperTests(PostgresDatabases postgres)
 {
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]

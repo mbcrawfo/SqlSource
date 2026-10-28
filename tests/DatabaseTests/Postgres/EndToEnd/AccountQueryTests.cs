@@ -11,7 +11,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // which are of a second namespace.  Every query is many, so each method returns an IReadOnlyList, the project's
 // collection type.  Half the tests give the method an open connection and half a closed one, which the method opens.
 [Collection(UsesPostgres.Name)]
-public sealed class AccountQueryTests(PostgresContainer postgres)
+public sealed class AccountQueryTests(PostgresDatabases postgres)
 {
     private static readonly DateTimeOffset AliceCreatedAt = new(2024, 1, 1, 9, 0, 0, TimeSpan.Zero);
     private static readonly DateTimeOffset BobCreatedAt = new(2024, 2, 1, 9, 30, 0, TimeSpan.Zero);

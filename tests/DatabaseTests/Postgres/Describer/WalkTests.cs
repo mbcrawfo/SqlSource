@@ -14,7 +14,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // The nullability walk against a real server: what only a planner can show, and what a describe leaves behind.
 // The matrix of join shapes is the fixture cases named walk-*, which FixtureCasesTests describes here.
 [Collection(UsesPostgres.Name)]
-public sealed class WalkTests(PostgresContainer postgres)
+public sealed class WalkTests(PostgresDatabases postgres)
 {
     private Task<QueryDescription> ShouldDescribeAsync(string sql) =>
         Sessions.ShouldDescribeAsync(postgres.ConnectionString, sql);
@@ -125,7 +125,7 @@ public sealed class WalkTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_InsertSelectFromATableAliasedOld_KeepsTheHeuristicForOld()
     {
-        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
+        postgres.SkipBelow(18, PostgresDatabases.NoOldAndNewInReturning);
 
         (
             await WalkedAsync(
@@ -139,7 +139,7 @@ public sealed class WalkTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_InsertSelectFromATableQuotedOld_KeepsTheHeuristicForOld()
     {
-        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
+        postgres.SkipBelow(18, PostgresDatabases.NoOldAndNewInReturning);
 
         (
             await WalkedAsync(
@@ -153,7 +153,7 @@ public sealed class WalkTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_ReturningQuotedOldWithNoOtherGateWord_IsGatedAndKeepsTheHeuristic()
     {
-        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
+        postgres.SkipBelow(18, PostgresDatabases.NoOldAndNewInReturning);
 
         (
             await WalkedAsync("INSERT INTO orders (user_id, total) VALUES (@user_id, @total) RETURNING \"old\".id")
@@ -164,7 +164,7 @@ public sealed class WalkTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_OldAliasThatIsAlsoATablesAlias_IsRefusedByTheServer()
     {
-        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
+        postgres.SkipBelow(18, PostgresDatabases.NoOldAndNewInReturning);
 
         var described = await Sessions.DescribeAsync(
             postgres.ConnectionString,

@@ -57,6 +57,7 @@
             ReferenceOutputAssembly="true"
         />
         <ProjectReference Include="../SqlSource.Testing/SqlSource.Testing.csproj" />
+        <ProjectReference Include="../DatabaseTests/TestHarness/TestHarness.csproj" />
     </ItemGroup>
     <Import Project="../../src/SqlSource/build/SqlSource.targets" />
 </Project>

@@ -10,7 +10,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // The queries of Queries/Billing/, run through their generated methods on the seed of the database "billing" into their
 // sealed class models, whose date is a DateTime by the folder's type override.
 [Collection(UsesSqlServer.Name)]
-public sealed class InvoiceQueryTests(SqlServerContainer sqlServer)
+public sealed class InvoiceQueryTests(SqlServerDatabases sqlServer)
 {
     [Fact]
     public async Task ListInvoices_Seed_ReadsTheTableModel()

@@ -9,12 +9,12 @@ using System.Reflection;
 using NpgsqlTypes;
 using Shouldly;
 using SqlSource.DatabaseTests.Postgres.EndToEnd.Types;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using SqlSource.Generation.Types.Maps;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
-using SqlSource.Testing.EndToEnd;
 using Xunit;
-using static SqlSource.Testing.EndToEnd.ModelReflection;
+using static SqlSource.DatabaseTests.TestHarness.EndToEnd.ModelReflection;
 
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 

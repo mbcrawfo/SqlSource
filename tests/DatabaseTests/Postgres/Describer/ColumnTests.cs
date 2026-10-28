@@ -16,7 +16,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // A query's columns against a real server: what only a server can show, the row description of a statement and
 // what Npgsql makes of it.
 [Collection(UsesPostgres.Name)]
-public sealed class ColumnTests(PostgresContainer postgres)
+public sealed class ColumnTests(PostgresDatabases postgres)
 {
     private Task<QueryDescription> ShouldDescribeAsync(string sql) =>
         Sessions.ShouldDescribeAsync(postgres.ConnectionString, sql);
@@ -624,7 +624,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_ReturningOldAndNew_KeepsTheHeuristic()
     {
-        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
+        postgres.SkipBelow(18, PostgresDatabases.NoOldAndNewInReturning);
 
         var description = await ShouldDescribeAsync(
             "INSERT INTO orders (user_id, total) VALUES (@user_id, @total) RETURNING old.id, new.id"

@@ -17,7 +17,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // A session against a real server: what "open" knows of it, each way a session is not opened, and what a describe
 // says once the server has ended the session.
 [Collection(UsesPostgres.Name)]
-public sealed class SessionTests(PostgresContainer postgres)
+public sealed class SessionTests(PostgresDatabases postgres)
 {
     [Fact]
     public async Task OpenAsync_Container_GivesTheVersionTheDriverAndTheThreeSettings()
@@ -345,7 +345,7 @@ public sealed class SessionTests(PostgresContainer postgres)
         opened.Value.ShouldBeNull();
         var failure = opened.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC224");
-        failure.Arguments.ShouldBe([PostgresContainer.Database]);
+        failure.Arguments.ShouldBe([PostgresDatabases.Database]);
         failure.Step.ShouldBeNull();
         Failures
             .TextsOf(failure)

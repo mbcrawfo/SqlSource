@@ -43,7 +43,6 @@
         <PackageReference Include="Microsoft.Data.SqlClient" VersionOverride="6.1.7" />
         <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
         <PackageReference Include="Shouldly" />
-        <PackageReference Include="Testcontainers.MsSql" />
         <PackageReference Include="xunit.v3" />
     </ItemGroup>
     <ItemGroup>
@@ -53,6 +52,7 @@
             ReferenceOutputAssembly="false"
         />
         <ProjectReference Include="../../SqlSource.Testing/SqlSource.Testing.csproj" />
+        <ProjectReference Include="../TestHarness/TestHarness.csproj" />
     </ItemGroup>
     <Import Project="../../../src/SqlSource/build/SqlSource.targets" />
 </Project>

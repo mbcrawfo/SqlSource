@@ -12,7 +12,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // says.  Half the tests give the method an open connection and half a closed one, which the method opens.  The types
 // that the methods declare are read by MethodShapeTests.
 [Collection(UsesPostgres.Name)]
-public sealed class CollectionQueryTests(PostgresContainer postgres)
+public sealed class CollectionQueryTests(PostgresDatabases postgres)
 {
     // The seed's three accounts.
     private static readonly CollectedAccount[] Accounts = [new(1, "alice"), new(2, "bob"), new(3, "carol")];

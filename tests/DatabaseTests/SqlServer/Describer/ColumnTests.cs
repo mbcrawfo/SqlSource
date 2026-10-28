@@ -17,7 +17,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 // a session of its own.  A column is written "name nullable origin": nullable 1 or 0, the origin schema.table.column or
 // "-" for none, and a name the server does not give "null".
 [Collection(UsesSqlServer.Name)]
-public sealed class ColumnTests(SqlServerContainer sqlServer)
+public sealed class ColumnTests(SqlServerDatabases sqlServer)
 {
     // Every row of the spike's table of columns, and of its table of statements with OUTPUT, that answers columns, but
     // the view, the system tables, the rows with no result set and the table with a trigger, which have tests of their
@@ -246,7 +246,7 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
         var rows = await ColumnsAsync(sql);
 
         rows.Where(row => !row.IsHidden).Select(Written).ShouldBe(expected);
-        var built = SqlServerColumns.Build(rows, SqlServerContainer.Database);
+        var built = SqlServerColumns.Build(rows, SqlServerDatabases.Database);
         if (rows.FirstOrDefault(row => row is { IsHidden: false, Name: null }) is { } unnamed)
         {
             built.Failure.ShouldBe(unnamed.ColumnOrdinal);
@@ -300,7 +300,7 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
         var visible = rows.Where(row => !row.IsHidden).ToList();
         visible.Count.ShouldBe(2);
         visible.ShouldAllBe(row => row.SourceDatabase == database && row.SourceTable != null);
-        var columns = SqlServerColumns.Build(rows, SqlServerContainer.Database).Value.ShouldNotBeNull();
+        var columns = SqlServerColumns.Build(rows, SqlServerDatabases.Database).Value.ShouldNotBeNull();
         columns.ShouldAllBe(column =>
             column.Column.Origin == null && column.NoOriginReason == SqlServerColumns.AnotherDatabase
         );
@@ -390,7 +390,7 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
 
         rows.Where(row => !row.IsHidden).ShouldAllBe(row => row.SourceTable != null && row.SourceColumn != null);
         SqlServerColumns
-            .Build(rows, SqlServerContainer.Database)
+            .Build(rows, SqlServerDatabases.Database)
             .Value.ShouldNotBeNull()
             .ShouldAllBe(column =>
                 column.Column.Origin == null && column.NoOriginReason == SqlServerColumns.NotATableOrView
@@ -428,7 +428,7 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
         var rows = await ColumnsAsync(sql);
 
         rows.ShouldBeEmpty();
-        SqlServerColumns.Build(rows, SqlServerContainer.Database).Value.ShouldNotBeNull().ShouldBeEmpty();
+        SqlServerColumns.Build(rows, SqlServerDatabases.Database).Value.ShouldNotBeNull().ShouldBeEmpty();
     }
 
     // The spike's one row of its table of statements that the server refuses under mode 1 is refused under mode 2.
@@ -500,7 +500,7 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
     }
 
     private async Task<IReadOnlyList<BuiltColumn>> BuiltAsync(string sql) =>
-        SqlServerColumns.Build(await ColumnsAsync(sql), SqlServerContainer.Database).Value.ShouldNotBeNull();
+        SqlServerColumns.Build(await ColumnsAsync(sql), SqlServerDatabases.Database).Value.ShouldNotBeNull();
 
     private static string Written(SqlServerColumnRow row) =>
         $"{row.Name ?? "null"} {Nullable(row.IsNullable)} "
@@ -523,7 +523,7 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
         (schema, table, column) switch
         {
             (null, null, null) => "-",
-            _ when database == SqlServerContainer.Database => $"{schema}.{table}.{column}",
+            _ when database == SqlServerDatabases.Database => $"{schema}.{table}.{column}",
             _ => $"{database}.{schema}.{table}.{column}",
         };
 }

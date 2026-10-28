@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
-using SqlSource.Testing.EndToEnd;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -16,7 +16,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // open one open, in its transaction.  Each test reads the connection's state after the call.  The queries that wait are
 // Sleep and ListThenSleep of Queries/Methods.sql, and each sleeps for far longer than the test waits for it.
 [Collection(UsesPostgres.Name)]
-public sealed class RunTimeTests(PostgresContainer postgres)
+public sealed class RunTimeTests(PostgresDatabases postgres)
 {
     // Far longer than a test waits: a test that sees the sleep end has failed.
     private const int LongSleep = 30;
@@ -295,7 +295,7 @@ public sealed class RunTimeTests(PostgresContainer postgres)
             WHERE datname = $1 AND wait_event = 'PgSleep' AND query LIKE '%generate_series%'
             """
         );
-        _ = command.Parameters.Add(new NpgsqlParameter<string> { TypedValue = PostgresContainer.AppDatabase });
+        _ = command.Parameters.Add(new NpgsqlParameter<string> { TypedValue = PostgresDatabases.AppDatabase });
         return (bool)(await command.ExecuteScalarAsync(token))!;
     }
 }

@@ -58,15 +58,21 @@
             first build without CVE-2026-70162 and CVE-2026-84008.  Remove it when SqlClient brings that build or later.
         -->
         <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="9.0.21" />
-        <!-- Starts the SQL Server that tests/DatabaseTests/SqlServer describes against.  It needs Docker. -->
+        <!--
+            Starts the SQL Server of tests/DatabaseTests/TestHarness, which the SQL Server projects describe against.
+            It needs Docker.
+        -->
         <PackageVersion Include="Testcontainers.MsSql" Version="4.16.0" />
-        <!-- Starts the PostgreSQL that tests/DatabaseTests/Postgres describes against.  It needs Docker. -->
+        <!--
+            Starts the PostgreSQL of tests/DatabaseTests/TestHarness, which the PostgreSQL projects describe against.
+            It needs Docker.
+        -->
         <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
         <PackageVersion Include="xunit.analyzers" Version="2.1.0" />
         <PackageVersion Include="xunit.v3" Version="4.0.1" />
         <!--
-            For tests/SqlSource.Testing and tests/SqlSource.Tool.Testing: what a library of the tests takes of xunit,
-            at the version xunit.v3 brings.
+            For tests/SqlSource.Testing, tests/SqlSource.Tool.Testing and tests/DatabaseTests/TestHarness: what a
+            library of the tests takes of xunit, at the version xunit.v3 brings.
         -->
         <PackageVersion Include="xunit.v3.assert" Version="4.0.1" />
         <PackageVersion Include="xunit.v3.extensibility.core" Version="4.0.1" />

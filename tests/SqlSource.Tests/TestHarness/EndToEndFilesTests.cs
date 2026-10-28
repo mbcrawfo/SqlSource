@@ -1,9 +1,9 @@
 using System;
 using Shouldly;
-using SqlSource.Testing;
+using SqlSource.DatabaseTests.TestHarness;
 using Xunit;
 
-namespace SqlSource.DatabaseTests.SqlServer;
+namespace SqlSource.Tests.TestHarness;
 
 // The split of a script of SQL Server into batches, which needs no server.
 public sealed class EndToEndFilesTests

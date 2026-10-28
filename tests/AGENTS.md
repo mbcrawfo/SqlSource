@@ -4,12 +4,12 @@
 
 ## Projects and libraries
 
-- **A test project compiles no `.cs` file of another project, with one exception.**  Code that two test projects need is in one of the two libraries, which they reference.  The exception is `tests/SqlSource.Tests/Generator/`, whose test classes `tests/SqlSource.Tests.RoslynFloor` compiles a second time against Roslyn 4.8.0.  `tests/SqlSource.Tests/TestLayoutTests.cs` checks this.
-- **The two libraries, `tests/SqlSource.Testing` and `tests/SqlSource.Tool.Testing`, hold no tests.**  A helper that one test project alone uses stays in that project; one that a second project comes to need moves into a library.
-- **Keep the two libraries apart.**  `tests/SqlSource.Tests.RoslynFloor` references `SqlSource.Testing`, so it stays on the pinned Roslyn with no `VersionOverride`, while the tool raises Roslyn to a current version, which would reach RoslynFloor through one library ([why](README.md#the-projects)).
+- **A test project compiles no `.cs` file of another project, with one exception.**  Code that two test projects need is in one of the libraries, which they reference.  The exception is `tests/SqlSource.Tests/Generator/`, whose test classes `tests/SqlSource.Tests.RoslynFloor` compiles a second time against Roslyn 4.8.0.  `tests/SqlSource.Tests/TestLayoutTests.cs` checks this.
+- **The three libraries, `tests/SqlSource.Testing`, `tests/DatabaseTests/TestHarness` and `tests/SqlSource.Tool.Testing`, hold no tests.**  A helper that one test project alone uses stays in that project; one that a second project comes to need moves into a library.
+- **A library references only what every project that references it can take** ([why](README.md#the-projects)): `SqlSource.Testing` stays on the pinned Roslyn and references nothing of the tool, `TestHarness` brings no database driver and nothing of the tool, and `Tool.Testing` references the tool.
 - **A test reads the repository only through `RepositoryRoot.Path`**, never by building a path from the root, and `RepositoryRoot.WorkingFolder` is only for starting a process in the root, since `Path` is what refuses a read that `tools/test-scopes.txt` would let a change skip ([when it refuses](README.md#reading-the-repository)).
-- **The libraries' types stay `internal`**, except `SettingLevel` of `tests/SqlSource.Testing/Generator/LevelSettings.cs`, which a public theory takes as its row.
-- **A test reads a generated model by reflection through `ModelReflection` of `tests/SqlSource.Testing`**, which orders the properties by `MetadataToken`, the order they are declared in.  `Type.GetProperties()` does not promise that order, so a test never compares it.
+- **The libraries' types stay `internal`**, except `SettingLevel` of `tests/SqlSource.Testing`, which a public theory takes as its row, and the harness's `PostgresContainer` and `SqlServerContainer`, which the projects' fixtures subclass.
+- **A test reads a generated model by reflection through `ModelReflection` of `tests/DatabaseTests/TestHarness`**, which orders the properties as they are declared, since `Type.GetProperties()` does not promise that order.
 - **Every test that opens a describer opens it through `Describers.OpenAsync` of `tests/SqlSource.Tool.Testing`** (the tool's tests, `PostgresScript`, `SqlServerScript` and `FixtureReplay` among them), and none builds an `OpenRequest` but to look at it.
 
 ## Where a test goes
@@ -36,7 +36,7 @@
 
 - **A test holds on CI's busy runner and under coverage, not only on a quiet machine.**  The flaky failures so far each assumed that nothing else acts during the test.
   - Never let a timer keep a command running or decide an order: SQL Server ends a `WAITFOR` early when it runs short of threads.  Hold the command on something the test controls, a row lock or an application lock, and wait for the state through `Eventually` or `ProcessGate` before acting, as `RunTimeArgumentTests` and `SessionTests` of `tests/DatabaseTests/SqlServer` do.
-  - Measure the allocations of synchronous code with `GC.GetAllocatedBytesForCurrentThread`, which coverage and other threads leave alone.  A measure of the whole process, `GC.GetTotalAllocatedBytes`, goes through `CallAllocations`, which skips under coverage or a profiler, and runs in a collection with `DisableParallelization` ([why](SqlSource.Testing/EndToEnd/CallAllocations.cs)).
+  - Measure the allocations of synchronous code with `GC.GetAllocatedBytesForCurrentThread`, which coverage and other threads leave alone.  A measure of the whole process, `GC.GetTotalAllocatedBytes`, goes through `CallAllocations`, which skips under coverage or a profiler, and runs in a collection with `DisableParallelization` ([why](DatabaseTests/TestHarness/EndToEnd/CallAllocations.cs)).
   - A threshold or margin set from what a test measures is measured again as CI's `build` job runs it, with the whole solution running at once and with `--coverage` unless the test skips under it, as well as alone, and its comment says how it was measured.
 
 ## Allocation budgets
@@ -53,7 +53,7 @@
 - **`Method` is what the test calls**: the C# method in full, `DescribeAsync_` and never `Describe_`, or the command or statement it runs, as the `Describe_` of `DescribeCommandTests`, which runs `describe`, and the `Explain_` of `PlanOutputTests`, which runs the server's `EXPLAIN`.  A test of a value names the value as `Method` and what it is read under as `Scenario`, as `Patience_OfEveryWait_IsTwoMinutes`.
 - **A test that needs another current culture takes it from `CultureScope` of `tests/SqlSource.Testing`**, which puts back the one it found.
 - **A unit-test class and a container class may share a name**, as the two `NpgsqlCheckTests` do: their folders tell them apart.
-- **Every test class is `sealed`**, a `partial` one `public sealed partial class`.  Nothing checks it; a new class follows the rest.
+- **Every test class is `sealed`**, a `partial` one `public sealed partial class`.
 - **`.github/workflows/nightly.yml` names each test project in the Test step of its `test` job.**  A new test project that needs no container is added there, or it never runs on Windows or macOS.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

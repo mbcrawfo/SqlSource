@@ -12,7 +12,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 // the tests' deps file names (Programs.ToolStart); tools/check-tool-install.sh shows that the packed tool loads its
 // own.  The project is a copy of the fixture SqlServer, which tests/SqlSource.Tool.Tests owns.
 [Collection(UsesSqlServer.Name)]
-public sealed class ToolProcessTests(SqlServerContainer sqlServer) : IDisposable
+public sealed class ToolProcessTests(SqlServerDatabases sqlServer) : IDisposable
 {
     private readonly FixtureProjects _fixtures = new();
 
@@ -23,7 +23,7 @@ public sealed class ToolProcessTests(SqlServerContainer sqlServer) : IDisposable
         await ToolProcess.ShouldDescribeOneQueryAsync(
             _fixtures,
             _fixtures.Copy("SqlServer"),
-            SqlServerContainer.Database + "=" + sqlServer.ConnectionString,
+            SqlServerDatabases.Database + "=" + sqlServer.ConnectionString,
             "fixtures (mssql): 1 described, 0 skipped, 0 failed",
             _fixtures.PathOf("SqlServer/Queries/Orders.sql"),
             "GetOrders",

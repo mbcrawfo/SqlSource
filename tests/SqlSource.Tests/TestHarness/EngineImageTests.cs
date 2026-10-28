@@ -1,13 +1,11 @@
 using System;
-using System.Threading;
 using System.Threading.Tasks;
-using DotNet.Testcontainers.Containers;
 using Shouldly;
-using SqlSource.Testing;
+using SqlSource.DatabaseTests.TestHarness;
 using Xunit;
 using Xunit.Sdk;
 
-namespace SqlSource.Tests;
+namespace SqlSource.Tests.TestHarness;
 
 // What the containers of both engines share, tested here with no server: the gates on a server's version, each of
 // which takes the version it is asked about so that a test names it; the tag of an image; each engine's default image
@@ -68,7 +66,7 @@ public sealed class EngineImageTests
     [Fact]
     public async Task StartOnceAsync_StartThatThrows_DisposesTheContainerAndRethrows()
     {
-        await using var container = new FakeContainer(new InvalidOperationException("It did not start."));
+        await using var container = new FakeStartingContainer(new InvalidOperationException("It did not start."));
 
         var exception = await Should.ThrowAsync<InvalidOperationException>(() =>
             EngineImage.StartOnceAsync(() => container, TestContext.Current.CancellationToken)
@@ -81,12 +79,12 @@ public sealed class EngineImageTests
     [Fact]
     public async Task StartOnceAsync_StartThatSucceeds_ReturnsTheContainerUndisposed()
     {
-        await using var container = new FakeContainer(null);
+        await using var container = new FakeStartingContainer();
 
         var started = await EngineImage.StartOnceAsync(() => container, TestContext.Current.CancellationToken);
 
         started.ShouldBeSameAs(container);
-        container.Started.ShouldBeTrue();
+        container.Starts.ShouldBe(1);
         container.Disposals.ShouldBe(0);
     }
 
@@ -97,30 +95,4 @@ public sealed class EngineImageTests
             nameof(EngineImage.SqlServer) => EngineImage.SqlServer,
             _ => throw new ArgumentOutOfRangeException(nameof(engine), engine, "No such engine."),
         };
-
-    // A container whose start throws the exception it is given, or succeeds when given none.
-    private sealed class FakeContainer(Exception? failure) : IStartingContainer
-    {
-        public bool Started { get; private set; }
-
-        public int Disposals { get; private set; }
-
-        public string Image => "fake:1";
-
-        public TestcontainersStates State => TestcontainersStates.Undefined;
-
-        public Task StartAsync(CancellationToken token)
-        {
-            Started = true;
-            return failure is null ? Task.CompletedTask : Task.FromException(failure);
-        }
-
-        public Task<(string Stdout, string Stderr)> GetLogsAsync() => Task.FromResult((string.Empty, string.Empty));
-
-        public ValueTask DisposeAsync()
-        {
-            Disposals++;
-            return ValueTask.CompletedTask;
-        }
-    }
 }

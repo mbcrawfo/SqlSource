@@ -16,7 +16,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // them: a form is trusted only where a server is seen to print it so.  A row that fails on a server is a form the
 // recogniser must not read as written.
 [Collection(UsesPostgres.Name)]
-public sealed class PlanOutputTests(PostgresContainer postgres)
+public sealed class PlanOutputTests(PostgresDatabases postgres)
 {
     private const string OneTable =
         "SELECT deleted_at IS NULL, greatest(created_at, deleted_at), coalesce(email, 'x') FROM users a ORDER BY id";

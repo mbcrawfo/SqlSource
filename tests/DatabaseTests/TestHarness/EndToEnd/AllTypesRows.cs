@@ -7,8 +7,9 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Reflection;
 using Shouldly;
+using SqlSource.Testing;
 
-namespace SqlSource.Testing.EndToEnd;
+namespace SqlSource.DatabaseTests.TestHarness.EndToEnd;
 
 // The two rows of all_types that the seed of the end-to-end database "app" holds, as a model of the table read through
 // Dapper has them: row 1 with a value in every column, row 2 with NULL in every column but id.  A row is read by

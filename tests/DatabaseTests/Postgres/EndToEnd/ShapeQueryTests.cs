@@ -12,7 +12,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // give the method an open connection and half a closed one, which the method opens.  The tests read this project's own
 // generated models, which the other engine's project does not have, so they are not shared.
 [Collection(UsesPostgres.Name)]
-public sealed class ShapeQueryTests(PostgresContainer postgres)
+public sealed class ShapeQueryTests(PostgresDatabases postgres)
 {
     [Fact]
     public async Task SearchAccounts_IdOrName_ReadsTheAccountsOfEitherParameter()

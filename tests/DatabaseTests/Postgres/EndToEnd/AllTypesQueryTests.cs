@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 using Dapper;
 using Npgsql;
 using Shouldly;
-using SqlSource.Testing.EndToEnd;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
-using static SqlSource.Testing.EndToEnd.ModelReflection;
+using static SqlSource.DatabaseTests.TestHarness.EndToEnd.ModelReflection;
 
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 
@@ -19,7 +19,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // by RETURNING, for every type that Dapper can send, by its method and by its constant through Dapper.  Each insert
 // runs in a transaction that is rolled back.  EveryTypeTests writes every column through InsertEveryType's method.
 [Collection(UsesPostgres.Name)]
-public sealed class AllTypesQueryTests(PostgresContainer postgres)
+public sealed class AllTypesQueryTests(PostgresDatabases postgres)
 {
     private const int InsertedId = 3;
 

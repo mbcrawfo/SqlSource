@@ -13,7 +13,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // the record structs AccountId and NoteCount, through their converters, as columns and as parameters.  Half the tests
 // give the method an open connection and half a closed one, which the method opens.
 [Collection(UsesPostgres.Name)]
-public sealed class NoteQueryTests(PostgresContainer postgres)
+public sealed class NoteQueryTests(PostgresDatabases postgres)
 {
     [Fact]
     public async Task ListAccountNotes_AnAccountWithNoNote_HasNulls()

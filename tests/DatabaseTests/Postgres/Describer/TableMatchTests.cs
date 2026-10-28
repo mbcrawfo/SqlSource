@@ -10,7 +10,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // The table match against a real server: what only a server can show, the origins of a row description for
 // SELECT *, for a view, for a RETURNING list and for a table that lost a column.
 [Collection(UsesPostgres.Name)]
-public sealed class TableMatchTests(PostgresContainer postgres)
+public sealed class TableMatchTests(PostgresDatabases postgres)
 {
     private Task<QueryDescription> ShouldDescribeAsync(string sql) =>
         Sessions.ShouldDescribeAsync(postgres.ConnectionString, sql);

@@ -4,7 +4,7 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot.Reading;
 
-namespace SqlSource.Testing.EndToEnd;
+namespace SqlSource.DatabaseTests.TestHarness.EndToEnd;
 
 // The entries that committed sidecars hold, which the end-to-end CheckTests of both engines compare with the counts
 // that "describe --check" prints.

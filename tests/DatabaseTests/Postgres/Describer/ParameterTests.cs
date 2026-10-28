@@ -18,7 +18,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // A query's parameters against a real server.  A describe through DescribeAsync runs in a session of its own and
 // ends with no prepared statement left in it.
 [Collection(UsesPostgres.Name)]
-public sealed class ParameterTests(PostgresContainer postgres)
+public sealed class ParameterTests(PostgresDatabases postgres)
 {
     private Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(DescribeRequest request) =>
         Sessions.DescribeAsync(postgres.ConnectionString, request);

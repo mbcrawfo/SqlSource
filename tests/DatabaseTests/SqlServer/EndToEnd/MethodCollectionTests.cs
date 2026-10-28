@@ -12,7 +12,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // header and a query's marker, run through the methods of the classes of CollectionQueries.cs on the seed of
 // "app".  Each test reads the type the method returns, the collection that holds the rows, and the rows.
 [Collection(UsesSqlServer.Name)]
-public sealed class MethodCollectionTests(SqlServerContainer sqlServer)
+public sealed class MethodCollectionTests(SqlServerDatabases sqlServer)
 {
     private static readonly CollectedAccount[] Accounts = [new(1, "alice"), new(2, "bob"), new(3, "carol")];
 

@@ -23,6 +23,7 @@
         <InternalsVisibleTo Include="SqlSource.Tests.RoslynFloor" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.SqlServer" />
+        <InternalsVisibleTo Include="SqlSource.DatabaseTests.TestHarness" />
         <InternalsVisibleTo Include="SqlSource.Testing" />
         <InternalsVisibleTo Include="SqlSource.Tool" />
         <InternalsVisibleTo Include="SqlSource.Tool.Testing" />

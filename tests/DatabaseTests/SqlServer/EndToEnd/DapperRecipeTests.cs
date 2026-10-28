@@ -9,7 +9,7 @@ using Microsoft.Data;
 using Microsoft.Data.SqlTypes;
 using Shouldly;
 using SqlSource.DatabaseTests.SqlServer.EndToEnd.Types;
-using SqlSource.Testing.EndToEnd;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
@@ -23,7 +23,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // connection in a transaction is given the transaction.  The generated SQL it runs is that of the claims at the output
 // models, in DapperQueries.cs.  A test that writes rolls back.
 [Collection(UsesSqlServer.Name)]
-public sealed class DapperRecipeTests(SqlServerContainer sqlServer)
+public sealed class DapperRecipeTests(SqlServerDatabases sqlServer)
 {
     private const int WrittenId = 3;
 

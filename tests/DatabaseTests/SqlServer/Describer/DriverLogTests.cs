@@ -20,7 +20,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 // so the SqlClient activity a listener sees is the test's own.  The log here does not redact, so a string that named
 // the host, the login, the database or the password would be found as it is.
 [Collection(UsesSqlServer.Name)]
-public sealed class DriverLogTests(SqlServerContainer sqlServer)
+public sealed class DriverLogTests(SqlServerDatabases sqlServer)
 {
     private static readonly string[] BeginExecuteMembers =
     [

@@ -14,7 +14,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // column stays unknown because the server can return NULL in it, the test runs the query over rows that make it, in a
 // transaction it rolls back: the fixture's tables are counted by other tests.
 [Collection(UsesPostgres.Name)]
-public sealed class SetOperationTests(PostgresContainer postgres)
+public sealed class SetOperationTests(PostgresDatabases postgres)
 {
     // Two users, one of whom has an order: x has no email and no deleted_at, its order has no note, and y has no
     // order, so a LEFT JOIN of users to orders extends y with NULL.  The name x is the one that NULLIF(name, 'x')

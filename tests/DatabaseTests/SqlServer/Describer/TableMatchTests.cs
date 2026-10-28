@@ -11,7 +11,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 // The table match against a real server, each query described in a session of its own: the origins the server gives
 // under browse mode 2, and its description of SELECT * from the origin's table or view, which is the table's list.
 [Collection(UsesSqlServer.Name)]
-public sealed class TableMatchTests(SqlServerContainer sqlServer)
+public sealed class TableMatchTests(SqlServerDatabases sqlServer)
 {
     // The whole of users, by * and by its list in order: the computed columns and the rowversion are in its list, and
     // name_len_p, PERSISTED NOT NULL, is not null in the query, read from its one table, as in the table read whole.

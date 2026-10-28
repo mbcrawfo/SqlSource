@@ -18,7 +18,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Realistic.Generation;
 // or to refuse otherwise, fails naming itself, and its models member cannot go stale.  No case of the corpus has one
 // today, so every case skips, until one comes to need it.
 [Collection(UsesSqlServer.Name)]
-public sealed class RealisticModelRefusalTests(SqlServerContainer sqlServer)
+public sealed class RealisticModelRefusalTests(SqlServerDatabases sqlServer)
 {
     // Where the generator sees the corpus's settings file and the case's query, in a folder of its own below it, as
     // Realistic/Cases/<case>/query.sql is below Realistic/Cases/sqlsource.json.
@@ -91,7 +91,7 @@ public sealed class RealisticModelRefusalTests(SqlServerContainer sqlServer)
     {
         var opened = await Sessions.OpenAsync(
             sqlServer.RealisticConnectionString,
-            database: SqlServerContainer.RealisticDatabase
+            database: SqlServerDatabases.RealisticDatabase
         );
         if (!opened.Succeeded)
         {

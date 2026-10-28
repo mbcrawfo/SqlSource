@@ -10,7 +10,7 @@ using Npgsql;
 using NpgsqlTypes;
 using Shouldly;
 using SqlSource.DatabaseTests.Postgres.EndToEnd.Types;
-using SqlSource.Testing.EndToEnd;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
@@ -20,7 +20,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // sample copied in Types/, or as a string cast in the SQL; a C# enum parameter is sent as its number; a DateTimeOffset
 // parameter takes offset 0 alone; and which records Dapper fills.  A test that writes rolls back.
 [Collection(UsesPostgres.Name)]
-public sealed class DapperRecipeTests(PostgresContainer postgres)
+public sealed class DapperRecipeTests(PostgresDatabases postgres)
 {
     private const int WrittenId = 3;
 

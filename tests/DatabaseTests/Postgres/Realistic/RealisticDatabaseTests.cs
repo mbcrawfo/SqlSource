@@ -9,7 +9,7 @@ namespace SqlSource.DatabaseTests.Postgres.Realistic;
 // The database "realistic" of the corpus: made beside "fixtures", with its schema and its seed applied, and the
 // shared database left as it was.
 [Collection(UsesPostgres.Name)]
-public sealed class RealisticDatabaseTests(PostgresContainer postgres)
+public sealed class RealisticDatabaseTests(PostgresDatabases postgres)
 {
     // Every table of schema.sql, a partitioned one by its parent: the partitions are counted apart.
     private const string Tables = """

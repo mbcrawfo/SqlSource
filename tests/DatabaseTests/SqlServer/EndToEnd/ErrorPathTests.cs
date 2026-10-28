@@ -10,7 +10,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // test makes the table of the query on the database "fixtures" and drops it again.  ErrorPaths of
 // tests/SqlSource.Tool.Testing holds the steps, and this class the statements of SQL Server.
 [Collection(UsesSqlServer.Name)]
-public sealed class ErrorPathTests(SqlServerContainer sqlServer) : IDisposable
+public sealed class ErrorPathTests(SqlServerDatabases sqlServer) : IDisposable
 {
     private const string Table = "dbo.error_path_widgets";
 

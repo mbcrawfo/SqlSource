@@ -10,7 +10,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // "dotnet msbuild" and the registry of the released tool, against the container.  The project is a copy of the
 // fixture Single, which tests/SqlSource.Tool.Tests owns.
 [Collection(UsesPostgres.Name)]
-public sealed class ToolProcessTests(PostgresContainer postgres) : IDisposable
+public sealed class ToolProcessTests(PostgresDatabases postgres) : IDisposable
 {
     private readonly FixtureProjects _fixtures = new();
 

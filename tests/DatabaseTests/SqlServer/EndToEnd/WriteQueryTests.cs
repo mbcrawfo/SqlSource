@@ -13,7 +13,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // transaction it is not given.  Each reads the row of its OUTPUT into its model, and the seed is as it was after the
 // rollback.  The test's own statements, which read the next id and the seed, run through Dapper.
 [Collection(UsesSqlServer.Name)]
-public sealed class WriteQueryTests(SqlServerContainer sqlServer)
+public sealed class WriteQueryTests(SqlServerDatabases sqlServer)
 {
     // The notes of the seed, and the name and status of each account, which no write may leave changed.
     private static readonly SeedNote[] SeedNotes =

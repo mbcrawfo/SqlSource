@@ -4,8 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.DatabaseTests.SqlServer.Realistic;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using SqlSource.Testing;
-using SqlSource.Testing.EndToEnd;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
@@ -16,7 +16,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // "describe --check" on the project, with the real MSBuild and a connection to each database, finds every entry the
 // same as its sidecar's.  The counts it prints are those of the entries the committed sidecars hold for each database.
 [Collection(UsesSqlServer.Name)]
-public sealed class CheckTests(SqlServerContainer sqlServer)
+public sealed class CheckTests(SqlServerDatabases sqlServer)
 {
     // The sidecars under EndToEnd/ and Realistic/Cases/.
     private static IEnumerable<string> Sidecars() =>
@@ -28,17 +28,17 @@ public sealed class CheckTests(SqlServerContainer sqlServer)
     public async Task Check_Project_EveryEntryIsTheSame()
     {
         var sidecars = Sidecars().ToList();
-        var app = CommittedEntries.Count(sidecars, SqlServerContainer.AppDatabase);
-        var billing = CommittedEntries.Count(sidecars, SqlServerContainer.BillingDatabase);
-        var realistic = CommittedEntries.Count(sidecars, SqlServerContainer.RealisticDatabase);
+        var app = CommittedEntries.Count(sidecars, SqlServerDatabases.AppDatabase);
+        var billing = CommittedEntries.Count(sidecars, SqlServerDatabases.BillingDatabase);
+        var realistic = CommittedEntries.Count(sidecars, SqlServerDatabases.RealisticDatabase);
         app.ShouldBeGreaterThan(0);
         billing.ShouldBeGreaterThan(0);
         realistic.ShouldBeGreaterThan(0);
         string[] connections =
         [
-            .. Connection(SqlServerContainer.AppDatabase),
-            .. Connection(SqlServerContainer.BillingDatabase),
-            .. Connection(SqlServerContainer.RealisticDatabase),
+            .. Connection(SqlServerDatabases.AppDatabase),
+            .. Connection(SqlServerDatabases.BillingDatabase),
+            .. Connection(SqlServerDatabases.RealisticDatabase),
         ];
 
         var withModels = RealisticCases.Corpus.All.Where(static found => found.HasModels).ToList();
@@ -65,7 +65,7 @@ public sealed class CheckTests(SqlServerContainer sqlServer)
         var leavesOutNewTypes = sqlServer.Major < 17;
         var newTypes = CommittedEntries.Count(
             [RepositoryPaths.NewTypesQueries + ".json"],
-            SqlServerContainer.AppDatabase
+            SqlServerDatabases.AppDatabase
         );
         newTypes.ShouldBeGreaterThan(0);
         checkedHere.ShouldNotBeEmpty();
@@ -78,9 +78,9 @@ public sealed class CheckTests(SqlServerContainer sqlServer)
             .Concat(checkedHere.Select(static found => Path.Combine(found.Folder, RealisticCase.QueryFile)))
             .ToList();
         var namedSidecars = named.Select(static path => path + ".json").Where(File.Exists).ToList();
-        var checkedApp = CommittedEntries.Count(namedSidecars, SqlServerContainer.AppDatabase);
-        var checkedBilling = CommittedEntries.Count(namedSidecars, SqlServerContainer.BillingDatabase);
-        var checkedRealistic = CommittedEntries.Count(namedSidecars, SqlServerContainer.RealisticDatabase);
+        var checkedApp = CommittedEntries.Count(namedSidecars, SqlServerDatabases.AppDatabase);
+        var checkedBilling = CommittedEntries.Count(namedSidecars, SqlServerDatabases.BillingDatabase);
+        var checkedRealistic = CommittedEntries.Count(namedSidecars, SqlServerDatabases.RealisticDatabase);
         checkedApp.ShouldBe(leavesOutNewTypes ? app - newTypes : app);
         checkedBilling.ShouldBe(billing);
         checkedRealistic.ShouldBe(checkedHere.Count);

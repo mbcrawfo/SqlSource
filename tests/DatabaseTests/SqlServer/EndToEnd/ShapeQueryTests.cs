@@ -12,7 +12,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // and class output models.  The tests read this project's own generated models, which the other engine's
 // project does not have, so they are not shared.
 [Collection(UsesSqlServer.Name)]
-public sealed class ShapeQueryTests(SqlServerContainer sqlServer)
+public sealed class ShapeQueryTests(SqlServerDatabases sqlServer)
 {
     [Fact]
     public async Task SearchAccounts_IdOrName_ReadsTheAccountsOfEitherParameter()

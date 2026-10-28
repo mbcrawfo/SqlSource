@@ -14,7 +14,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 // A query's parameters against a real server, each described in a session of its own.  The canary of the schema,
 // dbo.victim, must be there after every text that would drop it.
 [Collection(UsesSqlServer.Name)]
-public sealed class ParameterTests(SqlServerContainer sqlServer)
+public sealed class ParameterTests(SqlServerDatabases sqlServer)
 {
     private const string DropVictim = "DROP TABLE dbo.victim";
 

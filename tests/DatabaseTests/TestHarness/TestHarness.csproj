@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        The harness of the database tests, which every project of tests/DatabaseTests references: the images and the
+        start of a container, the files of the end-to-end databases and the driver-free containers.  A library of the
+        tests, never a test project of its own.  It brings no database driver, no Dapper and nothing of the tool, so
+        the projects that pin the oldest supported driver can reference it; each project brings its own driver.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>false</IsTestProject>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Shouldly" />
+        <!-- The containers of both engines: Testcontainers brings no database driver. -->
+        <PackageReference Include="Testcontainers.MsSql" />
+        <PackageReference Include="Testcontainers.PostgreSql" />
+        <!-- Assert.SkipWhen and Assert.SkipUnless, for EngineImage. -->
+        <PackageReference Include="xunit.v3.assert" />
+        <!-- TestContext and IAsyncLifetime, without what makes a project a test executable. -->
+        <PackageReference Include="xunit.v3.extensibility.core" />
+    </ItemGroup>
+    <ItemGroup>
+        <!--
+            The six projects of this folder, QueryMethodAllocation among them before it exists, and the three that
+            read EngineImage or ModelReflection.
+        -->
+        <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres" />
+        <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres.Npgsql8" />
+        <InternalsVisibleTo Include="SqlSource.DatabaseTests.QueryMethodAllocation" />
+        <InternalsVisibleTo Include="SqlSource.DatabaseTests.SqlServer" />
+        <InternalsVisibleTo Include="SqlSource.DatabaseTests.SqlServer.SqlClient61" />
+        <InternalsVisibleTo Include="SqlSource.Tests" />
+        <InternalsVisibleTo Include="SqlSource.Tool.Testing" />
+        <InternalsVisibleTo Include="SqlSource.Tool.Tests" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="../../../src/SqlSource/SqlSource.csproj" />
+        <ProjectReference Include="../../SqlSource.Testing/SqlSource.Testing.csproj" />
+    </ItemGroup>
+</Project>

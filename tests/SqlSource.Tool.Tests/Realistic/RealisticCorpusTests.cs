@@ -1,5 +1,6 @@
 using System.IO;
 using Shouldly;
+using SqlSource.DatabaseTests.TestHarness;
 using SqlSource.Snapshot;
 using SqlSource.Testing;
 using SqlSource.Tool.Testing.Realistic;

@@ -38,7 +38,6 @@
         <!-- The latest 8.0 release, the floor's driver: the end-to-end project gets 10 from the tool it references. -->
         <PackageReference Include="Npgsql" VersionOverride="8.0.9" />
         <PackageReference Include="Shouldly" />
-        <PackageReference Include="Testcontainers.PostgreSql" />
         <PackageReference Include="xunit.v3" />
     </ItemGroup>
     <ItemGroup>
@@ -48,6 +47,7 @@
             ReferenceOutputAssembly="false"
         />
         <ProjectReference Include="../../SqlSource.Testing/SqlSource.Testing.csproj" />
+        <ProjectReference Include="../TestHarness/TestHarness.csproj" />
     </ItemGroup>
     <Import Project="../../../src/SqlSource/build/SqlSource.targets" />
 </Project>

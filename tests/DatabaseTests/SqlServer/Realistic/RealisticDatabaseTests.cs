@@ -9,7 +9,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Realistic;
 // The database "realistic" of the corpus: made beside "fixtures", with its schema and its seed applied, and the
 // shared database left as it was.
 [Collection(UsesSqlServer.Name)]
-public sealed class RealisticDatabaseTests(SqlServerContainer sqlServer)
+public sealed class RealisticDatabaseTests(SqlServerDatabases sqlServer)
 {
     // Every user table of schema.sql, the history of a system-versioned table among them, and dbo.product_specs on a
     // server that has it.

@@ -12,7 +12,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // gives it to the method.  The others give the method an open connection or a closed one, which the method opens.
 // What the methods declare is read by MethodShapeTests.
 [Collection(UsesPostgres.Name)]
-public sealed class MethodQueryTests(PostgresContainer postgres)
+public sealed class MethodQueryTests(PostgresDatabases postgres)
 {
     [Fact]
     public async Task TouchAccount_OneRow_Returns1()

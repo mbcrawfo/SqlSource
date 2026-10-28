@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace SqlSource.Testing.EndToEnd;
+namespace SqlSource.DatabaseTests.TestHarness.EndToEnd;
 
 // The bytes that a call of a generated method allocates beyond a call of a hand-written method of the same query, for
 // the allocation tests of both end-to-end projects.  The calls are made in pairs, one of each method, one right after

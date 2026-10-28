@@ -19,7 +19,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // closes again a connection that the method opened.  Then a query whose rows fail past the row where a loop stops,
 // whose error the disposal throws.
 [Collection(UsesPostgres.Name)]
-public sealed class StreamingQueryTests(PostgresContainer postgres)
+public sealed class StreamingQueryTests(PostgresDatabases postgres)
 {
     // The seed's three accounts.
     private static readonly CollectedAccount[] Accounts = [new(1, "alice"), new(2, "bob"), new(3, "carol")];

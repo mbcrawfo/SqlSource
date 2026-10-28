@@ -30,9 +30,9 @@ public sealed class TestLayoutTests
             .Where(name => !name!.EndsWith("Tests.cs", StringComparison.Ordinal))
             .ShouldBeEmpty();
 
-    // A test project shares code through SqlSource.Testing or SqlSource.Tool.Testing, never by compiling another
-    // project's file.  RoslynFloor's compile of the generator's tests is the one exception.  The database projects
-    // sit one level down, in tests/DatabaseTests/.
+    // A test project shares code through a library, SqlSource.Testing, tests/DatabaseTests/TestHarness or
+    // SqlSource.Tool.Testing, never by compiling another project's file.  RoslynFloor's compile of the generator's
+    // tests is the one exception.  The database projects sit one level down, in tests/DatabaseTests/.
     [Fact]
     public void TestProjects_CompileIncludes_ReachNoFileOfAnotherProject() =>
         Directory
@@ -75,6 +75,45 @@ public sealed class TestLayoutTests
 
     private static IEnumerable<string> IncludesFromOutside(string projectFolder, XDocument project) =>
         ProjectIncludes.FromOutside(projectFolder, project, static item => item.Name.LocalName == "Compile");
+
+    // The harness is referenced by the projects that pin the oldest supported driver, so it brings no driver, no Dapper
+    // and nothing of the tool.
+    [Fact]
+    public void TestHarness_References_BringNoDriverAndNothingOfTheTool()
+    {
+        var project = XDocument.Load(RepositoryRoot.Path("tests/DatabaseTests/TestHarness/TestHarness.csproj"));
+
+        Includes(project, "PackageReference")
+            .ShouldBe(
+                [
+                    "Shouldly",
+                    "Testcontainers.MsSql",
+                    "Testcontainers.PostgreSql",
+                    "xunit.v3.assert",
+                    "xunit.v3.extensibility.core",
+                ],
+                ignoreOrder: true
+            );
+        Includes(project, "ProjectReference")
+            .Select(Path.GetFileName)
+            .ShouldBe(["SqlSource.csproj", "SqlSource.Testing.csproj"], ignoreOrder: true);
+    }
+
+    // SqlSource.Testing is referenced by RoslynFloor, so it brings no Testcontainers, which the harness carries for it.
+    [Fact]
+    public void SqlSourceTesting_PackageReferences_BringNoTestcontainers() =>
+        Includes(
+                XDocument.Load(RepositoryRoot.Path("tests/SqlSource.Testing/SqlSource.Testing.csproj")),
+                "PackageReference"
+            )
+            .Where(include => include.StartsWith("Testcontainers.", StringComparison.Ordinal))
+            .ShouldBeEmpty();
+
+    private static IEnumerable<string> Includes(XDocument project, string item) =>
+        project
+            .Descendants()
+            .Where(element => element.Name.LocalName == item)
+            .Select(element => (string)element.Attribute("Include")!);
 
     [Fact]
     public void GeneratorTests_FirstLine_SaysTheyAreShared() =>

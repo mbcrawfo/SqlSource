@@ -15,10 +15,6 @@
         -->
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
         <PackageReference Include="Shouldly" />
-        <!-- For EngineImage and SqlServerStart: it brings Testcontainers and no database driver. -->
-        <PackageReference Include="Testcontainers.MsSql" />
-        <!-- Assert.SkipWhen and Assert.SkipUnless, for EngineImage. -->
-        <PackageReference Include="xunit.v3.assert" />
         <!-- TestContext, without what makes a project a test executable. -->
         <PackageReference Include="xunit.v3.extensibility.core" />
     </ItemGroup>
@@ -44,6 +40,7 @@
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres.Npgsql8" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.SqlServer" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.SqlServer.SqlClient61" />
+        <InternalsVisibleTo Include="SqlSource.DatabaseTests.TestHarness" />
         <InternalsVisibleTo Include="SqlSource.Tool.Testing" />
         <InternalsVisibleTo Include="SqlSource.Tool.Tests" />
     </ItemGroup>

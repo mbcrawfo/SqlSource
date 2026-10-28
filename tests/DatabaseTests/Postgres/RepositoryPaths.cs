@@ -1,4 +1,5 @@
 using System.IO;
+using SqlSource.DatabaseTests.TestHarness;
 using SqlSource.Testing;
 
 namespace SqlSource.DatabaseTests.Postgres;

@@ -13,7 +13,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // on any other path.  An error of tables, relations, partitions or overloads is logged and never reported, so only a
 // test of the call itself sees it.
 [Collection(UsesPostgres.Name)]
-public sealed class HiddenTypesCallTests(PostgresContainer postgres)
+public sealed class HiddenTypesCallTests(PostgresDatabases postgres)
 {
     private async Task<(PostgresConnection Connection, PostgresLive Live)> HiddenAsync()
     {

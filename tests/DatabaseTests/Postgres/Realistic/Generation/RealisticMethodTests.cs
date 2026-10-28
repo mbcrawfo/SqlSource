@@ -20,7 +20,7 @@ namespace SqlSource.DatabaseTests.Postgres.Realistic.Generation;
 // truth is still RealisticNullabilitySafetyTests'.  Some sample must read a row, so that a run that reads nothing
 // cannot pass, and each sample runs in a transaction that is rolled back, since some cases write.
 [Collection(UsesPostgres.Name)]
-public sealed class RealisticMethodTests(PostgresContainer postgres)
+public sealed class RealisticMethodTests(PostgresDatabases postgres)
 {
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]

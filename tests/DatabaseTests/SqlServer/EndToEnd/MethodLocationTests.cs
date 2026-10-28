@@ -10,7 +10,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // async-method-suffix names, on the seed of "app", by the classes of LocationQueries.cs.  Each test reads where the
 // method is and how it can be called, and the rows.
 [Collection(UsesSqlServer.Name)]
-public sealed class MethodLocationTests(SqlServerContainer sqlServer)
+public sealed class MethodLocationTests(SqlServerDatabases sqlServer)
 {
     private const BindingFlags Statics = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
 

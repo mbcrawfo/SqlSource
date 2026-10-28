@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
+using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Shouldly;
-using SqlSource.Testing;
+using SqlSource.DatabaseTests.TestHarness;
 using Xunit;
 using Xunit.Sdk;
 
@@ -14,7 +15,7 @@ namespace SqlSource.DatabaseTests.SqlServer;
 // database of the fixtures with its schema applied, the databases of the end-to-end tests seeded, and the skips by the
 // server's major.
 [Collection(UsesSqlServer.Name)]
-public sealed class SqlServerContainerTests(SqlServerContainer sqlServer)
+public sealed class SqlServerDatabasesTests(SqlServerDatabases sqlServer)
 {
     // A tag that names a cumulative update, with a GDR over it or not, and the Ubuntu it runs on.
     private const string PinnedTag = @"^\d{4}-CU\d+(-GDR\d+)?-ubuntu-\d+\.\d+$";
@@ -33,7 +34,7 @@ public sealed class SqlServerContainerTests(SqlServerContainer sqlServer)
         await using var reader = await command.ExecuteReaderAsync(token);
 
         (await reader.ReadAsync(token)).ShouldBeTrue();
-        reader.GetString(0).ShouldBe(SqlServerContainer.Database);
+        reader.GetString(0).ShouldBe(SqlServerDatabases.Database);
         (await reader.IsDBNullAsync(1, token)).ShouldBeFalse();
         (await reader.IsDBNullAsync(2, token)).ShouldBeFalse();
     }
@@ -41,15 +42,15 @@ public sealed class SqlServerContainerTests(SqlServerContainer sqlServer)
     [Fact]
     public async Task InitializeAsync_EndToEnd_SeedsEachTable()
     {
-        SqlServerContainer.EndToEndDatabases.ShouldBe([
-            SqlServerContainer.AppDatabase,
-            SqlServerContainer.BillingDatabase,
+        SqlServerDatabases.EndToEndDatabases.ShouldBe([
+            SqlServerDatabases.AppDatabase,
+            SqlServerDatabases.BillingDatabase,
         ]);
 
-        (await CountAsync(SqlServerContainer.AppDatabase, "dbo.accounts")).ShouldBe(3);
-        (await CountAsync(SqlServerContainer.AppDatabase, "dbo.notes")).ShouldBe(3);
-        (await CountAsync(SqlServerContainer.AppDatabase, "dbo.all_types")).ShouldBe(2);
-        (await CountAsync(SqlServerContainer.BillingDatabase, "billing.invoices")).ShouldBe(3);
+        (await CountAsync(SqlServerDatabases.AppDatabase, "dbo.accounts")).ShouldBe(3);
+        (await CountAsync(SqlServerDatabases.AppDatabase, "dbo.notes")).ShouldBe(3);
+        (await CountAsync(SqlServerDatabases.AppDatabase, "dbo.all_types")).ShouldBe(2);
+        (await CountAsync(SqlServerDatabases.BillingDatabase, "billing.invoices")).ShouldBe(3);
     }
 
     // Row 1 has a value in every column, and row 2 NULL in every column but id and rowversion_value, which the server
@@ -58,7 +59,7 @@ public sealed class SqlServerContainerTests(SqlServerContainer sqlServer)
     public async Task InitializeAsync_AllTypes_HasAValueInEveryColumnOfRow1AndNullInEveryColumnButTwoOfRow2()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = sqlServer.SourceOf(SqlServerContainer.AppDatabase);
+        await using var source = sqlServer.SourceOf(SqlServerDatabases.AppDatabase);
         await using var command = source.CreateCommand("SELECT * FROM dbo.all_types ORDER BY id");
         await using var reader = await command.ExecuteReaderAsync(token);
 
@@ -75,7 +76,7 @@ public sealed class SqlServerContainerTests(SqlServerContainer sqlServer)
     [Fact]
     public async Task InitializeAsync_NewTypes_OnlyOn2025()
     {
-        await using var source = sqlServer.SourceOf(SqlServerContainer.AppDatabase);
+        await using var source = sqlServer.SourceOf(SqlServerDatabases.AppDatabase);
         await using var command = source.CreateCommand("SELECT OBJECT_ID('dbo.new_types')");
 
         var made = await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);
@@ -108,6 +109,16 @@ public sealed class SqlServerContainerTests(SqlServerContainer sqlServer)
 
         build.ShouldBe(SqlServerContainer.ImageBuilds[EngineImage.SqlServer.Image]);
     }
+
+    // The build of 2025 is 17.0.5015.4: the major is the build's first number.
+    [Fact]
+    public void Major_OfTheRun_IsTheMajorOfTheImagesBuild() =>
+        sqlServer.Major.ShouldBe(
+            int.Parse(
+                SqlServerContainer.ImageBuilds[EngineImage.SqlServer.Image].Split('.')[0],
+                CultureInfo.InvariantCulture
+            )
+        );
 
     [Fact]
     public void ImageBuilds_EveryImage_IsPinnedAndNotLatest()

@@ -1,8 +1,9 @@
 using System;
+using System.Globalization;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
-using SqlSource.Testing;
+using SqlSource.DatabaseTests.TestHarness;
 using Xunit;
 using Xunit.Sdk;
 
@@ -11,7 +12,7 @@ namespace SqlSource.DatabaseTests.Postgres;
 // The container itself: the image the variable names, the database of the fixtures with its schema applied, the
 // databases of the end-to-end tests seeded, and the skips by the server's major.
 [Collection(UsesPostgres.Name)]
-public sealed class PostgresContainerTests(PostgresContainer postgres)
+public sealed class PostgresDatabasesTests(PostgresDatabases postgres)
 {
     [Fact]
     public async Task ConnectionString_OfTheContainer_OpensTheFixtureDatabaseOfTheImage()
@@ -26,30 +27,37 @@ public sealed class PostgresContainerTests(PostgresContainer postgres)
         await using var reader = await command.ExecuteReaderAsync(token);
 
         (await reader.ReadAsync(token)).ShouldBeTrue();
-        reader.GetString(0).ShouldBe(PostgresContainer.Database);
+        reader.GetString(0).ShouldBe(PostgresDatabases.Database);
         reader.GetBoolean(2).ShouldBeTrue();
         reader.GetBoolean(3).ShouldBeTrue();
         // "postgres:18.6" runs a server whose server_version is "18.6 (Debian 18.6-1.pgdg13+1)".
         reader.GetString(1).Split(' ')[0].ShouldBe(EngineImage.TagOf(EngineImage.Postgres.Image));
     }
 
+    // server_version_num is 180006 on 18.6: the major is the tag's first number.
+    [Fact]
+    public void Major_OfTheRun_IsTheMajorOfTheImagesTag() =>
+        postgres.Major.ShouldBe(
+            int.Parse(EngineImage.TagOf(EngineImage.Postgres.Image).Split('.')[0], CultureInfo.InvariantCulture)
+        );
+
     [Fact]
     public async Task InitializeAsync_EndToEndDatabases_AreSeeded()
     {
-        PostgresContainer.EndToEndDatabases.ShouldBe([
-            PostgresContainer.AppDatabase,
-            PostgresContainer.BillingDatabase,
+        PostgresDatabases.EndToEndDatabases.ShouldBe([
+            PostgresDatabases.AppDatabase,
+            PostgresDatabases.BillingDatabase,
         ]);
 
-        (await CountAsync(PostgresContainer.AppDatabase, "all_types")).ShouldBe(2);
-        (await CountAsync(PostgresContainer.AppDatabase, "accounts")).ShouldBe(3);
-        (await CountAsync(PostgresContainer.BillingDatabase, "billing.invoices")).ShouldBe(3);
+        (await CountAsync(PostgresDatabases.AppDatabase, "all_types")).ShouldBe(2);
+        (await CountAsync(PostgresDatabases.AppDatabase, "accounts")).ShouldBe(3);
+        (await CountAsync(PostgresDatabases.BillingDatabase, "billing.invoices")).ShouldBe(3);
     }
 
     [Fact]
     public async Task InitializeAsync_AllTypes_HasAValueInEveryColumnOfRow1AndNullInEveryColumnButIdOfRow2()
     {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionStringOf(PostgresContainer.AppDatabase));
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionStringOf(PostgresDatabases.AppDatabase));
         await using var command = source.CreateCommand(
             "SELECT id, (SELECT count(*) FROM jsonb_each(to_jsonb(t)) WHERE value = 'null'::jsonb), "
                 + "(SELECT count(*) FROM information_schema.columns "
@@ -72,7 +80,7 @@ public sealed class PostgresContainerTests(PostgresContainer postgres)
     [Fact]
     public async Task InitializeAsync_AllTypesRegconfig_IsTheFixedOidOfSimple()
     {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionStringOf(PostgresContainer.AppDatabase));
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionStringOf(PostgresDatabases.AppDatabase));
         await using var command = source.CreateCommand("SELECT regconfig_value::oid FROM all_types WHERE id = 1");
 
         var oid = await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);

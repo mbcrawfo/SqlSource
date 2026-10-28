@@ -21,7 +21,7 @@
 # Usage: describe-end-to-end.sh
 set -euo pipefail
 
-IMAGES='tests/SqlSource.Testing/DefaultImages.cs'
+IMAGES='tests/DatabaseTests/TestHarness/DefaultImages.cs'
 
 POSTGRES_PROJECT='tests/DatabaseTests/Postgres'
 POSTGRES_END_TO_END="$POSTGRES_PROJECT/EndToEnd"
@@ -99,7 +99,7 @@ describe_postgres() {
     fi
     echo 'done'
 
-    # The schemas and seeds are the files that PostgresContainer applies, in the same order.
+    # The schemas and seeds are the files that PostgresDatabases of the PostgreSQL project applies, in the same order.
     for database in "${POSTGRES_DATABASES[@]}"; do
         printf 'Creating the database %s ... ' "$database"
         docker exec "$postgres_container" psql -v ON_ERROR_STOP=1 -q -U postgres -c "CREATE DATABASE $database" \
@@ -162,11 +162,11 @@ describe_sqlserver() {
     done
     echo 'done'
 
-    # The schemas and seeds are the files that SqlServerContainer applies, in the same order: those of "realistic",
-    # then those of "app", with new-types.sql after them, since the default image is SQL Server 2025, then those of
-    # "billing".  sqlcmd splits each at its lines of GO, and -f 65001 names the files' code page, UTF-8, rather than
-    # leaving it to sqlcmd's default.  Keep -f 65001 on the run of each file, so that each is read as UTF-8, as
-    # SqlServerContainer reads it.
+    # The schemas and seeds are the files that SqlServerDatabases of the SQL Server project applies, in the same order:
+    # those of "realistic", then those of "app", with new-types.sql after them, since the default image is SQL Server
+    # 2025, then those of "billing".  sqlcmd splits each at its lines of GO, and -f 65001 names the files' code page,
+    # UTF-8, rather than leaving it to sqlcmd's default.  Keep -f 65001 on the run of each file, so that each is read as
+    # UTF-8, as SqlServerContainer reads it.
     for database in "${SQLSERVER_DATABASES[@]}"; do
         printf 'Creating the database %s ... ' "$database"
         docker exec "$sqlserver_container" "${SQLCMD[@]}" -Q "CREATE DATABASE [$database]" >/dev/null

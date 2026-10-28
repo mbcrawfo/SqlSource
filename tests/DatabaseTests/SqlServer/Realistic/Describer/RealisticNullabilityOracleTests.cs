@@ -13,7 +13,7 @@ namespace SqlSource.DatabaseTests.SqlServer.Realistic.Describer;
 // row is seen, a sample is bound to its parameter, of an alias type too and as an expression that ends in a comment,
 // and a query that fails throws its own error.
 [Collection(UsesSqlServer.Name)]
-public sealed class RealisticNullabilityOracleTests(SqlServerContainer sqlServer)
+public sealed class RealisticNullabilityOracleTests(SqlServerDatabases sqlServer)
 {
     private const string CountStock = "SELECT COUNT_BIG(*) FROM dbo.stock";
 

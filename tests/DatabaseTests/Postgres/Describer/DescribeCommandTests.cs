@@ -46,11 +46,11 @@ public sealed class DescribeCommandTests : IDisposable
             .Where(static found => !File.Exists(Path.Combine(found.Folder, FixtureCase.ExplainSettingsFile))),
     ];
 
-    private readonly PostgresContainer _postgres;
+    private readonly PostgresDatabases _postgres;
     private readonly CliRun _run = new();
     private readonly TestProject _project;
 
-    public DescribeCommandTests(PostgresContainer postgres)
+    public DescribeCommandTests(PostgresDatabases postgres)
     {
         _postgres = postgres;
         _run.Describers.Add(new PostgresDescriber());

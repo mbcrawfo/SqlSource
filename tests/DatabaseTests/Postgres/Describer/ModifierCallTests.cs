@@ -10,7 +10,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 
 // "columns", "types" and "spellings" against a real server, for what they say of a type modifier.
 [Collection(UsesPostgres.Name)]
-public sealed class ModifierCallTests(PostgresContainer postgres)
+public sealed class ModifierCallTests(PostgresDatabases postgres)
 {
     private const string Statement = "modifier_columns";
 

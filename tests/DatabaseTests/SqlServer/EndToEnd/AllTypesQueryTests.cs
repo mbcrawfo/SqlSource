@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using Shouldly;
-using SqlSource.Testing.EndToEnd;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
-using static SqlSource.Testing.EndToEnd.ModelReflection;
+using static SqlSource.DatabaseTests.TestHarness.EndToEnd.ModelReflection;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
@@ -17,7 +17,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // inserted with InsertAllTypesArgs, built from the values of row 1, and read back by OUTPUT, for every type that Dapper
 // sends exactly.  Each insert runs in a transaction that is rolled back.
 [Collection(UsesSqlServer.Name)]
-public sealed class AllTypesQueryTests(SqlServerContainer sqlServer)
+public sealed class AllTypesQueryTests(SqlServerDatabases sqlServer)
 {
     private const int InsertedId = 3;
 

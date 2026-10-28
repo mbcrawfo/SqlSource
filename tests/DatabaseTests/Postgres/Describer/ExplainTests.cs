@@ -11,7 +11,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // "explain" against a real server: the plan is a generic one that PlanNode reads, and the call leaves the describe's
 // transaction as it found it.
 [Collection(UsesPostgres.Name)]
-public sealed class ExplainTests(PostgresContainer postgres)
+public sealed class ExplainTests(PostgresDatabases postgres)
 {
     private const string Statement = "walk_explain";
 
