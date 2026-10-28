@@ -278,7 +278,7 @@ Which errors of `check` are a disagreement is decided in one place, `NpgsqlCheck
 
 ## Why a query cannot run a statement
 
-Nothing a `.sql` file holds can make the describer run a statement.  That is a security invariant, and the tool's [`AGENTS.md`](../../src/SqlSource.Tool/AGENTS.md) holds it with its reasons in full, since an agent cannot keep it safely without them.  This section is the map of what the describer sends.
+Nothing a `.sql` file holds can make the describer run a statement.  That is a security invariant, and the describer's [`AGENTS.md`](../../src/SqlSource.Tool/Describing/Postgres/AGENTS.md) holds it with its reasons in full, since an agent cannot keep it safely without them.  This section is the map of what the describer sends.
 
 Two texts hold a user's SQL, and each goes through a batch of one command, as that rule requires:
 

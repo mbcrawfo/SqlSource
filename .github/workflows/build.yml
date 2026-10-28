@@ -24,6 +24,8 @@ env:
   CONFIGURATION: Release
   DOTNET_NOLOGO: 'true'
   # MSBuild reads environment variables as properties, so every dotnet command of every job sees the same version.
+  # Version values reach MSBuild only through these two, never as -p: flags, so that the format check, build, test
+  # and pack jobs cannot disagree.
   BuildNumber: ${{ github.run_number }}
   VersionSuffix: ${{ inputs.version-suffix }}
 

@@ -1,0 +1,7 @@
+# AGENTS.md - src/SqlSource/Settings
+
+- **No file access, no symbols, no pipeline types, and nothing from `Parsing/`, `Generation/` or `Diagnostics/`.**  A rule shared with another folder goes in the root namespace, as `SqlIdentifier`, `DatabaseName` and `SystemSchemas` do.
+- **The column types follow the type override's rules, in `Settings/ColumnTypes/`, with one array for both engines.**  `ColumnTypeMap` merges and weighs them as `TypeOverrideMap` does the type override's, and the two share their sorted list, `Settings/SortedKeyedList.cs`, and their ranking of a place, `SettingPlaces.Specificity`, so a change to either changes both settings; so never drop a `default` before `ColumnTypeMap.Find`, and compare keys only through it; `ColumnTypeGrammar` is their one reader, and reads every type with `TypeOverrideGrammar`'s `TryReadType`, so a change to that changes both settings.  See [the column types](../../../docs/architecture/generator.md#the-column-types).
+- **A value from a fixed list is read by `SettingValue.TryReadChoice`**, from the names of an enum's members, so renaming a member changes what a user may write, and with it the list and the pattern of that choice in `schemas/settings-v1.schema.json`, which `SettingsFileSchemaTests` checks against the enum.
+
+> Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.
