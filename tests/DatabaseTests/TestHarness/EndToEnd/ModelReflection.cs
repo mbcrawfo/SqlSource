@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using Shouldly;
 
-namespace SqlSource.Testing.EndToEnd;
+namespace SqlSource.DatabaseTests.TestHarness.EndToEnd;
 
 // The kinds of model that the generator writes: a record or a class, sealed or not.
 internal enum ModelShape

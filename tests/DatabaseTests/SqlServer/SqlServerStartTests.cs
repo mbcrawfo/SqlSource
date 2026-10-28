@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DotNet.Testcontainers.Containers;
 using Shouldly;
-using SqlSource.Testing;
+using SqlSource.DatabaseTests.TestHarness;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer;

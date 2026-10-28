@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
-using SqlSource.Testing;
+using SqlSource.DatabaseTests.TestHarness;
 using Xunit;
 using Xunit.Sdk;
 

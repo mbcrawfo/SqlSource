@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using Shouldly;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using SqlSource.Generation.Models;
 using SqlSource.Settings;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
-using SqlSource.Testing.EndToEnd;
 using Xunit;
 
 namespace SqlSource.Tool.Testing.Realistic;

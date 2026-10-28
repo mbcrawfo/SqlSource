@@ -29,5 +29,6 @@
         <ProjectReference Include="../../src/SqlSource.Tool/SqlSource.Tool.csproj" />
         <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
         <ProjectReference Include="../SqlSource.Testing/SqlSource.Testing.csproj" />
+        <ProjectReference Include="../DatabaseTests/TestHarness/TestHarness.csproj" />
     </ItemGroup>
 </Project>

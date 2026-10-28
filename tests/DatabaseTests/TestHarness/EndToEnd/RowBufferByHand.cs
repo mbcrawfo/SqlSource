@@ -1,4 +1,4 @@
-namespace SqlSource.Testing.EndToEnd;
+namespace SqlSource.DatabaseTests.TestHarness.EndToEnd;
 
 // The pooled buffer that a generated many method of any pooled collection type reads its rows into, for the
 // hand-written methods of the allocation tests of both end-to-end projects, which make the generated method's calls.

@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Shouldly;
 using SqlSource.DatabaseTests.SqlServer.EndToEnd.Shapes;
-using SqlSource.Testing.EndToEnd;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;

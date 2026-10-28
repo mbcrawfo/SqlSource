@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
-using SqlSource.Testing;
+using SqlSource.DatabaseTests.TestHarness;
 using Testcontainers.MsSql;
 using Xunit;
 

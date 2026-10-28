@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using SqlSource.DatabaseTests.TestHarness;
 using SqlSource.Snapshot;
 using SqlSource.Testing;
 

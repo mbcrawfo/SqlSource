@@ -4,7 +4,7 @@ using System.Data.Common;
 using System.Threading.Tasks;
 using Npgsql;
 using SqlSource.DatabaseTests.Postgres.Realistic;
-using SqlSource.Testing;
+using SqlSource.DatabaseTests.TestHarness;
 using Testcontainers.PostgreSql;
 using Xunit;
 

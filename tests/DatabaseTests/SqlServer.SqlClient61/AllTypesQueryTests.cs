@@ -5,7 +5,7 @@ using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.SqlTypes;
 using Shouldly;
-using SqlSource.Testing.EndToEnd;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.SqlClient61;

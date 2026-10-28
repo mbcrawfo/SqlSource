@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Shouldly;
 
-namespace SqlSource.Testing.EndToEnd;
+namespace SqlSource.DatabaseTests.TestHarness.EndToEnd;
 
 // The rows of all_types and of new_types that the seed of SQL Server's end-to-end database "app" holds, as the models
 // of the tables read through Dapper have them: row 1 with a value in every column, row 2 with NULL in every column but

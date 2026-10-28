@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Npgsql;
 using NpgsqlTypes;
 using Shouldly;
-using SqlSource.Testing.EndToEnd;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd;

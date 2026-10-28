@@ -1,6 +1,6 @@
 using System;
 using Shouldly;
-using SqlSource.Testing;
+using SqlSource.DatabaseTests.TestHarness;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer;

@@ -26,7 +26,6 @@
         <PackageReference Include="Microsoft.SqlServer.Types" />
         <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
         <PackageReference Include="Shouldly" />
-        <PackageReference Include="Testcontainers.MsSql" />
         <PackageReference Include="xunit.v3" />
     </ItemGroup>
     <ItemGroup>
@@ -69,6 +68,7 @@
             ReferenceOutputAssembly="true"
         />
         <ProjectReference Include="../../SqlSource.Testing/SqlSource.Testing.csproj" />
+        <ProjectReference Include="../TestHarness/TestHarness.csproj" />
         <ProjectReference Include="../../SqlSource.Tool.Testing/SqlSource.Tool.Testing.csproj" />
     </ItemGroup>
     <Import Project="../../../src/SqlSource/build/SqlSource.targets" />

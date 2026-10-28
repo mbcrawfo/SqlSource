@@ -4,7 +4,7 @@
 -- second, nor rowversion_value, which the server fills.  WriteAllTypes writes every column but rowversion_value through
 -- its method, which binds each parameter as its type; the queries after it bind the types whose binding has facets, in
 -- a WHERE or a write.  tests/DatabaseTests/SqlServer.SqlClient61 links this file, so ListTinyintLevels names an
--- enum of tests/SqlSource.Testing, which both projects reference.
+-- enum of tests/DatabaseTests/TestHarness, which both projects reference.
 
 -- name: ListAllTypes
 -- summary: Every row of all_types, with date given back to the type map.
@@ -145,7 +145,7 @@ SELECT value FROM @stored WHERE value = @value;
 
 -- name: ListTinyintLevels
 -- summary: The tinyint values of the rows that hold a level, sent and read as a C# enum over byte.
--- type-override: tinyint = SqlSource.Testing.EndToEnd.Level
+-- type-override: tinyint = SqlSource.DatabaseTests.TestHarness.EndToEnd.Level
 SELECT tinyint_value
 FROM dbo.all_types
 WHERE tinyint_value = @level

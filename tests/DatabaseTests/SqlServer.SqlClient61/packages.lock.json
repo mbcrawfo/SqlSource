@@ -67,15 +67,6 @@
         "resolved": "10.35.0.4138",
         "contentHash": "T5o/tuyPw9pHRkyWxW07TkSri4I4pLpqwH922JuhphDjHAM7BUHaGE67h/w+65evHsIar8mYB2Ey6OmOLj9QDw=="
       },
-      "Testcontainers.MsSql": {
-        "type": "Direct",
-        "requested": "[4.16.0, )",
-        "resolved": "4.16.0",
-        "contentHash": "UVLYLyq9CDSfLZUeu+CyDmwV7wo2LMNlpBLP8ZO9HG42WT3KTMI/p7qYesiCAZmo6GUeWH/Z6SOIw66Y4qnWuw==",
-        "dependencies": {
-          "Testcontainers": "4.16.0"
-        }
-      },
       "xunit.v3": {
         "type": "Direct",
         "requested": "[4.0.1, )",
@@ -521,14 +512,24 @@
       "sqlsource": {
         "type": "Project"
       },
+      "SqlSource.DatabaseTests.TestHarness": {
+        "type": "Project",
+        "dependencies": {
+          "Shouldly": "[4.3.0, )",
+          "SqlSource": "[0.1.0-dev, )",
+          "SqlSource.Testing": "[0.1.0-dev, )",
+          "Testcontainers.MsSql": "[4.16.0, )",
+          "Testcontainers.PostgreSql": "[4.16.0, )",
+          "xunit.v3.assert": "[4.0.1, )",
+          "xunit.v3.extensibility.core": "[4.0.1, )"
+        }
+      },
       "sqlsource.testing": {
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.8.0, )",
           "Shouldly": "[4.3.0, )",
           "SqlSource": "[0.1.0-dev, )",
-          "Testcontainers.MsSql": "[4.16.0, )",
-          "xunit.v3.assert": "[4.0.1, )",
           "xunit.v3.extensibility.core": "[4.0.1, )"
         }
       },
@@ -552,6 +553,24 @@
         "requested": "[9.0.21, )",
         "resolved": "9.0.21",
         "contentHash": "KD+oHoYIxwNCajjVe58WVwq9cRpum+Pg3tRveDRtkcaw6w3oc7sNBoMRtb5P5OehI3bgv1ucMpgjf8lpj5J96A=="
+      },
+      "Testcontainers.MsSql": {
+        "type": "CentralTransitive",
+        "requested": "[4.16.0, )",
+        "resolved": "4.16.0",
+        "contentHash": "UVLYLyq9CDSfLZUeu+CyDmwV7wo2LMNlpBLP8ZO9HG42WT3KTMI/p7qYesiCAZmo6GUeWH/Z6SOIw66Y4qnWuw==",
+        "dependencies": {
+          "Testcontainers": "4.16.0"
+        }
+      },
+      "Testcontainers.PostgreSql": {
+        "type": "CentralTransitive",
+        "requested": "[4.16.0, )",
+        "resolved": "4.16.0",
+        "contentHash": "QqvFS8Oj+i6deH3QJOMd7jgFF9P3h7RZ37wOaoR97ZahMcSYMYCb+COR4nUVznT1d7EavEcZdUs1QV0ow69JiA==",
+        "dependencies": {
+          "Testcontainers": "4.16.0"
+        }
       },
       "xunit.analyzers": {
         "type": "CentralTransitive",

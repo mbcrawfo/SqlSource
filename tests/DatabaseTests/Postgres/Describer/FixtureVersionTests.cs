@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Shouldly;
-using SqlSource.Testing;
+using SqlSource.DatabaseTests.TestHarness;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 

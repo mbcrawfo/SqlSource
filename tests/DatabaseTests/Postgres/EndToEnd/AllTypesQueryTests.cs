@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 using Dapper;
 using Npgsql;
 using Shouldly;
-using SqlSource.Testing.EndToEnd;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
-using static SqlSource.Testing.EndToEnd.ModelReflection;
+using static SqlSource.DatabaseTests.TestHarness.EndToEnd.ModelReflection;
 
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 

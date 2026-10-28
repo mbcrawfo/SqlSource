@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using DotNet.Testcontainers.Containers;
 using Xunit;
 
-namespace SqlSource.Testing;
+namespace SqlSource.DatabaseTests.TestHarness;
 
 // Starts a SQL Server container of the tests, and a new one, once, when the first stopped before it was ready with
 // sqlservr's fatal error: the crash of TD-0072, which comes at random on CI's runners and has no known cause.

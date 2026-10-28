@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using DotNet.Testcontainers.Containers;
 using Xunit;
 
-namespace SqlSource.Testing;
+namespace SqlSource.DatabaseTests.TestHarness;
 
 // What the tests of an engine's containers share: the image they run on, which an environment variable can change, the
 // majors that the tests pin answers for, the gates that skip a test on a server whose version it does not suit, and

@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Shouldly;
-using SqlSource.Testing.EndToEnd;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 
 namespace SqlSource.Tests;

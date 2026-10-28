@@ -5,7 +5,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using SqlSource.DatabaseTests.SqlServer.Realistic;
-using SqlSource.Testing;
+using SqlSource.DatabaseTests.TestHarness;
 using Testcontainers.MsSql;
 using Xunit;
 

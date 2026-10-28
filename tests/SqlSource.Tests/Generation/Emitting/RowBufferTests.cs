@@ -25,7 +25,8 @@ public sealed class RowBufferTests
     // and its declaration, in place of the generated one's.
     private static readonly string HandWrittenCopy = RepositoryRoot.Path(
         "tests",
-        "SqlSource.Testing",
+        "DatabaseTests",
+        "TestHarness",
         "EndToEnd",
         "RowBufferByHand.cs"
     );

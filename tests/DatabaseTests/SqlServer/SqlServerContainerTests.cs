@@ -4,7 +4,7 @@ using System.Data.Common;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Shouldly;
-using SqlSource.Testing;
+using SqlSource.DatabaseTests.TestHarness;
 using Xunit;
 using Xunit.Sdk;
 

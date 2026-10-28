@@ -1,4 +1,4 @@
-namespace SqlSource.Testing;
+namespace SqlSource.DatabaseTests.TestHarness;
 
 // The default image of each engine's tests: one constant for each, so that the tests and the scripts read an image from
 // one place.

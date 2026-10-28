@@ -10,7 +10,7 @@ using Npgsql;
 using NpgsqlTypes;
 using Shouldly;
 using SqlSource.DatabaseTests.Postgres.EndToEnd.Types;
-using SqlSource.Testing.EndToEnd;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd;

@@ -232,7 +232,7 @@ dotnet_diagnostic.CA1515.severity = none
 # CA2007 (ConfigureAwait): xUnit1030 forbids the call in a test.
 dotnet_diagnostic.CA2007.severity = none
 
-[tests/SqlSource.Testing/EndToEndFiles.cs]
+[tests/DatabaseTests/TestHarness/EndToEndFiles.cs]
 # CA2100 (review SQL for user input): the place that makes a command of each batch of a file of the repository that
 # builds a test database, never of what a user writes.
 dotnet_diagnostic.CA2100.severity = none

@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using Shouldly;
-using SqlSource.Testing.EndToEnd;
+using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
-using static SqlSource.Testing.EndToEnd.ModelReflection;
+using static SqlSource.DatabaseTests.TestHarness.EndToEnd.ModelReflection;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 

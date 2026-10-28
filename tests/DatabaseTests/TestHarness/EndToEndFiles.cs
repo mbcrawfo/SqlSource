@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace SqlSource.Testing;
+namespace SqlSource.DatabaseTests.TestHarness;
 
 // The files of the end-to-end databases "app" and "billing", in the repository: a folder for each in the engine's
 // folder, with its schema.sql and its seed.sql, which tools/describe-end-to-end.sh applies in the same order.  Every
