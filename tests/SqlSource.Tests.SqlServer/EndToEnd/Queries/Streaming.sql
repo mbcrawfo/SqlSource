@@ -65,15 +65,19 @@ ORDER BY id;
 SELECT 1;
 
 -- name: StreamThenRaise
--- summary: The accounts, and then a statement that raises an error, which the stream meets when it is disposed.
+-- summary: The accounts, a mark on the session, and then an error that the method does not report.
 -- output-model: CollectedAccount
+-- SET CONTEXT_INFO keeps its value for the session, which a test reads from the same connection: the mark is there when
+-- the batch ran as far as the THROW.
 SELECT id, name
 FROM dbo.accounts
 ORDER BY id;
+SET CONTEXT_INFO 0x02;
 THROW 50000, 'after the rows', 1;
 
 -- name: StreamNumbersThenMark
 -- summary: The numbers from 1 to a count, and then a statement that marks the session once the numbers are read.
+-- This is StreamNumbers with the mark after it, and the two are meant to match.
 -- SET CONTEXT_INFO keeps its value for the session, which a test reads from the same connection: the mark is there only
 -- when the batch ran to its end, and a command that was cancelled partway through the numbers never reaches it.
 WITH digits (v) AS (SELECT v FROM (VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9)) AS d (v))

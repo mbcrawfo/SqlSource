@@ -371,29 +371,36 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
         connection.State.ShouldBe(ConnectionState.Closed);
     }
 
-    // The rows of the first statement are yielded, and the error of the second is not thrown: SqlClient reads the rest
-    // of the batch when the reader is disposed, and drops an error that comes after the last result set that it was
-    // asked for.
+    // The rows of the first statement are yielded and nothing is thrown, though the batch ran as far as the THROW: the
+    // statement before it set a mark on the session, which the test reads back on the same connection, open for that.
+    // The batch's error is not reported, as SqlClient reads the rest of the batch when the reader is disposed and drops
+    // an error that follows the last result set that it was asked for.  The mark shows that the batch reached the
+    // THROW, and not that the THROW ran.
     [Fact]
-    public async Task StreamThenRaise_ErrorAfterTheRows_IsNotThrown()
+    public async Task StreamThenRaise_ErrorAfterTheRows_RunsTheBatchToTheThrowAndIsNotThrown()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(token);
+        await ClearMarkAsync(connection, token);
 
         var streamed = await connection.StreamThenRaise(cancellationToken: token).ToListAsync(token);
 
         streamed.ShouldBe(Accounts);
-        connection.State.ShouldBe(ConnectionState.Closed);
+        (await ReadMarkAsync(connection, token)).ShouldBe(2);
+        connection.State.ShouldBe(ConnectionState.Open);
     }
 
     // The same stream by hand, to see which calls would throw: the MoveNextAsync that ends the loop returns false, and
-    // so does the DisposeAsync after it, on an open connection that the disposal leaves usable.
+    // so does the DisposeAsync after it, on an open connection that the disposal leaves usable, with the mark of the
+    // statement before the THROW set.
     [Fact]
     public async Task StreamThenRaise_ErrorAfterTheRows_ThrowsFromNeitherMoveNextAsyncNorDisposeAsync()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(token);
+        await ClearMarkAsync(connection, token);
         var enumerator = connection.StreamThenRaise(cancellationToken: token).GetAsyncEnumerator(token);
         var rows = new List<CollectedAccount>();
 
@@ -405,9 +412,8 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
         await enumerator.DisposeAsync();
 
         rows.ShouldBe(Accounts);
+        (await ReadMarkAsync(connection, token)).ShouldBe(2);
         connection.State.ShouldBe(ConnectionState.Open);
-        await using var select = new SqlCommand("SELECT 1", connection);
-        (await select.ExecuteScalarAsync(token)).ShouldBe(1);
     }
 
     // A break reads and discards the rest of the result, and the statements after it run: SET CONTEXT_INFO marks the
@@ -419,10 +425,7 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(token);
-        await using (var clear = new SqlCommand("SET CONTEXT_INFO 0x00", connection))
-        {
-            _ = await clear.ExecuteNonQueryAsync(token);
-        }
+        await ClearMarkAsync(connection, token);
 
         var rows = 0;
         await foreach (
@@ -439,7 +442,20 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
         }
 
         rows.ShouldBe(10);
+        (await ReadMarkAsync(connection, token)).ShouldBe(1);
+    }
+
+    // The mark of the queries that end with SET CONTEXT_INFO: the first byte of the session's context, which stays on
+    // an open connection and which the pool resets when the connection is returned to it.
+    private static async Task ClearMarkAsync(SqlConnection connection, CancellationToken token)
+    {
+        await using var clear = new SqlCommand("SET CONTEXT_INFO 0x00", connection);
+        _ = await clear.ExecuteNonQueryAsync(token);
+    }
+
+    private static async Task<object?> ReadMarkAsync(SqlConnection connection, CancellationToken token)
+    {
         await using var select = new SqlCommand("SELECT CAST(SUBSTRING(CONTEXT_INFO(), 1, 1) AS int)", connection);
-        (await select.ExecuteScalarAsync(token)).ShouldBe(1);
+        return await select.ExecuteScalarAsync(token);
     }
 }
