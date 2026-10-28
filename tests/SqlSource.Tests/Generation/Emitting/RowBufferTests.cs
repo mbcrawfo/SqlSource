@@ -21,8 +21,8 @@ public sealed class RowBufferTests
         Collection = CollectionKind.Array,
     };
 
-    // The hand-written copy of the buffer that the allocation tests of both end-to-end projects read their rows into,
-    // and its declaration, in place of the generated one's.
+    // The hand-written copy of the buffer that the allocation tests of tests/DatabaseTests/QueryMethodAllocation read
+    // their rows into, and its declaration, in place of the generated one's.
     private static readonly string HandWrittenCopy = RepositoryRoot.Path(
         "tests",
         "DatabaseTests",
