@@ -1,12 +1,11 @@
 # AGENTS.md - docs/manual
 
-How to write and maintain the user documentation: the pages of this folder and the two packed readmes, `README.md` and `src/SqlSource.Tool/README.md`.  The documentation describes what works today and marks what is coming, so every change a user can see, and every phase of query generation that lands, updates it in the same PR.
+How to write and maintain the user documentation: the pages of this folder and the two packed readmes, `README.md` and `src/SqlSource.Tool/README.md`.
 
 ## Who reads what
 
-- **`README.md`** is for the average user, who should never need to read further: what SqlSource does and why, a status line, the databases it works with, installation and the supported environments, getting started in five steps, "Only want to generate models?", "Just want to keep your SQL out of code files?", a FAQ of five to ten items, "NodaTime and other libraries", "Custom type mapping" and "Where to next".  It shows the common path and links to the manual for every option.  It never repeats the manual's reference tables of markers, settings, dialects, generator parameters or diagnostics.  A FAQ answer is a few sentences that link to a recipe where one exists.
-- **`src/SqlSource.Tool/README.md`** is the tool's page on nuget.org: what the tool is for, how to install it, the three `describe` commands, and links to `tool.md` and the README.  Keep it that short; the tool's behaviour goes in `tool.md`.
-- **This folder** is for the user with a specific need.  Each topic has one home:
+- **`README.md`**: a status line, the databases it works with, installation and the supported environments, getting started in five steps, "Only want to generate models?", "Just want to keep your SQL out of code files?", a FAQ of five to ten items, "NodaTime and other libraries", "Custom type mapping" and "Where to next".  It never repeats the manual's reference tables of markers, settings, dialects, generator parameters or diagnostics.  A FAQ answer is a few sentences that link to a recipe where one exists.
+- **This folder**: each topic has one home:
 
 | Page | Holds |
 |----|----|
@@ -24,7 +23,7 @@ How to write and maintain the user documentation: the pages of this folder and t
 
 ## Write effects, never internals
 
-A user needs to know what they write, what they get and what they see: the effect on their parameters, their generated models and their build.  They do not need to know how SqlSource gets there.  Never name the describer, a plan or a plan walk, `EXPLAIN`, a heuristic, a provenance value, a capture file, a type of the library, or a field of the sidecar (the one link to `schemas/sidecar-v1.schema.json` in `tool.md` is the way in for the curious).  Never link into `docs/tech-debt`, `docs/deferred`, `docs/superpowers` or `src/`, and never cite an item's id.
+Never name the describer, a plan or a plan walk, `EXPLAIN`, a heuristic, a provenance value, a capture file, a type of the library, or a field of the sidecar (the one link to `schemas/sidecar-v1.schema.json` in `tool.md` is the way in for the curious).  Never link into `docs/tech-debt`, `docs/deferred`, `docs/superpowers` or `src/`, and never cite an item's id.
 
 Examples of what was rewritten, from the old tool readme into `postgresql.md`:
 
@@ -51,10 +50,10 @@ $ grep -n -i -E "describer|EXPLAIN|heuristic|nullableSource|provenance|capture|t
   > **Coming in a later release.**  <One sentence on what it will do.>  See [what works today](README.md#what-works-today).
   ```
 
-  In the packed readmes the link is `https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today`.  A setting that is accepted and has no effect says so where it is mentioned.
+  A setting that is accepted and has no effect says so where it is mentioned.
 - **Settings are documented in `settings.md` only.**  Its tables under `#all-settings`, the settings that work today and, when there are any, those accepted that have no effect yet, have a row for each setting with every place it can be written, and each setting has a section anchored `setting-<name>`.  A setting moves to the first table when it starts to work, and the second table goes when it is empty.  Other pages link to that anchor and never repeat a setting's values or precedence.  A new setting or marker gets its row, its section, and, for a marker, its row in the marker index of `sql-files.md`.  A new generator parameter goes in the Values cell of the Generator parameters row, in the table of parameters under `#setting-generator-parameters`, and in the section of `SQLSRC109` in `diagnostics.md` and the list of parameters in `DiagnosticsDocumentTests`, which checks the section against that list.
 - **Recipes hold examples, not rules.**  Each is a sample and a link to the section that gives the rules, so it cannot drift from them.
-- **Anchors.**  On a page of this folder, a heading that is linked from anywhere gets an explicit anchor on the line above it, `<a id="configure-a-folder"></a>`, and a reworded heading keeps its anchor.  Each page's "Known issues" heading has `<a id="known-issues"></a>`.  The two packed readmes carry no raw HTML, since nuget.org shows a package readme with HTML turned off: their headings are linked by GitHub's slug, so renaming one means changing every link to it, which the link test finds.
+- **Anchors.**  On a page of this folder, a heading that is linked from anywhere gets an explicit anchor on the line above it, `<a id="configure-a-folder"></a>`, and a reworded heading keeps its anchor.  Each page's "Known issues" heading has `<a id="known-issues"></a>`.
 - **Links.**  Every link in the two packed readmes is absolute, `https://github.com/mbcrawfo/SqlSource/blob/main/<path>[#anchor]`.  Pages of this folder link to each other relatively.  Write inline links and `#` headings only; the tests read no other form.
 - **SQL samples** are fenced with `sql` (read as `ansi`), `sql <dialect>` (`sql postgres`, `sql mysql,ansi-quotes`), `sql fragment` (part of a file, not parsed) or `sql error` (shows a mistake, not parsed).  Mark a sample so; never weaken the test.  Put no fence inside a blockquote.
 - **`--prerelease`.**  Install and update commands carry `--prerelease` while only previews are published, and the NuGet badge is `nuget/vpre`.  The first stable release takes them out, by the release step in `docs/publishing.md`.
@@ -68,7 +67,7 @@ In `tests/SqlSource.Tests/`, run by `./pre-commit-validation.sh`.  `Documentatio
 
 - **`Documentation/UserDocsLinksTests.cs`** follows every link: a relative link or a `https://github.com/mbcrawfo/SqlSource/blob/main/...` URL must reach a file and an anchor that exist.  It also fails on a relative link in a packed readme, a link into `docs/tech-debt`, `docs/deferred`, `docs/superpowers` or `src/`, a link form or heading form it does not read, and a page of this folder that the entry page does not list.
 - **`Documentation/UserDocsSamplesTests.cs`** parses every `sql` block by the dialect its info string names, and fails on an error, so a sample a user copies is SQL that SqlSource reads.
-- **`Diagnostics/DiagnosticsDocumentTests.cs`** fails when the sections of `diagnostics.md` and the descriptors disagree: the order of the sections, each section's first bold line, and the index's rows.  It also fails when the section of `SQLSRC109`, an unknown generator parameter, does not name each parameter of the test's own list, which a new generator parameter is added to by hand.
+- **`Diagnostics/DiagnosticsDocumentTests.cs`** fails when the sections of `diagnostics.md` and the descriptors disagree: the order of the sections, each section's first bold line, and the index's rows.
 
 No test checks what a page says.  Whether a sentence is true today, and free of internals, is yours to keep.
 

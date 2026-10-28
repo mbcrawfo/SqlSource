@@ -10,7 +10,7 @@ namespace SqlSource.Tests.Snapshot;
 
 public sealed class SidecarWriterTests
 {
-    // The examples of the format design are the oracle of the layout.
+    // The sample sidecars of Snapshot/Examples/ are the oracle of the layout.
     [Theory]
     [InlineData(SidecarExamples.Users)]
     [InlineData(SidecarExamples.Orders)]

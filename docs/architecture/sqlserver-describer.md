@@ -320,7 +320,7 @@ An unknown column, `207`, a `GO` inside the query, `102`, and a word read as a p
 
 ## Why a query cannot run a statement
 
-Nothing a `.sql` file holds can make the describer run a statement.  That is a security invariant, and the tool's [`AGENTS.md`](../../src/SqlSource.Tool/AGENTS.md) holds it.  This section is the map of what the describer sends.
+Nothing a `.sql` file holds can make the describer run a statement.  That is a security invariant, and the describer's [`AGENTS.md`](../../src/SqlSource.Tool/Describing/SqlServer/AGENTS.md) holds it.  This section is the map of what the describer sends.
 
 The user's SQL and the declarations reach the server only as the values of `@tsql` and `@params`, `nvarchar(max)` parameters of two things that analyse a text and run nothing:
 
