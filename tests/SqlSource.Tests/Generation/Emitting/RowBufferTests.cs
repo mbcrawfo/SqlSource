@@ -23,8 +23,7 @@ public sealed class RowBufferTests
 
     // The hand-written copy of the buffer that the allocation tests of both end-to-end projects read their rows into,
     // and its declaration, in place of the generated one's.
-    private static readonly string HandWrittenCopy = Path.Combine(
-        RepositoryRoot.Folder,
+    private static readonly string HandWrittenCopy = RepositoryRoot.Path(
         "tests",
         "SqlSource.Testing",
         "EndToEnd",
@@ -64,6 +63,22 @@ public sealed class RowBufferTests
             }
         }
     }
+
+    // A streaming method yields each row as it reads it, so it has nothing to buffer.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void IsUsedBy_ManyOfIAsyncEnumerable_IsFalse(bool useArrayPool) =>
+        RowBuffer
+            .IsUsedBy(
+                ListUsers with
+                {
+                    Shape = ResultShape.Many,
+                    Collection = CollectionKind.IAsyncEnumerable,
+                    UseArrayPool = useArrayPool,
+                }
+            )
+            .ShouldBeFalse();
 
     [Fact]
     public void NameFor_ExtensionClassOfATypeNamedLikeTheBuffer_IsTheName() =>

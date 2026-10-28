@@ -206,6 +206,80 @@
         }
       ]
     },
+    "StreamUsersOldestFirst": {
+      "hash": "e483817a6cb3183306e9c7790abeaf005f3fb41065fe4cbe21fb32beeb8effac",
+      "engine": "mssql",
+      "database": "mssql",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "users",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type": {
+            "name": "nvarchar(100)",
+            "maxLength": 200,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "users",
+            "column": "name"
+          },
+          "identity": false,
+          "computed": false
+        },
+        {
+          "ordinal": 2,
+          "name": "email",
+          "type": {
+            "name": "nvarchar(200)",
+            "maxLength": 400,
+            "precision": 0,
+            "scale": 0,
+            "userType": {
+              "schema": "dbo",
+              "name": "Email"
+            }
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "users",
+            "column": "email"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "ListUsersSortedBy": {
       "hash": "a693111c134fa0a9d130085bdb4d44c7ae37d01b8c53b22aa470917fa9f77179",
       "engine": "mssql",

@@ -38,7 +38,7 @@ public sealed partial class AgentsFileTests
     // The repository-relative paths, with '/', of every AGENTS.md.
     private static readonly IReadOnlyList<string> Files =
     [
-        .. Find(RepositoryRoot.Folder, "").Order(StringComparer.Ordinal),
+        .. Find(RepositoryRoot.Path(), "").Order(StringComparer.Ordinal),
     ];
 
     // A finder that finds nothing would make the other tests pass.
@@ -54,7 +54,7 @@ public sealed partial class AgentsFileTests
     public void Rules_OfEveryAgentsFile_AreAtMost80Words() =>
         Files
             .SelectMany(file =>
-                Rules(File.ReadAllText(Path.Combine(RepositoryRoot.Folder, file))).Select(rule => (file, rule))
+                Rules(File.ReadAllText(RepositoryRoot.Path(file.Split('/')))).Select(rule => (file, rule))
             )
             .Where(found => IsTooLong(found.rule))
             .Select(found => $"{found.file}:{found.rule.Line}: {found.rule.Words} words: {found.rule.Start}")
@@ -63,7 +63,7 @@ public sealed partial class AgentsFileTests
     [Fact]
     public void Size_OfEveryAgentsFile_IsWithinItsLimit() =>
         Files
-            .Select(file => (file, bytes: new FileInfo(Path.Combine(RepositoryRoot.Folder, file)).Length))
+            .Select(file => (file, bytes: new FileInfo(RepositoryRoot.Path(file.Split('/'))).Length))
             .Where(found => IsTooLarge(found.file, found.bytes))
             .Select(found => $"{found.file}: {found.bytes} bytes")
             .ShouldBeEmpty();

@@ -15,7 +15,8 @@ namespace SqlSource.Tests.Postgres.Npgsql8;
 // InsertEveryType's method and read back, and the columns that InsertAllTypes writes by its method, each in a
 // transaction that is rolled back.  The end-to-end project proves the same table on Npgsql 10.  The data source maps
 // nothing: all_types reads its enum as a string.
-public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppContainer>
+[Collection(UsesApp.Name)]
+public sealed class AllTypesQueryTests(AppContainer app)
 {
     private const int FullRowCopyId = 3;
 

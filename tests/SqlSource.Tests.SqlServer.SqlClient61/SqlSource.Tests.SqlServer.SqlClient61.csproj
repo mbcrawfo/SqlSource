@@ -36,6 +36,14 @@
             Include="../SqlSource.Tests.SqlServer/EndToEnd/Queries/NewTypes.sql.json"
             Link="Queries/%(Filename)%(Extension)"
         />
+        <AdditionalFiles
+            Include="../SqlSource.Tests.SqlServer/EndToEnd/Queries/Streaming.sql"
+            Link="Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlSource.Tests.SqlServer/EndToEnd/Queries/Streaming.sql.json"
+            Link="Queries/%(Filename)%(Extension)"
+        />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Dapper" />

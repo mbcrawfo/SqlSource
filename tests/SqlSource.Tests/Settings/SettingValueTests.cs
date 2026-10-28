@@ -81,6 +81,8 @@ public sealed class SettingValueTests
     [InlineData("immutable-array", 7)]
     [InlineData("ImmutableList", 8)]
     [InlineData("IImmutableList", 9)]
+    [InlineData("IAsyncEnumerable", 10)]
+    [InlineData("i-async enumerable", 10)]
     public void TryReadChoice_CollectionType_IsRead(string value, int expected)
     {
         SettingValue.TryReadChoice<CollectionKind>(value.AsSpan(), out var kind).ShouldBeTrue();

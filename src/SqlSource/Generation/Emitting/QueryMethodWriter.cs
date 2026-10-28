@@ -11,7 +11,9 @@ namespace SqlSource.Generation.Emitting;
 
 /// <summary>
 /// Writes the asynchronous method of a query: it opens the connection when it is closed, binds each parameter with
-/// the <see cref="ParameterBinder" /> of its file's engine, runs the query and reads its rows as the shape says.
+/// the <see cref="ParameterBinder" /> of its file's engine, runs the query and reads its rows as the shape says.  A
+/// many query of <see cref="CollectionKind.IAsyncEnumerable" /> checks its arguments and returns a local iterator
+/// that does the rest as the loop asks for each row.
 /// </summary>
 /// <remarks>
 /// A token's argument can have any name that is not a fixed argument's, so every local, and the parameters of the
@@ -76,28 +78,74 @@ internal static class QueryMethodWriter
     {
         var tokens = MethodWriter.GetTokens(method.Segments);
         var arguments = GetArguments(tokens);
+        var streams = Streams(method);
         var locals = new Locals(
             tokens,
             method.Input,
-            method.Shape is ResultShape.None or ResultShape.RowCount ? null : method.Output
+            method.Shape is ResultShape.None or ResultShape.RowCount ? null : method.Output,
+            streams
         );
         var bodyIndent = indent + GeneratedText.Indent;
         var blockIndent = bodyIndent + GeneratedText.Indent;
 
-        AppendDocumentation(builder, indent, method, tokens);
-        AppendSignature(builder, indent, method, modifiers, isExtension, arguments);
+        AppendDocumentation(builder, indent, method, tokens, streams);
+        AppendSignature(builder, indent, method, modifiers, isExtension, arguments, streams);
         _ = builder.Append(indent).Append("{\n");
         AppendChecks(builder, bodyIndent, method, arguments);
-        AppendSql(builder, bodyIndent, method, tokens, arguments, locals);
+        if (!streams)
+        {
+            AppendBody(builder, bodyIndent, method, tokens, arguments, locals, rowBufferType, streams);
+            AppendEnd(builder, indent);
+            return;
+        }
+
+        // The checks run when the method is called, and the rest when the loop asks for the first row.  The iterator
+        // captures nothing: it takes every argument by the same name, so the body is written as in any other method.
+        _ = builder.Append('\n').Append(bodyIndent).Append("return ").Append(locals.Iterator).Append('(');
+        AppendCallArguments(builder, method, arguments);
+        _ = builder
+            .Append(");\n\n")
+            .Append(bodyIndent)
+            .Append("static async ")
+            .Append(GetResultType(method))
+            .Append(' ')
+            .Append(locals.Iterator)
+            .Append("(\n");
+        AppendArguments(builder, bodyIndent, method, arguments, isExtension: false, isIterator: true);
+        _ = builder.Append(bodyIndent).Append("{\n");
+        AppendBody(builder, blockIndent, method, tokens, arguments, locals, rowBufferType, streams);
+        AppendEnd(builder, bodyIndent);
+        AppendEnd(builder, indent);
+    }
+
+    // A many query of IAsyncEnumerable, whose method returns a local iterator that reads each row as it is asked for.
+    private static bool Streams(QueryMethod method) =>
+        method.Shape == ResultShape.Many && method.Collection == CollectionKind.IAsyncEnumerable;
+
+    // The SQL, the opening of a closed connection, the command, its parameters and its execution, and the closing of
+    // the connection in a finally, at the indent of the method's body.
+    private static void AppendBody(
+        StringBuilder builder,
+        string indent,
+        QueryMethod method,
+        List<string> tokens,
+        List<string> arguments,
+        Locals locals,
+        string rowBufferType,
+        bool streams
+    )
+    {
+        var blockIndent = indent + GeneratedText.Indent;
+        AppendSql(builder, indent, method, tokens, arguments, locals);
 
         _ = builder
-            .Append(bodyIndent)
+            .Append(indent)
             .Append("var ")
             .Append(locals.WasClosed)
             .Append(" = ")
             .Append(Connection)
             .Append(".State == global::System.Data.ConnectionState.Closed;\n");
-        AppendIf(builder, bodyIndent, locals.WasClosed);
+        AppendIf(builder, indent, locals.WasClosed);
         _ = builder
             .Append(blockIndent)
             .Append("await ")
@@ -105,8 +153,8 @@ internal static class QueryMethodWriter
             .Append(".OpenAsync(")
             .Append(CancellationToken)
             .Append(").ConfigureAwait(false);\n");
-        AppendEnd(builder, bodyIndent);
-        _ = builder.Append('\n').Append(bodyIndent).Append("try\n").Append(bodyIndent).Append("{\n");
+        AppendEnd(builder, indent);
+        _ = builder.Append('\n').Append(indent).Append("try\n").Append(indent).Append("{\n");
 
         AppendCommand(builder, blockIndent, locals, builtAtRunTime: tokens.Count > 0);
         if (method.Input is { } input)
@@ -129,15 +177,9 @@ internal static class QueryMethodWriter
             }
         }
 
-        AppendExecution(builder, blockIndent, method, locals, rowBufferType);
+        AppendExecution(builder, blockIndent, method, locals, rowBufferType, streams);
 
-        _ = builder
-            .Append(bodyIndent)
-            .Append("}\n")
-            .Append(bodyIndent)
-            .Append("finally\n")
-            .Append(bodyIndent)
-            .Append("{\n");
+        _ = builder.Append(indent).Append("}\n").Append(indent).Append("finally\n").Append(indent).Append("{\n");
         AppendIf(builder, blockIndent, locals.WasClosed);
         _ = builder
             .Append(blockIndent)
@@ -146,7 +188,6 @@ internal static class QueryMethodWriter
             .Append(Connection)
             .Append(".CloseAsync().ConfigureAwait(false);\n");
         AppendEnd(builder, blockIndent);
-        AppendEnd(builder, bodyIndent);
         AppendEnd(builder, indent);
     }
 
@@ -154,7 +195,8 @@ internal static class QueryMethodWriter
         StringBuilder builder,
         string indent,
         QueryMethod method,
-        List<string> tokens
+        List<string> tokens,
+        bool streams
     )
     {
         XmlDocWriter.AppendMember(builder, indent, method.SummaryXml, MethodWriter.GetSql(method.Segments));
@@ -162,8 +204,11 @@ internal static class QueryMethodWriter
             builder,
             indent,
             Connection,
-            "The connection to run the query on.  It is opened when it is closed, and closed again when the method "
-                + "opened it."
+            streams
+                ? "The connection to run the query on.  When it is closed, it is opened when the loop starts and "
+                    + "closed again when the loop ends."
+                : "The connection to run the query on.  It is opened when it is closed, and closed again when the "
+                    + "method opened it."
         );
         if (method.Input is not null)
         {
@@ -188,6 +233,7 @@ internal static class QueryMethodWriter
             indent,
             method.Shape switch
             {
+                ResultShape.Many when streams => "The rows the query returns, each read as the loop asks for it.",
                 ResultShape.Many => "The rows the query returned.",
                 ResultShape.One => "The row.",
                 ResultShape.OneOptional => "The row, or null when there is none.",
@@ -216,20 +262,44 @@ internal static class QueryMethodWriter
         QueryMethod method,
         string modifiers,
         bool isExtension,
-        List<string> arguments
+        List<string> arguments,
+        bool streams
+    )
+    {
+        // A streaming method is not asynchronous itself: it returns its iterator.
+        _ = builder.Append(indent).Append(modifiers);
+        if (streams)
+        {
+            _ = builder.Append(' ').Append(GetResultType(method)).Append(' ');
+        }
+        else
+        {
+            _ = builder.Append(" async global::System.Threading.Tasks.Task");
+            if (GetResultType(method) is { } resultType)
+            {
+                _ = builder.Append('<').Append(resultType).Append('>');
+            }
+
+            _ = builder.Append(' ');
+        }
+
+        _ = builder.Append(method.Name).Append("(\n");
+        AppendArguments(builder, indent, method, arguments, isExtension, isIterator: false);
+    }
+
+    // The arguments of the method, one to a line, and the parenthesis that closes them.  The iterator of a streaming
+    // method takes them without this or a default, and marks its token as the one WithCancellation gives.
+    private static void AppendArguments(
+        StringBuilder builder,
+        string indent,
+        QueryMethod method,
+        List<string> arguments,
+        bool isExtension,
+        bool isIterator
     )
     {
         var argumentIndent = indent + GeneratedText.Indent;
-        _ = builder.Append(indent).Append(modifiers).Append(" async global::System.Threading.Tasks.Task");
-        if (GetResultType(method) is { } resultType)
-        {
-            _ = builder.Append('<').Append(resultType).Append('>');
-        }
-
         _ = builder
-            .Append(' ')
-            .Append(method.Name)
-            .Append("(\n")
             .Append(argumentIndent)
             .Append(isExtension ? "this " : string.Empty)
             .Append("global::System.Data.Common.DbConnection ")
@@ -249,15 +319,43 @@ internal static class QueryMethodWriter
             .Append(argumentIndent)
             .Append("global::System.Data.Common.DbTransaction? ")
             .Append(Transaction)
-            .Append(" = null,\n")
+            .Append(isIterator ? ",\n" : " = null,\n")
             .Append(argumentIndent)
             .Append("int? ")
             .Append(CommandTimeout)
-            .Append(" = null,\n")
+            .Append(isIterator ? ",\n" : " = null,\n")
             .Append(argumentIndent)
-            .Append("global::System.Threading.CancellationToken ")
+            .Append(
+                isIterator
+                    ? "[global::System.Runtime.CompilerServices.EnumeratorCancellation] "
+                        + "global::System.Threading.CancellationToken "
+                    : "global::System.Threading.CancellationToken "
+            )
             .Append(CancellationToken)
-            .Append(" = default)\n");
+            .Append(isIterator ? ")\n" : " = default)\n");
+    }
+
+    // The arguments of the call to the iterator, in the order of the method's.
+    private static void AppendCallArguments(StringBuilder builder, QueryMethod method, List<string> arguments)
+    {
+        _ = builder.Append(Connection);
+        if (method.Input is not null)
+        {
+            _ = builder.Append(", ").Append(Parameters);
+        }
+
+        foreach (var argument in arguments)
+        {
+            _ = builder.Append(", ").Append(argument);
+        }
+
+        _ = builder
+            .Append(", ")
+            .Append(Transaction)
+            .Append(", ")
+            .Append(CommandTimeout)
+            .Append(", ")
+            .Append(CancellationToken);
     }
 
     // The type the task gives, or null for a task that gives nothing.
@@ -283,6 +381,7 @@ internal static class QueryMethodWriter
             CollectionKind.List => "global::System.Collections.Generic.List<" + row + ">",
             CollectionKind.ImmutableArray => "global::System.Collections.Immutable.ImmutableArray<" + row + ">",
             CollectionKind.ImmutableList => "global::System.Collections.Immutable.ImmutableList<" + row + ">",
+            CollectionKind.IAsyncEnumerable => "global::System.Collections.Generic.IAsyncEnumerable<" + row + ">",
             CollectionKind.IImmutableList or _ => "global::System.Collections.Immutable.IImmutableList<" + row + ">",
         };
 
@@ -300,14 +399,15 @@ internal static class QueryMethodWriter
             {
                 CollectionKind.List or CollectionKind.IList or CollectionKind.ICollection => ".ToList()",
                 CollectionKind.ImmutableArray => ".ToImmutableArray()",
-                // The two immutable lists never reach this switch, since RowBuffer.IsUsedBy leaves them out; they are
-                // named so that the switch lists every member.
+                // The two immutable lists and IAsyncEnumerable never reach this switch, since RowBuffer.IsUsedBy leaves
+                // them out; they are named so that the switch lists every member.
                 CollectionKind.Array
                 or CollectionKind.IEnumerable
                 or CollectionKind.IReadOnlyCollection
                 or CollectionKind.IReadOnlyList
                 or CollectionKind.ImmutableList
                 or CollectionKind.IImmutableList
+                or CollectionKind.IAsyncEnumerable
                 or _ => ".ToArray()",
             };
             return ("new " + rowBufferType + "<" + row + ">()", rows + toResult);
@@ -327,10 +427,13 @@ internal static class QueryMethodWriter
                 "global::System.Collections.Immutable.ImmutableList.CreateBuilder<" + row + ">()",
                 rows + ".ToImmutable()"
             ),
+            // A streaming method buffers nothing and never reaches this switch; IAsyncEnumerable is named so that the
+            // switch lists every member.
             CollectionKind.Array
             or CollectionKind.IEnumerable
             or CollectionKind.IReadOnlyCollection
             or CollectionKind.IReadOnlyList
+            or CollectionKind.IAsyncEnumerable
             or _ => ("new global::System.Collections.Generic.List<" + row + ">()", rows + ".ToArray()"),
         };
     }
@@ -460,7 +563,8 @@ internal static class QueryMethodWriter
         string indent,
         QueryMethod method,
         Locals locals,
-        string rowBufferType
+        string rowBufferType,
+        bool streams
     )
     {
         if (method.Shape is ResultShape.None or ResultShape.RowCount)
@@ -488,19 +592,38 @@ internal static class QueryMethodWriter
             .Append(").ConfigureAwait(false);\n");
         AppendScope(builder, indent, locals.ReaderScope, locals.Reader);
 
+        // A streaming method yields each row as it reads it, where any other reads them into its buffer and returns
+        // the collection.
         if (method.Shape == ResultShape.Many)
         {
-            var (buffer, result) = GetBuffer(method, output.TypeText, locals.Rows, rowBufferType);
-            _ = builder.Append(indent).Append("var ").Append(locals.Rows).Append(" = ").Append(buffer).Append(";\n");
+            string? result = null;
+            if (!streams)
+            {
+                (var buffer, result) = GetBuffer(method, output.TypeText, locals.Rows, rowBufferType);
+                _ = builder
+                    .Append(indent)
+                    .Append("var ")
+                    .Append(locals.Rows)
+                    .Append(" = ")
+                    .Append(buffer)
+                    .Append(";\n");
+            }
+
             _ = builder.Append(indent).Append("while (");
             AppendRead(builder, locals);
             _ = builder.Append(")\n").Append(indent).Append("{\n");
             AppendVectorChecks(builder, innerIndent, output, locals);
-            _ = builder.Append(innerIndent).Append(locals.Rows).Append(".Add(");
+            _ = streams
+                ? builder.Append(innerIndent).Append("yield return ")
+                : builder.Append(innerIndent).Append(locals.Rows).Append(".Add(");
             AppendRow(builder, output, locals);
-            _ = builder.Append(");\n");
+            _ = builder.Append(streams ? ";\n" : ");\n");
             AppendEnd(builder, indent);
-            _ = builder.Append('\n').Append(indent).Append("return ").Append(result).Append(";\n");
+            if (result is not null)
+            {
+                _ = builder.Append('\n').Append(indent).Append("return ").Append(result).Append(";\n");
+            }
+
             return;
         }
 
@@ -736,11 +859,11 @@ internal static class QueryMethodWriter
 
     // The names of the method's locals and of the lambdas' parameters, none of which an argument has.  The locals
     // that read rows are named only for a method that reads them, whose output is given, the value of a converted
-    // parameter only for a method that has one, and the element of an array and its value only for a method that
-    // converts one by element.
+    // parameter only for a method that has one, the element of an array and its value only for a method that
+    // converts one by element, and the iterator only for a method that streams.
     private sealed class Locals
     {
-        public Locals(List<string> tokens, MethodInput? input, MethodOutput? output)
+        public Locals(List<string> tokens, MethodInput? input, MethodOutput? output, bool streams)
         {
             var names = new LocalNames(Seed(tokens));
             Sql = names.Take("sql");
@@ -778,6 +901,7 @@ internal static class QueryMethodWriter
 
             Span = names.Take("span");
             State = names.Take("state");
+            Iterator = streams ? names.Take("ReadRows") : string.Empty;
         }
 
         public string Sql { get; }
@@ -809,6 +933,9 @@ internal static class QueryMethodWriter
         public string Span { get; }
 
         public string State { get; }
+
+        // The local function a streaming method returns, which reads its rows.
+        public string Iterator { get; }
 
         private static bool HasWrite(MethodInput? input) =>
             input is not null && input.Parameters.Any(static parameter => parameter.Write is not null);

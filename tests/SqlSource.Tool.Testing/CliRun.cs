@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Snapshot;
+using SqlSource.Testing;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Planning;
@@ -49,6 +50,9 @@ internal sealed class CliRun : IDisposable
     // environment is the test process's, as the command line runs.  The tool's own tests fake MSBuild, which the
     // end-to-end tests exist not to do.
     public static CliRun Real(string workingDirectory) => new(workingDirectory);
+
+    // A real run in the repository's root, which a test may start the tool in but never read through.
+    public static CliRun Real(RepositoryWorkingFolder folder) => new(folder.Path);
 
     // What every describer of the run asked and was answered.  The engine is a name only: a run may have several.
     public DescribeCapture Capture { get; } = new(SidecarValues.Engine.Postgres);

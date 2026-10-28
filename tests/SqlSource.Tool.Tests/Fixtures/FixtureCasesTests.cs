@@ -19,13 +19,13 @@ public sealed class FixtureCasesTests : IDisposable
     public void Of_EngineWithNoFolder_IsEmpty() => FixtureCases.Of("no-such-engine").ShouldBeEmpty();
 
     [Fact]
-    public void Of_EngineWithCases_GivesThemInNameOrder()
+    public void InFolder_EngineWithCases_GivesThemInNameOrder()
     {
         _ = FixtureCaseFiles.Create(_folder.Path, SidecarValues.Engine.Postgres, "b", "SELECT 1;\n");
         _ = FixtureCaseFiles.Create(_folder.Path, SidecarValues.Engine.Postgres, "a", "SELECT 1;\n");
         _ = _folder.WriteFile("postgres/schema.sql", "CREATE TABLE users ();\n");
 
-        var cases = FixtureCases.Of(SidecarValues.Engine.Postgres, _folder.Path);
+        var cases = FixtureCases.InFolder(_folder.PathOf(SidecarValues.Engine.Postgres));
 
         cases.Select(found => found.Name).ShouldBe(["a", "b"]);
         cases.ShouldAllBe(found => found.Engine == "postgres");

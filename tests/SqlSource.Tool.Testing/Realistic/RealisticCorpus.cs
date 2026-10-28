@@ -32,7 +32,7 @@ internal sealed class RealisticCorpus
     public string Project { get; }
 
     // The paths are found from the repository's root when they are read, never when the corpus is made.
-    public string Folder => Path.Combine(RepositoryRoot.Folder, "tests", Project, "Realistic");
+    public string Folder => RepositoryRoot.Path("tests", Project, "Realistic");
 
     public string Schema => Path.Combine(Folder, "schema.sql");
 
@@ -42,7 +42,7 @@ internal sealed class RealisticCorpus
 
     // The settings file of the engine's project, which the corpus shares with the project's other tests: the file of
     // a build that holds the corpus's queries.
-    public string ProjectSettingsFile => Path.Combine(RepositoryRoot.Folder, "tests", Project, SettingsFileName);
+    public string ProjectSettingsFile => RepositoryRoot.Path("tests", Project, SettingsFileName);
 
     // The settings file of Cases/, which every query of the corpus is below: its database and its type override.
     public string CasesSettingsFile => Path.Combine(Cases, SettingsFileName);

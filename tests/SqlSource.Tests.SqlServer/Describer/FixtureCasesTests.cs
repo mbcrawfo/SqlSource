@@ -15,10 +15,7 @@ namespace SqlSource.Tests.SqlServer.Describer;
 [Collection(UsesSqlServer.Name)]
 public sealed class FixtureCasesTests(SqlServerContainer sqlServer)
 {
-    private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.Of(
-        SidecarValues.Engine.SqlServer,
-        RepositoryPaths.DescriberFixtures
-    );
+    private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.InFolder(RepositoryPaths.DescriberFixtures);
 
     public static TheoryData<string> Cases => [with(Found.Select(static found => found.Name))];
 

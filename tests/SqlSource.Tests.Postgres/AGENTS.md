@@ -7,7 +7,7 @@
 - **A container starts through `EngineImage.Postgres.StartAsync`, never through the container's own `StartAsync`**, since it disposes a container whose start threw, which xunit does not.  `AppContainer` of `tests/SqlSource.Tests.Postgres.Npgsql8` starts its own so too.
 - **Its databases are `fixtures`, `realistic`, and `app` and `billing` for `EndToEnd/`**, built from `EndToEnd/app/` and `EndToEnd/billing/`, each through `EndToEndFiles` of `tests/SqlSource.Testing` (schema first, then seed), as the Npgsql 8 project builds its own.
 - **`EndToEnd/AllocationTests.cs` needs the server and counts what every thread allocates, so it is in the collection `MeasuresAllocations` instead**, of `MeasuresAllocations.cs`, which runs while no other test does and starts a `PostgresContainer` of its own.
-- **The project reads `tests/SqlSource.Tool.Tests/Fixtures/Describers/` from the repository**, found through `RepositoryRoot`, and not from an output folder.
+- **The project reads `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/` from the repository** through `RepositoryRoot.Path`, and not from an output folder.
 
 ## Versions
 

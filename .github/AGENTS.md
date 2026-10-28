@@ -20,8 +20,10 @@
 ## Workflows
 
 - **The check steps in `workflows/build.yml` mirror `pre-commit-validation.sh`.**  A check added to or removed from one is added to or removed from the other in the same commit.  The step `Pull test images` of the `build` job and the jobs `Test on PostgreSQL 14` and `Test on SQL Server 2017` are the ones the script has no counterpart for.
+- CI runs every check on every change; the skips of a plain script run are local, so a trigger added to the script is no change to the workflow.
 - A check that needs only Docker goes in the `lint` job.  One that needs the .NET SDK goes in the job whose build it shares, or in a job of its own when it would make that job the slowest.
 - **No job of `workflows/build.yml` `needs` another**, so the `packages` artifact can exist in a run whose lint or tests failed: anything that consumes it must `needs` the whole `build.yml` call, as `publish.yml` does, never a single job inside it.
+- **Every `--report-github` comes with `--report-github-summary-include-passed false`.**  A step's summary holds 1 MiB, the reporter cuts its output there, and GitHub then shows little or none of it; the passed tests of the solution alone are past the limit.
 - **The `Test` step of the `build` job leaves out the two end-to-end `AllocationTests` classes by name, and its `Test allocations` step runs them without coverage**, since the collector allocates in the process they measure.  Renaming or moving either class, or adding another test that measures the whole process, changes both steps.
 - **`workflows/build.yml` and `workflows/nightly.yml` together test every supported major of each engine, each once.**  `build.yml` tests the floor and the default; the matrices of the `test-postgres` and `test-sqlserver` jobs of `nightly.yml` test every supported major between them, each image pinned as rule 5 of the root `AGENTS.md` says.
   - A pull request that moves a floor or a default, or adds or drops a supported major, changes the other workflow in the same pull request: when the default moves to PostgreSQL 19, PostgreSQL 18 joins the nightly matrix.

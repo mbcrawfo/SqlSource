@@ -1,12 +1,13 @@
 # AGENTS.md - tests
 
-Seven xunit projects and the two libraries they share.  [`README.md`](README.md) says what each is, which Roslyn it runs on and how they reference each other; this file is the traps.
+[`README.md`](README.md) says what each test project and library is, which Roslyn it runs on and how they reference each other.
 
 ## Projects and libraries
 
 - **A test project compiles no `.cs` file of another project, with one exception.**  Code that two test projects need is in one of the two libraries, which they reference.  The exception is `tests/SqlSource.Tests/Generator/`, whose test classes `tests/SqlSource.Tests.RoslynFloor` compiles a second time against Roslyn 4.8.0.  `tests/SqlSource.Tests/TestLayoutTests.cs` checks this.
 - **The two libraries, `tests/SqlSource.Testing` and `tests/SqlSource.Tool.Testing`, hold no tests.**  A helper that one test project alone uses stays in that project; one that a second project comes to need moves into a library.
 - **Keep the two libraries apart.**  `tests/SqlSource.Tests.RoslynFloor` references `SqlSource.Testing`, so it stays on the pinned Roslyn with no `VersionOverride`, while the tool raises Roslyn to a current version, which would reach RoslynFloor through one library ([why](README.md#the-projects)).
+- **A test reads the repository only through `RepositoryRoot.Path`**, never by building a path from the root, and `RepositoryRoot.WorkingFolder` is only for starting a process in the root, since `Path` is what refuses a read that `tools/test-scopes.txt` would let a change skip ([when it refuses](README.md#reading-the-repository)).
 - **The libraries' types stay `internal`**, except `SettingLevel` of `tests/SqlSource.Testing/Generator/LevelSettings.cs`, which a public theory takes as its row.
 - **A test reads a generated model by reflection through `ModelReflection` of `tests/SqlSource.Testing`**, which orders the properties by `MetadataToken`, the order they are declared in.  `Type.GetProperties()` does not promise that order, so a test never compares it.
 - **Every test that opens a describer opens it through `Describers.OpenAsync` of `tests/SqlSource.Tool.Testing`** (the tool's tests, `PostgresScript`, `SqlServerScript` and `FixtureReplay` among them), and none builds an `OpenRequest` but to look at it.
@@ -44,7 +45,7 @@ Seven xunit projects and the two libraries they share.  [`README.md`](README.md)
 
 ## Documents
 
-- **`tests/SqlSource.Tests/Documentation/` checks the documents a user reads**, `README.md`, `src/SqlSource.Tool/README.md` and every page of `docs/manual/` (except its `AGENTS.md`): `UserDocsLinksTests` their links and anchors, and `UserDocsSamplesTests` the SQL in their fenced blocks.  `AgentsFileTests` there checks the limits of every `AGENTS.md`.
+- **`tests/SqlSource.Tests/Documentation/` checks the links, anchors and SQL samples of the documents a user reads, and the limits of every `AGENTS.md`.**
 
 ## Style and CI
 

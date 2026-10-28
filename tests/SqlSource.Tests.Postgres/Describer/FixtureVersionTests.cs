@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Shouldly;
-using SqlSource.Snapshot;
 using SqlSource.Testing;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
@@ -15,10 +14,7 @@ namespace SqlSource.Tests.Postgres.Describer;
 // default image moves and the cases are not recorded again.  It needs no server.
 public sealed partial class FixtureVersionTests
 {
-    private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.Of(
-        SidecarValues.Engine.Postgres,
-        RepositoryPaths.DescriberFixtures
-    );
+    private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.InFolder(RepositoryPaths.DescriberFixtures);
 
     public static TheoryData<string> Cases => [with(Found.Select(static found => found.Name))];
 

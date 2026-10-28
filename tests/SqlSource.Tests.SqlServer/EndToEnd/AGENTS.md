@@ -16,6 +16,8 @@
 - **A query runs through its generated method, the project's default being `codegen`.**  A file whose SQL a Dapper test runs is claimed a second time at the output `models`, by a class of `EndToEnd/DapperQueries.cs` in the namespace of its first claim, so that the two share its models, since a `codegen` query has a method and no constant.
 - **A test of a query reads, asserts the values of at least one row, `NULL`s included, and takes its connection from `EndToEndSources`.**
 - **A test that writes runs in a transaction that is rolled back and passes it as `transaction` to every call**, of a method or of Dapper, since SqlClient refuses a command without it.
+- **A test that must show that a commit succeeds commits only into a temporary table of its own connection**, as the transaction test of `EndToEnd/StreamingQueryTests.cs` does, since a rollback cannot show that the transaction was not aborted.
+- **A test that changes a setting of the session, such as `SET XACT_ABORT ON`, takes a connection that is not pooled from `EndToEndSources.AppUnpooled`**, as `EndToEnd/UnpooledTransaction.cs` does, so that no other test gets the session.
 - **`EndToEnd/ErrorPaths/` is a fixture project that the test project never compiles or describes**: the `.csproj` removes it from `Compile`, `AdditionalFiles` and `None` and copies it to the output as `Fixtures/Projects/ErrorPaths/`.
 
 ## `all_types` and the recipe
@@ -28,6 +30,7 @@
 ## Allocations
 
 - **`AllocationTests.cs` holds each generated method to a hand-written one that makes the same calls**, within a margin below the smallest object.  A change to the calls a method makes changes the hand-written method with it, never the margin.
+- **The streaming `StreamAccounts` has an allocation pair of its own**, against a hand-written static local async iterator, within the same margin.
 - **A pooled result member that copies its rows out needs a test against a hand-written baseline of its own**, as `ToArray`, `ToList` and `ToImmutableArray` have, since the pairs against `RowBufferByHand` cannot see what the buffer costs.  Each `Least*SavingInBytesPerCall` is set from a measure, raised when the pool saves more, and never lowered to make a change pass.
 - **It measures through `CallAllocations` of `tests/SqlSource.Testing`**, by the commonest difference of pairs of calls, never by a total, a median of blocks or the least of the calls ([why](../../SqlSource.Testing/EndToEnd/CallAllocations.cs)).
 

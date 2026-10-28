@@ -13,10 +13,8 @@ namespace SqlSource.Tests;
 // repository itself.
 public sealed class TestLayoutTests
 {
-    private static readonly string Tests = Path.Combine(RepositoryRoot.Folder, "tests");
+    private static readonly string Tests = RepositoryRoot.Path("tests");
     private static readonly string GeneratorTests = Path.Combine(Tests, "SqlSource.Tests", "Generator");
-
-    private static readonly string[] FolderProperties = ["$(MSBuildThisFileDirectory)", "$(MSBuildProjectDirectory)"];
 
     // The first line of each file of Generator/, so that a reader of one sees that RoslynFloor compiles it too.
     private const string SharedHeader =
@@ -73,33 +71,8 @@ public sealed class TestLayoutTests
             )
         );
 
-    // The Include of each Compile item of the project that names a file outside the project's folder, however it is
-    // spelled: the path is resolved as MSBuild resolves it, from the project's folder.
-    private static IEnumerable<string> IncludesFromOutside(string projectFolder, XDocument project)
-    {
-        var folder = Path.GetFullPath(projectFolder) + Path.DirectorySeparatorChar;
-        return project
-            .Descendants("Compile")
-            .Select(item => (string?)item.Attribute("Include"))
-            .OfType<string>()
-            .Where(include => !Resolve(folder, include).StartsWith(folder, StringComparison.Ordinal));
-    }
-
-    // MSBuild accepts either separator on every system, and the two properties name the project's folder.
-    private static string Resolve(string folder, string include)
-    {
-        var path = include.Replace('\\', '/');
-        foreach (var property in FolderProperties)
-        {
-            if (path.StartsWith(property, StringComparison.Ordinal))
-            {
-                path = path[property.Length..].TrimStart('/');
-                break;
-            }
-        }
-
-        return Path.GetFullPath(Path.Combine(folder, path));
-    }
+    private static IEnumerable<string> IncludesFromOutside(string projectFolder, XDocument project) =>
+        ProjectIncludes.FromOutside(projectFolder, project, static item => item.Name.LocalName == "Compile");
 
     [Fact]
     public void GeneratorTests_FirstLine_SaysTheyAreShared() =>

@@ -50,7 +50,7 @@ Each name links to its section, which gives its values and its rules.  **Written
 | [`SqlLocation`](#setting-sql-location) | `Nested`, `Direct`.  Default `Nested` | `SqlLocation` on the attribute | Works today |
 | [Nested class](#setting-nested-class) | A C# identifier that is not a keyword.  Default `Sql` | `nestedClass` in a settings file; `NestedClass` on the attribute | Works today |
 | [`Path`](#setting-path) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: that folder | `Path` on the attribute | Works today |
-| [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`: see [its section](#setting-collection-type).  Default `Array` | `collectionType` in a settings file; `CollectionType` on the attribute; `-- collection-type:` in the file header and inside a query | Works today |
+| [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`, or `IAsyncEnumerable` to stream the rows: see [its section](#setting-collection-type).  Default `Array` | `collectionType` in a settings file; `CollectionType` on the attribute; `-- collection-type:` in the file header and inside a query | Works today |
 | [`MethodLocation`](#setting-method-location) | `ExtensionClass`, `Public`, `Internal`, `Private`.  Default `ExtensionClass` | `MethodLocation` on the attribute | Works today |
 
 A value from a list is matched ignoring case, hyphens and spaces, so `CodeGen`, `codegen` and `code-gen` are one value, and so are `SealedRecord` and `sealed record`.  On the attribute you write the member of the enum that the package adds to your project, as in `Output = GeneratorOutput.Sql`.
@@ -210,7 +210,7 @@ A [generator parameter](concepts.md#generator-parameter) is a word that changes 
 | `sort-input`, `sort-output` | The properties of the query's input model, or of its output model, are sorted by name: see [the order of the properties](generator.md#property-order) |
 | `no-table-models` | A query that reads a whole table gets a row model named after the query, not after the table: see [table models](generator.md#table-models) |
 | `async-method-suffix` | The name of a query's [method](generator.md#method-signature) ends with `Async`: `GetUserAsync` for `GetUser` |
-| `no-array-pool` | A [`many`](generator.md#method-shapes) method reads its rows into buffers borrowed from .NET's shared array pool, unless it returns an `ImmutableList<T>` or an `IImmutableList<T>`.  Once the pool holds buffers of the sizes it needs, a method that reads through the pool allocates no collection for a result of up to about 1,000 rows but the one it returns.  Under `no-array-pool`, every `many` method reads its rows into a collection that it allocates and grows, as hand-written code usually does, and as a method that returns one of the two immutable lists always does.  Use it to keep the pool out of a project, or to compare the two |
+| `no-array-pool` | A [`many`](generator.md#method-shapes) method that returns a collection reads its rows into buffers borrowed from .NET's shared array pool, unless it returns an `ImmutableList<T>` or an `IImmutableList<T>`.  Once the pool holds buffers of the sizes it needs, a method that reads through the pool allocates no collection for a result of up to about 1,000 rows but the one it returns.  Under `no-array-pool`, every such method reads its rows into a collection that it allocates and grows, as hand-written code usually does, and as a method that returns one of the two immutable lists always does.  Use it to keep the pool out of a project, or to compare the two.  A method that [streams its rows](#streaming-rows) holds no collection, so it is the same with or without `no-array-pool` |
 | `default` | The empty list: every default.  `default` must be the only word in its list, though it may be repeated |
 
 Words are matched ignoring case.
@@ -331,11 +331,48 @@ The type that the [method](generator.md#query-methods) of a query whose result s
 | `ImmutableArray` | `ImmutableArray<T>` | An `ImmutableArray<T>` |
 | `ImmutableList` | `ImmutableList<T>` | An `ImmutableList<T>` |
 | `IImmutableList` | `IImmutableList<T>` | An `ImmutableList<T>` |
+| `IAsyncEnumerable` | `IAsyncEnumerable<T>` | Nothing: each row is read as the loop asks for it |
 
-`T` is the query's output model.  Every collection is filled before the method's task completes, `IEnumerable` included, so reading it runs no query.
+`T` is the query's output model.  Every collection but `IAsyncEnumerable` is filled before the method's task completes, `IEnumerable` included, so reading it runs no query.
 
 - It stands in the file header and inside a query.  It can also be `collectionType` in a settings file, or `CollectionType = GeneratorCollectionType.IReadOnlyList` on the attribute.
 - It changes nothing for a query whose shape is not `many`, and nothing under the output `sql` or `models`.
+
+<a id="streaming-rows"></a>
+
+### Streaming rows
+
+```sql postgres
+-- name: StreamUsers
+-- collection-type: IAsyncEnumerable
+SELECT id, name FROM users ORDER BY id;
+```
+
+```csharp
+// Generated, shown without global::
+public static IAsyncEnumerable<StreamUsersDto> StreamUsers(
+    this DbConnection connection,
+    DbTransaction? transaction = null,
+    int? commandTimeout = null,
+    CancellationToken cancellationToken = default)
+
+// Your code
+await foreach (var user in connection.StreamUsers(cancellationToken: cancellationToken))
+{
+    await writer.WriteLineAsync(user.Name);
+}
+```
+
+The method of a `many` query whose collection type is `IAsyncEnumerable` returns `IAsyncEnumerable<T>`, and gives your loop each row as it is read.  So the loop starts on the first row while the rest are still to come, and the rows are never all held at once.  The method takes the arguments that every [query method](generator.md#method-signature) takes, and its name ends with `Async` under `async-method-suffix`, as every method's does.
+
+- **The call checks the arguments and runs nothing.**  A null `connection` or `parameters` throws when the method is called, and so does a token's text that is blank, unless [`no-token-validation`](parameters-and-tokens.md#token-validation) is in effect.  The connection is opened, the values of the `parameters` model read and the query sent when the loop asks for the first row, not at the call, and each loop over the result runs the query again with the values the model holds then.  An enumerator that is disposed before it asks for a row opens nothing.
+- **The connection stays open until the loop ends.**  A closed connection is opened for the loop and closed again when the loop ends: when it finishes, at a `break`, at an exception in its body, or when the enumerator is disposed.  An open connection stays open.  While the loop runs, the connection is busy with the query, so another command on it in the loop's body is refused by the driver: Npgsql throws `NpgsqlOperationInProgressException`, and Microsoft.Data.SqlClient, on a connection without `MultipleActiveResultSets`, `InvalidOperationException`.  Run such a command on another connection, or read the rows into a collection first.
+- **Leaving the loop early reads the rest of the rows.**  At a `break`, or an exception in the loop's body, the rows still to come are read and discarded before the loop ends, so on a large result that takes as long as reading them.  The query is not cancelled, and a transaction is left as it was, unless the database raises an error for one of those rows, such as a division by zero:
+  - **On PostgreSQL, that error is thrown when the loop ends**: at the `break`, or in place of the exception that the loop's body threw, which is then lost.  It also aborts a transaction that the query ran in, as any error does on PostgreSQL, so the transaction's next command is refused until it is rolled back.  See [known issues](#known-issues).
+  - **On SQL Server, that error is not reported**: the loop ends at the `break`, or with the exception that its body threw, as it would if no row failed.  It can still roll back the transaction the query ran in, with nothing thrown.  Under `SET XACT_ABORT ON` nearly every error does.  With `XACT_ABORT` off, as Microsoft.Data.SqlClient leaves it, some errors do and others do not, depending on the error in ways this manual does not list: `CAST('x' AS int)` rolls the transaction back, while a division by zero or `CAST(300 AS tinyint)` leaves it as it was.  When it is rolled back, what the transaction did is lost, a later command given it runs outside any transaction and is committed on its own, and only `Commit` throws.  See [known issues](#known-issues).
+- **Each row is read as every `many` method reads it**, with the same checks and [converters](#converters).  An error at a row that the loop reads, such as a null in a column whose property cannot be null, or an error that the database raises for that row, is thrown by the loop when it reaches that row, after the rows before it: see [how a row is read](generator.md#reading-rows).  A row that the loop leaves unread is not checked or converted: of its errors, only one that the database raises can reach your code, as the item above says.
+- **Either token cancels.**  The method's `cancellationToken`, and a token given to `WithCancellation`, each cancel the loop, which throws what the driver throws when a method is cancelled: see [PostgreSQL](postgresql.md#method-results) and [SQL Server](sqlserver.md#method-results).
+- **On SQL Server, a query of several statements** gives the rows of its first result set, and its other statements run before the loop ends.  An error that one of them raises is not reported, as for every method that reads rows, and depending on the error and on `XACT_ABORT` it can roll back the transaction the query ran in: see [what a method reads and throws](sqlserver.md#method-results).
 
 <a id="setting-type-overrides"></a>
 
@@ -730,6 +767,9 @@ See: [SQLSRC015](diagnostics.md#sqlsrc015), a file that is not a JSON object; [S
   Change the name and the path to your own.  `BeforeTargets="SqlSourceListFiles"` is the line that matters.  In a project that is not of the .NET SDK, or one that sets `AfterMicrosoftNETSdkTargets` without keeping its value, a target that runs later also leaves the file without the settings of a `sqlsource.json` that only it reaches, such as the one beside it, with no error; the same line fixes that too.
 - **A type override's key cannot be written in brackets.**  T-SQL writes a name `[dbo].[Email]`, and a key written so is not valid: [SQLSRC019](diagnostics.md#sqlsrc019) in a settings file, and [SQLSRC111](diagnostics.md#sqlsrc111) in a marker.  Write `dbo.Email`, which matches the type's name in any case, or `"dbo"."Email"`, which matches its case exactly; the message shows both.  See [type overrides](#setting-type-overrides).
 - **A C# type that is generic can give its model a warning for a `?` inside a type argument**, in a type override, a column type or a `-- param:` marker.  A type argument written with a `?` where a constraint forbids null is [SQLSRC252](diagnostics.md#sqlsrc252) at the query, but a `?` inside a type argument is not.  An override such as `MyApp.Names<System.Collections.Generic.List<string?>>`, where `Names<T>` requires `where T : System.Collections.Generic.IEnumerable<string>`, is accepted, and the generated model gets the compiler's warning CS8631.  Give the type arguments the nullability that the constraints ask for.  See [type overrides](#setting-type-overrides).
+- **A short name can name a type of a package your project did not mean.**  A short name is found in every assembly your project references, those that a package brings with it among them.  So a short name written for a type your project does not have, or no longer has, names a `public` type of that name in such an assembly, with no error: under Microsoft.Data.SqlClient 6.1, `AccountId` is `Microsoft.Identity.Client.AccountId`, of a package that SqlClient brings.  The property then has that type, which has no converter, so the driver throws `InvalidCastException` when the query runs.  Write the full name, `MyApp.AccountId`, where a referenced assembly may have a type of the same name.  See [type overrides](#setting-type-overrides).
+- **On PostgreSQL, an exception thrown in a loop over streamed rows can be lost.**  When the body of a loop over [streamed rows](#streaming-rows) throws, the rows still to come are read before the loop ends, and an error that PostgreSQL raises for one of them, such as a division by zero, is thrown in place of your exception, which is lost.  To keep your exception, catch it in the loop's body, keep it in a variable and `break`, and around the loop catch the `PostgresException` and throw the exception you kept, if there is one.  Or have the query return only the rows the loop needs, with a `WHERE` or a `LIMIT`, so that no row is left to fail.
+- **On SQL Server, a loop over streamed rows can roll back your transaction with no exception.**  When a loop over [streamed rows](#streaming-rows) in a transaction ends early and SQL Server raises an error for a row still to come, or when its query raises an error after its rows, the error is not reported, and it can roll the transaction back.  Under `SET XACT_ABORT ON` nearly every error does.  With `XACT_ABORT` off some errors do and others do not, depending on the error in ways this manual does not list: `CAST('x' AS int)` does, and a division by zero, a `THROW` or `CAST(300 AS tinyint)` does not.  Your code goes on as if it had not: the transaction's `Connection` is null, a command you then give the transaction runs outside any transaction and is committed on its own, and `Commit` throws `InvalidOperationException`, "This SqlTransaction has completed; it is no longer usable.".  Checking the transaction after the loop, and treating a `Connection` that is null as a rollback, is the only reliable check, whatever the error and the setting.  Keeping `XACT_ABORT` off protects the transaction from some errors and not from others.  The same holds for a method that returns its rows: see [SQL Server's known issues](sqlserver.md#known-issues).
 - **A type made by Vogen or StronglyTypedId needs converters written for it.**  SqlSource converts a type only through methods marked `[SqlSourceConverter]`, and never through a type's `Value` property and its `From` method or constructor, so such a type with no converter is given to the driver as it is, which throws `InvalidCastException`.  Write the two converters in a class of your project, each calling the type's own members:
 
   ```csharp

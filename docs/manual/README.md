@@ -20,6 +20,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Know which models a query gets, what they are named, and what their properties are | [Models](generator.md#models) |
 | Run a query with its generated method, and know what it returns and throws | [Query methods](generator.md#query-methods) |
 | Choose what a query method returns its rows in, where the methods go, or give them `Async` names | [Collection type](settings.md#setting-collection-type), [where the methods go](settings.md#setting-method-location), [generator parameters](settings.md#setting-generator-parameters) |
+| Process each row as it is read, without holding them all | [Streaming rows](settings.md#streaming-rows) |
 | Run several queries in a transaction | [The recipe](recipes.md#queries-in-a-transaction) |
 | Use the queries with Dapper or ADO.NET | [The recipe](recipes.md#dapper-and-adonet) |
 | Read rows into the models with Dapper | [The recipe](recipes.md#models-through-dapper) |
@@ -66,6 +67,7 @@ SqlSource is in early development.  This table is the one list of what works in 
 | Models for the parameters and rows of a query: their names, namespace, shape, properties and nullability, table models and shared models | Available | [Models](generator.md#models), [PostgreSQL](postgresql.md#models), [SQL Server](sqlserver.md#models) |
 | A column's nullability set by `!` or `?` at the end of its alias, or by a `-- column:` marker, which leaves the column's name alone for Dapper | Available | [Which properties can be null](generator.md#model-nullability), [the `-- column:` marker](generator.md#column-marker) |
 | Generated query methods, which run a query on a connection and read its rows into its models, and `UnexpectedRowCountException` | Available | [Query methods](generator.md#query-methods) |
+| Streaming rows: a `many` method that returns `IAsyncEnumerable<T>`, by the collection type `IAsyncEnumerable`, and reads each row as the loop asks for it | Available | [Streaming rows](settings.md#streaming-rows) |
 | Each parameter of a query method sent as the database type it was described with | Available | [How a parameter is sent](generator.md#method-parameters), [PostgreSQL](postgresql.md#query-methods), [SQL Server](sqlserver.md#method-parameters) |
 | Converters: methods of your own that convert between a C# type of your choice and one the driver reads and sends, for the query methods | Available | [Converters](settings.md#converters), [the recipe](recipes.md#strongly-typed-id) |
 | Library maps for the types of libraries such as NodaTime | Coming | Not documented until it is delivered |

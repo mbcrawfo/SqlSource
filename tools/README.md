@@ -1,6 +1,6 @@
 # Tools
 
-This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, a script that pulls the test images, and two recording scripts, which are not checks.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
+This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, the file that says which database tests a change can skip, a script that pulls the test images, and two recording scripts, which are not checks.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
 
 ## Linters
 
@@ -52,6 +52,37 @@ tools/check-tool-install.sh artifacts/packages
 This installs the tool the way a user does: `dotnet tool install` into a temporary folder outside the repository, from a feed that holds nothing else.  It then runs `sqlsource --version` and compares it with the package's version, runs `sqlsource --help`, and runs `sqlsource describe` in an empty folder, which must exit with 1 and report `SQLSRC201`.  Then it writes a project of one `mssql` query beside SqlSource's MSBuild files, copied from `src/SqlSource/build/`, with a settings file that sets `"root": true`, the dialect `mssql` and the database `orders`, never restored, and describes it with a connection to the port 1 of the machine, which refuses: the run must exit with 1 and report `SQLSRC224` with the text that SqlClient could not reach the server, and no `SQLSRC200`.  SqlClient is loaded only to connect, and the copy outside `runtimes/` is a stub that throws on any use, which the tool reports as `SQLSRC224` with another text, so this shows that the copy for the platform loads.  A tool's package carries everything the tool loads, so this is what shows that all of it is there.
 
 Last, it runs `sqlsource --version` again with `DOTNET_ROLL_FORWARD` set to `LatestMajor`, which starts the tool on the newest runtime the machine has.  The tool targets .NET 8 and rolls forward on a machine that has only a later one, and this proves it wherever the script runs.  Without an argument the script packs first.
+
+## Formatting
+
+`format.sh` is at the root of the repository, and `pre-commit-validation.sh` runs it as `format.sh --check`.
+
+```bash
+./format.sh [--check] [style|analyzers|csharpier ...] [-- file ...]
+```
+
+Without `--check` it rewrites files in place.  The part names choose which of `dotnet format style`, `dotnet format analyzers` and CSharpier run, always in that order, and all three run when none is given.  Files after `--`, as paths from the repository root, limit all three parts to those files: the two `dotnet format` parts take them as `--include`, and CSharpier checks them in place of the tree.  That is how a pre-commit run checks only the `.cs` files that changed.  `--` with no file after it is a usage error.
+
+## Test scopes
+
+`tools/test-scopes.txt` says which database test projects a change to a path can affect.  `pre-commit-validation.sh` reads it to skip the PostgreSQL pair of test projects (`tests/SqlSource.Tests.Postgres` and `tests/SqlSource.Tests.Postgres.Npgsql8`) or the SQL Server pair (`tests/SqlSource.Tests.SqlServer` and `tests/SqlSource.Tests.SqlServer.SqlClient61`) when nothing in the uncommitted change reaches them, and the tests read it to check that a skip is safe.  `--full` ignores it, and so does CI.
+
+A line is `<scope> <pattern>`:
+
+- The scope is `none` (neither pair), `postgres`, `sqlserver` or `both`.
+- The pattern is a path from the repository root, with `/` as the separator.  `*` matches any run of characters, `/` included, and every other character is literal.  A pattern with `?`, `[`, `]`, `\`, `(`, `)`, `!`, `+` or `@` in it is refused, since bash would read them as glob characters, as an escape or as an extended glob operator.
+- Blank lines and lines that start with `#` are ignored.
+- The first line whose pattern matches a path decides that path's scope, so an exception goes before the broad line it carves out of.  A path that no line matches is `both`.
+- The pairs that run are the union over every changed path.  A change to the file itself runs both.
+- A `project <postgres|sqlserver> <path>` line names a container project's `.csproj` and the engine that runs it.  The four container projects are the only ones listed, and every other test project always runs.
+
+To change it, edit the file and run the tests; `tests/SqlSource.Tests/Validation/` checks:
+
+- Every line parses and every pattern matches at least one file of the repository, so a renamed folder cannot leave a dead line behind (`TestScopesFileTests`).
+- Every file that a container project includes from outside its own folder, a linked file, a referenced project or an import, has a scope that runs that project (`ContainerProjectInputsTests`).  The check reads the project's `.csproj`, every `Directory.Build.props` and `Directory.Build.targets` from its folder up to the root, and every project under `tests/` that it references, directly or not, with the `Directory.Build` files above that project.  A project that links a file whose scope is `none` or the other engine's fails there.
+- In a container project, `RepositoryRoot.Path` throws when the path, or a file below it, has a scope that would let a change to it skip that project (`RepositoryRootTests`).  A read that bypasses `Path` is not caught, which is why [`tests/AGENTS.md`](../tests/AGENTS.md) forbids it.  [`tests/README.md`](../tests/README.md#reading-the-repository) says what to do when `Path` throws.
+
+`pre-commit-validation.sh --plan <path> ...` prints what a run would do for those paths and runs nothing, which shows the effect of a line.
 
 ## Pulling the test images
 

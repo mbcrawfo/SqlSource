@@ -6,6 +6,9 @@
 # build.yml tests each engine's floor and default image, and test-postgres and test-sqlserver here every supported major
 # between them, so that the two cover every supported major: see the rule in .github/AGENTS.md.
 # It is no required check.  A pull request that changes this file runs it, so that a change to it is tried.
+# Every test run's summary lists its failed and skipped tests and leaves out the passed ones.  A step's summary holds
+# 1 MiB, the reporter cuts its output there, and GitHub then shows little or none of it.  The passed tests of the Test
+# step alone are past that, and so are some hundreds of failed tests: see .github/workflows/README.md.
 name: Nightly
 
 on:
@@ -77,7 +80,7 @@ jobs:
           for project in tests/SqlSource.Tests tests/SqlSource.Tests.RoslynFloor tests/SqlSource.Tool.Tests; do
               dotnet test --project "$project" --configuration "$CONFIGURATION" --no-build \
                   --results-directory "artifacts/test-results/$(basename "$project")" \
-                  --report-github || status=1
+                  --report-github --report-github-summary-include-passed false || status=1
           done
           exit "$status"
 
@@ -126,7 +129,9 @@ jobs:
       - name: Test
         env:
           SQLSOURCE_TESTS_POSTGRES_IMAGE: ${{ matrix.image }}
-        run: dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build --report-github
+        run: >-
+          dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
+          --report-github --report-github-summary-include-passed false
 
   # The same for tests/SqlSource.Tests.SqlServer, which build.yml runs on SQL Server 2017, the floor, and 2025, the
   # default.  Each image here has its row of SqlServerContainer.ImageBuilds.  The steps are those of build.yml's
@@ -171,4 +176,6 @@ jobs:
       - name: Test
         env:
           SQLSOURCE_TESTS_SQLSERVER_IMAGE: ${{ matrix.image }}
-        run: dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build --report-github
+        run: >-
+          dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
+          --report-github --report-github-summary-include-passed false

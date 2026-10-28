@@ -60,6 +60,13 @@ public sealed class QueryMethodWriterTests
         TestModels.NameLocation("Users.sql")
     );
 
+    // GetUser streaming its rows.
+    private static readonly QueryMethod Stream = GetUser with
+    {
+        Shape = ResultShape.Many,
+        Collection = CollectionKind.IAsyncEnumerable,
+    };
+
     [Fact]
     public void Append_OneOptionalWithParametersAndAToken_IsTheWholeMethod()
     {
@@ -746,6 +753,245 @@ public sealed class QueryMethodWriterTests
         );
     }
 
+    // The outer method checks the arguments and returns the iterator, a static local function that takes every
+    // argument and holds the rest of the body, yielding each row as it reads it.
+    [Fact]
+    public void Append_IAsyncEnumerable_IsTheWholeMethod() =>
+        Write(Stream)
+            .ShouldBe(
+                Joined(
+                    """
+                    /// <summary>
+                    /// The <c>GetUser</c> query from <c>Users.sql</c>.
+                    /// </summary>
+                    /// <remarks>
+                    /// <code>
+                    /// SELECT id, name FROM users WHERE id = @id ORDER BY {{orderBy}}
+                    /// </code>
+                    /// </remarks>
+                    /// <param name="connection">The connection to run the query on.  ↩
+                    When it is closed, it is opened when the loop starts and closed again when the loop ends.</param>
+                    /// <param name="parameters">The query's parameters.</param>
+                    /// <param name="orderBy">The text that replaces <c>{{orderBy}}</c>.</param>
+                    /// <param name="transaction">The transaction to run the query in, or null.</param>
+                    /// <param name="commandTimeout">↩
+                    The command's timeout in seconds, or null for the driver's.</param>
+                    /// <param name="cancellationToken">Cancels the query.</param>
+                    /// <returns>The rows the query returns, each read as the loop asks for it.</returns>
+                    public static global::System.Collections.Generic.IAsyncEnumerable<global::App.GetUserDto> GetUser(
+                        this global::System.Data.Common.DbConnection connection,
+                        global::App.GetUserParams parameters,
+                        string orderBy,
+                        global::System.Data.Common.DbTransaction? transaction = null,
+                        int? commandTimeout = null,
+                        global::System.Threading.CancellationToken cancellationToken = default)
+                    {
+                        global::System.ArgumentNullException.ThrowIfNull(connection);
+                        global::System.ArgumentNullException.ThrowIfNull(parameters);
+                        global::System.ArgumentException.ThrowIfNullOrWhiteSpace(orderBy);
+
+                        return ReadRows(↩
+                    connection, parameters, orderBy, transaction, commandTimeout, cancellationToken);
+
+                        static async ↩
+                    global::System.Collections.Generic.IAsyncEnumerable<global::App.GetUserDto> ReadRows(
+                            global::System.Data.Common.DbConnection connection,
+                            global::App.GetUserParams parameters,
+                            string orderBy,
+                            global::System.Data.Common.DbTransaction? transaction,
+                            int? commandTimeout,
+                            [global::System.Runtime.CompilerServices.EnumeratorCancellation] ↩
+                    global::System.Threading.CancellationToken cancellationToken)
+                        {
+                            var sql = string.Create(
+                                checked(51 + orderBy.Length),
+                                orderBy,
+                                static (span, state) =>
+                                {
+                                    "SELECT id, name FROM users WHERE id = @id ORDER BY ".CopyTo(span);
+                                    span = span.Slice(51);
+                                    state.CopyTo(span);
+                                }
+                            );
+                            var wasClosed = connection.State == global::System.Data.ConnectionState.Closed;
+                            if (wasClosed)
+                            {
+                                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                            }
+
+                            try
+                            {
+                                var command = connection.CreateCommand();
+                                await using var commandScope = ↩
+                    global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(command, false);
+                                #pragma warning disable CA2100 // The text of a token is the caller's own choice.
+                                command.CommandText = sql;
+                                #pragma warning restore CA2100
+                                command.Transaction = transaction;
+                                if (commandTimeout.HasValue)
+                                {
+                                    command.CommandTimeout = commandTimeout.Value;
+                                }
+
+                                {
+                                    var parameter = new global::Npgsql.NpgsqlParameter<int>();
+                                    parameter.ParameterName = "id";
+                                    parameter.DataTypeName = "integer";
+                                    parameter.TypedValue = parameters.Id;
+                                    command.Parameters.Add(parameter);
+                                }
+
+                                var reader = await command.ExecuteReaderAsync(↩
+                    global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);
+                                await using var readerScope = ↩
+                    global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
+                                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                                {
+                                    yield return new global::App.GetUserDto(reader.GetFieldValue<int>(0), ↩
+                    reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1));
+                                }
+                            }
+                            finally
+                            {
+                                if (wasClosed)
+                                {
+                                    await connection.CloseAsync().ConfigureAwait(false);
+                                }
+                            }
+                        }
+                    }
+
+                    """
+                )
+            );
+
+    // The call checks its arguments at once; the iterator runs nothing until the loop asks for a row.
+    [Fact]
+    public void Append_IAsyncEnumerable_ChecksTheArgumentsInTheOuterMethod()
+    {
+        var text = Write(Stream);
+        var call = text.IndexOf("return ReadRows(", StringComparison.Ordinal);
+
+        call.ShouldBeGreaterThan(0);
+        var outer = text[..call];
+        var iterator = text[call..];
+        outer.ShouldContain("ThrowIfNull(connection)");
+        outer.ShouldContain("ThrowIfNull(parameters)");
+        outer.ShouldContain("ThrowIfNullOrWhiteSpace(orderBy)");
+        iterator.ShouldNotContain("ThrowIfNull(connection)");
+        iterator.ShouldNotContain("ThrowIfNull(parameters)");
+        iterator.ShouldNotContain("ThrowIfNullOrWhiteSpace(orderBy)");
+    }
+
+    [Fact]
+    public void Append_IAsyncEnumerableWithoutParameters_PassesNoParameters()
+    {
+        var text = Write(Stream with { Input = null });
+
+        text.ShouldContain(
+            "    return ReadRows(connection, orderBy, transaction, commandTimeout, cancellationToken);\n"
+        );
+        text.ShouldNotContain("parameters");
+    }
+
+    [Fact]
+    public void Append_IAsyncEnumerableTokenNamedReadRows_RenamesTheLocalFunction()
+    {
+        var text = Write(
+            Stream with
+            {
+                Segments = TestModels.Array(TestModels.Literal("SELECT 1 FROM "), Token("ReadRows")),
+            }
+        );
+
+        text.ShouldContain(
+            "    return ReadRows1(connection, parameters, ReadRows, transaction, commandTimeout, cancellationToken);\n"
+        );
+        text.ShouldContain("> ReadRows1(\n");
+        text.ShouldContain("\n    global::App.GetUserParams parameters,\n    string ReadRows,\n");
+        text.ShouldContain("\n        global::App.GetUserParams parameters,\n        string ReadRows,\n");
+    }
+
+    // As in the method of any other type: an asynchronous local function cannot use await as an identifier either.
+    [Fact]
+    public void Append_IAsyncEnumerableTokenNamedAwait_WritesItVerbatim()
+    {
+        var text = Write(
+            Stream with
+            {
+                Segments = TestModels.Array(TestModels.Literal("SELECT 1 FROM "), Token("await"), Token("b")),
+            }
+        );
+
+        text.ShouldContain("/// <param name=\"await\">The text that replaces <c>{{await}}</c>.</param>\n");
+        text.ShouldContain(
+            "    return ReadRows(connection, parameters, @await, b, transaction, commandTimeout, cancellationToken);\n"
+        );
+        text.ShouldContain("\n    string @await,\n    string b,\n");
+        text.ShouldContain("\n        string @await,\n        string b,\n");
+        text.ShouldContain("    global::System.ArgumentException.ThrowIfNullOrWhiteSpace(@await);\n");
+        text.ShouldContain("            checked(14 + @await.Length + b.Length),\n            (@await, b),\n");
+        text.ShouldNotContain("string await");
+        text.ShouldNotContain("(await)");
+        text.ShouldNotContain(" await.Length");
+        text.ShouldNotContain("(await, b)");
+        text.ShouldNotContain(" await,");
+    }
+
+    [Fact]
+    public void Append_IAsyncEnumerableNotNullVectorColumn_ChecksBeforeYielding() =>
+        Write(Stream with { Output = VectorOutput(isNullable: false) })
+            .ShouldContain(
+                "            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
+                    + "            {\n"
+                    + "                var value1 = reader.GetFieldValue<"
+                    + Vector
+                    + ">(1);\n"
+                    + "                if (value1.IsNull)\n"
+                    + "                {\n"
+                    + "                    throw new global::System.InvalidCastException("
+                    + "\"Column 'embedding' is null.\");\n"
+                    + "                }\n"
+                    + "\n"
+                    + "                yield return new global::App.GetUserDto(reader.GetFieldValue<int>(0), value1);\n"
+                    + "            }\n"
+            );
+
+    [Theory]
+    [InlineData("public static")]
+    [InlineData("internal static")]
+    [InlineData("private static")]
+    public void Append_IAsyncEnumerableTypePlacement_TakesTheConnectionWithoutThis(string modifiers)
+    {
+        var text = Write(Stream, modifiers, isExtension: false);
+
+        text.ShouldContain(
+            "\n"
+                + modifiers
+                + " global::System.Collections.Generic.IAsyncEnumerable<global::App.GetUserDto> GetUser(\n"
+                + "    global::System.Data.Common.DbConnection connection,\n"
+        );
+        text.ShouldNotContain("this ");
+    }
+
+    // The collection type reads only a many query, so any other shape's method does not stream.
+    [Theory]
+    [InlineData(nameof(ResultShape.One))]
+    [InlineData(nameof(ResultShape.OneOptional))]
+    [InlineData(nameof(ResultShape.None))]
+    [InlineData(nameof(ResultShape.RowCount))]
+    public void Append_IAsyncEnumerableOfANonManyShape_IsTheOrdinaryMethod(string shapeName)
+    {
+        var method = GetUser with { Shape = Enum.Parse<ResultShape>(shapeName) };
+
+        Write(method with { Collection = CollectionKind.IAsyncEnumerable }).ShouldBe(Write(method));
+    }
+
+    // Nothing is buffered, so no-array-pool has nothing to change.
+    [Fact]
+    public void Append_IAsyncEnumerableUnderNoArrayPool_IsTheSameMethod() =>
+        Write(Stream with { UseArrayPool = false }).ShouldBe(Write(Stream));
+
     [Fact]
     public void Append_SummaryOfTheQuery_IsTheMethodsSummary() =>
         Write(GetUser with { SummaryXml = "Finds a user by <c>id</c>,\nor none." })
@@ -773,7 +1019,9 @@ public sealed class QueryMethodWriterTests
             Token("var"),
             Token("System"),
             Token("App"),
-            Token("await")
+            Token("await"),
+            Token("ReadRows"),
+            Token("yield")
         );
         var withVector = GetUser.Output! with
         {
