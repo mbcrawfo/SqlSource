@@ -380,6 +380,11 @@ test_args=()
 if [[ "$allocation_go" == false ]]; then
     test_args+=(--filter-not-class '*.EndToEnd.AllocationTests')
 fi
+# The allocation tests are in the two container projects, so when neither pair runs, none of them does, whatever set
+# off their trigger.  The filter is decided above, and this only changes what the plan and the summary say.
+if [[ "$allocation_go" == true && "$postgres_go" == false && "$sqlserver_go" == false ]]; then
+    decide allocation '' 'no container pair runs'
+fi
 
 if [[ "$plan" == true ]]; then
     if [[ -n "$full_reason" ]]; then
