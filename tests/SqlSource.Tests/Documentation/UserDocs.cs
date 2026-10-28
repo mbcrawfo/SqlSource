@@ -35,7 +35,7 @@ internal static partial class UserDocs
         "README.md",
         "src/SqlSource.Tool/README.md",
         .. Directory
-            .EnumerateFiles(Path.Combine(RepositoryRoot.Folder, Manual), "*.md")
+            .EnumerateFiles(RepositoryRoot.Path(Manual), "*.md")
             .Select(path => $"{Manual}/{Path.GetFileName(path)}")
             .Where(path => path != $"{Manual}/AGENTS.md")
             .Order(StringComparer.Ordinal),
@@ -118,7 +118,7 @@ internal static partial class UserDocs
             return (file, anchor);
         }
 
-        var root = RepositoryRoot.Folder;
+        var root = RepositoryRoot.Path();
         var folder = Path.GetDirectoryName(file) ?? "";
         var full = Path.GetFullPath(Path.Combine(root, folder, path));
         return (Path.GetRelativePath(root, full).Replace('\\', '/').TrimEnd('/'), anchor);
@@ -127,12 +127,12 @@ internal static partial class UserDocs
     // Whether a path of the repository, as Resolve gives it, names a file or a folder that is there.
     public static bool Exists(string path)
     {
-        var full = Path.Combine(RepositoryRoot.Folder, path);
+        var full = RepositoryRoot.Path(path);
         return File.Exists(full) || Directory.Exists(full);
     }
 
     private static Document Load(string file) =>
-        Documents.GetOrAdd(file, name => Read(File.ReadAllLines(Path.Combine(RepositoryRoot.Folder, name))));
+        Documents.GetOrAdd(file, name => Read(File.ReadAllLines(RepositoryRoot.Path(name))));
 
     // Reads the lines of one document.  Internal for the tests of this reading, which give it lines of their own.
     internal static Document Read(string[] lines)

@@ -48,7 +48,7 @@ public sealed class TestScopesFileTests
     {
         foreach (var projectFile in TestScopes.Repository.ProjectFiles)
         {
-            File.Exists(Path.Combine(RepositoryRoot.Folder, projectFile)).ShouldBeTrue(projectFile);
+            File.Exists(RepositoryRoot.Path(projectFile)).ShouldBeTrue(projectFile);
         }
     }
 
@@ -67,7 +67,7 @@ public sealed class TestScopesFileTests
     // Every file under the root, as a path from it with `/` as the separator.
     private static IEnumerable<string> FilesOfTheRepository()
     {
-        var root = new DirectoryInfo(RepositoryRoot.Folder);
+        var root = new DirectoryInfo(RepositoryRoot.Path());
         var pending = new Stack<DirectoryInfo>([root]);
         while (pending.Count > 0)
         {

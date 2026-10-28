@@ -18,11 +18,11 @@ public sealed class ContainerProjectInputsTests
     [Fact]
     public void Refused_ScopesWithoutTheFixtureProjectLines_NamesTheLinkedFixtures()
     {
-        var text = File.ReadAllText(Path.Combine(RepositoryRoot.Folder, "tools", "test-scopes.txt"));
+        var text = File.ReadAllText(RepositoryRoot.Path("tools", "test-scopes.txt"));
         var lines = text.Split('\n').Where(line => !line.Contains(" " + FixtureProjects, StringComparison.Ordinal));
         var scopes = TestScopes.Parse(string.Join('\n', lines));
 
-        var refused = ProjectIncludes.Refused(scopes, RepositoryRoot.Folder);
+        var refused = ProjectIncludes.Refused(scopes, RepositoryRoot.Path());
 
         refused.ShouldContain(line =>
             line.StartsWith($"SqlSource.Tests.Postgres: {FixtureProjects}Single/", StringComparison.Ordinal)
@@ -34,5 +34,5 @@ public sealed class ContainerProjectInputsTests
 
     [Fact]
     public void Refused_RepositoryScopes_IsEmpty() =>
-        ProjectIncludes.Refused(TestScopes.Repository, RepositoryRoot.Folder).ShouldBeEmpty();
+        ProjectIncludes.Refused(TestScopes.Repository, RepositoryRoot.Path()).ShouldBeEmpty();
 }

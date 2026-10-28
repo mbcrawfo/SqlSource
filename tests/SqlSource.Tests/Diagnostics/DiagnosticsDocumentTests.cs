@@ -25,9 +25,7 @@ public sealed class DiagnosticsDocumentTests
         .. SqlDiagnostics.All.Concat(ToolDiagnostics.All).OrderBy(descriptor => descriptor.Id, StringComparer.Ordinal),
     ];
 
-    private static readonly string[] Lines = File.ReadAllLines(
-        Path.Combine(RepositoryRoot.Folder, "docs", "manual", "diagnostics.md")
-    );
+    private static readonly string[] Lines = File.ReadAllLines(RepositoryRoot.Path("docs", "manual", "diagnostics.md"));
 
     [Fact]
     public void Document_Sections_AreTheDescriptorsInOrder() =>

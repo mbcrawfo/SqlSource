@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Testing;
 using SqlSource.Testing.EndToEnd;
 using SqlSource.Tests.SqlServer.Realistic;
 using SqlSource.Tool.Testing;
@@ -98,7 +99,7 @@ public sealed class CheckTests(SqlServerContainer sqlServer)
     // "describe --check" over the real project, on the real MSBuild and the describers of the released tool.
     private static async Task<CliResult> CheckAsync(IEnumerable<string> args)
     {
-        using var run = CliRun.Real(RepositoryPaths.Root);
+        using var run = CliRun.Real(RepositoryRoot.WorkingFolder);
         run.ReleasedDescribers = true;
         return await run.RunAsync(["describe", "--check", RepositoryPaths.EndToEndProject, .. args]);
     }

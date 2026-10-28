@@ -24,7 +24,7 @@ internal enum TestScope
 internal sealed class TestScopes
 {
     private static readonly Lazy<TestScopes> RepositoryFile = new(() =>
-        Parse(File.ReadAllText(Path.Combine(RepositoryRoot.Folder, "tools", "test-scopes.txt")))
+        Parse(File.ReadAllText(RepositoryRoot.ScopesFile))
     );
 
     // Compiled once for each pattern, since a test asks about every pattern of the file for every file of the

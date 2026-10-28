@@ -13,7 +13,7 @@ namespace SqlSource.Tests;
 // repository itself.
 public sealed class TestLayoutTests
 {
-    private static readonly string Tests = Path.Combine(RepositoryRoot.Folder, "tests");
+    private static readonly string Tests = RepositoryRoot.Path("tests");
     private static readonly string GeneratorTests = Path.Combine(Tests, "SqlSource.Tests", "Generator");
 
     // The first line of each file of Generator/, so that a reader of one sees that RoslynFloor compiles it too.

@@ -7,17 +7,16 @@ namespace SqlSource.Tests.Postgres;
 // in the repository itself and not in an output folder: recording writes there.
 internal static class RepositoryPaths
 {
-    public static string Root { get; } = RepositoryRoot.Folder;
-
-    // The folder with one folder for each engine: its schema.sql and its cases.
+    // The folder of the PostgreSQL describer's fixtures: its schema.sql and its cases.  The other engine's folder
+    // beside it is not this project's to read.
     public static string DescriberFixtures { get; } =
-        Path.Combine(Root, "tests", "SqlSource.Tool.Tests", "Fixtures", "Describers");
+        RepositoryRoot.Path("tests", "SqlSource.Tool.Tests", "Fixtures", "Describers", "postgres");
 
-    public static string PostgresSchema { get; } = Path.Combine(DescriberFixtures, "postgres", "schema.sql");
+    public static string PostgresSchema { get; } = Path.Combine(DescriberFixtures, "schema.sql");
 
     // The end-to-end project's folder EndToEnd/: the folders of the databases "app" and "billing", and Queries/.
     public static string EndToEnd => EndToEndEngine.Postgres.Folder;
 
     public static string EndToEndProject { get; } =
-        Path.Combine(Root, "tests", "SqlSource.Tests.Postgres", "SqlSource.Tests.Postgres.csproj");
+        RepositoryRoot.Path("tests", "SqlSource.Tests.Postgres", "SqlSource.Tests.Postgres.csproj");
 }

@@ -65,5 +65,5 @@ public sealed class RealisticCorpusTests
 
     // The path from the repository's root, with / between its folders on every system.
     private static string RelativeToTheRepository(string path) =>
-        Path.GetRelativePath(RepositoryRoot.Folder, path).Replace(Path.DirectorySeparatorChar, '/');
+        Path.GetRelativePath(RepositoryRoot.Path(), path).Replace(Path.DirectorySeparatorChar, '/');
 }
