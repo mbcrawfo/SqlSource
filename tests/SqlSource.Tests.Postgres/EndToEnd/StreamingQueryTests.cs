@@ -202,6 +202,28 @@ public sealed class StreamingQueryTests(PostgresContainer postgres)
         connection.State.ShouldBe(ConnectionState.Closed);
     }
 
+    // Npgsql runs one command at a time on a connection, and the loop's body, while the reader reads, is where a caller
+    // would run a second.
+    [Fact]
+    public async Task StreamAccounts_ACommandInTheLoopBody_ThrowsNpgsqlsError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+
+        var thrown = await Should.ThrowAsync<NpgsqlOperationInProgressException>(async () =>
+        {
+            await foreach (var account in connection.StreamAccounts(cancellationToken: token))
+            {
+                await using var other = new NpgsqlCommand("SELECT 1", connection);
+                _ = await other.ExecuteScalarAsync(token);
+            }
+        });
+
+        thrown.Message.ShouldStartWith("A command is already in progress");
+        connection.State.ShouldBe(ConnectionState.Open);
+    }
+
     [Fact]
     public async Task StreamNumbers_BreakPartway_LeavesTheConnectionUsable()
     {

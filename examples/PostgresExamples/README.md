@@ -92,4 +92,4 @@ ListUsersSortedByDto[] users = await queries.ListUsersSortedByAsync("created_at 
 await queries.WriteUserNamesAsync(Console.Out, cancellationToken);
 ```
 
-Each method opens the connection when it is closed and closes it again before it returns, and `StreamUsersOldestFirst`, which `WriteUserNamesAsync` calls, when its loop ends.  To run several queries on one open connection or in a transaction, open the connection yourself and pass the transaction to each generated method: see [the connection](../../docs/manual/generator.md#method-connection) and [the recipe](../../docs/manual/recipes.md#queries-in-a-transaction).
+Each method opens the connection when it is closed and closes it again before it returns; `StreamUsersOldestFirst`, which `WriteUserNamesAsync` calls, opens it when its loop starts and closes it when the loop ends.  To run several queries on one open connection or in a transaction, open the connection yourself and pass the transaction to each generated method: see [the connection](../../docs/manual/generator.md#method-connection) and [the recipe](../../docs/manual/recipes.md#queries-in-a-transaction).

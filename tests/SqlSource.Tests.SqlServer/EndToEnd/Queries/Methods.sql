@@ -89,6 +89,26 @@ SELECT id, name
 FROM dbo.accounts
 WHERE id = @secondId;
 
+-- name: ListThenRaise
+-- summary: The accounts into an array, a mark on the session, and then an error that the method does not report.
+-- StreamThenRaise of Streaming.sql, read into the default collection type: its test pins that the error is lost by a
+-- method that reads its rows into a collection too.  SET CONTEXT_INFO keeps its value for the session, which the test
+-- reads from the same connection: the mark is there when the batch ran as far as the THROW.
+-- output-model: CollectedAccount
+SELECT id, name
+FROM dbo.accounts
+ORDER BY id;
+SET CONTEXT_INFO 0x03;
+THROW 50000, 'after the rows', 1;
+
+-- name: RunThenRaise -> none
+-- summary: The accounts, a mark on the session, and then an error, which a method that reads no rows reports.
+SELECT id, name
+FROM dbo.accounts
+ORDER BY id;
+SET CONTEXT_INFO 0x04;
+THROW 50000, 'after the rows', 1;
+
 -- name: MergeAccountStatuses -> rowcount
 -- summary: Sets the status of the accounts up to an id by MERGE, whose OUTPUT the count includes.
 MERGE dbo.accounts AS a

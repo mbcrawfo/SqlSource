@@ -383,12 +383,12 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(token);
-        await ClearMarkAsync(connection, token);
+        await SessionMark.ClearAsync(connection, token);
 
         var streamed = await connection.StreamThenRaise(cancellationToken: token).ToListAsync(token);
 
         streamed.ShouldBe(Accounts);
-        (await ReadMarkAsync(connection, token)).ShouldBe(2);
+        (await SessionMark.ReadAsync(connection, token)).ShouldBe(2);
         connection.State.ShouldBe(ConnectionState.Open);
     }
 
@@ -401,7 +401,7 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(token);
-        await ClearMarkAsync(connection, token);
+        await SessionMark.ClearAsync(connection, token);
         var enumerator = connection.StreamThenRaise(cancellationToken: token).GetAsyncEnumerator(token);
         var rows = new List<CollectedAccount>();
 
@@ -413,7 +413,7 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
         await enumerator.DisposeAsync();
 
         rows.ShouldBe(Accounts);
-        (await ReadMarkAsync(connection, token)).ShouldBe(2);
+        (await SessionMark.ReadAsync(connection, token)).ShouldBe(2);
         connection.State.ShouldBe(ConnectionState.Open);
     }
 
@@ -426,7 +426,7 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(token);
-        await ClearMarkAsync(connection, token);
+        await SessionMark.ClearAsync(connection, token);
 
         var rows = 0;
         await foreach (
@@ -443,20 +443,6 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
         }
 
         rows.ShouldBe(10);
-        (await ReadMarkAsync(connection, token)).ShouldBe(1);
-    }
-
-    // The mark of the queries that end with SET CONTEXT_INFO: the first byte of the session's context, which stays on
-    // an open connection and which the pool resets when the connection is returned to it.
-    private static async Task ClearMarkAsync(SqlConnection connection, CancellationToken token)
-    {
-        await using var clear = new SqlCommand("SET CONTEXT_INFO 0x00", connection);
-        _ = await clear.ExecuteNonQueryAsync(token);
-    }
-
-    private static async Task<object?> ReadMarkAsync(SqlConnection connection, CancellationToken token)
-    {
-        await using var select = new SqlCommand("SELECT CAST(SUBSTRING(CONTEXT_INFO(), 1, 1) AS int)", connection);
-        return await select.ExecuteScalarAsync(token);
+        (await SessionMark.ReadAsync(connection, token)).ShouldBe(1);
     }
 }

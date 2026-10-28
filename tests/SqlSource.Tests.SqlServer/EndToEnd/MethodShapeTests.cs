@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Dapper;
+using Microsoft.Data.SqlClient;
 using Shouldly;
 using Xunit;
 
@@ -177,5 +178,42 @@ public sealed class MethodShapeTests(SqlServerContainer sqlServer)
         );
 
         accounts.ShouldBe([new ListAccountsWhereDto(3, "carol")]);
+    }
+
+    // The error after the rows is lost by a method that reads them into an array, as by the streaming StreamThenRaise:
+    // the rows are returned and nothing is thrown, though the batch ran as far as the THROW, which its mark shows.  A
+    // fix that reports the error flips this test.
+    [Fact]
+    public async Task ListThenRaise_ErrorAfterTheRows_ReturnsTheRowsAndIsNotThrown()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(token);
+        await SessionMark.ClearAsync(connection, token);
+
+        var accounts = await connection.ListThenRaise(cancellationToken: token);
+
+        accounts.ShouldBe([
+            new CollectedAccount(1, "alice"),
+            new CollectedAccount(2, "bob"),
+            new CollectedAccount(3, "carol"),
+        ]);
+        (await SessionMark.ReadAsync(connection, token)).ShouldBe(3);
+    }
+
+    // The same batch under none, which reads no rows, reports the error of the THROW.
+    [Fact]
+    public async Task RunThenRaise_ErrorAfterTheRows_ThrowsTheError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(token);
+        await SessionMark.ClearAsync(connection, token);
+
+        var thrown = await Should.ThrowAsync<SqlException>(() => connection.RunThenRaise(cancellationToken: token));
+
+        thrown.Number.ShouldBe(50000);
+        thrown.Message.ShouldBe("after the rows");
+        (await SessionMark.ReadAsync(connection, token)).ShouldBe(4);
     }
 }
