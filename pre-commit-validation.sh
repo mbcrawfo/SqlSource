@@ -64,8 +64,9 @@ formats_everything() {
     esac
 }
 
-# tools/test-scopes.txt, read once.  Its patterns hold no glob character but `*`, which matches `/` in bash as it does
-# in the C# reader, so matching a path against the pattern unquoted gives the same answer.
+# tools/test-scopes.txt, read once.  Its patterns hold no glob character, escape or extended glob operator but `*`,
+# which the C# reader refuses, and `*` matches `/` in bash as it does there, so matching a path against the pattern
+# unquoted gives the same answer.
 scope_names=()
 scope_patterns=()
 project_engines=()
@@ -110,6 +111,12 @@ needs_allocation() {
     case "${1##*/}" in
     *Allocation*) allocation=true ;;
     esac
+    # A container project's own .csproj can override the compile settings and driver versions, with a VersionOverride.
+    for project in "${project_paths[@]}"; do
+        if [[ "$1" == "$project" ]]; then
+            allocation=true
+        fi
+    done
 }
 
 # A path that can change what is packed or how the packages are checked.  README.md is the generator's readme.
@@ -122,21 +129,45 @@ needs_packages() {
     esac
 }
 
+# Every temporary file goes here, the plan's included, and none is left behind.
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
 # The change set is what differs from HEAD, untracked files included.  It is read with -z, so that git does not quote
-# a path that holds a space or a quote.
+# a path that holds a space or a quote, and through a file, since bash 3.2 cannot see the status of a process
+# substitution.  A git command that fails makes the run full, since its change set is unknown.
 changes=()
-if [[ ${#planned[@]} -gt 0 ]]; then
-    changes=("${planned[@]}")
-else
+git_failure=''
+collect() {
+    if ! "$@" >"$work/paths"; then
+        echo "pre-commit-validation.sh: '$*' failed, so everything runs" >&2
+        if [[ -z "$git_failure" ]]; then
+            git_failure="'$*' failed"
+        fi
+        return
+    fi
     while IFS= read -r -d '' path; do
         changes+=("$path")
-    done < <(git diff -z --name-only --no-renames HEAD && git ls-files -z --others --exclude-standard)
+    done <"$work/paths"
+}
+if [[ ${#planned[@]} -gt 0 ]]; then
+    for path in "${planned[@]}"; do
+        while [[ "$path" == ./* ]]; do
+            path="${path#./}"
+        done
+        changes+=("$path")
+    done
+else
+    collect git diff -z --name-only --no-renames HEAD
+    collect git ls-files -z --others --exclude-standard
 fi
 
 # A clean tree is almost always a check before a push, so it runs everything.
 full_reason=''
 if [[ "$full" == true ]]; then
     full_reason='--full'
+elif [[ -n "$git_failure" ]]; then
+    full_reason="$git_failure"
 elif [[ ${#changes[@]} -eq 0 ]]; then
     full_reason='the tree is clean'
 fi
@@ -167,7 +198,8 @@ for path in ${changes[@]+"${changes[@]}"}; do
     needs_packages "$path"
     if [[ "$known" == false ]]; then first unknown; fi
     if [[ "$everything" == true ]]; then first format_all; fi
-    if [[ "$path" == *.sh ]]; then first shell_trigger; fi
+    # shfmt takes its layout from .editorconfig.
+    if [[ "$path" == *.sh || "${path##*/}" == .editorconfig ]]; then first shell_trigger; fi
     if [[ "$path" == .github/workflows/* ]]; then first workflow_trigger; fi
     if [[ "$scope" == postgres || "$scope" == both ]]; then first postgres_trigger; fi
     if [[ "$scope" == sqlserver || "$scope" == both ]]; then first sqlserver_trigger; fi
@@ -195,13 +227,26 @@ elif [[ ${#format_files[@]} -gt 0 ]]; then
     fi
 fi
 
-# Sets go, action and why from a trigger and the reason to skip without one.  A full run sets off every trigger.
-verdict() {
-    go=true action=run why="${full_reason:-$1}"
+# Each verdict is decided once, from its trigger and the reason to skip without one, into <name>_go and <name>_why.  A
+# full run sets off every trigger.  The plan, the run and the summary all read these.
+decide() {
+    local go=true why="${full_reason:-$2}"
     if [[ -z "$why" ]]; then
-        go=false action=skip why="$2"
+        go=false
+        why="$3"
     fi
+    printf -v "${1}_go" '%s' "$go"
+    printf -v "${1}_why" '%s' "$why"
 }
+no_scope='no change in its scope'
+decide always always ''
+decide format "$format_trigger" "$no_format"
+decide shell "$shell_trigger" 'no .sh file or .editorconfig changed'
+decide workflow "$workflow_trigger" 'no file under .github/workflows/ changed'
+decide postgres "$postgres_trigger" "$no_scope"
+decide sqlserver "$sqlserver_trigger" "$no_scope"
+decide allocation "$allocation_trigger" 'no change can alter what they measure'
+decide packages "$packages_trigger" 'no change reaches the packages'
 
 # Every restore below runs in locked mode, as it does in CI, so that a stale packages.lock.json fails the validation
 # instead of being rewritten by it.
@@ -226,9 +271,12 @@ run_step() {
 # Runs a step when its verdict says so, and records the skip otherwise.  Under --plan it prints the verdict instead.
 # Without a command it only records the decision, as for a pair of test projects that the test step leaves out.
 step() {
-    local name="$1"
-    verdict "$2" "$3"
-    shift 3
+    local name="$1" go_name="${2}_go" why_name="${2}_why"
+    local go="${!go_name}" why="${!why_name}" action=run
+    shift 2
+    if [[ "$go" == false ]]; then
+        action=skip
+    fi
     if [[ "$plan" == true ]]; then
         printf '  %-4s  %-20s  %s\n' "$action" "$name" "$why"
         return 0
@@ -242,28 +290,43 @@ step() {
     fi
 }
 
+# Records each named step as skipped for one reason, as when the build fails.
+skip_all() {
+    local reason="$1" name
+    shift
+    for name in "$@"; do
+        results+=("skipped  $name ($reason)")
+    done
+}
+
+# A string of the solution filter, escaped for JSON.
+json_string() {
+    printf '"%s"' "$(printf '%s' "$1" | sed 's/[\\"]/\\&/g')"
+}
+
 # The test step runs a solution filter of every project but the container projects whose pair is skipped.  The
 # projects in the filter still run in parallel, as they do for the solution.
 filter_projects=''
 project_plan=()
 while IFS= read -r project; do
-    verdict always ''
+    decision=always
     for index in "${!project_paths[@]}"; do
         if [[ "${project_paths[index]}" == "$project" ]]; then
-            case "${project_engines[index]}" in
-            postgres) verdict "$postgres_trigger" 'no change in its scope' ;;
-            sqlserver) verdict "$sqlserver_trigger" 'no change in its scope' ;;
-            esac
+            decision="${project_engines[index]}"
         fi
     done
-    project_plan+=("$(printf '        %-4s  %s  (%s)' "$action" "$project" "$why")")
-    if [[ "$go" == true ]]; then
-        filter_projects+="${filter_projects:+,}\"$project\""
+    go_name="${decision}_go"
+    why_name="${decision}_why"
+    action=skip
+    if [[ "${!go_name}" == true ]]; then
+        action=run
+        filter_projects+="${filter_projects:+,}$(json_string "$project")"
     fi
+    project_plan+=("$(printf '        %-4s  %s  (%s)' "$action" "$project" "${!why_name}")")
 done < <(sed -n 's/.*<Project Path="\([^"]*\)".*/\1/p' "$SOLUTION")
 test_args=()
-verdict "$allocation_trigger" ''
-if [[ "$go" == false ]]; then
+# shellcheck disable=SC2154 # decide sets it, through printf -v.
+if [[ "$allocation_go" == false ]]; then
     test_args+=(--filter-not-class '*.EndToEnd.AllocationTests')
 fi
 
@@ -274,41 +337,35 @@ if [[ "$plan" == true ]]; then
         printf 'Partial run of %s changed path(s).\n' "${#changes[@]}"
     fi
 else
-    work="$(mktemp -d)"
-    trap 'rm -rf "$work"' EXIT
-    printf '{"solution":{"path":"%s","projects":[%s]}}\n' "$repo_root/$SOLUTION" "$filter_projects" \
+    printf '{"solution":{"path":%s,"projects":[%s]}}\n' "$(json_string "$repo_root/$SOLUTION")" "$filter_projects" \
         >"$work/tests.slnf"
 fi
 
-step 'format' "$format_trigger" "$no_format" ./format.sh "${format_args[@]}" || true
-step 'editorconfig-checker' always '' tools/editorconfig-checker.sh || true
-step 'shellcheck' "$shell_trigger" 'no .sh file changed' tools/shellcheck.sh || true
-step 'shfmt' "$shell_trigger" 'no .sh file changed' tools/shfmt.sh --check || true
-step 'actionlint' "$workflow_trigger" 'no file under .github/workflows/ changed' tools/actionlint.sh || true
-if step 'build' always '' dotnet build "$SOLUTION"; then
-    step 'test' always '' dotnet test --solution "${work:-}/tests.slnf" --no-build ${test_args[@]+"${test_args[@]}"} ||
-        true
+# Each package check is tools/check-<name>.sh, and takes the folder that the pack writes.
+PACKAGE_CHECKS=(package package-install tool-install)
+package_folder="$work/packages"
+step 'format' format ./format.sh "${format_args[@]}" || true
+step 'editorconfig-checker' always tools/editorconfig-checker.sh || true
+step 'shellcheck' shell tools/shellcheck.sh || true
+step 'shfmt' shell tools/shfmt.sh --check || true
+step 'actionlint' workflow tools/actionlint.sh || true
+if step 'build' always dotnet build "$SOLUTION"; then
+    step 'test' always dotnet test --solution "$work/tests.slnf" --no-build ${test_args[@]+"${test_args[@]}"} || true
     if [[ "$plan" == true ]]; then
         printf '%s\n' "${project_plan[@]}"
     fi
-    step 'postgres tests' "$postgres_trigger" 'no change in its scope'
-    step 'sqlserver tests' "$sqlserver_trigger" 'no change in its scope'
-    step 'allocation tests' "$allocation_trigger" 'no change can alter what they measure'
-    no_packages='no change reaches the packages'
-    if step 'pack' "$packages_trigger" "$no_packages" dotnet pack "$SOLUTION" --output "${work:-}/packages"; then
-        step 'package' "$packages_trigger" "$no_packages" tools/check-package.sh "${work:-}/packages" || true
-        step 'package-install' "$packages_trigger" "$no_packages" \
-            tools/check-package-install.sh "${work:-}/packages" || true
-        step 'tool-install' "$packages_trigger" "$no_packages" tools/check-tool-install.sh "${work:-}/packages" ||
-            true
+    step 'postgres tests' postgres
+    step 'sqlserver tests' sqlserver
+    step 'allocation tests' allocation
+    if step 'pack' packages dotnet pack "$SOLUTION" --output "$package_folder"; then
+        for check in "${PACKAGE_CHECKS[@]}"; do
+            step "$check" packages "tools/check-$check.sh" "$package_folder" || true
+        done
     else
-        results+=('skipped  package (the pack failed)' 'skipped  package-install (the pack failed)'
-            'skipped  tool-install (the pack failed)')
+        skip_all 'the pack failed' "${PACKAGE_CHECKS[@]}"
     fi
 else
-    results+=('skipped  test (the build failed)' 'skipped  pack (the build failed)'
-        'skipped  package (the build failed)' 'skipped  package-install (the build failed)'
-        'skipped  tool-install (the build failed)')
+    skip_all 'the build failed' test pack "${PACKAGE_CHECKS[@]}"
 fi
 
 if [[ "$plan" == true ]]; then

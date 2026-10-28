@@ -67,6 +67,12 @@ public sealed class TestScopesTests
     [InlineData("?")]
     [InlineData("[")]
     [InlineData("]")]
+    [InlineData("\\")]
+    [InlineData("(")]
+    [InlineData(")")]
+    [InlineData("!")]
+    [InlineData("+")]
+    [InlineData("@")]
     public void Parse_PatternWithAGlobCharacter_ThrowsNamingTheLine(string character) =>
         Should
             .Throw<FormatException>(() => TestScopes.Parse($"none a/*\nnone a{character}b\n"))

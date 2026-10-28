@@ -3,8 +3,10 @@
 #
 # A line is `<scope> <pattern>`, where the scope is none (neither engine's projects), postgres, sqlserver or both, and
 # the pattern is a path from the repository root with `/` as the separator.  `*` matches any run of characters, `/`
-# included; every other character is literal, and `?` and brackets are refused.  The first line that matches a path
-# decides its scope, so an exception goes before the broad line it carves out of.  A path that no line matches is both.
+# included; every other character is literal, and `?`, the brackets, `\`, the parentheses, `!`, `+` and `@` are
+# refused, since bash would read them as glob characters, escapes or extended glob operators.  The first line that
+# matches a path decides its scope, so an exception goes before the broad line it carves out of.  A path that no line
+# matches is both.
 #
 # A `project <postgres|sqlserver> <path>` line names a container project and the engine that runs it.
 

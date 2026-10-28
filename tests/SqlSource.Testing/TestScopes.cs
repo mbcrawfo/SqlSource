@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -18,14 +19,18 @@ internal enum TestScope
 
 // tools/test-scopes.txt, read the same way by the tests and by pre-commit-validation.sh.  Its lines sort the paths of
 // the repository into scopes; the first line that matches a path decides it, and a path that none matches is Both.  A
-// pattern holds `*`, which matches any run of characters, `/` included, and every other character is literal: `?` and
-// the brackets are refused, since bash would read them as glob characters and the two readers would disagree.  The
-// `project` lines name the container projects and the engine each needs.
+// pattern holds `*`, which matches any run of characters, `/` included, and every other character is literal: `?`, the
+// brackets, `\`, the parentheses, `!`, `+` and `@` are refused, since bash would read them as glob characters, escapes
+// or, from bash 4.1, extended glob operators, and the two readers would disagree.  The `project` lines name the
+// container projects and the engine each needs.
 internal sealed class TestScopes
 {
     private static readonly Lazy<TestScopes> RepositoryFile = new(() =>
         Parse(File.ReadAllText(RepositoryRoot.ScopesFile))
     );
+
+    // The characters that bash would read as glob characters, escapes or extended glob operators.
+    private static readonly SearchValues<char> RefusedCharacters = SearchValues.Create("?[]\\()!+@");
 
     // Compiled once for each pattern, since a test asks about every pattern of the file for every file of the
     // repository.
@@ -128,7 +133,7 @@ internal sealed class TestScopes
             throw new FormatException($"Test scopes line {lineNumber}: expected '<scope> <pattern>'.");
         }
 
-        if (words[1].AsSpan().IndexOfAny("?[]") >= 0)
+        if (words[1].AsSpan().IndexOfAny(RefusedCharacters) >= 0)
         {
             throw new FormatException(
                 $"Test scopes line {lineNumber}: '{words[1]}' holds a glob character other than '*'."
