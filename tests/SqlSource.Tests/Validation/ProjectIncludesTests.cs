@@ -61,7 +61,7 @@ public sealed class ProjectIncludesTests : IDisposable
         Write("tests/Other/Elsewhere/D.sql");
 
         ProjectIncludes
-            .Expand(_root.FullName, Path.Combine(_root.FullName, "tests", "App"), "../Other/Fixtures/*.sql")
+            .Expand(_root.FullName, Path.Combine(_root.FullName, "tests", "App"), "../Other/Fixtures/**/*.sql")
             .ShouldBe(["tests/Other/Fixtures/A.sql", "tests/Other/Fixtures/Deep/B.sql"]);
     }
 

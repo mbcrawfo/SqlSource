@@ -45,6 +45,9 @@ internal static class ProjectIncludes
             return [pattern];
         }
 
+        // MSBuild's `**/` also covers no folder at all, so `dir/**/*.sql` includes `dir/a.sql`.  Matching it as it is
+        // would need a `/` after `dir` and miss that file; with `*`, which crosses `/`, both are found.
+        var matching = pattern.Replace("**/", "*", StringComparison.Ordinal);
         var root = Path.Combine(repositoryRoot, pattern[..(pattern.LastIndexOf('/', star) + 1)]);
         if (!Directory.Exists(root))
         {
@@ -56,7 +59,7 @@ internal static class ProjectIncludes
             .. Directory
                 .EnumerateFiles(root, "*", SearchOption.AllDirectories)
                 .Select(file => Path.GetRelativePath(repositoryRoot, file).Replace('\\', '/'))
-                .Where(file => TestScopes.Matches(pattern, file))
+                .Where(file => TestScopes.Matches(matching, file))
                 .Order(StringComparer.Ordinal),
         ];
     }
