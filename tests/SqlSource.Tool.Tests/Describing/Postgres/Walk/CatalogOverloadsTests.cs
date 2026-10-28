@@ -8,7 +8,7 @@ using static SqlSource.Tool.Tests.PostgresPlans;
 namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // The closed table of the names of pg_catalog whose every overload is never NULL under its condition.
-// tests/SqlSource.Tests.Postgres/Describer/PlanOutputTests.cs holds every overload to the catalog of 14 and 18.
+// tests/DatabaseTests/Postgres/Describer/PlanOutputTests.cs holds every overload to the catalog of 14 and 18.
 public sealed class CatalogOverloadsTests
 {
     [Fact]

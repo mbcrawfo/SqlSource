@@ -1,0 +1,85 @@
+-- The queries of the notes, claimed by NoteQueries.  The schema's enum and domains are read as C# types of the project:
+-- the enum as a C# enum that the data source maps, and each domain through the converters of its type.  The ids of the
+-- accounts are AccountIds, read and sent through its converters: accounts.id and notes.account_id by the header's
+-- -- column: markers.
+-- type-override: public.note_kind = SqlSource.DatabaseTests.Postgres.EndToEnd.Types.NoteKind
+-- type-override: public.email = SqlSource.DatabaseTests.Postgres.EndToEnd.Types.Email
+-- type-override: public.note_ref = SqlSource.DatabaseTests.Postgres.EndToEnd.Types.NoteRef
+-- column: accounts.id -> AccountId
+-- column: notes.account_id -> AccountId
+
+-- name: ListAccountNotes
+-- summary: Every account with its notes, and an account with none once, with NULL for the note.
+SELECT a.id, a.name, n.id AS note_id, n.account_id, n.kind, n.body
+FROM accounts AS a
+LEFT JOIN notes AS n ON n.account_id = a.id
+ORDER BY a.id, n.id;
+
+-- name: CountAccountNotes
+-- summary: The number of notes of each account.
+-- A count has no source column, so the column types do not reach it, and the marker gives it its type.
+-- column: note_count -> NoteCount
+SELECT a.id, count(n.id) AS note_count
+FROM accounts AS a
+LEFT JOIN notes AS n ON n.account_id = a.id
+GROUP BY a.id
+ORDER BY a.id;
+
+-- name: GetAccountNoteCount -> one
+-- summary: The number of notes of the account that an id names.
+-- A parameter has no source column either: the marker gives it its C# type, and the database infers its type from the
+-- column it is compared with.
+-- param: @id -> AccountId
+-- column: note_count -> NoteCount
+SELECT a.id, count(n.id) AS note_count
+FROM accounts AS a
+LEFT JOIN notes AS n ON n.account_id = a.id
+WHERE a.id = @id
+GROUP BY a.id;
+
+-- name: ListDisplayNames
+-- summary: The name of each account with each word capitalized.
+-- column: display_name not null
+-- initcap is never NULL for a name that is not, and the tool does not prove it, so the column would be nullable
+-- without its marker.
+SELECT a.id, initcap(a.name) AS display_name
+FROM accounts AS a
+ORDER BY a.id;
+
+-- name: ListMarkedNames
+-- summary: The names of the accounts, with their nullability set by the marks of their aliases.
+-- As in ListDisplayNames, the column would be nullable without its mark.  A function that the tool proves, such as
+-- upper, would leave the mark nothing to show.
+SELECT a.id AS "id?", initcap(a.name) AS "initcap_name!"
+FROM accounts AS a
+ORDER BY a.id;
+
+-- name: ListNoteKinds
+-- summary: The kind of each note and the email of its account.
+SELECT n.kind, a.email
+FROM notes AS n
+JOIN accounts AS a ON a.id = n.account_id
+ORDER BY n.id;
+
+-- name: GetNoteByRef -> one
+-- summary: The note that a ref names, with its ref.
+-- A parameter compared with a column of a domain is described as the domain's base type, so the marker declares it as
+-- the domain, which the type override gives the type NoteRef.
+-- param: @ref public.note_ref
+SELECT n.id, n.ref, n.body
+FROM notes AS n
+WHERE n.ref = @ref;
+
+-- name: FindNotesByEmail
+-- summary: The notes of the account that an email names, with each note's ref, which may be NULL.
+-- param: @email public.email
+SELECT n.id, n.ref, a.email
+FROM notes AS n
+JOIN accounts AS a ON a.id = n.account_id
+WHERE a.email = @email
+ORDER BY n.id;
+
+-- name: StreamNoteAccounts
+-- summary: The accounts that have notes, with the id of each as an AccountId, read through its converters.
+-- collection-type: IAsyncEnumerable
+SELECT DISTINCT account_id FROM notes ORDER BY account_id;

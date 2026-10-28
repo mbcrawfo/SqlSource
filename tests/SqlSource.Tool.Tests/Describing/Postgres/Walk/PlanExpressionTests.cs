@@ -9,7 +9,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // An entry of a plan's Output read as a whole: the forms that can never be NULL, the NULL constant, and the texts that
 // start or end like a form and are none.  The texts are as PostgreSQL 14 and 18 print them, which
-// tests/SqlSource.Tests.Postgres/Describer/PlanOutputTests.cs pins against both servers.
+// tests/DatabaseTests/Postgres/Describer/PlanOutputTests.cs pins against both servers.
 public sealed class PlanExpressionTests
 {
     private static readonly Func<OutputReference, bool> NoneProved = static _ => false;

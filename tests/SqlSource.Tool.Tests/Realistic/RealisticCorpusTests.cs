@@ -15,9 +15,9 @@ public sealed class RealisticCorpusTests
     public void Cases_OfEachCorpus_IsItsProjectsCasesFolder()
     {
         RelativeToTheRepository(RealisticCorpus.Postgres.Cases)
-            .ShouldBe("tests/SqlSource.Tests.Postgres/Realistic/Cases");
+            .ShouldBe("tests/DatabaseTests/Postgres/Realistic/Cases");
         RelativeToTheRepository(RealisticCorpus.SqlServer.Cases)
-            .ShouldBe("tests/SqlSource.Tests.SqlServer/Realistic/Cases");
+            .ShouldBe("tests/DatabaseTests/SqlServer/Realistic/Cases");
         Directory.Exists(RealisticCorpus.Postgres.Cases).ShouldBeTrue();
         Directory.Exists(RealisticCorpus.SqlServer.Cases).ShouldBeTrue();
     }
@@ -38,13 +38,13 @@ public sealed class RealisticCorpusTests
     public void SettingsFiles_OfEachCorpus_AreTheProjectsAndTheCasesFolders()
     {
         RelativeToTheRepository(RealisticCorpus.Postgres.ProjectSettingsFile)
-            .ShouldBe("tests/SqlSource.Tests.Postgres/sqlsource.json");
+            .ShouldBe("tests/DatabaseTests/Postgres/sqlsource.json");
         RelativeToTheRepository(RealisticCorpus.Postgres.CasesSettingsFile)
-            .ShouldBe("tests/SqlSource.Tests.Postgres/Realistic/Cases/sqlsource.json");
+            .ShouldBe("tests/DatabaseTests/Postgres/Realistic/Cases/sqlsource.json");
         RelativeToTheRepository(RealisticCorpus.SqlServer.ProjectSettingsFile)
-            .ShouldBe("tests/SqlSource.Tests.SqlServer/sqlsource.json");
+            .ShouldBe("tests/DatabaseTests/SqlServer/sqlsource.json");
         RelativeToTheRepository(RealisticCorpus.SqlServer.CasesSettingsFile)
-            .ShouldBe("tests/SqlSource.Tests.SqlServer/Realistic/Cases/sqlsource.json");
+            .ShouldBe("tests/DatabaseTests/SqlServer/Realistic/Cases/sqlsource.json");
         foreach (var corpus in new[] { RealisticCorpus.Postgres, RealisticCorpus.SqlServer })
         {
             File.Exists(corpus.ProjectSettingsFile).ShouldBeTrue(corpus.ProjectSettingsFile);

@@ -19,20 +19,20 @@ internal sealed class RealisticCorpus
     }
 
     public static RealisticCorpus Postgres { get; } =
-        new("SqlSource.Tests.Postgres", SidecarValues.Engine.Postgres, EngineImage.Postgres);
+        new("Postgres", SidecarValues.Engine.Postgres, EngineImage.Postgres);
 
     public static RealisticCorpus SqlServer { get; } =
-        new("SqlSource.Tests.SqlServer", SidecarValues.Engine.SqlServer, EngineImage.SqlServer);
+        new("SqlServer", SidecarValues.Engine.SqlServer, EngineImage.SqlServer);
 
     // The engine, whose recorded majors a checkedFrom names one of.  It needs no repository, so that a test of a case
     // that reads no file can build on it.
     public RealisticEngine Engine { get; }
 
-    // The folder of the engine's project under tests/, which holds the corpus in Realistic/.
+    // The folder of the engine's project under tests/DatabaseTests/, which holds the corpus in Realistic/.
     public string Project { get; }
 
     // The paths are found from the repository's root when they are read, never when the corpus is made.
-    public string Folder => RepositoryRoot.Path("tests", Project, "Realistic");
+    public string Folder => RepositoryRoot.Path("tests", "DatabaseTests", Project, "Realistic");
 
     public string Schema => Path.Combine(Folder, "schema.sql");
 
@@ -42,7 +42,7 @@ internal sealed class RealisticCorpus
 
     // The settings file of the engine's project, which the corpus shares with the project's other tests: the file of
     // a build that holds the corpus's queries.
-    public string ProjectSettingsFile => RepositoryRoot.Path("tests", Project, SettingsFileName);
+    public string ProjectSettingsFile => RepositoryRoot.Path("tests", "DatabaseTests", Project, SettingsFileName);
 
     // The settings file of Cases/, which every query of the corpus is below: its database and its type override.
     public string CasesSettingsFile => Path.Combine(Cases, SettingsFileName);

@@ -6,7 +6,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // The closed tables of the operators, functions and aggregates of pg_catalog that never return NULL for arguments that
-// are not, looked up by their exact argument types.  tests/SqlSource.Tests.Postgres/Describer/PlanOutputTests.cs holds
+// are not, looked up by their exact argument types.  tests/DatabaseTests/Postgres/Describer/PlanOutputTests.cs holds
 // each row to the catalog of 14 and 18.
 public sealed class TotalFunctionsTests
 {

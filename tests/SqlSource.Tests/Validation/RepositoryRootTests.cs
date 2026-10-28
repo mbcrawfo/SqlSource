@@ -10,8 +10,8 @@ namespace SqlSource.Tests.Validation;
 // on the real table.  The tests of PathFor read real folders of the repository.
 public sealed class RepositoryRootTests
 {
-    private const string Pg = "PgTests";
-    private const string Ms = "MsTests";
+    private const string Pg = TestScopes.AssemblyPrefix + "PgTests";
+    private const string Ms = TestScopes.AssemblyPrefix + "MsTests";
 
     // A broad line under the engines' lines, as the real table has, so that a folder decided by its own path and not
     // by the files it holds would fall in it.

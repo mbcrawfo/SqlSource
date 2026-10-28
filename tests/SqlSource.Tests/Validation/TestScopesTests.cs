@@ -93,10 +93,21 @@ public sealed class TestScopesTests
     {
         var scopes = TestScopes.Parse("project sqlserver tests/X/X.csproj\nproject postgres tests/Y/Y.csproj\n");
 
-        scopes.Projects["X"].ShouldBe(TestScope.SqlServer);
-        scopes.Projects["Y"].ShouldBe(TestScope.Postgres);
+        scopes.Projects[TestScopes.AssemblyPrefix + "X"].ShouldBe(TestScope.SqlServer);
+        scopes.Projects[TestScopes.AssemblyPrefix + "Y"].ShouldBe(TestScope.Postgres);
         scopes.ProjectFiles.ShouldBe(["tests/X/X.csproj", "tests/Y/Y.csproj"]);
         scopes.Lines.ShouldBeEmpty();
+    }
+
+    // The assembly of a database project is its project file's name under the prefix that
+    // tests/DatabaseTests/Directory.Build.props gives it, and RepositoryRoot finds the running project by its assembly.
+    [Fact]
+    public void Parse_ProjectLine_IsKeyedByThePrefixedProjectName()
+    {
+        var scopes = TestScopes.Parse("project postgres tests/DatabaseTests/Postgres/Postgres.csproj\n");
+
+        scopes.Projects.Keys.ShouldBe(["SqlSource.DatabaseTests.Postgres"]);
+        scopes.ProjectFiles.ShouldBe(["tests/DatabaseTests/Postgres/Postgres.csproj"]);
     }
 
     [Fact]
@@ -104,9 +115,9 @@ public sealed class TestScopesTests
     {
         var scopes = TestScopes.Parse("project sqlserver tests/X/X.csproj");
 
-        scopes.Runs("X", TestScope.Postgres).ShouldBeFalse();
-        scopes.Runs("X", TestScope.None).ShouldBeFalse();
-        scopes.Runs("X", TestScope.SqlServer).ShouldBeTrue();
+        scopes.Runs(TestScopes.AssemblyPrefix + "X", TestScope.Postgres).ShouldBeFalse();
+        scopes.Runs(TestScopes.AssemblyPrefix + "X", TestScope.None).ShouldBeFalse();
+        scopes.Runs(TestScopes.AssemblyPrefix + "X", TestScope.SqlServer).ShouldBeTrue();
     }
 
     [Fact]
@@ -123,7 +134,7 @@ public sealed class TestScopesTests
     {
         var scopes = TestScopes.Parse("project sqlserver tests/X/X.csproj");
 
-        scopes.Runs("X", TestScope.Both).ShouldBeTrue();
+        scopes.Runs(TestScopes.AssemblyPrefix + "X", TestScope.Both).ShouldBeTrue();
         scopes.Runs("Other", TestScope.Both).ShouldBeTrue();
     }
 }

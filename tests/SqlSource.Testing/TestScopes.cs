@@ -25,6 +25,16 @@ internal enum TestScope
 // container projects and the engine each needs.
 internal sealed class TestScopes
 {
+    // The prefix of every database project's assembly name: tests/DatabaseTests/Directory.Build.props gives each
+    // project of that folder its assembly name from its project file's name under this prefix, and a project line
+    // names the project file, so the two agree by construction.  RunningProjectTests of each project fails when they
+    // do not.
+    public const string AssemblyPrefix = "SqlSource.DatabaseTests.";
+
+    // The assembly name of the project file: its name without the extension under the prefix.
+    public static string ProjectOf(string projectFile) =>
+        AssemblyPrefix + Path.GetFileNameWithoutExtension(projectFile);
+
     private static readonly Lazy<TestScopes> RepositoryFile = new(() =>
         Parse(File.ReadAllText(RepositoryRoot.ScopesFile))
     );
@@ -47,7 +57,8 @@ internal sealed class TestScopes
 
     public IReadOnlyList<(TestScope Scope, string Pattern)> Lines => _patterns;
 
-    // The name of a project, the file name of its .csproj without the extension, and the engine it needs.
+    // The assembly name of a project, the file name of its .csproj without the extension under AssemblyPrefix, and
+    // the engine it needs.
     public IReadOnlyDictionary<string, TestScope> Projects => _projects;
 
     public IReadOnlyList<string> ProjectFiles => _projectFiles;
@@ -155,7 +166,7 @@ internal sealed class TestScopes
             );
         }
 
-        var name = Path.GetFileNameWithoutExtension(words[2]);
+        var name = ProjectOf(words[2]);
         if (!_projects.TryAdd(name, engine))
         {
             throw new FormatException($"Test scopes line {lineNumber}: the project '{name}' is already listed.");

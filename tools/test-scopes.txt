@@ -10,20 +10,20 @@
 #
 # A `project <postgres|sqlserver> <path>` line names a container project and the engine that runs it.
 
-project postgres tests/SqlSource.Tests.Postgres/SqlSource.Tests.Postgres.csproj
-project postgres tests/SqlSource.Tests.Postgres.Npgsql8/SqlSource.Tests.Postgres.Npgsql8.csproj
-project sqlserver tests/SqlSource.Tests.SqlServer/SqlSource.Tests.SqlServer.csproj
-project sqlserver tests/SqlSource.Tests.SqlServer.SqlClient61/SqlSource.Tests.SqlServer.SqlClient61.csproj
+project postgres tests/DatabaseTests/Postgres/Postgres.csproj
+project postgres tests/DatabaseTests/Postgres.Npgsql8/Postgres.Npgsql8.csproj
+project sqlserver tests/DatabaseTests/SqlServer/SqlServer.csproj
+project sqlserver tests/DatabaseTests/SqlServer.SqlClient61/SqlServer.SqlClient61.csproj
 
 postgres src/SqlSource.Tool/Describing/Postgres/*
-postgres tests/SqlSource.Tests.Postgres/*
-postgres tests/SqlSource.Tests.Postgres.Npgsql8/*
+postgres tests/DatabaseTests/Postgres/*
+postgres tests/DatabaseTests/Postgres.Npgsql8/*
 postgres tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/*
 postgres tests/SqlSource.Tool.Tests/Fixtures/Projects/Single/*
 
 sqlserver src/SqlSource.Tool/Describing/SqlServer/*
-sqlserver tests/SqlSource.Tests.SqlServer/*
-sqlserver tests/SqlSource.Tests.SqlServer.SqlClient61/*
+sqlserver tests/DatabaseTests/SqlServer/*
+sqlserver tests/DatabaseTests/SqlServer.SqlClient61/*
 sqlserver tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql/*
 sqlserver tests/SqlSource.Tool.Tests/Fixtures/Projects/SqlServer/*
 

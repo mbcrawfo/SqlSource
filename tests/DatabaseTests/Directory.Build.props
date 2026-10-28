@@ -1,0 +1,14 @@
+<Project>
+    <!--
+        Every project of this folder: the folder and the project file carry the short name, Postgres.csproj, and the
+        assembly and the root namespace carry the prefix, SqlSource.DatabaseTests.Postgres.  TestScopes of
+        tests/SqlSource.Testing derives the same name from a project line of tools/test-scopes.txt, so the two agree
+        by construction; tests/DatabaseTests/AGENTS.md states the pattern.  The import is a literal path, since
+        ProjectIncludes cannot resolve a property it does not know.
+    -->
+    <Import Project="../../Directory.Build.props" />
+    <PropertyGroup>
+        <AssemblyName>SqlSource.DatabaseTests.$(MSBuildProjectName)</AssemblyName>
+        <RootNamespace>SqlSource.DatabaseTests.$(MSBuildProjectName)</RootNamespace>
+    </PropertyGroup>
+</Project>

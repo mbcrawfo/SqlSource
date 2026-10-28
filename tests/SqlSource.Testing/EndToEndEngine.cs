@@ -10,9 +10,9 @@ internal sealed record EndToEndEngine(string Folder, Func<string, IReadOnlyList<
 {
     // PostgreSQL's, whose file runs whole as one command.
     public static EndToEndEngine Postgres =>
-        new(RepositoryRoot.Path("tests", "SqlSource.Tests.Postgres", "EndToEnd"), static script => [script]);
+        new(RepositoryRoot.Path("tests", "DatabaseTests", "Postgres", "EndToEnd"), static script => [script]);
 
     // SQL Server's, whose file runs batch by batch, split at the lines that hold GO alone.
     public static EndToEndEngine SqlServer =>
-        new(RepositoryRoot.Path("tests", "SqlSource.Tests.SqlServer", "EndToEnd"), EndToEndFiles.SqlServerBatches);
+        new(RepositoryRoot.Path("tests", "DatabaseTests", "SqlServer", "EndToEnd"), EndToEndFiles.SqlServerBatches);
 }

@@ -8,14 +8,16 @@
     <Project Path="src/SqlSource/SqlSource.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/SqlSource.Tests.Postgres.Npgsql8/SqlSource.Tests.Postgres.Npgsql8.csproj" />
-    <Project Path="tests/SqlSource.Tests.Postgres/SqlSource.Tests.Postgres.csproj" />
     <Project Path="tests/SqlSource.Tests.RoslynFloor/SqlSource.Tests.RoslynFloor.csproj" />
-    <Project Path="tests/SqlSource.Tests.SqlServer.SqlClient61/SqlSource.Tests.SqlServer.SqlClient61.csproj" />
-    <Project Path="tests/SqlSource.Tests.SqlServer/SqlSource.Tests.SqlServer.csproj" />
     <Project Path="tests/SqlSource.Tests/SqlSource.Tests.csproj" />
     <Project Path="tests/SqlSource.Testing/SqlSource.Testing.csproj" />
     <Project Path="tests/SqlSource.Tool.Testing/SqlSource.Tool.Testing.csproj" />
     <Project Path="tests/SqlSource.Tool.Tests/SqlSource.Tool.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/DatabaseTests/">
+    <Project Path="tests/DatabaseTests/Postgres.Npgsql8/Postgres.Npgsql8.csproj" />
+    <Project Path="tests/DatabaseTests/Postgres/Postgres.csproj" />
+    <Project Path="tests/DatabaseTests/SqlServer.SqlClient61/SqlServer.SqlClient61.csproj" />
+    <Project Path="tests/DatabaseTests/SqlServer/SqlServer.csproj" />
   </Folder>
 </Solution>
