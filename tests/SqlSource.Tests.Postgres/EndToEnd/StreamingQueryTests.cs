@@ -16,7 +16,8 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 // its arguments at the call, and the iterator it returns opens a closed connection on its first MoveNextAsync and
 // closes it again when the loop ends, however it ends.  The tests hold the connection's state in each of those ways,
 // that a stream can be enumerated twice, that a break leaves the connection usable, and that a throw or a cancellation
-// closes again a connection that the method opened.
+// closes again a connection that the method opened.  Then a query whose rows fail past the row where a loop stops,
+// whose error the disposal throws.
 [Collection(UsesPostgres.Name)]
 public sealed class StreamingQueryTests(PostgresContainer postgres)
 {
@@ -288,6 +289,113 @@ public sealed class StreamingQueryTests(PostgresContainer postgres)
         rows.ShouldBe(10);
         await using var select = new NpgsqlCommand("SELECT n FROM streamed", connection);
         (await select.ExecuteScalarAsync(token)).ShouldBe(7);
+    }
+
+    // A loop that reads every row gets the rows before the row of 500,000 and then the division by zero that the server
+    // raises for it, which the tests below leave to the rows still to come.
+    [Fact]
+    public async Task StreamNumbersFailingHalfway_ReadToTheEnd_ThrowsAtTheFailingRow()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = source.CreateConnection();
+        var rows = 0;
+
+        var thrown = await Should.ThrowAsync<PostgresException>(async () =>
+        {
+            await foreach (var row in connection.StreamNumbersFailingHalfway(cancellationToken: token))
+            {
+                rows++;
+            }
+        });
+
+        thrown.SqlState.ShouldBe(PostgresErrorCodes.DivisionByZero);
+        rows.ShouldBe(499_999);
+        connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
+    // A break disposes the stream, whose reader reads the rows still to come, and the row of 500,000 is among them: the
+    // division by zero that the server raises for it is thrown at the break, by the loop.
+    [Fact]
+    public async Task StreamNumbersFailingHalfway_BreakBeforeTheFailingRow_ThrowsTheServersError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        var rows = 0;
+
+        var thrown = await Should.ThrowAsync<PostgresException>(async () =>
+        {
+            await foreach (var row in connection.StreamNumbersFailingHalfway(cancellationToken: token))
+            {
+                if (++rows == 10)
+                {
+                    break;
+                }
+            }
+        });
+
+        thrown.SqlState.ShouldBe(PostgresErrorCodes.DivisionByZero);
+        rows.ShouldBe(10);
+        connection.State.ShouldBe(ConnectionState.Open);
+        (await connection.ListAsArray(cancellationToken: token)).ShouldBe(Accounts);
+    }
+
+    // The body's exception disposes the stream as a break does, and the server's error for a row still to come is
+    // thrown in its place: the body's exception is lost.
+    [Fact]
+    public async Task StreamNumbersFailingHalfway_AThrowInTheLoopBody_ThrowsTheServersErrorInItsPlace()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = source.CreateConnection();
+        var rows = new List<StreamNumbersFailingHalfwayDto>();
+
+        var thrown = await Should.ThrowAsync<PostgresException>(async () =>
+        {
+            await foreach (var row in connection.StreamNumbersFailingHalfway(cancellationToken: token))
+            {
+                rows.Add(row);
+                if (row.N == 1)
+                {
+                    throw new InvalidOperationException("The body throws on the first row.");
+                }
+            }
+        });
+
+        thrown.SqlState.ShouldBe(PostgresErrorCodes.DivisionByZero);
+        rows.ShouldBe([new StreamNumbersFailingHalfwayDto(1, 0)]);
+        connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
+    // The server's error for a row still to come aborts the transaction the stream ran in, as any error of a statement
+    // does on PostgreSQL: the next command in it is refused until it is rolled back.
+    [Fact]
+    public async Task StreamNumbersFailingHalfway_BreakInATransaction_AbortsTheTransaction()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+        var rows = 0;
+
+        _ = await Should.ThrowAsync<PostgresException>(async () =>
+        {
+            await foreach (
+                var row in connection.StreamNumbersFailingHalfway(transaction: transaction, cancellationToken: token)
+            )
+            {
+                if (++rows == 10)
+                {
+                    break;
+                }
+            }
+        });
+
+        await using var select = new NpgsqlCommand("SELECT 1", connection, transaction);
+        var refused = await Should.ThrowAsync<PostgresException>(() => select.ExecuteScalarAsync(token));
+        refused.SqlState.ShouldBe(PostgresErrorCodes.InFailedSqlTransaction);
+        rows.ShouldBe(10);
     }
 
     [Fact]

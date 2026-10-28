@@ -240,6 +240,49 @@
           "computed": false
         }
       ]
+    },
+    "StreamNumbersFailingHalfway": {
+      "hash": "b5925b1e394ba54fa9e5eb99f3fb950c400045b1ba54a40b573443e7d1f27546",
+      "engine": "postgres",
+      "database": "app",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "walked",
+      "tableMatch": "no-origin",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "n",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "nullableSource": "no-origin",
+          "origin": null,
+          "identity": null,
+          "computed": null
+        },
+        {
+          "ordinal": 1,
+          "name": "quotient",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": null,
+          "nullableSource": "no-origin",
+          "origin": null,
+          "identity": null,
+          "computed": null
+        }
+      ]
     }
   }
 }

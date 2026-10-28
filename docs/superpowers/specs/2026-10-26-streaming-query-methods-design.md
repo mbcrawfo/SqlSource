@@ -4,6 +4,8 @@ Date: 2026-10-26
 
 Corrected on 2026-10-27 from the end-to-end tests: what a query of several statements does on SQL Server, in "Behaviour the user sees" and "Testing".
 
+Corrected on 2026-10-28 from the end-to-end tests: what leaving the loop early does when a row still to come fails, in "Behaviour the user sees".
+
 A feature outside the [query generation epic](2026-10-07-query-generation-epic-design.md), which listed `IAsyncEnumerable<T>` as out of its scope.  It lets the generated method of a `many` query hand its rows to the caller one at a time, as an `IAsyncEnumerable<T>`, instead of reading them all into a collection first.
 
 ## Intent
@@ -120,7 +122,7 @@ public static global::System.Collections.Generic.IAsyncEnumerable<ListUsersDto> 
 
 - **Nothing runs until the loop starts.**  The call checks the arguments and returns; the connection is opened, the parameters read from the input model and the query sent on the first `MoveNextAsync`.  Each enumeration runs the query again.
 - **The connection is busy while the loop runs.**  Another command on it inside the loop fails, as each driver reports it (no MARS on SQL Server).  A connection the method opened stays open until the loop ends.
-- **Leaving the loop early** disposes the reader, which reads and discards the rest of the rows, and then closes a connection the method opened.  On a large result this takes as long as reading the rest.  A transaction is left as it was.
+- **Leaving the loop early** disposes the reader, which reads and discards the rest of the rows, and then closes a connection the method opened.  On a large result this takes as long as reading the rest.  A transaction is left as it was, unless the server raises an error for a row still to come: on PostgreSQL that error is thrown from the disposal, at the `break` or in place of the loop body's exception, which is lost, and aborts the transaction, as [TD-0087](../../tech-debt/TD-0087-drained-rows-error-replaces-the-loop-bodys-exception.md) records; on SQL Server it is not reported.
 - **An error in a later row** throws from `MoveNextAsync`, after the rows before it were yielded: a null in a column that cannot be null, a converter's exception, a driver error.
 - **On SQL Server, a query of several statements** yields the rows of its first result set, and its other statements run when the reader is disposed.  An error that a later statement raises is not reported: neither `MoveNextAsync` nor the disposal throws it, and a buffered method of the same SQL loses it too, as [TD-0085](../../tech-debt/TD-0085-sql-server-error-after-the-first-result-set-is-lost.md) records.
 - **Cancellation** through either token throws as each driver throws today; [PostgreSQL](../../manual/postgresql.md#method-results) and [SQL Server](../../manual/sqlserver.md#method-results) already document it.

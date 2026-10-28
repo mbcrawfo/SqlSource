@@ -17,8 +17,9 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // its arguments at the call, and the iterator it returns opens a closed connection on its first MoveNextAsync and
 // closes it again when the loop ends, however it ends.  The tests hold the connection's state in each of those ways,
 // that a stream can be enumerated twice, that a break leaves the connection usable, and that a throw or a cancellation
-// closes again a connection that the method opened.  Then the queries of several statements, whose later statements
-// run when the reader is disposed.
+// closes again a connection that the method opened.  Then a query whose rows fail past the row where a loop stops,
+// whose error the disposal does not report, and the queries of several statements, whose later statements run when
+// the reader is disposed.
 [Collection(UsesSqlServer.Name)]
 public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
 {
@@ -28,6 +29,9 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
     // The count of the numbers that a break leaves unread.  The query sorts them, so the server has all of them before
     // it sends the first and is still sending when the loop stops.
     private const int ManyRows = 1_000_000;
+
+    // The number of SQL Server's error "Divide by zero error encountered.".
+    private const int DivideByZero = 8134;
 
     [Fact]
     public async Task StreamAccounts_EveryAccount_YieldsTheArrayMethodsRows()
@@ -281,6 +285,117 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
         rows.ShouldBe(10);
         await using var select = new SqlCommand("SELECT n FROM #streamed", connection);
         (await select.ExecuteScalarAsync(token)).ShouldBe(7);
+    }
+
+    // A loop that reads every row gets the rows before the row of 500,000 and then the divide by zero that the server
+    // raises for it, error 8134, which the tests below leave to the rows still to come.
+    [Fact]
+    public async Task StreamNumbersFailingHalfway_ReadToTheEnd_ThrowsAtTheFailingRow()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        var rows = 0;
+
+        var thrown = await Should.ThrowAsync<SqlException>(async () =>
+        {
+            await foreach (var row in connection.StreamNumbersFailingHalfway(cancellationToken: token))
+            {
+                rows++;
+            }
+        });
+
+        thrown.Number.ShouldBe(DivideByZero);
+        rows.ShouldBe(499_999);
+        connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
+    // A break disposes the stream, whose reader reads the rows still to come, and the row of 500,000 is among them, but
+    // SqlClient does not report an error that it reads while it discards the rows: the loop ends at the break with no
+    // exception, as it does where no row fails, and the connection is usable after.  PostgreSQL throws the error here.
+    [Fact]
+    public async Task StreamNumbersFailingHalfway_BreakBeforeTheFailingRow_ThrowsNothing()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(token);
+        var rows = 0;
+
+        await foreach (var row in connection.StreamNumbersFailingHalfway(cancellationToken: token))
+        {
+            if (++rows == 10)
+            {
+                break;
+            }
+        }
+
+        rows.ShouldBe(10);
+        connection.State.ShouldBe(ConnectionState.Open);
+        (await MarkerCollectionQueries.ListAccountsInArray(connection, cancellationToken: token)).ShouldBe(Accounts);
+    }
+
+    // The divide by zero of a row still to come ends that statement alone, as SqlClient leaves XACT_ABORT off, so the
+    // transaction the stream ran in commits after the break.  The temporary table is the one of the transaction test of
+    // StreamNumbers.  PostgreSQL aborts the transaction here.
+    [Fact]
+    public async Task StreamNumbersFailingHalfway_BreakInATransaction_TheTransactionCommits()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(token);
+
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(token);
+        await using (var create = new SqlCommand("CREATE TABLE #streamed (n int)", connection, transaction))
+        {
+            _ = await create.ExecuteNonQueryAsync(token);
+        }
+
+        await using (var insert = new SqlCommand("INSERT INTO #streamed (n) VALUES (7)", connection, transaction))
+        {
+            _ = await insert.ExecuteNonQueryAsync(token);
+        }
+
+        var rows = 0;
+        await foreach (
+            var row in connection.StreamNumbersFailingHalfway(transaction: transaction, cancellationToken: token)
+        )
+        {
+            if (++rows == 10)
+            {
+                break;
+            }
+        }
+
+        await transaction.CommitAsync(token);
+
+        rows.ShouldBe(10);
+        await using var select = new SqlCommand("SELECT n FROM #streamed", connection);
+        (await select.ExecuteScalarAsync(token)).ShouldBe(7);
+    }
+
+    // The body's exception disposes the stream as a break does, and the error of a row still to come is not reported,
+    // so the body's exception is the one the loop throws.  PostgreSQL throws the error in its place.
+    [Fact]
+    public async Task StreamNumbersFailingHalfway_AThrowInTheLoopBody_ThrowsTheBodysException()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        var rows = new List<StreamNumbersFailingHalfwayDto>();
+
+        var thrown = await Should.ThrowAsync<InvalidOperationException>(async () =>
+        {
+            await foreach (var row in connection.StreamNumbersFailingHalfway(cancellationToken: token))
+            {
+                rows.Add(row);
+                if (row.N == 1)
+                {
+                    throw new InvalidOperationException("The body throws on the first row.");
+                }
+            }
+        });
+
+        thrown.Message.ShouldBe("The body throws on the first row.");
+        rows.ShouldBe([new StreamNumbersFailingHalfwayDto(1, 0)]);
+        connection.State.ShouldBe(ConnectionState.Closed);
     }
 
     // SqlClient's ReadAsync throws a TaskCanceledException for a token cancelled between two rows, as the methods that
