@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using SqlSource.Parsing;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Testing.Realistic;
 
 namespace SqlSource.DatabaseTests.Postgres.Realistic;
@@ -16,7 +18,7 @@ internal static class RealisticSamples
     public static string Substitute(
         string sql,
         IReadOnlyDictionary<string, string> sample,
-        IReadOnlyDictionary<string, string> types
+        IReadOnlyList<DescribedParameter> parameters
     )
     {
         var lexed = SqlLexer.Lex(sql, SqlDialectRules.PostgreSql);
@@ -40,7 +42,11 @@ internal static class RealisticSamples
                 RealisticSampleChecks.Find(sample, name)
                 ?? throw new InvalidOperationException($"The sample has no value of @{name}.");
             var type =
-                RealisticSampleChecks.Find(types, name)
+                parameters
+                    .FirstOrDefault(parameter =>
+                        string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase)
+                    )
+                    ?.Type?.Name
                 ?? throw new InvalidOperationException($"No type is given for @{name}.");
             _ = text.Remove(lexeme.Span.Start, lexeme.Span.Length).Insert(lexeme.Span.Start, $"({value})::{type}");
         }

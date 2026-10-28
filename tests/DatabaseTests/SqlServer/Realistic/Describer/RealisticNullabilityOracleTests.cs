@@ -1,10 +1,9 @@
-using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.Realistic.Describer;
@@ -37,7 +36,7 @@ public sealed class RealisticNullabilityOracleTests(SqlServerDatabases sqlServer
             """;
         var connection = sqlServer.RealisticConnectionString;
         var before = (long)(await RealisticDatabase.ScalarAsync(connection, CountStock))!;
-        var batch = RealisticSamples.Batch(Insert, Values(), []);
+        var batch = RealisticSamples.Batch(Insert, RealisticSample.Of(), []);
 
         var first = await RealisticNullabilityOracle.RunAsync(connection, batch);
         var second = await RealisticNullabilityOracle.RunAsync(connection, batch);
@@ -54,7 +53,7 @@ public sealed class RealisticNullabilityOracleTests(SqlServerDatabases sqlServer
     {
         var run = await RealisticNullabilityOracle.RunAsync(
             sqlServer.RealisticConnectionString,
-            RealisticSamples.Batch("SELECT id, email FROM dbo.customers ORDER BY id", Values(), [])
+            RealisticSamples.Batch("SELECT id, email FROM dbo.customers ORDER BY id", RealisticSample.Of(), [])
         );
 
         run.Names.ShouldBe(["id", "email"]);
@@ -68,7 +67,7 @@ public sealed class RealisticNullabilityOracleTests(SqlServerDatabases sqlServer
         var active = (int)(await RealisticDatabase.ScalarAsync(connection, CountActive))!;
         var batch = RealisticSamples.Batch(
             "SELECT id, status FROM dbo.customers WHERE status = @status",
-            Values(("status", "'active'")),
+            RealisticSample.Of(("status", "'active'")),
             [new DescribedParameter("status", new SqlServerType("varchar(10)", 10, 0, 0, null), null)]
         );
 
@@ -92,7 +91,7 @@ public sealed class RealisticNullabilityOracleTests(SqlServerDatabases sqlServer
         var email = new SqlServerType("nvarchar(254)", 508, 0, 0, new SqlServerUserType("dbo", "Email", null));
         var batch = RealisticSamples.Batch(
             "SELECT id FROM dbo.customers WHERE email = @email ORDER BY id",
-            Values(("email", AnaEmail)),
+            RealisticSample.Of(("email", AnaEmail)),
             [new DescribedParameter("email", email, null)]
         );
 
@@ -118,7 +117,7 @@ public sealed class RealisticNullabilityOracleTests(SqlServerDatabases sqlServer
         var connection = sqlServer.RealisticConnectionString;
         var batch = RealisticSamples.Batch(
             "SELECT id, placed_at FROM dbo.orders WHERE placed_at >= @since ORDER BY placed_at",
-            Values(("since", Since)),
+            RealisticSample.Of(("since", Since)),
             [new DescribedParameter("since", new SqlServerType("datetime2(0)", 6, 19, 0, null), null)]
         );
         var expected = (int)(await RealisticDatabase.ScalarAsync(connection, CountSince))!;
@@ -136,21 +135,10 @@ public sealed class RealisticNullabilityOracleTests(SqlServerDatabases sqlServer
         var thrown = await Should.ThrowAsync<SqlException>(() =>
             RealisticNullabilityOracle.RunAsync(
                 sqlServer.RealisticConnectionString,
-                RealisticSamples.Batch("SELECT 1/0 AS x", Values(), [])
+                RealisticSamples.Batch("SELECT 1/0 AS x", RealisticSample.Of(), [])
             )
         );
 
         thrown.Number.ShouldBe(DivideByZero);
-    }
-
-    private static Dictionary<string, string> Values(params (string Name, string Value)[] values)
-    {
-        var found = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (name, value) in values)
-        {
-            found.Add(name, value);
-        }
-
-        return found;
     }
 }

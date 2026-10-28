@@ -43,16 +43,13 @@ public sealed class RealisticNullabilitySafetyTests(PostgresDatabases postgres)
         RealisticSampleChecks.CheckKeys(found, parameters.Select(static parameter => parameter.Name));
         RealisticSampleChecks.CheckNulls(found, request.Parameters);
         var sql = request.Sql;
-        var types = parameters
-            .Where(static parameter => parameter.Type is not null)
-            .ToDictionary(static parameter => parameter.Name, static parameter => parameter.Type!.Name);
 
         var sawNull = new bool[columns.Count];
         foreach (var sample in found.Samples)
         {
             var run = await RealisticNullabilityOracle.RunAsync(
                 postgres.RealisticConnectionString,
-                RealisticSamples.Substitute(sql, sample, types)
+                RealisticSamples.Substitute(sql, sample, parameters)
             );
 
             run.Names.ShouldBe(columns.Select(static column => column.Name), $"{found} names its columns otherwise");
