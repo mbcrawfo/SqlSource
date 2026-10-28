@@ -5,6 +5,7 @@ using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
@@ -31,7 +32,9 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 // the pooled NumbersAsArray, NumbersAsList and NumbersAsImmutableArray, at 300 rows, to allocating less than a List
 // copied to an array, a List grown by doubling and an ImmutableArray builder that is drained, each by at least a given
 // number of bytes, since a pooled buffer exists to save a list's growth arrays and the pairs above, against
-// RowBufferByHand, cannot see what the buffer itself costs.  In each pair the two make the same calls, so
+// RowBufferByHand, cannot see what the buffer itself costs.  The streaming StreamAccounts of StreamingQueries has a
+// pair of its own, against a hand-written static local async iterator that makes the same calls and yields each row,
+// for the whole of a call, from the first MoveNextAsync to the disposal.  In each pair the two make the same calls, so
 // what the generated method allocates beyond the hand-written one is the difference of their own state, which the
 // margin holds, and an object that it allocates on each call shows.  Both run on the same open connection of one data
 // source, with the same token, and ConfigureAwait(false) on each await.  The two are compared by the commonest
@@ -55,7 +58,8 @@ public sealed class AllocationTests(PostgresContainer postgres)
     // parameter and its DataTypeName, is in both sides alike.  So an extra boxed value, array or closure on each call
     // shows, a few of them exceed the margin, and the commonest difference does not move with the driver's share of a
     // call: an array of 64 bytes, 88 with its header, on each call of the generated methods failed every test of both
-    // pairs, at differences of 72 to 104 bytes.  Never above 128.
+    // pairs, at differences of 72 to 104 bytes.  The streaming StreamAccounts allocated about 2.1 KB a call, the same
+    // as its hand-written iterator on every run.  Never above 128.
     private const long MarginInBytesPerCall = 64;
 
     // The first calls pay for one-off work: JIT compilation, static initialisers, the pools of the driver and of the
@@ -67,6 +71,8 @@ public sealed class AllocationTests(PostgresContainer postgres)
     private const int Pairs = 500;
 
     private const string GetAccountNameSql = "SELECT id, name\nFROM accounts\nWHERE id = @accountId;";
+
+    private const string StreamAccountsSql = "SELECT id, name FROM accounts ORDER BY id;";
 
     private const string ListAccountsSql = "SELECT *\nFROM accounts\nORDER BY id;";
 
@@ -491,6 +497,48 @@ public sealed class AllocationTests(PostgresContainer postgres)
         pairs.Generated.Bytes.ShouldBeGreaterThan(0);
         pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
         pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-LeastImmutableArraySavingInBytesPerCall);
+    }
+
+    // The streaming method returns an iterator and yields each row as the reader reads it, with no buffer, so a call
+    // is the method, its iterator and the enumeration to the end, which both sides do: the hand-written iterator makes
+    // the calls that the generated one does, so what the generated method allocates beyond it is its own state.
+    [Fact]
+    public async Task StreamAccounts_PerCall_AllocatesNoMoreThanHandWritten()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        (await connection.StreamAccounts(cancellationToken: token).ToListAsync(token)).Count.ShouldBe(3);
+        (await StreamAccountsByHand(connection, cancellationToken: token).ToListAsync(token)).Count.ShouldBe(3);
+
+        var pairs = await MeasureAsync(
+            async () =>
+            {
+                var rows = 0;
+                await foreach (var account in connection.StreamAccounts(cancellationToken: token).ConfigureAwait(false))
+                {
+                    rows += account.Id;
+                }
+
+                return rows;
+            },
+            async () =>
+            {
+                var rows = 0;
+                await foreach (
+                    var account in StreamAccountsByHand(connection, cancellationToken: token).ConfigureAwait(false)
+                )
+                {
+                    rows += account.Id;
+                }
+
+                return rows;
+            }
+        );
+
+        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
+        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
+        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     // The pairs of calls of the two methods, after both are warmed up, written to the test's output.
@@ -1217,6 +1265,74 @@ public sealed class AllocationTests(PostgresContainer postgres)
             if (wasClosed)
             {
                 await connection.CloseAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    // StreamAccounts of Queries/Streaming.sql, by hand: a method that checks its argument at the call and returns a
+    // static local iterator, which opens a closed connection, yields each row inside the try and closes the connection
+    // it opened in the finally.
+    [SuppressMessage(
+        "Performance",
+        "CA1849:Call async methods when in an async method",
+        Justification = "The row is in memory once ReadAsync returns, as the generated method reads it."
+    )]
+    private static IAsyncEnumerable<CollectedAccount> StreamAccountsByHand(
+        DbConnection connection,
+        DbTransaction? transaction = null,
+        int? commandTimeout = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        return Iterate(connection, transaction, commandTimeout, cancellationToken);
+
+        static async IAsyncEnumerable<CollectedAccount> Iterate(
+            DbConnection connection,
+            DbTransaction? transaction,
+            int? commandTimeout,
+            [EnumeratorCancellation] CancellationToken cancellationToken
+        )
+        {
+            var wasClosed = connection.State == ConnectionState.Closed;
+            if (wasClosed)
+            {
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            try
+            {
+                var command = connection.CreateCommand();
+                await using (command.ConfigureAwait(false))
+                {
+                    command.CommandText = StreamAccountsSql;
+                    command.Transaction = transaction;
+                    if (commandTimeout.HasValue)
+                    {
+                        command.CommandTimeout = commandTimeout.Value;
+                    }
+
+                    var reader = await command
+                        .ExecuteReaderAsync(CommandBehavior.Default, cancellationToken)
+                        .ConfigureAwait(false);
+                    await using (reader.ConfigureAwait(false))
+                    {
+                        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                        {
+                            yield return new CollectedAccount(
+                                reader.GetFieldValue<int>(0),
+                                reader.GetFieldValue<string>(1)
+                            );
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                if (wasClosed)
+                {
+                    await connection.CloseAsync().ConfigureAwait(false);
+                }
             }
         }
     }
