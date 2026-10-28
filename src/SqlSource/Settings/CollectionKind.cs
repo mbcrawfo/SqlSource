@@ -35,4 +35,7 @@ internal enum CollectionKind
 
     /// <summary><c>IImmutableList&lt;T&gt;</c>, over an immutable list.</summary>
     IImmutableList = 9,
+
+    /// <summary><c>IAsyncEnumerable&lt;T&gt;</c>, each row read as the loop asks for it.</summary>
+    IAsyncEnumerable = 10,
 }

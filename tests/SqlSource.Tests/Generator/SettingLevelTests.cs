@@ -124,7 +124,7 @@ public sealed class SettingLevelTests
     [InlineData("Output = (GeneratorOutput)(-1)", "-1", "Output")]
     [InlineData("InputModelType = (GeneratorModelType)4", "4", "InputModelType")]
     [InlineData("OutputModelType = (GeneratorModelType)9", "9", "OutputModelType")]
-    [InlineData("CollectionType = (GeneratorCollectionType)10", "10", "CollectionType")]
+    [InlineData("CollectionType = (GeneratorCollectionType)11", "11", "CollectionType")]
     [InlineData("MethodLocation = (MethodLocation)4", "4", "MethodLocation")]
     [InlineData("InputModelSuffix = \"A B\"", "A B", "InputModelSuffix")]
     [InlineData("OutputModelSuffix = \"A.B\"", "A.B", "OutputModelSuffix")]
