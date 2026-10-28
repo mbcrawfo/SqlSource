@@ -643,6 +643,38 @@
           "computed": false
         }
       ]
+    },
+    "StreamNoteAccounts": {
+      "hash": "4db9e9b05e18911f0650bb4966aed6d89150e09e61f5d05a874a4860bc066acf",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "account_id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "notes",
+            "column": "account_id"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
     }
   }
 }

@@ -162,6 +162,46 @@ public sealed class RowBufferTests
         run.Sources[MethodRuns.MethodsFile].ShouldNotContain("SqlSourceRowBuffer");
     }
 
+    // A many method of IAsyncEnumerable yields its rows one at a time, so it uses no buffer.
+    [Fact]
+    public void Run_EveryManyMethodStreams_WritesNoRowBuffer()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: StreamUsers\n-- collection-type: IAsyncEnumerable\n" + Select
+        );
+
+        var run = MethodRuns.Run(file, [Users(file, "StreamUsers")]);
+
+        run.ShouldBeClean();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Sources[MethodRuns.MethodsFile].ShouldNotContain("SqlSourceRowBuffer");
+    }
+
+    [Fact]
+    public void Run_StreamingBesideAnArrayMethod_WritesTheRowBufferOnce()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: StreamUsers\n-- collection-type: IAsyncEnumerable\n" + Select + "\n-- name: ListUsers\n" + Select
+        );
+
+        var run = MethodRuns.Run(file, [Users(file, "StreamUsers"), Users(file, "ListUsers")]);
+
+        run.ShouldBeClean();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        Count(methods, Struct).ShouldBe(1);
+        Count(methods, "new global::App.SqlSourceRowBuffer<").ShouldBe(1);
+        // The one buffer is read by the array method, which follows the streaming method in the file.
+        var streaming = methods.IndexOf(" StreamUsers(\n", StringComparison.Ordinal);
+        var array = methods.IndexOf(" ListUsers(\n", StringComparison.Ordinal);
+        streaming.ShouldBeGreaterThan(-1);
+        array.ShouldBeGreaterThan(streaming);
+        methods[streaming..array].ShouldNotContain("SqlSourceRowBuffer");
+        methods[array..].ShouldContain("new global::App.SqlSourceRowBuffer<");
+    }
+
     [Fact]
     public void Run_FileMixingPooledAndNoArrayPoolMethods_PoolsOnlyThePooled()
     {

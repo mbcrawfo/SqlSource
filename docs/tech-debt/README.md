@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0085`
+Next id: `TD-0089`
 
 ## Active items
 
@@ -44,6 +44,10 @@ Next id: `TD-0085`
 | [TD-0082](TD-0082-a-test-converter-holds-its-token-in-a-static.md) | Open | 2026-10-27 | Low | The test converter `CancelOnRead` holds the token it cancels in a static that a test sets, so two tests reading through it in parallel would cancel each other's |
 | [TD-0083](TD-0083-two-tool-tests-wait-on-limits-of-their-own.md) | Open | 2026-10-27 | Low | `ProgramsTests` and `TerminationTests` wait on limits of their own, 20 and 60 seconds, beside `Eventually.Patience`, which `tests/AGENTS.md` makes the one limit |
 | [TD-0084](TD-0084-the-sidecar-contract-is-documented-only-in-a-spec.md) | Open | 2026-10-27 | Medium | The sidecar's reader rules, compatibility rules and the meaning of its values are written down only in its design spec, which is never kept current |
+| [TD-0085](TD-0085-sql-server-error-after-the-first-result-set-is-lost.md) | Open | 2026-10-27 | Medium | On SQL Server, an error that a statement after the first result set raises is reported by no method that reads rows, buffered or streaming: the method returns its rows, or the loop ends, as if the query had succeeded |
+| [TD-0086](TD-0086-short-name-binds-to-a-referenced-packages-type.md) | Open | 2026-10-27 | Low | A short name that the project has no type of binds with no diagnostic to a `public` type of that name in an assembly a package brings, as `AccountId` to `Microsoft.Identity.Client.AccountId` under SqlClient 6.1, which then has no converter and fails when the query runs |
+| [TD-0087](TD-0087-drained-rows-error-replaces-the-loop-bodys-exception.md) | Open | 2026-10-28 | Low | On PostgreSQL, an error that the server raises for a row that a streaming loop left unread is thrown when the loop ends early, at a `break` or in place of the exception the loop's body threw, which is lost, and aborts the transaction; SQL Server drops it |
+| [TD-0088](TD-0088-sql-server-unreported-error-rolls-back-the-transaction.md) | Open | 2026-10-28 | Medium | On SQL Server, an error that no method reports, after the rows of a query or in the rows a streaming loop left unread, can roll back the caller's transaction with nothing thrown, depending on the error and on `XACT_ABORT`: under `SET XACT_ABORT ON` nearly any error, and with it off some errors and not others, such as `CAST('x' AS int)` and not a divide by zero; later commands given the transaction commit on their own and only `Commit` throws |
 
 ## Columns
 

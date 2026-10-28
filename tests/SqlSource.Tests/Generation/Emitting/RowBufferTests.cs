@@ -64,6 +64,22 @@ public sealed class RowBufferTests
         }
     }
 
+    // A streaming method yields each row as it reads it, so it has nothing to buffer.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void IsUsedBy_ManyOfIAsyncEnumerable_IsFalse(bool useArrayPool) =>
+        RowBuffer
+            .IsUsedBy(
+                ListUsers with
+                {
+                    Shape = ResultShape.Many,
+                    Collection = CollectionKind.IAsyncEnumerable,
+                    UseArrayPool = useArrayPool,
+                }
+            )
+            .ShouldBeFalse();
+
     [Fact]
     public void NameFor_ExtensionClassOfATypeNamedLikeTheBuffer_IsTheName() =>
         RowBuffer.NameFor(Methods(MethodPlacement.ExtensionClass, "SqlSourceRowBuffer")).ShouldBe(RowBuffer.Name);

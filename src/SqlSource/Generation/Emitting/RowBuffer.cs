@@ -128,7 +128,8 @@ internal static class RowBuffer
     /// Whether the method reads its rows into the buffer: a method of <see cref="ResultShape.Many" /> that may use the
     /// pool and returns an array, <c>IEnumerable&lt;T&gt;</c>, <c>IReadOnlyCollection&lt;T&gt;</c>,
     /// <c>IReadOnlyList&lt;T&gt;</c>, <c>List&lt;T&gt;</c>, <c>IList&lt;T&gt;</c>, <c>ICollection&lt;T&gt;</c> or
-    /// <c>ImmutableArray&lt;T&gt;</c>: every type but <c>ImmutableList&lt;T&gt;</c> and <c>IImmutableList&lt;T&gt;</c>.
+    /// <c>ImmutableArray&lt;T&gt;</c>: every type but <c>ImmutableList&lt;T&gt;</c>, <c>IImmutableList&lt;T&gt;</c> and
+    /// <c>IAsyncEnumerable&lt;T&gt;</c>, which buffers nothing.
     /// </summary>
     public static bool IsUsedBy(QueryMethod method) =>
         method.Shape == ResultShape.Many

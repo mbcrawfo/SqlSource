@@ -104,10 +104,10 @@ internal static class MethodRuns
         }
         """;
 
-    // Two queries whose token has the name, beside a parameter that can be null and an array, each bound through a
-    // converter: Probe reads many rows and ProbeOne one, each into a model of a column read through a converter and
-    // an array read through it element by element, so that the token sits beside every local and every lambda's
-    // parameter a method can have.
+    // Three queries whose token has the name, beside a parameter that can be null and an array, each bound through a
+    // converter: Probe reads many rows, ProbeOne one and ProbeStream streams its rows, each into a model of a column
+    // read through a converter and an array read through it element by element, so that the token sits beside every
+    // local and every lambda's parameter a method can have.
     public static GeneratorRun RunTokenNamed(string token, LanguageVersion languageVersion)
     {
         var body =
@@ -118,7 +118,12 @@ internal static class MethodRuns
             + "}} WHERE id = @id OR id = ANY(@ids);\n";
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- type-override: int4=App.UserId\n-- name: Probe\n" + body + "-- name: ProbeOne -> one\n" + body
+            "-- type-override: int4=App.UserId\n-- name: Probe\n"
+                + body
+                + "-- name: ProbeOne -> one\n"
+                + body
+                + "-- name: ProbeStream\n-- collection-type: IAsyncEnumerable\n"
+                + body
         );
         var ids = ModelRuns.ArrayOf(ModelRuns.Int4, "_int4");
         SidecarParameter[] parameters =
@@ -132,6 +137,7 @@ internal static class MethodRuns
             [
                 ModelRuns.Entry(file, "Probe", parameters, columns),
                 ModelRuns.Entry(file, "ProbeOne", parameters, columns),
+                ModelRuns.Entry(file, "ProbeStream", parameters, columns),
             ],
             TokenSource,
             languageVersion: languageVersion

@@ -28,6 +28,15 @@ SELECT id, name, email
 FROM users
 ORDER BY created_at DESC, id;
 
+-- name: StreamUsersOldestFirst
+-- summary: Every user, the oldest first, each read as the caller's loop asks for it.
+-- The marker gives its rows the collection type IAsyncEnumerable, so its method streams them: it holds no collection,
+-- and the connection stays open until the loop ends.
+-- collection-type: IAsyncEnumerable
+SELECT id, name, email
+FROM users
+ORDER BY created_at, id;
+
 -- name: ListUsersSortedBy
 -- summary: Every user, in the order the caller chooses.
 -- The token orderBy is text that the caller's code chooses, never a user's; its default is the sample the tool

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Data.Common;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using SqlSource;
@@ -43,6 +44,19 @@ public sealed partial class StoreQueries(DbConnection connection)
     public Task<IReadOnlyList<ListUsersNewestFirstDto>> ListUsersNewestFirstAsync(
         CancellationToken cancellationToken = default
     ) => connection.ListUsersNewestFirst(cancellationToken: cancellationToken);
+
+    // The query's -- collection-type: IAsyncEnumerable makes its method return an IAsyncEnumerable, whose rows the loop
+    // takes one at a time, as each is read.  Nothing runs until the loop starts, and the connection is busy until it
+    // ends, so the loop's body runs no other query on it.
+    public async Task WriteUserNamesAsync(TextWriter writer, CancellationToken cancellationToken = default)
+    {
+        await foreach (
+            var user in connection.StreamUsersOldestFirst(cancellationToken: cancellationToken).ConfigureAwait(false)
+        )
+        {
+            await writer.WriteLineAsync(user.Name).ConfigureAwait(false);
+        }
+    }
 
     // A token is a string argument of the method, after the input model when the query has one.  Pass only text your
     // own code chooses, such as "created_at DESC".

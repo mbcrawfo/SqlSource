@@ -28,6 +28,16 @@ internal static class EndToEndSources
     public static SqlConnection App(SqlServerContainer sqlServer) =>
         new(sqlServer.ConnectionStringOf(SqlServerContainer.AppDatabase));
 
+    // A connection to "app" that is not pooled, for a test that changes a setting of the session that the pool would
+    // hand to the next test: disposing it ends the session.
+    public static SqlConnection AppUnpooled(SqlServerContainer sqlServer) =>
+        new(
+            new SqlConnectionStringBuilder(sqlServer.ConnectionStringOf(SqlServerContainer.AppDatabase))
+            {
+                Pooling = false,
+            }.ConnectionString
+        );
+
     public static SqlConnection Billing(SqlServerContainer sqlServer) =>
         new(sqlServer.ConnectionStringOf(SqlServerContainer.BillingDatabase));
 
