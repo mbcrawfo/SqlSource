@@ -113,6 +113,10 @@ needs_allocation() {
     src/SqlSource/*.md) ;;
     src/SqlSource/* | tests/SqlSource.Testing/* | tests/SqlSource.Tests.*/EndToEnd/*) allocation=true ;;
     global.json) allocation=true ;;
+    # The build adds every sqlsource.json in the folders above a query, up to one that sets "root", and no container
+    # project's own sets it, so the settings files of the folders above them, sqlsource.json at the root and
+    # tests/sqlsource.json, reach the generated methods that the tests measure.
+    sqlsource.json | tests/sqlsource.json) allocation=true ;;
     esac
     case "${1##*/}" in
     *Allocation*) allocation=true ;;

@@ -84,6 +84,7 @@ Anything else, such as `LICENSE`, `.gitattributes` or a new extension, means a f
   - a path under a container project's `EndToEnd/` folder: its queries, sidecars, seeds and the query classes the tests call;
   - any other path of one of the four container projects that is not under `Describer/` or `Realistic/` and is not a `*.md` file: its `sqlsource.json`, from which the end-to-end queries take their settings, the container class the tests connect through, its own `.csproj`, which can override the driver versions, and its `packages.lock.json`, which pins them;
   - a `.props` or `.targets` file at the root or directly in `tests/`, such as `Directory.Build.props`, `Directory.Build.targets` and `Directory.Packages.props`, which hold the compile settings and the driver versions, and `global.json`, which pins the SDK;
+  - `sqlsource.json` at the root and `tests/sqlsource.json`, the settings files of the folders above the container projects, which the build adds to their queries' settings, since no container project's own `sqlsource.json` sets `"root"`;
   - a file whose name contains `Allocation`.
 
   This keeps the saving for the common case, describer or fixture work, and errs toward running for everything that reaches the generated code, the drivers or the measured queries.

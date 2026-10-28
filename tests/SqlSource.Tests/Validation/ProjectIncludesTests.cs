@@ -127,6 +127,28 @@ public sealed class ProjectIncludesTests : IDisposable
         ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/Shared.targets is None"]);
     }
 
+    // $(MSBuildThisFileDirectory) is the folder of the file that holds it, here tests/, and not the project's.
+    [Fact]
+    public void Refused_ThisFileDirectoryInADirectoryBuildPropsAbove_IsJudgedFromThatFile()
+    {
+        var scopes = Scopes("none tests/Other/*");
+        WriteProject("tests/Directory.Build.props", Import("$(MSBuildThisFileDirectory)Other/Shared.props"));
+        WriteProject(Item("Compile", "Local.cs"));
+
+        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/Shared.props is None"]);
+    }
+
+    // $(MSBuildProjectDirectory) is the project's folder, here tests/App, even in a file above it.
+    [Fact]
+    public void Refused_ProjectDirectoryInADirectoryBuildPropsAbove_IsJudgedFromTheProject()
+    {
+        var scopes = Scopes("none tests/Other/*");
+        WriteProject("tests/Directory.Build.props", Item("None", "$(MSBuildProjectDirectory)/../Other/File.cs"));
+        WriteProject(Item("Compile", "Local.cs"));
+
+        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/File.cs is None"]);
+    }
+
     // The library is a level deeper than the project, so only resolving from the library's folder finds the file.
     [Fact]
     public void Refused_ItemOfAReferencedLibrary_IsJudgedFromTheLibrary()
