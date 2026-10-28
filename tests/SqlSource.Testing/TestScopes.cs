@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -26,7 +27,12 @@ internal sealed class TestScopes
         Parse(File.ReadAllText(Path.Combine(RepositoryRoot.Folder, "tools", "test-scopes.txt")))
     );
 
+    // Compiled once for each pattern, since a test asks about every pattern of the file for every file of the
+    // repository.
+    private static readonly ConcurrentDictionary<string, Regex> Matchers = new(StringComparer.Ordinal);
+
     private readonly List<(TestScope Scope, string Pattern, Regex Matcher)> _lines = [];
+    private readonly List<(TestScope Scope, string Pattern)> _patterns = [];
     private readonly Dictionary<string, TestScope> _projects = [];
     private readonly List<string> _projectFiles = [];
 
@@ -34,8 +40,7 @@ internal sealed class TestScopes
 
     public static TestScopes Repository => RepositoryFile.Value;
 
-    public IReadOnlyList<(TestScope Scope, string Pattern)> Lines =>
-        _lines.ConvertAll(line => (line.Scope, line.Pattern));
+    public IReadOnlyList<(TestScope Scope, string Pattern)> Lines => _patterns;
 
     // The name of a project, the file name of its .csproj without the extension, and the engine it needs.
     public IReadOnlyDictionary<string, TestScope> Projects => _projects;
@@ -88,8 +93,16 @@ internal sealed class TestScopes
     public bool Runs(string project, TestScope scope) =>
         scope == TestScope.Both || !_projects.TryGetValue(project, out var engine) || scope == engine;
 
+    // \z and not $, which also matches before a final newline.
     private static Regex Matcher(string pattern) =>
-        new("^" + Regex.Escape(pattern).Replace("\\*", ".*", StringComparison.Ordinal) + "$", RegexOptions.Singleline);
+        Matchers.GetOrAdd(
+            pattern,
+            static pattern =>
+                new(
+                    "^" + Regex.Escape(pattern).Replace("\\*", ".*", StringComparison.Ordinal) + "\\z",
+                    RegexOptions.Singleline
+                )
+        );
 
     private static TestScope? ScopeOf(string word) =>
         word switch
@@ -123,6 +136,7 @@ internal sealed class TestScopes
         }
 
         _lines.Add((scope, words[1], Matcher(words[1])));
+        _patterns.Add((scope, words[1]));
     }
 
     private void AddProject(string[] words, int lineNumber)

@@ -31,6 +31,18 @@ public sealed class TestScopesFileTests
         dead.ShouldBeEmpty("These patterns match no file of the repository: " + string.Join(", ", dead));
     }
 
+    // The first match wins, so the order of the lines is part of the meaning: an engine's fixtures and the folders of
+    // its projects come before the broad `none` lines.  The scope is a name, since a public theory cannot take the
+    // internal enum.
+    [Theory]
+    [InlineData("tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/schema.sql", nameof(TestScope.Postgres))]
+    [InlineData("tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql/schema.sql", nameof(TestScope.SqlServer))]
+    [InlineData("tests/SqlSource.Tool.Tests/Fixtures/Projects/Single/App.csproj", nameof(TestScope.Postgres))]
+    [InlineData("tests/SqlSource.Tool.Tests/Fixtures/Projects/SqlServer/App.csproj", nameof(TestScope.SqlServer))]
+    [InlineData("tests/SqlSource.Tool.Tests/SqlSource.Tool.Tests.csproj", nameof(TestScope.None))]
+    public void Of_RealPath_IsDecidedAsIntended(string path, string scope) =>
+        TestScopes.Repository.Of(path).ToString().ShouldBe(scope);
+
     [Fact]
     public void RepositoryFile_EveryProjectFile_Exists()
     {

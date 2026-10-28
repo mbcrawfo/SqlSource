@@ -30,6 +30,14 @@ public sealed class TestScopesTests
     [Fact]
     public void Matches_Star_CrossesSlashes() => TestScopes.Matches("*.md", "docs/manual/x.md").ShouldBeTrue();
 
+    [Theory]
+    [InlineData("a/*", "xa/b", false)]
+    [InlineData("a", "ab", false)]
+    [InlineData("a*c", "abbc", true)]
+    [InlineData("a*c", "abcd", false)]
+    public void Matches_Pattern_IsAnchoredAtBothEnds(string pattern, string path, bool matches) =>
+        TestScopes.Matches(pattern, path).ShouldBe(matches);
+
     [Fact]
     public void Matches_OtherCharacters_AreLiteral()
     {
@@ -55,16 +63,14 @@ public sealed class TestScopesTests
     public void Parse_MissingPattern_ThrowsNamingTheLine() =>
         Should.Throw<FormatException>(() => TestScopes.Parse("\npostgres\n")).Message.ShouldContain("line 2");
 
-    [Fact]
-    public void Parse_PatternWithAGlobCharacter_ThrowsNamingTheLine()
-    {
-        foreach (var pattern in new[] { "a?b", "a[b", "a]b" })
-        {
-            Should
-                .Throw<FormatException>(() => TestScopes.Parse($"none a/*\nnone {pattern}\n"))
-                .Message.ShouldContain("line 2");
-        }
-    }
+    [Theory]
+    [InlineData("?")]
+    [InlineData("[")]
+    [InlineData("]")]
+    public void Parse_PatternWithAGlobCharacter_ThrowsNamingTheLine(string character) =>
+        Should
+            .Throw<FormatException>(() => TestScopes.Parse($"none a/*\nnone a{character}b\n"))
+            .Message.ShouldContain("line 2");
 
     [Theory]
     [InlineData("project sqlserver")]
