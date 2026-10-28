@@ -33,7 +33,7 @@ Every commit must pass `./pre-commit-validation.sh`.  Nothing enforces this: no 
 ## Pull requests
 
 1. **Check the version before you open a pull request.**  Run `git fetch --tags origin`, then compare `VersionPrefix` in `Directory.Build.props` with the highest release tag, `git tag --list 'v*' --sort=-v:refname | head -n 1`.  If `VersionPrefix` is not greater than that tag, ask the user what the new version should be and set it in the same pull request.  When the repository has no `v*` tags there is nothing to compare.
-2. **Run the branch-review skill when the work is complete, and again before every later push.**  When the work on a branch is complete, run `branch-review:review`, address its findings and run it again until it comes back clean, and only then offer to open a pull request.  After that, run it again the same way before every push, on the branch exactly as it will be pushed.  A review covers only the commits it saw: a commit made after a clean review needs another one.
+2. **Run the branch-review skill when the work is complete, and again before every later push.**  When the work on a branch is complete, run `branch-review:review` on your own, without waiting to be asked, address its findings and run it again until it comes back clean, and only then offer to open a pull request.  After that, run it again the same way before every push, on the branch exactly as it will be pushed.  A review covers only the commits it saw: a commit made after a clean review needs another one.
 
 ## Reviewing maintainability
 
