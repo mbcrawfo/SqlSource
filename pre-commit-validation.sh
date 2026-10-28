@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Runs the validations that the uncommitted change could break: formatting, linting, build, tests and the three
-# package checks.  A step, a pair of container test projects or the allocation tests are skipped when nothing in the
-# change reaches them.  --full runs everything, as a clean tree, a change to this script and a changed path of no known
-# kind do.
+# package checks.  A step or a pair of container test projects is skipped when nothing in the change reaches them.
+# --full runs everything, as a clean tree, a change to this script and a changed path of no known kind do.
 # Rewrites nothing.  Every step runs even when an earlier one fails, except that the tests and the package checks are
 # skipped when the build fails, and the package checks when the pack fails.
 # Usage: pre-commit-validation.sh [--full] [--plan [path ...]]   --plan prints what a run would do and why, and runs
@@ -102,46 +101,6 @@ scope_of() {
     scope=both
 }
 
-# A path that can change what the allocation tests measure: the generated code, the shared test code, the compile
-# settings, the SDK and the driver versions, or anything of a container project that the end-to-end tests read, which
-# is all of it but its describer tests, its realistic cases and its docs.  That takes in the queries and their
-# settings, the classes that the tests call, the container that they connect through, the .csproj that can override a
-# driver version and the lock file that pins one.
-needs_allocation() {
-    allocation=false
-    case "$1" in
-    src/SqlSource/*.md) ;;
-    src/SqlSource/* | tests/SqlSource.Testing/* | tests/DatabaseTests/TestHarness/* | \
-        tests/DatabaseTests/*/EndToEnd/*) allocation=true ;;
-    global.json) allocation=true ;;
-    # The build adds every sqlsource.json in the folders above a query, up to one that sets "root", and no container
-    # project's own sets it, so the settings files of the folders above them, sqlsource.json at the root,
-    # tests/sqlsource.json and tests/DatabaseTests/sqlsource.json, reach the generated methods that the tests measure.
-    sqlsource.json | tests/sqlsource.json | tests/DatabaseTests/sqlsource.json) allocation=true ;;
-    esac
-    case "${1##*/}" in
-    *Allocation*) allocation=true ;;
-    esac
-    # MSBuild imports the Directory.Build files of the root and of tests/ into every test project, and those of
-    # tests/DatabaseTests/ into every database project, and the root's Directory.Packages.props, and any of them can
-    # import another .props or .targets file beside it.
-    local parent=''
-    if [[ "$1" == */* ]]; then parent="${1%/*}"; fi
-    case "$parent" in
-    '' | tests | tests/DatabaseTests)
-        if [[ "$1" == *.props || "$1" == *.targets ]]; then allocation=true; fi
-        ;;
-    esac
-    local project folder
-    for project in "${project_paths[@]}"; do
-        folder="${project%/*}/"
-        case "$1" in
-        "$folder"Describer/* | "$folder"Realistic/* | *.md) ;;
-        "$folder"*) allocation=true ;;
-        esac
-    done
-}
-
 # A path that can change what is packed or how the packages are checked.  README.md is the generator's readme.  Every
 # .props and .targets file at the root counts, since MSBuild imports the Directory.Build files and
 # Directory.Packages.props on its own, and any of them can import another.
@@ -215,7 +174,6 @@ shell_trigger=''
 workflow_trigger=''
 postgres_trigger=''
 sqlserver_trigger=''
-allocation_trigger=''
 packages_trigger=''
 for path in ${changes[@]+"${changes[@]}"}; do
     is_known_kind "$path"
@@ -223,7 +181,6 @@ for path in ${changes[@]+"${changes[@]}"}; do
     # The scopes file places every path, so a change to it can move any path into either pair.
     scope=both
     if [[ "$path" != "$SCOPES" ]]; then scope_of "$path"; fi
-    needs_allocation "$path"
     needs_packages "$path"
     if [[ "$known" == false ]]; then first unknown; fi
     if [[ "$path" == pre-commit-validation.sh ]]; then first script_trigger; fi
@@ -234,7 +191,6 @@ for path in ${changes[@]+"${changes[@]}"}; do
     if [[ "$path" == .github/workflows/* || "$path" == tools/actionlint.sh ]]; then first workflow_trigger; fi
     if [[ "$scope" == postgres || "$scope" == both ]]; then first postgres_trigger; fi
     if [[ "$scope" == sqlserver || "$scope" == both ]]; then first sqlserver_trigger; fi
-    if [[ "$allocation" == true ]]; then first allocation_trigger; fi
     if [[ "$packages" == true ]]; then first packages_trigger; fi
     # A deleted file has nothing to format, but its scopes still apply.
     if [[ "$path" == *.cs && -f "$path" ]]; then
@@ -280,7 +236,6 @@ decide shell "$shell_trigger" 'no .sh file or .editorconfig changed'
 decide workflow "$workflow_trigger" 'no workflow or tools/actionlint.sh changed'
 decide postgres "$postgres_trigger" "$no_scope"
 decide sqlserver "$sqlserver_trigger" "$no_scope"
-decide allocation "$allocation_trigger" 'no change can alter what they measure'
 decide packages "$packages_trigger" 'no change reaches the packages'
 
 # Every restore below runs in locked mode, as it does in CI, so that a stale packages.lock.json fails the validation
@@ -383,16 +338,6 @@ for project in ${solution_projects[@]+"${solution_projects[@]}"}; do
     fi
     project_plan+=("$(printf '        %-4s  %s  (%s)' "$action" "$project" "${!why_name}")")
 done
-test_args=()
-# shellcheck disable=SC2154 # decide sets it, through printf -v.
-if [[ "$allocation_go" == false ]]; then
-    test_args+=(--filter-not-class '*.EndToEnd.AllocationTests')
-fi
-# The allocation tests are in the two container projects, so when neither pair runs, none of them does, whatever set
-# off their trigger.  The filter is decided above, and this only changes what the plan and the summary say.
-if [[ "$allocation_go" == true && "$postgres_go" == false && "$sqlserver_go" == false ]]; then
-    decide allocation '' 'no container pair runs'
-fi
 
 if [[ "$plan" == true ]]; then
     if [[ -n "$full_reason" ]]; then
@@ -414,14 +359,13 @@ step 'shellcheck' shell tools/shellcheck.sh || true
 step 'shfmt' shell tools/shfmt.sh --check || true
 step 'actionlint' workflow tools/actionlint.sh || true
 if step 'build' always dotnet build "$SOLUTION"; then
-    step 'test' always dotnet test --solution "$test_solution" --no-build ${test_args[@]+"${test_args[@]}"} || true
+    step 'test' always dotnet test --solution "$test_solution" --no-build || true
     if [[ "$plan" == true ]]; then
         printf '        through %s\n' "$test_through"
         printf '%s\n' "${project_plan[@]}"
     fi
     step 'postgres tests' postgres
     step 'sqlserver tests' sqlserver
-    step 'allocation tests' allocation
     if step 'pack' packages dotnet pack "$SOLUTION" --output "$package_folder"; then
         for check in "${PACKAGE_CHECKS[@]}"; do
             step "$check" packages "tools/check-$check.sh" "$package_folder" || true
