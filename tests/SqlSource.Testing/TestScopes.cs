@@ -133,10 +133,12 @@ internal sealed class TestScopes
             throw new FormatException($"Test scopes line {lineNumber}: expected '<scope> <pattern>'.");
         }
 
-        if (words[1].AsSpan().IndexOfAny(RefusedCharacters) >= 0)
+        var refused = words[1].AsSpan().IndexOfAny(RefusedCharacters);
+        if (refused >= 0)
         {
             throw new FormatException(
-                $"Test scopes line {lineNumber}: '{words[1]}' holds a glob character other than '*'."
+                $"Test scopes line {lineNumber}: '{words[1]}' holds '{words[1][refused]}', "
+                    + "and only '*' is special in a pattern."
             );
         }
 

@@ -139,8 +139,11 @@ trap 'rm -rf "$work"' EXIT
 changes=()
 git_failure=''
 collect() {
-    if ! "$@" >"$work/paths"; then
-        echo "pre-commit-validation.sh: '$*' failed, so everything runs" >&2
+    local error
+    # git's error is kept to its first line, so that the failure reads as one message and not as git's usage text.
+    if ! "$@" >"$work/paths" 2>"$work/error"; then
+        error="$(head -n 1 "$work/error")"
+        echo "pre-commit-validation.sh: '$*' failed (${error:-no message}), so everything runs" >&2
         if [[ -z "$git_failure" ]]; then
             git_failure="'$*' failed"
         fi

@@ -73,10 +73,13 @@ public sealed class TestScopesTests
     [InlineData("!")]
     [InlineData("+")]
     [InlineData("@")]
-    public void Parse_PatternWithAGlobCharacter_ThrowsNamingTheLine(string character) =>
-        Should
-            .Throw<FormatException>(() => TestScopes.Parse($"none a/*\nnone a{character}b\n"))
-            .Message.ShouldContain("line 2");
+    public void Parse_PatternWithAGlobCharacter_ThrowsNamingTheLineAndTheCharacter(string character)
+    {
+        var message = Should.Throw<FormatException>(() => TestScopes.Parse($"none a/*\nnone a{character}b\n")).Message;
+
+        message.ShouldContain("line 2");
+        message.ShouldContain($"holds '{character}'");
+    }
 
     [Theory]
     [InlineData("project sqlserver")]
