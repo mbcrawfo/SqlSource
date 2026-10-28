@@ -12,7 +12,7 @@ The project copies two fixture projects to its output, with the package's MSBuil
 dotnet test --project tests/SqlSource.Tests.SqlServer
 ```
 
-`dotnet test --solution SqlSource.slnx`, and so `pre-commit-validation.sh`, runs it on the default image.  SQL Server 2017 is the oldest that is supported, which CI runs as well:
+`dotnet test --solution SqlSource.slnx`, and so `pre-commit-validation.sh --full`, runs it on the default image.  A plain `pre-commit-validation.sh` runs it only when the uncommitted change can reach it, which [`tools/test-scopes.txt`](../../tools/README.md#test-scopes) decides.  SQL Server 2017 is the oldest that is supported, which CI runs as well:
 
 ```bash
 SQLSOURCE_TESTS_SQLSERVER_IMAGE=mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04 dotnet test --project tests/SqlSource.Tests.SqlServer

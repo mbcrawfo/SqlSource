@@ -88,13 +88,25 @@ This builds in `Release` and writes two packages with one version, `artifacts/pa
 
 ## Checks
 
-Run every check before committing:
+Run the checks before committing, and all of them before pushing:
 
 ```bash
 ./pre-commit-validation.sh
+./pre-commit-validation.sh --full
 ```
 
-It verifies formatting, runs the [linters](tools/README.md#linters), builds the solution, runs the tests, checks the two packages, installs the generator's into a project and installs the tool.  It never rewrites files, runs every step even when one fails (the tests and the three package checks are skipped if the build fails), and ends with a summary of what passed and failed.  `format.sh` rewrites C# and project files with `dotnet format style`, `dotnet format analyzers` and CSharpier, and `format.sh --check` reports what it would change and rewrites nothing.  Either takes part names, `style`, `analyzers` or `csharpier`, to run only those parts; CI runs them in separate jobs.
+It verifies formatting, runs the [linters](tools/README.md#linters), builds the solution, runs the tests, checks the two packages, installs the generator's into a project and installs the tool.  It never rewrites files, runs every step even when one fails (the tests and the three package checks are skipped if the build fails), and ends with a summary of what passed, failed and was skipped.
+
+A plain run checks only what the uncommitted change (staged, unstaged and untracked) can affect:
+
+- Formatting is limited to the changed `.cs` files, and skipped when none changed; a change to a file that configures the formatters checks everything.
+- editorconfig-checker always runs.  shellcheck and shfmt run when a shell script or `.editorconfig` changed, actionlint when a workflow changed, and the three package checks when a change can alter what is packed.
+- The build and the tests that need no container always run.  A pair of container test projects, PostgreSQL's or SQL Server's, runs only when the change can reach it, and the allocation tests only when it can change what they measure.  [`tools/test-scopes.txt`](tools/README.md#test-scopes) decides which pair a path can reach.
+- A clean tree, a path of a kind the script does not know and a failing `git` command each make the run full.
+
+`--full` runs everything, and every push needs it, on the tree as it will be pushed.  A partial run says so at its end.  `--plan [path ...]` prints what a run would do and why, for the uncommitted change or for the paths given, and runs nothing.
+
+`format.sh` rewrites C# and project files with `dotnet format style`, `dotnet format analyzers` and CSharpier, and `format.sh --check` reports what it would change and rewrites nothing.  Either takes part names, `style`, `analyzers` or `csharpier`, to run only those parts, and `-- file ...` after them to limit the run to those files; CI runs the parts in separate jobs.  [`tools/README.md`](tools/README.md#formatting) has the form.
 
 Both `pre-commit-validation.sh` and `format.sh --check` restore packages in locked mode, as CI does, so a `packages.lock.json` that no longer matches its project fails the check.  After changing a package reference or version, update the lock files and commit them:
 
@@ -104,7 +116,7 @@ dotnet restore SqlSource.slnx
 
 ## Continuous integration
 
-CI runs the same checks as `pre-commit-validation.sh` on Linux, in parallel jobs.  It pulls the test images in a step of its own, with `tools/pull-test-images.sh`, and runs `tests/SqlSource.Tests.Postgres` again on PostgreSQL 14 and `tests/SqlSource.Tests.SqlServer` again on SQL Server 2017, each in a job of its own.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests that need no container on Windows and macOS every night, and `tests/SqlSource.Tests.Postgres` on PostgreSQL 15 to 17 and `tests/SqlSource.Tests.SqlServer` on SQL Server 2019 and 2022 on Linux, and by hand on a branch:
+CI runs the same checks as `pre-commit-validation.sh --full` on Linux, in parallel jobs.  It pulls the test images in a step of its own, with `tools/pull-test-images.sh`, and runs `tests/SqlSource.Tests.Postgres` again on PostgreSQL 14 and `tests/SqlSource.Tests.SqlServer` again on SQL Server 2017, each in a job of its own.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests that need no container on Windows and macOS every night, and `tests/SqlSource.Tests.Postgres` on PostgreSQL 15 to 17 and `tests/SqlSource.Tests.SqlServer` on SQL Server 2019 and 2022 on Linux, and by hand on a branch:
 
 ```bash
 gh workflow run nightly.yml --ref <branch>
