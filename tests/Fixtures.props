@@ -1,0 +1,32 @@
+<Project>
+    <!--
+        The package's three MSBuild files and the repository's global.json, linked into Fixtures/ of the output beside
+        the fixture projects, where FixtureProjects of tests/SqlSource.Tool.Testing copies them from.  Imported by
+        tests/SqlSource.Tool.Tests, tests/DatabaseTests/Postgres and tests/DatabaseTests/SqlServer, which sit at
+        different depths, so each path starts at this file's folder.  It matches no line of tools/test-scopes.txt, so
+        a change to it runs both engines' projects, and ProjectIncludes reads its items for each project that imports
+        it.
+    -->
+    <ItemGroup>
+        <None
+            Include="$(MSBuildThisFileDirectory)../src/SqlSource/build/SqlSource.props"
+            Link="Fixtures/build/SqlSource.props"
+            CopyToOutputDirectory="PreserveNewest"
+        />
+        <None
+            Include="$(MSBuildThisFileDirectory)../src/SqlSource/build/SqlSource.targets"
+            Link="Fixtures/build/SqlSource.targets"
+            CopyToOutputDirectory="PreserveNewest"
+        />
+        <None
+            Include="$(MSBuildThisFileDirectory)../src/SqlSource/build/SqlSource.AfterSdk.targets"
+            Link="Fixtures/build/SqlSource.AfterSdk.targets"
+            CopyToOutputDirectory="PreserveNewest"
+        />
+        <None
+            Include="$(MSBuildThisFileDirectory)../global.json"
+            Link="Fixtures/global.json"
+            CopyToOutputDirectory="PreserveNewest"
+        />
+    </ItemGroup>
+</Project>

@@ -32,6 +32,20 @@ public sealed class ContainerProjectInputsTests
         );
     }
 
+    // global.json reaches the describer projects only through tests/Fixtures.props, so this holds only while the check
+    // reads the files that an Import names.
+    [Fact]
+    public void Refused_ScopesWithGlobalJsonNone_NamesItForBothDescriberProjects()
+    {
+        var text = File.ReadAllText(RepositoryRoot.Path("tools", "test-scopes.txt"));
+        var scopes = TestScopes.Parse("none global.json\n" + text);
+
+        var refused = ProjectIncludes.Refused(scopes, RepositoryRoot.Path());
+
+        refused.ShouldContain("SqlSource.DatabaseTests.Postgres: global.json is None");
+        refused.ShouldContain("SqlSource.DatabaseTests.SqlServer: global.json is None");
+    }
+
     [Fact]
     public void Refused_RepositoryScopes_IsEmpty() =>
         ProjectIncludes.Refused(TestScopes.Repository, RepositoryRoot.Path()).ShouldBeEmpty();
