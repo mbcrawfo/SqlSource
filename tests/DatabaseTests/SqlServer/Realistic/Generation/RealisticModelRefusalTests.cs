@@ -4,8 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using SqlSource.Testing.Generator;
 using SqlSource.DatabaseTests.SqlServer.Describer;
+using SqlSource.Testing.Generator;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 

@@ -20,26 +20,17 @@
             linked queries take the settings files of their own folder, so they are generated with the end-to-end
             project's settings.
         -->
-        <AdditionalFiles
-            Include="../SqlServer/EndToEnd/Queries/AllTypes.sql"
-            Link="Queries/%(Filename)%(Extension)"
-        />
+        <AdditionalFiles Include="../SqlServer/EndToEnd/Queries/AllTypes.sql" Link="Queries/%(Filename)%(Extension)" />
         <AdditionalFiles
             Include="../SqlServer/EndToEnd/Queries/AllTypes.sql.json"
             Link="Queries/%(Filename)%(Extension)"
         />
-        <AdditionalFiles
-            Include="../SqlServer/EndToEnd/Queries/NewTypes.sql"
-            Link="Queries/%(Filename)%(Extension)"
-        />
+        <AdditionalFiles Include="../SqlServer/EndToEnd/Queries/NewTypes.sql" Link="Queries/%(Filename)%(Extension)" />
         <AdditionalFiles
             Include="../SqlServer/EndToEnd/Queries/NewTypes.sql.json"
             Link="Queries/%(Filename)%(Extension)"
         />
-        <AdditionalFiles
-            Include="../SqlServer/EndToEnd/Queries/Streaming.sql"
-            Link="Queries/%(Filename)%(Extension)"
-        />
+        <AdditionalFiles Include="../SqlServer/EndToEnd/Queries/Streaming.sql" Link="Queries/%(Filename)%(Extension)" />
         <AdditionalFiles
             Include="../SqlServer/EndToEnd/Queries/Streaming.sql.json"
             Link="Queries/%(Filename)%(Extension)"

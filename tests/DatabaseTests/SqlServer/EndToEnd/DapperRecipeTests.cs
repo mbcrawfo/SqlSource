@@ -8,8 +8,8 @@ using Dapper;
 using Microsoft.Data;
 using Microsoft.Data.SqlTypes;
 using Shouldly;
-using SqlSource.Testing.EndToEnd;
 using SqlSource.DatabaseTests.SqlServer.EndToEnd.Types;
+using SqlSource.Testing.EndToEnd;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;

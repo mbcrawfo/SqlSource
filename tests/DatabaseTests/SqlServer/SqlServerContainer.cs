@@ -4,8 +4,8 @@ using System.Data.Common;
 using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
-using SqlSource.Testing;
 using SqlSource.DatabaseTests.SqlServer.Realistic;
+using SqlSource.Testing;
 using Testcontainers.MsSql;
 using Xunit;
 

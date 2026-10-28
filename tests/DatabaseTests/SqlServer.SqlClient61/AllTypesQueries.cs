@@ -20,14 +20,8 @@ internal static partial class NewTypesQueries;
 
 // The same two files a second time, at the output codegen, for their methods on SqlClient 6.1.  Each claim is in the
 // namespace of the models' claim, so the two share the files' models, which the methods and Dapper both read.
-[SqlSourceGenerate(
-    Path = "../SqlServer/EndToEnd/Queries/AllTypes.sql",
-    Output = GeneratorOutput.CodeGen
-)]
+[SqlSourceGenerate(Path = "../SqlServer/EndToEnd/Queries/AllTypes.sql", Output = GeneratorOutput.CodeGen)]
 internal static partial class AllTypesMethodQueries;
 
-[SqlSourceGenerate(
-    Path = "../SqlServer/EndToEnd/Queries/NewTypes.sql",
-    Output = GeneratorOutput.CodeGen
-)]
+[SqlSourceGenerate(Path = "../SqlServer/EndToEnd/Queries/NewTypes.sql", Output = GeneratorOutput.CodeGen)]
 internal static partial class NewTypesMethodQueries;

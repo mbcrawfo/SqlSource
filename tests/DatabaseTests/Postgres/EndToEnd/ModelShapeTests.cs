@@ -8,11 +8,11 @@ using System.Net.NetworkInformation;
 using System.Reflection;
 using NpgsqlTypes;
 using Shouldly;
+using SqlSource.DatabaseTests.Postgres.EndToEnd.Types;
 using SqlSource.Generation.Types.Maps;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
 using SqlSource.Testing.EndToEnd;
-using SqlSource.DatabaseTests.Postgres.EndToEnd.Types;
 using Xunit;
 using static SqlSource.Testing.EndToEnd.ModelReflection;
 

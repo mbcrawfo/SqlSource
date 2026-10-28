@@ -4,8 +4,8 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.Data.SqlTypes;
 using Shouldly;
-using SqlSource.Testing.EndToEnd;
 using SqlSource.DatabaseTests.SqlServer.EndToEnd.Types;
+using SqlSource.Testing.EndToEnd;
 using Xunit;
 using static SqlSource.Testing.EndToEnd.ModelReflection;
 

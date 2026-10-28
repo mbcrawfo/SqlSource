@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Npgsql;
 using Shouldly;
-using SqlSource.Testing.Generator;
 using SqlSource.DatabaseTests.Postgres.Describer;
+using SqlSource.Testing.Generator;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 

@@ -9,8 +9,8 @@ using Dapper;
 using Npgsql;
 using NpgsqlTypes;
 using Shouldly;
-using SqlSource.Testing.EndToEnd;
 using SqlSource.DatabaseTests.Postgres.EndToEnd.Types;
+using SqlSource.Testing.EndToEnd;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.EndToEnd;

@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Threading.Tasks;
 using Npgsql;
-using SqlSource.Testing;
 using SqlSource.DatabaseTests.Postgres.Realistic;
+using SqlSource.Testing;
 using Testcontainers.PostgreSql;
 using Xunit;
 
