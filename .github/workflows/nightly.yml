@@ -7,7 +7,8 @@
 # between them, so that the two cover every supported major: see the rule in .github/AGENTS.md.
 # It is no required check.  A pull request that changes this file runs it, so that a change to it is tried.
 # Every test run's summary lists its failed and skipped tests and leaves out the passed ones.  A step's summary holds
-# 1 MiB, the reporter cuts its output there, mid-tag, and the passed tests of the Test step alone are past it.
+# 1 MiB, the reporter cuts its output there, and GitHub then shows little or none of it.  The passed tests of the Test
+# step alone are past that, and so are some hundreds of failed tests: see .github/workflows/README.md.
 name: Nightly
 
 on:

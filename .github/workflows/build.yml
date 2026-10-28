@@ -6,7 +6,8 @@
 # the tools.  The first job to finish saves the cache under its key, so two jobs that restore different packages must
 # never share a key, or the cache could hold only the packages of the smaller job.
 # Every test run's summary lists its failed and skipped tests and leaves out the passed ones.  A step's summary holds
-# 1 MiB, the reporter cuts its output there, mid-tag, and the passed tests of the solution alone are past it.
+# 1 MiB, the reporter cuts its output there, and GitHub then shows little or none of it.  The passed tests of the
+# solution alone are past that, and so are some hundreds of failed tests: see .github/workflows/README.md.
 name: Build
 
 on:

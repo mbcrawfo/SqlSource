@@ -18,7 +18,9 @@ Each floor job of `build.yml` names its floor image once, as `POSTGRES_FLOOR_IMA
 
 ## Artifacts
 
-Each run of `build.yml` uploads two artifacts: `packages`, the two `.nupkg` files, from the `package` job, and `coverage`, from the `build` job, the HTML, Cobertura and markdown reports.  The run's job summary also holds the coverage summary and, for each test project a step ran, its counts and its failed and skipped tests.  It lists no passed tests: a step's summary holds 1 MiB, the reporter cuts its output there, and the passed tests of the solution alone are past it, so the projects after the cut would be lost.
+Each run of `build.yml` uploads two artifacts: `packages`, the two `.nupkg` files, from the `package` job, and `coverage`, from the `build` job, the HTML, Cobertura and markdown reports.  The run's job summary also holds the coverage summary and, for each test project a step ran, its counts and its failed and skipped tests.  It lists no passed tests: a step's summary holds 1 MiB, the reporter cuts its output there, and GitHub then shows little or none of that step's summary.  The passed tests of the solution alone are past the limit.
+
+This leaves a limitation of the reporter, which has no option to shorten or cap what it lists: each failed test is listed with its message and stack trace, about 3 KB, so a step where some hundreds of tests fail, as when a project's container does not start, passes 1 MiB again and its summary is lost.  The step's log still holds every failure.
 
 ## Continuous integration
 
