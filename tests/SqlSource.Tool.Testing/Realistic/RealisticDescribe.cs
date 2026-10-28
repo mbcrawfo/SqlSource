@@ -22,10 +22,13 @@ internal sealed class RealisticDescribe(RealisticCorpus corpus, string database,
         StringComparer.Ordinal
     );
 
+    // The corpus the describer describes the cases of.
+    public RealisticCorpus Corpus { get; } = corpus;
+
     // The case of that folder of Cases, read from the repository, once the server of that major runs it.
     public RealisticCase Start(string name, int major)
     {
-        var found = corpus.ReadNamed(name);
+        var found = Corpus.ReadNamed(name);
         found.SkipUnlessRunsOn(major);
         return found;
     }
@@ -78,6 +81,33 @@ internal sealed class RealisticDescribe(RealisticCorpus corpus, string database,
     {
         var token = TestContext.Current.CancellationToken;
         var request = RequestOf(found);
+        var session = await OpenAsync(found, connection);
+        await using (session)
+        {
+            return await session.DescribeAsync(request, token);
+        }
+    }
+
+    // The entry that a run writes for a case that is not refused, described in a session of its own on the corpus's
+    // database, for a sidecar held in memory.  A case that is refused fails, as it has no entry.
+    public async Task<SidecarEntry> EntryAsync(RealisticCase found, string connection)
+    {
+        var session = await OpenAsync(found, connection);
+        await using (session)
+        {
+            var described = await session.DescribeAsync(RequestOf(found), TestContext.Current.CancellationToken);
+            if (!described.Succeeded)
+            {
+                Assert.Fail($"{found} was refused:\n{RealisticDescriptions.RenderFailure(described.Failure)}");
+            }
+
+            return EntryOf(found, session.Server, described.Value);
+        }
+    }
+
+    // A session of its own, opened through the describer on the corpus's database.
+    private async Task<IDescribeSession> OpenAsync(RealisticCase found, string connection)
+    {
         var opened = await describer().OpenAsync(database, connection);
         if (!opened.Succeeded)
         {
@@ -86,10 +116,6 @@ internal sealed class RealisticDescribe(RealisticCorpus corpus, string database,
             );
         }
 
-        var session = opened.Value;
-        await using (session)
-        {
-            return await session.DescribeAsync(request, token);
-        }
+        return opened.Value;
     }
 }
