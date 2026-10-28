@@ -64,13 +64,13 @@ Anything else, such as `LICENSE`, `.gitattributes` or a new extension, means a f
 
 - It is skipped when no `.cs` file changed.
 - Otherwise `dotnet format style` and `dotnet format analyzers` take `--include` with the changed `.cs` files that still exist, and CSharpier checks those files.  `--include` took the two `dotnet format` checks from about 55s to about 15s for two files.
-- A change to any file that the formatters read as configuration runs format on everything.  These are `.editorconfig`, any `*.globalconfig`, any `*.props`, `*.targets` or `*.csproj` file (`Directory.Packages.props` pins the analyzers), `global.json`, `dotnet-tools.json` (it pins CSharpier) and any CSharpier configuration or ignore file.
+- A change to `format.sh`, or to any file that the formatters read as configuration, runs format on everything.  These are `.editorconfig`, any `*.globalconfig`, any `*.props`, `*.targets` or `*.csproj` file (`Directory.Packages.props` pins the analyzers), `global.json`, `dotnet-tools.json` (it pins CSharpier) and any CSharpier configuration or ignore file.
 
 ### Linters
 
 - editorconfig-checker always runs (3s).
 - shellcheck and shfmt run only when a `*.sh` file or `.editorconfig` changed.  shfmt takes its layout from `.editorconfig`.
-- actionlint runs only when a file under `.github/workflows/` changed.
+- actionlint runs only when a file under `.github/workflows/` or `tools/actionlint.sh` changed.
 
 ### Tests
 

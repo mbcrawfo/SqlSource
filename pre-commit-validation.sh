@@ -51,11 +51,14 @@ is_known_kind() {
     known=false
 }
 
-# The files that the formatters read as configuration, so a change to one can change the verdict on any file:
-# Directory.Packages.props pins the analyzers and dotnet-tools.json pins CSharpier.  CSharpier formats the .slnx files
-# too, and they reach it only this way, since the changed files that format is limited to are the .cs files.
+# The files that the formatters read as configuration, and format.sh itself, so a change to one can change the verdict
+# on any file: Directory.Packages.props pins the analyzers and dotnet-tools.json pins CSharpier.  CSharpier formats the
+# .slnx files too, and they reach it only this way, since the changed files that format is limited to are the .cs files.
 formats_everything() {
     everything=false
+    if [[ "$1" == format.sh ]]; then
+        everything=true
+    fi
     case "${1##*/}" in
     .editorconfig | *.globalconfig | *.props | *.targets | *.csproj | *.slnx | global.json | dotnet-tools.json)
         everything=true
@@ -112,6 +115,7 @@ needs_allocation() {
     *Allocation*) allocation=true ;;
     esac
     # A container project's own .csproj can override the compile settings and driver versions, with a VersionOverride.
+    local project
     for project in "${project_paths[@]}"; do
         if [[ "$1" == "$project" ]]; then
             allocation=true
@@ -203,7 +207,8 @@ for path in ${changes[@]+"${changes[@]}"}; do
     if [[ "$everything" == true ]]; then first format_all; fi
     # shfmt takes its layout from .editorconfig.
     if [[ "$path" == *.sh || "${path##*/}" == .editorconfig ]]; then first shell_trigger; fi
-    if [[ "$path" == .github/workflows/* ]]; then first workflow_trigger; fi
+    # actionlint reads the workflows, and its script is how it runs.
+    if [[ "$path" == .github/workflows/* || "$path" == tools/actionlint.sh ]]; then first workflow_trigger; fi
     if [[ "$scope" == postgres || "$scope" == both ]]; then first postgres_trigger; fi
     if [[ "$scope" == sqlserver || "$scope" == both ]]; then first sqlserver_trigger; fi
     if [[ "$allocation" == true ]]; then first allocation_trigger; fi
@@ -245,7 +250,7 @@ no_scope='no change in its scope'
 decide always always ''
 decide format "$format_trigger" "$no_format"
 decide shell "$shell_trigger" 'no .sh file or .editorconfig changed'
-decide workflow "$workflow_trigger" 'no file under .github/workflows/ changed'
+decide workflow "$workflow_trigger" 'no workflow or tools/actionlint.sh changed'
 decide postgres "$postgres_trigger" "$no_scope"
 decide sqlserver "$sqlserver_trigger" "$no_scope"
 decide allocation "$allocation_trigger" 'no change can alter what they measure'

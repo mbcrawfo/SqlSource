@@ -68,7 +68,7 @@ public sealed class ProjectIncludesTests : IDisposable
     [Fact]
     public void Refused_ProjectReference_IsClassifiedByItsProjectFileAlone()
     {
-        Write("tests/Other/Other.csproj");
+        WriteProject("tests/Other/Other.csproj");
         Write("tests/Other/Extra.cs");
         var scopes = Scopes("none tests/Other/Other.csproj", "postgres tests/Other/*");
         WriteProject(Item("ProjectReference", "../Other/Other.csproj"));
@@ -105,6 +105,60 @@ public sealed class ProjectIncludesTests : IDisposable
             .ShouldBe(["App: $(Other)/File.cs holds a property the check cannot resolve"]);
     }
 
+    // MSBuild resolves an item of an imported file from the project's folder.
+    [Fact]
+    public void Refused_ItemOfADirectoryBuildPropsAbove_IsJudgedFromTheProject()
+    {
+        var scopes = Scopes("none tests/Other/*");
+        WriteProject("tests/Directory.Build.props", Item("None", "../Other/File.cs"));
+        WriteProject(Item("Compile", "Local.cs"));
+
+        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/File.cs is None"]);
+    }
+
+    // MSBuild resolves an Import from the folder of the file that holds it.
+    [Fact]
+    public void Refused_ImportOfADirectoryBuildTargetsAbove_IsJudgedFromThatFile()
+    {
+        var scopes = Scopes("none tests/Other/*");
+        WriteProject("tests/Directory.Build.targets", Import("Other/Shared.targets"));
+        WriteProject(Item("Compile", "Local.cs"));
+
+        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/Shared.targets is None"]);
+    }
+
+    [Fact]
+    public void Refused_ItemOfAReferencedLibrary_NamesIt()
+    {
+        var scopes = Scopes("none tests/Other/*");
+        WriteProject("tests/Library/Library.csproj", Item("None", "../Other/File.cs"));
+        WriteProject(Item("ProjectReference", "../Library/Library.csproj"));
+
+        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/File.cs is None"]);
+    }
+
+    [Fact]
+    public void Refused_ItemOfALibraryReferencedThroughAnother_NamesIt()
+    {
+        var scopes = Scopes("none tests/Other/*");
+        WriteProject("tests/Deep/Deep.csproj", Item("Compile", "../Other/File.cs"));
+        WriteProject("tests/Library/Library.csproj", Item("ProjectReference", "../Deep/Deep.csproj"));
+        WriteProject(Item("ProjectReference", "../Library/Library.csproj"));
+
+        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/File.cs is None"]);
+    }
+
+    // A project outside tests/ is the code under test, whose files reach the project through its scope alone.
+    [Fact]
+    public void Refused_ReferenceOutsideTests_IsNotRead()
+    {
+        var scopes = Scopes("none docs/*");
+        WriteProject("src/Library/Library.csproj", Item("None", "../../docs/Readme.md"));
+        WriteProject(Item("ProjectReference", "../../src/Library/Library.csproj"));
+
+        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBeEmpty();
+    }
+
     [Fact]
     public void Refused_RemoveOnlyElement_IsIgnored()
     {
@@ -126,14 +180,14 @@ public sealed class ProjectIncludesTests : IDisposable
     private static TestScopes Scopes(params string[] lines) =>
         TestScopes.Parse(string.Join('\n', lines.Prepend("project postgres tests/App/App.csproj")));
 
-    private void WriteProject(params XElement[] items) =>
-        Project(items)
-            .Save(
-                Path.Combine(
-                    Directory.CreateDirectory(Path.Combine(_root.FullName, "tests", "App")).FullName,
-                    "App.csproj"
-                )
-            );
+    private void WriteProject(params XElement[] items) => WriteProject("tests/App/App.csproj", items);
+
+    private void WriteProject(string path, params XElement[] items)
+    {
+        var file = Path.Combine(_root.FullName, path);
+        _ = Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        Project(items).Save(file);
+    }
 
     private void Write(string path)
     {
