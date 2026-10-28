@@ -373,9 +373,9 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
 
     // The rows of the first statement are yielded and nothing is thrown, though the batch ran as far as the THROW: the
     // statement before it set a mark on the session, which the test reads back on the same connection, open for that.
-    // The batch's error is not reported, as SqlClient reads the rest of the batch when the reader is disposed and drops
-    // an error that follows the last result set that it was asked for.  The mark shows that the batch reached the
-    // THROW, and not that the THROW ran.
+    // The mark shows that the batch reached the THROW, and not that the THROW ran; the error is not reported, which is
+    // likely SqlClient dropping an error that follows the last result set that it was asked for, a cause that these
+    // tests do not show.
     [Fact]
     public async Task StreamThenRaise_ErrorAfterTheRows_RunsTheBatchToTheThrowAndIsNotThrown()
     {
