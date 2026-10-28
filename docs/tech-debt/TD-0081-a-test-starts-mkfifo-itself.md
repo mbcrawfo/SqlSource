@@ -2,7 +2,7 @@
 
 ## Problem
 
-[`PostgresDescriberTests.SecretsOf_PasswordFileThatIsANamedPipe_IsNoneAndIsNotOpened`](../../tests/SqlSource.Tool.Tests/Describing/Postgres/PostgresDescriberTests.cs) makes its named pipe with `Process.Start(new ProcessStartInfo("mkfifo", ...))`, found by the maintainability review of 2026-10-27.  `tests/AGENTS.md` says a test starts a program through `Programs.RunAsync`, never `Process.Start`, and skips with `Programs.SkipUnlessOnPath` where a program of the operating system is missing.  The test skips only on Windows, and waits for `mkfifo` on the test's token rather than on `Eventually.Patience`.
+[`PostgresDescriberTests.SecretsOf_PasswordFileThatIsANamedPipe_IsNoneAndIsNotOpened`](../../tests/SqlSource.Tool.Tests/Describing/Postgres/PostgresDescriberTests.cs) makes its named pipe with `Process.Start(new ProcessStartInfo("mkfifo", ...))`, found by the maintainability review of 2026-10-27.  `tests/AGENTS.md` says a test starts a program through `Programs.RunAsync`, never `Process.Start`, and `tests/SqlSource.Tool.Tests/AGENTS.md` that it skips with `Programs.SkipUnlessOnPath` where a program of the operating system is missing.  The test skips only on Windows, and waits for `mkfifo` on the test's token rather than on `Eventually.Patience`.
 
 ## Why it exists
 

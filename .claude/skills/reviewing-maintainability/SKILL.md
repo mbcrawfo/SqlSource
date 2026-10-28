@@ -26,7 +26,7 @@ The briefs are in [sweeps.md](sweeps.md).  Each brief says what the repository d
 | Finding | Action |
 |----|----|
 | A cohesive group of four or more files in a large folder | Move now, if the cost below allows |
-| A folder whose traps no AGENTS.md covers | Add one, under 250 lines, traps only, with the maintenance footer |
+| A folder whose traps no AGENTS.md covers | Add one within root guideline 13's limits (rules of at most 80 words, a file of at most 8 KB), traps only, with the maintenance footer |
 | A comment that is wrong, stale, or restates its own code | Fix or delete now |
 | A test whose assertions do not check what its comment says | Correct the comment now; record the gap in the grouped `TD-` item of the tests; do not change the test |
 | Duplicated logic, uneven conventions, over-long methods, dead members | One grouped `TD-` item per area (`src/`, tests), numbered, with the file links; do not refactor |
