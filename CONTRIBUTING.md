@@ -23,7 +23,7 @@ The two projects that ship are:
 - `src/SqlSource` is the source generator, and the package `SqlSource`.  [`docs/architecture/generator.md`](docs/architecture/generator.md) explains how it works.
 - `src/SqlSource.Tool` is the `sqlsource` command, a console application that references the generator's project and shares its code, and the package `SqlSource.Tool`.  [`docs/architecture/tool.md`](docs/architecture/tool.md) explains how it works.
 
-The seven test projects and the two libraries they share, which [`tests/README.md`](tests/README.md) describes:
+The seven test projects and the three libraries they share, which [`tests/README.md`](tests/README.md) describes:
 
 - `tests/SqlSource.Tests` runs every test of the generator.
 - `tests/SqlSource.Tests.RoslynFloor` compiles the generator driver tests a second time, on the oldest supported Roslyn.
@@ -32,7 +32,7 @@ The seven test projects and the two libraries they share, which [`tests/README.m
 - `tests/DatabaseTests/Postgres.Npgsql8` writes and reads every mapped type through the generated methods, reads them through Dapper, and breaks out of a streaming method, on Npgsql 8, the oldest supported driver, and needs Docker.
 - `tests/DatabaseTests/SqlServer` runs the tests of SQL Server against a real server and is SQL Server's end-to-end project, which builds models and query methods from its own queries, runs each query through its method, writes and reads every mapped type through the methods, measures their allocations against hand-written ADO.NET, and reads rows through Dapper for the manual's recipe, and needs Docker.
 - `tests/DatabaseTests/SqlServer.SqlClient61` reads every mapped type through Dapper, writes and reads it through the generated methods, and breaks out of a streaming method, on Microsoft.Data.SqlClient 6.1, the oldest supported driver, and needs Docker.
-- `tests/SqlSource.Testing` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
+- `tests/SqlSource.Testing`, `tests/DatabaseTests/TestHarness` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 
 `examples/PostgresExamples` shows a user SqlSource with PostgreSQL and Dapper, and `examples/SqlServerExamples` with SQL Server and Dapper; they build with the solution and hold no tests.
 
