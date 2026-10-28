@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using SqlSource.DatabaseTests.TestHarness;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Testing.Fixtures;
@@ -15,7 +16,7 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class FixtureCasesTests(PostgresDatabases postgres)
 {
-    private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.InFolder(RepositoryPaths.DescriberFixtures);
+    private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.InFolder(DescriberFixtures.Postgres.Folder);
 
     public static TheoryData<string> Cases => [with(Found.Select(static found => found.Name))];
 

@@ -15,7 +15,7 @@ Each project's folder and project file carry its short name, `Postgres/Postgres.
 
 ## The harness
 
-`TestHarness/` is the library of this folder, `SqlSource.DatabaseTests.TestHarness`, which every project here references.  It holds the images, the start of a container, the files of the end-to-end databases and the two driver-free containers, `PostgresContainer` and `SqlServerContainer`, which a project subclasses, giving its driver's `DbProviderFactory`, its image and the databases to build with their scripts in order, the first being the one that `ConnectionString`, `ExecuteAsync` and `ScalarAsync` use.  It brings no driver, so the two driver-floor projects reference it too.  Its unit tests are in `tests/SqlSource.Tests/TestHarness/`, since they need no Docker.
+`TestHarness/` is the library of this folder, `SqlSource.DatabaseTests.TestHarness`, which every project here references.  It holds the images, the start of a container, the folder of each engine's describer fixtures, the files of the end-to-end databases and the two driver-free containers, `PostgresContainer` and `SqlServerContainer`, which a project subclasses, giving its driver's `DbProviderFactory`, its image and the databases to build with their scripts in order, the first being the one that `ConnectionString`, `ExecuteAsync` and `ScalarAsync` use.  It brings no driver, so the two driver-floor projects reference it too.  Its unit tests are in `tests/SqlSource.Tests/TestHarness/`, since they need no Docker.
 
 ## Running
 
