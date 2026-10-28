@@ -111,7 +111,7 @@ needs_allocation() {
     allocation=false
     case "$1" in
     src/SqlSource/*.md) ;;
-    src/SqlSource/* | tests/SqlSource.Testing/* | tests/SqlSource.Tests.*/EndToEnd/*) allocation=true ;;
+    src/SqlSource/* | tests/SqlSource.Testing/* | tests/DatabaseTests/*/EndToEnd/*) allocation=true ;;
     global.json) allocation=true ;;
     # The build adds every sqlsource.json in the folders above a query, up to one that sets "root", and no container
     # project's own sets it, so the settings files of the folders above them, sqlsource.json at the root and
@@ -121,13 +121,16 @@ needs_allocation() {
     case "${1##*/}" in
     *Allocation*) allocation=true ;;
     esac
-    # MSBuild imports the Directory.Build files of the root and of tests/ into every test project, and the root's
-    # Directory.Packages.props, and any of them can import another .props or .targets file beside it.
+    # MSBuild imports the Directory.Build files of the root and of tests/ into every test project, and those of
+    # tests/DatabaseTests/ into every database project, and the root's Directory.Packages.props, and any of them can
+    # import another .props or .targets file beside it.
     local parent=''
     if [[ "$1" == */* ]]; then parent="${1%/*}"; fi
-    if [[ (-z "$parent" || "$parent" == tests) && ("$1" == *.props || "$1" == *.targets) ]]; then
-        allocation=true
-    fi
+    case "$parent" in
+    '' | tests | tests/DatabaseTests)
+        if [[ "$1" == *.props || "$1" == *.targets ]]; then allocation=true; fi
+        ;;
+    esac
     local project folder
     for project in "${project_paths[@]}"; do
         folder="${project%/*}/"

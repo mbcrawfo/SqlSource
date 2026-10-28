@@ -4,13 +4,13 @@
 # person runs it after a change to a query or a case, to a schema or to a seed of the folders below, and in the pull
 # request that raises VersionPrefix, since every sidecar holds the tool's version, and reads the diff of what it wrote
 # before committing it.  It has a part for each engine, which starts its own container and removes it:
-# - PostgreSQL: the .sql.json files of the realistic cases under tests/SqlSource.Tests.Postgres/Realistic/Cases and of
-#   the end-to-end queries under tests/SqlSource.Tests.Postgres/EndToEnd/Queries, against the databases "realistic",
+# - PostgreSQL: the .sql.json files of the realistic cases under tests/DatabaseTests/Postgres/Realistic/Cases and of
+#   the end-to-end queries under tests/DatabaseTests/Postgres/EndToEnd/Queries, against the databases "realistic",
 #   "app" and "billing", each made from the schema.sql and seed.sql of Realistic/, EndToEnd/app/ and EndToEnd/billing/.
 #   It then writes the sidecars of examples/PostgresExamples the same way, against a database "examples" made from its
 #   schema.sql, and runs after a change to a query or to the schema of the examples too.
-# - SQL Server: the .sql.json files of the realistic cases under tests/SqlSource.Tests.SqlServer/Realistic/Cases and of
-#   the end-to-end queries under tests/SqlSource.Tests.SqlServer/EndToEnd/Queries, against the databases "realistic",
+# - SQL Server: the .sql.json files of the realistic cases under tests/DatabaseTests/SqlServer/Realistic/Cases and of
+#   the end-to-end queries under tests/DatabaseTests/SqlServer/EndToEnd/Queries, against the databases "realistic",
 #   "app" and "billing", each made from the schema.sql and seed.sql of Realistic/, EndToEnd/app/ and EndToEnd/billing/,
 #   with EndToEnd/app/new-types.sql after the seed of "app".  It then writes the sidecars of examples/SqlServerExamples
 #   the same way, against a database "examples" made from its schema.sql, and runs after a change to a query or to the
@@ -23,7 +23,7 @@ set -euo pipefail
 
 IMAGES='tests/SqlSource.Testing/DefaultImages.cs'
 
-POSTGRES_PROJECT='tests/SqlSource.Tests.Postgres'
+POSTGRES_PROJECT='tests/DatabaseTests/Postgres'
 POSTGRES_END_TO_END="$POSTGRES_PROJECT/EndToEnd"
 POSTGRES_REALISTIC="$POSTGRES_PROJECT/Realistic"
 POSTGRES_DATABASES=(realistic app billing)
@@ -32,7 +32,7 @@ POSTGRES_EXAMPLES='examples/PostgresExamples'
 # The database of each engine's examples.
 EXAMPLES_DATABASE='examples'
 
-SQLSERVER_PROJECT='tests/SqlSource.Tests.SqlServer'
+SQLSERVER_PROJECT='tests/DatabaseTests/SqlServer'
 SQLSERVER_END_TO_END="$SQLSERVER_PROJECT/EndToEnd"
 SQLSERVER_REALISTIC="$SQLSERVER_PROJECT/Realistic"
 SQLSERVER_DATABASES=(realistic app billing)
@@ -120,7 +120,7 @@ describe_postgres() {
     find "$POSTGRES_END_TO_END/Queries" "$POSTGRES_REALISTIC/Cases" -name '*.sql.json' -type f -delete
 
     dotnet run --project src/SqlSource.Tool -- \
-        describe --force "$POSTGRES_PROJECT/SqlSource.Tests.Postgres.csproj" "${connections[@]}"
+        describe --force "$POSTGRES_PROJECT/Postgres.csproj" "${connections[@]}"
 
     # The examples: their schema on a database of their own, and their project described with that connection, under
     # the logical database that its queries belong to, named after their dialect.
@@ -190,7 +190,7 @@ describe_sqlserver() {
     find "$SQLSERVER_END_TO_END/Queries" "$SQLSERVER_REALISTIC/Cases" -name '*.sql.json' -type f -delete
 
     dotnet run --project src/SqlSource.Tool -- \
-        describe --force "$SQLSERVER_PROJECT/SqlSource.Tests.SqlServer.csproj" "${connections[@]}"
+        describe --force "$SQLSERVER_PROJECT/SqlServer.csproj" "${connections[@]}"
 
     # The examples: their schema on a database of their own, and their project described with that connection, under
     # the logical database that its queries belong to, named after their dialect.

@@ -71,8 +71,8 @@ jobs:
       - name: Build
         run: dotnet build "$SOLUTION" --configuration "$CONFIGURATION" --no-restore
 
-      # Each project but tests/SqlSource.Tests.Postgres, tests/SqlSource.Tests.Postgres.Npgsql8,
-      # tests/SqlSource.Tests.SqlServer and tests/SqlSource.Tests.SqlServer.SqlClient61, whose containers these runners
+      # Each project but tests/DatabaseTests/Postgres, tests/DatabaseTests/Postgres.Npgsql8,
+      # tests/DatabaseTests/SqlServer and tests/DatabaseTests/SqlServer.SqlClient61, whose containers these runners
       # cannot start.  Every project runs even when an earlier one failed.
       - name: Test
         run: |
@@ -84,7 +84,7 @@ jobs:
           done
           exit "$status"
 
-  # build.yml runs every test of tests/SqlSource.Tests.Postgres on PostgreSQL 14, the floor, and 18, the default.  This
+  # build.yml runs every test of tests/DatabaseTests/Postgres on PostgreSQL 14, the floor, and 18, the default.  This
   # runs them on every supported major between the two, each image pinned as rule 5 of AGENTS.md says.  The steps are
   # those of build.yml's test-postgres-floor.
   test-postgres:
@@ -103,7 +103,7 @@ jobs:
           - major: 17
             image: postgres:17.11
     env:
-      PROJECT: tests/SqlSource.Tests.Postgres
+      PROJECT: tests/DatabaseTests/Postgres
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -115,7 +115,7 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: tests/SqlSource.Tests.Postgres/packages.lock.json
+          cache-dependency-path: tests/DatabaseTests/Postgres/packages.lock.json
 
       - name: Build
         run: dotnet build "$PROJECT" --configuration "$CONFIGURATION"
@@ -133,7 +133,7 @@ jobs:
           dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
           --report-github --report-github-summary-include-passed false
 
-  # The same for tests/SqlSource.Tests.SqlServer, which build.yml runs on SQL Server 2017, the floor, and 2025, the
+  # The same for tests/DatabaseTests/SqlServer, which build.yml runs on SQL Server 2017, the floor, and 2025, the
   # default.  Each image here has its row of SqlServerContainer.ImageBuilds.  The steps are those of build.yml's
   # test-sqlserver-floor.
   test-sqlserver:
@@ -150,7 +150,7 @@ jobs:
           - major: 2022
             image: mcr.microsoft.com/mssql/server:2022-CU27-GDR1-ubuntu-22.04
     env:
-      PROJECT: tests/SqlSource.Tests.SqlServer
+      PROJECT: tests/DatabaseTests/SqlServer
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -162,7 +162,7 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: tests/SqlSource.Tests.SqlServer/packages.lock.json
+          cache-dependency-path: tests/DatabaseTests/SqlServer/packages.lock.json
 
       - name: Build
         run: dotnet build "$PROJECT" --configuration "$CONFIGURATION"
