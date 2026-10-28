@@ -3,7 +3,7 @@
 This file holds the rules for changing the check scripts, the consumer project in `package-install/`, the script that pulls the test images and the two recording scripts.  [`README.md`](README.md) says what each of them does.
 
 - **A check added here is added to both callers in the same commit**: `pre-commit-validation.sh` at the root and a job of `.github/workflows/build.yml`.  A check that needs only Docker goes in `lint`; one that needs the .NET SDK goes in the job whose build it shares, or in a job of its own.
-- **A step of `pre-commit-validation.sh` has a decision function near the top of the script**, and a path of a kind that `is_known_kind` omits makes the run full, so a new kind is listed only when the readers of every check are clear.
+- **A kind of file is added to `is_known_kind` in `pre-commit-validation.sh` only after the trigger of every check that reads it handles it**, since a kind that is listed no longer makes the run full, and an unlisted one does.
 - **`test-scopes.txt` is read by `pre-commit-validation.sh` and by `TestScopes` of `tests/SqlSource.Testing`**, so a pattern holds no glob character but `*`, since the C# reader refuses the others ([the format](README.md#test-scopes)).
 - **A container test project that is added or removed gets or loses its `project` line in `test-scopes.txt` in the same commit**, and `TestScopesFileTests` of `tests/SqlSource.Tests/Validation/` names the four that exist.
 - **A new version of a linter is a change to the tag and the digest of its image in the script, and nothing else**, except that editorconfig-checker's also changes `Version` in `.editorconfig-checker.json` to match.
