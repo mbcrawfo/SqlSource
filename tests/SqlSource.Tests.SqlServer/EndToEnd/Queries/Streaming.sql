@@ -49,13 +49,6 @@ SELECT id
 FROM {{table:dbo.accounts}}
 ORDER BY id;
 
--- name: StreamNoteAccounts
--- summary: The accounts that have notes, with the id of each as an AccountId, read through its converters.
--- column: account_id -> AccountId
-SELECT DISTINCT account_id
-FROM dbo.notes
-ORDER BY account_id;
-
 -- name: StreamThenSelect
 -- summary: The accounts, and then a second result set that the stream does not read.
 -- output-model: CollectedAccount

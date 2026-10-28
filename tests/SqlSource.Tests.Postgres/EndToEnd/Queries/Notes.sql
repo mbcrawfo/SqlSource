@@ -78,3 +78,9 @@ FROM notes AS n
 JOIN accounts AS a ON a.id = n.account_id
 WHERE a.email = @email
 ORDER BY n.id;
+
+-- name: StreamNoteAccounts
+-- summary: The accounts that have notes, with the id of each as an AccountId, read through its converters.
+-- collection-type: IAsyncEnumerable
+-- column: account_id -> AccountId
+SELECT DISTINCT account_id FROM notes ORDER BY account_id;

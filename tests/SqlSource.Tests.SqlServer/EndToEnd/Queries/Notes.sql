@@ -78,3 +78,11 @@ WHERE email = @email;
 INSERT INTO dbo.accounts (name, email, opened_on)
 OUTPUT INSERTED.id, INSERTED.email
 VALUES (@name, @email, @openedOn);
+
+-- name: StreamNoteAccounts
+-- summary: The accounts that have notes, with the id of each as an AccountId, read through its converters.
+-- collection-type: IAsyncEnumerable
+-- column: account_id -> AccountId
+SELECT DISTINCT account_id
+FROM dbo.notes
+ORDER BY account_id;

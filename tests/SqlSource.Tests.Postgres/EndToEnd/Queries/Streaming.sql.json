@@ -240,38 +240,6 @@
           "computed": false
         }
       ]
-    },
-    "StreamNoteAccounts": {
-      "hash": "e7e7522c62af14d5aee9e2a68091c78e1b33a6c9aaf6d4f11c7a415c37a4d195",
-      "engine": "postgres",
-      "database": "app",
-      "serverVersion": "18.6",
-      "resultKind": "rows",
-      "matchesTable": null,
-      "plan": "not-needed",
-      "tableMatch": "columns-differ",
-      "parameters": [],
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "account_id",
-          "type": {
-            "name": "integer",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "int4"
-          },
-          "nullable": false,
-          "nullableSource": "catalog",
-          "origin": {
-            "schema": "public",
-            "table": "notes",
-            "column": "account_id"
-          },
-          "identity": false,
-          "computed": false
-        }
-      ]
     }
   }
 }

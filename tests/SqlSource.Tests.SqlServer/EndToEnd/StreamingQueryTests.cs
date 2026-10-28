@@ -345,7 +345,8 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
         connection.State.ShouldBe(ConnectionState.Closed);
     }
 
-    // Notes.sql converts account_id to an AccountId through the converters of the type, and so does this query.
+    // StreamNoteAccounts is a query of Notes.sql, which converts account_id to an AccountId through the converters of
+    // the type, and gives this one its own collection type: its method is in NoteQueriesExtensions.
     [Fact]
     public async Task StreamNoteAccounts_ConvertedColumn_YieldsAccountIds()
     {

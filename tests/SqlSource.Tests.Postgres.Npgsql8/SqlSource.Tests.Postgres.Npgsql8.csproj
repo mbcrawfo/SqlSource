@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
         The end-to-end write and read of all_types on Npgsql 8.0.9, the latest 8.0 release; 8.0 is the oldest version
-        that is supported: through the generated methods, and the read through Dapper.  A project of its own, since the
-        end-to-end project gets Npgsql 10 through the tool it references.
+        that is supported: through the generated methods, and the read through Dapper; and the streaming method.  A
+        project of its own, since the end-to-end project gets Npgsql 10 through the tool it references.
         The generator comes from a project reference, which does not bring the package's MSBuild files, so the real
         ones are imported here and at the end of this file.
     -->
@@ -16,8 +16,9 @@
     </PropertyGroup>
     <ItemGroup>
         <!--
-            The query and the sidecar of the end-to-end project, kept at their own paths for the generator.  The linked
-            query takes the settings files of its own folder, so it is generated with the end-to-end project's settings.
+            The queries and the sidecars of the end-to-end project, kept at their own paths for the generator.  The
+            linked queries take the settings files of their own folder, so they are generated with the end-to-end
+            project's settings.
         -->
         <AdditionalFiles
             Include="../SqlSource.Tests.Postgres/EndToEnd/Queries/AllTypes.sql"
@@ -25,6 +26,14 @@
         />
         <AdditionalFiles
             Include="../SqlSource.Tests.Postgres/EndToEnd/Queries/AllTypes.sql.json"
+            Link="Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlSource.Tests.Postgres/EndToEnd/Queries/Streaming.sql"
+            Link="Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlSource.Tests.Postgres/EndToEnd/Queries/Streaming.sql.json"
             Link="Queries/%(Filename)%(Extension)"
         />
     </ItemGroup>

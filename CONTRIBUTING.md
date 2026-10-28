@@ -29,9 +29,9 @@ The seven test projects and the two libraries they share, which [`tests/README.m
 - `tests/SqlSource.Tests.RoslynFloor` compiles the generator driver tests a second time, on the oldest supported Roslyn.
 - `tests/SqlSource.Tool.Tests` runs the tests of the tool.
 - `tests/SqlSource.Tests.Postgres` runs the PostgreSQL describer against a real server and is the end-to-end project, which builds models and methods from its own queries and runs every described query through its method, and needs Docker.
-- `tests/SqlSource.Tests.Postgres.Npgsql8` writes and reads every mapped type through the generated methods, and reads them through Dapper, on Npgsql 8, the oldest supported driver, and needs Docker.
+- `tests/SqlSource.Tests.Postgres.Npgsql8` writes and reads every mapped type through the generated methods, reads them through Dapper, and breaks out of a streaming method, on Npgsql 8, the oldest supported driver, and needs Docker.
 - `tests/SqlSource.Tests.SqlServer` runs the tests of SQL Server against a real server and is SQL Server's end-to-end project, which builds models and query methods from its own queries, runs each query through its method, writes and reads every mapped type through the methods, measures their allocations against hand-written ADO.NET, and reads rows through Dapper for the manual's recipe, and needs Docker.
-- `tests/SqlSource.Tests.SqlServer.SqlClient61` reads every mapped type through Dapper, and writes and reads it through the generated methods, on Microsoft.Data.SqlClient 6.1, the oldest supported driver, and needs Docker.
+- `tests/SqlSource.Tests.SqlServer.SqlClient61` reads every mapped type through Dapper, writes and reads it through the generated methods, and breaks out of a streaming method, on Microsoft.Data.SqlClient 6.1, the oldest supported driver, and needs Docker.
 - `tests/SqlSource.Testing` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 
 `examples/PostgresExamples` shows a user SqlSource with PostgreSQL and Dapper, and `examples/SqlServerExamples` with SQL Server and Dapper; they build with the solution and hold no tests.
