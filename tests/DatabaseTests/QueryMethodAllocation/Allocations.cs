@@ -1,7 +1,6 @@
 using System;
 using System.Data;
 using System.Data.Common;
-using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
@@ -18,11 +17,6 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation;
 
 // What a test measures with: the calls made before the first pair to warm both methods up, the pairs of calls, and the
 // least bytes a call of either method must allocate for the measure to be of the call at all.
-[SuppressMessage(
-    "Performance",
-    "CA1812:Avoid uninstantiated internal classes",
-    Justification = "The allocation tests of each engine make it; none has been written yet."
-)]
 internal sealed record MeasureSettings(int WarmUpCalls, int Pairs, long LeastBytesPerCall);
 
 // The assertions of the allocation tests of both engines, through CallAllocations, which explains the measure.
