@@ -18,7 +18,7 @@ Each floor job of `build.yml` names its floor image once, as `POSTGRES_FLOOR_IMA
 
 ## Artifacts
 
-Each run of `build.yml` uploads two artifacts: `packages`, the two `.nupkg` files, from the `package` job, and `coverage`, from the `build` job, the HTML, Cobertura and markdown reports.  The test results and the coverage summary are also in the run's job summary.
+Each run of `build.yml` uploads two artifacts: `packages`, the two `.nupkg` files, from the `package` job, and `coverage`, from the `build` job, the HTML, Cobertura and markdown reports.  The run's job summary also holds the coverage summary and, for each test project a step ran, its counts and its failed and skipped tests.  It lists no passed tests: a step's summary holds 1 MiB, the reporter cuts its output there, and the passed tests of the solution alone are past it, so the projects after the cut would be lost.
 
 ## Continuous integration
 

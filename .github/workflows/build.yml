@@ -5,6 +5,8 @@
 # The NuGet cache of each job is keyed on the lock files of what it restores, with dotnet-tools.json when it restores
 # the tools.  The first job to finish saves the cache under its key, so two jobs that restore different packages must
 # never share a key, or the cache could hold only the packages of the smaller job.
+# Every test run's summary lists its failed and skipped tests and leaves out the passed ones.  A step's summary holds
+# 1 MiB, the reporter cuts its output there, mid-tag, and the passed tests of the solution alone are past it.
 name: Build
 
 on:
@@ -150,7 +152,7 @@ jobs:
           dotnet test --solution "$SOLUTION" --configuration "$CONFIGURATION" --no-build
           --results-directory artifacts/test-results
           --coverage --coverage-output-format cobertura
-          --report-github
+          --report-github --report-github-summary-include-passed false
           --filter-not-class SqlSource.Tests.Postgres.EndToEnd.AllocationTests
           --filter-not-class SqlSource.Tests.SqlServer.EndToEnd.AllocationTests
 
@@ -160,7 +162,8 @@ jobs:
           status=0
           for engine in Postgres SqlServer; do
               dotnet test --project "tests/SqlSource.Tests.$engine" --configuration "$CONFIGURATION" --no-build \
-                  --report-github --filter-class "SqlSource.Tests.$engine.EndToEnd.AllocationTests" || status=1
+                  --report-github --report-github-summary-include-passed false \
+                  --filter-class "SqlSource.Tests.$engine.EndToEnd.AllocationTests" || status=1
           done
           exit "$status"
 
@@ -217,7 +220,9 @@ jobs:
       - name: Test
         env:
           SQLSOURCE_TESTS_POSTGRES_IMAGE: ${{ env.POSTGRES_FLOOR_IMAGE }}
-        run: dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build --report-github
+        run: >-
+          dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
+          --report-github --report-github-summary-include-passed false
 
   # The same for tests/SqlSource.Tests.SqlServer, which the build job ran on the default image, on the oldest SQL Server
   # that is supported: see tests/SqlSource.Tests.SqlServer/README.md.
@@ -252,7 +257,9 @@ jobs:
       - name: Test
         env:
           SQLSOURCE_TESTS_SQLSERVER_IMAGE: ${{ env.SQLSERVER_FLOOR_IMAGE }}
-        run: dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build --report-github
+        run: >-
+          dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
+          --report-github --report-github-summary-include-passed false
 
   # Packs the generator and the tool, checks both packages, and uploads them for publish.yml.  The package checks do
   # not wait for the tests: publish.yml needs the whole of this workflow, so a package is never pushed from a run whose

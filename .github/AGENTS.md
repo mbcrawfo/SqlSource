@@ -30,6 +30,7 @@
   - Pass every value from the event to the script through `env:`.  The head branch name is chosen by the fork; an expression inside `run:` would execute it.
   - Find the pull request from the event, never from the artifact.
   - It is bound to three names: `name: CI` in `workflows/ci.yml`, the `coverage` artifact that `workflows/build.yml` uploads, and `SummaryGithub.md` inside it.  Change one and change the workflow in the same commit.
+- **Every `--report-github` comes with `--report-github-summary-include-passed false`.**  A step's summary holds 1 MiB and the reporter cuts its output there, so a list of every passed test loses the projects after the cut.
 - **An expression cannot yield an empty string from the middle of `&&`/`||`.**  `cond && '' || x` always yields `x`.  Put the empty string last, as `publish.yml` does.
 - Fold workflow lines over the 120-character `.editorconfig` limit with `>-` or `\`.
 - Run `tools/actionlint.sh` after any change.  A change to `publish.yml` or `coverage-comment.yml` is never exercised before merge: a manual run of `publish.yml` on a branch skips every job, and a pull request runs the `coverage-comment.yml` on `main`, so actionlint and a careful read are the only checks; say in the pull request that the change is untried.
