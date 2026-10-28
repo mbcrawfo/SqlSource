@@ -19,7 +19,7 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // that a stream can be enumerated twice, that a break leaves the connection usable, and that a throw or a cancellation
 // closes again a connection that the method opened.  Then a query whose rows fail past the row where a loop stops,
 // whose error the disposal does not report, and the queries of several statements, whose later statements run when
-// the reader is disposed.
+// the reader is disposed; under SET XACT_ABORT ON either error rolls back the caller's transaction, still unreported.
 [Collection(UsesSqlServer.Name)]
 public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
 {
@@ -372,6 +372,33 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
         (await select.ExecuteScalarAsync(token)).ShouldBe(7);
     }
 
+    // Under SET XACT_ABORT ON the same divide by zero rolls the transaction back, and SqlClient still reports nothing:
+    // the break throws nothing, and the caller learns of the rollback only at the commit, after a later command given
+    // the transaction has run and committed outside it.
+    [Fact]
+    public async Task StreamNumbersFailingHalfway_BreakInATransactionUnderXactAbort_RollsItBackUnreported()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await XactAbortTransaction.BeginAsync(sqlServer, token);
+
+        var rows = 0;
+        await foreach (
+            var row in session.Connection.StreamNumbersFailingHalfway(
+                transaction: session.Transaction,
+                cancellationToken: token
+            )
+        )
+        {
+            if (++rows == 10)
+            {
+                break;
+            }
+        }
+
+        rows.ShouldBe(10);
+        await session.ShouldHaveRolledBackUnreportedAsync(token);
+    }
+
     // The body's exception disposes the stream as a break does, and the error of a row still to come is not reported,
     // so the body's exception is the one the loop throws.  PostgreSQL throws the error in its place.
     [Fact]
@@ -531,6 +558,53 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
         rows.ShouldBe(Accounts);
         (await SessionMark.ReadAsync(connection, token)).ShouldBe(2);
         connection.State.ShouldBe(ConnectionState.Open);
+    }
+
+    // With XACT_ABORT off, as SqlClient leaves it, the THROW ends the batch and leaves the transaction that the stream
+    // ran in open, so the commit after the loop commits what the transaction did.  The temporary table is the one of
+    // the transaction test of StreamNumbers.
+    [Fact]
+    public async Task StreamThenRaise_ErrorAfterTheRowsInATransaction_TheTransactionCommits()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(token);
+
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(token);
+        await using (var create = new SqlCommand("CREATE TABLE #streamed (n int)", connection, transaction))
+        {
+            _ = await create.ExecuteNonQueryAsync(token);
+        }
+
+        await using (var insert = new SqlCommand("INSERT INTO #streamed (n) VALUES (7)", connection, transaction))
+        {
+            _ = await insert.ExecuteNonQueryAsync(token);
+        }
+
+        var streamed = await connection
+            .StreamThenRaise(transaction: transaction, cancellationToken: token)
+            .ToListAsync(token);
+        await transaction.CommitAsync(token);
+
+        streamed.ShouldBe(Accounts);
+        await using var select = new SqlCommand("SELECT n FROM #streamed", connection);
+        (await select.ExecuteScalarAsync(token)).ShouldBe(7);
+    }
+
+    // Under SET XACT_ABORT ON the THROW rolls back the transaction that the stream ran in, and the loop still ends as
+    // if the query had succeeded: the caller learns of the rollback only at the commit.
+    [Fact]
+    public async Task StreamThenRaise_ErrorAfterTheRowsInATransactionUnderXactAbort_RollsItBackUnreported()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await XactAbortTransaction.BeginAsync(sqlServer, token);
+
+        var streamed = await session
+            .Connection.StreamThenRaise(transaction: session.Transaction, cancellationToken: token)
+            .ToListAsync(token);
+
+        streamed.ShouldBe(Accounts);
+        await session.ShouldHaveRolledBackUnreportedAsync(token);
     }
 
     // A break reads and discards the rest of the result, and the statements after it run: SET CONTEXT_INFO marks the

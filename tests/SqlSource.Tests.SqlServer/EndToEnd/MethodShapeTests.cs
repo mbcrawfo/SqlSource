@@ -201,6 +201,28 @@ public sealed class MethodShapeTests(SqlServerContainer sqlServer)
         (await SessionMark.ReadAsync(connection, token)).ShouldBe(3);
     }
 
+    // Under SET XACT_ABORT ON the THROW rolls back the transaction that the method ran in, and the method still returns
+    // the rows and throws nothing, as the streaming StreamThenRaise does: the caller learns of the rollback only at the
+    // commit.
+    [Fact]
+    public async Task ListThenRaise_ErrorAfterTheRowsInATransactionUnderXactAbort_RollsItBackUnreported()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await XactAbortTransaction.BeginAsync(sqlServer, token);
+
+        var accounts = await session.Connection.ListThenRaise(
+            transaction: session.Transaction,
+            cancellationToken: token
+        );
+
+        accounts.ShouldBe([
+            new CollectedAccount(1, "alice"),
+            new CollectedAccount(2, "bob"),
+            new CollectedAccount(3, "carol"),
+        ]);
+        await session.ShouldHaveRolledBackUnreportedAsync(token);
+    }
+
     // The error after the row is lost by one as by many: the row is returned and nothing is thrown, though the batch
     // ran as far as the THROW.  A fix that reports the error flips this test.
     [Fact]
