@@ -88,13 +88,13 @@ internal static class QueryMethodWriter
         var bodyIndent = indent + GeneratedText.Indent;
         var blockIndent = bodyIndent + GeneratedText.Indent;
 
-        AppendDocumentation(builder, indent, method, tokens);
-        AppendSignature(builder, indent, method, modifiers, isExtension, arguments);
+        AppendDocumentation(builder, indent, method, tokens, streams);
+        AppendSignature(builder, indent, method, modifiers, isExtension, arguments, streams);
         _ = builder.Append(indent).Append("{\n");
         AppendChecks(builder, bodyIndent, method, arguments);
         if (!streams)
         {
-            AppendBody(builder, bodyIndent, method, tokens, arguments, locals, rowBufferType);
+            AppendBody(builder, bodyIndent, method, tokens, arguments, locals, rowBufferType, streams);
             AppendEnd(builder, indent);
             return;
         }
@@ -106,14 +106,14 @@ internal static class QueryMethodWriter
         _ = builder
             .Append(");\n\n")
             .Append(bodyIndent)
-            .Append("static async global::System.Collections.Generic.IAsyncEnumerable<")
-            .Append(method.Output!.TypeText)
-            .Append("> ")
+            .Append("static async ")
+            .Append(GetResultType(method))
+            .Append(' ')
             .Append(locals.Iterator)
             .Append("(\n");
         AppendArguments(builder, bodyIndent, method, arguments, isExtension: false, isIterator: true);
         _ = builder.Append(bodyIndent).Append("{\n");
-        AppendBody(builder, blockIndent, method, tokens, arguments, locals, rowBufferType);
+        AppendBody(builder, blockIndent, method, tokens, arguments, locals, rowBufferType, streams);
         AppendEnd(builder, bodyIndent);
         AppendEnd(builder, indent);
     }
@@ -131,7 +131,8 @@ internal static class QueryMethodWriter
         List<string> tokens,
         List<string> arguments,
         Locals locals,
-        string rowBufferType
+        string rowBufferType,
+        bool streams
     )
     {
         var blockIndent = indent + GeneratedText.Indent;
@@ -176,7 +177,7 @@ internal static class QueryMethodWriter
             }
         }
 
-        AppendExecution(builder, blockIndent, method, locals, rowBufferType);
+        AppendExecution(builder, blockIndent, method, locals, rowBufferType, streams);
 
         _ = builder.Append(indent).Append("}\n").Append(indent).Append("finally\n").Append(indent).Append("{\n");
         AppendIf(builder, blockIndent, locals.WasClosed);
@@ -194,10 +195,10 @@ internal static class QueryMethodWriter
         StringBuilder builder,
         string indent,
         QueryMethod method,
-        List<string> tokens
+        List<string> tokens,
+        bool streams
     )
     {
-        var streams = Streams(method);
         XmlDocWriter.AppendMember(builder, indent, method.SummaryXml, MethodWriter.GetSql(method.Segments));
         XmlDocWriter.AppendParam(
             builder,
@@ -261,21 +262,19 @@ internal static class QueryMethodWriter
         QueryMethod method,
         string modifiers,
         bool isExtension,
-        List<string> arguments
+        List<string> arguments,
+        bool streams
     )
     {
-        if (Streams(method))
+        // A streaming method is not asynchronous itself: it returns its iterator.
+        _ = builder.Append(indent).Append(modifiers);
+        if (streams)
         {
-            _ = builder
-                .Append(indent)
-                .Append(modifiers)
-                .Append(" global::System.Collections.Generic.IAsyncEnumerable<")
-                .Append(method.Output!.TypeText)
-                .Append("> ");
+            _ = builder.Append(' ').Append(GetResultType(method)).Append(' ');
         }
         else
         {
-            _ = builder.Append(indent).Append(modifiers).Append(" async global::System.Threading.Tasks.Task");
+            _ = builder.Append(" async global::System.Threading.Tasks.Task");
             if (GetResultType(method) is { } resultType)
             {
                 _ = builder.Append('<').Append(resultType).Append('>');
@@ -382,8 +381,6 @@ internal static class QueryMethodWriter
             CollectionKind.List => "global::System.Collections.Generic.List<" + row + ">",
             CollectionKind.ImmutableArray => "global::System.Collections.Immutable.ImmutableArray<" + row + ">",
             CollectionKind.ImmutableList => "global::System.Collections.Immutable.ImmutableList<" + row + ">",
-            // A streaming method writes its signature without this switch; the member is named so that the switch
-            // lists every member.
             CollectionKind.IAsyncEnumerable => "global::System.Collections.Generic.IAsyncEnumerable<" + row + ">",
             CollectionKind.IImmutableList or _ => "global::System.Collections.Immutable.IImmutableList<" + row + ">",
         };
@@ -566,7 +563,8 @@ internal static class QueryMethodWriter
         string indent,
         QueryMethod method,
         Locals locals,
-        string rowBufferType
+        string rowBufferType,
+        bool streams
     )
     {
         if (method.Shape is ResultShape.None or ResultShape.RowCount)
@@ -598,12 +596,10 @@ internal static class QueryMethodWriter
         // the collection.
         if (method.Shape == ResultShape.Many)
         {
-            var streams = Streams(method);
-            var (buffer, result) = streams
-                ? (string.Empty, string.Empty)
-                : GetBuffer(method, output.TypeText, locals.Rows, rowBufferType);
+            string? result = null;
             if (!streams)
             {
+                (var buffer, result) = GetBuffer(method, output.TypeText, locals.Rows, rowBufferType);
                 _ = builder
                     .Append(indent)
                     .Append("var ")
@@ -623,7 +619,7 @@ internal static class QueryMethodWriter
             AppendRow(builder, output, locals);
             _ = builder.Append(streams ? ";\n" : ");\n");
             AppendEnd(builder, indent);
-            if (!streams)
+            if (result is not null)
             {
                 _ = builder.Append('\n').Append(indent).Append("return ").Append(result).Append(";\n");
             }

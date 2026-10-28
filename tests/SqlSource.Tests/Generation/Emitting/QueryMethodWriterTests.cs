@@ -974,6 +974,19 @@ public sealed class QueryMethodWriterTests
         text.ShouldNotContain("this ");
     }
 
+    // The collection type reads only a many query, so any other shape's method does not stream.
+    [Theory]
+    [InlineData(nameof(ResultShape.One))]
+    [InlineData(nameof(ResultShape.OneOptional))]
+    [InlineData(nameof(ResultShape.None))]
+    [InlineData(nameof(ResultShape.RowCount))]
+    public void Append_IAsyncEnumerableOfANonManyShape_IsTheOrdinaryMethod(string shapeName)
+    {
+        var method = GetUser with { Shape = Enum.Parse<ResultShape>(shapeName) };
+
+        Write(method with { Collection = CollectionKind.IAsyncEnumerable }).ShouldBe(Write(method));
+    }
+
     // Nothing is buffered, so no-array-pool has nothing to change.
     [Fact]
     public void Append_IAsyncEnumerableUnderNoArrayPool_IsTheSameMethod() =>
