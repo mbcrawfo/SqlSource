@@ -1,24 +1,18 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 
 namespace SqlSource.Testing;
 
 // An engine's end-to-end databases: the folder that holds a folder for each, with its schema.sql and its seed.sql, and
-// how a file of that engine is split into the commands it runs as.
+// how a file of that engine is split into the commands it runs as.  Each is made when it is read, so that a project of
+// one engine never reads the other's folder, which RepositoryRoot would refuse.
 internal sealed record EndToEndEngine(string Folder, Func<string, IReadOnlyList<string>> Batches)
 {
     // PostgreSQL's, whose file runs whole as one command.
-    public static EndToEndEngine Postgres { get; } =
-        new(
-            Path.Combine(RepositoryRoot.Folder, "tests", "SqlSource.Tests.Postgres", "EndToEnd"),
-            static script => [script]
-        );
+    public static EndToEndEngine Postgres =>
+        new(RepositoryRoot.Path("tests", "SqlSource.Tests.Postgres", "EndToEnd"), static script => [script]);
 
     // SQL Server's, whose file runs batch by batch, split at the lines that hold GO alone.
-    public static EndToEndEngine SqlServer { get; } =
-        new(
-            Path.Combine(RepositoryRoot.Folder, "tests", "SqlSource.Tests.SqlServer", "EndToEnd"),
-            EndToEndFiles.SqlServerBatches
-        );
+    public static EndToEndEngine SqlServer =>
+        new(RepositoryRoot.Path("tests", "SqlSource.Tests.SqlServer", "EndToEnd"), EndToEndFiles.SqlServerBatches);
 }

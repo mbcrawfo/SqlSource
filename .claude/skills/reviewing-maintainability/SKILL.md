@@ -52,7 +52,7 @@ A move changes a namespace: `dotnet_style_namespace_match_folder` is on, and the
 
 ## Finishing
 
-`./pre-commit-validation.sh` before each commit, and again on the final tree before the push; nothing runs it for you.  Lines over 120 characters fail `editorconfig-checker`, and a rewritten comment is where they appear.  Commit the comments, the new AGENTS.md files and the tech debt together, and each move in a commit of its own.  Check `VersionPrefix` against the highest `v*` tag before opening the pull request.  The final report and the pull request say how many findings were applied and how many dropped, which `TD-` items were added, which folders moved, and each coverage gap exactly, by file, with no rounding of the count.
+`./pre-commit-validation.sh` before each commit, and `./pre-commit-validation.sh --full` on the final tree before the push; nothing runs it for you.  Lines over 120 characters fail `editorconfig-checker`, and a rewritten comment is where they appear.  Commit the comments, the new AGENTS.md files and the tech debt together, and each move in a commit of its own.  Check `VersionPrefix` against the highest `v*` tag before opening the pull request.  The final report and the pull request say how many findings were applied and how many dropped, which `TD-` items were added, which folders moved, and each coverage gap exactly, by file, with no rounding of the count.
 
 ## Common mistakes
 

@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Testing;
 using SqlSource.Testing.EndToEnd;
 using SqlSource.Tests.Postgres.Realistic;
 using SqlSource.Tool.Describing.Postgres;
@@ -91,7 +92,7 @@ public sealed class CheckTests(PostgresContainer postgres)
     // "describe --check" over the real project, on the real MSBuild and the PostgreSQL describer.
     private static async Task<CliResult> CheckAsync(IEnumerable<string> args)
     {
-        using var run = CliRun.Real(RepositoryPaths.Root);
+        using var run = CliRun.Real(RepositoryRoot.WorkingFolder);
         run.Describers.Add(new PostgresDescriber());
         return await run.RunAsync(["describe", "--check", RepositoryPaths.EndToEndProject, .. args]);
     }

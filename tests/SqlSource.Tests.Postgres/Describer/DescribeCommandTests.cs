@@ -42,7 +42,7 @@ public sealed class DescribeCommandTests : IDisposable
     private static readonly IReadOnlyList<FixtureCase> Cases =
     [
         .. FixtureCases
-            .Of(SidecarValues.Engine.Postgres, RepositoryPaths.DescriberFixtures)
+            .InFolder(RepositoryPaths.DescriberFixtures)
             .Where(static found => !File.Exists(Path.Combine(found.Folder, FixtureCase.ExplainSettingsFile))),
     ];
 

@@ -29,7 +29,7 @@ public sealed class FixtureCaseFilesTests
             token
         );
 
-        var read = FixtureCases.Of(SidecarValues.Engine.Postgres, folder.Path).ShouldHaveSingleItem();
+        var read = FixtureCases.InFolder(folder.PathOf(SidecarValues.Engine.Postgres)).ShouldHaveSingleItem();
         read.Name.ShouldBe(fixture.Name);
         read.Query.ShouldBe("SELECT 1;");
         read.Expected.ShouldBe("{}");

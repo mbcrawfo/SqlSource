@@ -10,7 +10,7 @@ The project needs Docker running, and its first run pulls the image.  It starts 
 dotnet test --project tests/SqlSource.Tests.Postgres
 ```
 
-`dotnet test --solution SqlSource.slnx`, and so `pre-commit-validation.sh`, runs it on the default image.
+`dotnet test --solution SqlSource.slnx`, and so `pre-commit-validation.sh --full`, runs it on the default image.  A plain `pre-commit-validation.sh` runs it only when the uncommitted change can reach it, which [`tools/test-scopes.txt`](../../tools/README.md#test-scopes) decides.
 
 The project copies two fixture projects to its output, with the package's MSBuild files and `global.json`: `Single`, from `tests/SqlSource.Tool.Tests/Fixtures/Projects/`, and `ErrorPaths`, from `EndToEnd/ErrorPaths/`.  `DescribeCommandTests` runs the whole `describe` command in process against the container, over the fixture cases, `--check`, `--force` and `--log`, and `ToolProcessTests` starts the tool that was built in a process of its own and describes a copy of `Single`, whose `sqlsource.json` gives the dialect `postgres` and whose one file names the database `billing` by its header.  `ErrorPathTests` describes copies of `ErrorPaths`, [below](#the-end-to-end-project).
 

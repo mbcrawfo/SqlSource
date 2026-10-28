@@ -14,7 +14,7 @@ public sealed class RepositorySettingsFileTests
     [Fact]
     public void RootSettingsFile_OfTheRepository_StopsEveryChainAndSetsNothing()
     {
-        var path = Path.Combine(RepositoryRoot.Folder, SettingsFile.FileName);
+        var path = RepositoryRoot.Path(SettingsFile.FileName);
 
         var file = SettingsFileReader.Read(File.ReadAllText(path), SettingPlace.OfSettingsFile(path, 0));
 
