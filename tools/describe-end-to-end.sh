@@ -21,7 +21,7 @@
 # Usage: describe-end-to-end.sh
 set -euo pipefail
 
-IMAGES='tests/SqlSource.Testing/DefaultImages.cs'
+IMAGES='tests/DatabaseTests/TestHarness/DefaultImages.cs'
 
 POSTGRES_PROJECT='tests/DatabaseTests/Postgres'
 POSTGRES_END_TO_END="$POSTGRES_PROJECT/EndToEnd"

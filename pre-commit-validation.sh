@@ -111,7 +111,8 @@ needs_allocation() {
     allocation=false
     case "$1" in
     src/SqlSource/*.md) ;;
-    src/SqlSource/* | tests/SqlSource.Testing/* | tests/DatabaseTests/*/EndToEnd/*) allocation=true ;;
+    src/SqlSource/* | tests/SqlSource.Testing/* | tests/DatabaseTests/TestHarness/* | \
+        tests/DatabaseTests/*/EndToEnd/*) allocation=true ;;
     global.json) allocation=true ;;
     # The build adds every sqlsource.json in the folders above a query, up to one that sets "root", and no container
     # project's own sets it, so the settings files of the folders above them, sqlsource.json at the root,

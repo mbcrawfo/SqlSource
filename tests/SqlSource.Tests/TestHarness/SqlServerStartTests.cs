@@ -8,7 +8,7 @@ using Shouldly;
 using SqlSource.DatabaseTests.TestHarness;
 using Xunit;
 
-namespace SqlSource.DatabaseTests.SqlServer;
+namespace SqlSource.Tests.TestHarness;
 
 // The start of a SQL Server container and its one retry after the crash of TD-0072, over fakes: the crash does not
 // happen on a developer's machine, so no container is started here.
@@ -25,7 +25,7 @@ public sealed class SqlServerStartTests
     [Fact]
     public async Task StartAsync_FirstStarts_ReturnsItAndReportsNothing()
     {
-        var first = new FakeContainer();
+        var first = new FakeStartingContainer { Image = ImageName };
         var builds = new Builds(first);
 
         var started = await StartAsync(builds);
@@ -43,7 +43,7 @@ public sealed class SqlServerStartTests
     public async Task StartAsync_FirstCrashes_DisposesItAndStartsAnother(bool inStderr)
     {
         var first = Crashed(inStderr ? ("", CrashLog) : (CrashLog, ""));
-        var second = new FakeContainer();
+        var second = new FakeStartingContainer { Image = ImageName };
         var builds = new Builds(first, second);
 
         var started = await StartAsync(builds);
@@ -65,13 +65,14 @@ public sealed class SqlServerStartTests
     [Fact]
     public async Task StartAsync_NotRunningWhileStateSaysRunning_DisposesItAndStartsAnother()
     {
-        var first = new FakeContainer
+        var first = new FakeStartingContainer
         {
+            Image = ImageName,
             Failure = new ContainerNotRunningException("id", CrashLog, "", 1, new InvalidOperationException()),
             State = TestcontainersStates.Running,
             Logs = (CrashLog, ""),
         };
-        var second = new FakeContainer();
+        var second = new FakeStartingContainer { Image = ImageName };
         var builds = new Builds(first, second);
 
         var started = await StartAsync(builds);
@@ -115,8 +116,9 @@ public sealed class SqlServerStartTests
     [Fact]
     public async Task StartAsync_FailsWhileRunning_DisposesAndThrows()
     {
-        var first = new FakeContainer
+        var first = new FakeStartingContainer
         {
+            Image = ImageName,
             Failure = new TimeoutException("The wait strategy timed out."),
             State = TestcontainersStates.Running,
             Logs = (CrashLog, ""),
@@ -187,7 +189,7 @@ public sealed class SqlServerStartTests
     public async Task ReportAsync_NoSummaryPath_Completes() =>
         await Should.NotThrowAsync(() => SqlServerStart.ReportAsync("one", summaryPath: null));
 
-    private Task<FakeContainer> StartAsync(Builds builds) =>
+    private Task<FakeStartingContainer> StartAsync(Builds builds) =>
         SqlServerStart.StartAsync(builds.Next, Report, TestContext.Current.CancellationToken);
 
     private Task Report(string message)
@@ -197,61 +199,23 @@ public sealed class SqlServerStartTests
     }
 
     // A container that stopped before it was ready, with that log.
-    private static FakeContainer Crashed((string Stdout, string Stderr) logs) =>
+    private static FakeStartingContainer Crashed((string Stdout, string Stderr) logs) =>
         new()
         {
+            Image = ImageName,
             Failure = new InvalidOperationException("The container exited."),
             State = TestcontainersStates.Exited,
             Logs = logs,
         };
 
     // Hands out the containers in order, one for each build, and fails a build past the last.
-    private sealed class Builds(params FakeContainer[] containers)
+    private sealed class Builds(params FakeStartingContainer[] containers)
     {
         public int Count { get; private set; }
 
-        public FakeContainer Next() =>
+        public FakeStartingContainer Next() =>
             Count < containers.Length
                 ? containers[Count++]
                 : throw new InvalidOperationException("More containers were built than the test expects.");
-    }
-
-    private sealed class FakeContainer : IStartingContainer
-    {
-        // Thrown by the start, which succeeds when it is null.
-        public Exception? Failure { get; set; }
-
-        // Thrown by the read of the log, which succeeds when it is null.
-        public Exception? LogFailure { get; set; }
-
-        public (string Stdout, string Stderr) Logs { get; init; } = ("", "");
-
-        public int Starts { get; private set; }
-
-        public int LogReads { get; private set; }
-
-        public int Disposals { get; private set; }
-
-        public string Image => ImageName;
-
-        public TestcontainersStates State { get; init; } = TestcontainersStates.Running;
-
-        public Task StartAsync(CancellationToken token)
-        {
-            Starts++;
-            return Failure is null ? Task.CompletedTask : Task.FromException(Failure);
-        }
-
-        public Task<(string Stdout, string Stderr)> GetLogsAsync()
-        {
-            LogReads++;
-            return LogFailure is null ? Task.FromResult(Logs) : Task.FromException<(string, string)>(LogFailure);
-        }
-
-        public ValueTask DisposeAsync()
-        {
-            Disposals++;
-            return ValueTask.CompletedTask;
-        }
     }
 }

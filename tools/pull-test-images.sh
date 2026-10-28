@@ -2,13 +2,13 @@
 # Pulls the Docker images that the tests start, one `docker pull` each, and prints the seconds each took.  It is a step
 # and no check: build.yml runs it before the tests, so that the time a pull takes shows apart from the time a test
 # takes, and a person can run it to have the images before a first test run.
-# It pulls the default image of each engine, which it reads from tests/SqlSource.Testing/DefaultImages.cs by the line
-# that declares it, and every image given as an argument, such as the floor images.
+# It pulls the default image of each engine, which it reads from tests/DatabaseTests/TestHarness/DefaultImages.cs by
+# the line that declares it, and every image given as an argument, such as the floor images.
 # It needs Docker.
 # Usage: pull-test-images.sh [image ...]
 set -euo pipefail
 
-IMAGES='tests/SqlSource.Testing/DefaultImages.cs'
+IMAGES='tests/DatabaseTests/TestHarness/DefaultImages.cs'
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"

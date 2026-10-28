@@ -4,7 +4,7 @@ using Shouldly;
 using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 
-namespace SqlSource.Tests;
+namespace SqlSource.Tests.TestHarness;
 
 // What the tests of the end-to-end projects read of a model by reflection: its properties in the order they are
 // declared, with their types and whether each can hold null, its shape and the column of a property.  The models here
@@ -51,7 +51,9 @@ public sealed class ModelReflectionTests
 
     [Fact]
     public void ModelNamed_TypeThatIsNotThere_IsNull() =>
-        ModelReflection.ModelNamed(typeof(ModelReflectionTests).Assembly, "SqlSource.Tests.NotThere").ShouldBeNull();
+        ModelReflection
+            .ModelNamed(typeof(ModelReflectionTests).Assembly, "SqlSource.Tests.TestHarness.NotThere")
+            .ShouldBeNull();
 
     [Fact]
     public void ModelNamed_TypeThatIsThere_IsTheType() =>

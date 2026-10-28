@@ -8,7 +8,7 @@
 # Usage: record-fixtures.sh [postgres|mssql]   (both engines when none is given)
 set -euo pipefail
 
-IMAGES='tests/SqlSource.Testing/DefaultImages.cs'
+IMAGES='tests/DatabaseTests/TestHarness/DefaultImages.cs'
 
 usage() {
     echo 'Usage: record-fixtures.sh [postgres|mssql]' >&2
