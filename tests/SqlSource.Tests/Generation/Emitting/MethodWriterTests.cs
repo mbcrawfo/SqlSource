@@ -408,6 +408,8 @@ public sealed class MethodWriterTests
     [InlineData("value0")]
     [InlineData("element")]
     [InlineData("item")]
+    [InlineData("ReadRows")]
+    [InlineData("yield")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_CompilesOnTheNewestCSharp(string name)
     {
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.Latest);
@@ -415,6 +417,8 @@ public sealed class MethodWriterTests
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldContain(" ProbeOne(\n");
+        methods.ShouldContain(" ProbeStream(\n");
+        methods.ShouldContain("yield return ");
         methods.ShouldContain(" ? global::App.UserId.ToDatabase(");
         methods.ShouldContain("global::App.UserId.FromDatabase(");
         methods.ShouldContain("global::System.Array.ConvertAll<int?, global::App.UserId>(");
