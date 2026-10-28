@@ -12,17 +12,24 @@ internal static class ProjectIncludes
 {
     private static readonly string[] FolderProperties = ["$(MSBuildThisFileDirectory)", "$(MSBuildProjectDirectory)"];
 
-    // The Include of each item of the project that the filter accepts and that names a file outside the project's
-    // folder, however it is spelled: the path is resolved as MSBuild resolves it, from the project's folder.
+    // Each path that an item of the project names outside the project's folder, however it is spelled: the Include of
+    // an item that the filter accepts, split at `;`, or the Project of an Import.  The path is resolved as MSBuild
+    // resolves it, from the project's folder.  One that holds a property the check does not know cannot be resolved,
+    // so it counts as outside.  An item with only a Remove or an Update names nothing.
     public static IEnumerable<string> FromOutside(string projectFolder, XDocument project, Func<XElement, bool> items)
     {
         var folder = Path.GetFullPath(projectFolder) + Path.DirectorySeparatorChar;
         return project
             .Descendants()
             .Where(items)
-            .Select(item => (string?)item.Attribute("Include"))
+            .Select(item => (string?)item.Attribute(item.Name.LocalName == "Import" ? "Project" : "Include"))
             .OfType<string>()
-            .Where(include => !Resolve(folder, include).StartsWith(folder, StringComparison.Ordinal));
+            .SelectMany(static value =>
+                value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            )
+            .Where(include =>
+                HoldsProperty(include) || !Resolve(folder, include).StartsWith(folder, StringComparison.Ordinal)
+            );
     }
 
     // The files that an include names, as paths from the repository root with `/` as the separator.  With no `*` that
@@ -54,9 +61,9 @@ internal static class ProjectIncludes
         ];
     }
 
-    // One line for each file that a container project includes from outside its folder and that the scopes let it
-    // skip, as "<project>: <path> is <scope>".  A ProjectReference counts as the .csproj it names, and an element
-    // that only removes or updates items names nothing.
+    // One line for each file that a container project includes or imports from outside its folder and that the scopes
+    // let it skip, as "<project>: <path> is <scope>", and one for each path it cannot resolve.  A ProjectReference
+    // counts as the .csproj it names.
     public static IReadOnlyList<string> Refused(TestScopes scopes, string repositoryRoot)
     {
         var refused = new List<string>();
@@ -67,6 +74,12 @@ internal static class ProjectIncludes
             var folder = Path.GetDirectoryName(path)!;
             foreach (var include in FromOutside(folder, XDocument.Load(path), static _ => true))
             {
+                if (HoldsProperty(include))
+                {
+                    refused.Add($"{project}: {include} holds a property the check cannot resolve");
+                    continue;
+                }
+
                 foreach (var file in Expand(repositoryRoot, folder, include))
                 {
                     var scope = scopes.Of(file);
@@ -82,18 +95,24 @@ internal static class ProjectIncludes
     }
 
     // MSBuild accepts either separator on every system, and the two properties name the project's folder.
-    private static string Resolve(string folder, string include)
+    private static string Resolve(string folder, string include) =>
+        Path.GetFullPath(Path.Combine(folder, WithoutFolderProperty(include)));
+
+    // A property other than those two stays in the path, where it would land inside the folder and be missed.
+    private static bool HoldsProperty(string include) =>
+        WithoutFolderProperty(include).Contains("$(", StringComparison.Ordinal);
+
+    private static string WithoutFolderProperty(string include)
     {
         var path = include.Replace('\\', '/');
         foreach (var property in FolderProperties)
         {
             if (path.StartsWith(property, StringComparison.Ordinal))
             {
-                path = path[property.Length..].TrimStart('/');
-                break;
+                return path[property.Length..].TrimStart('/');
             }
         }
 
-        return Path.GetFullPath(Path.Combine(folder, path));
+        return path;
     }
 }
