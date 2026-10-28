@@ -27,9 +27,10 @@
         neither property of NuGet has one.
 
         The compiler reads a value up to its first # or ;, and the folders are parted by |, so each folder is written
-        with its %, |, # and ; escaped as %25, %7C, %23 and %3B, % first, which the generator decodes.  MSBuild reads
-        %XX in a project file as the character it stands for, so each escape is written with its % as %25: %2525,
-        %257C, %2523 and %253B.
+        with its %, |, # and ; escaped as %25, %7C, %23 and %3B, % first, which the generator decodes in
+        Generation/Chains/BuildFolders.cs: the escaping and the decoding change together.  MSBuild reads %XX in a
+        project file as the character it stands for, so each escape is written with its % as %25: %2525, %257C, %2523
+        and %253B.
 
         Each folder of NuGetPackageFolders is escaped in its item's metadata, which batches over the items: a property
         batched over them would keep only the last.

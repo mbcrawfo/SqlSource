@@ -12,6 +12,9 @@ namespace SqlSource.Testing.Generator;
 // records, and never loaded.  A synthetic one is an assembly named Microsoft.Data.SqlClient of any version, with the
 // types the probe looks for.
 //
+// The versions of Downloaded are those of the PackageDownload items of SqlSource.Testing.csproj: a mismatch builds and
+// fails only when a test runs.
+//
 // Like the other files of this folder, it stays within Roslyn 4.8.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
 internal static class SqlClientReferences

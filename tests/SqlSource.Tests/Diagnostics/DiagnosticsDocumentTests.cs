@@ -42,6 +42,8 @@ public sealed class DiagnosticsDocumentTests
         }
     }
 
+    // The index is a table per area, and the rows of all the tables together must be in id order: a new id above the
+    // last one goes in the last table, or in a new table after it, never back in an earlier area's table.
     [Fact]
     public void Document_Table_ListsEveryDescriptorWithItsTitleAndAnchor()
     {
@@ -55,6 +57,8 @@ public sealed class DiagnosticsDocumentTests
 
     // The section of SQLSRC109 tells a user what the generator parameters are.  A generator parameter that is added is
     // added to this list and to the section together; each name here must be in the section and known to the parser.
+    // It also goes in docs/manual/settings.md, in the Values cell of the Generator parameters row and in the table of
+    // parameters under #setting-generator-parameters, which no test checks.
     [Fact]
     public void Document_UnknownGeneratorParameterSection_ListsEveryGeneratorParameter()
     {

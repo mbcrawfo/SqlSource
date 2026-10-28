@@ -73,7 +73,8 @@ internal sealed record CatalogNames(IReadOnlySet<string> Functions, IReadOnlySet
 /// state the final function reads saw one.
 /// </para>
 /// <para>
-/// A row goes in this table only with <c>Catalog_CatalogOverloads_ArePinned</c> in <c>PlanOutputTests</c>, which holds
+/// A row goes in this table only for a name whose every overload in <c>pg_catalog</c> is never <c>NULL</c> under its
+/// row's condition, and only with <c>Catalog_CatalogOverloads_ArePinned</c> in <c>PlanOutputTests</c>, which holds
 /// the overloads of each name to the catalog of 14 and 18, their implementations included, none strict, since a strict
 /// one is <c>NULL</c> for a <c>NULL</c> argument before its C function runs, the functions of each aggregate's moving
 /// and partial modes, and the intersection to each range type.

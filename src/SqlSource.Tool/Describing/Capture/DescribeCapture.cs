@@ -14,7 +14,7 @@ namespace SqlSource.Tool.Describing.Capture;
 internal sealed class DescribeCapture(string engine)
 {
     /// <summary>
-    /// The version of the file.  It rises when a capture of the version before can no longer be read.
+    /// The version of the file.  It rises only when a capture of the version before can no longer be read.
     /// </summary>
     public const int Version = 1;
 

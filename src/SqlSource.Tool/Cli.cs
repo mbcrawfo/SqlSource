@@ -26,8 +26,10 @@ public static class Cli
     internal const string DebugVariable = "SQLSOURCE_DEBUG";
 
     /// <summary>
-    /// What ends a <c>describe</c> that reported an error and wrote no log: there is no hint under each error, and
-    /// this one line says how to get a record of the run.
+    /// What ends a <c>describe</c> that reported an error other than <c>SQLSRC219</c>, was not cancelled and was
+    /// asked for no log, once, on standard error: there is no hint under each error, and this one line says how to
+    /// get a record of the run.  A test that compares the whole of standard error of such a run ends its text with
+    /// <c>DescribeScene.RunAgain</c>.
     /// </summary>
     internal const string RunAgainLine = "sqlsource: run again with --log <file> for a record of what the run did";
 

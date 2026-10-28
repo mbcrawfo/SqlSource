@@ -26,7 +26,8 @@
         <!--
             The drivers whose metadata the probe of Npgsql is tested against.  They are downloaded and never
             referenced: the tests read each one's metadata from the NuGet folder, which the assembly records, and
-            never load it.
+            never load it.  The versions of both items are those of Generator/NpgsqlReferences.cs and
+            Generator/SqlClientReferences.cs: a mismatch builds and fails only when a test runs.
         -->
         <PackageDownload Include="Npgsql" Version="[8.0.3];[9.0.3];[10.0.3]" />
         <!--

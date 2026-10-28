@@ -12,6 +12,12 @@ namespace SqlSource.Tool.Reporting;
 /// </summary>
 /// <remarks>
 /// <para>
+/// The format is a contract with MSBuild and with editors:
+/// <c>&lt;path&gt;(&lt;line&gt;,&lt;column&gt;): error &lt;id&gt;: &lt;message&gt;</c>, or <c>&lt;path&gt; : error</c>,
+/// or <c>sqlsource : error</c>; then continuation lines, each four spaces, a label, a colon, a space and a text; then
+/// <c>see:</c>, indented the same, with the descriptor's help link, last.
+/// </para>
+/// <para>
 /// The first line of an error starts in the first column and every other line of it with four spaces.  That is all
 /// a reader may rely on to tell them apart, so no text of an error may hold a line break: each is written as a space.
 /// </para>
@@ -81,6 +87,7 @@ internal sealed class Reporter(TextWriter error, RunTrace? trace = null)
                 _differences++;
             }
 
+            // Under the same lock as the console, to the trace the reporter was made with.
             Trace.Log.Write(
                 "diagnostic",
                 new("id", diagnostic.Descriptor.Id),

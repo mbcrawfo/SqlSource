@@ -10,10 +10,28 @@ namespace SqlSource.Tool;
 /// Finds what is wrong with a command line, before System.CommandLine reads it.
 /// </summary>
 /// <remarks>
+/// <para>
 /// System.CommandLine's own messages repeat the token they reject, and a token may be a secret: a misspelt
 /// <c>--conection</c> is followed by a connection string.  So the tool writes these lines itself.  A line names an
 /// option the tool has, or the name of an unknown option that is close to one the tool has, cut at its first
-/// <c>=</c> or <c>:</c>, or a position, and never any other text of the command line.
+/// <c>=</c> or <c>:</c>, or a position, and never any other text of the command line.  The lines have no id and do
+/// not go through the reporter.  <c>UsageCheckTests</c> holds the rule for an option that takes a value.
+/// </para>
+/// <para>
+/// It and System.CommandLine must read a command line the same way: <c>Cli</c> runs nothing unless System.CommandLine
+/// found the same command and arguments (<c>Usage.IsReadTheSameBy</c>), and gave <c>--project</c>,
+/// <c>--database</c>, <c>--connection</c> and <c>--log</c> the same values in the same order
+/// (<c>DescribeCommand.ReadsValuesAs</c>).  A token that one takes for the value of an option and the other for the
+/// path is printed as a path: what is left of that risk is
+/// <c>docs/tech-debt/TD-0023-path-without-an-equals-sign-is-printed-as-given.md</c>.
+/// </para>
+/// <para>
+/// <c>Check_EveryAcceptedCommandLine_IsReadTheSameBySystemCommandLine</c> holds the two together over every command
+/// line of a few tokens, and a new kind of option adds its tokens to that test's vocabulary.  An option of the tool
+/// itself is added to that of <c>Check_EveryAcceptedCommandLineOfTheTool_IsReadTheSameBySystemCommandLine</c>, which
+/// runs the tool's own commands and also compares the values that each reader gives an option.  A disagreement
+/// either finds is fixed here, by reading as System.CommandLine does or by rejecting more.
+/// </para>
 /// </remarks>
 internal static class UsageCheck
 {

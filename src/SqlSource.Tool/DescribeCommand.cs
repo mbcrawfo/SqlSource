@@ -45,6 +45,14 @@ internal static class DescribeCommand
 
     public static Command Create()
     {
+        // Every option is declared so that UsageCheck reads it right.  A flag has Arity = ArgumentArity.Zero:
+        // System.CommandLine's default for a bool takes an optional value, and the token after the flag would be read
+        // as that value.  An option that takes a value takes exactly one each time it is given: ExactlyOne when it is
+        // given once, and an array with OneOrMore when it may be repeated, since System.CommandLine rejects a second
+        // ExactlyOne.  UsageCheck rejects that second one itself, since System.CommandLine's message repeats the
+        // value.  An option is added to --help in the change that gives it an effect, not before: one that is read
+        // and checked earlier is Hidden until then, as --database was in sub-phase 2.4.
+
         // Several, so that System.CommandLine takes a .sql path beside the unit.  CheckUsage holds them to one unit.
         var path = new Argument<string[]>(PathArgument)
         {
@@ -172,7 +180,10 @@ internal static class DescribeCommand
     /// <c>--database</c> is a database name, by the rule of the <c>-- database:</c> marker.  A value of
     /// <c>--connection</c> is a name, <c>=</c> and a value, and a name is given once.  On a line with a
     /// <c>--connection</c>, an argument that holds <c>=</c> or <c>;</c>, a <c>.sql</c> path too, is taken for the rest
-    /// of a value that the shell split: it would be printed as a path.
+    /// of a value that the shell split: it would be printed as a path, a <c>.sql</c> one in full by <c>SQLSRC212</c>.
+    /// A path may hold either, as a folder of <c>tests/SqlSource.Tool.Tests/Fixtures/Projects/OddPaths</c> does, so a
+    /// line with no <c>--connection</c> is left as it is.  <c>Cli.ReadCommandLineAsync</c> calls this only when
+    /// <see cref="UsageCheck" /> found nothing.
     /// </remarks>
     public static IReadOnlyList<string> CheckUsage(Usage usage)
     {

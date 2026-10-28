@@ -13,7 +13,8 @@ namespace SqlSource.Tool.Tests.Commands;
 
 // The tool in a process of its own, by its real entry, on a project of Fixtures/Projects with the real
 // "dotnet msbuild": a signal reaches a process and nothing less, and Cli.Run is where the tool listens.  One test
-// for the systems that have signals, and one for Windows.
+// for the systems that have signals, and one for Windows.  Only nightly.yml runs the test of a closed console, so try a
+// change to it by starting that workflow by hand.
 public sealed class TerminationTests : IDisposable
 {
     // The folders that a run makes in the temporary directory for its manifests.

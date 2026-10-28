@@ -26,8 +26,9 @@ internal static class FileOutcomes
     /// </param>
     /// <param name="read">
     /// Reads the sidecar beside a <c>.sql</c> file, given the file's path.  A sidecar is deleted only when there is
-    /// one and it is not of a higher format version: that is a newer tool's file, which is left as it is.  One that
-    /// the system will not let the tool open is left too, and its outcome holds the <c>SQLSRC218</c> that says so.
+    /// one and it is not of a higher format version: that is a newer tool's file, which is left as it is, and
+    /// nothing is reported of it.  One that the system will not let the tool open is left too, and its outcome holds
+    /// the <c>SQLSRC218</c> that says so.
     /// </param>
     public static ImmutableArray<FileOutcome> Decide(
         ImmutableArray<FileWork> files,

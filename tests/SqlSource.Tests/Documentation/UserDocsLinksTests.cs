@@ -85,6 +85,8 @@ public sealed class UserDocsLinksTests
             .Select(link => $"{link.File}:{link.Line}: {link.Target}")
             .ShouldBeEmpty();
 
+    // A link anywhere on the entry page satisfies this test, so keeping the page listed under "The pages", with a
+    // "Find what you need" row for each need it answers, is the writer's job.
     [Fact]
     public void Manual_EntryPage_ListsEveryPage()
     {

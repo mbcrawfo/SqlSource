@@ -1,6 +1,7 @@
 # AGENTS.md - tests/SqlSource.Tests.SqlServer/Realistic
 
 - **`tests/SqlSource.Tests.SqlServer/Realistic/` is SQL Server's realistic corpus** ([layout and procedures](../README.md#the-realistic-corpus)).  Its rules:
+  - What both engines' corpora share is in `tests/SqlSource.Tool.Testing/Realistic/`, with its tests in `tests/SqlSource.Tool.Tests/Realistic/`; what reads a database through a driver stays in this project.  `Realistic/RealisticCases.cs` holds only the binding of the corpus, its models and its describer, and every test reads the corpus through it.
   - A `case.json` is never written from what the describer answers, and an `exempt` needs a reason, which `RealisticCaseReader` enforces, as for PostgreSQL's.
   - The checks of the generated models go in `Realistic/Generation/`, beside `Describer/`, never into the corpus's root.
   - Every folder of `Cases/` holds `query.sql`, `case.json` and, when the case has models, its sidecar `query.sql.json`, and no other file, which `RealisticCasesTests` checks.
