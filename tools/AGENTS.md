@@ -1,7 +1,7 @@
 # AGENTS.md - tools
 
 - **A check added here is added to both callers in the same commit**: `pre-commit-validation.sh` at the root and a job of `.github/workflows/build.yml`.  A check that needs only Docker goes in `lint`; one that needs the .NET SDK goes in the job whose build it shares, or in a job of its own.
-- **A check's own script sets off that check in `pre-commit-validation.sh`**, as `format.sh` runs format on everything and `tools/actionlint.sh` runs actionlint, since a change to the script can change the verdict on any file it checks.
+- **A check's own script sets off that check in `pre-commit-validation.sh`**, as `format.sh` runs format on everything and `tools/actionlint.sh` runs actionlint, since a change to the script can change the verdict on any file it checks.  A change to `pre-commit-validation.sh` itself makes the run full, since it makes every decision.
 - **A kind of file is added to `is_known_kind` in `pre-commit-validation.sh` only after the trigger of every check that reads it handles it**, since a kind that is listed no longer makes the run full, and an unlisted one does.
 - **`test-scopes.txt` is read by `pre-commit-validation.sh` and by `TestScopes` of `tests/SqlSource.Testing`**, so a pattern holds no glob character but `*`, since the C# reader refuses the others ([the format](README.md#test-scopes)).
 - **A container test project that is added or removed gets or loses its `project` line in `test-scopes.txt` and its `RunningProjectTests` in the same commit**, and `TestScopesFileTests` of `tests/SqlSource.Tests/Validation/` names the four that exist.

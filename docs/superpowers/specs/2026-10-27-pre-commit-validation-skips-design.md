@@ -51,6 +51,7 @@ The owner chose A, then chose to have the test table checked by tests in the sam
 
 - The change set is `git diff --name-only --no-renames HEAD` plus `git ls-files --others --exclude-standard`.  A clean tree means a full run, since that run is almost always a check before a push.
 - `--full` ignores the change set.  The push rule in `AGENTS.md` (Commits, rule 2) requires it.
+- A change to `pre-commit-validation.sh` makes the run full, since the script makes every decision and invokes every check.
 
 ### Paths of no known kind
 
@@ -74,14 +75,15 @@ Anything else, such as `LICENSE`, `.gitattributes` or a new extension, means a f
 
 ### Tests
 
-- The script writes a temporary solution filter (`.slnf`) naming the projects to run, so the chosen projects still run in parallel.  `dotnet test --solution <file>.slnf` was checked and works.
+- The script writes a temporary solution filter (`.slnf`) naming the projects to run, so the chosen projects still run in parallel.  `dotnet test --solution <file>.slnf` was checked and works.  When neither pair is skipped, the tests run `SqlSource.slnx` itself.  The script reads a project only when its `<Project` tag and its `Path` are on one line, so it also counts the `<Project` tags; when it read fewer, it warns and runs `SqlSource.slnx` itself, and both pairs with it, rather than a filter that would drop a project.
 - `SqlSource.Tests`, `SqlSource.Tests.RoslynFloor` and `SqlSource.Tool.Tests` always run.  They take 26s at most, in parallel, and `SqlSource.Tests` reads the docs, the workflows and the schemas.
 - The PostgreSQL pair (`Tests.Postgres`, `Tests.Postgres.Npgsql8`) and the SQL Server pair (`Tests.SqlServer`, `Tests.SqlServer.SqlClient61`) are decided separately, by the test scopes file below.
 - **Allocation tests.**  `--filter-not-class '*.EndToEnd.AllocationTests'` drops the `AllocationTests` of both engines.  It was checked and drops exactly 26 SQL Server and 17 PostgreSQL tests.  It is added unless the change set holds a path that can change what those tests measure:
   - a path under `src/SqlSource/` other than a `*.md` file;
   - a path under `tests/SqlSource.Testing/`;
   - a path under a container project's `EndToEnd/` folder: its queries, sidecars, seeds and the query classes the tests call;
-  - a root `Directory.*.props` file, which holds the compile settings and the driver versions, or a container project's own `.csproj`, which can override them;
+  - any other path of one of the four container projects that is not under `Describer/` or `Realistic/` and is not a `*.md` file: its `sqlsource.json`, from which the end-to-end queries take their settings, the container class the tests connect through, its own `.csproj`, which can override the driver versions, and its `packages.lock.json`, which pins them;
+  - a `.props` or `.targets` file at the root or directly in `tests/`, such as `Directory.Build.props`, `Directory.Build.targets` and `Directory.Packages.props`, which hold the compile settings and the driver versions, and `global.json`, which pins the SDK;
   - a file whose name contains `Allocation`.
 
   This keeps the saving for the common case, describer or fixture work, and errs toward running for everything that reaches the generated code, the drivers or the measured queries.
@@ -124,7 +126,7 @@ A container project may read a repository file outside its own folder only when 
 
 ### Package checks
 
-- They run when the change set holds a path under `src/`, a root build file (`Directory.*.props`, `global.json`, `*.slnx`, `dotnet-tools.json`), `README.md`, `tools/package-install/**` or a `tools/check-*.sh` script.  Otherwise all three are skipped.
+- They run when the change set holds a path under `src/`, a root build file (any `.props` or `.targets` file at the root, such as `Directory.Build.props`, `Directory.Build.targets` and `Directory.Packages.props`, `global.json`, `*.slnx`, `dotnet-tools.json`), `README.md`, `tools/package-install/**` or a `tools/check-*.sh` script.  Otherwise all three are skipped.
 - In every run, the packages are packed once into a temporary folder that is passed to all three checks, as CI does.
 
 ### Docs in the same PR
@@ -145,7 +147,7 @@ A container project may read a repository file outside its own folder only when 
 - **The scopes file**: the name `tools/test-scopes.txt`, a line format that bash reads without `jq`, which is not a required tool, and the small pattern language.
 - **`RepositoryRoot.WorkingFolder`** as a type of its own, rather than a source-scanning test, to keep the root out of `Path.Combine`.
 - **The list of known kinds**, with a full run for anything outside it, so that the positive step triggers never skip a kind of file nobody planned for.
-- **The allocation trigger** widened to the end-to-end folders and the root `Directory.*.props` files, and the filter applied to both engines.
+- **The allocation trigger** widened to the end-to-end folders, the rest of each container project but its describer tests, realistic cases and docs, and the build files of the root and of `tests/`, and the filter applied to both engines.
 
 ## Left to the builder
 

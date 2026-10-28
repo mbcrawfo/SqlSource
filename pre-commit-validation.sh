@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs the validations that the uncommitted change could break: formatting, linting, build, tests and the three
 # package checks.  A step, a pair of container test projects or the allocation tests are skipped when nothing in the
-# change reaches them.  --full runs everything, as a clean tree and a changed path of no known kind do.
+# change reaches them.  --full runs everything, as a clean tree, a change to this script and a changed path of no known
+# kind do.
 # Rewrites nothing.  Every step runs even when an earlier one fails, except that the tests and the package checks are
 # skipped when the build fails, and the package checks when the pack fails.
 # Usage: pre-commit-validation.sh [--full] [--plan [path ...]]   --plan prints what a run would do and why, and runs
@@ -101,35 +102,47 @@ scope_of() {
     scope=both
 }
 
-# A path that can change what the allocation tests measure: the generated code, the shared test code, the queries and
-# the classes that the tests call, the compile settings and driver versions, or the tests themselves.
+# A path that can change what the allocation tests measure: the generated code, the shared test code, the compile
+# settings, the SDK and the driver versions, or anything of a container project that the end-to-end tests read, which
+# is all of it but its describer tests, its realistic cases and its docs.  That takes in the queries and their
+# settings, the classes that the tests call, the container that they connect through, the .csproj that can override a
+# driver version and the lock file that pins one.
 needs_allocation() {
     allocation=false
     case "$1" in
     src/SqlSource/*.md) ;;
     src/SqlSource/* | tests/SqlSource.Testing/* | tests/SqlSource.Tests.*/EndToEnd/*) allocation=true ;;
-    */*) ;;
-    Directory.*.props) allocation=true ;;
+    global.json) allocation=true ;;
     esac
     case "${1##*/}" in
     *Allocation*) allocation=true ;;
     esac
-    # A container project's own .csproj can override the compile settings and driver versions, with a VersionOverride.
-    local project
+    # MSBuild imports the Directory.Build files of the root and of tests/ into every test project, and the root's
+    # Directory.Packages.props, and any of them can import another .props or .targets file beside it.
+    local parent=''
+    if [[ "$1" == */* ]]; then parent="${1%/*}"; fi
+    if [[ (-z "$parent" || "$parent" == tests) && ("$1" == *.props || "$1" == *.targets) ]]; then
+        allocation=true
+    fi
+    local project folder
     for project in "${project_paths[@]}"; do
-        if [[ "$1" == "$project" ]]; then
-            allocation=true
-        fi
+        folder="${project%/*}/"
+        case "$1" in
+        "$folder"Describer/* | "$folder"Realistic/* | *.md) ;;
+        "$folder"*) allocation=true ;;
+        esac
     done
 }
 
-# A path that can change what is packed or how the packages are checked.  README.md is the generator's readme.
+# A path that can change what is packed or how the packages are checked.  README.md is the generator's readme.  Every
+# .props and .targets file at the root counts, since MSBuild imports the Directory.Build files and
+# Directory.Packages.props on its own, and any of them can import another.
 needs_packages() {
     packages=false
     case "$1" in
     src/* | tools/package-install/* | tools/check-*.sh) packages=true ;;
     */*) ;;
-    Directory.*.props | global.json | *.slnx | dotnet-tools.json | README.md) packages=true ;;
+    *.props | *.targets | global.json | *.slnx | dotnet-tools.json | README.md) packages=true ;;
     esac
 }
 
@@ -186,6 +199,7 @@ first() {
     fi
 }
 unknown=''
+script_trigger=''
 format_all=''
 format_files=()
 no_format='no .cs file changed'
@@ -204,6 +218,7 @@ for path in ${changes[@]+"${changes[@]}"}; do
     needs_allocation "$path"
     needs_packages "$path"
     if [[ "$known" == false ]]; then first unknown; fi
+    if [[ "$path" == pre-commit-validation.sh ]]; then first script_trigger; fi
     if [[ "$everything" == true ]]; then first format_all; fi
     # shfmt takes its layout from .editorconfig.
     if [[ "$path" == *.sh || "${path##*/}" == .editorconfig ]]; then first shell_trigger; fi
@@ -220,6 +235,10 @@ for path in ${changes[@]+"${changes[@]}"}; do
         no_format='no changed .cs file exists'
     fi
 done
+# This script makes every decision, and invokes every check, so a change to it can change any verdict.
+if [[ -n "$script_trigger" && -z "$full_reason" ]]; then
+    full_reason='pre-commit-validation.sh changed'
+fi
 if [[ -n "$unknown" && -z "$full_reason" ]]; then
     full_reason="$unknown is of no known kind"
 fi
@@ -312,11 +331,35 @@ json_string() {
     printf '"%s"' "$(printf '%s' "$1" | sed 's/[\\"]/\\&/g')"
 }
 
-# The test step runs a solution filter of every project but the container projects whose pair is skipped.  The
-# projects in the filter still run in parallel, as they do for the solution.
+# The projects of the solution.  sed reads a project only when its tag and its Path are on one line, and CSharpier
+# wraps a long element over several, so the tags are also counted with the lines joined, to find a project it missed.
+solution_projects=()
+while IFS= read -r project; do
+    solution_projects+=("$project")
+done < <(sed -n 's/.*<Project Path="\([^"]*\)".*/\1/p' "$SOLUTION")
+solution_tags=$(($(tr '\n' ' ' <"$SOLUTION" | { grep -o -E '<Project[[:space:]/>]' || true; } | wc -l)))
+
+# The test step runs a solution filter of every project but the container projects whose pair is skipped, and the
+# solution itself when no pair is.  The projects in the filter still run in parallel, as they do for the solution.  A
+# filter of a solution that was not read whole would drop a project without a word, so then the solution runs, and
+# both pairs with it.
+test_solution="$work/tests.slnf"
+test_through="a filter of $SOLUTION"
+# shellcheck disable=SC2154 # decide sets them, through printf -v.
+if [[ "$postgres_go" == true && "$sqlserver_go" == true ]]; then
+    test_solution="$SOLUTION"
+    test_through="$SOLUTION"
+elif [[ ${#solution_projects[@]} -ne $solution_tags ]]; then
+    unread="${#solution_projects[@]} of the $solution_tags projects of $SOLUTION were read"
+    echo "pre-commit-validation.sh: warning: only $unread, so the tests run the whole solution" >&2
+    test_solution="$SOLUTION"
+    test_through="$SOLUTION"
+    decide postgres "$unread" "$no_scope"
+    decide sqlserver "$unread" "$no_scope"
+fi
 filter_projects=''
 project_plan=()
-while IFS= read -r project; do
+for project in ${solution_projects[@]+"${solution_projects[@]}"}; do
     decision=always
     for index in "${!project_paths[@]}"; do
         if [[ "${project_paths[index]}" == "$project" ]]; then
@@ -331,7 +374,7 @@ while IFS= read -r project; do
         filter_projects+="${filter_projects:+,}$(json_string "$project")"
     fi
     project_plan+=("$(printf '        %-4s  %s  (%s)' "$action" "$project" "${!why_name}")")
-done < <(sed -n 's/.*<Project Path="\([^"]*\)".*/\1/p' "$SOLUTION")
+done
 test_args=()
 # shellcheck disable=SC2154 # decide sets it, through printf -v.
 if [[ "$allocation_go" == false ]]; then
@@ -344,9 +387,9 @@ if [[ "$plan" == true ]]; then
     else
         printf 'Partial run of %s changed path(s).\n' "${#changes[@]}"
     fi
-else
+elif [[ "$test_solution" != "$SOLUTION" ]]; then
     printf '{"solution":{"path":%s,"projects":[%s]}}\n' "$(json_string "$repo_root/$SOLUTION")" "$filter_projects" \
-        >"$work/tests.slnf"
+        >"$test_solution"
 fi
 
 # Each package check is tools/check-<name>.sh, and takes the folder that the pack writes.
@@ -358,8 +401,9 @@ step 'shellcheck' shell tools/shellcheck.sh || true
 step 'shfmt' shell tools/shfmt.sh --check || true
 step 'actionlint' workflow tools/actionlint.sh || true
 if step 'build' always dotnet build "$SOLUTION"; then
-    step 'test' always dotnet test --solution "$work/tests.slnf" --no-build ${test_args[@]+"${test_args[@]}"} || true
+    step 'test' always dotnet test --solution "$test_solution" --no-build ${test_args[@]+"${test_args[@]}"} || true
     if [[ "$plan" == true ]]; then
+        printf '        through %s\n' "$test_through"
         printf '%s\n' "${project_plan[@]}"
     fi
     step 'postgres tests' postgres
