@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Testing.Realistic;
@@ -23,10 +24,15 @@ public sealed class RealisticParametersTests
             .SelectOf(RealisticSample.Of(("q", "N'a'"), ("limit", "10")), Parameters)
             .ShouldBe("SELECT CAST((\n10\n) AS bigint), CAST((\nN'a'\n) AS nvarchar(10))");
 
+    // Over a sample that compares by ordinal, so that it is SelectOf that finds the name ignoring case, and not the
+    // dictionary.
     [Fact]
     public void SelectOf_SampleNamedInAnotherCase_IsFound() =>
         RealisticParameters
-            .SelectOf(RealisticSample.Of(("Q", "N'a'"), ("LIMIT", "10")), Parameters)
+            .SelectOf(
+                new Dictionary<string, string>(StringComparer.Ordinal) { ["Q"] = "N'a'", ["LIMIT"] = "10" },
+                Parameters
+            )
             .ShouldBe("SELECT CAST((\n10\n) AS bigint), CAST((\nN'a'\n) AS nvarchar(10))");
 
     // A comment at the end of a sample runs to the end of its line, so a parenthesis on that line would be lost.

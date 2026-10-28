@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
@@ -40,10 +41,14 @@ public sealed class RealisticSamplesTests
         batch.Statement.ShouldBe(Sql);
     }
 
+    // Over a sample that compares by ordinal, so that it is Batch that finds the key ignoring case, and not the
+    // dictionary.
     [Fact]
     public void Batch_SampleKeyDifferingInCase_IsFound()
     {
-        var batch = RealisticSamples.Batch(Sql, RealisticSample.Of(("ACCOUNT", "7")), [Described("account", "int")]);
+        var sample = new Dictionary<string, string>(StringComparer.Ordinal) { ["ACCOUNT"] = "7" };
+
+        var batch = RealisticSamples.Batch(Sql, sample, [Described("account", "int")]);
 
         batch.Text.ShouldContain("DECLARE @sample_0 int = (\n7\n);");
     }

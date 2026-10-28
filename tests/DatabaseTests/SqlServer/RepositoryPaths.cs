@@ -4,8 +4,8 @@ using SqlSource.Testing;
 
 namespace SqlSource.DatabaseTests.SqlServer;
 
-// Where the files of the repository are, found from this assembly.  A describer's fixtures are read and recorded
-// in the repository itself and not in an output folder: recording writes there.
+// Where the files of the repository that this project reads are, found from this assembly.  The describer's
+// fixtures are DescriberFixtures of the harness.
 internal static class RepositoryPaths
 {
     // The end-to-end project's folder EndToEnd/: the folders of the databases "app" and "billing", and Queries/, from

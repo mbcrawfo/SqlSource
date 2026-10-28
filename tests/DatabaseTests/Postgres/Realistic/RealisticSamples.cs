@@ -41,13 +41,13 @@ internal static class RealisticSamples
             var value =
                 RealisticSampleChecks.Find(sample, name)
                 ?? throw new InvalidOperationException($"The sample has no value of @{name}.");
-            var type =
-                parameters
-                    .FirstOrDefault(parameter =>
-                        string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase)
-                    )
-                    ?.Type?.Name
-                ?? throw new InvalidOperationException($"No type is given for @{name}.");
+            // The parameter by its name as written, then ignoring case, as Find finds the sample.
+            var parameter =
+                parameters.FirstOrDefault(parameter => parameter.Name == name)
+                ?? parameters.FirstOrDefault(parameter =>
+                    string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase)
+                );
+            var type = parameter?.Type?.Name ?? throw new InvalidOperationException($"No type is given for @{name}.");
             _ = text.Remove(lexeme.Span.Start, lexeme.Span.Length).Insert(lexeme.Span.Start, $"({value})::{type}");
         }
 

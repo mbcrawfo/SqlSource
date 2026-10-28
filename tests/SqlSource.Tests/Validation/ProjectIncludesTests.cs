@@ -113,13 +113,14 @@ public sealed class ProjectIncludesTests : IDisposable
             .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/File.cs is None"]);
     }
 
-    // $(MSBuildThisFileDirectory) in an imported file is that file's folder, here tests/Shared, and not the project's.
+    // $(MSBuildThisFileDirectory) in an imported file is that file's folder, here tests/Shared/Deep, and not the
+    // project's: the file sits a folder deeper than the project, so resolving from the wrong one misses the file.
     [Fact]
     public void Refused_ThisFileDirectoryInAnImportedFile_IsJudgedFromThatFile()
     {
         var scopes = Scopes("none tests/Other/*");
-        WriteProject("tests/Shared/Shared.props", Item("None", "$(MSBuildThisFileDirectory)../Other/File.cs"));
-        WriteProject(Import("../Shared/Shared.props"));
+        WriteProject("tests/Shared/Deep/Shared.props", Item("None", "$(MSBuildThisFileDirectory)../../Other/File.cs"));
+        WriteProject(Import("../Shared/Deep/Shared.props"));
 
         ProjectIncludes
             .Refused(scopes, _root.FullName)
@@ -166,12 +167,12 @@ public sealed class ProjectIncludesTests : IDisposable
     }
 
     // A file outside tests/ is the code under test, whose items reach the project through its scope alone, as a
-    // referenced project outside tests/ does.
+    // referenced project outside tests/ does.  Its item, resolved from the project's folder, would be docs/Readme.md.
     [Fact]
     public void Refused_ImportOutsideTests_IsNotRead()
     {
         var scopes = Scopes("none docs/*");
-        WriteProject("src/Shared.props", Item("None", "../docs/Readme.md"));
+        WriteProject("src/Shared.props", Item("None", "../../docs/Readme.md"));
         WriteProject(Import("../../src/Shared.props"));
 
         ProjectIncludes.Refused(scopes, _root.FullName).ShouldBeEmpty();
