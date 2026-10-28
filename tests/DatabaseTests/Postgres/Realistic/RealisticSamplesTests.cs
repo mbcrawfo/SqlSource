@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
@@ -17,12 +18,14 @@ public sealed class RealisticSamplesTests
             .Substitute("SELECT '@x', \"@x\", @x -- @x", RealisticSample.Of(("x", "1")), [Described("x", "integer")])
             .ShouldBe("SELECT '@x', \"@x\", (1)::integer -- @x");
 
+    // Over a sample that compares by ordinal, so that it is Substitute that finds @B's value ignoring case, and not
+    // the dictionary.
     [Fact]
     public void Substitute_TwoParameters_ReplacesEachWithItsCastLiteral() =>
         RealisticSamples
             .Substitute(
                 "WHERE a = @a AND b = @B",
-                RealisticSample.Of(("a", "'x'"), ("b", "NULL")),
+                new Dictionary<string, string>(StringComparer.Ordinal) { ["a"] = "'x'", ["b"] = "NULL" },
                 [Described("a", "text"), Described("b", "bigint")]
             )
             .ShouldBe("WHERE a = ('x')::text AND b = (NULL)::bigint");
