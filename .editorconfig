@@ -36,7 +36,7 @@ end_of_line = lf
 [*.sql.json]
 max_line_length = off
 
-# The schemas of a sidecar, as the sidecar format design gives it, and of a settings file, whose patterns are long.
+# The schemas of a sidecar and of a settings file, whose patterns are long.
 [schemas/*.json]
 max_line_length = off
 end_of_line = lf

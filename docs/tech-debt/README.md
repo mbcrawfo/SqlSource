@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0084`
+Next id: `TD-0085`
 
 ## Active items
 
@@ -43,6 +43,7 @@ Next id: `TD-0084`
 | [TD-0081](TD-0081-a-test-starts-mkfifo-itself.md) | Open | 2026-10-27 | Low | `PostgresDescriberTests` starts `mkfifo` with `Process.Start` and no skip where it is missing, against the rule that a test starts a program through `Programs` |
 | [TD-0082](TD-0082-a-test-converter-holds-its-token-in-a-static.md) | Open | 2026-10-27 | Low | The test converter `CancelOnRead` holds the token it cancels in a static that a test sets, so two tests reading through it in parallel would cancel each other's |
 | [TD-0083](TD-0083-two-tool-tests-wait-on-limits-of-their-own.md) | Open | 2026-10-27 | Low | `ProgramsTests` and `TerminationTests` wait on limits of their own, 20 and 60 seconds, beside `Eventually.Patience`, which `tests/AGENTS.md` makes the one limit |
+| [TD-0084](TD-0084-the-sidecar-contract-is-documented-only-in-a-spec.md) | Open | 2026-10-27 | Medium | The sidecar's reader rules, compatibility rules and the meaning of its values are written down only in its design spec, which is never kept current |
 
 ## Columns
 

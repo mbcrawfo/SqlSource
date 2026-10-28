@@ -31,7 +31,8 @@ jobs:
         || format('beta.{0}', github.run_number) }}
 
   # The one job to require in branch protection.  It runs even when a job it needs failed, because a skipped
-  # required check counts as passing.
+  # required check counts as passing.  It keeps its name and `if: ${{ always() }}`, and every new job in this file
+  # goes in its `needs`.
   ci:
     name: ci
     needs:

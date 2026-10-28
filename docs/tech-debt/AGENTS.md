@@ -1,6 +1,6 @@
 # AGENTS.md - docs/tech-debt
 
-Tracks problems that were identified and not resolved, and intentional choices that are known to be sub-optimal: shortcuts, workarounds, suppressed warnings, known bugs left in place, fragile or slow code accepted for now.
+Items include shortcuts, workarounds, suppressed warnings, known bugs left in place, and fragile or slow code accepted for now.
 
 - If planned work is simply missing, it belongs in `docs/deferred`, not here.
 - Record problems you find in code you did not write or change, too.  Finding it and not fixing it is what triggers the rule.

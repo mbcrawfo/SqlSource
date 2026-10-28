@@ -1,6 +1,6 @@
 # AGENTS.md - docs/architecture
 
-How SqlSource's code works, for a developer who changes it.  `README.md` is the overview: the components, the flow, where shared code lives, the glossary and the reading guide.
+`README.md` is the overview: the components, the flow, where shared code lives, the glossary and the reading guide.
 
 ## Which page covers which code
 
@@ -37,7 +37,6 @@ A new page gets its rows here and its line in the reading guide of `README.md`, 
 
 ## Keeping the pages true
 
-- **Pages describe what the code does today.**  When a change makes a page wrong, the same pull request updates it.
 - **A page is coupled to every name it gives.**  When a change renames, moves or removes a file, folder, type or member that a page names, the same commit updates the page, as root `AGENTS.md` asks of an `AGENTS.md`.
 - **Check a claim against the code before you write it.**  When the code and an older document disagree, the page says what the code does.  When the code itself is the problem, it is recorded in `docs/tech-debt`.
 - **Use the glossary's terms in its sense.**  A term that a second page needs goes in the glossary of `README.md`, and is not defined again on a page.
@@ -52,17 +51,15 @@ A part of query generation that is not built yet has a placeholder under `## Not
 > **Not built yet.**  How the generator maps a described type to a type of a library such as NodaTime.  Delivered by phase 7 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
 ```
 
-- **The work that delivers a phase fills its placeholders**, in the same pull request: it replaces each one with a description of what was built, written from the code it wrote.
 - **A placeholder is never filled with design from a spec.**  It holds no design and no types until the code exists.
 - **Never describe the future as present.**  A part that is not built is a placeholder or nothing.
 
 ## What belongs elsewhere
 
-- Rules for editing code go in the `AGENTS.md` of the code's folder.  A page explains; it gives the reasons that a rule there links to.
 - Behaviour a user sees goes in `docs/manual/`.  Where a page touches it, such as exit codes or which columns can be null, the page links to the manual and explains only how the code produces it.
 - Decisions and their history go in `docs/superpowers/`.
 - What has been delivered is recorded in "What works today" in `docs/manual/README.md`.  A page holds no status table.
-- The sidecar's format is recorded in `docs/superpowers/specs/2026-10-07-sidecar-format-design.md`.  Link to it; never restate it.
+- The sidecar's format is defined by `schemas/sidecar-v1.schema.json`.  Link to it; never restate it.
 
 ## Writing a page
 

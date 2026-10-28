@@ -207,7 +207,7 @@
         target hooks SqlSourceListFiles.  TD-0025.
 
         The file is lines of key=value, and its format is a contract with the tool: the rules are in
-        src/SqlSource/AGENTS.md, and the reasons in docs/architecture/msbuild-and-manifest.md.  The tool names the
+        src/SqlSource/build/AGENTS.md, and the reasons in docs/architecture/msbuild-and-manifest.md.  The tool names the
         file with SqlSourceManifestFile; without it the file is under obj, and is added to FileWrites.  That reaches
         "dotnet clean" only from inside a build, so it has no effect until a build runs this target.
 
