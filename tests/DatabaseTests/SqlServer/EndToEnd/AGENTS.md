@@ -32,6 +32,6 @@
 - **`AllocationTests.cs` holds each generated method to a hand-written one that makes the same calls**, within a margin below the smallest object.  A change to the calls a method makes changes the hand-written method with it, never the margin.
 - **The streaming `StreamAccounts` has an allocation pair of its own**, against a hand-written static local async iterator, within the same margin.
 - **A pooled result member that copies its rows out needs a test against a hand-written baseline of its own**, as `ToArray`, `ToList` and `ToImmutableArray` have, since the pairs against `RowBufferByHand` cannot see what the buffer costs.  Each `Least*SavingInBytesPerCall` is set from a measure, raised when the pool saves more, and never lowered to make a change pass.
-- **It measures through `CallAllocations` of `tests/SqlSource.Testing`**, by the commonest difference of pairs of calls, never by a total, a median of blocks or the least of the calls ([why](../../SqlSource.Testing/EndToEnd/CallAllocations.cs)).
+- **It measures through `CallAllocations` of `tests/SqlSource.Testing`**, by the commonest difference of pairs of calls, never by a total, a median of blocks or the least of the calls ([why](../../../SqlSource.Testing/EndToEnd/CallAllocations.cs)).
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.
