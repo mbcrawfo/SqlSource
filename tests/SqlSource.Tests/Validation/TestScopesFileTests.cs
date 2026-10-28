@@ -56,6 +56,15 @@ public sealed class TestScopesFileTests
         }
     }
 
+    // TestScopes.ProjectOf puts every project line under TestScopes.AssemblyPrefix, which only
+    // tests/DatabaseTests/Directory.Build.props gives an assembly, so a project listed elsewhere would never match
+    // its own name and would read every file unchecked.
+    [Fact]
+    public void RepositoryFile_EveryProjectFile_IsUnderDatabaseTests() =>
+        TestScopes.Repository.ProjectFiles.ShouldAllBe(file =>
+            file.StartsWith("tests/DatabaseTests/", StringComparison.Ordinal)
+        );
+
     [Fact]
     public void RepositoryFile_Projects_AreTheFourContainerProjects() =>
         TestScopes.Repository.Projects.Keys.ShouldBe(

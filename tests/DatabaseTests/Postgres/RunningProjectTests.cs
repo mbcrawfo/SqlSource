@@ -5,7 +5,9 @@ using Xunit;
 namespace SqlSource.DatabaseTests.Postgres;
 
 // RepositoryRoot checks the reads of a project that tools/test-scopes.txt names, and finds it by the name of the
-// assembly that runs.  An assembly named otherwise than its .csproj would read every file unchecked.
+// assembly that runs, which TestScopes.ProjectOf derives from the project line.  An assembly named otherwise than
+// that derivation, by a project file that Directory.Build.props of tests/DatabaseTests/ does not reach, would read
+// every file unchecked.
 public sealed class RunningProjectTests
 {
     [Fact]
