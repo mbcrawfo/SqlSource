@@ -714,6 +714,57 @@
         }
       ]
     },
+    "ListThenFailConversion": {
+      "hash": "a155dc4471b6bd31990cc9a4ad6ced0ac759d8f703be7b2e0134abce3f8b5d0c",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type": {
+            "name": "nvarchar(100)",
+            "maxLength": 200,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "accounts",
+            "column": "name"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "RunThenRaise": {
       "hash": "38dfcf69d060a6bc691720d9606180093675cae644d141a9faf0563ead0ee7f6",
       "engine": "mssql",

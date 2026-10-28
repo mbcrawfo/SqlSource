@@ -208,9 +208,31 @@ public sealed class MethodShapeTests(SqlServerContainer sqlServer)
     public async Task ListThenRaise_ErrorAfterTheRowsInATransactionUnderXactAbort_RollsItBackUnreported()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var session = await XactAbortTransaction.BeginAsync(sqlServer, token);
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: true, token);
 
         var accounts = await session.Connection.ListThenRaise(
+            transaction: session.Transaction,
+            cancellationToken: token
+        );
+
+        accounts.ShouldBe([
+            new CollectedAccount(1, "alice"),
+            new CollectedAccount(2, "bob"),
+            new CollectedAccount(3, "carol"),
+        ]);
+        await session.ShouldHaveRolledBackUnreportedAsync(token);
+    }
+
+    // With XACT_ABORT off, as SqlClient leaves it, the failed conversion after the rows rolls back the transaction that
+    // the method ran in, and the method still returns the rows and throws nothing, as the streaming
+    // StreamThenFailConversion does: the caller learns of the rollback only at the commit.
+    [Fact]
+    public async Task ListThenFailConversion_ErrorAfterTheRowsInATransaction_RollsItBackUnreported()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+
+        var accounts = await session.Connection.ListThenFailConversion(
             transaction: session.Transaction,
             cancellationToken: token
         );

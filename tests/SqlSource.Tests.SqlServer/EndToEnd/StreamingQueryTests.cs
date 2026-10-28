@@ -19,7 +19,8 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // that a stream can be enumerated twice, that a break leaves the connection usable, and that a throw or a cancellation
 // closes again a connection that the method opened.  Then a query whose rows fail past the row where a loop stops,
 // whose error the disposal does not report, and the queries of several statements, whose later statements run when
-// the reader is disposed; under SET XACT_ABORT ON either error rolls back the caller's transaction, still unreported.
+// the reader is disposed; under SET XACT_ABORT ON either error rolls back the caller's transaction, still unreported,
+// and with it off a failed conversion after the rows does too.
 [Collection(UsesSqlServer.Name)]
 public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
 {
@@ -379,7 +380,7 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
     public async Task StreamNumbersFailingHalfway_BreakInATransactionUnderXactAbort_RollsItBackUnreported()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var session = await XactAbortTransaction.BeginAsync(sqlServer, token);
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: true, token);
 
         var rows = 0;
         await foreach (
@@ -597,10 +598,27 @@ public sealed class StreamingQueryTests(SqlServerContainer sqlServer)
     public async Task StreamThenRaise_ErrorAfterTheRowsInATransactionUnderXactAbort_RollsItBackUnreported()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var session = await XactAbortTransaction.BeginAsync(sqlServer, token);
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: true, token);
 
         var streamed = await session
             .Connection.StreamThenRaise(transaction: session.Transaction, cancellationToken: token)
+            .ToListAsync(token);
+
+        streamed.ShouldBe(Accounts);
+        await session.ShouldHaveRolledBackUnreportedAsync(token);
+    }
+
+    // With XACT_ABORT off, as SqlClient leaves it, where the THROW of StreamThenRaise leaves the transaction to commit,
+    // the failed conversion after the rows rolls it back, and the loop still ends as if the query had succeeded: so
+    // whether an unreported error rolls back the transaction depends on the error, not on XACT_ABORT alone.
+    [Fact]
+    public async Task StreamThenFailConversion_ErrorAfterTheRowsInATransaction_RollsItBackUnreported()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+
+        var streamed = await session
+            .Connection.StreamThenFailConversion(transaction: session.Transaction, cancellationToken: token)
             .ToListAsync(token);
 
         streamed.ShouldBe(Accounts);

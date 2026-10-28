@@ -68,6 +68,16 @@ ORDER BY id;
 SET CONTEXT_INFO 0x02;
 THROW 50000, 'after the rows', 1;
 
+-- name: StreamThenFailConversion
+-- summary: The accounts, and then a conversion that fails, an error that the method does not report.
+-- StreamThenRaise with a failed conversion, error 245, in the place of the THROW: with XACT_ABORT off, as SqlClient
+-- leaves it, SQL Server rolls back the transaction for this error, where it leaves it open for the THROW.
+-- output-model: CollectedAccount
+SELECT id, name
+FROM dbo.accounts
+ORDER BY id;
+SELECT CAST('x' AS int);
+
 -- name: StreamNumbersThenMark
 -- summary: The numbers from 1 to a count, and then a statement that marks the session once the numbers are read.
 -- This is StreamNumbers with the mark after it, and the two are meant to match.

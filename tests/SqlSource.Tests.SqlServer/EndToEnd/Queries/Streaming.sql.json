@@ -341,6 +341,57 @@
         }
       ]
     },
+    "StreamThenFailConversion": {
+      "hash": "a155dc4471b6bd31990cc9a4ad6ced0ac759d8f703be7b2e0134abce3f8b5d0c",
+      "engine": "mssql",
+      "database": "app",
+      "serverVersion": "17.0.5015.4",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "accounts",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type": {
+            "name": "nvarchar(100)",
+            "maxLength": 200,
+            "precision": 0,
+            "scale": 0
+          },
+          "nullable": false,
+          "nullableSource": "server",
+          "origin": {
+            "schema": "dbo",
+            "table": "accounts",
+            "column": "name"
+          },
+          "identity": false,
+          "computed": false
+        }
+      ]
+    },
     "StreamNumbersThenMark": {
       "hash": "b40a4dff3cae353dd9a9fb1b4b698fef7403a704aa0b7fe037dc8fee73cc6d21",
       "engine": "mssql",

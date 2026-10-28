@@ -101,6 +101,16 @@ ORDER BY id;
 SET CONTEXT_INFO 0x03;
 THROW 50000, 'after the rows', 1;
 
+-- name: ListThenFailConversion
+-- summary: The accounts into an array, and then a conversion that fails, an error that the method does not report.
+-- StreamThenFailConversion of Streaming.sql, read into the default collection type: its test pins that the failed
+-- conversion rolls back a transaction with XACT_ABORT off for a method that reads its rows into a collection too.
+-- output-model: CollectedAccount
+SELECT id, name
+FROM dbo.accounts
+ORDER BY id;
+SELECT CAST('x' AS int);
+
 -- name: RunThenRaise -> none
 -- summary: The accounts, a mark on the session, and then an error, which a method that reads no rows reports.
 SELECT id, name
