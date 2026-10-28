@@ -113,7 +113,7 @@ public sealed class RepositoryRootTests
         const string Build = """
             project postgres tests/PgTests/PgTests.csproj
             sqlserver tests/SqlSource.Tests/bin/*
-            none tests/SqlSource.Tests/obj/*
+            sqlserver tests/SqlSource.Tests/obj/*
             postgres tests/SqlSource.Tests/*
             """;
         var source = "tests/SqlSource.Tests/Validation/RepositoryRootTests.cs";
