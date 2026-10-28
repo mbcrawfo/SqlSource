@@ -40,7 +40,8 @@ SQLSERVER_EXAMPLES='examples/SqlServerExamples'
 # The password of sa, which SQL Server refuses unless it has three kinds of character and eight of them.
 SQLSERVER_PASSWORD='Describe-End-To-End-1'
 # The image's sqlcmd: -C trusts the server's own certificate, -I sets QUOTED_IDENTIFIER on, as SqlClient does, and -b
-# fails on the first error.
+# fails on the first error.  Keep -I, so that the files run as SqlServerContainer runs them, with QUOTED_IDENTIFIER on;
+# a default image whose sqlcmd is at another path changes this path.
 SQLCMD=(/opt/mssql-tools18/bin/sqlcmd -C -I -b -S localhost -U sa -P "$SQLSERVER_PASSWORD")
 
 if [[ $# -ne 0 ]]; then
@@ -144,7 +145,7 @@ describe_sqlserver() {
     local image port deadline database folder file files connection connections=()
     image="$(default_image SqlServer)"
 
-    # The image is built for x64 alone, which an arm64 host runs under emulation.
+    # The image is built for x64 alone, which an arm64 host runs under emulation.  Keep --platform linux/amd64.
     printf 'Starting %s ... ' "$image"
     sqlserver_container="$(docker run -d --platform linux/amd64 -e ACCEPT_EULA=Y \
         -e "MSSQL_SA_PASSWORD=$SQLSERVER_PASSWORD" -p 127.0.0.1::1433 "$image")"
@@ -164,7 +165,8 @@ describe_sqlserver() {
     # The schemas and seeds are the files that SqlServerContainer applies, in the same order: those of "realistic",
     # then those of "app", with new-types.sql after them, since the default image is SQL Server 2025, then those of
     # "billing".  sqlcmd splits each at its lines of GO, and -f 65001 names the files' code page, UTF-8, rather than
-    # leaving it to sqlcmd's default.
+    # leaving it to sqlcmd's default.  Keep -f 65001 on the run of each file, so that each is read as UTF-8, as
+    # SqlServerContainer reads it.
     for database in "${SQLSERVER_DATABASES[@]}"; do
         printf 'Creating the database %s ... ' "$database"
         docker exec "$sqlserver_container" "${SQLCMD[@]}" -Q "CREATE DATABASE [$database]" >/dev/null

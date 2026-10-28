@@ -49,6 +49,10 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// group that has a row, whose every input is not <c>NULL</c>, none is <c>NULL</c>.
 /// <c>Catalog_TotalAggregates_ArePgCatalogsOwn</c> holds every row to the catalog, its two functions included.
 /// </para>
+/// <para>
+/// So a row goes in this table only for one that is total, never merely strict, with the C function that implements
+/// it, which the <c>Catalog_Total*</c> tests of <c>PlanOutputTests</c> pin on PostgreSQL 14 and 18.
+/// </para>
 /// </remarks>
 internal static class TotalFunctions
 {

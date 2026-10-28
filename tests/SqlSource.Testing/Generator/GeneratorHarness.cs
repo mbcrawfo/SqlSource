@@ -88,7 +88,10 @@ internal static class GeneratorHarness
     public static SqlFile SettingsFile(string path, string json) => new(path, json);
 
     // Every run states its output, the output of the project's settings file: null writes none, for a test that needs
-    // the project not to set it, of the default or of the output's levels.
+    // the project not to set it, of the default or of the output's levels, or whose own root file, which hides the
+    // project's, or own file at ProjectSettingsPath gives the output, and the test says so in a comment.  The default,
+    // CodeGen, needs an entry in a sidecar for each query, so a test that leaves it unsaid gets SQLSRC209 for each file
+    // under ansi.
     public static GeneratorRun Run(OutputKind? output, string source, params SqlFile[] sqlFiles) =>
         Run(output, [new SourceFile(SourcePath, source)], sqlFiles);
 
@@ -217,7 +220,8 @@ internal static class GeneratorHarness
         return [.. files, SettingsFile(ProjectSettingsPath, projectSettings)];
     }
 
-    // A file of the test's own at the path of the project's settings file, beside the one the run writes, is refused.
+    // A file of the test's own at the path of the project's settings file, beside the one the run writes, is refused:
+    // its keys go in the run's settings.
     public static void RefuseTheProjectsPath(IEnumerable<string> paths)
     {
         if (paths.Any(path => SqlPath.Normalize(path) == SqlPath.Normalize(ProjectSettingsPath)))

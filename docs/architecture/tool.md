@@ -12,6 +12,8 @@ How `src/SqlSource.Tool` runs `sqlsource describe`: how a command line is read a
 
 Every dialect that `SqlDescribableDialects` lists has a describer in the released host, so no query of the released tool is `SQLSRC216` ([describing](#describing)); a test that gives its host a `DescriberRegistry` without a dialect's describer reaches it.  [The SQL Server describer](sqlserver-describer.md) carries Microsoft.Data.SqlClient into the tool's package, whose copy for each platform is under `runtimes/`, beside a copy outside it that throws on any use; `tools/check-tool-install.sh` describes an `mssql` query with the installed tool against a port that refuses, so that the copy for the machine's platform is shown to load ([tools](../../tools/README.md)).
 
+A test makes its host with [`Hosts`](../../tests/SqlSource.Tool.Testing/Hosts.cs), which fixes `Runtime` and `OperatingSystem`.  The clock of the tests' runs, hosts and sessions is [`TestClock`](../../tests/SqlSource.Tool.Testing/TestClock.cs) unless a test brings its own, so the time of an event and the length of a step never come from `DateTime` or `Stopwatch`.  A database is reached only through `ToolHost.Describers` and `ToolHost.Exchange`, and the log's file only through `ToolHost.CreateFile`, which a test replaces with a stream that fails.
+
 `ToolHost.Create` asks for the current directory, which throws when it was deleted.  `Cli.Run` catches that, writes the `SQLSRC200` to standard error with a reporter of its own, and returns `1`, since there is no host to report to.
 
 ### Signals
@@ -20,7 +22,7 @@ Every dialect that `SqlDescribableDialects` lists has a describer in the release
 
 - **The first signal** cancels the run's token and keeps the process (`Cli.Interrupt`).  The run then ends as it would end anyway, with its exit code: each step that looks at the token throws `OperationCanceledException`, `Cli.RunCommandAsync` catches it, and the exit code is `1`.
 - **A second signal**, while the run has not ended, does not keep the process, so the system ends it.  A run that waits on a database may not look at its token.
-- **`SIGTERM` and `SIGHUP`** do what Ctrl+C does, and for the first signal the handler returns only when the run has ended (`Cli.Terminate`).  Windows ends the process when the handler of a shutdown or a closed console returns, whatever it answers, so a handler that returned at once would leave the run no time to end.  `TerminationTests` cannot raise the shutdown of Windows, which has the same handler as the closed console it tests.
+- **`SIGTERM` and `SIGHUP`** do what Ctrl+C does, and for the first signal the handler returns only when the run has ended (`Cli.Terminate`).  Windows ends the process when the handler of a shutdown or a closed console returns, whatever it answers, so a handler that returned at once would leave the run no time to end.  [`TerminationTests`](../../tests/SqlSource.Tool.Tests/Commands/TerminationTests.cs) sends each signal to the tool in a process of its own, on a system that has signals, and closes the tool's console on Windows.  It cannot raise the shutdown of Windows, which has the same handler as the closed console it tests.
 
 What the user sees of a stopped run is in the manual's [exit codes](../manual/tool.md#exit-codes).
 

@@ -32,8 +32,10 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// </para>
 /// <para>
 /// An <see cref="EventListener" /> is the process's: it sees SqlClient's commands on every connection while it lives,
-/// which in the tool are the session's, since the run describes one database at a time.  It is enabled when the
-/// session opens and disposed when it ends or fails to open.  SqlClient writes from the thread that runs a command, so
+/// which in the tool are the session's, since the run describes one database at a time.  So it lives only as long as
+/// the session's connection: <see cref="SqlServerConnection" /> makes it, for a log that writes, when the session
+/// opens, and disposes it in <c>DisposeAsync</c> when the session ends or fails to open, and a run without a log makes
+/// none.  SqlClient writes from the thread that runs a command, so
 /// <see cref="IRunLog.Write" /> is called from any thread; the run's log writes an event under a lock.
 /// </para>
 /// </remarks>

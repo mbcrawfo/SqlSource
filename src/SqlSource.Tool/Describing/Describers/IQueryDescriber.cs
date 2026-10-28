@@ -35,7 +35,8 @@ internal interface IQueryDescriber
     /// them to nothing else.
     /// </summary>
     /// <remarks>
-    /// It is asked once for a database, before its session is opened.  It gives none for a value the driver cannot
+    /// It is asked once for a database, under a guard that knows only the whole value, before anything else of the
+    /// database and before its session is opened.  It gives none for a value the driver cannot
     /// read, and for what a user can cause it throws nothing: a file that cannot be read for an I/O or access reason
     /// gives none.  Any other exception is a bug, and <c>SQLSRC200</c>.  A password that the driver takes from
     /// elsewhere is not in the value, and is given all the same when the describer can know it: from the host's

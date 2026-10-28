@@ -1,39 +1,18 @@
 # AGENTS.md - docs/manual
 
-How to write and maintain the user documentation: the pages of this folder and the two packed readmes, `README.md` and `src/SqlSource.Tool/README.md`.
+Rules for the user documentation, this folder and the two packed readmes, beside root rule 4.
 
-## Who reads what
-
-- **`README.md`**: a status line, the databases it works with, installation and the supported environments, getting started in five steps, "Only want to generate models?", "Just want to keep your SQL out of code files?", a FAQ of five to ten items, "NodaTime and other libraries", "Custom type mapping" and "Where to next".  It never repeats the manual's reference tables of markers, settings, dialects, generator parameters or diagnostics.  A FAQ answer is a few sentences that link to a recipe where one exists.
-- **This folder**: each topic has one home:
-
-| Page | Holds |
-|----|----|
-| `README.md` | The entry page: "Find what you need" (a need to a page), the **"What works today"** table, and the list of every page |
-| `concepts.md` | How the pieces fit together, and the glossary every page uses |
-| `sql-files.md` | The `.sql` file format, opening with the marker index |
-| `settings.md` | Every setting, once: the tables with their Status column, the precedence rule, one section per setting |
-| `parameters-and-tokens.md` | Query parameters, `-- param:`, `DECLARE`, tokens and their validation |
-| `dialects.md` | Reading rules of every dialect, and the database support table |
-| `generator.md` | What the `SqlSource` package generates, and where |
-| `tool.md` | The `sqlsource` tool: the workflow, then the command reference |
-| `postgresql.md`, `sqlserver.md` | One page per database that can be described: describing it, its types and models, and its query methods |
-| `recipes.md` | Short how-tos: a sample and a link to the rules |
-| `diagnostics.md` | Every `SQLSRC` error, what it means and how to fix it |
+- **`README.md`**, beyond root rule 4: the databases it works with, getting started in five steps, "Only want to generate models?", "Just want to keep your SQL out of code files?", a FAQ of five to ten items, "NodaTime and other libraries", "Custom type mapping" and "Where to next".  A FAQ answer is a few sentences that link to a recipe where one exists.
+- **This folder**: the entry page, `README.md`, holds "Find what you need", the "What works today" table, and "The pages", which says what each page holds.
+- `sql-files.md` opens with the marker index; `parameters-and-tokens.md` holds `DECLARE` and token validation; `tool.md` gives the workflow, then the command reference; a database page covers describing it, its types and models, and its query methods.
 
 ## Write effects, never internals
 
-Never name the describer, a plan or a plan walk, `EXPLAIN`, a heuristic, a provenance value, a capture file, a type of the library, or a field of the sidecar (the one link to `schemas/sidecar-v1.schema.json` in `tool.md` is the way in for the curious).  Never link into `docs/tech-debt`, `docs/deferred`, `docs/superpowers` or `src/`, and never cite an item's id.
-
-Examples of what was rewritten, from the old tool readme into `postgresql.md`:
-
-- **Before:** "`true`, `outer-join`: an outer join of the plan fills the column's table, view or foreign table with `NULL`."  **After:** "An outer join can fill the column with null: a column of the optional side of a `LEFT`, `RIGHT` or `FULL` join."  Say what makes a column possibly null, not which value the sidecar records.
-- **Before:** "It prepares each, describes the prepared statement without executing it, and asks for its plan with `EXPLAIN` and without `ANALYZE`, in a transaction that it rolls back ... the settings it changes for a plan are `SET LOCAL`."  **After:** "The tool never runs your queries.  For some queries it also asks PostgreSQL how it would run the statement, without running it ... in a transaction that the tool rolls back."  Say what the user's database experiences.
-- **Before:** "... so such a function with an effect outside the transaction, a sequence it advances for one, has that effect (TD-0047)."  **After:** a known issue, "A function marked `IMMUTABLE` can run while a query is described", with the remedy: "mark it `VOLATILE`, which is what it is, or describe against a copy of the schema".  An effect and what to do, no id.
-
-The same holds for what is coming.  A type map is a table of the database type and the C# type a user gets, with the driver version where that changes it; not how the driver is detected or what is set on a `DbParameter`.  A generated method is its signature and what it returns and throws; not how it reads a row.
-
-Before a commit, run this over the pages you changed.  Rewrite every hit, unless it is text the user sees anyway: a diagnostic's own title, such as `SQLSRC216`'s, or a SQL command a user writes, such as `EXPLAIN` in `SQLSRC233`'s list of statements.
+- Never name the describer, a plan or a plan walk, `EXPLAIN`, a heuristic, a provenance value, a capture file, a type of the library, or a field of the sidecar (`tool.md` links `schemas/sidecar-v1.schema.json` once, for the curious).
+- Never link into the project's notes or source, and never cite an item's id.
+- Say what makes a column possibly null, not what the sidecar records, and what the user's database experiences.
+- The same holds for what is coming.  A type map is the database type and the C# type a user gets, with the driver version where that changes it; not how the driver is detected or what is set on a `DbParameter`.  A generated method is its signature and what it returns and throws; not how it reads a row.
+- Before a commit, grep the pages you changed and rewrite every hit but text the user sees anyway: a diagnostic's own title (`SQLSRC216`'s) or a SQL command a user writes (`EXPLAIN` in `SQLSRC233`'s list).
 
 ```console
 $ grep -n -i -E "describer|EXPLAIN|heuristic|nullableSource|provenance|capture|tech-debt|superpowers|TD-0|D-0" <pages>
@@ -41,61 +20,47 @@ $ grep -n -i -E "describer|EXPLAIN|heuristic|nullableSource|provenance|capture|t
 
 ## Conventions
 
-- **Example first.**  A reference section opens with an example of what to write, then gives the rules.
-- **Terms**, defined in `concepts.md#glossary` and used everywhere: *query parameter* (`@id`), *generator parameter* (`keep-comments`), *token* (`{{table}}`), *dialect* (how a file is read), *logical database* (what the tool connects to), *file header* (the part of a `.sql` file before its first `-- name:` line), *sidecar*, *settings file* (a `sqlsource.json`), *describe*, *output*, *query method*, *token method*.  Say *inside a query* too, and *folder*, never "directory" in prose.  Do not say "parameter" or "database" alone where it is ambiguous.
-- **One status, in one place.**  The "What works today" table (`README.md#what-works-today` here) is the record of what is delivered: a feature is "Available", "Coming", or "Accepted; no effect yet" for settings that are read and change no generated code, and a row that partly works says which part.  The Status column of `settings.md` carries the same status for each setting: "Works today", or "Accepted; no effect yet", linked to the table, for a setting that is read and checked and changes no generated code.  Where only part works, either one says which part, as "Works today, for the tool alone" does for the database.  A table that has an "Accepted; no effect yet" row says beneath it what that means.  No other page keeps a status of its own.
-- **A placeholder is one standard callout**, never a description of the feature as if it worked:
-
-  ```markdown
-  > **Coming in a later release.**  <One sentence on what it will do.>  See [what works today](README.md#what-works-today).
-  ```
-
-  A setting that is accepted and has no effect says so where it is mentioned.
-- **Settings are documented in `settings.md` only.**  Its tables under `#all-settings`, the settings that work today and, when there are any, those accepted that have no effect yet, have a row for each setting with every place it can be written, and each setting has a section anchored `setting-<name>`.  A setting moves to the first table when it starts to work, and the second table goes when it is empty.  Other pages link to that anchor and never repeat a setting's values or precedence.  A new setting or marker gets its row, its section, and, for a marker, its row in the marker index of `sql-files.md`.  A new generator parameter goes in the Values cell of the Generator parameters row, in the table of parameters under `#setting-generator-parameters`, and in the section of `SQLSRC109` in `diagnostics.md` and the list of parameters in `DiagnosticsDocumentTests`, which checks the section against that list.
-- **Recipes hold examples, not rules.**  Each is a sample and a link to the section that gives the rules, so it cannot drift from them.
-- **Anchors.**  On a page of this folder, a heading that is linked from anywhere gets an explicit anchor on the line above it, `<a id="configure-a-folder"></a>`, and a reworded heading keeps its anchor.  Each page's "Known issues" heading has `<a id="known-issues"></a>`.
-- **Links.**  Every link in the two packed readmes is absolute, `https://github.com/mbcrawfo/SqlSource/blob/main/<path>[#anchor]`.  Pages of this folder link to each other relatively.  Write inline links and `#` headings only; the tests read no other form.
-- **SQL samples** are fenced with `sql` (read as `ansi`), `sql <dialect>` (`sql postgres`, `sql mysql,ansi-quotes`), `sql fragment` (part of a file, not parsed) or `sql error` (shows a mistake, not parsed).  Mark a sample so; never weaken the test.  Put no fence inside a blockquote.
-- **`--prerelease`.**  Install and update commands carry `--prerelease` while only previews are published, and the NuGet badge is `nuget/vpre`.  The first stable release takes them out, by the release step in `docs/publishing.md`.
-- **Known issues.**  Each page that documents behaviour ends with a "Known issues" section: the problems a user can plausibly hit, from the open items of `docs/tech-debt` and `docs/deferred`, each by its effect in the user's words and what to do about it.  An item a user cannot see (a test gap, duplicated code, a cost with no visible effect) is left out.  Add one in the PR that opens such an item and remove it in the PR that closes it.  A known issue names no id, so a search for the id does not find it: search the "Known issues" sections for its effect.  A page that gains its first known issue gets the section, with its anchor, and a link from the "Find a problem that is not an error" row of the entry page.
-- **`diagnostics.md`.**  A new diagnostic gets a row in the index, a `## SQLSRCnnn` section whose first bold line is its descriptor's title; and, where a manual section documents the rule, a closing `See: [section](page.md#anchor)` line.  The index is a table per area (project and attribute, settings files, `.sql` files, the tool, describing a query, the sidecar of a `.sql` file, the C# types of a query, a C# type of your choice, the models of a query, an entry of the type override that maps nothing, the parameters of a SQL Server query, the columns of a SQL Server query, the C# types of a SQL Server query, the encoding of a file, the methods of a query, converters), and the rows of all the tables together must be in id order, since a test compares them with the descriptors: a new id above the last one goes in the last table, or in a new table after it, never back in an earlier area's table.  The paragraphs under the index that give each area's range of ids are kept true.  The help link every error prints is the lower-case id's slug, so the heading is never given another anchor.
-- **A new page** is listed under "The pages" of the entry page and gets a "Find what you need" row for each need it answers.  A test fails until the entry page links it, but a link anywhere on the page satisfies the test, so the list is yours to keep.
-
-## The tests
-
-In `tests/SqlSource.Tests/`, run by `./pre-commit-validation.sh`.  `Documentation/UserDocs.cs` decides which files are user documents: the two readmes and every page here but this file.
-
-- **`Documentation/UserDocsLinksTests.cs`** follows every link: a relative link or a `https://github.com/mbcrawfo/SqlSource/blob/main/...` URL must reach a file and an anchor that exist.  It also fails on a relative link in a packed readme, a link into `docs/tech-debt`, `docs/deferred`, `docs/superpowers` or `src/`, a link form or heading form it does not read, and a page of this folder that the entry page does not list.
-- **`Documentation/UserDocsSamplesTests.cs`** parses every `sql` block by the dialect its info string names, and fails on an error, so a sample a user copies is SQL that SqlSource reads.
-- **`Diagnostics/DiagnosticsDocumentTests.cs`** fails when the sections of `diagnostics.md` and the descriptors disagree: the order of the sections, each section's first bold line, and the index's rows.
-
-No test checks what a page says.  Whether a sentence is true today, and free of internals, is yours to keep.
+- **Example first.**  A reference section opens with an example, then the rules.
+- **Terms.**  Use the terms of `concepts.md#glossary`, *inside a query*, and *folder*, never "directory" in prose.  Never say "parameter" or "database" alone where it is ambiguous: say *query parameter* (`@id`), *generator parameter* or *logical database*.
+- **One status, in one place.**  The "What works today" table says "Available", "Coming", or "Accepted; no effect yet" for a setting read and checked that changes no generated code.  `settings.md`'s Status column: "Works today" or "Accepted; no effect yet", linked to the table.  No other page keeps a status.
+- Where only part works, the cell says which part, as "Works today, for the tool alone" does for the database.  A table with an "Accepted; no effect yet" row explains it beneath.
+- **A placeholder is root rule 4's callout, linking `README.md#what-works-today` relatively**, never a description of the feature as if it worked.  An accepted setting with no effect says so where it is mentioned.
+- **Settings are documented in `settings.md` only**, each in a section anchored `setting-<name>`; other pages link to it and never repeat a setting's values or precedence.
+- A setting's row under `#all-settings` names every place it can be written.  It moves to the first table when it starts to work, and the second table goes when it is empty.
+- A new setting or marker gets its row and its section, and a marker its row in the marker index of `sql-files.md`.  A new generator parameter goes in each place that the comment on the list in `DiagnosticsDocumentTests` names.
+- **Recipes hold examples, not rules.**  Each is a sample and a link to the rules, so it cannot drift from them.
+- **Anchors.**  A heading of this folder linked from anywhere gets an `<a id>` anchor on the line above, kept when the heading is reworded; "Known issues" gets `<a id="known-issues"></a>`.
+- **Links.**  Pages of this folder link to each other relatively.
+- **SQL samples** are marked by the info strings `UserDocsSamplesTests` reads; never weaken the test.  Put no fence inside a blockquote.
+- **`--prerelease`** goes on every page's install and update commands while only previews are published, as root rule 4 says.
+- **Known issues.**  A page that documents behaviour ends with "Known issues": what a user can plausibly hit from the open items of `docs/tech-debt` and `docs/deferred`, by its effect in the user's words and what to do.  Leave out what a user cannot see, such as a test gap, duplicated code or a cost with no visible effect.
+- Add one in the PR that opens its item; remove it in the PR that closes it, found by its effect, as it names no id.  A page's first one brings the section and a link from the entry page's "Find a problem that is not an error" row.
+- **`diagnostics.md`.**  A new diagnostic gets a row in the index, a `## SQLSRCnnn` section whose first bold line is its descriptor's title, and, where a manual section documents the rule, a closing `See: [section](page.md#anchor)` line.
+- Keep true the paragraphs giving each area's range of ids.  Never give a heading another anchor: every error's help link is the lower-case id's slug.
+- **A new page** is listed under "The pages" of the entry page, with a "Find what you need" row for each need it answers.
+- **Tests.**  The tests in `tests/SqlSource.Tests/Documentation/` and `Diagnostics/DiagnosticsDocumentTests.cs` say in comments what fails them.  None checks whether a page is true today and free of internals.
 
 ## When a phase lands
 
-Every phase of query generation (`docs/superpowers/specs/2026-10-07-query-generation-epic-design.md`), and every later feature, does all of this in its PR:
+Every phase of query generation (`docs/superpowers/specs/2026-10-07-query-generation-epic-design.md`), and every later feature, does in its PR what root rule 4 and this file ask, its Status cells in `settings.md` included, and:
 
-1. **Flips its rows of the "What works today" table**, and its Status cells in `settings.md`, to what is now true.  A row that is only partly delivered says which part.
-2. **Replaces its callouts with documentation**, example first.  `git grep -n "Coming in a later release" -- README.md src/SqlSource.Tool/README.md docs/manual` lists them all.  A callout for a part still to come stays, and one that covers two phases is narrowed to the part still to come.
-3. **Rewrites the sentences that say it is missing or still to come**, such as "It takes effect when generated query methods arrive" or "The generated query methods of a later release will send".  This finds most of them, among many lines to read past; it is not exhaustive, so read each page the table below names:
+- **Callouts.**  `git grep -n "Coming in a later release" -- README.md src/SqlSource.Tool/README.md docs/manual` lists them.  A callout for a part still to come stays, narrowed to that part.
+- **Sentences that say it is missing or still to come**, such as "It takes effect when generated query methods arrive", are rewritten.  It finds most, among much noise; also read each page the table names:
 
-   ```bash
-   git grep -n -i -E "no effect yet|today|coming|arrive|later release|until|growing|(^|[^[:alnum:]_])(yet|will)([^[:alnum:]_]|$)" -- README.md src/SqlSource.Tool/README.md docs/manual
-   ```
+  ```bash
+  git grep -n -i -E "no effect yet|today|coming|arrive|later release|until|growing|(^|[^[:alnum:]_])(yet|will)([^[:alnum:]_]|$)" -- README.md src/SqlSource.Tool/README.md docs/manual
+  ```
 
-4. **Adds or removes its known issues** as its `docs/tech-debt` and `docs/deferred` items open and close.
-5. **Adds its diagnostics** to `diagnostics.md`, with their See: lines, and its recipes to `recipes.md`, where a task is new.
-6. **Updates the README** where it changes the common path: the status line in the introduction, getting started, a scenario, a FAQ answer, the supported environments.
-7. **Updates the examples** in `examples/`, by the `examples/` item of rule 4 in the root `AGENTS.md`.
+- **Recipes** go in `recipes.md` where a task is new.  **The README** changes where the common path does: the introduction's status line, getting started, a scenario, a FAQ answer, the supported environments.
 
-Which pages each phase touches, besides those seven steps:
+The pages each phase touches, besides those:
 
 | Phase | Pages |
 |----|----|
-| 7. Library maps | README: "NodaTime and other libraries", with the call each library needs on the data source.  The Types section of each database page, both of them: in `sqlserver.md` the row of `json`, a `string` today, and those of `hierarchyid`, `geography` and `geometry`, whose help names the type override and Microsoft.SqlServer.Types today, and in `diagnostics.md` the help of `SQLSRC246` where it says the same.  `settings.md`: the `libraryTypes` setting and the `-- library-types:` marker, with each library's default by engine.  The query methods' pages, where a library's map makes a converter or a taught driver unnecessary: the converters section of `settings.md`, the README's FAQ on `InvalidCastException`, and how a row is read and a parameter sent in `generator.md` and in the Query methods section of each database page, whose methods then read and send the library's types.  The examples: a library's map shown in each example project whose database it covers |
-| 9. Build integration | `tool.md`: running in the build, the `.env` file and what to keep out of git, watch mode, and the new options in the command reference.  `settings.md`: what turns it on.  README: step 5 |
-| 10. Bug reports | `tool.md`: making a bundle, what it holds before you share it, and the new commands in the command reference |
+| 7. Library maps | README: "NodaTime and other libraries", with the call each library needs on the data source.  Both database pages' Types: in `sqlserver.md` `json`, a `string` today, and `hierarchyid`, `geography` and `geometry`, whose help names the type override and Microsoft.SqlServer.Types, as `SQLSRC246`'s help in `diagnostics.md` does.  `settings.md`: `libraryTypes` and `-- library-types:`, each library's default by engine.  Where a library's map makes a converter or a taught driver unnecessary: `settings.md`'s converters, the README's FAQ on `InvalidCastException`, and how a row is read and a parameter sent in `generator.md` and each database page's Query methods. |
+| 9. Build integration | `tool.md`: running in the build, the `.env` file and what to keep out of git, watch mode, the new options in the command reference.  `settings.md`: what turns it on.  README: step 5 |
+| 10. Bug reports | `tool.md`: making a bundle, what it holds before you share it, the new commands in the command reference |
 
-A database that becomes describable gets its own page, a row in the support table of `dialects.md`, and the README's supported environments.  A dialect that is added gets its rows in the tables of `dialects.md` and its name in the section of `SQLSRC019` in `diagnostics.md`, where `dialect` lists the names; `settings.md`'s Dialect row changes only for a dialect with options.
+A database that becomes describable gets its own page, a row in the support table of `dialects.md`, and the README's supported environments.  A new dialect gets its rows in `dialects.md`'s tables and its name in `SQLSRC019`'s section of `diagnostics.md`, where `dialect` lists the names; `settings.md`'s Dialect row changes only for a dialect with options.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

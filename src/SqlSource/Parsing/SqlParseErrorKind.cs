@@ -6,6 +6,9 @@ namespace SqlSource.Parsing;
 /// <summary>
 /// The problems the parser reports.  Each member says what <see cref="SqlParseError.Arguments" /> holds for it.
 /// </summary>
+/// <remarks>
+/// The parser's diagnostic ids follow the order of the members, so a new member goes at the end.
+/// </remarks>
 internal enum SqlParseErrorKind
 {
     /// <summary>A quoted region is not closed.  No argument.</summary>
