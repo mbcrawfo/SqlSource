@@ -19,7 +19,7 @@
 - **`PostgresErrors` gives a server's error its id by the order of [errors](../../../../docs/architecture/postgres-describer.md#errors).**  A SQLSTATE is matched alone, since a message may be translated.  Which errors of `check` are a disagreement is decided in `NpgsqlCheck.Read` alone.
 - **`check` is the lexer against Npgsql** ([the check against Npgsql](../../../../docs/architecture/postgres-describer.md#the-check-against-npgsql)).  The sidecar records only a `bindName` that `check` bound in this run, and the tool never rewrites a user's SQL to make a parameter bindable.  `BatchRewritesTests` and `RowDescriptionsTests` pin the members read by reflection.
 - **A rule of how PostgreSQL writes a name is `PostgresIdentifiers.cs`'s.**  A new reader uses it; one that keeps a rule of its own is listed, with why, in the remarks of `PostgresIdentifiers`.
-- **`tests/SqlSource.Tool.Tests/PostgresScript.cs` answers the session with no server**, so its tests hold what is asked as well as what is made of the answers.  What only a server can show is tested in `tests/SqlSource.Tests.Postgres/Describer/`.
+- **`tests/SqlSource.Tool.Tests/PostgresScript.cs` answers the session with no server**, so its tests hold what is asked as well as what is made of the answers.  What only a server can show is tested in `tests/DatabaseTests/Postgres/Describer/`.
 
 ## Nothing a `.sql` file holds can make the describer run a statement
 
@@ -35,7 +35,7 @@
 - The tool's lexer, Npgsql's and the server's may split a text differently, so the guarantee does not rest on the lexer: it reads a character above U+007F as part of a name, as the server does, so `SELECT 1 AS §$x$; DROP TABLE t; --$x$` is two statements to all three, but a text the lexer reads as one can still be two to the server.
 - The type list still ends with a line break before `AS`: whatever a type's text held, the `) AS` is not on its line, so nothing in a type can reach it.
 - A change to any of them gets a case in `tests/SqlSource.Tool.Tests/Describing/Postgres/` that shows what is refused.
-- A new place that puts a user's text into SQL the tool sends does it so that the driver cannot split the text, and gets a case with a canary beside `PrepareAsync_TextOfTwoStatements_AnswersTheServersErrorAndRunsNothing` in `tests/SqlSource.Tests.Postgres/Describer/ParameterTests.cs`, and for a text that goes to `check`, one beside `NpgsqlCheckTests.CheckAsync_TextNpgsqlWouldSplit_AnswersAnErrorAndRunsNothing` in `tests/SqlSource.Tests.Postgres/Describer/NpgsqlCheckTests.cs`.
+- A new place that puts a user's text into SQL the tool sends does it so that the driver cannot split the text, and gets a case with a canary beside `PrepareAsync_TextOfTwoStatements_AnswersTheServersErrorAndRunsNothing` in `tests/DatabaseTests/Postgres/Describer/ParameterTests.cs`, and for a text that goes to `check`, one beside `NpgsqlCheckTests.CheckAsync_TextNpgsqlWouldSplit_AnswersAnErrorAndRunsNothing` in `tests/DatabaseTests/Postgres/Describer/NpgsqlCheckTests.cs`.
 - Every text the describer sends, and how, is [why a query cannot run a statement](../../../../docs/architecture/postgres-describer.md#why-a-query-cannot-run-a-statement).
 
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.
