@@ -122,7 +122,7 @@ public static global::System.Collections.Generic.IAsyncEnumerable<ListUsersDto> 
 - **The connection is busy while the loop runs.**  Another command on it inside the loop fails, as each driver reports it (no MARS on SQL Server).  A connection the method opened stays open until the loop ends.
 - **Leaving the loop early** disposes the reader, which reads and discards the rest of the rows, and then closes a connection the method opened.  On a large result this takes as long as reading the rest.  A transaction is left as it was.
 - **An error in a later row** throws from `MoveNextAsync`, after the rows before it were yielded: a null in a column that cannot be null, a converter's exception, a driver error.
-- **On SQL Server, a query of several statements** yields the rows of its first result set, and its other statements run when the reader is disposed.  An error that a later statement raises is not reported: neither `MoveNextAsync` nor the disposal throws it, and a buffered method of the same SQL loses it too, as [TD-0084](../../tech-debt/TD-0084-sql-server-error-after-the-first-result-set-is-lost.md) records.
+- **On SQL Server, a query of several statements** yields the rows of its first result set, and its other statements run when the reader is disposed.  An error that a later statement raises is not reported: neither `MoveNextAsync` nor the disposal throws it, and a buffered method of the same SQL loses it too, as [TD-0085](../../tech-debt/TD-0085-sql-server-error-after-the-first-result-set-is-lost.md) records.
 - **Cancellation** through either token throws as each driver throws today; [PostgreSQL](../../manual/postgresql.md#method-results) and [SQL Server](../../manual/sqlserver.md#method-results) already document it.
 
 ### Settings

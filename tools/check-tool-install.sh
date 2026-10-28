@@ -167,7 +167,8 @@ if [[ "$code" -ne 1 ]] || ! grep --quiet --fixed-strings "$summary" "$work/mssql
 fi
 
 # A machine that has a .NET 8 runtime ran the tool on it above.  This run takes the newest runtime the machine has,
-# which is what a machine without .NET 8 does by the RollForward of the project.
+# which is what a machine without .NET 8 does by the RollForward of the project.  Keep this last run: it is the one
+# check that the tool rolls forward from .NET 8.
 export DOTNET_ROLL_FORWARD=LatestMajor
 check_version 'on the newest runtime'
 

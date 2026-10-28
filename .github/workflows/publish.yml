@@ -1,5 +1,7 @@
 # Publishes to nuget.org through trusted publishing: a release from a v* tag, or a beta from a manual run on main.
 # The file name and the nuget environment are part of the nuget.org policy.  Do not rename either.
+# The publish job keeps `environment: nuget`, and the NuGet/login and push steps stay in this file, not in a
+# reusable workflow.
 name: Publish
 
 on:

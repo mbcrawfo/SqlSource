@@ -3,8 +3,8 @@ using System.IO;
 
 namespace SqlSource.Tests.Snapshot;
 
-// The examples of the sidecar format design, sections 4.1 and 4.2, as files beside the tests.  They are copies:
-// a pull request that changes an example changes it in the document and here.
+// Sample sidecars, as files beside the tests.  SidecarSchemaTests validates them against
+// schemas/sidecar-v1.schema.json.
 internal static class SidecarExamples
 {
     public const string Users = "Users.sql.json";
