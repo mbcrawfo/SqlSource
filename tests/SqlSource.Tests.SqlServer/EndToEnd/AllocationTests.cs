@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Data;
 using System.Data.Common;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -31,9 +32,11 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // method returns.  Three more tests hold the pooled NumbersAsArray, NumbersAsList and NumbersAsImmutableArray, at 300
 // rows, to allocating less than a List copied to an array, a List grown by doubling and an ImmutableArray builder that
 // is drained, each by at least a given number of bytes, since a pooled buffer exists to save a list's growth arrays and
-// the pairs above, against RowBufferByHand, cannot see what the buffer itself costs.  In each pair the two make the
-// same calls, so any object that the generated method allocates on each call and the hand-written one does not fails
-// the test.  The two are compared by the commonest difference of pairs of calls, one of each method, which
+// the pairs above, against RowBufferByHand, cannot see what the buffer itself costs.  The streaming StreamAccounts of
+// StreamingQueries has a pair of its own, against a hand-written static local async iterator that makes the same calls
+// and yields each row, for the whole of a call, from the first MoveNextAsync to the disposal.  In each pair the two
+// make the same calls, so any object that the generated method allocates on each call and the hand-written one does
+// not fails the test.  The two are compared by the commonest difference of pairs of calls, one of each method, which
 // CallAllocations explains.  GC.GetTotalAllocatedBytes(true) counts every thread, where the driver completes the
 // continuations of an asynchronous call, so the test runs in MeasuresAllocations, alone and on a server of its own, and
 // skips under coverage, whose collector allocates in the process too.
@@ -65,12 +68,17 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
     // process, so that any object the generated method allocates for each call and the hand-written does not fails the
     // test, and an extra object did, at 24 bytes, and an array of 64 bytes, at 88, failed both pairs of SearchAccounts.
     // It lets the generated method's state machine hold up to two more fields of 8 bytes than the hand-written one's.
-    // Never raise it to make a change pass.
+    // The streaming StreamAccounts allocated about 5.0 KB a call on an open connection and 5.4 KB on a closed one, the
+    // same as its hand-written iterator: 0 by the commonest difference, in more than four pairs in five, on every one
+    // of four runs, three on SQL Server 2025 and one on 2017.  Never raise it to make a change pass.
     private const long MarginInBytesPerCall = 16;
 
     // A call allocates its command, its parameters, its reader and its rows: some kilobytes on the drivers that the
     // project runs.  A call below this measured nothing.
     private const long LeastBytesPerCall = 1024;
+
+    // The SQL of StreamAccounts, as the generated method sends it.
+    private const string StreamAccountsSql = "SELECT id, name\nFROM dbo.accounts\nORDER BY id;";
 
     // The SQL of the numbers queries of RowBuffers.sql, as the generated methods send it.
     private const string NumbersSql =
@@ -121,6 +129,9 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
 
     // "%o%" matches bob and carol, and the id alice.
     private static readonly SearchAccountsFilter Filter = new() { Name = "%o%", AccountId = 1 };
+
+    // The rows of StreamAccounts.
+    private static readonly CollectedAccount[] CollectedAccounts = [new(1, "alice"), new(2, "bob"), new(3, "carol")];
 
     private static readonly SearchAccountsView[] Rows = [new(1, "alice"), new(2, "bob"), new(3, "carol")];
 
@@ -542,6 +553,59 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
         pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
         pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
         pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-LeastImmutableArraySavingInBytesPerCall);
+    }
+
+    // The streaming method returns an iterator and yields each row as the reader reads it, with no buffer, so a call is
+    // the method, its iterator and the enumeration to the end, which both sides do: the hand-written iterator makes the
+    // calls that the generated one does, so what the generated method allocates beyond it is its own state.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StreamAccounts_ManyCalls_AllocatesNoMoreThanByHand(bool open)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        if (open)
+        {
+            await connection.OpenAsync(token);
+        }
+
+        (await connection.StreamAccounts(cancellationToken: token).ToListAsync(token)).ShouldBe(CollectedAccounts);
+        (await StreamAccountsByHand(connection, cancellationToken: token).ToListAsync(token)).ShouldBe(
+            CollectedAccounts
+        );
+
+        var pairs = await CallAllocations.MeasureAsync(
+            async () =>
+            {
+                var sum = 0;
+                await foreach (var account in connection.StreamAccounts(cancellationToken: token).ConfigureAwait(false))
+                {
+                    sum += account.Id;
+                }
+
+                return sum;
+            },
+            async () =>
+            {
+                var sum = 0;
+                await foreach (
+                    var account in StreamAccountsByHand(connection, cancellationToken: token).ConfigureAwait(false)
+                )
+                {
+                    sum += account.Id;
+                }
+
+                return sum;
+            },
+            WarmUpCalls,
+            Pairs
+        );
+        TestContext.Current.TestOutputHelper?.WriteLine($"StreamAccounts, of {Pairs} pairs of calls, {pairs}.");
+
+        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
+        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
+        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     // SearchAccounts by hand: the arguments of the generated method, and its calls, the rows into RowBufferByHand.
@@ -976,6 +1040,72 @@ public sealed class AllocationTests(SqlServerContainer sqlServer)
             if (wasClosed)
             {
                 await connection.CloseAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    // StreamAccounts of Queries/Streaming.sql, by hand: a method that checks its argument at the call and returns a
+    // static local iterator, which opens a closed connection, yields each row inside the try and closes the connection
+    // it opened in the finally.
+    private static IAsyncEnumerable<CollectedAccount> StreamAccountsByHand(
+        DbConnection connection,
+        DbTransaction? transaction = null,
+        int? commandTimeout = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        return Iterate(connection, transaction, commandTimeout, cancellationToken);
+
+        static async IAsyncEnumerable<CollectedAccount> Iterate(
+            DbConnection connection,
+            DbTransaction? transaction,
+            int? commandTimeout,
+            [EnumeratorCancellation] CancellationToken cancellationToken
+        )
+        {
+            var wasClosed = connection.State == ConnectionState.Closed;
+            if (wasClosed)
+            {
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            try
+            {
+                var command = connection.CreateCommand();
+                await using (command.ConfigureAwait(false))
+                {
+                    command.CommandText = StreamAccountsSql;
+                    command.Transaction = transaction;
+                    if (commandTimeout.HasValue)
+                    {
+                        command.CommandTimeout = commandTimeout.Value;
+                    }
+
+                    var reader = await command
+                        .ExecuteReaderAsync(CommandBehavior.Default, cancellationToken)
+                        .ConfigureAwait(false);
+                    await using (reader.ConfigureAwait(false))
+                    {
+                        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                        {
+                            // The generated method's reads: a row's columns are in its buffer once ReadAsync returns.
+#pragma warning disable CA1849
+                            yield return new CollectedAccount(
+                                reader.GetFieldValue<int>(0),
+                                reader.GetFieldValue<string>(1)
+                            );
+#pragma warning restore CA1849
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                if (wasClosed)
+                {
+                    await connection.CloseAsync().ConfigureAwait(false);
+                }
             }
         }
     }
