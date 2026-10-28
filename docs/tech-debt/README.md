@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0084`
+Next id: `TD-0086`
 
 ## Active items
 
@@ -43,6 +43,8 @@ Next id: `TD-0084`
 | [TD-0081](TD-0081-a-test-starts-mkfifo-itself.md) | Open | 2026-10-27 | Low | `PostgresDescriberTests` starts `mkfifo` with `Process.Start` and no skip where it is missing, against the rule that a test starts a program through `Programs` |
 | [TD-0082](TD-0082-a-test-converter-holds-its-token-in-a-static.md) | Open | 2026-10-27 | Low | The test converter `CancelOnRead` holds the token it cancels in a static that a test sets, so two tests reading through it in parallel would cancel each other's |
 | [TD-0083](TD-0083-two-tool-tests-wait-on-limits-of-their-own.md) | Open | 2026-10-27 | Low | `ProgramsTests` and `TerminationTests` wait on limits of their own, 20 and 60 seconds, beside `Eventually.Patience`, which `tests/AGENTS.md` makes the one limit |
+| [TD-0084](TD-0084-sql-server-error-after-the-first-result-set-is-lost.md) | Open | 2026-10-27 | Medium | On SQL Server, an error that a statement after the first result set raises is reported by no method that reads rows, buffered or streaming: the method returns its rows, or the loop ends, as if the query had succeeded |
+| [TD-0085](TD-0085-short-name-binds-to-a-referenced-packages-type.md) | Open | 2026-10-27 | Low | A short name that the project has no type of binds with no diagnostic to a `public` type of that name in an assembly a package brings, as `AccountId` to `Microsoft.Identity.Client.AccountId` under SqlClient 6.1, which then has no converter and fails when the query runs |
 
 ## Columns
 

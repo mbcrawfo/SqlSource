@@ -2,6 +2,8 @@
 
 Date: 2026-10-26
 
+Corrected on 2026-10-27 from the end-to-end tests: what a query of several statements does on SQL Server, in "Behaviour the user sees" and "Testing".
+
 A feature outside the [query generation epic](2026-10-07-query-generation-epic-design.md), which listed `IAsyncEnumerable<T>` as out of its scope.  It lets the generated method of a `many` query hand its rows to the caller one at a time, as an `IAsyncEnumerable<T>`, instead of reading them all into a collection first.
 
 ## Intent
@@ -120,7 +122,7 @@ public static global::System.Collections.Generic.IAsyncEnumerable<ListUsersDto> 
 - **The connection is busy while the loop runs.**  Another command on it inside the loop fails, as each driver reports it (no MARS on SQL Server).  A connection the method opened stays open until the loop ends.
 - **Leaving the loop early** disposes the reader, which reads and discards the rest of the rows, and then closes a connection the method opened.  On a large result this takes as long as reading the rest.  A transaction is left as it was.
 - **An error in a later row** throws from `MoveNextAsync`, after the rows before it were yielded: a null in a column that cannot be null, a converter's exception, a driver error.
-- **On SQL Server, a query of several statements** yields the rows of its first result set; its other statements run when the reader is disposed, so an error they raise is thrown at the end of the loop, from disposal.  The builder confirms this end to end and the manual says what is observed.
+- **On SQL Server, a query of several statements** yields the rows of its first result set, and its other statements run when the reader is disposed.  An error that a later statement raises is not reported: neither `MoveNextAsync` nor the disposal throws it, and a buffered method of the same SQL loses it too, as [TD-0084](../../tech-debt/TD-0084-sql-server-error-after-the-first-result-set-is-lost.md) records.
 - **Cancellation** through either token throws as each driver throws today; [PostgreSQL](../../manual/postgresql.md#method-results) and [SQL Server](../../manual/sqlserver.md#method-results) already document it.
 
 ### Settings
@@ -140,7 +142,7 @@ public static global::System.Collections.Generic.IAsyncEnumerable<ListUsersDto> 
   - the method's `cancellationToken` and `WithCancellation` each cancel;
   - a null in a column that cannot be null throws at that row, after the rows before it;
   - a converted column reads as it does in the array method;
-  - on SQL Server, a query of several statements, including one whose later statement raises an error.
+  - on SQL Server, a query of several statements: one that yields the rows of its first result set alone, and one whose `THROW` after its rows is thrown by no `MoveNextAsync` and not by the disposal, though the batch ran as far as the `THROW`.
 - **Allocations**, in both `EndToEnd/AllocationTests.cs`: the streaming method, enumerated to the end, against a hand-written `static` local async iterator that makes the same calls, within the existing margin, which is never raised.  *(Designer's call, after the builder check.)*
 - **The floor driver projects**, `SqlSource.Tests.Postgres.Npgsql8` and `SqlSource.Tests.SqlServer.SqlClient61`: one streaming query each, if the builder finds behaviour on the floor drivers can differ.
 

@@ -968,7 +968,7 @@ From the epic, kept:
 - **Collection types**: `SqlSourceCollectionType` and its levels, as phase 1 built them; default `Array`.  The read-only interfaces are backed by the array; `IList` and `ICollection` by a `List<T>`; `IImmutableList` by an `ImmutableList<T>`.  Every collection is materialised before the method returns, `IEnumerable` included.  One reading loop feeds every materialiser.
 - **Method location**: `MethodLocation` on the attribute alone.  `ExtensionClass`, the default, puts the methods as extension methods on `DbConnection` in a generated top-level `static partial class <Type>Extensions` in the attributed type's namespace with the type's accessibility.  `Public`, `Internal` and `Private` put them in the attributed type as static methods of that accessibility, taking the `DbConnection` as their first argument.
 - **Reading by ordinal**, not by name, with `GetFieldValue<T>`, and `IsDBNull` only for a column the model calls nullable.  A type the provider cannot convert to the mapped C# type is a bug in the type map, caught by the end-to-end tests.
-- `IAsyncEnumerable<T>`, synchronous methods and bulk operations are out of scope.
+- `IAsyncEnumerable<T>`, synchronous methods and bulk operations are out of scope.  `IAsyncEnumerable<T>` was delivered after the epic by [streaming query methods](2026-10-26-streaming-query-methods-design.md).
 
 Decided by the owner on 2026-10-24:
 
@@ -1061,7 +1061,7 @@ Obfuscate the fixtures and assert that replay gives the same provenance on the o
 - Multiple result sets, stored procedures and table-valued functions.
 - Databases other than PostgreSQL and SQL Server.  The description's optional fields and the `-- param:` type marker are the room left for them.  CockroachDB is the PostgreSQL describer with the walk off, and the first candidate; SQLite would need a static describer; MySQL, MariaDB and Oracle need declared parameter types.
 - Using a token's default as the C# default value of the generated method's parameter.  A default is a sample for describing; whether it should also be a run-time default is a separate question.
-- Synchronous execution methods, streaming results as `IAsyncEnumerable<T>`, and bulk operations.  The method shapes in this epic are one row, a list and a count.
+- Synchronous execution methods, streaming results as `IAsyncEnumerable<T>`, and bulk operations.  The method shapes in this epic are one row, a list and a count.  Streaming results as `IAsyncEnumerable<T>` was delivered after the epic by [streaming query methods](2026-10-26-streaming-query-methods-design.md).
 - Per-column C# type overrides.  Table-valued parameters.
 - A schema fingerprint in the snapshot.
 - Running migrations or starting a database from the tool.  The tool describes against a database the user has; how the schema got there is not its business.

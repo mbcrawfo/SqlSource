@@ -542,7 +542,7 @@ A null `connection` or `parameters` throws `ArgumentNullException`.  The names o
 
 | Shape | Returns |
 |----|----|
-| `many` | `Task<C>`, where `C` is the [collection type](settings.md#setting-collection-type) of the output model: an array by default, `Task<ListFromDto[]>` |
+| `many` | `Task<C>`, where `C` is the [collection type](settings.md#setting-collection-type) of the output model: an array by default, `Task<ListFromDto[]>`.  For the collection type `IAsyncEnumerable`, `IAsyncEnumerable<TDto>`, with no `Task` |
 | `one` | `Task<TDto>`, the output model |
 | `one-optional` | `Task<TDto?>` |
 | `none` | `Task` |
@@ -552,7 +552,7 @@ A null `connection` or `parameters` throws `ArgumentNullException`.  The names o
 
 ### The connection
 
-The method opens the connection when its `State` is `Closed`, and closes it again before it returns or throws.  A connection that was not closed is left as it was: it stays open, in the transaction and with the session's settings it had.  So to run several queries on one open connection, or in a transaction, open the connection yourself.
+The method opens the connection when its `State` is `Closed`, and closes it again before it returns or throws.  A method that [streams its rows](settings.md#streaming-rows) opens it when the loop asks for the first row, and closes it again when the loop ends, and the connection is busy with the query until then, so the loop's body cannot run another command on it.  A connection that was not closed is left as it was: it stays open, in the transaction and with the session's settings it had.  So to run several queries on one open connection, or in a transaction, open the connection yourself.
 
 **Give the method the transaction.**  The method gives its command the `transaction` it is given, or none when it is given null.  On SQL Server, Microsoft.Data.SqlClient refuses a command on a connection that has a transaction the command was not given, and throws `InvalidOperationException` ("... requires the command to have a transaction when the connection assigned to the command is in a pending local transaction ...") before anything is sent.  Npgsql runs such a command in the connection's transaction.  Pass the transaction to every method you call inside one, on both: see [the recipe](recipes.md#queries-in-a-transaction).
 
@@ -562,13 +562,13 @@ The method opens the connection when its `State` is `Closed`, and closes it agai
 
 The [result shape](sql-files.md#result-shapes) after the query's name says what the method does with the rows.  Without one, a query that returns rows is `many`, and one that returns none is `rowcount`.
 
-- **`many`** reads every row into the [collection type](settings.md#setting-collection-type), an array by default, and complete when the task completes.  Unless the query has [`no-array-pool`](settings.md#setting-generator-parameters), the rows of every collection type but `ImmutableList<T>` and `IImmutableList<T>` are read into buffers borrowed from .NET's shared array pool, so that, once the pool holds buffers of the sizes it needs, the method allocates no collection for up to about 1,000 rows but the one it returns.
+- **`many`** reads every row into the [collection type](settings.md#setting-collection-type), an array by default, and complete when the task completes, or, for the collection type `IAsyncEnumerable`, gives each row to the caller's loop as it is read: see [streaming rows](settings.md#streaming-rows).  Unless the query has [`no-array-pool`](settings.md#setting-generator-parameters), the rows of every collection but `ImmutableList<T>` and `IImmutableList<T>` are read into buffers borrowed from .NET's shared array pool, so that, once the pool holds buffers of the sizes it needs, the method allocates no collection for up to about 1,000 rows but the one it returns.
 - **`one`** returns the one row.  It throws [`UnexpectedRowCountException`](#unexpected-row-count) when the query returns no rows, or more than one: it reads a second row to see whether there is one.
 - **`one-optional`** returns the row, or null when there is none, and throws the same exception for more than one.
 - **`none`** runs the statement and returns nothing.
 - **`rowcount`** runs the statement and returns the count the driver reports: the rows inserted, updated or deleted, those of each statement added up when the query has several, and `-1` for a `SELECT`.  The rows of a `RETURNING` or `OUTPUT` clause are counted.  On PostgreSQL a `WITH` whose last statement is a `SELECT` counts as a `SELECT`, so it is `-1` though its `WITH` updates rows.  On SQL Server, `SET NOCOUNT ON` makes it `-1`, and when a query without parameters sets it, every later count on the connection too: see [known issues](#known-issues).
 
-`none` and `rowcount` read no rows, so they suit an `INSERT ... RETURNING` whose rows you do not want.  `one`, `one-optional` and `many` on a query that returns no rows are [SQLSRC272](diagnostics.md#sqlsrc272).  A SQL Server query of several statements returns the rows of its first result set, as its [model](sqlserver.md#what-can-be-described) has them, and its other statements still run.
+`none` and `rowcount` read no rows, so they suit an `INSERT ... RETURNING` whose rows you do not want.  `one`, `one-optional` and `many` on a query that returns no rows are [SQLSRC272](diagnostics.md#sqlsrc272).  A SQL Server query of several statements returns the rows of its first result set, as its [model](sqlserver.md#what-can-be-described) has them, and its other statements still run, though an error that one of them raises is not reported by a method that reads rows: see [what a method reads and throws](sqlserver.md#method-results).
 
 <a id="reading-rows"></a>
 
