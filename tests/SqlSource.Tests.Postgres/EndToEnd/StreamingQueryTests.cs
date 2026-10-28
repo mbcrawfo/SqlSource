@@ -22,8 +22,10 @@ public sealed class StreamingQueryTests(PostgresContainer postgres)
     // The seed's three accounts.
     private static readonly CollectedAccount[] Accounts = [new(1, "alice"), new(2, "bob"), new(3, "carol")];
 
-    // The count of the numbers that a break and a cancellation leave unread: far more than the driver buffers.
-    private const int ManyRows = 10_000;
+    // The count of the numbers that a break leaves unread.  The query sorts them, so the server is still sending when
+    // the loop stops, and a stream that cancelled its command on the break would abort the transaction of the caller;
+    // with 10,000 rows the server has sent them all by then and a cancel changes nothing.
+    private const int ManyRows = 1_000_000;
 
     [Fact]
     public async Task StreamAccounts_EveryAccount_YieldsTheArrayMethodsRows()
@@ -55,7 +57,7 @@ public sealed class StreamingQueryTests(PostgresContainer postgres)
     // The method is not async, so a null connection throws from the call itself and not from the first MoveNextAsync.
     [Fact]
     public void StreamAccounts_NullConnection_ThrowsAtTheCall() =>
-        Should.Throw<ArgumentNullException>(() => StreamingQueriesExtensions.StreamAccounts(null!));
+        _ = Should.Throw<ArgumentNullException>(() => StreamingQueriesExtensions.StreamAccounts(null!));
 
     [Fact]
     public async Task StreamAccountsNamedFrom_NullParameters_ThrowsAtTheCall()
@@ -195,10 +197,7 @@ public sealed class StreamingQueryTests(PostgresContainer postgres)
         await using var connection = source.CreateConnection();
         var stream = connection.StreamAccounts(cancellationToken: token);
 
-        await using (var enumerator = stream.GetAsyncEnumerator(token))
-        {
-            connection.State.ShouldBe(ConnectionState.Closed);
-        }
+        await stream.GetAsyncEnumerator(token).DisposeAsync();
 
         connection.State.ShouldBe(ConnectionState.Closed);
     }
@@ -224,8 +223,9 @@ public sealed class StreamingQueryTests(PostgresContainer postgres)
         (await connection.ListAsArray(cancellationToken: token)).ShouldBe(Accounts);
     }
 
-    // The break ends the stream while the transaction is open: the stream's reader is closed and the transaction is
-    // the caller's, so the commit that follows commits what the transaction did.  A temporary table keeps what the
+    // The break ends the stream while the transaction is open and the server is still sending rows: the stream's
+    // reader is closed and its command is not cancelled, which would abort the transaction, so the commit that follows
+    // commits what the transaction did.  A temporary table keeps what the
     // transaction writes out of the seed, which every test of the collection shares, and lives as long as the
     // connection.
     [Fact]
@@ -333,7 +333,7 @@ public sealed class StreamingQueryTests(PostgresContainer postgres)
 
     // Notes.sql converts account_id to an AccountId through the converters of the type, and so does this query.
     [Fact]
-    public async Task StreamNoteAccounts_ConvertedColumn_ReadsAsTheArrayMethodDoes()
+    public async Task StreamNoteAccounts_ConvertedColumn_YieldsAccountIds()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
