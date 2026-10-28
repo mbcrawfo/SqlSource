@@ -17,7 +17,7 @@
 - TD-0080 item 1 names six classes; the oracle's answer, `NullabilityRun`, is a record copied between the two `RealisticNullabilityOracle.cs` that the moved body of `RealisticNullabilitySafetyTests` reads, so it moves to `tests/SqlSource.Tool.Testing/Realistic/` with that body and the two oracles return it.  Nothing else of the oracles or of `RealisticSamples` moves: they read the database through the driver.
 - The engines' `RealisticCasesTests.Cases`, the `TheoryData<string>` every theory over the corpus takes, stays in each engine: it is one line, and `MemberData` needs a member of the test assembly.
 - The spec's "takes the engine's methods as delegates" for item 2: PostgreSQL's test took its connection from an `NpgsqlDataSource` made and disposed in each test, SQL Server's from `new SqlConnection`; the harness's helper takes a `Func<TConnection>` of a closed connection and opens it itself for an even count, so PostgreSQL's test class holds the data source and disposes it, as `ErrorPathTests` holds `ErrorPaths`.  An even count still runs on an open connection and an odd one on a closed one.
-- Item 7 (`td-0080-small`, which merges after this) will change `RealisticSamples.Substitute` to take the described parameters; the one call of it outside the tests of the helpers is now the delegate in PostgreSQL's `RealisticNullabilitySafetyTests.cs`, which that unit adapts.
+- Item 7 (`td-0080-small`, which merges after this) will change `RealisticSamples.Substitute` to take the described parameters; its two calls outside the tests of the helpers are the delegate in PostgreSQL's `RealisticNullabilitySafetyTests.cs` and `Generation/RealisticMethodTests.cs`, which that unit adapts.
 
 ## Global Constraints
 
