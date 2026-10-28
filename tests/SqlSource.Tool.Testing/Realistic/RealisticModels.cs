@@ -19,7 +19,7 @@ namespace SqlSource.Tool.Testing.Realistic;
 internal sealed class RealisticModels(Assembly assembly, string @namespace, DatabaseEngine engine)
 {
     // The suffix of an input model: the inputModelSuffix of the project's settings file,
-    // tests/<Project>/sqlsource.json.
+    // tests/DatabaseTests/<Project>/sqlsource.json.
     public const string InputSuffix = "Args";
 
     // The suffix of an output model: the default, which the project and the corpus leave unset.

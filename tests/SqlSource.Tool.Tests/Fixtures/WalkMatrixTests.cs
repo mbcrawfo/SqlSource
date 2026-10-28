@@ -16,7 +16,7 @@ namespace SqlSource.Tool.Tests.Fixtures;
 // the walk has since come to answer walk-subquery-kept, walk-cte-materialized, walk-aggregate, walk-union and the
 // merged columns of walk-using and walk-natural.  A recording that says otherwise is a bug of the walk or of the case,
 // never a reason to change this table without knowing which.  DescriberFixtureTests replays the same cases, and
-// tests/SqlSource.Tests.Postgres describes them on every supported major: 14 and 18 in CI, 15 to 17 every night.
+// tests/DatabaseTests/Postgres describes them on every supported major: 14 and 18 in CI, 15 to 17 every night.
 public sealed class WalkMatrixTests
 {
     // A NOT NULL column that nothing extends.

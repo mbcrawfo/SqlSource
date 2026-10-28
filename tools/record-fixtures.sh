@@ -20,16 +20,16 @@ usage() {
 engine_row() {
     case "$1" in
     postgres)
-        project='tests/SqlSource.Tests.Postgres'
+        project='tests/DatabaseTests/Postgres'
         cases='tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres'
-        tests='SqlSource.Tests.Postgres.Describer.FixtureCasesTests'
+        tests='SqlSource.DatabaseTests.Postgres.Describer.FixtureCasesTests'
         image_variable='SQLSOURCE_TESTS_POSTGRES_IMAGE'
         image_constant='Postgres'
         ;;
     mssql)
-        project='tests/SqlSource.Tests.SqlServer'
+        project='tests/DatabaseTests/SqlServer'
         cases='tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql'
-        tests='SqlSource.Tests.SqlServer.Describer.FixtureCasesTests'
+        tests='SqlSource.DatabaseTests.SqlServer.Describer.FixtureCasesTests'
         image_variable='SQLSOURCE_TESTS_SQLSERVER_IMAGE'
         image_constant='SqlServer'
         ;;

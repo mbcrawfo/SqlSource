@@ -2,7 +2,7 @@
 
 ## Problem
 
-[`CancelOnRead.Source`](../../tests/SqlSource.Tests.SqlServer/EndToEnd/Types/CancelOnRead.cs) is a `public static CancellationTokenSource?` with a setter, which [`RunTimeArgumentTests`](../../tests/SqlSource.Tests.SqlServer/EndToEnd/RunTimeArgumentTests.cs) sets before its call and resets after, found by the maintainability review of 2026-10-27.  The converter cancels whatever source the static holds when it reads a value.
+[`CancelOnRead.Source`](../../tests/DatabaseTests/SqlServer/EndToEnd/Types/CancelOnRead.cs) is a `public static CancellationTokenSource?` with a setter, which [`RunTimeArgumentTests`](../../tests/DatabaseTests/SqlServer/EndToEnd/RunTimeArgumentTests.cs) sets before its call and resets after, found by the maintainability review of 2026-10-27.  The converter cancels whatever source the static holds when it reads a value.
 
 ## Why it exists
 

@@ -40,6 +40,10 @@ public sealed class TestScopesFileTests
     [InlineData("tests/SqlSource.Tool.Tests/Fixtures/Projects/Single/App.csproj", nameof(TestScope.Postgres))]
     [InlineData("tests/SqlSource.Tool.Tests/Fixtures/Projects/SqlServer/App.csproj", nameof(TestScope.SqlServer))]
     [InlineData("tests/SqlSource.Tool.Tests/SqlSource.Tool.Tests.csproj", nameof(TestScope.None))]
+    [InlineData("tests/DatabaseTests/Postgres/Postgres.csproj", nameof(TestScope.Postgres))]
+    [InlineData("tests/DatabaseTests/Postgres.Npgsql8/AppContainer.cs", nameof(TestScope.Postgres))]
+    [InlineData("tests/DatabaseTests/Directory.Build.props", nameof(TestScope.Both))]
+    [InlineData("tests/DatabaseTests/README.md", nameof(TestScope.None))]
     public void Of_RealPath_IsDecidedAsIntended(string path, string scope) =>
         TestScopes.Repository.Of(path).ToString().ShouldBe(scope);
 
@@ -52,14 +56,23 @@ public sealed class TestScopesFileTests
         }
     }
 
+    // TestScopes.ProjectOf puts every project line under TestScopes.AssemblyPrefix, which only
+    // tests/DatabaseTests/Directory.Build.props gives an assembly, so a project listed elsewhere would never match
+    // its own name and would read every file unchecked.
+    [Fact]
+    public void RepositoryFile_EveryProjectFile_IsUnderDatabaseTests() =>
+        TestScopes.Repository.ProjectFiles.ShouldAllBe(file =>
+            file.StartsWith("tests/DatabaseTests/", StringComparison.Ordinal)
+        );
+
     [Fact]
     public void RepositoryFile_Projects_AreTheFourContainerProjects() =>
         TestScopes.Repository.Projects.Keys.ShouldBe(
             [
-                "SqlSource.Tests.Postgres",
-                "SqlSource.Tests.Postgres.Npgsql8",
-                "SqlSource.Tests.SqlServer",
-                "SqlSource.Tests.SqlServer.SqlClient61",
+                "SqlSource.DatabaseTests.Postgres",
+                "SqlSource.DatabaseTests.Postgres.Npgsql8",
+                "SqlSource.DatabaseTests.SqlServer",
+                "SqlSource.DatabaseTests.SqlServer.SqlClient61",
             ],
             ignoreOrder: true
         );

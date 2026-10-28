@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
-        The helpers of the tool's tests that tests/SqlSource.Tool.Tests, tests/SqlSource.Tests.Postgres and
-        tests/SqlSource.Tests.SqlServer share, the ones that tests/README.md lists.  A library of the tests, never a
+        The helpers of the tool's tests that tests/SqlSource.Tool.Tests, tests/DatabaseTests/Postgres and
+        tests/DatabaseTests/SqlServer share, the ones that tests/README.md lists.  A library of the tests, never a
         test project of its own.  It is apart from tests/SqlSource.Testing because it references the tool, which
         would raise the Roslyn of tests/SqlSource.Tests.RoslynFloor.
     -->
@@ -21,8 +21,8 @@
         <PackageReference Include="xunit.v3.extensibility.core" />
     </ItemGroup>
     <ItemGroup>
-        <InternalsVisibleTo Include="SqlSource.Tests.Postgres" />
-        <InternalsVisibleTo Include="SqlSource.Tests.SqlServer" />
+        <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres" />
+        <InternalsVisibleTo Include="SqlSource.DatabaseTests.SqlServer" />
         <InternalsVisibleTo Include="SqlSource.Tool.Tests" />
     </ItemGroup>
     <ItemGroup>

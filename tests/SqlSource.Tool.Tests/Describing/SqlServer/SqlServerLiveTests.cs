@@ -4,7 +4,7 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer;
 
-// The texts the live functions make themselves.  What they do with a server is in tests/SqlSource.Tests.SqlServer.
+// The texts the live functions make themselves.  What they do with a server is in tests/DatabaseTests/SqlServer.
 public sealed class SqlServerLiveTests
 {
     [Fact]

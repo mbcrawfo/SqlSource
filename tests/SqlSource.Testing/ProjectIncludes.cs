@@ -70,7 +70,7 @@ internal static class ProjectIncludes
         foreach (var projectFile in scopes.ProjectFiles)
         {
             var path = Path.GetFullPath(Path.Combine(repositoryRoot, projectFile));
-            var project = Path.GetFileNameWithoutExtension(path);
+            var project = TestScopes.ProjectOf(path);
             foreach (var (file, folder) in Inputs(repositoryRoot, path))
             {
                 var fileFolder = Path.GetDirectoryName(file)!;

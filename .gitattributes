@@ -19,10 +19,10 @@ schemas/*.json text eol=lf
 tests/SqlSource.Tool.Tests/Fixtures/Describers/** text eol=lf
 
 # A realistic case's query is described from its file at LF, as its committed sidecar was
-tests/SqlSource.Tests.Postgres/Realistic/Cases/** text eol=lf
+tests/DatabaseTests/Postgres/Realistic/Cases/** text eol=lf
 
 # A realistic case of SQL Server is described and executed from its file at LF, as PostgreSQL's is
-tests/SqlSource.Tests.SqlServer/Realistic/Cases/** text eol=lf
+tests/DatabaseTests/SqlServer/Realistic/Cases/** text eol=lf
 
 # An AGENTS.md is held to a size in bytes by AgentsFileTests, which a CRLF checkout would exceed
 AGENTS.md text eol=lf

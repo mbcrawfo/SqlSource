@@ -30,8 +30,8 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
     <ItemGroup>
-        <InternalsVisibleTo Include="SqlSource.Tests.Postgres" />
-        <InternalsVisibleTo Include="SqlSource.Tests.SqlServer" />
+        <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres" />
+        <InternalsVisibleTo Include="SqlSource.DatabaseTests.SqlServer" />
         <InternalsVisibleTo Include="SqlSource.Tool.Testing" />
         <InternalsVisibleTo Include="SqlSource.Tool.Tests" />
     </ItemGroup>

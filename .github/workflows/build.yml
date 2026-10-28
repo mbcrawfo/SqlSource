@@ -154,17 +154,17 @@ jobs:
           --results-directory artifacts/test-results
           --coverage --coverage-output-format cobertura
           --report-github --report-github-summary-include-passed false
-          --filter-not-class SqlSource.Tests.Postgres.EndToEnd.AllocationTests
-          --filter-not-class SqlSource.Tests.SqlServer.EndToEnd.AllocationTests
+          --filter-not-class SqlSource.DatabaseTests.Postgres.EndToEnd.AllocationTests
+          --filter-not-class SqlSource.DatabaseTests.SqlServer.EndToEnd.AllocationTests
 
       - name: Test allocations
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           status=0
           for engine in Postgres SqlServer; do
-              dotnet test --project "tests/SqlSource.Tests.$engine" --configuration "$CONFIGURATION" --no-build \
+              dotnet test --project "tests/DatabaseTests/$engine" --configuration "$CONFIGURATION" --no-build \
                   --report-github --report-github-summary-include-passed false \
-                  --filter-class "SqlSource.Tests.$engine.EndToEnd.AllocationTests" || status=1
+                  --filter-class "SqlSource.DatabaseTests.$engine.EndToEnd.AllocationTests" || status=1
           done
           exit "$status"
 
@@ -187,15 +187,15 @@ jobs:
           path: artifacts/coverage
           if-no-files-found: error
 
-  # The build job ran every test of tests/SqlSource.Tests.Postgres, the describer's and the end-to-end project's, on
+  # The build job ran every test of tests/DatabaseTests/Postgres, the describer's and the end-to-end project's, on
   # the default image.  This runs them again on the oldest PostgreSQL that is supported: see
-  # tests/SqlSource.Tests.Postgres/README.md.
+  # tests/DatabaseTests/Postgres/README.md.
   test-postgres-floor:
     name: Test on PostgreSQL 14
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      PROJECT: tests/SqlSource.Tests.Postgres
+      PROJECT: tests/DatabaseTests/Postgres
       # The oldest image that is supported, pinned as every image of the tests is: see rule 5 of AGENTS.md.
       POSTGRES_FLOOR_IMAGE: postgres:14.24
     steps:
@@ -209,7 +209,7 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: tests/SqlSource.Tests.Postgres/packages.lock.json
+          cache-dependency-path: tests/DatabaseTests/Postgres/packages.lock.json
 
       - name: Build
         run: dotnet build "$PROJECT" --configuration "$CONFIGURATION"
@@ -225,14 +225,14 @@ jobs:
           dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
           --report-github --report-github-summary-include-passed false
 
-  # The same for tests/SqlSource.Tests.SqlServer, which the build job ran on the default image, on the oldest SQL Server
-  # that is supported: see tests/SqlSource.Tests.SqlServer/README.md.
+  # The same for tests/DatabaseTests/SqlServer, which the build job ran on the default image, on the oldest SQL Server
+  # that is supported: see tests/DatabaseTests/SqlServer/README.md.
   test-sqlserver-floor:
     name: Test on SQL Server 2017
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      PROJECT: tests/SqlSource.Tests.SqlServer
+      PROJECT: tests/DatabaseTests/SqlServer
       # The oldest image that is supported, pinned as every image of the tests is: see rule 5 of AGENTS.md.
       SQLSERVER_FLOOR_IMAGE: mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04
     steps:
@@ -246,7 +246,7 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: tests/SqlSource.Tests.SqlServer/packages.lock.json
+          cache-dependency-path: tests/DatabaseTests/SqlServer/packages.lock.json
 
       - name: Build
         run: dotnet build "$PROJECT" --configuration "$CONFIGURATION"

@@ -1,12 +1,12 @@
 # AGENTS.md - src/SqlSource.Tool/Describing/SqlServer
 
-- **`tests/SqlSource.Tool.Tests/SqlServerScript.cs` answers a `SqlServerSession` with no server**, from a capture that the test builds in code, so its tests hold what is asked as well as what is made of the answers ([fixtures](../../../../docs/architecture/sqlserver-describer.md#fixtures)).  What only a server can show is tested in `tests/SqlSource.Tests.SqlServer/Describer/`.
+- **`tests/SqlSource.Tool.Tests/SqlServerScript.cs` answers a `SqlServerSession` with no server**, from a capture that the test builds in code, so its tests hold what is asked as well as what is made of the answers ([fixtures](../../../../docs/architecture/sqlserver-describer.md#fixtures)).  What only a server can show is tested in `tests/DatabaseTests/SqlServer/Describer/`.
 
 ## What reaches the server
 
 - **In `Describing/SqlServer/`, the user's text and a declaration reach the server only as the values of `@tsql` and `@params`** of `sys.sp_describe_undeclared_parameters`, called as a `CommandType.StoredProcedure`, and of `sys.dm_exec_describe_first_result_set` in the tool's own text (`Describing/SqlServer/SqlServerLive.cs`), through `columns` and `operands`, whose text is the query's own tokens rearranged (`Describing/SqlServer/Proofs/OperandsQuery.cs`), and are never put into a text the tool sends.
 - **Both analyse a text and run nothing, so that is what keeps a `.sql` file from making the describer run a statement** ([why a query cannot run a statement](../../../../docs/architecture/sqlserver-describer.md#why-a-query-cannot-run-a-statement)).
-- **The canary tests prove it.**  Those of `tests/SqlSource.Tests.SqlServer/Describer/ParameterTests.cs` prove it through `parameters`, `probe`, `declared` and a describe, and those of `SafetyTests.cs` beside it through `columns`, each finding `dbo.victim` there after a text that drops it, and through `operands`, finding a sequence not advanced by an operand that takes its next value.
+- **The canary tests prove it.**  Those of `tests/DatabaseTests/SqlServer/Describer/ParameterTests.cs` prove it through `parameters`, `probe`, `declared` and a describe, and those of `SafetyTests.cs` beside it through `columns`, each finding `dbo.victim` there after a text that drops it, and through `operands`, finding a sequence not advanced by an operand that takes its next value.
 - **A new place that sends a user's text sends it the same way and gets a canary beside them.**
 - **`DeclaredTypeText` is the first refusal, with an error that says what is wrong, and not the guarantee**: the server reads `@params` as a list of declarations and refuses one that is not.
 

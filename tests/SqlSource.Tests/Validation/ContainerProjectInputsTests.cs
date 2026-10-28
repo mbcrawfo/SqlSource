@@ -25,10 +25,10 @@ public sealed class ContainerProjectInputsTests
         var refused = ProjectIncludes.Refused(scopes, RepositoryRoot.Path());
 
         refused.ShouldContain(line =>
-            line.StartsWith($"SqlSource.Tests.Postgres: {FixtureProjects}Single/", StringComparison.Ordinal)
+            line.StartsWith($"SqlSource.DatabaseTests.Postgres: {FixtureProjects}Single/", StringComparison.Ordinal)
         );
         refused.ShouldContain(line =>
-            line.StartsWith($"SqlSource.Tests.SqlServer: {FixtureProjects}SqlServer/", StringComparison.Ordinal)
+            line.StartsWith($"SqlSource.DatabaseTests.SqlServer: {FixtureProjects}SqlServer/", StringComparison.Ordinal)
         );
     }
 

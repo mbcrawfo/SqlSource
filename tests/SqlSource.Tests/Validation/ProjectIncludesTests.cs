@@ -73,7 +73,9 @@ public sealed class ProjectIncludesTests : IDisposable
         var scopes = Scopes("none tests/Other/Other.csproj", "postgres tests/Other/*");
         WriteProject(Item("ProjectReference", "../Other/Other.csproj"));
 
-        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/Other.csproj is None"]);
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/Other.csproj is None"]);
     }
 
     [Fact]
@@ -82,7 +84,9 @@ public sealed class ProjectIncludesTests : IDisposable
         var scopes = Scopes("none tests/Other/*");
         WriteProject(Item("None", "Local.cs;../Other/File.cs"));
 
-        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/File.cs is None"]);
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/File.cs is None"]);
     }
 
     [Fact]
@@ -91,7 +95,9 @@ public sealed class ProjectIncludesTests : IDisposable
         var scopes = Scopes("none tests/Other/*");
         WriteProject(Import("../Other/Shared.props"));
 
-        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/Shared.props is None"]);
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/Shared.props is None"]);
     }
 
     [Fact]
@@ -102,7 +108,7 @@ public sealed class ProjectIncludesTests : IDisposable
 
         ProjectIncludes
             .Refused(scopes, _root.FullName)
-            .ShouldBe(["App: $(Other)/File.cs holds a property the check cannot resolve"]);
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: $(Other)/File.cs holds a property the check cannot resolve"]);
     }
 
     // MSBuild resolves an item of an imported file from the project's folder.
@@ -113,7 +119,9 @@ public sealed class ProjectIncludesTests : IDisposable
         WriteProject("tests/Directory.Build.props", Item("None", "../Other/File.cs"));
         WriteProject(Item("Compile", "Local.cs"));
 
-        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/File.cs is None"]);
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/File.cs is None"]);
     }
 
     // MSBuild resolves an Import from the folder of the file that holds it.
@@ -124,7 +132,9 @@ public sealed class ProjectIncludesTests : IDisposable
         WriteProject("tests/Directory.Build.targets", Import("Other/Shared.targets"));
         WriteProject(Item("Compile", "Local.cs"));
 
-        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/Shared.targets is None"]);
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/Shared.targets is None"]);
     }
 
     // $(MSBuildThisFileDirectory) is the folder of the file that holds it, here tests/, and not the project's.
@@ -135,7 +145,9 @@ public sealed class ProjectIncludesTests : IDisposable
         WriteProject("tests/Directory.Build.props", Import("$(MSBuildThisFileDirectory)Other/Shared.props"));
         WriteProject(Item("Compile", "Local.cs"));
 
-        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/Shared.props is None"]);
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/Shared.props is None"]);
     }
 
     // $(MSBuildProjectDirectory) is the project's folder, here tests/App, even in a file above it.
@@ -146,7 +158,9 @@ public sealed class ProjectIncludesTests : IDisposable
         WriteProject("tests/Directory.Build.props", Item("None", "$(MSBuildProjectDirectory)/../Other/File.cs"));
         WriteProject(Item("Compile", "Local.cs"));
 
-        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/File.cs is None"]);
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/File.cs is None"]);
     }
 
     // The library is a level deeper than the project, so only resolving from the library's folder finds the file.
@@ -157,7 +171,9 @@ public sealed class ProjectIncludesTests : IDisposable
         WriteProject("tests/Libs/Library/Library.csproj", Item("None", "../../Other/File.cs"));
         WriteProject(Item("ProjectReference", "../Libs/Library/Library.csproj"));
 
-        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/File.cs is None"]);
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/File.cs is None"]);
     }
 
     // The props is above the library and not above the project, and its item resolves from the library's folder.
@@ -169,7 +185,9 @@ public sealed class ProjectIncludesTests : IDisposable
         WriteProject("tests/Libs/Library/Library.csproj");
         WriteProject(Item("ProjectReference", "../Libs/Library/Library.csproj"));
 
-        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/File.cs is None"]);
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/File.cs is None"]);
     }
 
     [Fact]
@@ -184,7 +202,9 @@ public sealed class ProjectIncludesTests : IDisposable
         );
         WriteProject(Item("ProjectReference", "../Library/Library.csproj"));
 
-        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/File.cs is None"]);
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/File.cs is None"]);
     }
 
     [Fact]
@@ -195,7 +215,9 @@ public sealed class ProjectIncludesTests : IDisposable
         WriteProject("tests/Library/Library.csproj", Item("ProjectReference", "../Deep/Deep.csproj"));
         WriteProject(Item("ProjectReference", "../Library/Library.csproj"));
 
-        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBe(["App: tests/Other/File.cs is None"]);
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/File.cs is None"]);
     }
 
     // A project outside tests/ is the code under test, whose files reach the project through its scope alone.

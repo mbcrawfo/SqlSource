@@ -15,8 +15,8 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Fixtures;
 
 // Every case of every engine's fixtures, replayed with the engine's describer and no database: the text of the
-// sidecar is the case's expected.json, byte for byte.  tests/SqlSource.Tests.Postgres and
-// tests/SqlSource.Tests.SqlServer describe the same cases against a server, and tools/record-fixtures.sh records
+// sidecar is the case's expected.json, byte for byte.  tests/DatabaseTests/Postgres and
+// tests/DatabaseTests/SqlServer describe the same cases against a server, and tools/record-fixtures.sh records
 // them.
 public sealed class DescriberFixtureTests : IDisposable
 {
