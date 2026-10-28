@@ -26,10 +26,11 @@ internal static class RepositoryRoot
 
     // The full path of the parts under the root, or the root itself with none.  A path may go deeper than this from
     // there, never up, since only the path given here is checked.
-    public static string Path(params string[] parts) => Path(RunningProject, TestScopes.Repository, parts);
+    public static string Path(params string[] parts) => PathFor(RunningProject, TestScopes.Repository, parts);
 
-    // The same for another project and table, for the tests of the check.
-    internal static string Path(string project, TestScopes scopes, params string[] parts)
+    // Path for another project and table.  The tests of the check use it, and nothing else does: any other caller
+    // would choose what its read is checked against.
+    internal static string PathFor(string project, TestScopes scopes, params string[] parts)
     {
         var full = IOPath.GetFullPath(IOPath.Combine([Root, .. parts]));
         var relative = IOPath.GetRelativePath(Root, full).Replace('\\', '/');

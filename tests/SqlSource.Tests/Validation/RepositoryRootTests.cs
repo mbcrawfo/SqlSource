@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Shouldly;
 using SqlSource.Testing;
 using Xunit;
@@ -6,7 +7,7 @@ using Xunit;
 namespace SqlSource.Tests.Validation;
 
 // The run-time check of RepositoryRoot, on small scopes texts and projects of its own, so that no test here depends
-// on the real table.  The tests of Path read real folders of the repository.
+// on the real table.  The tests of PathFor read real folders of the repository.
 public sealed class RepositoryRootTests
 {
     private const string Pg = "PgTests";
@@ -18,6 +19,7 @@ public sealed class RepositoryRootTests
         """
         project postgres tests/PgTests/PgTests.csproj
         project sqlserver tests/MsTests/MsTests.csproj
+        sqlserver tests/PgTests/Shared/*
         postgres tests/PgTests/*
         sqlserver tests/MsTests/*
         none docs/*
@@ -56,10 +58,10 @@ public sealed class RepositoryRootTests
     public void Check_FolderWithAFileOfTheOtherEngine_Throws()
     {
         var thrown = Should.Throw<InvalidOperationException>(() =>
-            RepositoryRoot.Check(Pg, "tests", Scopes, ["tests/PgTests/a.sql", "tests/MsTests/b.sql"])
+            RepositoryRoot.Check(Pg, "tests/PgTests/", Scopes, ["tests/PgTests/a.sql", "tests/PgTests/Shared/b.sql"])
         );
 
-        thrown.Message.ShouldContain("tests/MsTests/b.sql");
+        thrown.Message.ShouldContain("tests/PgTests/Shared/b.sql under tests/PgTests/");
     }
 
     [Fact]
@@ -75,24 +77,54 @@ public sealed class RepositoryRootTests
         );
 
     [Fact]
-    public void Path_FolderOfTheProjectsOwnScope_IsTheFolder() =>
+    public void PathFor_FolderOfTheProjectsOwnScope_IsTheFolder() =>
         RepositoryRoot
-            .Path(Pg, DescriberScopes, [.. Describers, "postgres"])
+            .PathFor(Pg, DescriberScopes, [.. Describers, "postgres"])
             .ShouldBe(RepositoryRoot.Path([.. Describers, "postgres"]));
 
     [Fact]
-    public void Path_FolderOutsideTheProjectsScope_Throws()
+    public void PathFor_FolderOutsideTheProjectsScope_Throws()
     {
         var thrown = Should.Throw<InvalidOperationException>(() =>
-            RepositoryRoot.Path(Pg, DescriberScopes, Describers)
+            RepositoryRoot.PathFor(Pg, DescriberScopes, Describers)
         );
 
         thrown.Message.ShouldContain("tests/SqlSource.Tool.Tests/Fixtures/Describers/");
     }
 
     [Fact]
-    public void Path_AboveTheRoot_Throws() =>
-        Should.Throw<ArgumentException>(() => RepositoryRoot.Path(Pg, DescriberScopes, "..", "elsewhere"));
+    public void PathFor_AboveTheRoot_Throws() =>
+        Should.Throw<ArgumentException>(() => RepositoryRoot.PathFor(Pg, DescriberScopes, "..", "elsewhere"));
+
+    [Fact]
+    public void PathFor_UnlistedProject_PassesUnchecked() =>
+        RepositoryRoot
+            .PathFor("OtherTests", Scopes, "docs", "manual", "README.md")
+            .ShouldBe(RepositoryRoot.Path("docs", "manual", "README.md"));
+
+    // This project's own bin/ and obj/, which its build makes, are put in the other engine, and one of its sources is
+    // too: the check never lists the build output, and still lists every other file of the folder.
+    [Fact]
+    public void PathFor_FolderWithBinAndObjOfTheOtherEngine_ChecksOnlyItsOtherFiles()
+    {
+        string[] folder = ["tests", "SqlSource.Tests"];
+        Directory.Exists(RepositoryRoot.Path([.. folder, "bin"])).ShouldBeTrue();
+        Directory.Exists(RepositoryRoot.Path([.. folder, "obj"])).ShouldBeTrue();
+        const string Build = """
+            project postgres tests/PgTests/PgTests.csproj
+            sqlserver tests/SqlSource.Tests/bin/*
+            none tests/SqlSource.Tests/obj/*
+            postgres tests/SqlSource.Tests/*
+            """;
+        var source = "tests/SqlSource.Tests/Validation/RepositoryRootTests.cs";
+
+        _ = Should.NotThrow(() => RepositoryRoot.PathFor(Pg, TestScopes.Parse(Build), folder));
+        var thrown = Should.Throw<InvalidOperationException>(() =>
+            RepositoryRoot.PathFor(Pg, TestScopes.Parse($"sqlserver {source}\n{Build}"), folder)
+        );
+
+        thrown.Message.ShouldContain(source);
+    }
 
     [Fact]
     public void RunningProject_InThisProject_IsSqlSourceTests() =>
