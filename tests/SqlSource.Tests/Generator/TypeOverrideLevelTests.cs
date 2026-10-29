@@ -175,7 +175,7 @@ public sealed class TypeOverrideLevelTests
             .Where(key => key.Level < level)
             .Aggregate(new LevelSettings(), (settings, key) => settings.At(key.Level, Setting.TypeOverrides, key.Value))
             .At(level, Setting.TypeOverrides, value);
-        var files = settings.Files(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+        var files = settings.Files(GeneratorHarness.UsersFile);
         var file = files[0];
 
         var run = Run(settings, files, Entry(file, "GetUser", Timestamptz));
@@ -325,7 +325,7 @@ public sealed class TypeOverrideLevelTests
             Setting.TypeOverrides,
             EntryAt(level, "public._user_status", "System.Guid")
         );
-        var files = settings.Files(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+        var files = settings.Files(GeneratorHarness.UsersFile);
         var file = files[0];
 
         var run = Run(settings, files, Entry(file, "GetUser", ArrayOf(EnumType("user_status"), "_user_status")));
@@ -745,7 +745,7 @@ public sealed class TypeOverrideLevelTests
     public void Run_QuotedSchemaAndNameInAMarker_MapsTheType(SettingLevel level, string place)
     {
         var settings = new LevelSettings().At(level, Setting.TypeOverrides, QuotedKey + " = System.Guid");
-        var files = settings.Files(new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"));
+        var files = settings.Files(GeneratorHarness.UsersFile);
 
         var run = Run(settings, files, Entry(files[0], "GetUser", Composite("my schema", "order-status")));
 

@@ -42,7 +42,7 @@ public sealed class GeneratedSourceMethodTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"]
+        run.Sources[GeneratorHarness.SampleFile]
             .ShouldBe(
                 $$$"""
                 {{{GeneratedFile.Header}}}
@@ -318,6 +318,6 @@ public sealed class GeneratedSourceMethodTests
 
         withDefaults.Diagnostics.ShouldBeEmpty();
         withDefaults.GeneratedCodeWarnings.ShouldBeEmpty();
-        withDefaults.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
+        withDefaults.Sources[GeneratorHarness.SampleFile].ShouldBe(plain.Sources[GeneratorHarness.SampleFile]);
     }
 }

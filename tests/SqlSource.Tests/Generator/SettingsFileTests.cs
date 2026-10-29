@@ -85,7 +85,7 @@ public sealed class SettingsFileTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + Postgres + "\";");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"" + Postgres + "\";");
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public sealed class SettingsFileTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + Postgres + "\";");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"" + Postgres + "\";");
     }
 
     [Fact]
@@ -117,7 +117,7 @@ public sealed class SettingsFileTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + NotPostgres + "\";");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"" + NotPostgres + "\";");
     }
 
     // The parse builds the form of the query with its comments, which the folder's list asks for, and the constant is
@@ -140,7 +140,7 @@ public sealed class SettingsFileTests
             .Single<ParsedSqlFile>(run, TrackingNames.ParsedFile)
             .Queries.ShouldHaveSingleItem()
             .KeptSegments.ShouldNotBeNull();
-        run.Sources["App.Sample.g.cs"].ShouldContain(KeptConstant);
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain(KeptConstant);
     }
 
     // The nearer file's list replaces the farther files' whole, the project's file's among them, so no level outside
@@ -170,7 +170,7 @@ public sealed class SettingsFileTests
             .Single<ParsedSqlFile>(run, TrackingNames.ParsedFile)
             .Queries.ShouldHaveSingleItem()
             .KeptSegments.ShouldBeNull();
-        run.Sources["App.Sample.g.cs"].ShouldContain(StrippedConstant);
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain(StrippedConstant);
     }
 
     // The project asks for models, which need an entry for each query, and the folder's file asks for the constant
@@ -191,7 +191,7 @@ public sealed class SettingsFileTests
 
         run.ShouldBeClean();
         ModelFiles(run).ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string GetUser = ");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string GetUser = ");
     }
 
     // The attribute's suffix wins, and the folder's file still gives the other.
@@ -299,7 +299,7 @@ public sealed class SettingsFileTests
         );
 
         run.ShouldBeClean();
-        var type = run.Sources["App.Sample.g.cs"];
+        var type = run.Sources[GeneratorHarness.SampleFile];
         type.ShouldContain(StrippedConstant);
         type.ShouldContain(" ListFrom(");
         type.ShouldNotContain("ThrowIfNullOrWhiteSpace");
@@ -427,7 +427,7 @@ public sealed class SettingsFileTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("private static class Queries\n");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("private static class Queries\n");
     }
 
     // A file that a type links from outside its own folders takes the chain of the folder the file is in.
@@ -456,7 +456,7 @@ public sealed class SettingsFileTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain(KeptConstant);
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain(KeptConstant);
     }
 
     [Fact]
@@ -883,7 +883,7 @@ public sealed class SettingsFileTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + NotPostgres + "\";");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"" + NotPostgres + "\";");
     }
 
     private static GeneratorRun Run(string? dialect, params SqlFile[] files) => Run(dialect, files, null);

@@ -35,6 +35,9 @@ internal static class GeneratorHarness
     // settings.
     public const string ProjectSettingsPath = "/sqlsource.json";
 
+    // The file of the queries of the type Sample in the namespace App, which SampleSource and ModelRuns.Source declare.
+    public const string SampleFile = "App.Sample.g.cs";
+
     // The path of the .sql file that most tests use.
     public const string UsersPath = "/app/Repo/Users.sql";
 

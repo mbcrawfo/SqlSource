@@ -115,8 +115,8 @@ public sealed class SettingLevelTests
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
-        plain.Sources["App.Sample.g.cs"].ShouldContain(Constant);
-        run.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
+        plain.Sources[GeneratorHarness.SampleFile].ShouldContain(Constant);
+        run.Sources[GeneratorHarness.SampleFile].ShouldBe(plain.Sources[GeneratorHarness.SampleFile]);
     }
 
     [Theory]
@@ -149,7 +149,7 @@ public sealed class SettingLevelTests
             .ShouldHaveSingleItem();
         diagnostic.ShouldStartWith("SQLSRC006 /app/Repo/Sample.cs(5,2)-");
         diagnostic.ShouldEndWith(": '" + value + "' is not a valid value of " + property);
-        run.Sources.Keys.ShouldNotContain("App.Sample.g.cs");
+        run.Sources.Keys.ShouldNotContain(GeneratorHarness.SampleFile);
     }
 
     // The markers that change no type's file without a dialect, in a preamble and in a query: the type's file is the
@@ -182,8 +182,8 @@ public sealed class SettingLevelTests
         run.GeneratedCodeWarnings.ShouldBeEmpty();
 
         // The query has its constant or token method, so the comparison of the two files compares a member.
-        plain.Sources["App.Sample.g.cs"].ShouldMatch(@"public (const string Q = |static string Q\()");
-        run.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
+        plain.Sources[GeneratorHarness.SampleFile].ShouldMatch(@"public (const string Q = |static string Q\()");
+        run.Sources[GeneratorHarness.SampleFile].ShouldBe(plain.Sources[GeneratorHarness.SampleFile]);
     }
 
     // At sql, so that the query has a constant, which shows the marker's line stripped as a comment.
@@ -198,7 +198,7 @@ public sealed class SettingLevelTests
 
         // The line is an ordinary comment.
         run.Diagnostics.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("\"SELECT 1;\"");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("\"SELECT 1;\"");
     }
 
     // Below the level the project's file says another output, sql for codegen and codegen otherwise, so that the
@@ -234,12 +234,12 @@ public sealed class SettingLevelTests
         );
 
         run.ShouldBeClean();
-        var type = run.Sources["App.Sample.g.cs"];
+        var type = run.Sources[GeneratorHarness.SampleFile];
         if (output == "CodeGen")
         {
             type.ShouldNotContain("GetUser");
             run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUser(\n");
-            ModelRuns.ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs", "App.GetUserParams-Model.g.cs"]);
+            ModelRuns.ModelFiles(run).ShouldBe([ModelRuns.GetUserDtoFile, "App.GetUserParams-Model.g.cs"]);
         }
         else
         {
@@ -247,7 +247,7 @@ public sealed class SettingLevelTests
             run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
             ModelRuns
                 .ModelFiles(run)
-                .ShouldBe(output == "Models" ? ["App.GetUserDto-Model.g.cs", "App.GetUserParams-Model.g.cs"] : []);
+                .ShouldBe(output == "Models" ? [ModelRuns.GetUserDtoFile, "App.GetUserParams-Model.g.cs"] : []);
         }
     }
 
@@ -308,7 +308,7 @@ public sealed class SettingLevelTests
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldContain(holder);
         methods.ShouldContain(modifiers + "global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(\n");
-        run.Sources["App.Sample.g.cs"].ShouldNotContain("GetUser");
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
     }
 
     // SQLSRC209 for the query Q at this line, under the default dialect.

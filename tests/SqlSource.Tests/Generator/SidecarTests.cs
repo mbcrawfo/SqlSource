@@ -291,7 +291,7 @@ public sealed class SidecarTests
         UsableEntries(run).ShouldBeEmpty();
         withEntries.Diagnostics.ShouldBe([NotDescribable]);
         UsableEntries(withEntries).ShouldBeEmpty();
-        var generated = run.Sources["App.Sample.g.cs"];
+        var generated = run.Sources[GeneratorHarness.SampleFile];
         generated.ShouldContain("GetUser =");
         generated.ShouldContain("CountUsers =");
         generated.ShouldContain("ListUsers =");
@@ -338,7 +338,7 @@ public sealed class SidecarTests
                 + "'sql'.",
             .. noDefaults,
         ]);
-        ansi.Sources["App.Sample.g.cs"].ShouldContain("GetUser");
+        ansi.Sources[GeneratorHarness.SampleFile].ShouldContain("GetUser");
     }
 
     // The tool reports a token without a default whatever the file's sidecar and dialect, and so does the build:
@@ -481,7 +481,7 @@ public sealed class SidecarTests
         StepOutputs
             .Of<SidecarCheckResult>(run, TrackingNames.SidecarCheck)
             .ShouldAllBe(check => check.Diagnostics.Count == 0);
-        run.Sources.Keys.ShouldContain("App.Sample.g.cs");
+        run.Sources.Keys.ShouldContain(GeneratorHarness.SampleFile);
     }
 
     // Every sidecar of a claimed file is read, whatever its queries need.

@@ -48,7 +48,7 @@ public sealed class GeneratorHarnessTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string GetUser = ");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string GetUser = ");
     }
 
     // The harness writes the words, split at white space, as the array of the project's settings file.
@@ -63,7 +63,7 @@ public sealed class GeneratorHarnessTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"SELECT 1 -- kept\";");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"SELECT 1 -- kept\";");
         var file = StepOutputs.Single<ListedSettingsFile>(run, TrackingNames.SettingsFile);
         file.Path.ShouldBe(GeneratorHarness.ProjectSettingsPath);
         file.File.Errors.ShouldBeEmpty();
@@ -149,6 +149,6 @@ public sealed class GeneratorHarnessTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"SELECT 1 -- kept\";");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"SELECT 1 -- kept\";");
     }
 }

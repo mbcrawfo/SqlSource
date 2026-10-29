@@ -340,7 +340,7 @@ public sealed class CheckTests : IDisposable
     // The sidecar of a file that needs none any more, which "describe" would delete.
     private string AddPlainWithASidecar(int formatVersion = SidecarFormat.Version)
     {
-        var plain = _scene.Project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 4;\n");
+        var plain = _scene.Project.AddSql("Plain.sql", SqlTexts.Plain);
         File.WriteAllText(SidecarFormat.PathFor(plain), SidecarFiles.Empty(formatVersion));
         return plain;
     }
@@ -363,7 +363,7 @@ public sealed class CheckTests : IDisposable
     public async Task Check_SidecarOfAFileThatNeedsNoneAndCannotBeOpened_IsSqlsrc218AndNoDifference()
     {
         _ = await DescribeFirstAsync();
-        var plain = _scene.Project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 4;\n");
+        var plain = _scene.Project.AddSql("Plain.sql", SqlTexts.Plain);
         var sidecar = SidecarFormat.PathFor(plain);
         _ = Directory.CreateDirectory(sidecar);
 

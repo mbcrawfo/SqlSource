@@ -58,8 +58,8 @@ public sealed class GeneratedSourceTests
         );
 
         run.ShouldBeClean();
-        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs", "App.Sample.g.cs"], ignoreOrder: true);
-        run.Sources["App.Sample.g.cs"]
+        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs", GeneratorHarness.SampleFile], ignoreOrder: true);
+        run.Sources[GeneratorHarness.SampleFile]
             .ShouldBe(
                 $$"""
                 {{GeneratedFile.Header}}
@@ -120,7 +120,7 @@ public sealed class GeneratedSourceTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"]
+        run.Sources[GeneratorHarness.SampleFile]
             .ShouldBe(
                 $$"""
                 {{GeneratedFile.Header}}

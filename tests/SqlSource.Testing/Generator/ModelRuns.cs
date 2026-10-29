@@ -28,6 +28,9 @@ internal static class ModelRuns
         }
         """;
 
+    // The file of the model of GetUser's rows, in the namespace App.
+    public const string GetUserDtoFile = "App.GetUserDto-Model.g.cs";
+
     // A model's file ends in -Model.g.cs, with a hash before .g.cs when its name is made unique.
     private const string ModelMark = "-Model.";
 

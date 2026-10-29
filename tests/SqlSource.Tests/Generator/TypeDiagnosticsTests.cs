@@ -395,7 +395,7 @@ public sealed class TypeDiagnosticsTests
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
-        run.Sources.Keys.ShouldContain("App.Sample.g.cs");
+        run.Sources.Keys.ShouldContain(GeneratorHarness.SampleFile);
     }
 
     // Each is reported where the attribute reader reads it: the location, the method location, then the settings in
