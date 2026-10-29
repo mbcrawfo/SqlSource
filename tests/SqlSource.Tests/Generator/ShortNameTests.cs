@@ -1,5 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Nodes;
 using Microsoft.CodeAnalysis;
@@ -42,6 +43,22 @@ public sealed class ShortNameTests
         namespace Lib
         {
             public readonly record struct UserId(long Value);
+        }
+        """;
+
+    // A library whose assembly only a package that the project does not list itself brings, when the build names it so.
+    private const string BroughtAssembly = "Brought.Client";
+
+    private const string BroughtSource = """
+        namespace Brought.Client;
+
+        public readonly record struct AccountId(long Value)
+        {
+            [SqlSource.SqlSourceConverter]
+            public static AccountId FromDatabase(long value) => new(value);
+
+            [SqlSource.SqlSourceConverter]
+            public static long ToDatabase(AccountId id) => id.Value;
         }
         """;
 
@@ -392,8 +409,173 @@ public sealed class ShortNameTests
         type.Candidates.ShouldBe(["App.UserId", "Other.UserId"]);
     }
 
+    // A short name that finds a type of an assembly that only a package brings is a warning, and the type is used.
+    [Fact]
+    public void Run_ShortNameOfATransitivePackagesType_IsSqlsrc284AndKeepsTheType()
+    {
+        var run = RunBrought(OutputKind.Models, OverrideFiles(Int8), Override("int8", "AccountId"));
+
+        run.Problems()
+            .ShouldBe([
+                $"SQLSRC284 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'int8' is mapped to 'AccountId' for "
+                    + $"column 'id', in {Place}, and the short name 'AccountId' finds 'Brought.Client.AccountId', of "
+                    + "the assembly Brought.Client, which this project has only through a package that it does not "
+                    + "reference itself.  If that is the type meant, write its full name, 'Brought.Client.AccountId'; "
+                    + "otherwise correct the name.",
+            ]);
+        run.SeverityOf("SQLSRC284").ShouldBe(DiagnosticSeverity.Warning);
+        run.Sources[GetUserDtoFile].ShouldContain("global::Brought.Client.AccountId Id");
+    }
+
+    [Fact]
+    public void Run_FullNameOfATransitivePackagesType_IsClean()
+    {
+        var run = RunBrought(OutputKind.Models, OverrideFiles(Int8), Override("int8", "Brought.Client.AccountId"));
+
+        run.ShouldBeClean();
+        run.Sources[GetUserDtoFile].ShouldContain("global::Brought.Client.AccountId Id");
+    }
+
+    // The build names no assembly that only a package brings, so Brought.Client is a reference of the project's own.
+    [Fact]
+    public void Run_ShortNameOfADirectReferencesType_IsClean()
+    {
+        var run = RunBrought(OutputKind.Models, OverrideFiles(Int8), Override("int8", "AccountId"), brought: false);
+
+        run.ShouldBeClean();
+        run.Sources[GetUserDtoFile].ShouldContain("global::Brought.Client.AccountId Id");
+    }
+
+    [Fact]
+    public void Run_ShortNameInATypeArgument_IsSqlsrc284ForTheArgument()
+    {
+        var run = RunBrought(
+            OutputKind.Models,
+            OverrideFiles(ArrayOf(Int8, "_int8")),
+            Override("int8[]", "System.Collections.Generic.List<AccountId>")
+        );
+
+        run.Problems()
+            .ShouldHaveSingleItem()
+            .ShouldBe(
+                $"SQLSRC284 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'int8[]' is mapped to "
+                    + $"'System.Collections.Generic.List<AccountId>' for column 'id', in {Place}, and the short name "
+                    + "'AccountId' finds 'Brought.Client.AccountId', of the assembly Brought.Client, which this "
+                    + "project has only through a package that it does not reference itself.  If that is the type "
+                    + "meant, write its full name, 'Brought.Client.AccountId'; otherwise correct the name."
+            );
+        run.Sources[GetUserDtoFile]
+            .ShouldContain("global::System.Collections.Generic.List<global::Brought.Client.AccountId> Id");
+    }
+
+    // The array's type is its element's entry with [], which keeps the warning of the element's short name.
+    [Fact]
+    public void Run_ArrayColumnOfAnElementsEntry_IsSqlsrc284()
+    {
+        var run = RunBrought(OutputKind.Models, OverrideFiles(ArrayOf(Int8, "_int8")), Override("int8", "AccountId"));
+
+        run.Problems()
+            .ShouldHaveSingleItem()
+            .ShouldStartWith(
+                $"SQLSRC284 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'int8' is mapped to 'AccountId' for "
+                    + $"column 'id', in {Place}, and the short name 'AccountId' finds "
+            );
+        run.Sources[GetUserDtoFile].ShouldContain("global::Brought.Client.AccountId[] Id");
+    }
+
+    [Fact]
+    public void Run_ColumnMarkerAndParamMarker_EachIsSqlsrc284()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n-- param: @id -> AccountId\n-- column: id -> AccountId\n"
+                + "SELECT id FROM users WHERE id = @id;\n"
+        );
+
+        var run = RunBrought(
+            OutputKind.Models,
+            [file, Sidecars.Of(file, Entry(file, "GetUser", [Parameter("id", Int8, false)], [Column("id", Int8)]))]
+        );
+
+        const string Finds =
+            ", and the short name 'AccountId' finds 'Brought.Client.AccountId', of the assembly Brought.Client, which "
+            + "this project has only through a package that it does not reference itself.  If that is the type meant, "
+            + "write its full name, 'Brought.Client.AccountId'; otherwise correct the name.";
+        run.Problems()
+            .ShouldBe([
+                $"SQLSRC284 {GeneratorHarness.UsersPath}(1,10)-(1,17): '@id' is mapped to 'AccountId' for "
+                    + "parameter 'id', in the -- param: marker of the parameter"
+                    + Finds,
+                $"SQLSRC284 {GeneratorHarness.UsersPath}(1,10)-(1,17): 'id' is mapped to 'AccountId' for "
+                    + "column 'id', in a -- column: marker of the query"
+                    + Finds,
+            ]);
+        run.Sources["App.GetUserParams-Model.g.cs"].ShouldContain("global::Brought.Client.AccountId Id");
+        run.Sources[GetUserDtoFile].ShouldContain("global::Brought.Client.AccountId Id");
+    }
+
+    // The warning leaves the query its method, which reads the column through the type's converters.
+    [Fact]
+    public void Run_CodeGenQuery_IsSqlsrc284AndGetsItsMethod()
+    {
+        var run = RunBrought(OutputKind.CodeGen, OverrideFiles(Int8), Override("int8", "AccountId"));
+
+        run.Problems().ShouldHaveSingleItem().ShouldStartWith("SQLSRC284 ");
+        run.Sources[MethodRuns.MethodsFile]
+            .ShouldContain("global::Brought.Client.AccountId.FromDatabase(reader.GetFieldValue<long>(0))");
+    }
+
+    // A query whose output is sql has no C# types, and needs no entry, so no short name of its type override is used.
+    [Fact]
+    public void Run_SqlOutputQuery_IsClean()
+    {
+        var run = RunBrought(OutputKind.Sql, [GeneratorHarness.UsersFile], Override("int8", "AccountId"));
+
+        run.ShouldBeClean();
+    }
+
+    // The source and files under postgres on Npgsql 10 with Brought.Client referenced, which the build names as an
+    // assembly that only a package the project does not list itself brings, unless brought is false.
+    private static GeneratorRun RunBrought(
+        OutputKind output,
+        SqlFile[] files,
+        string? settings = null,
+        bool brought = true
+    ) =>
+        GeneratorHarness.Run(
+            output,
+            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            files,
+            references:
+            [
+                NpgsqlReferences.Npgsql10,
+                GeneratorHarness.CreateReference(OutputKind.Sql, BroughtAssembly, BroughtSource),
+            ],
+            dialect: "postgres",
+            properties: brought
+                ? new Dictionary<string, string?> { [TransitivePackageAssemblies.PropertyName] = BroughtAssembly }
+                : null,
+            settings: settings
+        );
+
+    // GetUser, with one column id of the type, and its sidecar.
+    private static SqlFile[] OverrideFiles(PostgresType type)
+    {
+        var file = GeneratorHarness.UsersFile;
+        return [file, Sidecars.Of(file, Entry(file, "GetUser", [], [Column("id", type)]))];
+    }
+
+    // The project's settings file's type override of the key to the C# type.
+    private static string Override(string key, string mappedType) =>
+        GeneratorHarness.Json(new JsonObject { ["typeOverrides"] = new JsonObject { [key] = mappedType } });
+
     private static MappedType Resolve(Compilation compilation, string name) =>
         MappedTypeResolver
-            .Resolve(compilation, new EquatableArray<string>([name]), TestContext.Current.CancellationToken)
+            .Resolve(
+                compilation,
+                new EquatableArray<string>([name]),
+                TransitivePackageAssemblies.None,
+                TestContext.Current.CancellationToken
+            )
             .Types.ShouldHaveSingleItem();
 }

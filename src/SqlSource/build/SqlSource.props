@@ -39,10 +39,13 @@
         are in settings files, sqlsource.json, which SqlSource.targets gives the compiler as AdditionalFiles items, so
         no setting is listed, and no metadata.  SqlSourceBuildFolders is no setting: SqlSource.targets sets it to the
         folders the build writes C# files and its outputs into and the NuGet package folders, and a C# file under
-        one, such as one the SDK writes into obj or one a package ships, reaches no settings file.  It is not under
-        the condition above: a project that lists its own .sql files still needs it.
+        one, such as one the SDK writes into obj or one a package ships, reaches no settings file.  Nor is
+        SqlSourceTransitivePackageAssemblies: SqlSource.targets sets it to the names of the referenced assemblies that
+        only a package the project does not list brings, and a short type name that binds to a type of one is warned
+        of.  Neither is under the condition above: a project that lists its own .sql files still needs them.
     -->
     <ItemGroup>
         <CompilerVisibleProperty Include="SqlSourceBuildFolders" />
+        <CompilerVisibleProperty Include="SqlSourceTransitivePackageAssemblies" />
     </ItemGroup>
 </Project>
