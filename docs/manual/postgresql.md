@@ -312,7 +312,7 @@ Each parameter is sent as the PostgreSQL type it was described with, or the type
 - **`rowcount` is `-1` for a `SELECT`**, and for a `WITH` whose last statement is a `SELECT`, though its `WITH` updates rows: see [what each shape returns](generator.md#method-shapes).
 - **`commandTimeout`** that passes throws Npgsql's `NpgsqlException`, whose inner exception is a `TimeoutException`.
 - **A cancelled method throws `OperationCanceledException`**, whether the token was cancelled before the call, while the command runs or while the rows are read.
-- **A loop over [streamed rows](settings.md#streaming-rows) that ends early throws the error of a row it left unread.**  At a `break`, or an exception in the loop's body, the rows still to come are read, and a `PostgresException` that PostgreSQL raises for one of them, such as `22012` for a division by zero, is thrown when the loop ends, in place of the body's exception, and aborts the transaction the query ran in.  See [known issues](settings.md#known-issues).
+- **A loop over [streamed rows](settings.md#streaming-rows) that ends early throws the error of a row it left unread.**  At a `break`, or an exception in the loop's body, the rows still to come are read, and a `PostgresException` that PostgreSQL raises for one of them, such as `22012` for a division by zero, is thrown when the loop ends, in place of the body's exception, and aborts the transaction the query ran in.  To keep the body's exception too, see [streamed rows](settings.md#streaming-rows).
 - **The connection's commands must take Npgsql's own parameters**, as those of `NpgsqlConnection` do.  A connection that wraps Npgsql's and creates parameters of its own is a [known issue](generator.md#known-issues).
 
 <a id="known-issues"></a>
