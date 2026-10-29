@@ -33,13 +33,14 @@ public sealed class FixtureCasesTests : IDisposable
         cases[0].Folder.ShouldBe(_folder.PathOf("postgres/a"));
     }
 
-    // A folder without a query is no case: an incremental build leaves the empty folder of a case renamed or removed
-    // in the output, and the build copies a case's files, not its folders.
+    // A folder without a query is no case, whether empty, as an incremental build leaves the folder of a case
+    // renamed or removed in the output, or holding other files of a case.
     [Fact]
     public void InFolder_FolderWithoutAQuery_IsNoCase()
     {
         _ = FixtureCaseFiles.Create(_folder.Path, SidecarValues.Engine.Postgres, "a", "SELECT 1;\n");
         _ = Directory.CreateDirectory(_folder.PathOf("postgres/gone"));
+        _ = _folder.WriteFile("postgres/partial/capture.json", "[]\n");
 
         var cases = FixtureCases.InFolder(_folder.PathOf(SidecarValues.Engine.Postgres));
 
