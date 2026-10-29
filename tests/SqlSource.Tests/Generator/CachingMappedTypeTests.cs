@@ -61,7 +61,7 @@ public sealed class CachingMappedTypeTests
         var (types, reason) = Outputs(result, TrackingNames.MappedTypes).ShouldHaveSingleItem();
         reason.ShouldBe(IncrementalStepRunReason.Cached);
         types.ShouldBe(before);
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // A short name is looked up again on the new compilation, through the index of each reference, which is the
@@ -88,7 +88,7 @@ public sealed class CachingMappedTypeTests
 
         AllReasons(result, TrackingNames.ResolvedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
         Outputs(result, TrackingNames.MappedTypes).ShouldHaveSingleItem().Value.ShouldBe(before);
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public sealed class CachingMappedTypeTests
         reason.ShouldBe(IncrementalStepRunReason.Cached);
         converters.ShouldBe(before);
         AllReasons(result, TrackingNames.Converters).ShouldBe([IncrementalStepRunReason.Cached]);
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // A converter of the library changes, and the type it is on does not: the converters run again and the mapped

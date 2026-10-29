@@ -82,8 +82,8 @@ public sealed class CachingCheckTests
                 },
                 ignoreOrder: true
             );
-        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.TypeNeeds).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.TypeNeeds).ShouldAllBeCached();
         result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC244");
     }
 
@@ -195,7 +195,7 @@ public sealed class CachingCheckTests
             .ShouldAllBe(reason =>
                 reason == IncrementalStepRunReason.Unchanged || reason == IncrementalStepRunReason.Cached
             );
-        Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        Checks(result).Values.ShouldAllBeCached();
     }
 
     // An edit of the project's settings file's model suffix: every type's needs are found again and are the same, so
@@ -216,14 +216,12 @@ public sealed class CachingCheckTests
         );
         var result = Run(driver.ReplaceAdditionalText(project, edited), compilation);
 
-        AllReasons(result, TrackingNames.TypeNeeds).ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
+        AllReasons(result, TrackingNames.TypeNeeds).ShouldAllBe(IncrementalStepRunReason.Unchanged);
         AllReasons(result, TrackingNames.FileNeeds).ShouldBe([IncrementalStepRunReason.Cached]);
-        AllReasons(result, TrackingNames.SidecarCheckInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.FileTypesInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
-        AllReasons(result, TrackingNames.FileTypes).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.SidecarCheckInput).ShouldAllBeCached();
+        Checks(result).Values.ShouldAllBeCached();
+        AllReasons(result, TrackingNames.FileTypesInput).ShouldAllBe(IncrementalStepRunReason.Unchanged);
+        AllReasons(result, TrackingNames.FileTypes).ShouldAllBeCached();
     }
 
     // A project at Sql with no sidecar: no query needs an entry, so no check has anything to do and no hash is

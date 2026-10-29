@@ -39,10 +39,9 @@ public sealed class CachingSidecarTests
                 ignoreOrder: true
             );
         AllReasons(result, TrackingNames.Sidecars).ShouldBe([IncrementalStepRunReason.Modified]);
-        AllReasons(result, TrackingNames.FileParseInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.FileParseInput).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBeCached();
     }
 
     [Fact]
@@ -113,8 +112,8 @@ public sealed class CachingSidecarTests
                 },
                 ignoreOrder: true
             );
-        Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        Checks(result).Values.ShouldAllBeCached();
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // A sidecar with no .sql file beside it, which no type can claim.

@@ -181,7 +181,8 @@ public sealed class TypeOverrideLevelTests
         var run = Run(settings, files, Entry(file, "GetUser", Timestamptz));
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser")
+        StepOutputs
+            .ColumnsOf(run, "GetUser")
             .ShouldBe([new PropertyType("global::System.DateTime", true, true, NoWarnings, "timestamptz", null)]);
     }
 
@@ -200,7 +201,8 @@ public sealed class TypeOverrideLevelTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser")
+        StepOutputs
+            .ColumnsOf(run, "GetUser")
             .ShouldBe([
                 new PropertyType("short", true, true, NoWarnings, "int4", TheQueryPlace, IntBase),
                 new PropertyType(
@@ -267,7 +269,8 @@ public sealed class TypeOverrideLevelTests
         var ofTheElement = Run(elementOverride, (file, [Entry(file, "GetUser", array)]));
 
         ofTheArray.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(ofTheArray, "GetUser")
+        StepOutputs
+            .ColumnsOf(ofTheArray, "GetUser")
             .ShouldBe([
                 new PropertyType(
                     "global::System.Collections.Generic.List<int>",
@@ -279,7 +282,8 @@ public sealed class TypeOverrideLevelTests
                     database
                 ),
             ]);
-        ColumnsOf(ofTheElement, "GetUser")
+        StepOutputs
+            .ColumnsOf(ofTheElement, "GetUser")
             .ShouldBe([new PropertyType(elementType, false, true, NoWarnings, element, TheProjectFilePlace, database)]);
     }
 
@@ -461,7 +465,8 @@ public sealed class TypeOverrideLevelTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser")
+        StepOutputs
+            .ColumnsOf(run, "GetUser")
             .Select(column => column.Text)
             .ShouldBe(["global::System.Uri", "global::System.Uri[]"]);
     }
@@ -535,7 +540,8 @@ public sealed class TypeOverrideLevelTests
         );
 
         own.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(own, "GetUser")
+        StepOutputs
+            .ColumnsOf(own, "GetUser")
             .ShouldBe([
                 new PropertyType(
                     "global::System.Guid",
@@ -548,7 +554,8 @@ public sealed class TypeOverrideLevelTests
                 ),
                 new PropertyType("long", true, true, NoWarnings, "int4", TheProjectFilePlace, IntBase),
             ]);
-        ColumnsOf(ofTheBase, "GetUser")
+        StepOutputs
+            .ColumnsOf(ofTheBase, "GetUser")
             .ShouldBe([new PropertyType("long", true, true, NoWarnings, "int4", TheProjectFilePlace, IntBase)]);
     }
 
@@ -569,7 +576,8 @@ public sealed class TypeOverrideLevelTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser")
+        StepOutputs
+            .ColumnsOf(run, "GetUser")
             .ShouldBe([
                 new PropertyType("global::NpgsqlTypes.NpgsqlRange<int>", true, true, NoWarnings, "int4range", null),
             ]);
@@ -589,7 +597,8 @@ public sealed class TypeOverrideLevelTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser")
+        StepOutputs
+            .ColumnsOf(run, "GetUser")
             .ShouldBe([
                 new PropertyType(
                     "global::System.Guid",
@@ -627,7 +636,8 @@ public sealed class TypeOverrideLevelTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser")
+        StepOutputs
+            .ColumnsOf(run, "GetUser")
             .ShouldBe([
                 new PropertyType(
                     "global::System.Guid",
@@ -673,7 +683,7 @@ public sealed class TypeOverrideLevelTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("int", true, true, NoWarnings, "int4", null)]);
+        StepOutputs.ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("int", true, true, NoWarnings, "int4", null)]);
     }
 
     // The query's entry replaces the project's file's for the type, though the file's key is spelled exactly as the
@@ -692,7 +702,8 @@ public sealed class TypeOverrideLevelTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser")
+        StepOutputs
+            .ColumnsOf(run, "GetUser")
             .ShouldBe([
                 new PropertyType(
                     "global::System.Uri",
@@ -739,7 +750,8 @@ public sealed class TypeOverrideLevelTests
         var run = Run(settings, files, Entry(files[0], "GetUser", Composite("my schema", "order-status")));
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser")
+        StepOutputs
+            .ColumnsOf(run, "GetUser")
             .ShouldBe([new PropertyType("global::System.Guid", true, true, NoWarnings, QuotedKey, place, NoBase)]);
     }
 
@@ -757,7 +769,8 @@ public sealed class TypeOverrideLevelTests
 
         run.Diagnostics.ShouldBeEmpty();
         const string Place = "a -- type-override: marker in the file header";
-        ColumnsOf(run, "GetUser")
+        StepOutputs
+            .ColumnsOf(run, "GetUser")
             .ShouldBe([
                 new PropertyType("global::System.Guid", true, true, NoWarnings, "public.Status", Place, StringBase),
                 new PropertyType("global::System.Uri", false, true, NoWarnings, "public.status", Place, StringBase),
@@ -866,7 +879,9 @@ public sealed class TypeOverrideLevelTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("string", false, true, NoWarnings, "text", null)]);
+        StepOutputs
+            .ColumnsOf(run, "GetUser")
+            .ShouldBe([new PropertyType("string", false, true, NoWarnings, "text", null)]);
     }
 
     [Fact]
@@ -880,7 +895,7 @@ public sealed class TypeOverrideLevelTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        var column = ColumnsOf(run, "GetUser").ShouldHaveSingleItem();
+        var column = StepOutputs.ColumnsOf(run, "GetUser").ShouldHaveSingleItem();
         column.WarningIds.ShouldBe(["CS0612", "CS0618"]);
         (column with { WarningIds = NoWarnings }).ShouldBe(
             new PropertyType("global::MyApp.OldThing", false, true, NoWarnings, "int4", TheProjectFilePlace, IntBase)
@@ -906,7 +921,8 @@ public sealed class TypeOverrideLevelTests
         );
 
         run.ShouldBeClean();
-        ColumnsOf(run, "GetUser")
+        StepOutputs
+            .ColumnsOf(run, "GetUser")
             .ShouldBe([
                 new PropertyType("global::MyApp.Inner", true, false, NoWarnings, "int4", TheProjectFilePlace, IntBase),
             ]);
@@ -982,15 +998,6 @@ public sealed class TypeOverrideLevelTests
             .Of<FileTypes>(run, TrackingNames.FileTypes)
             .SelectMany(file => file.Queries)
             .ToDictionary(query => query.Name, query => query.Columns.ShouldNotBeNull().ShouldHaveSingleItem().Text);
-
-    private static PropertyType[] ColumnsOf(GeneratorRun run, string queryName) =>
-        [
-            .. StepOutputs
-                .Of<FileTypes>(run, TrackingNames.FileTypes)
-                .SelectMany(file => file.Queries)
-                .Single(query => query.Name == queryName)
-                .Columns.ShouldNotBeNull(),
-        ];
 
     // Where the name of the query is in Users, as the harness formats a location.
     private static string NameOf(string text, string queryName)

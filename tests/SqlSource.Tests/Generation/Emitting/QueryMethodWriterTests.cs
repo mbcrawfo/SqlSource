@@ -26,9 +26,6 @@ public sealed class QueryMethodWriterTests
     // The row buffer as the methods of a file in the namespace App name it.
     private const string RowBufferType = "global::App.SqlSourceRowBuffer";
 
-    // Ends a line of an expected text that goes on in the next, written so to keep within the width of a line.
-    private const string Continued = "\u21a9";
-
     // The type integer, as the entry of a parameter describes it.
     private static readonly PostgresType Integer = TestSidecars.Postgres(bindName: "integer");
 
@@ -77,7 +74,7 @@ public sealed class QueryMethodWriterTests
         builder
             .ToString()
             .ShouldBe(
-                Joined(
+                GeneratedFile.Joined(
                     """
                     before
                         /// <summary>
@@ -759,7 +756,7 @@ public sealed class QueryMethodWriterTests
     public void Append_IAsyncEnumerable_IsTheWholeMethod() =>
         Write(Stream)
             .ShouldBe(
-                Joined(
+                GeneratedFile.Joined(
                     """
                     /// <summary>
                     /// The <c>GetUser</c> query from <c>Users.sql</c>.
@@ -1126,10 +1123,6 @@ public sealed class QueryMethodWriterTests
                 new MethodColumn("embedding", "Embedding", Vector, isNullable)
             ),
         };
-
-    // The text with each line that ends in the mark joined to the next, whose indentation is dropped.
-    private static string Joined(string text) =>
-        Regex.Replace(text, Continued + "\n *", string.Empty, RegexOptions.None, TimeSpan.FromSeconds(1));
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);
 

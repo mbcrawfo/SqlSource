@@ -1,6 +1,5 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
-using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Testing.Generator;
 using Xunit;
@@ -68,7 +67,7 @@ public sealed class MethodConflictTests
             Sidecars.Of(b, Entry(b, "Get", [], [Column("id")]))
         );
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC274 /app/Repo/A.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'Get', because "
                     + "the method of the query 'Get' of 'App.Second.Queries' has that name too, in the class "
@@ -95,7 +94,7 @@ public sealed class MethodConflictTests
             Sidecars.Of(b, Entry(b, "Get", [], [Column("id")]))
         );
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC274 /app/Repo/A.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'Get', because "
                     + "the method of the query 'Get' of 'App.Second', in the class 'App.SecondExtensions' of the same "
@@ -133,7 +132,7 @@ public sealed class MethodConflictTests
 
         var run = MethodRuns.Run(file, [Entry(file, "Get", [], [Column("id")])], Source);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'Get', "
                     + "because the method of the query 'Get' of 'App.First', in the class 'App.FirstExtensions' of the "
@@ -183,7 +182,7 @@ public sealed class MethodConflictTests
 
         var run = MethodRuns.Run(file, [Entry(file, "Get", [], [Column("id")])], Source);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC276 /app/Repo/Sample.cs(5,6)-(5,23): The query methods of 'App.Sample' cannot go into the "
                     + "extension class 'App.SampleExtensions', because the project has a type of that name.  Rename "
@@ -209,7 +208,7 @@ public sealed class MethodConflictTests
 
         var run = MethodRuns.Run(file, [Entry(file, "Get", [], [Column("id")])], Source);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC276 /app/Repo/Sample.cs(3,2)-(3,19): The query methods of 'Sample' cannot go into the "
                     + "extension class 'SampleExtensions', because the project has a type of that name.  Rename the "
@@ -232,7 +231,7 @@ public sealed class MethodConflictTests
 
         var run = MethodRuns.Run(file, [Entry(file, "Get", [], [Column("id")])]);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC276 /app/Repo/Sample.cs(5,6)-(5,23): The query methods of 'App.Sample' cannot go into the "
                     + "extension class 'App.SampleExtensions', because SqlSource writes "
@@ -276,7 +275,7 @@ public sealed class MethodConflictTests
             Sidecars.Of(b, Entry(b, "GetB", [], [Column("id")]))
         );
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC276 /app/Repo/Sample.cs(7,10)-(7,43): The query methods of 'App.First.Queries' cannot go into "
                     + "the extension class 'App.QueriesExtensions', because 'App.Second.Queries' puts its methods "
@@ -310,13 +309,5 @@ public sealed class MethodConflictTests
         run.Sources["App.First.Queries-Methods.g.cs"].ShouldContain(" GetA(\n");
         run.Sources["App.Second.Queries-Methods.g.cs"].ShouldContain("public static partial class QueriesExtensions\n");
         run.Sources["App.Second.Queries-Methods.g.cs"].ShouldContain(" GetB(\n");
-    }
-
-    // The diagnostics of a run whose generated code compiles with no error and no warning.
-    private static IReadOnlyList<string> Problems(GeneratorRun run)
-    {
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
-        return run.Diagnostics;
     }
 }

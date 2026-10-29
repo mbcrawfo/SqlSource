@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
@@ -40,7 +39,7 @@ public sealed class MethodTests
         run.ShouldBeClean();
         run.Sources[MethodRuns.MethodsFile]
             .ShouldBe(
-                Joined(
+                GeneratedFile.Joined(
                     $$$"""
                     {{{GeneratedFile.ModelHeader}}}
                     namespace App
@@ -618,8 +617,4 @@ public sealed class MethodTests
         run.CompilationErrors.ShouldBeEmpty();
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
-
-    // An expected text with each line that ends in the mark joined to the next, whose indentation goes.
-    private static string Joined(string text) =>
-        Regex.Replace(text, "\u21a9\n *", string.Empty, RegexOptions.None, TimeSpan.FromSeconds(1));
 }

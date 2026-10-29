@@ -122,7 +122,7 @@ public sealed class CachingSettingsFileTests
         AllReasons(result, TrackingNames.CompilePaths).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.BuildFolders).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.ReachedSettingsFiles).ShouldBe([IncrementalStepRunReason.Cached]);
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // A folder of the build that holds no C# file of the scene: the folders are read again and changed, and the same
@@ -161,11 +161,10 @@ public sealed class CachingSettingsFileTests
 
         AllReasons(result, TrackingNames.BuildFolders).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.ReachedSettingsFiles).ShouldBe([IncrementalStepRunReason.Cached]);
-        AllReasons(result, TrackingNames.FileParseInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.FileParseInput).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBeCached();
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // The counterpart of Run_OptionsReplacedWithoutChangingTheBuildFolders_EmitsNothingAgain for a settings file: what
@@ -195,11 +194,10 @@ public sealed class CachingSettingsFileTests
                 ignoreOrder: true
             );
         AllReasons(result, TrackingNames.SettingsFiles).ShouldBe([IncrementalStepRunReason.Cached]);
-        AllReasons(result, TrackingNames.FileParseInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.FileParseInput).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBeCached();
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // The edit leaves the dialect alone, so no file is parsed again, and the file's new error is reported.

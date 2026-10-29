@@ -35,10 +35,9 @@ public sealed class CachingTypeTests
 
         var result = Run(driver, WithMethodBodyEdited(compilation));
 
-        AllReasons(result, TrackingNames.FileTypesInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.FileTypes).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.FileTypesInput).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.FileTypes).ShouldAllBeCached();
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // The edit makes the entry of Users stale, so Users has no types now, and Orders is not typed again.
@@ -156,8 +155,7 @@ public sealed class CachingTypeTests
         );
         var result = Run(driver.ReplaceAdditionalText(project, edited), compilation);
 
-        AllReasons(result, TrackingNames.FileTypesInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.FileTypesInput).ShouldAllBe(IncrementalStepRunReason.Modified);
         Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
@@ -190,9 +188,8 @@ public sealed class CachingTypeTests
         var result = Run(driver, WithMethodBodyEdited(compilation));
 
         AllReasons(result, TrackingNames.ResolvedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
-        AllReasons(result, TrackingNames.FileTypesInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.FileTypes).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.FileTypesInput).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.FileTypes).ShouldAllBeCached();
         TypesOf(result, "app/Users/Users.sql")
             .Queries.ShouldHaveSingleItem()
             .Columns.ShouldNotBeNull()
@@ -424,7 +421,7 @@ public sealed class CachingTypeTests
         var result = Run(driver, compilation.AddReferences(NpgsqlReferences.Npgsql10));
 
         AllReasons(result, TrackingNames.NpgsqlProbe).ShouldBe([IncrementalStepRunReason.Modified]);
-        AllReasons(result, TrackingNames.FileTypes).ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.FileTypes).ShouldAllBe(IncrementalStepRunReason.Modified);
         result.Diagnostics.ShouldBeEmpty();
         TypesOf(result, "app/Orders/Orders.sql")
             .Queries.ShouldHaveSingleItem()

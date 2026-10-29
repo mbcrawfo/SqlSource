@@ -546,7 +546,7 @@ public sealed class CachingModelTests
 
         AllReasons(result, TrackingNames.TakenModelNames).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.Models).ShouldBe([IncrementalStepRunReason.Cached]);
-        AllReasons(result, TrackingNames.ModelOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ModelOutput).ShouldAllBeCached();
         ModelReasons(result).Count.ShouldBe(3);
         OutputReasons(result).Distinct().ShouldBe([IncrementalStepRunReason.Cached]);
     }
@@ -571,7 +571,7 @@ public sealed class CachingModelTests
             .ShouldBe([IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.ModelGroups).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.Models).ShouldBe([IncrementalStepRunReason.Cached]);
-        AllReasons(result, TrackingNames.ModelOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ModelOutput).ShouldAllBeCached();
         ModelReasons(result).Count.ShouldBe(3);
     }
 
@@ -605,7 +605,7 @@ public sealed class CachingModelTests
         AllReasons(result, TrackingNames.ModelGroups).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.Models).ShouldBe([IncrementalStepRunReason.Cached]);
         ModelReasons(result).Count.ShouldBe(3);
-        AllReasons(result, TrackingNames.ModelOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ModelOutput).ShouldAllBeCached();
     }
 
     // A project at Sql has no model, so there is no name to look up in the compilation.
