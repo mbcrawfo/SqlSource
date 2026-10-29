@@ -67,7 +67,8 @@ public sealed class SidecarWriterTests
     public void Write_NoQueries_IsAnEmptyObjectOnTheLineOfItsKey() =>
         SidecarWriter.Write(SidecarOf()).ShouldEndWith("  \"queries\": {}\n}\n");
 
-    // The format design, section 1.  The character is given by its code, so that a test's name holds none.
+    // docs/architecture/sidecar-format.md, "The text".  The character is given by its code, so that a test's name
+    // holds none.
     // The comparison is case-sensitive, as Shouldly's is not unless asked: the hex digits are in upper case.
     [Theory]
     [InlineData(0x22, "\\\"")]

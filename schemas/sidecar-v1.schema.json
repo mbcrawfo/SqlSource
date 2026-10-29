@@ -2,19 +2,31 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/sidecar-v1.schema.json",
   "title": "SqlSource sidecar, format version 1",
-  "description": "Written by `sqlsource describe` beside a .sql file and read by the SqlSource source generator. This schema is strict and describes what the current tool writes; the generator's reader ignores keys it does not know.",
+  "description": "Written by `sqlsource describe` beside a .sql file and read by the SqlSource source generator. This schema is strict and describes what the current tool writes; the generator's reader ignores keys it does not know. Each object lists its properties in the order the tool writes them. The layout, the reader rules and the rules for a new formatVersion are in docs/architecture/sidecar-format.md of the repository.",
   "type": "object",
   "required": ["_WARNING", "$schema", "formatVersion", "toolVersion", "queries"],
   "additionalProperties": false,
   "properties": {
-    "_WARNING": { "type": "string" },
-    "$schema": { "type": "string", "format": "uri" },
-    "formatVersion": { "const": 1 },
+    "_WARNING": {
+      "description": "A fixed sentence saying that the tool wrote the file and that it is not edited by hand. Written first, so that it is the first line a reader sees. Readers ignore it.",
+      "type": "string"
+    },
+    "$schema": {
+      "description": "The URL of this schema, so that an editor validates the file. Readers ignore it.",
+      "type": "string",
+      "format": "uri"
+    },
+    "formatVersion": {
+      "description": "The version of the format, which a reader reads before anything else. It rises only for a change that a reader of the previous version cannot read safely.",
+      "const": 1
+    },
     "toolVersion": {
+      "description": "The version of the tool that wrote the file, as major.minor.patch with no prerelease suffix, so that a local build and a CI build of one version write the same file. The generator warns when it differs from its own, and the tool keeps no entry of a file another version wrote.",
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
     "queries": {
+      "description": "One entry for each query of the .sql file that needs a description, keyed by the query's name and in the file's order. The tool never writes a file with no entry.",
       "type": "object",
       "propertyNames": { "minLength": 1 },
       "additionalProperties": { "$ref": "#/$defs/query" }
@@ -25,20 +37,59 @@
     "triState": { "type": ["boolean", "null"] },
     "ordinal": { "type": "integer", "minimum": 0 },
     "query": {
+      "description": "What the database said of one query.",
       "type": "object",
       "required": ["hash", "engine", "database", "serverVersion", "resultKind", "parameters"],
       "additionalProperties": false,
       "properties": {
-        "hash": { "$ref": "#/$defs/hash" },
-        "engine": { "type": "string", "enum": ["postgres", "mssql"] },
-        "database": { "type": "string", "minLength": 1 },
-        "serverVersion": { "type": "string" },
-        "resultKind": { "type": "string", "enum": ["rows", "none"] },
-        "parameters": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
-        "columns": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/column" } },
-        "matchesTable": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/tableRef" }] },
-        "plan": { "type": "string", "enum": ["not-needed", "walked", "unavailable", "skipped"] },
-        "tableMatch": { "type": "string", "enum": ["matched", "no-origin", "several-tables", "names-differ", "columns-differ", "order-differs", "nullability-differs"] }
+        "hash": {
+          "description": "SHA-256, in lower-case hex, of the UTF-8 bytes of: the engine's name; a line feed; the query's SQL without comments, each token written as {{name:default}}; a line feed; and a line for each parameter that a -- param: marker declares with a type or a nullability. It ties the entry to the query's text: an entry whose hash is not the query's is stale. Changing its input raises formatVersion.",
+          "$ref": "#/$defs/hash"
+        },
+        "engine": {
+          "description": "The canonical name of the file's dialect, which picks the shape of every type object in the entry: 'postgres' or 'mssql'.",
+          "type": "string",
+          "enum": ["postgres", "mssql"]
+        },
+        "database": {
+          "description": "The name of the database the query was described against, as the settings name it. The tool compares it ignoring case.",
+          "type": "string",
+          "minLength": 1
+        },
+        "serverVersion": {
+          "description": "Informational: the server's version, short so that a change of server shows in a diff as one word. PostgreSQL: server_version cut at its first space, '16.4'. SQL Server: SERVERPROPERTY('ProductVersion'), '16.0.4135.4'.",
+          "type": "string"
+        },
+        "resultKind": {
+          "description": "Whether the statement returns rows: 'rows' or 'none'.",
+          "type": "string",
+          "enum": ["rows", "none"]
+        },
+        "matchesTable": {
+          "description": "The table whose column list the result is exactly: every column comes from it, with its name unchanged, all of its columns in its order, each as nullable as the table's. The generator names the query's model after it. Null when no table matches; tableMatch says why.",
+          "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/tableRef" }]
+        },
+        "plan": {
+          "description": "Provenance: whether the nullability plan walk ran. 'not-needed': no column is one a plan could answer, the query holding no word of the outer-join gate, such as LEFT or ROLLUP, and no column of no origin. 'walked': the walk read the plan. 'unavailable': there was no plan, or none the walk could use, and the log says why. 'skipped': the engine has no walk, as SQL Server. The generator never reads it.",
+          "type": "string",
+          "enum": ["not-needed", "walked", "unavailable", "skipped"]
+        },
+        "tableMatch": {
+          "description": "Provenance for matchesTable: the first check of the table match that failed, in this order, or 'matched'. 'no-origin': a column comes from no table. 'several-tables': the columns come from more than one. 'names-differ': a column is renamed. 'columns-differ': the result is not all of the table's columns. 'order-differs': they are in another order. 'nullability-differs': a column's nullability is not the table's. The generator never reads it.",
+          "type": "string",
+          "enum": ["matched", "no-origin", "several-tables", "names-differ", "columns-differ", "order-differs", "nullability-differs"]
+        },
+        "parameters": {
+          "description": "The query's parameters, in the order of its parameter list; empty when it has none.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/parameter" }
+        },
+        "columns": {
+          "description": "The columns of the result, in their order. Absent, not empty, when resultKind is 'none'.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/column" }
+        }
       },
       "allOf": [
         {
@@ -71,11 +122,28 @@
       "required": ["name", "ordinal", "type", "nullable"],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "ordinal": { "$ref": "#/$defs/ordinal" },
-        "type": { "type": ["object", "null"] },
-        "nullable": { "$ref": "#/$defs/triState" },
-        "typeSource": { "type": "string", "enum": ["inferred", "inferred-from-copies", "declared"] }
+        "name": {
+          "description": "The parameter's name without its prefix, in the case of its first appearance in the query.",
+          "type": "string",
+          "minLength": 1
+        },
+        "ordinal": {
+          "description": "The parameter's zero-based position, which is its index in the array.",
+          "$ref": "#/$defs/ordinal"
+        },
+        "type": {
+          "description": "The engine's type object, whose shape the entry's engine picks. Null when neither the server nor a declaration gave a type, which neither engine of this version writes.",
+          "type": ["object", "null"]
+        },
+        "nullable": {
+          "description": "True when a -- param: marker says null, false when it says not null, and null otherwise, since no engine reports a parameter's nullability. A parameter is not nullable unless this is true.",
+          "$ref": "#/$defs/triState"
+        },
+        "typeSource": {
+          "description": "Provenance, written when type is not null. 'inferred': the server inferred the type from the query. 'inferred-from-copies': on SQL Server, the tool gave each use of a reused parameter a name of its own and every copy's inferred type agreed. 'declared': the type a -- param: marker declared. The generator never reads it.",
+          "type": "string",
+          "enum": ["inferred", "inferred-from-copies", "declared"]
+        }
       },
       "if": { "properties": { "type": { "type": "object" } } },
       "then": { "required": ["typeSource"] }
@@ -85,14 +153,39 @@
       "required": ["ordinal", "name", "type", "nullable", "nullableSource", "origin", "identity", "computed"],
       "additionalProperties": false,
       "properties": {
-        "ordinal": { "$ref": "#/$defs/ordinal" },
-        "name": { "type": "string" },
-        "type": { "type": "object" },
-        "nullable": { "$ref": "#/$defs/triState" },
-        "nullableSource": { "type": "string", "enum": ["server", "catalog", "outer-join", "view", "foreign-table", "expression", "set-operation", "no-origin", "heuristic"] },
-        "origin": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/origin" }] },
-        "identity": { "$ref": "#/$defs/triState" },
-        "computed": { "$ref": "#/$defs/triState" }
+        "ordinal": {
+          "description": "The column's zero-based position in the result, as DbDataReader.GetFieldValue takes it, which is its index in the array.",
+          "$ref": "#/$defs/ordinal"
+        },
+        "name": {
+          "description": "The column's name exactly as the server returned it, a ! or ? override suffix included: the generator strips the suffix and applies it.",
+          "type": "string"
+        },
+        "type": {
+          "description": "The engine's type object, whose shape the entry's engine picks. Never null: a column whose type the server cannot name is an error of the tool, not an entry.",
+          "type": "object"
+        },
+        "nullable": {
+          "description": "Whether the column can be null, as the server and the tool established it, before any ! or ? override. Null when unknown: the generator treats unknown as nullable, a policy kept out of the file.",
+          "$ref": "#/$defs/triState"
+        },
+        "nullableSource": {
+          "description": "Provenance: what decided nullable. 'server': the engine reported it. 'catalog': the origin's NOT NULL flag; on PostgreSQL the plan walk found the origin on no null-extending side; on SQL Server the origin is a PERSISTED NOT NULL computed column read from the query's one table, always with nullable false. 'outer-join': the walk found the origin on a null-extending side. 'view': the origin is a view. 'foreign-table': the origin is a foreign table, whose constraints PostgreSQL does not enforce. 'expression': on PostgreSQL the plan prints the column as an expression that can never be NULL (false) or as a NULL constant (true); on SQL Server the tool proved from the query's text that it can never be NULL (false). 'set-operation': on PostgreSQL every input of a UNION, INTERSECT or EXCEPT that the operation returns rows of can never give it NULL, always with nullable false. 'no-origin': no table column, always with nullable null. 'heuristic': the plan was unavailable or did not show the origin, and a word of the outer-join gate, such as LEFT or ROLLUP, made the column nullable. The override is never a source. The generator never reads it.",
+          "type": "string",
+          "enum": ["server", "catalog", "outer-join", "view", "foreign-table", "expression", "set-operation", "no-origin", "heuristic"]
+        },
+        "origin": {
+          "description": "The table column the result's column comes from, or null for an expression, an aggregate, a cast, a set operation's column or a USING column. The generator matches the keys of columnTypes against it, and names it in the property's documentation.",
+          "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/origin" }]
+        },
+        "identity": {
+          "description": "Whether the origin is an identity column; null when the engine cannot say. Informational.",
+          "$ref": "#/$defs/triState"
+        },
+        "computed": {
+          "description": "Whether the origin is a generated or computed column; null when the engine cannot say. Informational.",
+          "$ref": "#/$defs/triState"
+        }
       }
     },
     "tableRef": {
@@ -100,8 +193,15 @@
       "required": ["schema", "table"],
       "additionalProperties": false,
       "properties": {
-        "schema": { "type": ["string", "null"] },
-        "table": { "type": "string", "minLength": 1 }
+        "schema": {
+          "description": "The table's schema; null for an engine without schemas.",
+          "type": ["string", "null"]
+        },
+        "table": {
+          "description": "The table's name.",
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "origin": {
@@ -109,28 +209,86 @@
       "required": ["schema", "table", "column"],
       "additionalProperties": false,
       "properties": {
-        "schema": { "type": ["string", "null"] },
-        "table": { "type": "string", "minLength": 1 },
-        "column": { "type": "string", "minLength": 1 }
+        "schema": {
+          "description": "The table's schema; null for an engine without schemas.",
+          "type": ["string", "null"]
+        },
+        "table": {
+          "description": "The table's name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "column": {
+          "description": "The table column's name.",
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "postgresType": {
+      "description": "A PostgreSQL type. OIDs are never stored.",
       "type": "object",
       "required": ["name", "kind", "schema", "internalName"],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "bindName": { "type": "string", "minLength": 1 },
-        "kind": { "type": "string", "enum": ["base", "array", "domain", "enum", "range", "multirange", "composite"] },
-        "schema": { "type": "string", "minLength": 1 },
-        "internalName": { "type": "string", "minLength": 1 },
-        "length": { "type": "integer", "minimum": 0 },
-        "precision": { "type": "integer", "minimum": 0 },
-        "scale": { "type": "integer", "minimum": -1000, "maximum": 1000 },
-        "element": { "$ref": "#/$defs/postgresType" },
-        "base": { "$ref": "#/$defs/postgresType" },
-        "labels": { "type": "array", "items": { "type": "string" } },
-        "subtype": { "$ref": "#/$defs/postgresType" }
+        "name": {
+          "description": "The type as PostgreSQL spells it, its modifier included: 'numeric(18,2)', 'character varying(100)', 'text[]'. A type outside pg_catalog is qualified by its schema, 'public.user_status', whatever the search path was.",
+          "type": "string",
+          "minLength": 1
+        },
+        "bindName": {
+          "description": "Written on a parameter's own type alone, never on a column's or a nested type: the NpgsqlParameter.DataTypeName that the tool bound the parameter by, without a modifier. The generated code binds by a name made from schema and internalName, those of the innermost base for a domain over a domain, and falls back to this one for an array of a domain over a domain, a kind it does not know, or a schema or name that holds a dot. It does not depend on the search path.",
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "description": "The family of pg_type.typtype, with arrays apart: 'base', 'array', 'domain', 'enum', 'range', 'multirange' or 'composite'.",
+          "type": "string",
+          "enum": ["base", "array", "domain", "enum", "range", "multirange", "composite"]
+        },
+        "schema": {
+          "description": "The type's schema, pg_namespace.nspname.",
+          "type": "string",
+          "minLength": 1
+        },
+        "internalName": {
+          "description": "pg_type.typname: 'int4', 'varchar', 'timestamptz', '_text'. The type's stable identity in the catalog, and with schema the key of the generator's type map and of a type override, and the name the generated code binds a parameter of the type by; a domain over a domain binds by its innermost base's.",
+          "type": "string",
+          "minLength": 1
+        },
+        "length": {
+          "description": "Written when the modifier sets it: varchar(100), char(2), bit(8).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "precision": {
+          "description": "Written when the modifier sets it: numeric(18,2), timestamp(3), interval(6).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "scale": {
+          "description": "Written when the modifier sets it: numeric(18,2). PostgreSQL 15 and later allow a negative scale.",
+          "type": "integer",
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "element": {
+          "description": "The element type of an array, written when kind is 'array'.",
+          "$ref": "#/$defs/postgresType"
+        },
+        "base": {
+          "description": "The base type of a domain, with the domain's own modifier, written when kind is 'domain'.",
+          "$ref": "#/$defs/postgresType"
+        },
+        "labels": {
+          "description": "The labels of an enum, in their sort order, written when kind is 'enum'.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "subtype": {
+          "description": "The element type of a range, written when kind is 'range' or 'multirange'; a multirange carries its range's.",
+          "$ref": "#/$defs/postgresType"
+        }
       },
       "allOf": [
         { "if": { "properties": { "kind": { "const": "array" } } }, "then": { "required": ["element"] }, "else": { "not": { "required": ["element"] } } },
@@ -140,23 +298,45 @@
       ]
     },
     "mssqlType": {
+      "description": "A SQL Server type. Its three facets are written for every type, even int's.",
       "type": "object",
       "required": ["name", "maxLength", "precision", "scale"],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "bindName": { "type": "string", "minLength": 1 },
-        "maxLength": { "type": "integer", "minimum": -1 },
-        "precision": { "type": "integer", "minimum": 0 },
-        "scale": { "type": "integer", "minimum": 0 },
+        "name": {
+          "description": "The server's system_type_name verbatim, facets included: 'nvarchar(50)', 'decimal(18,2)', 'varchar(max)'. rowversion is 'timestamp', as the server says.",
+          "type": "string",
+          "minLength": 1
+        },
+        "bindName": {
+          "description": "Never written for SQL Server: the generated code binds a parameter by its SqlDbType with maxLength, precision and scale, or a CLR type by its userType, so it needs no name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "maxLength": {
+          "description": "max_length verbatim: bytes, -1 for max.",
+          "type": "integer",
+          "minimum": -1
+        },
+        "precision": {
+          "description": "precision verbatim.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "scale": {
+          "description": "scale verbatim.",
+          "type": "integer",
+          "minimum": 0
+        },
         "userType": {
+          "description": "Written for an alias type or a CLR type: user_type_schema, user_type_name and, for a CLR type, assembly_qualified_type_name.",
           "type": "object",
           "required": ["schema", "name"],
           "additionalProperties": false,
           "properties": {
-            "schema": { "type": "string", "minLength": 1 },
-            "name": { "type": "string", "minLength": 1 },
-            "assemblyQualifiedName": { "type": "string", "minLength": 1 }
+            "schema": { "description": "The user type's schema.", "type": "string", "minLength": 1 },
+            "name": { "description": "The user type's name.", "type": "string", "minLength": 1 },
+            "assemblyQualifiedName": { "description": "The assembly-qualified name of a CLR type.", "type": "string", "minLength": 1 }
           }
         }
       }

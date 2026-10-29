@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0091`
+Next id: `TD-0092`
 
 ## Active items
 
@@ -37,12 +37,9 @@ Next id: `TD-0091`
 | [TD-0072](TD-0072-sql-server-2025-container-crashes-at-start-in-ci.md) | Open | 2026-10-22 | Low | A SQL Server 2025 test container sometimes crashes as it starts in CI, for a reason not known; the tests start another, once, and report it in the job's summary, but two crashes in a row still fail every test of that project |
 | [TD-0076](TD-0076-what-the-first-refusal-of-a-declared-type-says.md) | Open | 2026-10-23 | Low | PostgreSQL's first refusal of a `-- param:` type says only that it is not a type name, where SQL Server's says what was found, and SQL Server's refuses a name that holds a combining mark, a letter number or a format character after its first character, which the server takes |
 | [TD-0079](TD-0079-duplicated-logic-and-uneven-conventions-in-src.md) | Open | 2026-10-27 | Low | Rules of `src/` are written in several places: a type's usable files, binary searches, the describers' own errors and connection texts, the comparison of parameter names, SQL Server's names, the binders' shapes, a file's engine; the sidecar reader's switches read an unknown key as the last; `MappedTypeResolver` and `QueryMethodWriter` are long, the planners pass long lists, and one member is dead |
-| [TD-0081](TD-0081-a-test-starts-mkfifo-itself.md) | Open | 2026-10-27 | Low | `PostgresDescriberTests` starts `mkfifo` with `Process.Start` and no skip where it is missing, against the rule that a test starts a program through `Programs` |
-| [TD-0082](TD-0082-a-test-converter-holds-its-token-in-a-static.md) | Open | 2026-10-27 | Low | The test converter `CancelOnRead` holds the token it cancels in a static that a test sets, so two tests reading through it in parallel would cancel each other's |
-| [TD-0083](TD-0083-two-tool-tests-wait-on-limits-of-their-own.md) | Open | 2026-10-27 | Low | `ProgramsTests` and `TerminationTests` wait on limits of their own, 20 and 60 seconds, beside `Eventually.Patience`, which `tests/AGENTS.md` makes the one limit |
-| [TD-0084](TD-0084-the-sidecar-contract-is-documented-only-in-a-spec.md) | Open | 2026-10-27 | Medium | The sidecar's reader rules, compatibility rules and the meaning of its values are written down only in its design spec, which is never kept current |
 | [TD-0089](TD-0089-theories-that-branch-on-their-row.md) | Open | 2026-10-29 | Low | Some theories still branch on their row with an `if` or derive their expectations with `?:`, so a reader must follow the branch to know what a row checks |
 | [TD-0090](TD-0090-sql-server-error-at-a-row-hides-a-rollback.md) | Open | 2026-10-29 | Low | On SQL Server, a method whose read throws the database's error at a row, such as a divide by zero, throws it as it is, and an error that the rest of the batch then raises can roll back the caller's transaction with nothing to say so; a caller that catches the first error and goes on finds its own later commands, or Dapper's, committed on their own, where a later generated method refuses the transaction and `Commit` throws |
+| [TD-0091](TD-0091-check-does-not-compare-a-columns-origin.md) | Open | 2026-10-29 | Medium | `describe --check` never compares a column's `origin`, though the generator matches `columnTypes` against it, so a check passes on a sidecar whose next `describe` changes a column's generated type |
 
 ## Columns
 

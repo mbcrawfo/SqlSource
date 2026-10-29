@@ -229,7 +229,7 @@ Two things the describer needs have no public member in Npgsql.  [`RowDescriptio
 
 [`PostgresTableMatcher`](../../src/SqlSource.Tool/Describing/Postgres/Columns/PostgresTableMatcher.cs) says whether a result is exactly one relation's column list, so that the generator can name the model after the relation.  `PostgresSession.MatchOf` calls it once for a statement with rows, after `check` and after the walk, since its last check reads the `nullable` each column was recorded with.  It is given the columns and the `ColumnOrigin` of each, which holds the relation and every attribute of it that is not dropped, as `tables` answered, so it asks the server nothing.
 
-The checks are the values of the format's `tableMatch`, in the format's order, held once by [`TableMatchChecks`](../../src/SqlSource.Tool/Describing/Describers/TableMatchChecks.cs) for both engines, and the first that fails is the answer, since a sidecar says which failed first ([a query entry](../superpowers/specs/2026-10-07-sidecar-format-design.md#12-a-query-entry)):
+The checks are the values of the format's `tableMatch`, in the format's order, held once by [`TableMatchChecks`](../../src/SqlSource.Tool/Describing/Describers/TableMatchChecks.cs) for both engines, and the first that fails is the answer, since a sidecar says which failed first (the `tableMatch` of [the schema](../../schemas/sidecar-v1.schema.json)):
 
 | Check | Fails when |
 |----|----|
