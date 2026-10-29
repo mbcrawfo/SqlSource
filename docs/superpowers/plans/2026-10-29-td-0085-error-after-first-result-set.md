@@ -4,7 +4,7 @@
 
 **Goal:** A generated SQL Server method that reads rows, buffered or streaming, drains the results after its rows with `NextResultAsync` and the method's token, so that an error a later statement raises is thrown instead of lost.
 
-**Architecture:** `QueryMethodWriter.AppendExecution` writes `while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false)) { }` after the rows on every path that returns, for `DatabaseEngine.SqlServer` alone.  A PostgreSQL query is one statement ([SQLSRC230](../../manual/diagnostics.md#sqlsrc230)), so its reader never has a second result and its code is unchanged.  A streaming method drains after its last row; whether it also drains on an early exit is the owner's answer, Task 3.
+**Architecture:** `QueryMethodWriter.AppendExecution` writes `while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false)) { }` after the rows on every path that returns, for `DatabaseEngine.SqlServer` alone.  A PostgreSQL query is one statement ([SQLSRC230](../../manual/diagnostics.md#sqlsrc230)), so its reader never has a second result and its code is unchanged.  A streaming method drains after its last row; and, by the owner's answer, on an early exit too, Task 3.
 
 **Tech Stack:** C# source generator (`netstandard2.0`, Roslyn 4.8.0), Microsoft.Data.SqlClient 7.1 (6.1 floor), Npgsql 10 (8 floor), xUnit v3, Shouldly, Testcontainers.
 
@@ -77,14 +77,16 @@
 - [ ] **Step 6: Drain in the hand-written `StreamAccounts` iterator** after its loop.
 - [ ] **Step 7: Run both SQL Server projects; PASS.**  Commit.
 
-### Task 3: An early exit from a streaming loop (owner's answer)
+### Task 3: An early exit from a streaming loop drains and throws
 
-Held for the owner's answer to the question sent on 2026-10-29: on an early exit (a `break`, a body exception, a disposal), is a database error found while the iterator finishes thrown (option 1), dropped (option 2), or dropped except a rolled-back transaction (option 3)?
+The owner chose option 1 on 2026-10-29: after any early exit (a `break`, a body exception, a disposal) the iterator drains the rest of the batch and throws what the database raises, even when that replaces the loop body's exception.
 
-- **Option 1:** a local `atRow`, set `true` before each `yield return` and `false` after it, and a `finally` around the read loop that drains when `atRow` is true: so a disposal at a `yield` drains and throws, and an exception of the iterator's own code does not drain again.  Flip `StreamNumbersFailingHalfway_BreakBeforeTheFailingRow_*`, `…_BreakInATransaction_*`, `…UnderXactAbort_*` and `…_AThrowInTheLoopBody_*` to throw 8134; add a `break` case of `StreamThenRaise` that throws 50000.  The hand-written iterator gets the same local and `finally`.
-- **Option 2 or 3:** no code change for SQL Server in this unit; the tests of an early exit keep pinning that nothing is thrown, and the manual's remedy stays for that case.
+**Files:** `QueryMethodWriter.cs` (streaming branch of `AppendExecution`, a new local name in `Locals`), `QueryMethodWriterTests.cs`, the awkward-name tests that `src/SqlSource/Generation/Emitting/AGENTS.md` names, `StreamingQueryTests.cs`, `Queries/Streaming.sql` (SQL Server), the hand-written `StreamAccounts` iterator.
 
-Steps follow the answer, in Task 1's order: writer test, implement, end-to-end flips, hand-written iterator, run, commit.
+- [ ] **Step 1: Failing writer test** `Append_SqlServerStreams_DrainsInAFinallyWhenLeftAtARow`: a `bool` local from `LocalNames` (`atRow`) declared `false` before the read loop, set `true` before `yield return` and `false` after it, the loop and the end-of-rows drain inside a `try` whose `finally` drains when it is true.  PostgreSQL's streaming iterator has neither.
+- [ ] **Step 2: Implement; run; PASS.**  The local takes its name from `LocalNames` and gets a row in the four awkward-name tests.
+- [ ] **Step 3: Flip** `StreamNumbersFailingHalfway_BreakBeforeTheFailingRow_ThrowsTheError` (8134 at the `break`, connection usable after), `…_BreakInATransaction_ThrowsAndTheTransactionCommits`, `…_BreakInATransactionUnderXactAbort_ThrowsAndRollsItBack`, `…_AThrowInTheLoopBody_ThrowsTheServersErrorInItsPlace` (8134 replaces the body's exception).  Add `StreamThenRaise_BreakAtTheFirstRow_ThrowsTheError` (50000).  `StreamNumbers_BreakPartway_*` and `StreamNumbersThenMark_BreakPartway_*` throw nothing still.
+- [ ] **Step 4: The hand-written `StreamAccounts` iterator gets the same local and `finally`.**  Run the SQL Server projects and the SQL Server allocation tests; commit.
 
 ### Task 4: PostgreSQL cases
 
