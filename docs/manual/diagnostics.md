@@ -2691,4 +2691,11 @@ This is a warning, so that a build goes on when an update of a package brings a 
 </PropertyGroup>
 ```
 
+A `.globalconfig` file in the project's folder turns it off too:
+
+```ini
+is_global = true
+dotnet_diagnostic.SQLSRC284.severity = none
+```
+
 See: [Type overrides](settings.md#setting-type-overrides), [column types](settings.md#setting-column-types)
