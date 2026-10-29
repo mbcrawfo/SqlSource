@@ -674,6 +674,37 @@ public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
         connection.State.ShouldBe(ConnectionState.Open);
     }
 
+    // A token that the loop's body cancelled before the break does not stop the iterator reading the rest of the
+    // batch, so the THROW after the rows is thrown at the break as it is without the cancel.
+    [Fact]
+    public async Task StreamThenRaise_BreakAfterTheTokenIsCancelled_ThrowsTheError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(token);
+        await SessionMark.ClearAsync(connection, token);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
+        var rows = 0;
+
+        var thrown = await Should.ThrowAsync<SqlException>(async () =>
+        {
+            await foreach (var row in connection.StreamThenRaise(cancellationToken: cancellation.Token))
+            {
+                if (++rows == 1)
+                {
+                    await cancellation.CancelAsync();
+                    break;
+                }
+            }
+        });
+
+        thrown.Number.ShouldBe(50000);
+        thrown.Message.ShouldBe("after the rows");
+        rows.ShouldBe(1);
+        (await SessionMark.ReadAsync(connection, token)).ShouldBe(2);
+        connection.State.ShouldBe(ConnectionState.Open);
+    }
+
     // With XACT_ABORT off, as SqlClient leaves it, the THROW ends the batch and leaves the transaction that the stream
     // ran in open: the loop throws the error, and the commit after it commits what the transaction did.  The temporary
     // table is the one of the transaction test of StreamNumbers.
