@@ -201,6 +201,7 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("value0")]
     [InlineData("element")]
     [InlineData("item")]
+    [InlineData("atRow")]
     public void Run_TokenWithAnAwkwardName_Compiles(string name)
     {
         var run = GeneratorHarness.Run(
@@ -278,6 +279,7 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("item")]
     [InlineData("ReadRows")]
     [InlineData("yield")]
+    [InlineData("atRow")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles(string name)
     {
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.CSharp12);
@@ -295,6 +297,14 @@ public sealed class GeneratedSourceMethodTests
         methods.ShouldContain("global::System.Array.ConvertAll<global::App.UserId, int>(");
         methods.ShouldNotContain("static " + name + " =>");
         methods.ShouldNotContain("is { } " + name + " ?");
+
+        var sqlServer = MethodRuns.RunSqlServerTokenNamed(name, LanguageVersion.CSharp12);
+
+        sqlServer.ShouldBeClean();
+        // The flag of a row being yielded takes the name atRow unless a token has it, and then atRow1.
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .ShouldContain(name == "atRow" ? "var atRow1 = false;" : "var atRow = false;");
     }
 
     [Fact]

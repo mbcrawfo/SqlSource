@@ -35,3 +35,13 @@ SELECT id FROM {{table:accounts}} ORDER BY id;
 SELECT n, 10 / (n - 500000) AS quotient
 FROM (SELECT n FROM generate_series(1, 1000000) AS n ORDER BY n) AS numbers
 ORDER BY n;
+
+-- name: StreamThenRaise
+-- summary: The accounts, and then a division by zero after them, which the loop throws at its end or at a break.
+-- ListThenRaise of Methods.sql, streamed: the UNION ALL sends the rows of its first branch, and then fails on the first
+-- row of the second, so the error comes after the three accounts.
+-- column: id not null
+-- output-model: CollectedAccount
+(SELECT id, name FROM accounts ORDER BY id)
+UNION ALL
+(SELECT id / 0, name FROM accounts WHERE id = 1);

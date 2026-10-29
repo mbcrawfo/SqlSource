@@ -49,3 +49,46 @@ SELECT 1 AS slept FROM pg_sleep(@seconds);
 -- summary: has sent most of the rows before it when the sleep starts.
 SELECT n FROM generate_series(1, @count) AS n
 CROSS JOIN LATERAL (SELECT FROM pg_sleep(CASE WHEN n = @count THEN @seconds ELSE 0 END)) AS s;
+
+-- name: ListThenRaise
+-- summary: The accounts into an array, and then a division by zero after them, which the method throws.
+-- A PostgreSQL query is one statement, so the error after the rows is in its second branch: the UNION ALL sends the
+-- rows of the first, and then fails on the first row of the second.  The tests of this and the four below pin that
+-- every shape throws it, as the same batches of several statements do on SQL Server.  The server cannot say that id
+-- is never NULL through the UNION, so the marker says it, as the model it shares with Collections.sql has it.
+-- column: id not null
+-- output-model: CollectedAccount
+(SELECT id, name FROM accounts ORDER BY id)
+UNION ALL
+(SELECT id / 0, name FROM accounts WHERE id = 1);
+
+-- name: GetThenRaise -> one
+-- summary: The first account, and then a division by zero after it, which the method throws.
+-- ListThenRaise under one, whose second read, to see that there is no second row, meets the error.
+-- column: id not null
+-- output-model: CollectedAccount
+(SELECT id, name FROM accounts WHERE id = 1)
+UNION ALL
+(SELECT id / 0, name FROM accounts WHERE id = 1);
+
+-- name: FindThenRaise -> one-optional
+-- summary: The first account, and then a division by zero after it, which the method throws.
+-- GetThenRaise under one-optional.
+-- column: id not null
+-- output-model: CollectedAccount
+(SELECT id, name FROM accounts WHERE id = 1)
+UNION ALL
+(SELECT id / 0, name FROM accounts WHERE id = 1);
+
+-- name: RunThenRaise -> none
+-- summary: The accounts, and then a division by zero after them, which a method that reads no rows throws.
+(SELECT id, name FROM accounts ORDER BY id)
+UNION ALL
+(SELECT id / 0, name FROM accounts WHERE id = 1);
+
+-- name: CountThenRaise -> rowcount
+-- summary: The accounts, and then a division by zero after them, which a method that reads no rows throws.
+-- RunThenRaise under rowcount.
+(SELECT id, name FROM accounts ORDER BY id)
+UNION ALL
+(SELECT id / 0, name FROM accounts WHERE id = 1);

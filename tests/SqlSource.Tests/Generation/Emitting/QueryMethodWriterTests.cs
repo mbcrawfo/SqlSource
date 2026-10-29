@@ -57,11 +57,25 @@ public sealed class QueryMethodWriterTests
         TestModels.NameLocation("Users.sql")
     );
 
+    // GetUser on SQL Server, without parameters, whose binding is SqlServerBindingTests'.
+    private static readonly QueryMethod SqlServerGetUser = GetUser with
+    {
+        Engine = DatabaseEngine.SqlServer,
+        Input = null,
+    };
+
     // GetUser streaming its rows.
     private static readonly QueryMethod Stream = GetUser with
     {
         Shape = ResultShape.Many,
         Collection = CollectionKind.IAsyncEnumerable,
+    };
+
+    // GetUser streaming its rows on SQL Server, without parameters.
+    private static readonly QueryMethod SqlServerStream = Stream with
+    {
+        Engine = DatabaseEngine.SqlServer,
+        Input = null,
     };
 
     [Fact]
@@ -369,6 +383,83 @@ public sealed class QueryMethodWriterTests
                 + "    finally\n"
         );
     }
+
+    // On SQL Server the later results are read before the method returns, so that an error a later statement raises
+    // is thrown rather than lost when the reader is disposed.
+    [Fact]
+    public void Append_SqlServerShapeMany_DrainsTheLaterResultsBeforeItReturns() =>
+        Write(SqlServerGetUser with { Shape = ResultShape.Many, Collection = CollectionKind.Array })
+            .ShouldContain(
+                "        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
+                    + "        {\n"
+                    + "            rows.Add(new global::App.GetUserDto(reader.GetFieldValue<int>(0), "
+                    + "reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1)));\n"
+                    + "        }\n"
+                    + "\n"
+                    + Drain("        ")
+                    + "\n"
+                    + "        return rows.ToArray();\n"
+                    + "    }\n"
+                    + "    finally\n"
+            );
+
+    // The method's own exception, for no row or for a second, is thrown as it is: only the return drains.
+    [Fact]
+    public void Append_SqlServerShapeOne_DrainsAfterTheSecondRead()
+    {
+        var text = Write(SqlServerGetUser with { Shape = ResultShape.One });
+
+        text.ShouldContain(
+            "        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
+                + "        {\n"
+                + "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", false);\n"
+                + "        }\n"
+        );
+        text.ShouldContain(
+            "        if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
+                + "        {\n"
+                + "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n"
+                + "        }\n"
+                + "\n"
+                + Drain("        ")
+                + "\n"
+                + "        return row;\n"
+        );
+        Regex.Count(text, "NextResultAsync", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(1);
+    }
+
+    // No row drains too, so that a later error is thrown rather than hidden behind the null.
+    [Fact]
+    public void Append_SqlServerShapeOneOptional_DrainsBeforeEachReturn()
+    {
+        var text = Write(SqlServerGetUser with { Shape = ResultShape.OneOptional });
+
+        text.ShouldContain(
+            "        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
+                + "        {\n"
+                + Drain("            ")
+                + "\n"
+                + "            return null;\n"
+                + "        }\n"
+        );
+        text.ShouldContain(
+            "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n"
+                + "        }\n"
+                + "\n"
+                + Drain("        ")
+                + "\n"
+                + "        return row;\n"
+        );
+        Regex.Count(text, "NextResultAsync", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(2);
+    }
+
+    // A PostgreSQL query is one statement, so its reader never has a later result to read.
+    [Theory]
+    [InlineData(nameof(ResultShape.Many))]
+    [InlineData(nameof(ResultShape.One))]
+    [InlineData(nameof(ResultShape.OneOptional))]
+    public void Append_PostgresShapeReadingRows_DoesNotDrain(string shapeName) =>
+        Write(GetUser with { Shape = Enum.Parse<ResultShape>(shapeName) }).ShouldNotContain("NextResultAsync");
 
     // Under no-array-pool the types the buffer serves read their rows as before the buffer.
     [Theory]
@@ -951,6 +1042,86 @@ public sealed class QueryMethodWriterTests
         text.ShouldNotContain(" await,");
     }
 
+    // After the last row the iterator reads the later results inside its try, so that the move that ends the loop
+    // throws an error a later statement raises; PostgreSQL's has no later result.
+    [Fact]
+    public void Append_SqlServerStreams_DrainsAfterTheReadLoop()
+    {
+        Write(SqlServerStream)
+            .ShouldContain(
+                "                    atRow = false;\n"
+                    + "                }\n"
+                    + "\n"
+                    + Drain("                ")
+                    + "            }\n"
+                    + "            finally\n"
+            );
+        Write(Stream).ShouldNotContain("NextResultAsync");
+    }
+
+    // A loop left at a row, by a break, a throw in its body or a disposal, disposes the iterator at its yield, and the
+    // finally reads the later results then, so that an error the rest of the batch raises is thrown.  It reads them
+    // without the token, as the reader's disposal would, so a token the caller cancelled neither throws nor cancels the
+    // command.  The row is built before the flag is set, so an exception of the iterator's own, from a read, a check or
+    // a converter, reads none.
+    [Fact]
+    public void Append_SqlServerStreams_DrainsInAFinallyWhenLeftAtARow()
+    {
+        Write(SqlServerStream with { Output = VectorOutput(isNullable: false) })
+            .ShouldContain(
+                "            await using var readerScope = "
+                    + "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);\n"
+                    + "            var atRow = false;\n"
+                    + "            try\n"
+                    + "            {\n"
+                    + "                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
+                    + "                {\n"
+                    + "                    var value1 = reader.GetFieldValue<"
+                    + Vector
+                    + ">(1);\n"
+                    + "                    if (value1.IsNull)\n"
+                    + "                    {\n"
+                    + "                        throw new global::System.InvalidCastException("
+                    + "\"Column 'embedding' is null.\");\n"
+                    + "                    }\n"
+                    + "\n"
+                    + "                    var row = new global::App.GetUserDto("
+                    + "reader.GetFieldValue<int>(0), value1);\n"
+                    + "                    atRow = true;\n"
+                    + "                    yield return row;\n"
+                    + "                    atRow = false;\n"
+                    + "                }\n"
+                    + "\n"
+                    + Drain("                ")
+                    + "            }\n"
+                    + "            finally\n"
+                    + "            {\n"
+                    + "                if (atRow)\n"
+                    + "                {\n"
+                    + Drain("                    ", "global::System.Threading.CancellationToken.None")
+                    + "                }\n"
+                    + "            }\n"
+                    + "        }\n"
+                    + "        finally\n"
+            );
+        Write(Stream).ShouldNotContain("atRow");
+    }
+
+    // A token named as the flag renames the flag, which no argument may hide.
+    [Fact]
+    public void Append_SqlServerStreamsTokenNamedAtRow_RenamesTheFlag()
+    {
+        var text = Write(
+            SqlServerStream with
+            {
+                Segments = TestSidecars.Of(TestModels.Literal("SELECT 1 FROM "), Token("atRow")),
+            }
+        );
+
+        text.ShouldContain("var atRow1 = false;\n");
+        text.ShouldContain("if (atRow1)\n");
+    }
+
     [Fact]
     public void Append_IAsyncEnumerableNotNullVectorColumn_ChecksBeforeYielding() =>
         Write(Stream with { Output = VectorOutput(isNullable: false) })
@@ -1011,8 +1182,8 @@ public sealed class QueryMethodWriterTests
             .ShouldStartWith("/// <summary>\n/// Finds a user by <c>id</c>,\n/// or none.\n/// </summary>\n");
 
     // Not required of this writer's tests, which compare text: the driver tests compile it.  Every shape, collection
-    // type and placement, with names that could hide what the method writes, compiled together against the real
-    // System.Data, Npgsql's parameter and SqlClient's SqlVector.
+    // type, placement and engine, with names that could hide what the method writes, compiled together against the
+    // real System.Data, Npgsql's parameter and SqlClient's SqlVector.
     [Fact]
     public void Append_EveryShapeAndCollectionType_Compiles()
     {
@@ -1034,6 +1205,7 @@ public sealed class QueryMethodWriterTests
             Token("App"),
             Token("await"),
             Token("ReadRows"),
+            Token("atRow"),
             Token("yield")
         );
         var withVector = GetUser.Output! with
@@ -1055,24 +1227,29 @@ public sealed class QueryMethodWriterTests
             {
                 foreach (var output in new[] { withVector, asClass })
                 {
-                    var method = GetUser with
+                    foreach (var engine in new[] { DatabaseEngine.PostgreSql, DatabaseEngine.SqlServer })
                     {
-                        Name = "Q" + index++,
-                        Shape = shape,
-                        Collection = collection,
-                        Output = output,
-                        Segments = index % 2 == 0 ? awkward : GetUser.Segments,
-                        Input = index % 3 == 0 ? null : GetUser.Input,
-                    };
-                    // Every awkward method once by each placement: the segments go by twos, the placement by fours.
-                    QueryMethodWriter.Append(
-                        builder,
-                        "        ",
-                        method,
-                        "public static",
-                        isExtension: index % 4 < 2,
-                        RowBufferType
-                    );
+                        var method = GetUser with
+                        {
+                            Name = "Q" + index++,
+                            Shape = shape,
+                            Collection = collection,
+                            Engine = engine,
+                            Output = output,
+                            Segments = index % 4 < 2 ? awkward : GetUser.Segments,
+                            Input = index % 3 == 0 ? null : GetUser.Input,
+                        };
+                        // Every awkward method once by each placement and engine: the engine goes by ones, the
+                        // segments by twos and the placement by eights.
+                        QueryMethodWriter.Append(
+                            builder,
+                            "        ",
+                            method,
+                            "public static",
+                            isExtension: index % 8 < 4,
+                            RowBufferType
+                        );
+                    }
                 }
             }
         }
@@ -1141,6 +1318,17 @@ public sealed class QueryMethodWriterTests
         };
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);
+
+    // The loop that reads the results after the rows, at an indent, with the method's token unless another is given.
+    private static string Drain(string indent, string token = "cancellationToken") =>
+        indent
+        + "while (await reader.NextResultAsync("
+        + token
+        + ").ConfigureAwait(false))\n"
+        + indent
+        + "{\n"
+        + indent
+        + "}\n";
 
     private static string Write(QueryMethod method, string modifiers = "public static", bool isExtension = true)
     {

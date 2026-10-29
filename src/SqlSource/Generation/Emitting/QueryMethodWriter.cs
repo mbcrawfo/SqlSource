@@ -33,6 +33,9 @@ internal static class QueryMethodWriter
 
     private const string CancellationToken = "cancellationToken";
 
+    // The token of a call that nothing cancels.
+    private const string NoCancellation = "global::System.Threading.CancellationToken.None";
+
     private const string ExceptionType = "global::SqlSource.UnexpectedRowCountException";
 
     // The lines around the assignment of a command's SQL when its tokens build it.
@@ -83,7 +86,8 @@ internal static class QueryMethodWriter
             tokens,
             method.Input,
             method.Shape is ResultShape.None or ResultShape.RowCount ? null : method.Output,
-            streams
+            streams,
+            DrainsWhenLeftAtARow(method)
         );
         var bodyIndent = indent + GeneratedText.Indent;
         var blockIndent = bodyIndent + GeneratedText.Indent;
@@ -121,6 +125,11 @@ internal static class QueryMethodWriter
     // A many query of IAsyncEnumerable, whose method returns a local iterator that reads each row as it is asked for.
     private static bool Streams(QueryMethod method) =>
         method.Shape == ResultShape.Many && method.Collection == CollectionKind.IAsyncEnumerable;
+
+    // A streaming method on SQL Server, whose iterator reads the later results in a finally when its loop is left at
+    // a row.
+    private static bool DrainsWhenLeftAtARow(QueryMethod method) =>
+        Streams(method) && method.Engine == DatabaseEngine.SqlServer;
 
     // The SQL, the opening of a closed connection, the command, its parameters and its execution, and the closing of
     // the connection in a finally, at the indent of the method's body.
@@ -594,36 +603,27 @@ internal static class QueryMethodWriter
 
         // A streaming method yields each row as it reads it, where any other reads them into its buffer and returns
         // the collection.
+        if (streams)
+        {
+            AppendStream(builder, indent, method, output, locals);
+            return;
+        }
+
         if (method.Shape == ResultShape.Many)
         {
-            string? result = null;
-            if (!streams)
-            {
-                (var buffer, result) = GetBuffer(method, output.TypeText, locals.Rows, rowBufferType);
-                _ = builder
-                    .Append(indent)
-                    .Append("var ")
-                    .Append(locals.Rows)
-                    .Append(" = ")
-                    .Append(buffer)
-                    .Append(";\n");
-            }
-
+            var (buffer, result) = GetBuffer(method, output.TypeText, locals.Rows, rowBufferType);
+            _ = builder.Append(indent).Append("var ").Append(locals.Rows).Append(" = ").Append(buffer).Append(";\n");
             _ = builder.Append(indent).Append("while (");
             AppendRead(builder, locals);
             _ = builder.Append(")\n").Append(indent).Append("{\n");
             AppendVectorChecks(builder, innerIndent, output, locals);
-            _ = streams
-                ? builder.Append(innerIndent).Append("yield return ")
-                : builder.Append(innerIndent).Append(locals.Rows).Append(".Add(");
+            _ = builder.Append(innerIndent).Append(locals.Rows).Append(".Add(");
             AppendRow(builder, output, locals);
-            _ = builder.Append(streams ? ";\n" : ");\n");
+            _ = builder.Append(");\n");
             AppendEnd(builder, indent);
-            if (result is not null)
-            {
-                _ = builder.Append('\n').Append(indent).Append("return ").Append(result).Append(";\n");
-            }
-
+            _ = builder.Append('\n');
+            AppendDrain(builder, indent, method, locals);
+            _ = builder.Append(indent).Append("return ").Append(result).Append(";\n");
             return;
         }
 
@@ -636,6 +636,7 @@ internal static class QueryMethodWriter
         }
         else
         {
+            AppendDrain(builder, innerIndent, method, locals);
             _ = builder.Append(innerIndent).Append("return null;\n");
         }
 
@@ -649,7 +650,108 @@ internal static class QueryMethodWriter
         _ = builder.Append(")\n").Append(indent).Append("{\n");
         AppendThrow(builder, innerIndent, method.QueryName, moreThanOne: true);
         AppendEnd(builder, indent);
-        _ = builder.Append('\n').Append(indent).Append("return ").Append(locals.Row).Append(";\n");
+        _ = builder.Append('\n');
+        AppendDrain(builder, indent, method, locals);
+        _ = builder.Append(indent).Append("return ").Append(locals.Row).Append(";\n");
+    }
+
+    // The iterator's loop, which yields each row as it reads it.  On SQL Server the loop and the drain after it are in
+    // a try whose finally drains when the loop was left at a row: a break, a throw in the loop's body or a disposal
+    // disposes the iterator at its yield, and the rest of the batch can hold an error that the caller is to see.  The
+    // flag is set once the row is built, so an exception of the iterator's own, from a read, a check or a converter,
+    // drains nothing.  The finally's drain takes no token, as the reader's disposal would read the rest: a token the
+    // caller cancelled before an early exit neither throws nor cancels the command, and the drain throws only what the
+    // database raises.
+    private static void AppendStream(
+        StringBuilder builder,
+        string indent,
+        QueryMethod method,
+        MethodOutput output,
+        Locals locals
+    )
+    {
+        var tracksRow = DrainsWhenLeftAtARow(method);
+        var loopIndent = tracksRow ? indent + GeneratedText.Indent : indent;
+        var innerIndent = loopIndent + GeneratedText.Indent;
+        if (tracksRow)
+        {
+            _ = builder
+                .Append(indent)
+                .Append("var ")
+                .Append(locals.AtRow)
+                .Append(" = false;\n")
+                .Append(indent)
+                .Append("try\n")
+                .Append(indent)
+                .Append("{\n");
+        }
+
+        _ = builder.Append(loopIndent).Append("while (");
+        AppendRead(builder, locals);
+        _ = builder.Append(")\n").Append(loopIndent).Append("{\n");
+        AppendVectorChecks(builder, innerIndent, output, locals);
+        if (!tracksRow)
+        {
+            _ = builder.Append(innerIndent).Append("yield return ");
+            AppendRow(builder, output, locals);
+            _ = builder.Append(";\n");
+            AppendEnd(builder, loopIndent);
+            return;
+        }
+
+        _ = builder.Append(innerIndent).Append("var ").Append(locals.Row).Append(" = ");
+        AppendRow(builder, output, locals);
+        _ = builder
+            .Append(";\n")
+            .Append(innerIndent)
+            .Append(locals.AtRow)
+            .Append(" = true;\n")
+            .Append(innerIndent)
+            .Append("yield return ")
+            .Append(locals.Row)
+            .Append(";\n")
+            .Append(innerIndent)
+            .Append(locals.AtRow)
+            .Append(" = false;\n");
+        AppendEnd(builder, loopIndent);
+        _ = builder.Append('\n');
+        AppendDrainLoop(builder, loopIndent, locals, CancellationToken);
+        _ = builder.Append(indent).Append("}\n").Append(indent).Append("finally\n").Append(indent).Append("{\n");
+        AppendIf(builder, loopIndent, locals.AtRow);
+        AppendDrainLoop(builder, innerIndent, locals, NoCancellation);
+        AppendEnd(builder, loopIndent);
+        AppendEnd(builder, indent);
+    }
+
+    // On SQL Server, the results after the rows are read before the method returns, since SqlClient raises an error
+    // that a later statement of the batch holds only when NextResultAsync reaches it, and drops it when the reader is
+    // disposed.  The method's own throws do not drain, so that a later statement's error never replaces one.  A
+    // PostgreSQL query is one statement, so its reader has no later result.  The loop is followed by a blank line, as
+    // a return follows it.
+    private static void AppendDrain(StringBuilder builder, string indent, QueryMethod method, Locals locals)
+    {
+        if (method.Engine != DatabaseEngine.SqlServer)
+        {
+            return;
+        }
+
+        AppendDrainLoop(builder, indent, locals, CancellationToken);
+        _ = builder.Append('\n');
+    }
+
+    // The loop that reads the results after the rows and does nothing with them, with the token given.
+    private static void AppendDrainLoop(StringBuilder builder, string indent, Locals locals, string token)
+    {
+        _ = builder
+            .Append(indent)
+            .Append("while (await ")
+            .Append(locals.Reader)
+            .Append(".NextResultAsync(")
+            .Append(token)
+            .Append(").ConfigureAwait(false))\n")
+            .Append(indent)
+            .Append("{\n");
+        AppendEnd(builder, indent);
     }
 
     private static void AppendScope(StringBuilder builder, string indent, string scope, string disposable) =>
@@ -860,10 +962,11 @@ internal static class QueryMethodWriter
     // The names of the method's locals and of the lambdas' parameters, none of which an argument has.  The locals
     // that read rows are named only for a method that reads them, whose output is given, the value of a converted
     // parameter only for a method that has one, the element of an array and its value only for a method that
-    // converts one by element, and the iterator only for a method that streams.
+    // converts one by element, the iterator only for a method that streams, and the flag of a row being yielded only
+    // for one that drains when its loop is left at a row.
     private sealed class Locals
     {
-        public Locals(List<string> tokens, MethodInput? input, MethodOutput? output, bool streams)
+        public Locals(List<string> tokens, MethodInput? input, MethodOutput? output, bool streams, bool tracksRow)
         {
             var names = new LocalNames(Seed(tokens));
             Sql = names.Take("sql");
@@ -902,6 +1005,7 @@ internal static class QueryMethodWriter
             Span = names.Take("span");
             State = names.Take("state");
             Iterator = streams ? names.Take("ReadRows") : string.Empty;
+            AtRow = tracksRow ? names.Take("atRow") : string.Empty;
         }
 
         public string Sql { get; }
@@ -936,6 +1040,9 @@ internal static class QueryMethodWriter
 
         // The local function a streaming method returns, which reads its rows.
         public string Iterator { get; }
+
+        // The flag that is true while the iterator is suspended at the yield of a row.
+        public string AtRow { get; }
 
         private static bool HasWrite(MethodInput? input) =>
             input is not null && input.Parameters.Any(static parameter => parameter.Write is not null);
