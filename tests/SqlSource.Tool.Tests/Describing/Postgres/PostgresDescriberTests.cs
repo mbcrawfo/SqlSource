@@ -146,13 +146,11 @@ public sealed class PostgresDescriberTests
     public async Task SecretsOf_PasswordFileThatIsANamedPipe_IsNoneAndIsNotOpened()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), "mkfifo is a command of Unix.");
+        Programs.SkipUnlessOnPath("mkfifo");
         using var folder = new TempFolder();
         var path = folder.PathOf("pgpass");
-        using (var mkfifo = Process.Start(new ProcessStartInfo("mkfifo", [path]) { UseShellExecute = false }))
-        {
-            await mkfifo!.WaitForExitAsync(TestContext.Current.CancellationToken);
-            mkfifo.ExitCode.ShouldBe(0);
-        }
+        var made = await Programs.RunAsync(new ProcessStartInfo("mkfifo", [path]), Eventually.Patience);
+        made.ExitCode.ShouldBe(0, made.Error);
 
         var secrets = await Eventually.WithinAsync(
             Task.Run(() => new PostgresDescriber().SecretsOf("Host=h", Environments.Of(("PGPASSFILE", path)))),

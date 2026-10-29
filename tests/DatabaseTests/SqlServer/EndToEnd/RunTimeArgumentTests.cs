@@ -142,26 +142,21 @@ public sealed class RunTimeArgumentTests(SqlServerDatabases sqlServer)
     }
 
     // The converter of CancelOnRead cancels the token as the first row is read, and the ReadAsync of the second row
-    // throws.  The method opened the connection, and closes it again.
+    // throws.  The method opened the connection, and closes it again.  The source set here is of this test's flow
+    // alone, and goes with it: a value an async method sets does not flow back to its caller.
     [Fact]
     public async Task ListAccountIdsCancellingOnRead_TokenCancelledDuringTheRead_ThrowsTaskCanceledException()
     {
         await using var connection = EndToEndSources.App(sqlServer);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         CancelOnRead.Source = cancellation;
-        try
-        {
-            _ = await Should.ThrowAsync<TaskCanceledException>(() =>
-                connection.ListAccountIdsCancellingOnRead(cancellationToken: cancellation.Token)
-            );
 
-            cancellation.IsCancellationRequested.ShouldBeTrue();
-            connection.State.ShouldBe(ConnectionState.Closed);
-        }
-        finally
-        {
-            CancelOnRead.Source = null;
-        }
+        _ = await Should.ThrowAsync<TaskCanceledException>(() =>
+            connection.ListAccountIdsCancellingOnRead(cancellationToken: cancellation.Token)
+        );
+
+        cancellation.IsCancellationRequested.ShouldBeTrue();
+        connection.State.ShouldBe(ConnectionState.Closed);
     }
 
     // The connection is of a pool of its own, so that a cancel can find the session that the method opens, and the

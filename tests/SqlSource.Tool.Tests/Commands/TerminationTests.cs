@@ -20,8 +20,13 @@ public sealed class TerminationTests : IDisposable
     // The folders that a run makes in the temporary directory for its manifests.
     private const string RunFolders = "sqlsource-*";
 
-    // How soon the run ends once its console is closed.
-    private static readonly TimeSpan Soon = TimeSpan.FromSeconds(60);
+    // How soon the run ends once its console is closed: half the patience, so that this wait gives up, with what
+    // taskkill said, before RunAsync, whose patience is spent on the earlier waits too.
+    private static readonly TimeSpan Soon = Eventually.Patience / 2;
+
+    // How long the project's target waits: twice the patience, longer than every wait of the tests, so that a run
+    // that was not told to end is still going when they give up.
+    private static readonly int TargetWaitSeconds = (int)(Eventually.Patience * 2).TotalSeconds;
 
     private readonly FixtureProjects _fixtures = new();
 
@@ -103,7 +108,7 @@ public sealed class TerminationTests : IDisposable
 
                 closed = await CloseConsoleAsync(title);
 
-                // Left alone, the run would wait for its MSBuild for two minutes.
+                // Left alone, the run would wait for its MSBuild for twice the patience.
                 try
                 {
                     await shell.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(Soon);
@@ -118,13 +123,13 @@ public sealed class TerminationTests : IDisposable
         Directory.EnumerateDirectories(temp, RunFolders).ShouldBeEmpty(closed);
     }
 
-    // A copy of a fixture whose manifest target writes the file given and then waits for two minutes, so that a
+    // A copy of a fixture whose manifest target writes the file given and then waits for TargetWaitSeconds, so that a
     // run of it ends only when it is told to: a test that failed to tell it sees a run that goes on.  On Windows the
     // waiter, ping, writes its answers to the file "answers" names, or to nothing.
     private string ProjectThatWaits(string waiting, string? answers = null)
     {
         var project = _fixtures.Copy("Single");
-        var (program, arguments) = Programs.Waiter(120);
+        var (program, arguments) = Programs.Waiter(TargetWaitSeconds);
         var target = answers is null ? "nul" : $"\"{answers}\"";
         var output = OperatingSystem.IsWindows() ? " > " + target : "";
         var wait = SecurityElement.Escape(string.Join(' ', [program, .. arguments]) + output);
