@@ -23,7 +23,7 @@
 - **Every test that runs the generator or its emitter states its output.**  It passes an `OutputKind` to the harness's `OutputKind?` parameter, which has no default, nor has a helper of a test class that runs the generator: `Sql`, unless the test is of what an output that needs entries does, as the tests of sidecars and of their caching are.
 - **A test passes `null` for the output only as the comment on `GeneratorHarness.Run` allows**, and says why in a comment.
 - **`Microsoft.CodeAnalysis` has an `OutputKind` too**: a file that imports it names the generator's with `using OutputKind = SqlSource.Settings.OutputKind;`.
-- **A test gives a setting in `settings:`, a folder's settings file or a marker, or in `TestProject.Settings` or an `AddSettings` file, never in a property or metadata, which neither the generator nor the tool reads.**  `SqlSourceBuildFolders` is a build input, not a setting, which any test may set; the rule holds even for a test that would show that such a property is not read.
+- **A test gives a setting in `settings:`, a folder's settings file or a marker, or in `TestProject.Settings` or an `AddSettings` file, never in a property or metadata, which neither the generator nor the tool reads.**  The build's two properties are inputs, not settings, which any test may set; the rule holds even for a test that would show that such a property is not read.
 
 ## Programs, time and waits
 

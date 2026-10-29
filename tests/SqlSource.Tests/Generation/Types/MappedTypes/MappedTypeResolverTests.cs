@@ -860,6 +860,17 @@ public sealed class MappedTypeResolverTests
         type.Package.ShouldBe(new PackageBinding("Range", "Brought.Client.Range", "Brought.Client"));
     }
 
+    // A name whose own short name and an argument's both find a package's type is marked by its own, before its
+    // arguments'.
+    [Fact]
+    public void Resolve_ShortNameAndItsArgumentOfTransitivePackagesTypes_HasTheNamesOwnBinding()
+    {
+        var type = ResolveBrought("Range<AccountId>", TransitivePackageAssemblies.Of("Brought.Client"));
+
+        type.Status.ShouldBe(MappedTypeStatus.Found);
+        type.Package.ShouldBe(new PackageBinding("Range", "Brought.Client.Range", "Brought.Client"));
+    }
+
     // A full name says which type it means, whatever assembly has it.
     [Fact]
     public void Resolve_FullNameOfATransitivePackagesType_HasNoBinding()

@@ -87,33 +87,7 @@ internal sealed record TransitivePackageAssemblies(EquatableArray<string> Names)
         return new TransitivePackageAssemblies(new EquatableArray<string>(names.ToImmutable()));
     }
 
-    /// <summary>
-    /// Whether <paramref name="assemblyName" /> is one of the names, ignoring case, by a binary search of the sorted
-    /// names.
-    /// </summary>
-    public bool Contains(string assemblyName)
-    {
-        var low = 0;
-        var high = Names.Count - 1;
-        while (low <= high)
-        {
-            var middle = low + ((high - low) / 2);
-            var order = Comparer.Compare(Names[middle], assemblyName);
-            if (order == 0)
-            {
-                return true;
-            }
-
-            if (order < 0)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-
-        return false;
-    }
+    /// <summary>Whether <paramref name="assemblyName" /> is one of the names, ignoring case.</summary>
+    public bool Contains(string assemblyName) =>
+        SortedSearch.IndexOf(Names, assemblyName, static name => name, Comparer) >= 0;
 }
