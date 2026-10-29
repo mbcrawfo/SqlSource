@@ -241,7 +241,7 @@ public sealed class CliTests : IDisposable
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldStartWith("sqlsource : error SQLSRC200: ");
         var end = LogReader.Read(_run.Folder.PathOf("run.log"))[^1];
-        end.GetProperty("event").GetString().ShouldBe("run.end");
+        LogReader.EventOf(end).ShouldBe("run.end");
         var database = end.GetProperty("databases").EnumerateArray().ShouldHaveSingleItem();
         database.GetProperty("described").GetInt32().ShouldBe(1);
     }
@@ -261,9 +261,9 @@ public sealed class CliTests : IDisposable
 
         result.ExitCode.ShouldBe(1);
         var events = LogReader.Read(_run.Folder.PathOf("run.log"));
-        events[^2].GetProperty("event").GetString().ShouldBe("diagnostic");
+        LogReader.EventOf(events[^2]).ShouldBe("diagnostic");
         events[^2].GetProperty("id").GetString().ShouldBe("SQLSRC200");
-        events[^1].GetProperty("event").GetString().ShouldBe("run.end");
+        LogReader.EventOf(events[^1]).ShouldBe("run.end");
     }
 
     [Fact]

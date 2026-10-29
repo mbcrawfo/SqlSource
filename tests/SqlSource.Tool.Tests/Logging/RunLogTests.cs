@@ -48,7 +48,7 @@ public sealed class RunLogTests : IDisposable
         result.ShouldBe(new CliResult(0, "postgres (postgres): 2 described, 0 skipped, 0 failed\n", ""));
         var events = LogReader.Read(Log);
         var start = events[0];
-        start.GetProperty("event").GetString().ShouldBe("run.start");
+        LogReader.EventOf(start).ShouldBe("run.start");
         start.GetProperty("time").GetString().ShouldBe(TestClock.StartIso);
         start.GetProperty("toolVersion").GetString().ShouldBe(PackageVersion.Prefix);
         start.GetProperty("formatVersion").GetInt32().ShouldBe(SidecarFormat.Version);
@@ -56,7 +56,7 @@ public sealed class RunLogTests : IDisposable
         start.GetProperty("os").GetString().ShouldBe(Hosts.OperatingSystem);
         Strings(start.GetProperty("arguments")).ShouldBe(["describe", "--log", "run.log"]);
         var end = events[^1];
-        end.GetProperty("event").GetString().ShouldBe("run.end");
+        LogReader.EventOf(end).ShouldBe("run.end");
         end.GetProperty("time").GetString().ShouldBe("2026-10-09T14:02:11.462Z");
         end.GetProperty("exitCode").GetInt32().ShouldBe(0);
         end.GetProperty("durationMs").GetInt64().ShouldBe(50);
@@ -157,7 +157,7 @@ public sealed class RunLogTests : IDisposable
 
         result.ExitCode.ShouldBe(1);
         var events = LogReader.Read(Log);
-        var diagnostics = events.Where(line => line.GetProperty("event").GetString() == "diagnostic").ToArray();
+        var diagnostics = events.Where(line => LogReader.EventOf(line) == "diagnostic").ToArray();
         diagnostics.Select(line => line.GetProperty("id").GetString()).ShouldBe(["SQLSRC999", "SQLSRC217"]);
         var rejected = diagnostics[0];
         rejected.GetProperty("path").GetString().ShouldBe(_users);
@@ -667,7 +667,7 @@ public sealed class RunLogTests : IDisposable
         result.ExitCode.ShouldBe(1);
         var events = LogReader.Read(Log);
         events[^2].GetProperty("id").GetString().ShouldBe("SQLSRC200");
-        events[^1].GetProperty("event").GetString().ShouldBe("run.end");
+        LogReader.EventOf(events[^1]).ShouldBe("run.end");
         events[^1].GetProperty("exitCode").GetInt32().ShouldBe(1);
     }
 
@@ -681,7 +681,7 @@ public sealed class RunLogTests : IDisposable
 
         result.ExitCode.ShouldBe(1);
         var end = LogReader.Read(Log)[^1];
-        end.GetProperty("event").GetString().ShouldBe("run.end");
+        LogReader.EventOf(end).ShouldBe("run.end");
         end.GetProperty("exitCode").GetInt32().ShouldBe(1);
     }
 }

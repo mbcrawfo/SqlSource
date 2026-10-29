@@ -65,7 +65,7 @@ public sealed class RunLogFileTests : IDisposable
 
         Written().ShouldBe(Head + ",\"_event\":\"run.end\",\"_time\":\"never\",\"_truncated\":false}\n");
         var line = LogReader.Parse(Written().TrimEnd('\n'));
-        line.GetProperty("event").GetString().ShouldBe("e");
+        LogReader.EventOf(line).ShouldBe("e");
         line.GetProperty("time").GetString().ShouldBe(TestClock.StartIso);
         line.TryGetProperty("truncated", out _).ShouldBeFalse();
     }

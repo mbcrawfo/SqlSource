@@ -41,14 +41,11 @@ public sealed class SqlServerEventsSessionTests
             IsComputedColumn = null,
         };
         var script = new SqlServerScript()
-            .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([], null))
-            .Add(
-                "columns",
-                new SqlServerColumnsRequest(Sql, null),
+            .NoParametersThenColumns(
+                Sql,
                 new SqlServerColumnsAnswer([IdColumn, next, Rowstat with { ColumnOrdinal = 3 }], null, null)
             )
-            .Add(
-                "operands",
+            .Operands(
                 new SqlServerColumnsRequest("SELECT id\nAS [1]\nFROM dbo.users", null),
                 new SqlServerColumnsAnswer([IdColumn with { Name = "1" }, Rowstat], null, null)
             );
@@ -80,14 +77,8 @@ public sealed class SqlServerEventsSessionTests
     {
         const string Sql = "SELECT id FROM dbo.users";
         var script = new SqlServerScript()
-            .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([], null))
-            .Add(
-                "columns",
-                new SqlServerColumnsRequest(Sql, null),
-                new SqlServerColumnsAnswer([IdColumn, Rowstat], null, null)
-            )
-            .Add(
-                "table",
+            .NoParametersThenColumns(Sql, new SqlServerColumnsAnswer([IdColumn, Rowstat], null, null))
+            .Table(
                 new SqlServerTableRequest("dbo", "users"),
                 new SqlServerColumnsAnswer([IdColumn, Rowstat], null, null)
             );
@@ -116,14 +107,11 @@ public sealed class SqlServerEventsSessionTests
             SourceColumn = "nickname",
         };
         var script = new SqlServerScript()
-            .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([], null))
-            .Add(
-                "columns",
-                new SqlServerColumnsRequest(Sql, null),
+            .NoParametersThenColumns(
+                Sql,
                 new SqlServerColumnsAnswer([IdColumn, nickname, Rowstat with { ColumnOrdinal = 3 }], null, null)
             )
-            .Add(
-                "table",
+            .Table(
                 new SqlServerTableRequest("dbo", "users"),
                 new SqlServerColumnsAnswer([IdColumn, nickname, Rowstat with { ColumnOrdinal = 3 }], null, null)
             );
@@ -149,8 +137,7 @@ public sealed class SqlServerEventsSessionTests
         var intRow = new SqlServerParameterRow("@name_1", "int", 4, 10, 0, null, null, null);
         var textRow = new SqlServerParameterRow("@name_2", "nvarchar(100)", 200, 0, 0, null, null, null);
         var script = new SqlServerScript()
-            .Add(
-                "declared",
+            .Declared(
                 new SqlServerDeclaredRequest("SELECT @tenant AS [1]", "@tenant int"),
                 new SqlServerDeclaredAnswer(
                     [new SqlServerDeclaredRow(1, "int", 4, 10, 0, null, null, null)],
@@ -158,24 +145,20 @@ public sealed class SqlServerEventsSessionTests
                     null
                 )
             )
-            .Add("parameters", parameters, new SqlServerParametersAnswer([intRow, textRow], null))
-            .Add(
-                "probe",
+            .Parameters(parameters, new SqlServerParametersAnswer([intRow, textRow], null))
+            .Probe(
                 new SqlServerProbeRequest(Renamed, "@tenant int, @name_1 xml, @name_2 nvarchar(100)"),
                 new SqlServerProbeAnswer(true, null)
             )
-            .Add(
-                "probe",
+            .Probe(
                 new SqlServerProbeRequest(Renamed, "@tenant int, @name_1 int, @name_2 nvarchar(100)"),
                 new SqlServerProbeAnswer(true, null)
             )
-            .Add(
-                "probe",
+            .Probe(
                 new SqlServerProbeRequest(Renamed, "@tenant int, @name_1 int, @name_2 xml"),
                 new SqlServerProbeAnswer(false, null)
             )
-            .Add(
-                "columns",
+            .Columns(
                 new SqlServerColumnsRequest(Sql, "@tenant int, @name nvarchar(100)"),
                 new SqlServerColumnsAnswer([], null, null)
             );
@@ -210,8 +193,7 @@ public sealed class SqlServerEventsSessionTests
     public async Task DescribeAsync_ParametersThatFail_WritesTheErrorAndNoProbe()
     {
         const string Sql = "SELECT id FROM dbo.users WHERE id = @id";
-        var script = new SqlServerScript().Add(
-            "parameters",
+        var script = new SqlServerScript().Parameters(
             new SqlServerParametersRequest(Sql, null),
             new SqlServerParametersAnswer(null, Refused)
         );
@@ -231,8 +213,7 @@ public sealed class SqlServerEventsSessionTests
     {
         const string Sql = "SELECT id FROM dbo.users WHERE email = @p AND other = @e";
         var script = new SqlServerScript()
-            .Add(
-                "declared",
+            .Declared(
                 new SqlServerDeclaredRequest("SELECT @p AS [1]", "@p dbo.Email"),
                 new SqlServerDeclaredAnswer(
                     [new SqlServerDeclaredRow(1, "nvarchar(320)", 640, 0, 0, "dbo", "Email", null)],
@@ -240,16 +221,14 @@ public sealed class SqlServerEventsSessionTests
                     null
                 )
             )
-            .Add(
-                "parameters",
+            .Parameters(
                 new SqlServerParametersRequest(Sql, "@p dbo.Email"),
                 new SqlServerParametersAnswer(
                     [new SqlServerParameterRow("@e", "nvarchar(320)", 640, 0, 0, "dbo", "Email", null)],
                     null
                 )
             )
-            .Add(
-                "columns",
+            .Columns(
                 new SqlServerColumnsRequest(Sql, "@p dbo.Email, @e [dbo].[Email]"),
                 new SqlServerColumnsAnswer([], null, null)
             );
@@ -276,8 +255,7 @@ public sealed class SqlServerEventsSessionTests
     public async Task DescribeAsync_ThroughTheLogOfASession_RemovesTheSecretFromTheSqlAndTheMessageOfAnError()
     {
         const string Sql = "SELECT id FROM dbo.secret WHERE id = @id";
-        var script = new SqlServerScript().Add(
-            "parameters",
+        var script = new SqlServerScript().Parameters(
             new SqlServerParametersRequest(Sql, null),
             new SqlServerParametersAnswer(
                 null,

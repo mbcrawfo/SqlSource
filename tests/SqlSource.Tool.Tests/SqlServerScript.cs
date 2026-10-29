@@ -131,21 +131,42 @@ internal sealed class SqlServerScript
 
     public SqlServerScript()
     {
-        _ = Add("open", SqlServerOpenRequest.Instance, Opened);
+        _ = Add(SqlServerCallNames.Open, SqlServerOpenRequest.Instance, Opened);
     }
 
-    public SqlServerScript Add<TRequest, TAnswer>(string method, TRequest request, TAnswer answer)
-    {
-        _capture.Add(new CaptureCall(method, CaptureJson.ToElement(request), CaptureJson.ToElement(answer)));
-        return this;
-    }
+    public SqlServerScript Parameters(SqlServerParametersRequest request, SqlServerParametersAnswer answer) =>
+        Add(SqlServerCallNames.Parameters, request, answer);
+
+    public SqlServerScript Probe(SqlServerProbeRequest request, SqlServerProbeAnswer answer) =>
+        Add(SqlServerCallNames.Probe, request, answer);
+
+    public SqlServerScript Declared(SqlServerDeclaredRequest request, SqlServerDeclaredAnswer answer) =>
+        Add(SqlServerCallNames.Declared, request, answer);
+
+    public SqlServerScript Columns(SqlServerColumnsRequest request, SqlServerColumnsAnswer answer) =>
+        Add(SqlServerCallNames.Columns, request, answer);
+
+    public SqlServerScript Operands(SqlServerColumnsRequest request, SqlServerColumnsAnswer answer) =>
+        Add(SqlServerCallNames.Operands, request, answer);
+
+    public SqlServerScript Table(SqlServerTableRequest request, SqlServerColumnsAnswer answer) =>
+        Add(SqlServerCallNames.Table, request, answer);
+
+    // "parameters" answering that the statement has none, then "columns" of the statement, for a test of its columns.
+    public SqlServerScript NoParametersThenColumns(string sql, SqlServerColumnsAnswer answer) =>
+        Parameters(new SqlServerParametersRequest(sql, null), new SqlServerParametersAnswer([], null))
+            .Columns(new SqlServerColumnsRequest(sql, null), answer);
 
     // A capture of the one call "open", answered as the test gives, for a test of what the session makes of it.
     public static ReplayingExchange Answering(SqlServerOpenAnswer answer)
     {
         var capture = new DescribeCapture(SidecarValues.Engine.SqlServer);
         capture.Add(
-            new CaptureCall("open", CaptureJson.ToElement(SqlServerOpenRequest.Instance), CaptureJson.ToElement(answer))
+            new CaptureCall(
+                SqlServerCallNames.Open,
+                CaptureJson.ToElement(SqlServerOpenRequest.Instance),
+                CaptureJson.ToElement(answer)
+            )
         );
         return new ReplayingExchange(capture);
     }
@@ -174,5 +195,11 @@ internal sealed class SqlServerScript
             described,
             [.. asked.Calls.Skip(1).Select(static call => (call.Method, CaptureJson.KeyOf(call.Request)))]
         );
+    }
+
+    private SqlServerScript Add<TRequest, TAnswer>(string method, TRequest request, TAnswer answer)
+    {
+        _capture.Add(new CaptureCall(method, CaptureJson.ToElement(request), CaptureJson.ToElement(answer)));
+        return this;
     }
 }
