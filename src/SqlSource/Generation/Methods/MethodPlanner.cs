@@ -283,27 +283,16 @@ internal static class MethodPlanner
     // of its queries, so a search finds them.
     private static QueryModels? FindModels(FileModels file, int queryIndex, string name)
     {
-        var (low, high) = (0, file.Queries.Count - 1);
-        while (low <= high)
-        {
-            var middle = low + ((high - low) / 2);
-            var models = file.Queries[middle];
-            if (models.Index == queryIndex)
-            {
-                return string.Equals(models.Name, name, StringComparison.Ordinal) ? models : null;
-            }
+        var at = SortedSearch.IndexOf(file.Queries.Count, new QueryProbe(file.Queries, queryIndex));
+        return at >= 0 && string.Equals(file.Queries[at].Name, name, StringComparison.Ordinal)
+            ? file.Queries[at]
+            : null;
+    }
 
-            if (models.Index < queryIndex)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-
-        return null;
+    // A struct, so that SortedSearch does not box it.
+    private readonly struct QueryProbe(EquatableArray<QueryModels> queries, int queryIndex) : SortedSearch.IProbe
+    {
+        public int CompareAt(int index) => queries[index].Index.CompareTo(queryIndex);
     }
 
     // SQLSRC275 for each token named as a fixed argument.
@@ -448,28 +437,8 @@ internal static class MethodPlanner
         ModelRole role
     )
     {
-        var probe = new ModelAssignment(key, path, queryIndex, role, string.Empty, default);
-        var (low, high) = (0, assignments.Count - 1);
-        while (low <= high)
-        {
-            var middle = low + ((high - low) / 2);
-            var order = ModelAssignment.Order.Compare(assignments[middle], probe);
-            if (order == 0)
-            {
-                return assignments[middle];
-            }
-
-            if (order < 0)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-
-        return null;
+        var at = ModelAssignment.IndexOf(assignments, key, path, queryIndex, role);
+        return at >= 0 ? assignments[at] : null;
     }
 
     // What takes the name of a method of the type, as SQLSRC274 says it, or null when nothing does.  Another method of

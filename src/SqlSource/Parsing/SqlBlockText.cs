@@ -65,23 +65,16 @@ internal sealed class SqlBlockText(string text, (int Output, int Source)[] runs,
 
     // The index of the last run that starts at or before the offset, in the source or in the output, or -1 when
     // there is none.
-    private int FindRun(int offset, bool bySource)
-    {
-        var low = -1;
-        var high = runs.Length - 1;
-        while (low < high)
-        {
-            var middle = (low + high + 1) / 2;
-            if ((bySource ? runs[middle].Source : runs[middle].Output) <= offset)
-            {
-                low = middle;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
+    private int FindRun(int offset, bool bySource) =>
+        SortedSearch.LowerBound(runs.Length, new RunProbe(runs, offset, bySource)) - 1;
 
-        return low;
+    // Negative for a run that starts at or before the offset.  A struct, so that SortedSearch does not box it.
+    private readonly struct RunProbe((int Output, int Source)[] runs, int offset, bool bySource) : SortedSearch.IProbe
+    {
+        public int CompareAt(int index)
+        {
+            var start = bySource ? runs[index].Source : runs[index].Output;
+            return start <= offset ? -1 : 1;
+        }
     }
 }
