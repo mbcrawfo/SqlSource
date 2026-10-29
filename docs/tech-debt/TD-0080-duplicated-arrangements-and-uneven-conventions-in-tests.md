@@ -22,7 +22,7 @@ The maintainability review of 2026-10-27 found these in `tests/`.  The tests tha
 16. ~~**Shared SQL texts are written out**: `"-- name: ListInvoices\n-- database: billing\nSELECT 3;\n"` four times and `"-- name: Plain\n-- output: sql\nSELECT 4;\n"` six times in the tool's `Commands/` and `Logging/` tests, and `Generator/TypeOverrideLevelTests.cs` writes `GeneratorHarness.UsersFile` out three times.~~  Fixed: `SqlTexts.ListInvoices` and `SqlTexts.Plain`, and `TypeOverrideLevelTests` uses `GeneratorHarness.UsersFile`.
 17. ~~**The list of describer fixture cases is checked as a subset**: `Cases_OfPostgres_HoldEveryCase` and `Cases_OfSqlServer_HoldEveryCase` of `SqlSource.Tool.Tests/Fixtures/DescriberFixtureTests.cs` check that the listed cases exist, not that no other does, so a case recorded later is left out of the list without a failure (four were, until this review).~~  Fixed: `Cases_OfPostgres_AreTheListedCases` and `Cases_OfSqlServer_AreTheListedCases` compare the list with the cases found, whole.
 18. ~~**The fixture build files are linked by the same block in three projects**: `SqlSource.Tool.Tests`, `DatabaseTests/Postgres` and `DatabaseTests/SqlServer` each copy the `Fixtures/build/` and `Fixtures/global.json` items word for word.~~  Fixed by piece 4 of the database tests: `tests/Fixtures.props`, which the three import.
-19. **Some named steps of the generator have no caching test**: `src/SqlSource/AGENTS.md` and `tests/SqlSource.Tests/Generator/AGENTS.md` say a step whose re-runs matter has a name in `TrackingNames` and a test in the `Caching*Tests` class of its step, and no `Caching*Tests` class names `RepeatedPaths`, `AmbiguousHintNames`, `AllFileModels`, `FileModelSlots` or `ModelsByFile` (which `ModelsByFileTests` tests as a unit).  The first two almost never change and may be exempt; the rule does not say so.
+19. ~~**Some named steps of the generator have no caching test**: `src/SqlSource/AGENTS.md` and `tests/SqlSource.Tests/Generator/AGENTS.md` say a step whose re-runs matter has a name in `TrackingNames` and a test in the `Caching*Tests` class of its step, and no `Caching*Tests` class names `RepeatedPaths`, `AmbiguousHintNames`, `AllFileModels`, `FileModelSlots` or `ModelsByFile` (which `ModelsByFileTests` tests as a unit).  The first two almost never change and may be exempt; the rule does not say so.~~  Fixed: `Run_CSharpEdit_GathersAndArrangesNoModelAgain` and `Run_SqlFileEditedChangingOneModel_ChangesOnlyTheSlotsOfThatFile` of `CachingModelTests` pin `AllFileModels`, `ModelsByFile` and `FileModelSlots`, and the two rules name `RepeatedPaths` and `AmbiguousHintNames` as exempt.
 
 What the arrangement of compiling `SqlSource.Tests/Generator/` twice blocks: a test there cannot use a helper elsewhere in `SqlSource.Tests` (`TestModels`, `ParseOf`, `TextSpans`, `SidecarFaker`), so a shared helper must go in `SqlSource.Testing`, which stays on Roslyn 4.8 and cannot reach `SqlSource.Tool.Testing`.  It does not force items 4 and 8: `SqlSource.Testing/Generator/` can already hold them.
 
@@ -54,7 +54,7 @@ One item at a time, each in its own pull request:
 16. ~~Add the two texts to `SqlTexts`, and use `GeneratorHarness.UsersFile`.~~  Done.
 17. ~~Compare the list with the case folders whole.~~  Done.
 18. ~~A `tests/Fixtures.props` that the three projects import.~~  Done.
-19. A caching test for each of the model steps, and the exemptions named in the rule.
+19. ~~A caching test for each of the model steps, and the exemptions named in the rule.~~  Done.
 
 ## Trigger
 

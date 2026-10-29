@@ -6,6 +6,7 @@ using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
+using SqlSource.Generation.Models;
 using SqlSource.Generation.Sidecars;
 using SqlSource.Generation.Types;
 using Xunit;
@@ -33,6 +34,16 @@ internal static class StepReasons
         var (hintName, _) = ((string HintName, string Source))modelOutput;
         return hintName;
     }
+
+    // Why the slots of each file's models ran at FileModelSlots, by the files of the file's models, joined by commas.
+    // A test of it gives every file at least one model, so that no two files have the same key.
+    public static Dictionary<string, IncrementalStepRunReason> ModelSlotReasons(GeneratorDriverRunResult result) =>
+        Reasons<EquatableArray<EquatableArray<Model>>>(
+            result,
+            TrackingNames.FileModelSlots,
+            static slots =>
+                string.Join(",", slots.SelectMany(static slot => slot).Select(static model => model.HintName))
+        );
 
     // The files of the models that went.  A model is emitted from the node of its file, in the slot of its query and
     // role, so what goes is the model that went, and a model that moves to another file's node goes from the old one.
