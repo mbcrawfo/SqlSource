@@ -588,7 +588,7 @@ public sealed class AllocationTests(PostgresApp postgres)
                     new NpgsqlParameter<int>
                     {
                         ParameterName = "accountId",
-                        DataTypeName = "integer",
+                        DataTypeName = "pg_catalog.int4",
                         TypedValue = accountId,
                     }
                 );
@@ -651,7 +651,7 @@ public sealed class AllocationTests(PostgresApp postgres)
                     new NpgsqlParameter<int>
                     {
                         ParameterName = "accountId",
-                        DataTypeName = "integer",
+                        DataTypeName = "pg_catalog.int4",
                         TypedValue = accountId,
                     }
                 );
@@ -844,7 +844,7 @@ public sealed class AllocationTests(PostgresApp postgres)
                     new NpgsqlParameter<DateTimeOffset?>
                     {
                         ParameterName = "closedBefore",
-                        DataTypeName = "timestamp with time zone",
+                        DataTypeName = "pg_catalog.timestamptz",
                         TypedValue = closedBefore,
                     }
                 );
@@ -914,7 +914,7 @@ public sealed class AllocationTests(PostgresApp postgres)
                     new NpgsqlParameter<DateTimeOffset?>
                     {
                         ParameterName = "closedBefore",
-                        DataTypeName = "timestamp with time zone",
+                        DataTypeName = "pg_catalog.timestamptz",
                         TypedValue = closedBefore,
                     }
                 );
@@ -985,7 +985,7 @@ public sealed class AllocationTests(PostgresApp postgres)
                     new NpgsqlParameter<int>
                     {
                         ParameterName = "count",
-                        DataTypeName = "integer",
+                        DataTypeName = "pg_catalog.int4",
                         TypedValue = count,
                     }
                 );
@@ -1049,7 +1049,7 @@ public sealed class AllocationTests(PostgresApp postgres)
                     new NpgsqlParameter<int>
                     {
                         ParameterName = "count",
-                        DataTypeName = "integer",
+                        DataTypeName = "pg_catalog.int4",
                         TypedValue = count,
                     }
                 );
@@ -1113,7 +1113,7 @@ public sealed class AllocationTests(PostgresApp postgres)
                     new NpgsqlParameter<int>
                     {
                         ParameterName = "count",
-                        DataTypeName = "integer",
+                        DataTypeName = "pg_catalog.int4",
                         TypedValue = count,
                     }
                 );
@@ -1177,7 +1177,7 @@ public sealed class AllocationTests(PostgresApp postgres)
                     new NpgsqlParameter<int>
                     {
                         ParameterName = "count",
-                        DataTypeName = "integer",
+                        DataTypeName = "pg_catalog.int4",
                         TypedValue = count,
                     }
                 );
@@ -1241,7 +1241,7 @@ public sealed class AllocationTests(PostgresApp postgres)
                     new NpgsqlParameter<int>
                     {
                         ParameterName = "count",
-                        DataTypeName = "integer",
+                        DataTypeName = "pg_catalog.int4",
                         TypedValue = count,
                     }
                 );
