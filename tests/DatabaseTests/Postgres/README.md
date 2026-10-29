@@ -34,7 +34,7 @@ The describer's fixtures are in `tests/SqlSource.Tool.Tests/Fixtures/Describers/
 tools/record-fixtures.sh postgres
 ```
 
-To add a case, add its folder with a `query.sql` and run the script.  A recorded file is never edited by hand.
+To add a case, add its folder with a `query.sql`, add its name to the list of `Cases_OfPostgres_AreTheListedCases` in `tests/SqlSource.Tool.Tests/Fixtures/DescriberFixtureTests.cs`, which fails on a case it does not list, and run the script.  A recorded file is never edited by hand.
 
 A case of the walk is named `walk-` and its shape, and `tests/SqlSource.Tool.Tests/Fixtures/WalkMatrixTests.cs` holds a row for each, written by hand, which fails for a `walk-` case it does not list.  To add a case that forces a join method:
 

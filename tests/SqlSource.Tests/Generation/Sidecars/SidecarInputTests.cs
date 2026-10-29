@@ -1,13 +1,14 @@
 using Shouldly;
 using SqlSource.Generation.Sidecars;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Sidecars;
 
 public sealed class SidecarInputTests
 {
-    private static readonly EquatableArray<string> Claimed = TestModels.Array("app/Orders.sql", "app/Users.sql");
+    private static readonly EquatableArray<string> Claimed = TestSidecars.Of("app/Orders.sql", "app/Users.sql");
 
     [Theory]
     [InlineData("/app/Users.sql.json")]

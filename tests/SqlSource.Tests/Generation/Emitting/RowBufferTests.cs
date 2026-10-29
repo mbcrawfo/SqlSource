@@ -8,6 +8,7 @@ using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 using SqlSource.Testing;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
@@ -117,7 +118,7 @@ public sealed class RowBufferTests
             .NameFor(
                 Methods(MethodPlacement.Public, "SqlSourceRowBuffer") with
                 {
-                    Types = TestModels.Array(
+                    Types = TestSidecars.Of(
                         new TypeDeclaration("class", "@SqlSourceRowBuffer", "SqlSourceRowBuffer", "<T>", 1)
                     ),
                 }
@@ -168,11 +169,11 @@ public sealed class RowBufferTests
             placement,
             "App",
             "App",
-            TestModels.Array([new TypeDeclaration("class", name, name, string.Empty, 0), .. nested]),
+            TestSidecars.Of([new TypeDeclaration("class", name, name, string.Empty, 0), .. nested]),
             name + "Extensions",
             true,
             TestModels.AttributeLocation,
-            TestModels.Array(ListUsers),
+            TestSidecars.Of(ListUsers),
             EquatableArray<DiagnosticInfo>.Empty,
             CodeGenEngines.Postgres,
             EquatableArray<string>.Empty

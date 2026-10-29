@@ -4,6 +4,7 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Models;
 using SqlSource.Settings;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Models;
@@ -17,7 +18,7 @@ public sealed class ModelsByFileTests
         var onA = Model("App.OnA", ModelRole.Input);
         var set = Set((onB, Place("b/B.sql", 0, ModelRole.Output)), (onA, Place("a/A.sql", 1, ModelRole.Input)));
 
-        var byFile = ModelsByFile.Arrange(set, TestModels.Array<string>());
+        var byFile = ModelsByFile.Arrange(set, TestSidecars.Of<string>());
 
         byFile.Files.Select(file => file.NormalizedPath).ShouldBe(["a/A.sql", "b/B.sql"]);
         var slotsOfA = byFile.Files[0].Slots;
@@ -43,7 +44,7 @@ public sealed class ModelsByFileTests
             (byA, Place("a/A.sql", 0, ModelRole.Output, "App.A"))
         );
 
-        var byFile = ModelsByFile.Arrange(set, TestModels.Array<string>());
+        var byFile = ModelsByFile.Arrange(set, TestSidecars.Of<string>());
 
         byFile.Files.Count.ShouldBe(1);
         byFile.Files[0].Slots[1].ShouldBe([byA, byZ]);
@@ -56,7 +57,7 @@ public sealed class ModelsByFileTests
         var second = Model("App.Second", ModelRole.Input);
         var place = Place("a/A.sql", 0, ModelRole.Input);
 
-        var byFile = ModelsByFile.Arrange(Set((first, place), (second, place)), TestModels.Array<string>());
+        var byFile = ModelsByFile.Arrange(Set((first, place), (second, place)), TestSidecars.Of<string>());
 
         byFile.Files[0].Slots[0].ShouldBe([first, second]);
     }
@@ -68,7 +69,7 @@ public sealed class ModelsByFileTests
         var upper = Model("App.Upper", ModelRole.Input);
         var set = Set((upper, Place("a/A.sql", 1, ModelRole.Input)), (lower, Place("a/a.sql", 0, ModelRole.Input)));
 
-        var byFile = ModelsByFile.Arrange(set, TestModels.Array<string>());
+        var byFile = ModelsByFile.Arrange(set, TestSidecars.Of<string>());
 
         byFile.Files.Count.ShouldBe(1);
         byFile.Files[0].Slots[0].ShouldBe([lower]);
@@ -82,7 +83,7 @@ public sealed class ModelsByFileTests
         var onB = Model("App.OnB", ModelRole.Output);
         var set = Set((onA, Place("a/A.sql", 0, ModelRole.Output)), (onB, Place("b/B.sql", 0, ModelRole.Output)));
 
-        var byFile = ModelsByFile.Arrange(set, TestModels.Array("A/a.sql"));
+        var byFile = ModelsByFile.Arrange(set, TestSidecars.Of("A/a.sql"));
 
         byFile.Files.Select(file => file.NormalizedPath).ShouldBe(["b/B.sql"]);
         byFile.OfRepeatedPaths.ShouldBe([onA]);
@@ -91,7 +92,7 @@ public sealed class ModelsByFileTests
     [Fact]
     public void Arrange_NoModels_IsEmpty()
     {
-        var byFile = ModelsByFile.Arrange(Set(), TestModels.Array("a/A.sql"));
+        var byFile = ModelsByFile.Arrange(Set(), TestSidecars.Of("a/A.sql"));
 
         byFile.Files.ShouldBeEmpty();
         byFile.OfRepeatedPaths.ShouldBeEmpty();
@@ -135,7 +136,7 @@ public sealed class ModelsByFileTests
                     (Model("App.OnA", ModelRole.Input), Place("a/A.sql", 1, ModelRole.Input)),
                     (Model("App.OnRepeated", ModelRole.Input), Place("c/C.sql", 0, ModelRole.Input))
                 ),
-                TestModels.Array("c/C.sql")
+                TestSidecars.Of("c/C.sql")
             );
 
         var (first, second) = (Arrange(), Arrange());
@@ -146,10 +147,10 @@ public sealed class ModelsByFileTests
 
     private static ModelSet Set(params (Model Model, ModelPlace Place)[] models) =>
         new(
-            TestModels.Array([.. models.Select(model => model.Model)]),
-            TestModels.Array([.. models.Select(model => model.Place)]),
-            TestModels.Array<DiagnosticInfo>(),
-            TestModels.Array<ModelAssignment>()
+            TestSidecars.Of([.. models.Select(model => model.Model)]),
+            TestSidecars.Of([.. models.Select(model => model.Place)]),
+            TestSidecars.Of<DiagnosticInfo>(),
+            TestSidecars.Of<ModelAssignment>()
         );
 
     private static ModelPlace Place(string path, int queryIndex, ModelRole role, string claimingType = "App.Repo") =>
@@ -163,7 +164,7 @@ public sealed class ModelsByFileTests
             role,
             ModelKind.Record,
             true,
-            TestModels.Array<ModelProperty>(),
+            TestSidecars.Of<ModelProperty>(),
             string.Empty,
             false
         );

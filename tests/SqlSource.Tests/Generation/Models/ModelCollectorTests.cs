@@ -6,6 +6,7 @@ using SqlSource.Diagnostics;
 using SqlSource.Generation.Models;
 using SqlSource.Generation.Types;
 using SqlSource.Settings;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Models;
@@ -172,10 +173,10 @@ public sealed class ModelCollectorTests
             false,
             true,
             null,
-            TestModels.Array(
+            TestSidecars.Of(
                 new ModelProperty(
                     propertyName,
-                    new PropertyType("int", true, true, TestModels.Array<string>(), "int4", null),
+                    new PropertyType("int", true, true, TestSidecars.Of<string>(), "int4", null),
                     false,
                     string.Empty,
                     "column 'id'",

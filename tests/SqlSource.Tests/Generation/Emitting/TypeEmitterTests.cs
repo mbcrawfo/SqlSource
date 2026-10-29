@@ -7,6 +7,7 @@ using SqlSource.Parsing;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
@@ -211,20 +212,20 @@ public sealed class TypeEmitterTests
         );
         var typeFiles = new TypeFiles(
             TestModels.Type(),
-            TestModels.Array(GeneratorHarness.UsersNormalizedPath),
-            TestModels.Array(problem)
+            TestSidecars.Of(GeneratorHarness.UsersNormalizedPath),
+            TestSidecars.Of(problem)
         );
 
         var output = TypeEmitter.Emit(
             new TypeQueries(
                 typeFiles,
-                TestModels.Array(File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"))),
-                TestModels.Array(new SettingsLevel { Output = OutputKind.Sql }),
+                TestSidecars.Of(File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"))),
+                TestSidecars.Of(new SettingsLevel { Output = OutputKind.Sql }),
                 "App.UserRepository.g.cs"
             )
         );
 
-        output.ShouldBe(new TypeOutput("App.UserRepository.g.cs", null, TestModels.Array(problem)));
+        output.ShouldBe(new TypeOutput("App.UserRepository.g.cs", null, TestSidecars.Of(problem)));
     }
 
     [Fact]
@@ -469,13 +470,13 @@ public sealed class TypeEmitterTests
             new TypeQueries(
                 new TypeFiles(
                     TestModels.Type(settings: none),
-                    TestModels.Array<string>(),
-                    TestModels.Array<DiagnosticInfo>()
+                    TestSidecars.Of<string>(),
+                    TestSidecars.Of<DiagnosticInfo>()
                 ),
-                TestModels.Array(
+                TestSidecars.Of(
                     File("Users.sql", Kept("FromTheAttribute", SettingsLevel.None), Kept("FromItsMarker", keep))
                 ),
-                TestModels.Array(keep with { Output = OutputKind.Sql }),
+                TestSidecars.Of(keep with { Output = OutputKind.Sql }),
                 "App.UserRepository.g.cs"
             )
         );
@@ -716,7 +717,7 @@ public sealed class TypeEmitterTests
                 TestModels.Query("Other", "SELECT 1;", nameLocation: TestModels.NameLocation("B.sql")),
                 TestModels.Query("GetUser", "SELECT 2;", nameLocation: TestModels.NameLocation("B.sql")) with
                 {
-                    KeptErrors = TestModels.Array(error),
+                    KeptErrors = TestSidecars.Of(error),
                 }
             )
         );
@@ -776,9 +777,9 @@ public sealed class TypeEmitterTests
     ) =>
         TypeEmitter.Emit(
             new TypeQueries(
-                new TypeFiles(type, TestModels.Array<string>(), TestModels.Array<DiagnosticInfo>()),
-                TestModels.Array(files),
-                TestModels.Array(Array.ConvertAll(fileSettings, level => level with { Output = output })),
+                new TypeFiles(type, TestSidecars.Of<string>(), TestSidecars.Of<DiagnosticInfo>()),
+                TestSidecars.Of(files),
+                TestSidecars.Of(Array.ConvertAll(fileSettings, level => level with { Output = output })),
                 HintName.Create(type)
             )
         );
@@ -787,8 +788,8 @@ public sealed class TypeEmitterTests
         new(
             "app/Repo/" + fileName,
             fileName,
-            TestModels.Array(queries),
-            TestModels.Array<DiagnosticInfo>(),
+            TestSidecars.Of(queries),
+            TestSidecars.Of<DiagnosticInfo>(),
             SqlDialect.Ansi
         );
 
@@ -799,13 +800,13 @@ public sealed class TypeEmitterTests
             TestModels.NameLocation(file),
             null,
             null,
-            TestModels.Array(
+            TestSidecars.Of(
                 TestModels.Literal("SELECT * FROM "),
                 new SqlSegment(SqlSegmentKind.Token, "table"),
                 TestModels.Literal(";")
             ),
             null,
-            TestModels.Array(new SqlToken("table", null)),
+            TestSidecars.Of(new SqlToken("table", null)),
             EquatableArray<SqlQueryParameter>.Empty,
             tokenValidation switch
             {

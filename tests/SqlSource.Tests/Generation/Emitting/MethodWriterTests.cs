@@ -7,6 +7,7 @@ using SqlSource.Generation.Emitting;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
@@ -23,7 +24,7 @@ public sealed class MethodWriterTests
             "    ",
             "Lists <c>rows</c>.",
             "ListFrom",
-            TestModels.Array(
+            TestSidecars.Of(
                 TestModels.Literal("SELECT id FROM "),
                 Token("table"),
                 TestModels.Literal(" WHERE "),
@@ -434,7 +435,7 @@ public sealed class MethodWriterTests
     private static string Write(bool validate, params SqlSegment[] segments)
     {
         var builder = new StringBuilder();
-        MethodWriter.Append(builder, string.Empty, "S", "Q", TestModels.Array(segments), validate);
+        MethodWriter.Append(builder, string.Empty, "S", "Q", TestSidecars.Of(segments), validate);
         return builder.ToString();
     }
 

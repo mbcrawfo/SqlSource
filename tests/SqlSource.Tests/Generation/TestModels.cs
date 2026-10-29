@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
@@ -7,6 +5,7 @@ using SqlSource.Generation.Emitting;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Testing.Snapshot;
 
 namespace SqlSource.Tests.Generation;
 
@@ -17,9 +16,6 @@ internal static class TestModels
 
     public static LocationInfo AttributeLocation { get; } =
         new(SourceFile, new TextSpan(20, 10), new LinePositionSpan(new LinePosition(2, 1), new LinePosition(2, 11)));
-
-    public static EquatableArray<T> Array<T>(params T[] items)
-        where T : IEquatable<T> => new(ImmutableArray.Create(items));
 
     public static TargetType Type(
         string? path = null,
@@ -33,7 +29,9 @@ internal static class TestModels
     ) =>
         new(
             @namespace,
-            Array(types ?? [new TypeDeclaration("class", "UserRepository", "UserRepository", string.Empty, 0)]),
+            TestSidecars.Of(
+                types ?? [new TypeDeclaration("class", "UserRepository", "UserRepository", string.Empty, 0)]
+            ),
             placement,
             MethodPlacement.ExtensionClass,
             settings ?? SettingsLevel.None,
@@ -41,7 +39,7 @@ internal static class TestModels
             path,
             filePath,
             AttributeLocation,
-            Array(diagnostics ?? [])
+            TestSidecars.Of(diagnostics ?? [])
         );
 
     public static SqlSegment Literal(string text) => new(SqlSegmentKind.Literal, text);
@@ -61,8 +59,8 @@ internal static class TestModels
             nameLocation ?? NameLocation("Users.sql"),
             summary,
             null,
-            Array(Literal(sql)),
-            keptSql is null ? null : Array(Literal(keptSql)),
+            TestSidecars.Of(Literal(sql)),
+            keptSql is null ? null : TestSidecars.Of(Literal(keptSql)),
             EquatableArray<SqlToken>.Empty,
             EquatableArray<SqlQueryParameter>.Empty,
             markers ?? SettingsLevel.None,

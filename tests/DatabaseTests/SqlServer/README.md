@@ -44,7 +44,7 @@ The describer's fixtures are in `tests/SqlSource.Tool.Tests/Fixtures/Describers/
 tools/record-fixtures.sh mssql
 ```
 
-To add a case, add its folder with a `query.sql` and run the script.  A recorded file is never edited by hand.  Nothing is recorded on the floor image.
+To add a case, add its folder with a `query.sql`, add its name to the list of `Cases_OfSqlServer_AreTheListedCases` in `tests/SqlSource.Tool.Tests/Fixtures/DescriberFixtureTests.cs`, which fails on a case it does not list, and run the script.  A recorded file is never edited by hand.  Nothing is recorded on the floor image.
 
 ## The realistic corpus
 

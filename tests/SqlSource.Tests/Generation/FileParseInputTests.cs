@@ -5,6 +5,7 @@ using SqlSource.Generation.Chains;
 using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation;
@@ -101,5 +102,5 @@ public sealed class FileParseInputTests
         InMemoryAdditionalText file,
         SettingsChain chain,
         params string[] commentPaths
-    ) => FileParseInput.Resolve(file, GeneratorHarness.UsersNormalizedPath, chain, TestModels.Array(commentPaths));
+    ) => FileParseInput.Resolve(file, GeneratorHarness.UsersNormalizedPath, chain, TestSidecars.Of(commentPaths));
 }

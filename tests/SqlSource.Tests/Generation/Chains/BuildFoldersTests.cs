@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Shouldly;
 using SqlSource.Generation.Chains;
 using SqlSource.Generation.Paths;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Chains;
@@ -136,7 +137,7 @@ public sealed class BuildFoldersTests
     public void ReachingPaths_PathsWithBackslashes_AreNormalised() =>
         BuildFolders.None.ReachingPaths([@"C:\repo\A.cs"]).ShouldBe([SqlPath.Normalize(@"C:\repo\A.cs")]);
 
-    private static BuildFolders Of(params string[] folders) => new(TestModels.Array(folders));
+    private static BuildFolders Of(params string[] folders) => new(TestSidecars.Of(folders));
 
     private sealed class Options(Dictionary<string, string> values) : AnalyzerConfigOptions
     {

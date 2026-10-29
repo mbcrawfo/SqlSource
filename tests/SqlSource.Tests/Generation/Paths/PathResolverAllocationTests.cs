@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using Shouldly;
 using SqlSource.Generation.Paths;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Paths;
@@ -66,6 +67,6 @@ public sealed class PathResolverAllocationTests
             paths.Add(string.Create(CultureInfo.InvariantCulture, $"db/migrations/{file:0000}.sql"));
         }
 
-        return TestModels.Array([.. paths.OrderBy(path => path, SqlPath.Comparer)]);
+        return TestSidecars.Of([.. paths.OrderBy(path => path, SqlPath.Comparer)]);
     }
 }
