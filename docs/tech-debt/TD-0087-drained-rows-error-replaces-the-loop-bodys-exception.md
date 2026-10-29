@@ -14,7 +14,7 @@ Low.  It needs a query whose rows fail beyond the row where the loop stops, such
 
 ## Proposed fix
 
-Decide between two ways, each a change to the iterator that `QueryMethodWriter.AppendBody` and `AppendExecution` write, with the allocation pair of `StreamAccounts` in both engines' `AllocationTests` measured before and after.  Either catches a `DbException` from the reader's disposal only when the iterator ends before its last row, which a local set after the read loop tells apart, so a loop that reads to the end still throws the error at its row.
+Decide between two ways, each a change to the iterator that `QueryMethodWriter.AppendBody` and `AppendExecution` write, with the allocation pair of `StreamAccounts` in both engines' allocation tests of `tests/DatabaseTests/QueryMethodAllocation` measured before and after.  Either catches a `DbException` from the reader's disposal only when the iterator ends before its last row, which a local set after the read loop tells apart, so a loop that reads to the end still throws the error at its row.
 
 1. Drop the error on an early exit, as SqlClient does: the `break` throws nothing, the body's exception survives, and the PostgreSQL transaction is still aborted, now with no error to say so, which the manual would then have to say.
 2. Keep the error but not in place of the body's exception: since the iterator cannot see that exception, this needs the caller's help, for instance a generated helper that runs the loop's body as a delegate and throws an `AggregateException` of both, which changes how a stream is consumed.

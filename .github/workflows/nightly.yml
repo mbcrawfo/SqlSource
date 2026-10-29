@@ -5,6 +5,7 @@
 # are Linux images, which these runners cannot start, and build.yml has all three.
 # build.yml tests each engine's floor and default image, and test-postgres and test-sqlserver here every supported major
 # between them, so that the two cover every supported major: see the rule in .github/AGENTS.md.
+# The two allocation jobs run the default images only.
 # It is no required check.  A pull request that changes this file runs it, so that a change to it is tried.
 # Every test run's summary lists its failed and skipped tests and leaves out the passed ones.  A step's summary holds
 # 1 MiB, the reporter cuts its output there, and GitHub then shows little or none of it.  The passed tests of the Test
@@ -73,7 +74,8 @@ jobs:
 
       # Each project but tests/DatabaseTests/Postgres, tests/DatabaseTests/Postgres.Npgsql8,
       # tests/DatabaseTests/SqlServer and tests/DatabaseTests/SqlServer.SqlClient61, whose containers these runners
-      # cannot start.  Every project runs even when an earlier one failed.
+      # cannot start, and tests/DatabaseTests/QueryMethodAllocation, which the allocation jobs below run.  Every
+      # project runs even when an earlier one failed.
       - name: Test
         run: |
           status=0
@@ -178,4 +180,78 @@ jobs:
           SQLSOURCE_TESTS_SQLSERVER_IMAGE: ${{ matrix.image }}
         run: >-
           dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
+          --report-github --report-github-summary-include-passed false
+
+  # Runs the allocation tests of tests/DatabaseTests/QueryMethodAllocation on PostgreSQL's default image, alone and
+  # without coverage, which allocates in the process it measures.  A red job means a generated method may allocate
+  # more than its hand-written twin: tests/DatabaseTests/QueryMethodAllocation/README.md says how to read it.
+  allocation-postgres:
+    name: Allocation tests on PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PROJECT: tests/DatabaseTests/QueryMethodAllocation
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: tests/DatabaseTests/QueryMethodAllocation/packages.lock.json
+
+      - name: Build
+        run: dotnet build "$PROJECT" --configuration "$CONFIGURATION"
+
+      # tools/pull-test-images.sh pulls the default image of both engines, so that no workflow names a default image:
+      # rule 5 of AGENTS.md lists the places that do.
+      - name: Pull test images
+        run: tools/pull-test-images.sh
+
+      - name: Test
+        run: >-
+          dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
+          -p:RunQueryMethodAllocation=true
+          --filter-namespace SqlSource.DatabaseTests.QueryMethodAllocation.Postgres
+          --report-github --report-github-summary-include-passed false
+
+  # Runs the allocation tests of tests/DatabaseTests/QueryMethodAllocation on SQL Server's default image, alone and
+  # without coverage, which allocates in the process it measures.  A red job means a generated method may allocate
+  # more than its hand-written twin: tests/DatabaseTests/QueryMethodAllocation/README.md says how to read it.
+  allocation-sqlserver:
+    name: Allocation tests on SQL Server
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PROJECT: tests/DatabaseTests/QueryMethodAllocation
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: tests/DatabaseTests/QueryMethodAllocation/packages.lock.json
+
+      - name: Build
+        run: dotnet build "$PROJECT" --configuration "$CONFIGURATION"
+
+      # tools/pull-test-images.sh pulls the default image of both engines, so that no workflow names a default image:
+      # rule 5 of AGENTS.md lists the places that do.
+      - name: Pull test images
+        run: tools/pull-test-images.sh
+
+      - name: Test
+        run: >-
+          dotnet test --project "$PROJECT" --configuration "$CONFIGURATION" --no-build
+          -p:RunQueryMethodAllocation=true
+          --filter-namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer
           --report-github --report-github-summary-include-passed false

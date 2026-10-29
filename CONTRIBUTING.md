@@ -23,15 +23,16 @@ The two projects that ship are:
 - `src/SqlSource` is the source generator, and the package `SqlSource`.  [`docs/architecture/generator.md`](docs/architecture/generator.md) explains how it works.
 - `src/SqlSource.Tool` is the `sqlsource` command, a console application that references the generator's project and shares its code, and the package `SqlSource.Tool`.  [`docs/architecture/tool.md`](docs/architecture/tool.md) explains how it works.
 
-The seven test projects and the three libraries they share, which [`tests/README.md`](tests/README.md) describes:
+The eight test projects and the three libraries they share, which [`tests/README.md`](tests/README.md) describes:
 
 - `tests/SqlSource.Tests` runs every test of the generator.
 - `tests/SqlSource.Tests.RoslynFloor` compiles the generator driver tests a second time, on the oldest supported Roslyn.
 - `tests/SqlSource.Tool.Tests` runs the tests of the tool.
 - `tests/DatabaseTests/Postgres` runs the PostgreSQL describer against a real server and is the end-to-end project, which builds models and methods from its own queries and runs every described query through its method, and needs Docker.
 - `tests/DatabaseTests/Postgres.Npgsql8` writes and reads every mapped type through the generated methods, reads them through Dapper, and breaks out of a streaming method, on Npgsql 8, the oldest supported driver, and needs Docker.
-- `tests/DatabaseTests/SqlServer` runs the tests of SQL Server against a real server and is SQL Server's end-to-end project, which builds models and query methods from its own queries, runs each query through its method, writes and reads every mapped type through the methods, measures their allocations against hand-written ADO.NET, and reads rows through Dapper for the manual's recipe, and needs Docker.
+- `tests/DatabaseTests/SqlServer` runs the tests of SQL Server against a real server and is SQL Server's end-to-end project, which builds models and query methods from its own queries, runs each query through its method, writes and reads every mapped type through the methods, and reads rows through Dapper for the manual's recipe, and needs Docker.
 - `tests/DatabaseTests/SqlServer.SqlClient61` reads every mapped type through Dapper, writes and reads it through the generated methods, and breaks out of a streaming method, on Microsoft.Data.SqlClient 6.1, the oldest supported driver, and needs Docker.
+- `tests/DatabaseTests/QueryMethodAllocation` runs the allocation tests of the generated methods of both engines against hand-written ADO.NET, needs Docker, and is run by the nightly alone.
 - `tests/SqlSource.Testing`, `tests/DatabaseTests/TestHarness` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 
 `examples/PostgresExamples` shows a user SqlSource with PostgreSQL and Dapper, and `examples/SqlServerExamples` with SQL Server and Dapper; they build with the solution and hold no tests.
@@ -72,7 +73,7 @@ dotnet test --solution SqlSource.slnx --results-directory artifacts/test-results
 dotnet reportgenerator '-reports:artifacts/test-results/*.cobertura.xml' -targetdir:artifacts/coverage -reporttypes:Html '-assemblyfilters:+SqlSource;+SqlSource.Tool'
 ```
 
-Each test project writes its own Cobertura file, and the report merges them.  It is `artifacts/coverage/index.html`.  The end-to-end `AllocationTests` of the two container projects skip under coverage, since the collector allocates in the process they measure; run them without `--coverage`, as `pre-commit-validation.sh --full` and CI do; a plain run includes them only when the change can alter what they measure.
+Each test project writes its own Cobertura file, and the report merges them.  It is `artifacts/coverage/index.html`.  The allocation tests of `tests/DatabaseTests/QueryMethodAllocation` skip under coverage and run only in the nightly; its readme has the command.
 
 ## Pack
 
@@ -101,7 +102,7 @@ A plain run checks only what the uncommitted change (staged, unstaged and untrac
 
 - Formatting is limited to the changed `.cs` files, and skipped when none changed; a change to `format.sh` or to a file that configures the formatters checks everything.
 - editorconfig-checker always runs.  shellcheck and shfmt run when a shell script or `.editorconfig` changed, actionlint when a workflow or `tools/actionlint.sh` changed, and the three package checks when a change can alter what is packed or how the packages are checked.
-- The build and the tests that need no container always run.  A pair of container test projects, PostgreSQL's or SQL Server's, runs only when the change can reach it, and the allocation tests only when it can change what they measure.  [`tools/test-scopes.txt`](tools/README.md#test-scopes) decides which pair a path can reach.
+- The build and the tests that need no container always run.  A pair of container test projects, PostgreSQL's or SQL Server's, runs only when the change can reach it.  [`tools/test-scopes.txt`](tools/README.md#test-scopes) decides which pair a path can reach.
 - A clean tree, a change to `pre-commit-validation.sh`, a path of a kind the script does not know and a failing `git` command each make the run full.
 
 `--full` runs everything, and every push needs it, on the tree as it will be pushed.  A partial run says so at its end.  `--plan [path ...]` prints what a run would do and why, for the uncommitted change or for the paths given, and runs nothing.
@@ -116,7 +117,7 @@ dotnet restore SqlSource.slnx
 
 ## Continuous integration
 
-CI runs the same checks as `pre-commit-validation.sh --full` on Linux, in parallel jobs.  It pulls the test images in a step of its own, with `tools/pull-test-images.sh`, and runs `tests/DatabaseTests/Postgres` again on PostgreSQL 14 and `tests/DatabaseTests/SqlServer` again on SQL Server 2017, each in a job of its own.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests that need no container on Windows and macOS every night, and `tests/DatabaseTests/Postgres` on PostgreSQL 15 to 17 and `tests/DatabaseTests/SqlServer` on SQL Server 2019 and 2022 on Linux, and by hand on a branch:
+CI runs the same checks as `pre-commit-validation.sh --full` on Linux, in parallel jobs.  It pulls the test images in a step of its own, with `tools/pull-test-images.sh`, and runs `tests/DatabaseTests/Postgres` again on PostgreSQL 14 and `tests/DatabaseTests/SqlServer` again on SQL Server 2017, each in a job of its own.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests that need no container on Windows and macOS every night, and `tests/DatabaseTests/Postgres` on PostgreSQL 15 to 17 and `tests/DatabaseTests/SqlServer` on SQL Server 2019 and 2022 on Linux, and the allocation tests on each engine's default image, and by hand on a branch:
 
 ```bash
 gh workflow run nightly.yml --ref <branch>

@@ -27,6 +27,8 @@ sqlserver tests/DatabaseTests/SqlServer.SqlClient61/*
 sqlserver tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql/*
 sqlserver tests/SqlSource.Tool.Tests/Fixtures/Projects/SqlServer/*
 
+# The nightly alone runs the allocation project, and `project` lines are for the projects the script runs.
+none tests/DatabaseTests/QueryMethodAllocation/*
 none docs/*
 none examples/*
 none tools/*
