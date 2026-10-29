@@ -18,10 +18,13 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// Each function answers through <see cref="AnswerAsync{TAnswer}" />: what the server can cause is the answer's
 /// error.  A cancellation passes through, and anything else is a bug.
 /// <para>
-/// The SQL of the catalog calls runs under the user's <c>search_path</c>, so every type and function it names is
-/// written with <c>pg_catalog.</c>: a user's domain named <c>text</c> before <c>pg_catalog</c> on the path would
-/// otherwise take <c>::text</c>.  Its operators are not (TD-0077), but those of <c>overloads</c> compare only by the
-/// exact argument types of an operator of <c>pg_catalog</c>'s.
+/// The SQL of the catalog calls runs under the user's <c>search_path</c>, so every type, function and collation it
+/// names is written with <c>pg_catalog.</c>: a user's domain named <c>text</c> before <c>pg_catalog</c> on the path
+/// would otherwise take <c>::text</c>.  Every operator is written <c>OPERATOR(pg_catalog.op)</c>, so that the server
+/// chooses among <c>pg_catalog</c>'s alone: a user's operator of the same name would otherwise be taken before
+/// <c>pg_catalog</c> on the path, and after it too where its argument types are a comparison's exactly and those of
+/// <c>pg_catalog</c>'s are not, as for <c>(oid, integer)</c>, <c>(regclass, oid)</c> and <c>(smallint[],
+/// smallint[])</c>.
 /// </para>
 /// </remarks>
 internal sealed class PostgresLive(PostgresConnection connection)
@@ -60,7 +63,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
 
     private const string ParameterTypesSql =
         "SELECT parameter_types::pg_catalog.oid[] FROM pg_catalog.pg_prepared_statements "
-        + "WHERE name = $1 AND statement = $2";
+        + "WHERE name OPERATOR(pg_catalog.=) $1 AND statement OPERATOR(pg_catalog.=) $2";
 
     // Every relation asked for with its columns, in one query: by OID for "tables", and by schema and name for
     // "relations", whose text is the same but for the FROM and the WHERE of the first CTE, which are in TablesSql and
@@ -78,16 +81,18 @@ internal sealed class PostgresLive(PostgresConnection connection)
                 c.relnamespace,
                 c.relname,
                 c.relhassubclass,
-                c.relkind = 'p' AND EXISTS (
+                c.relkind OPERATOR(pg_catalog.=) 'p' AND EXISTS (
                     SELECT 1
                     FROM pg_catalog.pg_partition_tree(c.oid) AS t
-                    JOIN pg_catalog.pg_class AS f ON f.oid = t.relid
-                    WHERE f.relkind = 'f'
+                    JOIN pg_catalog.pg_class AS f ON f.oid OPERATOR(pg_catalog.=) t.relid
+                    WHERE f.relkind OPERATOR(pg_catalog.=) 'f'
                 ) AS has_foreign_partition,
                 EXISTS (
                     SELECT 1
                     FROM pg_catalog.pg_rewrite AS w
-                    WHERE w.ev_class = c.oid AND w.ev_type <> '1' AND w.is_instead
+                    WHERE w.ev_class OPERATOR(pg_catalog.=) c.oid
+                        AND w.ev_type OPERATOR(pg_catalog.<>) '1'
+                        AND w.is_instead
                 ) AS has_instead_rule
         """;
 
@@ -109,17 +114,20 @@ internal sealed class PostgresLive(PostgresConnection connection)
             r.has_foreign_partition,
             r.has_instead_rule
         FROM relations AS r
-        JOIN pg_catalog.pg_namespace AS n ON n.oid = r.relnamespace
-        LEFT JOIN pg_catalog.pg_attribute AS a ON a.attrelid = r.oid AND a.attnum > 0 AND NOT a.attisdropped
+        JOIN pg_catalog.pg_namespace AS n ON n.oid OPERATOR(pg_catalog.=) r.relnamespace
+        LEFT JOIN pg_catalog.pg_attribute AS a
+            ON a.attrelid OPERATOR(pg_catalog.=) r.oid AND a.attnum OPERATOR(pg_catalog.>) 0 AND NOT a.attisdropped
         LEFT JOIN pg_catalog.pg_constraint AS k
-            ON k.conrelid = r.oid AND k.contype = 'n' AND k.conkey = ARRAY[a.attnum]
+            ON k.conrelid OPERATOR(pg_catalog.=) r.oid
+                AND k.contype OPERATOR(pg_catalog.=) 'n'
+                AND k.conkey OPERATOR(pg_catalog.=) ARRAY[a.attnum]
         ORDER BY r.oid, a.attnum
         """;
 
     private const string TablesSql = $"""
         {TableRowsHead}
             FROM pg_catalog.pg_class AS c
-            WHERE c.oid = ANY ($1)
+            WHERE c.oid OPERATOR(pg_catalog.=) ANY ($1)
         {TableRowsTail}
         """;
 
@@ -132,8 +140,9 @@ internal sealed class PostgresLive(PostgresConnection connection)
                 pg_catalog.unnest($1::pg_catalog.text[]),
                 pg_catalog.unnest($2::pg_catalog.text[])
             ) AS p (schema, name)
-            JOIN pg_catalog.pg_namespace AS s ON s.nspname = p.schema
-            JOIN pg_catalog.pg_class AS c ON c.relnamespace = s.oid AND c.relname = p.name
+            JOIN pg_catalog.pg_namespace AS s ON s.nspname OPERATOR(pg_catalog.=) p.schema
+            JOIN pg_catalog.pg_class AS c
+                ON c.relnamespace OPERATOR(pg_catalog.=) s.oid AND c.relname OPERATOR(pg_catalog.=) p.name
         {TableRowsTail}
         """;
 
@@ -146,15 +155,16 @@ internal sealed class PostgresLive(PostgresConnection connection)
             ARRAY(
                 SELECT a.relid::pg_catalog.oid
                 FROM pg_catalog.pg_partition_ancestors(c.oid) WITH ORDINALITY AS a (relid, position)
-                WHERE a.relid <> c.oid
+                WHERE a.relid OPERATOR(pg_catalog.<>) c.oid
                 ORDER BY a.position
             )
         FROM ROWS FROM (
             pg_catalog.unnest($1::pg_catalog.text[]),
             pg_catalog.unnest($2::pg_catalog.text[])
         ) AS p (schema, name)
-        JOIN pg_catalog.pg_namespace AS n ON n.nspname = p.schema
-        JOIN pg_catalog.pg_class AS c ON c.relnamespace = n.oid AND c.relname = p.name
+        JOIN pg_catalog.pg_namespace AS n ON n.nspname OPERATOR(pg_catalog.=) p.schema
+        JOIN pg_catalog.pg_class AS c
+            ON c.relnamespace OPERATOR(pg_catalog.=) n.oid AND c.relname OPERATOR(pg_catalog.=) p.name
         ORDER BY 1, 2
         """;
 
@@ -165,28 +175,25 @@ internal sealed class PostgresLive(PostgresConnection connection)
     // The names of the functions and of the operators, among the ones asked for, that a schema other than pg_catalog
     // holds, or that pg_catalog holds as an object that is not built in: two queries, one for each, with the names as
     // one positional text[].  Each name is of the collation "C", so that ORDER BY 1 gives ordinal order whatever the
-    // database's collation.  The call is made only when the session finds pg_catalog first, and each comparison is of
-    // the exact argument types of an operator of pg_catalog's, (name, text) and (oid, oid), so that one is taken: a
-    // user's operator of a comparison's exact types beats one of pg_catalog's that needs a cast, wherever it stands on
-    // the path.
+    // database's collation.
     private const string OverloadedFunctionsSql = $"""
-        SELECT DISTINCT p.proname::pg_catalog.text COLLATE "C"
+        SELECT DISTINCT p.proname::pg_catalog.text COLLATE pg_catalog."C"
         FROM pg_catalog.pg_proc AS p
-        WHERE p.proname = ANY ($1::pg_catalog.text[])
+        WHERE p.proname OPERATOR(pg_catalog.=) ANY ($1::pg_catalog.text[])
             AND (
-                p.pronamespace <> 'pg_catalog'::pg_catalog.regnamespace::pg_catalog.oid
-                OR p.oid >= {FirstNormalObjectId}::pg_catalog.oid
+                p.pronamespace OPERATOR(pg_catalog.<>) 'pg_catalog'::pg_catalog.regnamespace::pg_catalog.oid
+                OR p.oid OPERATOR(pg_catalog.>=) {FirstNormalObjectId}::pg_catalog.oid
             )
         ORDER BY 1
         """;
 
     private const string OverloadedOperatorsSql = $"""
-        SELECT DISTINCT o.oprname::pg_catalog.text COLLATE "C"
+        SELECT DISTINCT o.oprname::pg_catalog.text COLLATE pg_catalog."C"
         FROM pg_catalog.pg_operator AS o
-        WHERE o.oprname = ANY ($1::pg_catalog.text[])
+        WHERE o.oprname OPERATOR(pg_catalog.=) ANY ($1::pg_catalog.text[])
             AND (
-                o.oprnamespace <> 'pg_catalog'::pg_catalog.regnamespace::pg_catalog.oid
-                OR o.oid >= {FirstNormalObjectId}::pg_catalog.oid
+                o.oprnamespace OPERATOR(pg_catalog.<>) 'pg_catalog'::pg_catalog.regnamespace::pg_catalog.oid
+                OR o.oid OPERATOR(pg_catalog.>=) {FirstNormalObjectId}::pg_catalog.oid
             )
         ORDER BY 1
         """;
@@ -206,21 +213,26 @@ internal sealed class PostgresLive(PostgresConnection connection)
     // base, so an array is a base type of the category A.
     private const string TypesSql = """
         WITH RECURSIVE closure (oid) AS (
-            SELECT t.oid FROM pg_catalog.pg_type AS t WHERE t.oid = ANY ($1)
+            SELECT t.oid FROM pg_catalog.pg_type AS t WHERE t.oid OPERATOR(pg_catalog.=) ANY ($1)
             UNION
             SELECT link.oid
             FROM closure AS c
-            JOIN pg_catalog.pg_type AS t ON t.oid = c.oid
-            LEFT JOIN pg_catalog.pg_range AS r ON r.rngtypid = t.oid
-            LEFT JOIN pg_catalog.pg_range AS m ON m.rngmultitypid = t.oid
+            JOIN pg_catalog.pg_type AS t ON t.oid OPERATOR(pg_catalog.=) c.oid
+            LEFT JOIN pg_catalog.pg_range AS r ON r.rngtypid OPERATOR(pg_catalog.=) t.oid
+            LEFT JOIN pg_catalog.pg_range AS m ON m.rngmultitypid OPERATOR(pg_catalog.=) t.oid
             CROSS JOIN LATERAL (
                 VALUES
-                    (CASE WHEN t.typtype = 'b' AND t.typcategory = 'A' THEN t.typelem END),
-                    (CASE WHEN t.typtype = 'd' THEN t.typbasetype END),
+                    (
+                        CASE
+                            WHEN t.typtype OPERATOR(pg_catalog.=) 'b' AND t.typcategory OPERATOR(pg_catalog.=) 'A'
+                                THEN t.typelem
+                        END
+                    ),
+                    (CASE WHEN t.typtype OPERATOR(pg_catalog.=) 'd' THEN t.typbasetype END),
                     (r.rngsubtype),
                     (m.rngtypid)
             ) AS link (oid)
-            WHERE link.oid IS NOT NULL AND link.oid <> 0
+            WHERE link.oid IS NOT NULL AND link.oid OPERATOR(pg_catalog.<>) 0
         )
         SELECT
             t.oid,
@@ -236,15 +248,15 @@ internal sealed class PostgresLive(PostgresConnection connection)
             (
                 SELECT pg_catalog.array_agg(e.enumlabel::pg_catalog.text ORDER BY e.enumsortorder)
                 FROM pg_catalog.pg_enum AS e
-                WHERE e.enumtypid = t.oid
+                WHERE e.enumtypid OPERATOR(pg_catalog.=) t.oid
             ),
             t.typtypmod
         FROM closure AS c
-        JOIN pg_catalog.pg_type AS t ON t.oid = c.oid
-        JOIN pg_catalog.pg_namespace AS n ON n.oid = t.typnamespace
-        LEFT JOIN pg_catalog.pg_range AS r ON r.rngtypid = t.oid
-        LEFT JOIN pg_catalog.pg_range AS m ON m.rngmultitypid = t.oid
-        LEFT JOIN pg_catalog.pg_range AS mr ON mr.rngtypid = m.rngtypid
+        JOIN pg_catalog.pg_type AS t ON t.oid OPERATOR(pg_catalog.=) c.oid
+        JOIN pg_catalog.pg_namespace AS n ON n.oid OPERATOR(pg_catalog.=) t.typnamespace
+        LEFT JOIN pg_catalog.pg_range AS r ON r.rngtypid OPERATOR(pg_catalog.=) t.oid
+        LEFT JOIN pg_catalog.pg_range AS m ON m.rngmultitypid OPERATOR(pg_catalog.=) t.oid
+        LEFT JOIN pg_catalog.pg_range AS mr ON mr.rngtypid OPERATOR(pg_catalog.=) m.rngtypid
         ORDER BY t.oid
         """;
 
@@ -252,6 +264,10 @@ internal sealed class PostgresLive(PostgresConnection connection)
     private const string ProbeSql = "SELECT $1";
 
     /// <summary>Asks <c>open</c>.</summary>
+    /// <remarks>
+    /// Every column of the answer is text, so a column that Npgsql cannot read as a string is a session whose types
+    /// the driver could not load, which is <see cref="PostgresConnection.UnreadableTypes" />.
+    /// </remarks>
     public Task<PostgresOpenAnswer> OpenAsync(CancellationToken token) =>
         AnswerAsync(
             async () =>
@@ -263,12 +279,23 @@ internal sealed class PostgresLive(PostgresConnection connection)
                     throw new InvalidOperationException("The server answered 'open' with no row.");
                 }
 
-                return new PostgresOpenAnswer(
-                    VersionOf(reader.GetString(0)),
-                    PostgresConnection.DriverVersion,
-                    [.. SettingNames.Select((name, index) => new PostgresSetting(name, reader.GetString(index + 1)))],
-                    null
-                );
+                try
+                {
+                    return new PostgresOpenAnswer(
+                        VersionOf(reader.GetString(0)),
+                        PostgresConnection.DriverVersion,
+                        [
+                            .. SettingNames.Select(
+                                (name, index) => new PostgresSetting(name, reader.GetString(index + 1))
+                            ),
+                        ],
+                        null
+                    );
+                }
+                catch (InvalidCastException)
+                {
+                    throw new NpgsqlException(PostgresConnection.UnreadableTypes);
+                }
             },
             ConnectionErrors.AtOpen,
             static error => new PostgresOpenAnswer(null, null, null, error)

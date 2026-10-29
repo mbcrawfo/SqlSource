@@ -9,8 +9,10 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // thrown away, and the fixtures are recorded in one of their own.  So a class that runs it first makes the same object
 // as any other would.  An object that changes what another test sees while it exists, public."numeric", the schema
 // "user", the schema shadow of ShadowCount and ShadowOperators, the aggregate pg_catalog.count(text) of CatalogCount,
-// the operator pg_catalog.* of CatalogOperator, the schema zz of OperatorsAfterTheCatalog, describer_canary,
-// command_widgets, error_path_widgets, session_gone and transaction_kept, is made by its test and dropped in a finally.
+// the operator pg_catalog.* of CatalogOperator, the schema zz of OperatorsAfterTheCatalog, the schema
+// shadowing_operators of ShadowingOperators, the schema shadowing_equals of ShadowingEquals, describer_canary,
+// command_widgets, error_path_widgets, session_gone and transaction_kept, is made by its test and dropped in a
+// finally.
 internal static class ScratchSchema
 {
     /// <summary>
@@ -162,6 +164,92 @@ internal static class ScratchSchema
     /// <c>count(x)</c> of any other test.
     /// </summary>
     public const string DropOperatorsAfterTheCatalog = "DROP SCHEMA IF EXISTS zz CASCADE";
+
+    /// <summary>
+    /// The schema <c>shadowing_operators</c>, of operators that always return false, on the argument types of the
+    /// comparisons of the catalog calls: <c>=</c>, <c>&lt;&gt;</c> and <c>&gt;=</c> of <c>(oid, oid)</c>,
+    /// <c>&lt;&gt;</c> of <c>(oid, integer)</c>, <c>=</c> of <c>(text, text)</c> and of <c>(name, text)</c>,
+    /// <c>=</c> and <c>&lt;&gt;</c> of <c>("char", "char")</c>, <c>&gt;</c> of <c>(smallint, integer)</c>, <c>=</c>
+    /// of <c>(smallint[], smallint[])</c> and of <c>(oid, regclass)</c>, and <c>&lt;&gt;</c> of
+    /// <c>(regclass, oid)</c>.  On <see cref="ShadowingOperatorsPath" /> a comparison that the server resolves by the
+    /// path takes them.  CREATE OPERATOR has no OR REPLACE, so the text makes the schema again.
+    /// </summary>
+    public const string ShadowingOperators = """
+        DROP SCHEMA IF EXISTS shadowing_operators CASCADE;
+        CREATE SCHEMA shadowing_operators;
+        CREATE FUNCTION shadowing_operators.never(oid, oid) RETURNS boolean LANGUAGE sql AS 'SELECT false';
+        CREATE OPERATOR shadowing_operators.= (leftarg = oid, rightarg = oid, function = shadowing_operators.never);
+        CREATE OPERATOR shadowing_operators.<> (leftarg = oid, rightarg = oid, function = shadowing_operators.never);
+        CREATE OPERATOR shadowing_operators.>= (leftarg = oid, rightarg = oid, function = shadowing_operators.never);
+        CREATE FUNCTION shadowing_operators.never(oid, integer) RETURNS boolean LANGUAGE sql AS 'SELECT false';
+        CREATE OPERATOR shadowing_operators.<> (
+            leftarg = oid, rightarg = integer, function = shadowing_operators.never
+        );
+        CREATE FUNCTION shadowing_operators.never(text, text) RETURNS boolean LANGUAGE sql AS 'SELECT false';
+        CREATE OPERATOR shadowing_operators.= (leftarg = text, rightarg = text, function = shadowing_operators.never);
+        CREATE FUNCTION shadowing_operators.never(name, text) RETURNS boolean LANGUAGE sql AS 'SELECT false';
+        CREATE OPERATOR shadowing_operators.= (leftarg = name, rightarg = text, function = shadowing_operators.never);
+        CREATE FUNCTION shadowing_operators.never("char", "char") RETURNS boolean LANGUAGE sql AS 'SELECT false';
+        CREATE OPERATOR shadowing_operators.= (
+            leftarg = "char", rightarg = "char", function = shadowing_operators.never
+        );
+        CREATE OPERATOR shadowing_operators.<> (
+            leftarg = "char", rightarg = "char", function = shadowing_operators.never
+        );
+        CREATE FUNCTION shadowing_operators.never(smallint, integer) RETURNS boolean LANGUAGE sql AS 'SELECT false';
+        CREATE OPERATOR shadowing_operators.> (
+            leftarg = smallint, rightarg = integer, function = shadowing_operators.never
+        );
+        CREATE FUNCTION shadowing_operators.never(smallint[], smallint[]) RETURNS boolean
+            LANGUAGE sql AS 'SELECT false';
+        CREATE OPERATOR shadowing_operators.= (
+            leftarg = smallint[], rightarg = smallint[], function = shadowing_operators.never
+        );
+        CREATE FUNCTION shadowing_operators.never(oid, regclass) RETURNS boolean LANGUAGE sql AS 'SELECT false';
+        CREATE OPERATOR shadowing_operators.= (
+            leftarg = oid, rightarg = regclass, function = shadowing_operators.never
+        );
+        CREATE FUNCTION shadowing_operators.never(regclass, oid) RETURNS boolean LANGUAGE sql AS 'SELECT false';
+        CREATE OPERATOR shadowing_operators.<> (
+            leftarg = regclass, rightarg = oid, function = shadowing_operators.never
+        );
+        """;
+
+    /// <summary>
+    /// The part of a connection string that puts <see cref="ShadowingOperators" /> first.  <c>public</c> follows, so
+    /// that <c>format_type</c> writes a type of <c>public</c> without its schema, as on the default path.
+    /// </summary>
+    public const string ShadowingOperatorsPath = "Search Path=shadowing_operators,pg_catalog,public";
+
+    /// <summary>
+    /// Drops the schema <c>shadowing_operators</c> with what <see cref="ShadowingOperators" /> made in it.  Every
+    /// test that makes the schema runs this in a finally: while it holds a <c>=</c>, <c>overloads</c> answers that
+    /// name for any other test.
+    /// </summary>
+    public const string DropShadowingOperators = "DROP SCHEMA IF EXISTS shadowing_operators CASCADE";
+
+    /// <summary>
+    /// The schema <c>shadowing_equals</c>, of one operator <c>=</c> on two of <paramref name="type" /> that always
+    /// returns false.  On <see cref="ShadowingEqualsPath" />, Npgsql, which reads the database's types when it opens
+    /// a connection by SQL that compares them with <c>=</c>, cannot read them.  CREATE OPERATOR has no OR REPLACE, so
+    /// the text makes the schema again.
+    /// </summary>
+    public static string ShadowingEquals(string type) =>
+        $"""
+            DROP SCHEMA IF EXISTS shadowing_equals CASCADE;
+            CREATE SCHEMA shadowing_equals;
+            CREATE FUNCTION shadowing_equals.never({type}, {type}) RETURNS boolean LANGUAGE sql AS 'SELECT false';
+            CREATE OPERATOR shadowing_equals.= (leftarg = {type}, rightarg = {type}, function = shadowing_equals.never);
+            """;
+
+    /// <summary>The part of a connection string that puts <see cref="ShadowingEquals" /> first.</summary>
+    public const string ShadowingEqualsPath = "Search Path=shadowing_equals,pg_catalog,public";
+
+    /// <summary>
+    /// Drops the schema <c>shadowing_equals</c>.  Every test that makes it runs this in a finally: while it holds a
+    /// <c>=</c>, <c>overloads</c> answers that name for any other test.
+    /// </summary>
+    public const string DropShadowingEquals = "DROP SCHEMA IF EXISTS shadowing_equals CASCADE";
 
     /// <summary>
     /// The extension <c>postgres_fdw</c> and one loopback server, <c>scratch_loop</c>, to the container's own

@@ -52,6 +52,21 @@ public sealed class PostgresErrorsTests
         failure.Help.ShouldBe(PostgresErrors.SessionNotKeptHelp);
     }
 
+    // The driver could not load the database's types: still no session, with a help that names the likely cause.
+    [Fact]
+    public void Open_UnreadableTypes_IsSqlsrc224WithItsOwnHelp()
+    {
+        var failure = PostgresErrors.Open(
+            new PostgresServerError(null, PostgresConnection.UnreadableTypes, null, null, null),
+            "app"
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC224");
+        failure.Step.ShouldBeNull();
+        failure.ServerLines.ShouldBe(["Npgsql cannot read the database's types"]);
+        failure.Help.ShouldBe(PostgresErrors.UnreadableTypesHelp);
+    }
+
     // Each line the server gave, in the order PostgresErrors.ServerLines fixes, and a position counted from where the
     // SQL starts.
     [Fact]
