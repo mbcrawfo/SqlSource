@@ -1,8 +1,8 @@
 # AGENTS.md - src/SqlSource/Snapshot
 
-See [snapshot](../../../docs/architecture/generator.md#snapshot).
+See [snapshot](../../../docs/architecture/generator.md#snapshot) and [the sidecar format](../../../docs/architecture/sidecar-format.md).
 
-- **The format is a contract** with every committed sidecar, and `schemas/sidecar-v1.schema.json` defines it.  A change to what `SidecarWriter` gives changes the schema and the examples in `tests/SqlSource.Tests/Snapshot/Examples/` in one pull request.  What needs a new `formatVersion` is not yet written down anywhere current (TD-0084).
+- **The format is a contract** with every committed sidecar: `schemas/sidecar-v1.schema.json` defines its shape and each key's meaning, and [the sidecar format](../../../docs/architecture/sidecar-format.md) its rules.  A change to what `SidecarWriter` gives or `SidecarReader` accepts changes the schema, the page and the examples in `tests/SqlSource.Tests/Snapshot/Examples/` in one pull request, and the page's [compatibility](../../../docs/architecture/sidecar-format.md#compatibility) says whether it needs a new `formatVersion`.
 - **The reader never throws.**  Never hand a `SidecarCursor` a text the grammar pass has not passed, and keep a file the tool wrote tokenized twice and no more.  `Read_MistakeInAnArrayBeforeTheEngine_IsFound` in `tests/SqlSource.Tests/Snapshot/Reading/SidecarReaderTests.cs` and `Read_ReorderedFileCutShortOrDamagedAnywhere_ReturnsOneOfItsThreeStates` in `SidecarReaderRobustnessTests.cs` beside it hold the path no file of the tool takes.  See [reading a sidecar](../../../docs/architecture/generator.md#reading-a-sidecar).
 - **The sidecar is strict JSON**: no reader of a sidecar constructs a `SidecarTokenizer` with `lenient: true`, which `SettingsFiles/` alone uses.
 - **The reader is lenient and the schema is strict.**  A new key is added to the model, to its object's list of keys and to the `switch` beside it; a key of a parameter's type to each engine's list in `SidecarTypeReader`, and a key of an entry to `SidecarReader.EntryMembers`, which the `switch` of `ReadMembers` sets.

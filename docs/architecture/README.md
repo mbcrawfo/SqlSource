@@ -91,12 +91,13 @@ A `SettingsLevel`: what one source says about the settings, whether the markers 
 
 ### Sidecar
 
-The `<file>.sql.json` file that `sqlsource describe` writes beside a `.sql` file, with what the database said of each of its queries.  Its model is `Sidecar`, and its format is recorded in the [sidecar format design](../superpowers/specs/2026-10-07-sidecar-format-design.md).
+The `<file>.sql.json` file that `sqlsource describe` writes beside a `.sql` file, with what the database said of each of its queries.  Its model is `Sidecar`, its shape and the meaning of each key are [`schemas/sidecar-v1.schema.json`](../../schemas/sidecar-v1.schema.json), and its rules are [the sidecar format](sidecar-format.md).
 
 ## Reading guide
 
 - [The generator](generator.md): the incremental pipeline and its steps, how the settings are read and resolved in two stages, how a settings file is read, how a `.sql` file is parsed, how each claimed file's sidecar is read and checked, the C# types, the converters and the models of a query, what is written for a type and for a model, how diagnostics travel, and the sidecar model the assembly holds.
 - [The MSBuild files and the manifest](msbuild-and-manifest.md): what the props and targets hand the compiler, how they find the settings files, and the manifest, whose format is the contract between the package and the tool, with its known limits.
+- [The sidecar format](sidecar-format.md): the rules of the sidecar that its schema cannot say: the text's layout and key order, what is written when, the rules by which a file is read, which change to the format keeps `formatVersion` and which raises it, what the generator and the tool do with each version, and what `describe --check` compares.
 - [The tool](tool.md): how `sqlsource` reads a command line and ends a run, the steps of a `describe` run from the run unit to the sidecars, what each folder does and uses of the generator, and how a run reports and logs.
 - [The PostgreSQL describer](postgres-describer.md): the contract every describer implements, the exchange its calls go through and how a capture is recorded and replayed, then how the PostgreSQL describer describes one query, builds its parameters and columns, matches a table and chooses each error, and why no query can make it run a statement.
 - [PostgreSQL nullability](postgres-nullability.md): how the describer decides whether a column can be null, from the catalog, the outer-join gate and the generic plan, and how the plan walk reads a plan's joins, outputs, expressions and set operations.

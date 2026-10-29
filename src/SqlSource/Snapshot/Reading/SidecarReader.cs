@@ -6,8 +6,8 @@ using Microsoft.CodeAnalysis.Text;
 namespace SqlSource.Snapshot.Reading;
 
 /// <summary>
-/// Reads a sidecar, by the reader rules of the sidecar format design.  It never throws, whatever the text: a file a
-/// user can commit must not cost every type its generated code.
+/// Reads a sidecar, by the reader rules of docs/architecture/sidecar-format.md.  It never throws, whatever the text: a
+/// file a user can commit must not cost every type its generated code.
 /// </summary>
 /// <remarks>
 /// Two passes.  The first checks that the text is one JSON object nested at most
