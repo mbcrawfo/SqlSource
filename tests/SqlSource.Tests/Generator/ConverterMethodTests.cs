@@ -171,7 +171,7 @@ public sealed class ConverterMethodTests
     );
 
     [Fact]
-    public void Run_ColumnWithoutTheReadConverter_ReportsSQLSRC280AndGivesNoMethod()
+    public void Run_ColumnWithoutTheReadConverter_ReportsSqlsrc280AndGivesNoMethod()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -197,7 +197,7 @@ public sealed class ConverterMethodTests
     }
 
     [Fact]
-    public void Run_ParameterWithoutTheWriteConverter_ReportsSQLSRC280()
+    public void Run_ParameterWithoutTheWriteConverter_ReportsSqlsrc280()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -222,7 +222,7 @@ public sealed class ConverterMethodTests
     // No cast narrows a bigint into the int that UserId's converters take: an int converter on a bigint column is an
     // error, not a cast.
     [Fact]
-    public void Run_BigintColumnWithAnIntConverter_ReportsSQLSRC279()
+    public void Run_BigintColumnWithAnIntConverter_ReportsSqlsrc279()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -346,7 +346,7 @@ public sealed class ConverterMethodTests
     // A library's converter that is no converter is reported at the query that would use it, which the project can
     // change, since the method has no place in the project.
     [Fact]
-    public void Run_ReferencedConverterWithAFault_ReportsSQLSRC277AtTheQuery()
+    public void Run_ReferencedConverterWithAFault_ReportsSqlsrc277AtTheQuery()
     {
         var library = GeneratorHarness.CreateReference(
             OutputKind.Sql,

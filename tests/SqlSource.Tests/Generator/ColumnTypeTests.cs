@@ -303,7 +303,7 @@ public sealed class ColumnTypeTests
     [InlineData("folderFile", "users.id", TheFolderFilePlace)]
     [InlineData("header", "users.id", TheHeaderPlace)]
     [InlineData("query", "id", TheQueryPlace)]
-    public void Run_ColumnType_MissingType_IsSqlsrc250AtItsPlace(string level, string key, string place)
+    public void Run_ColumnTypeMissingItsType_IsSqlsrc250AtItsPlace(string level, string key, string place)
     {
         var text = level switch
         {
@@ -329,7 +329,7 @@ public sealed class ColumnTypeTests
 
     // An array mapped to an array of a foreign type is read as the base map's array and converted element by element.
     [Fact]
-    public void Run_ColumnType_ArrayOfAForeignType_ConvertsByElement()
+    public void Run_ColumnTypeOfAnArrayOfAForeignType_ConvertsByElement()
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListPosts\nSELECT tag_ids FROM posts;\n");
         var column = Column("tag_ids", ArrayOf(Catalog("int8"), "_int8"), origin: new("public", "posts", "tag_ids"));

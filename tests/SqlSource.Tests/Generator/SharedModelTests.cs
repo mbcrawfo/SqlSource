@@ -186,7 +186,7 @@ public sealed class SharedModelTests
 
     // A -- column: marker gives one query's column another C# type, so the two models differ in that property's type.
     [Fact]
-    public void Run_TwoQueries_OneColumnTypedByAMarker_IsSqlsrc257() =>
+    public void Run_TwoQueriesWithOneColumnTypedByAMarker_IsSqlsrc257() =>
         ShouldBeSqlsrc257AtTheLaterMarker(
             "",
             "-- column: id -> long\n",

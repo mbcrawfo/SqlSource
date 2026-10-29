@@ -77,7 +77,7 @@ public sealed class RedactionTests
 
     // A value that was in two lines leaves one, as it does for a part.
     [Fact]
-    public void Of_Failure_RewriteCutOverTwoServerLines_IsTheMark()
+    public void Of_FailureWhoseRewriteIsCutOverTwoServerLines_IsTheMark()
     {
         var secret = new ConnectionSecret(
             "host=db;password=hunter22",

@@ -566,7 +566,12 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("-- column: total\t->\tMyApp.PostCount", null, "global::MyApp.PostCount", false)]
     [InlineData("-- column: \"a -> b\" -> PostCount", null, "PostCount", false)]
     [InlineData("-- column: \"posts.id\" -> PostId", null, "PostId", false)]
-    public void Parse_ColumnMarker_InAQuery_WithAType(string marker, bool? isNullable, string? clrType, bool resetsType)
+    public void Parse_ColumnMarkerWithATypeInAQuery_ReadsTheTypeAndNullability(
+        string marker,
+        bool? isNullable,
+        string? clrType,
+        bool resetsType
+    )
     {
         var column = Blocks("-- name: Q\n" + marker + "\nSELECT 1\n")
             .ShouldHaveSingleItem()
@@ -578,7 +583,7 @@ public sealed class SqlFileParserMarkerTests
     }
 
     [Fact]
-    public void Parse_ColumnMarker_InAQuery_KeepsTheNameWithoutQuotes() =>
+    public void Parse_ColumnMarkerInAQuery_KeepsTheNameWithoutQuotes() =>
         Blocks("-- name: Q\n-- column: \"a -> b\" -> PostCount\nSELECT 1\n")
             .ShouldHaveSingleItem()
             .ColumnMarkers.ShouldHaveSingleItem()
@@ -586,13 +591,13 @@ public sealed class SqlFileParserMarkerTests
 
     // A type is not a setting of the query's level: the result's column carries it.
     [Fact]
-    public void Parse_ColumnMarker_InAQuery_IsNoColumnTypeOfTheLevel() =>
+    public void Parse_ColumnMarkerInAQuery_IsNoColumnTypeOfTheLevel() =>
         Blocks("-- name: Q\n-- column: total -> PostCount\nSELECT 1\n")
             .ShouldHaveSingleItem()
             .Markers.ShouldBeSameAs(SettingsLevel.None);
 
     [Fact]
-    public void Parse_ColumnMarker_InTheHeader_IsAColumnType()
+    public void Parse_ColumnMarkerInTheHeader_IsAColumnType()
     {
         var blocks = Blocks(
             "-- column: posts.id -> PostId\n-- column: auth.\"Users\".id -> default\n"
@@ -613,7 +618,7 @@ public sealed class SqlFileParserMarkerTests
 
     // The header's entries reach the level of a query that has markers of its own.
     [Fact]
-    public void Parse_ColumnMarker_InTheHeader_ReachesAQueryWithMarkersOfItsOwn() =>
+    public void Parse_ColumnMarkerInTheHeader_ReachesAQueryWithMarkersOfItsOwn() =>
         Blocks("-- column: posts.id -> PostId\n-- name: A\n-- output: sql\nSELECT 1\n")
             .ShouldHaveSingleItem()
             .Markers.ColumnTypes.ShouldNotBeNull()
@@ -628,7 +633,7 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("total null")]
     [InlineData("posts.id -> int?")]
     [InlineData("a.b.c.d -> PostId")]
-    public void Parse_ColumnMarker_InTheHeader_WithNullability_IsSQLSRC111(string value)
+    public void Parse_ColumnMarkerWithNullabilityInTheHeader_IsSqlsrc111(string value)
     {
         var text = "-- column: " + value + "\n-- name: Q\nSELECT 1\n";
 
@@ -648,7 +653,7 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("posts.id null")]
     [InlineData("public.posts.id not null -> PostId")]
     [InlineData("posts.id")]
-    public void Parse_ColumnMarker_InAQuery_DottedName_IsSQLSRC111(string value)
+    public void Parse_ColumnMarkerOfADottedNameInAQuery_IsSqlsrc111(string value)
     {
         var text = "-- name: Q\n-- column: " + value + "\nSELECT 1\n";
 
@@ -666,7 +671,7 @@ public sealed class SqlFileParserMarkerTests
     // A file without a name marker takes both kinds: a key of two or three parts is the header's, one part the
     // query's.
     [Fact]
-    public void Parse_ColumnMarker_InAWholeFile_DottedIsTheHeaders()
+    public void Parse_ColumnMarkerOfADottedNameInAWholeFile_IsTheHeaders()
     {
         var block = Blocks("-- column: posts.id -> PostId\n-- column: total -> PostCount\nSELECT 1\n")
             .ShouldHaveSingleItem();
@@ -680,7 +685,7 @@ public sealed class SqlFileParserMarkerTests
     }
 
     [Fact]
-    public void Parse_ColumnMarker_InAWholeFile_DottedWithNullability_IsSQLSRC111()
+    public void Parse_ColumnMarkerOfADottedNameWithNullabilityInAWholeFile_IsSqlsrc111()
     {
         const string Value = "posts.id not null -> PostId";
         const string Text = "-- column: " + Value + "\nSELECT 1\n";
@@ -697,7 +702,7 @@ public sealed class SqlFileParserMarkerTests
     }
 
     [Fact]
-    public void Parse_ColumnMarkers_TypeAndNullabilityApart_AreNoConflict()
+    public void Parse_ColumnMarkersOfATypeAndANullabilityApart_AreNoConflict()
     {
         var markers = Blocks(
                 "-- name: Q\n-- column: note null\n-- column: NOTE -> NoteText\n-- column: note null -> NoteText\n"
@@ -716,7 +721,7 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("-- column: total -> PostCount", "TOTAL -> default")]
     [InlineData("-- column: total -> default", "total null -> PostCount")]
     [InlineData("-- column: total null -> PostCount", "total not null")]
-    public void Parse_ColumnMarkers_TwoTypes_IsSQLSRC112(string first, string second)
+    public void Parse_ColumnMarkersOfTwoTypes_IsSqlsrc112(string first, string second)
     {
         var text = "-- name: Q\n" + first + "\n-- column: " + second + "\nSELECT 1\n";
 
@@ -731,7 +736,7 @@ public sealed class SqlFileParserMarkerTests
     }
 
     [Fact]
-    public void Parse_HeaderColumnMarkers_TwoTypesForOneKey_IsSQLSRC112()
+    public void Parse_HeaderColumnMarkersOfTwoTypesForOneKey_IsSqlsrc112()
     {
         const string Second = "\"posts\".id -> Id";
         const string Text = "-- column: posts.id -> PostId\n-- column: " + Second + "\n-- name: Q\nSELECT 1\n";
@@ -748,7 +753,7 @@ public sealed class SqlFileParserMarkerTests
 
     // A quoted part and a plain part of one text are one key; keys that differ only by case are two.
     [Fact]
-    public void Parse_HeaderColumnMarkers_OneTypeTwice_IsNoConflict() =>
+    public void Parse_HeaderColumnMarkersOfOneTypeTwice_IsNoConflict() =>
         Blocks(
                 "-- column: posts.id -> PostId\n-- column: \"posts\".id -> PostId\n-- column: POSTS.ID -> Other\n"
                     + "-- name: Q\nSELECT 1\n"

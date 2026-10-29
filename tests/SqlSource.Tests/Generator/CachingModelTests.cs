@@ -103,53 +103,33 @@ public sealed class CachingModelTests
 
     // The model App.Shared.Row is the marker's in Orders and Users alike.  Orders comes first, so its request is the
     // model.  Whichever file is edited, the two now differ, which is SQLSRC257 at Users, and the model is the request
-    // of Orders alone, so its summary no longer names Users.  The edit of Orders changes the model's property too;
-    // the edit of Users changes the model's summary alone.  The model of Payments is no part of it.
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Run_SharedModelEdited_EmitsOnlyThatModelAgain(bool editsTheFileThatGivesIt)
+    // of Orders alone, so its summary no longer names Users.  The edit of Orders changes the model's property too.
+    // The model of Payments is no part of it.
+    [Fact]
+    public void Run_SharedModelEditedInTheFileThatGivesIt_EmitsOnlyThatModelAgain()
     {
-        var compilation = ModelsCompilation();
-        var users = new InMemoryAdditionalText(
-            _scene.Users.Path,
-            "-- name: GetUser\n-- output-model: App.Shared.Row\nSELECT 1;\n"
-        );
-        var orders = new InMemoryAdditionalText(
-            _scene.Orders.Path,
-            "-- name: GetOrder\n-- output-model: App.Shared.Row\nSELECT 2;\n"
-        );
-        var usersSidecar = TypedSidecar(users, "GetUser", "int4");
-        var ordersSidecar = TypedSidecar(orders, "GetOrder", "int4");
-        var driver = _scene.FirstRunOfModels(compilation, users, orders, [usersSidecar, ordersSidecar]);
-        var before = driver.GetRunResult().GeneratedTrees.Single(IsShared).ToString();
-        before.ShouldContain("queries <c>GetOrder</c> from <c>Orders.sql</c> and <c>GetUser</c> from <c>Users.sql</c>");
-        before.ShouldContain("Row(int Value)");
+        var shared = FirstRunOfSharedRow();
 
         var result = Run(
-            editsTheFileThatGivesIt
-                ? driver.ReplaceAdditionalText(ordersSidecar, TypedSidecar(orders, "GetOrder", "text"))
-                : driver.ReplaceAdditionalText(usersSidecar, TypedSidecar(users, "GetUser", "text")),
-            compilation
+            shared.Driver.ReplaceAdditionalText(shared.OrdersSidecar, TypedSidecar(shared.Orders, "GetOrder", "text")),
+            shared.Compilation
         );
 
-        ModelReasons(result)
-            .ShouldBe(
-                new Dictionary<string, IncrementalStepRunReason>
-                {
-                    ["App.Orders.GetPaymentDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
-                    ["App.Shared.Row-Model.g.cs"] = IncrementalStepRunReason.Modified,
-                },
-                ignoreOrder: true
-            );
-        var diagnostic = result.Diagnostics.ShouldHaveSingleItem();
-        diagnostic.Id.ShouldBe("SQLSRC257");
-        diagnostic.Location.GetLineSpan().Path.ShouldBe(_scene.Users.Path);
-        var after = result.GeneratedTrees.Single(IsShared).ToString();
-        after.ShouldContain("A row of the query <c>GetOrder</c> from <c>Orders.sql</c>.");
-        after.ShouldNotContain("GetUser");
-        after.ShouldContain(editsTheFileThatGivesIt ? "Row(string Value)" : "Row(int Value)");
-        static bool IsShared(SyntaxTree tree) => tree.FilePath.EndsWith("Row-Model.g.cs", StringComparison.Ordinal);
+        ShouldEmitTheSharedRowOfOrdersAlone(result).ShouldContain("Row(string Value)");
+    }
+
+    // The same edit of Users changes the model's summary alone.
+    [Fact]
+    public void Run_SharedModelEditedInTheOtherFile_EmitsOnlyThatModelAgain()
+    {
+        var shared = FirstRunOfSharedRow();
+
+        var result = Run(
+            shared.Driver.ReplaceAdditionalText(shared.UsersSidecar, TypedSidecar(shared.Users, "GetUser", "text")),
+            shared.Compilation
+        );
+
+        ShouldEmitTheSharedRowOfOrdersAlone(result).ShouldContain("Row(int Value)");
     }
 
     // The new file has a node of its own, after those of the files the project listed before, so no other file's
@@ -457,81 +437,44 @@ public sealed class CachingModelTests
             tree.FilePath.EndsWith("GetOrderDto-Model.g.cs", StringComparison.Ordinal);
     }
 
-    // A path that the project comes to list a second time, under the same spelling or one that differs by case alone,
-    // moves its model from its file's node to the collected output in one run, and the model's file is added once.
-    // The second spelling is a collision, SQLSRC013, as it is for any claimed file.
-    [Theory]
-    [InlineData("/app/Orders/Orders.sql")]
-    [InlineData("/app/Orders/orders.sql")]
-    public void Run_FileListedAgain_EmitsItsModelOnce(string spelling)
+    // A path that the project comes to list a second time under the same spelling moves its model from its file's
+    // node to the collected output in one run, and the model's file is added once.
+    [Fact]
+    public void Run_FileListedAgain_EmitsItsModelOnce()
     {
-        var compilation = ModelsCompilation();
-        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders);
-        var ordersAgain = new InMemoryAdditionalText(
-            spelling,
-            _scene.Orders.GetText(TestContext.Current.CancellationToken)!.ToString()
-        );
+        var result = RunWithOrdersListedAgainAt(_scene.Orders.Path);
 
-        var result = Run(driver.AddAdditionalTexts([ordersAgain]), compilation);
-
-        result.Results.Single().Exception.ShouldBeNull();
-        result
-            .GeneratedTrees.Count(tree => tree.FilePath.EndsWith("GetOrderDto-Model.g.cs", StringComparison.Ordinal))
-            .ShouldBe(1);
-        if (spelling == _scene.Orders.Path)
-        {
-            result.Diagnostics.ShouldBeEmpty();
-        }
-        else
-        {
-            result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC013");
-        }
+        result.Diagnostics.ShouldBeEmpty();
     }
 
-    // Each path listed twice, under one spelling or two, is typed and its models read once, from the collected files,
-    // so that its errors are reported once.  Without Npgsql, Users' column of date has no C# type, SQLSRC249, an error
-    // of its types.  Orders' column gives a property name that is not an identifier, SQLSRC254, an error of its
-    // models.  A second spelling is a collision, SQLSRC013, as it is for any claimed file.  When the first listings go,
-    // the second ones are typed and read from their own nodes, and each error is still reported once.
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Run_FileListedTwice_ReportsItsTypeAndNameErrorsOnce(bool byCase)
+    // The same under a spelling that differs by case alone, which is a collision, SQLSRC013, as it is for any claimed
+    // file.
+    [Fact]
+    public void Run_FileListedAgainUnderASpellingThatDiffersByCase_EmitsItsModelOnceAndIsSqlsrc013()
     {
-        var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = CreateDriver(
-                ProjectFileWithTypeOverrides(null),
-                [
-                    _scene.Users,
-                    Again(_scene.Users, byCase),
-                    _scene.Orders,
-                    Again(_scene.Orders, byCase),
-                    TypedSidecar(_scene.Users, "GetUser", "date"),
-                    TypedSidecar(_scene.Orders, "GetOrder", "int4", columnName: "api-url"),
-                ]
-            )
-            .RunGenerators(compilation, TestContext.Current.CancellationToken);
-        var first = driver.GetRunResult();
+        var result = RunWithOrdersListedAgainAt("/app/Orders/orders.sql");
 
-        first.Results.Single().Exception.ShouldBeNull();
-        first
-            .Diagnostics.Select(diagnostic => diagnostic.Id)
-            .ShouldBe(
-                byCase ? ["SQLSRC013", "SQLSRC013", "SQLSRC249", "SQLSRC254"] : ["SQLSRC249", "SQLSRC254"],
-                ignoreOrder: true
-            );
+        result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC013");
+    }
 
-        var result = Run(driver.RemoveAdditionalTexts([_scene.Users, _scene.Orders]), compilation);
+    // Each path listed twice under one spelling is typed and its models read once, from the collected files, so that
+    // its errors are reported once.  Without Npgsql, Users' column of date has no C# type, SQLSRC249, an error of its
+    // types.  Orders' column gives a property name that is not an identifier, SQLSRC254, an error of its models.  When
+    // the first listings go, the second ones are typed and read from their own nodes, and each error is still
+    // reported once.
+    [Fact]
+    public void Run_FileListedTwice_ReportsItsTypeAndNameErrorsOnce() =>
+        ShouldReportEachErrorOnceWhenListedTwice(static file => file.Path, ["SQLSRC249", "SQLSRC254"]);
 
-        result.Results.Single().Exception.ShouldBeNull();
-        result.Diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(["SQLSRC249", "SQLSRC254"], ignoreOrder: true);
-
-        // The file again at its own path, or at that path with its extension in capitals.
-        static InMemoryAdditionalText Again(InMemoryAdditionalText file, bool byCase) =>
-            new(
-                byCase ? file.Path.Replace(".sql", ".SQL", StringComparison.Ordinal) : file.Path,
-                file.GetText(TestContext.Current.CancellationToken)!.ToString()
-            );
+    // The same with the second listing at the path with its extension in capitals, a collision, SQLSRC013, as it is for
+    // any claimed file, reported for each file while both listings are there.
+    [Fact]
+    public void Run_FileListedTwiceUnderTwoSpellings_ReportsItsTypeAndNameErrorsOnce()
+    {
+        ShouldReportEachErrorOnceWhenListedTwice(
+            static file => file.Path.Replace(".sql", ".SQL", StringComparison.Ordinal),
+            ["SQLSRC013", "SQLSRC013", "SQLSRC249", "SQLSRC254"]
+        );
     }
 
     // The edit gives the pipeline a new compilation: the names the project has are looked up again and found the
@@ -623,4 +566,115 @@ public sealed class CachingModelTests
             (EquatableArray<TakenName>)Outputs(result, TrackingNames.TakenModelNames).ShouldHaveSingleItem().Value
         ).ShouldBeEmpty();
     }
+
+    // The first run of Users and Orders, whose queries both name the model App.Shared.Row, each with a sidecar of one
+    // column of int4: the model is the request of Orders, and its summary names both.
+    private SharedRow FirstRunOfSharedRow()
+    {
+        var compilation = ModelsCompilation();
+        var users = new InMemoryAdditionalText(
+            _scene.Users.Path,
+            "-- name: GetUser\n-- output-model: App.Shared.Row\nSELECT 1;\n"
+        );
+        var orders = new InMemoryAdditionalText(
+            _scene.Orders.Path,
+            "-- name: GetOrder\n-- output-model: App.Shared.Row\nSELECT 2;\n"
+        );
+        var usersSidecar = TypedSidecar(users, "GetUser", "int4");
+        var ordersSidecar = TypedSidecar(orders, "GetOrder", "int4");
+        var driver = _scene.FirstRunOfModels(compilation, users, orders, [usersSidecar, ordersSidecar]);
+        var before = driver.GetRunResult().GeneratedTrees.Single(IsSharedRow).ToString();
+        before.ShouldContain("queries <c>GetOrder</c> from <c>Orders.sql</c> and <c>GetUser</c> from <c>Users.sql</c>");
+        before.ShouldContain("Row(int Value)");
+        return new SharedRow(compilation, driver, users, orders, usersSidecar, ordersSidecar);
+    }
+
+    // The run after an edit of either file of the shared row emitted that model alone again, with SQLSRC257 at Users
+    // and a summary of Orders alone; the text of the model, for what the edit changed.
+    private string ShouldEmitTheSharedRowOfOrdersAlone(GeneratorDriverRunResult result)
+    {
+        ModelReasons(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Orders.GetPaymentDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
+                    ["App.Shared.Row-Model.g.cs"] = IncrementalStepRunReason.Modified,
+                },
+                ignoreOrder: true
+            );
+        var diagnostic = result.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Id.ShouldBe("SQLSRC257");
+        diagnostic.Location.GetLineSpan().Path.ShouldBe(_scene.Users.Path);
+        var after = result.GeneratedTrees.Single(IsSharedRow).ToString();
+        after.ShouldContain("A row of the query <c>GetOrder</c> from <c>Orders.sql</c>.");
+        after.ShouldNotContain("GetUser");
+        return after;
+    }
+
+    private static bool IsSharedRow(SyntaxTree tree) =>
+        tree.FilePath.EndsWith("Row-Model.g.cs", StringComparison.Ordinal);
+
+    // Users and Orders run, then Orders listed again at the path, in one run that moves its model and emits its file
+    // once.
+    private GeneratorDriverRunResult RunWithOrdersListedAgainAt(string path)
+    {
+        var compilation = ModelsCompilation();
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders);
+        var ordersAgain = new InMemoryAdditionalText(
+            path,
+            _scene.Orders.GetText(TestContext.Current.CancellationToken)!.ToString()
+        );
+
+        var result = Run(driver.AddAdditionalTexts([ordersAgain]), compilation);
+
+        result.Results.Single().Exception.ShouldBeNull();
+        result
+            .GeneratedTrees.Count(tree => tree.FilePath.EndsWith("GetOrderDto-Model.g.cs", StringComparison.Ordinal))
+            .ShouldBe(1);
+        return result;
+    }
+
+    // Users and Orders each listed a second time at the path the function gives, with errors of their types and models:
+    // the first run reports the ids given, and once the first listings go, each error is reported once.
+    private void ShouldReportEachErrorOnceWhenListedTwice(
+        Func<InMemoryAdditionalText, string> secondPath,
+        string[] firstIds
+    )
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = CreateDriver(
+                ProjectFileWithTypeOverrides(null),
+                [
+                    _scene.Users,
+                    Again(_scene.Users),
+                    _scene.Orders,
+                    Again(_scene.Orders),
+                    TypedSidecar(_scene.Users, "GetUser", "date"),
+                    TypedSidecar(_scene.Orders, "GetOrder", "int4", columnName: "api-url"),
+                ]
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        var first = driver.GetRunResult();
+
+        first.Results.Single().Exception.ShouldBeNull();
+        first.Diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(firstIds, ignoreOrder: true);
+
+        var result = Run(driver.RemoveAdditionalTexts([_scene.Users, _scene.Orders]), compilation);
+
+        result.Results.Single().Exception.ShouldBeNull();
+        result.Diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(["SQLSRC249", "SQLSRC254"], ignoreOrder: true);
+
+        InMemoryAdditionalText Again(InMemoryAdditionalText file) =>
+            new(secondPath(file), file.GetText(TestContext.Current.CancellationToken)!.ToString());
+    }
+
+    // The compilation, the first run and the files of the shared row's scene.
+    private sealed record SharedRow(
+        Compilation Compilation,
+        GeneratorDriver Driver,
+        InMemoryAdditionalText Users,
+        InMemoryAdditionalText Orders,
+        InMemoryAdditionalText UsersSidecar,
+        InMemoryAdditionalText OrdersSidecar
+    );
 }

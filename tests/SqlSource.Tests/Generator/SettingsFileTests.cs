@@ -185,7 +185,7 @@ public sealed class SettingsFileTests
 
     // The attribute's suffix wins, and the folder's file still gives the other.
     [Fact]
-    public void Run_AttributeOverridesTheFolder()
+    public void Run_SuffixInTheAttributeAndTheFolder_IsTheAttributes()
     {
         var run = RunUsers(
             Source.Replace(
@@ -206,7 +206,7 @@ public sealed class SettingsFileTests
 
     // Each file says the setting, and the farther one says another that the nearer one leaves to it.
     [Fact]
-    public void Run_NearerFileOverridesAFartherOne()
+    public void Run_SuffixInANearerAndAFartherFile_IsTheNearerOnes()
     {
         var run = RunUsers(
             Source,
@@ -254,7 +254,7 @@ public sealed class SettingsFileTests
     // The root file's own settings apply, and the file above it, the project's, is not read: the root file gives the
     // output and the dialect that the project's file gives the others.
     [Fact]
-    public void Run_RootFileHidesTheFilesAbove()
+    public void Run_RootFile_HidesTheFilesAbove()
     {
         var run = RunUsers(
             Source,
