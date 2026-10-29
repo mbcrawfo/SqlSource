@@ -237,7 +237,7 @@
           "minLength": 1
         },
         "bindName": {
-          "description": "Written on a parameter's own type alone, never on a column's or a nested type: the NpgsqlParameter.DataTypeName that the tool bound the parameter by, without a modifier, which the generated code binds it by. It does not depend on the search path.",
+          "description": "Written on a parameter's own type alone, never on a column's or a nested type: the NpgsqlParameter.DataTypeName that the tool bound the parameter by, without a modifier. The generated code binds by a name made from schema and internalName, and falls back to this one for an array of a domain over a domain, a kind it does not know, or a schema or name that holds a dot. It does not depend on the search path.",
           "type": "string",
           "minLength": 1
         },
@@ -252,7 +252,7 @@
           "minLength": 1
         },
         "internalName": {
-          "description": "pg_type.typname: 'int4', 'varchar', 'timestamptz', '_text'. The type's stable identity in the catalog, and with schema the key of the generator's type map and of a type override.",
+          "description": "pg_type.typname: 'int4', 'varchar', 'timestamptz', '_text'. The type's stable identity in the catalog, and with schema the key of the generator's type map and of a type override, and the name the generated code binds a parameter by.",
           "type": "string",
           "minLength": 1
         },
