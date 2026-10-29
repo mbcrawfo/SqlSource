@@ -76,7 +76,7 @@ public sealed class GeneratorParameterLevelTests
         );
 
         run.ShouldBeClean();
-        var generated = run.Sources["App.Sample.g.cs"];
+        var generated = run.Sources[GeneratorHarness.SampleFile];
         if (expected)
         {
             generated.ShouldContain("-- kept");
@@ -235,7 +235,7 @@ public sealed class GeneratorParameterLevelTests
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"SELECT 1\";");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"SELECT 1\";");
         var query = StepOutputs.Single<ParsedSqlFile>(run, TrackingNames.ParsedFile).Queries.ShouldHaveSingleItem();
         query.KeptSegments.ShouldBeNull();
         query.KeptErrors.ShouldBeEmpty();
@@ -258,7 +258,7 @@ public sealed class GeneratorParameterLevelTests
         var run = Run(OutputKind.Sql, "keep-comments", value);
 
         run.Diagnostics.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("-- kept");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("-- kept");
     }
 
     private static string Source(string? attribute) =>

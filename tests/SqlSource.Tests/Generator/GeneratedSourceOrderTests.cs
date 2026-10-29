@@ -28,7 +28,7 @@ public sealed class GeneratedSourceOrderTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"]
+        run.Sources[GeneratorHarness.SampleFile]
             .Split('\n')
             .Where(line => line.Contains("public const string", StringComparison.Ordinal))
             .Select(line => line.Trim())
@@ -67,7 +67,7 @@ public sealed class GeneratedSourceOrderTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"]
+        run.Sources[GeneratorHarness.SampleFile]
             .Split('\n')
             .Where(line => line.Contains("public const string", StringComparison.Ordinal))
             .Select(line => line.Trim().Split(' ')[3])

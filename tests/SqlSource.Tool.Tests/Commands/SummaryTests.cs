@@ -17,7 +17,7 @@ public sealed class SummaryTests : IDisposable
     public SummaryTests()
     {
         // "Invoices.sql" comes before "Users.sql", so the plan holds "billing" first.
-        _ = _scene.Project.AddSql("Invoices.sql", "-- name: ListInvoices\n-- database: billing\nSELECT 3;\n");
+        _ = _scene.Project.AddSql("Invoices.sql", SqlTexts.ListInvoices);
         _users = _scene.Project.AddSql("Users.sql", SqlTexts.Users);
     }
 

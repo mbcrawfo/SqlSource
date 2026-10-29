@@ -54,7 +54,7 @@ public sealed class DialectTests
         var run = Run(projectFile, Files(QueryPath, Query, marker, folderFile));
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + expected + "\";");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"" + expected + "\";");
     }
 
     // Each file in a folder of its own, claimed by a type of that folder: A under the project's file alone, B under its

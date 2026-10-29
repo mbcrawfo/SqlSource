@@ -35,7 +35,7 @@ public sealed class GeneratedSourceWarningTests
         );
 
         run.ShouldBeClean();
-        run.Sources.Keys.ShouldContain("App.Sample.g.cs");
+        run.Sources.Keys.ShouldContain(GeneratorHarness.SampleFile);
     }
 
     [Theory]
@@ -111,7 +111,7 @@ public sealed class GeneratedSourceWarningTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string " + name + " = \"SELECT 1;\";");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string " + name + " = \"SELECT 1;\";");
     }
 
     [Fact]

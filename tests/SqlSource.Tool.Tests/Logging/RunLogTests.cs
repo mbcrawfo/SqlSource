@@ -604,7 +604,7 @@ public sealed class RunLogTests : IDisposable
     [Fact]
     public async Task Run_QueryOfADatabaseThatIsNotSelected_IsNotSelectedAndLeftOut()
     {
-        _ = _scene.Project.AddSql("Invoices.sql", "-- name: ListInvoices\n-- database: billing\nSELECT 3;\n");
+        _ = _scene.Project.AddSql("Invoices.sql", SqlTexts.ListInvoices);
 
         _ = await _scene.DescribeAsync("--database", "postgres", "--log", "run.log");
 
@@ -629,7 +629,7 @@ public sealed class RunLogTests : IDisposable
         }
 
         _ = _scene.Project.AddSource("Plain/Queries.cs", Plans.Type);
-        var plain = _scene.Project.AddSql("Plain/Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 4;\n");
+        var plain = _scene.Project.AddSql("Plain/Plain.sql", SqlTexts.Plain);
         var sidecar = SidecarFormat.PathFor(plain);
         await File.WriteAllTextAsync(sidecar, SidecarFiles.Empty(), TestContext.Current.CancellationToken);
         var folder = Path.GetDirectoryName(plain)!;

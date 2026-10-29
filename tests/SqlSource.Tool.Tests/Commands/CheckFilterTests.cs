@@ -19,8 +19,8 @@ public sealed class CheckFilterTests : IDisposable
     public CheckFilterTests()
     {
         // "Invoices.sql" comes before "Users.sql", so the plan holds "billing" first.
-        _ = _scene.Project.AddSql("Invoices.sql", "-- name: ListInvoices\n-- database: billing\nSELECT 3;\n");
-        _plain = _scene.Project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 4;\n");
+        _ = _scene.Project.AddSql("Invoices.sql", SqlTexts.ListInvoices);
+        _plain = _scene.Project.AddSql("Plain.sql", SqlTexts.Plain);
         _users = _scene.Project.AddSql("Users.sql", SqlTexts.Users);
         // Two units stand in the working directory for the test of "--project", so each run names its own.
         _ = _scene.Run.Folder.WriteFile("App.slnx", "<Solution><Project Path=\"App.csproj\" /></Solution>");

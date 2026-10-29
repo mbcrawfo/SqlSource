@@ -159,7 +159,7 @@ public sealed class VerboseTests : IDisposable
     [Fact]
     public async Task Run_VerboseWithASidecarToDeleteAndOneThatCannotBeWritten_SaysDeletedAndCouldNotBeChanged()
     {
-        var plain = _scene.Project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 4;\n");
+        var plain = _scene.Project.AddSql("Plain.sql", SqlTexts.Plain);
         await File.WriteAllTextAsync(
             SidecarFormat.PathFor(plain),
             SidecarFiles.Empty(),

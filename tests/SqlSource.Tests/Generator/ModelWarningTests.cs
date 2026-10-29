@@ -121,7 +121,7 @@ public sealed class ModelWarningTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"]
+        run.Sources[GetUserDtoFile]
             .ShouldStartWith(
                 GeneratedFile.ModelHeader
                     + "#pragma warning disable MYAPP001 // A mapped type is obsolete or experimental.\n\n"
@@ -161,7 +161,7 @@ public sealed class ModelWarningTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"]
+        run.Sources[GetUserDtoFile]
             .ShouldStartWith(
                 GeneratedFile.ModelHeader
                     + "#pragma warning disable CS0612, CS0618, TRIAL001 "
@@ -195,7 +195,7 @@ public sealed class ModelWarningTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"]
+        run.Sources[GetUserDtoFile]
             .ShouldStartWith(
                 GeneratedFile.ModelHeader
                     + "#pragma warning disable class, if "
@@ -335,6 +335,6 @@ public sealed class ModelWarningTests
         );
 
         run.ShouldBeClean();
-        ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs"]);
+        ModelFiles(run).ShouldBe([GetUserDtoFile]);
     }
 }

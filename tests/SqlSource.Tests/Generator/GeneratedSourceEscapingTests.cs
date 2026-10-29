@@ -95,7 +95,7 @@ public sealed class GeneratedSourceEscapingTests
         );
 
         run.ShouldBeClean();
-        var source = run.Sources["App.Sample.g.cs"];
+        var source = run.Sources[GeneratorHarness.SampleFile];
         source.ShouldContain("\"SELECT \\\"a\\\", 'b\\\\c', '\\t', '<&>', '\\u2028\\u0085' FROM \".CopyTo(span);\n");
         source.ShouldContain("/// ' FROM {{table}} WHERE x &lt; 1;\n");
     }
@@ -114,7 +114,7 @@ public sealed class GeneratedSourceEscapingTests
         );
 
         run.ShouldBeClean();
-        var source = run.Sources["App.Sample.g.cs"];
+        var source = run.Sources[GeneratorHarness.SampleFile];
         source.ShouldContain("/// a &lt; b &amp; c\n");
         source.ShouldContain(
             "public const string Users = \"SELECT \\\"a\\\", 'b\\\\c', '\\t', '<&>', '\\u2028\\u0085' WHERE x < 1;\";\n"
@@ -133,7 +133,8 @@ public sealed class GeneratedSourceEscapingTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Users = \"SELECT '\\f\\u001A';\";\n");
+        run.Sources[GeneratorHarness.SampleFile]
+            .ShouldContain("public const string Users = \"SELECT '\\f\\u001A';\";\n");
     }
 
     [Fact]

@@ -292,7 +292,7 @@ public sealed class SharedModelTests
         ]);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain("public sealed record GetUserDto(int Id);");
+        run.Sources[GetUserDtoFile].ShouldContain("public sealed record GetUserDto(int Id);");
     }
 
     // The earlier request is of a generic type, which the message names as it is declared.
@@ -321,7 +321,7 @@ public sealed class SharedModelTests
         ]);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain("public sealed record GetUserDto(int Id);");
+        run.Sources[GetUserDtoFile].ShouldContain("public sealed record GetUserDto(int Id);");
     }
 
     [Fact]
@@ -343,9 +343,8 @@ public sealed class SharedModelTests
         var run = Run(source, [Users, Sidecar(Users, "GetUser", [Column("id")])]);
 
         run.ShouldBeClean();
-        ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs"]);
-        run.Sources["App.GetUserDto-Model.g.cs"]
-            .ShouldContain("    /// A row of the query <c>GetUser</c> from <c>Users.sql</c>.\n");
+        ModelFiles(run).ShouldBe([GetUserDtoFile]);
+        run.Sources[GetUserDtoFile].ShouldContain("    /// A row of the query <c>GetUser</c> from <c>Users.sql</c>.\n");
     }
 
     [Fact]
@@ -370,7 +369,7 @@ public sealed class SharedModelTests
         var run = Run(source, [Users, Sidecar(Users, "GetUser", [Column("id")])]);
 
         run.ShouldBeClean();
-        ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs", "Other.GetUserDto-Model.g.cs"]);
+        ModelFiles(run).ShouldBe([GetUserDtoFile, "Other.GetUserDto-Model.g.cs"]);
     }
 
     // The first type is internal, and the model takes the wider accessibility of the two.
@@ -393,7 +392,7 @@ public sealed class SharedModelTests
         var run = Run(source, [Users, Sidecar(Users, "GetUser", [Column("id")])]);
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain("    public sealed record GetUserDto(int Id);\n");
+        run.Sources[GetUserDtoFile].ShouldContain("    public sealed record GetUserDto(int Id);\n");
     }
 
     // C# tells the two names apart, and the compiler, which compares the names of generated files ignoring case,
@@ -676,8 +675,7 @@ public sealed class SharedModelTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"]
-            .ShouldContain("    internal sealed record GetUserDto(global::MyApp.Inner Id);\n");
+        run.Sources[GetUserDtoFile].ShouldContain("    internal sealed record GetUserDto(global::MyApp.Inner Id);\n");
     }
 
     // The models step names each query's model for the methods, and each query's entry gives its column names.

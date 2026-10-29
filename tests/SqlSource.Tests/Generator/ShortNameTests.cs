@@ -54,7 +54,7 @@ public sealed class ShortNameTests
 
         run.ShouldBeClean();
         TextOf(run).ShouldBe("global::App.UserId");
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain("global::App.UserId Id");
+        run.Sources[GetUserDtoFile].ShouldContain("global::App.UserId Id");
     }
 
     [Fact]

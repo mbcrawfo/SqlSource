@@ -93,7 +93,7 @@ public sealed class FileDiagnosticsTests
             $"SQLSRC115 {GeneratorHarness.UsersPath}(2,1)-(2,18): The '-- dialect:' marker must come before the file's "
                 + "first query and before any SQL",
         ]);
-        run.Sources["App.Sample.g.cs"].ShouldBe(EmptySqlClass);
+        run.Sources[GeneratorHarness.SampleFile].ShouldBe(EmptySqlClass);
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public sealed class FileDiagnosticsTests
         run.Diagnostics.ShouldBe([
             $"SQLSRC101 {GeneratorHarness.UsersPath}(1,8)-(1,9): A quoted string or identifier is not closed",
         ]);
-        run.Sources["App.Sample.g.cs"].ShouldBe(EmptySqlClass);
+        run.Sources[GeneratorHarness.SampleFile].ShouldBe(EmptySqlClass);
         run.CompilationErrors.ShouldBeEmpty();
     }
 
@@ -143,7 +143,7 @@ public sealed class FileDiagnosticsTests
         );
 
         run.Diagnostics.ShouldBe(["SQLSRC102 /app/Repo/Broken.sql(1,1)-(1,3): A block comment or hint is not closed"]);
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string GetUser = \"SELECT 1;\";");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string GetUser = \"SELECT 1;\";");
     }
 
     [Fact]
@@ -170,7 +170,7 @@ public sealed class FileDiagnosticsTests
         var run = GeneratorHarness.Run(OutputKind.Sql, Source, new SqlFile(GeneratorHarness.UsersPath, text));
 
         run.Diagnostics.ShouldBe([$"SQLSRC113 {GeneratorHarness.UsersPath}(1,1)-(1,1): The query has no SQL"]);
-        run.Sources["App.Sample.g.cs"].ShouldBe(EmptySqlClass);
+        run.Sources[GeneratorHarness.SampleFile].ShouldBe(EmptySqlClass);
     }
 
     [Fact]
@@ -208,7 +208,7 @@ public sealed class FileDiagnosticsTests
         );
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC103 /app/Repo/Broken.sql(1,10)-(1,12)");
-        run.Sources["App.Sample.g.cs"].Split("public const string GetUser").Length.ShouldBe(2);
+        run.Sources[GeneratorHarness.SampleFile].Split("public const string GetUser").Length.ShouldBe(2);
         run.CompilationErrors.ShouldBeEmpty();
     }
 
@@ -277,7 +277,7 @@ public sealed class FileDiagnosticsTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string GetUser");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string GetUser");
         run.CompilationErrors.ShouldBeEmpty();
     }
 
@@ -310,7 +310,7 @@ public sealed class FileDiagnosticsTests
             "SQLSRC008 /app/Repo/B.sql(4,10)-(4,17): The query name 'GetUser' is already used in 'A.sql', which also "
                 + "belongs to 'Sample'",
         ]);
-        var source = run.Sources["App.Sample.g.cs"];
+        var source = run.Sources[GeneratorHarness.SampleFile];
         source.ShouldContain("public const string GetUser = \"SELECT 1;\";");
         source.ShouldNotContain("Other");
         run.CompilationErrors.ShouldBeEmpty();
@@ -346,7 +346,7 @@ public sealed class FileDiagnosticsTests
             "SQLSRC009 /app/Repo/Sql.sql(1,1)-(1,1): A query of 'Sample' cannot be named 'Sql', because its member "
                 + "would have the name of the type that contains it",
         ]);
-        run.Sources["App.Sample.g.cs"].ShouldBe(EmptySqlClass);
+        run.Sources[GeneratorHarness.SampleFile].ShouldBe(EmptySqlClass);
         run.CompilationErrors.ShouldBeEmpty();
     }
 
@@ -389,7 +389,7 @@ public sealed class FileDiagnosticsTests
             "SQLSRC009 /app/Repo/B.sql(3,10)-(3,16): A query of 'Sample' cannot be named 'Sample', because its member "
                 + "would have the name of the type that contains it",
         ]);
-        var source = run.Sources["App.Sample.g.cs"];
+        var source = run.Sources[GeneratorHarness.SampleFile];
         source.ShouldContain("public const string Kept = \"SELECT 1;\";");
         source.ShouldNotContain("Dropped");
         run.CompilationErrors.ShouldBeEmpty();
