@@ -4,7 +4,6 @@
 
 - **A test of `tests/DatabaseTests/SqlServer` that needs the server is in the collection `UsesSqlServer`**, which starts one container for the run through `tests/DatabaseTests/SqlServer/SqlServerDatabases.cs`, a subclass of the harness's `SqlServerContainer`.  A test that needs no server is not in the collection ([such as](README.md#running)).
 - **The container runs on `EngineImage.SqlServer.Image` of `tests/DatabaseTests/TestHarness`, the one place a test takes the image from**: the image that `DefaultImages.SqlServer` names, unless the variable `EngineImage.SqlServer.Variable` names another.  Another tag in `tests/` is a sample that no test reads as the default ([the images](README.md#the-images)).
-- **The one test that needs a server of its own, `EndToEnd/AllocationTests.cs`, is in the collection `MeasuresAllocations`**, since it counts the bytes that every thread allocates: the collection runs alone, with parallelization off, on a `SqlServerDatabases` of its own.
 - **A container starts through `EngineImage.SqlServer.StartAsync` of the harness, never through the container's own `StartAsync`.**  It goes through `SqlServerStart`, which starts a new one, once, after the crash of TD-0072, and the harness starts every container so.
 
 ## Databases and scripts

@@ -9,11 +9,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Shouldly;
-using SqlSource.DatabaseTests.SqlServer.EndToEnd.Shapes;
-using SqlSource.DatabaseTests.TestHarness.EndToEnd;
+using SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer.Shapes;
 using Xunit;
 
-namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
+namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer;
 
 // The bytes that a generated method allocates for each call, against a hand-written ADO.NET method of the same calls:
 // ShapeQueries.SearchAccounts, with two parameters and three rows of the seed of "app".  The hand-written method makes
@@ -22,7 +21,7 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // an array behind it, which it can only build by copying what it read the rows into, since the count of the rows is not
 // known until they are read.  It reads them into what the generated method does, so there are two pairs:
 // SearchAccounts, which reads its rows into the pooled buffer, against a hand-written method that reads them into
-// RowBufferByHand of tests/DatabaseTests/TestHarness, the same buffer by hand; and SearchAccountsUnpooled, a copy of
+// RowBufferByHand of this project, the same buffer by hand; and SearchAccountsUnpooled, a copy of
 // the query under no-array-pool, which reads them into a List, against a hand-written method that does the same.  The
 // copy is a query of its own because SearchAccounts' own list of generator parameters, sort-input, replaces the list of
 // any claim's attribute, and UnpooledCopyTests holds its SQL to SearchAccounts'.  The numbers queries of
@@ -38,10 +37,11 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // disposal.  In each pair the two make the same calls, so any object that the generated method allocates on each call
 // and the hand-written one does not fails the test.  The two are compared by the commonest difference of pairs of
 // calls, one of each method, which CallAllocations explains.  GC.GetTotalAllocatedBytes(true) counts every thread,
-// where the driver completes the continuations of an asynchronous call, so the test runs in MeasuresAllocations, alone
-// and on a server of its own, and skips under coverage, whose collector allocates in the process too.
-[Collection(MeasuresAllocations.Name)]
-public sealed class AllocationTests(SqlServerDatabases sqlServer)
+// where the driver completes the continuations of an asynchronous call, so the class is in the collection
+// MeasuresSqlServer, which runs alone on a container of its own, and the assembly runs no two tests at once, and it
+// skips under coverage, whose collector allocates in the process too.
+[Collection(MeasuresSqlServer.Name)]
+public sealed class AllocationTests(SqlServerApp sqlServer)
 {
     // The SQL of SearchAccounts, as the generated method sends it.
     private const string SearchAccountsSql =
@@ -138,76 +138,59 @@ public sealed class AllocationTests(SqlServerDatabases sqlServer)
     // The rows of a numbers query at CountedRows.
     private static readonly CountedNumber[] CountedNumbers = [new(1), new(2), new(3)];
 
+    private static readonly MeasureSettings Settings = new(WarmUpCalls, Pairs, LeastBytesPerCall);
+
     // A closed connection is opened and closed again by each call; an open one is left open.
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task SearchAccounts_ManyCallsThroughThePool_AllocatesNoMoreThanByHand(bool open)
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task SearchAccounts_ThroughThePool_AllocatesNoMoreThanByHand(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
-        if (open)
-        {
-            await connection.OpenAsync(token);
-        }
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
 
         var generatedRows = await ShapeQueries.SearchAccounts(connection, Filter, cancellationToken: token);
         generatedRows.ShouldBe(Rows);
         (await SearchAccountsPooledByHandAsync(connection, Filter, cancellationToken: token)).ShouldBe(generatedRows);
 
-        var pairs = await CallAllocations.MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => ShapeQueries.SearchAccounts(connection, Filter, cancellationToken: token),
             () => SearchAccountsPooledByHandAsync(connection, Filter, cancellationToken: token),
-            WarmUpCalls,
-            Pairs
+            MarginInBytesPerCall,
+            Settings
         );
-        TestContext.Current.TestOutputHelper?.WriteLine($"SearchAccounts, of {Pairs} pairs of calls, {pairs}.");
-
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task SearchAccountsUnpooled_ManyCalls_AllocatesNoMoreThanByHand(bool open)
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task SearchAccountsUnpooled_UnderNoArrayPool_AllocatesNoMoreThanByHand(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
-        if (open)
-        {
-            await connection.OpenAsync(token);
-        }
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
 
         var generatedRows = await ShapeQueries.SearchAccountsUnpooled(connection, Filter, cancellationToken: token);
         generatedRows.ShouldBe(Rows);
         (await SearchAccountsUnpooledByHandAsync(connection, Filter, cancellationToken: token)).ShouldBe(generatedRows);
 
-        var pairs = await CallAllocations.MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => ShapeQueries.SearchAccountsUnpooled(connection, Filter, cancellationToken: token),
             () => SearchAccountsUnpooledByHandAsync(connection, Filter, cancellationToken: token),
-            WarmUpCalls,
-            Pairs
+            MarginInBytesPerCall,
+            Settings
         );
-        TestContext.Current.TestOutputHelper?.WriteLine($"SearchAccountsUnpooled, of {Pairs} pairs of calls, {pairs}.");
-
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NumbersAsList_ManyCallsThroughThePool_AllocatesNoMoreThanByHand(bool open)
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task NumbersAsList_ThreeRowsThroughThePool_AllocatesNoMoreThanByHand(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
-        if (open)
-        {
-            await connection.OpenAsync(token);
-        }
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
 
         var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersAsList(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
@@ -215,30 +198,22 @@ public sealed class AllocationTests(SqlServerDatabases sqlServer)
             CountedNumbers
         );
 
-        var pairs = await CallAllocations.MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => connection.NumbersAsList(parameters, cancellationToken: token),
             () => NumbersAsListPooledByHandAsync(connection, parameters, cancellationToken: token),
-            WarmUpCalls,
-            Pairs
+            MarginInBytesPerCall,
+            Settings
         );
-        TestContext.Current.TestOutputHelper?.WriteLine($"NumbersAsList, of {Pairs} pairs of calls, {pairs}.");
-
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NumbersAsIList_ManyCallsThroughThePool_AllocatesNoMoreThanByHand(bool open)
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task NumbersAsIList_ThreeRowsThroughThePool_AllocatesNoMoreThanByHand(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
-        if (open)
-        {
-            await connection.OpenAsync(token);
-        }
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
 
         var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersAsIList(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
@@ -246,30 +221,22 @@ public sealed class AllocationTests(SqlServerDatabases sqlServer)
             CountedNumbers
         );
 
-        var pairs = await CallAllocations.MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => connection.NumbersAsIList(parameters, cancellationToken: token),
             () => NumbersAsListPooledByHandAsync(connection, parameters, cancellationToken: token),
-            WarmUpCalls,
-            Pairs
+            MarginInBytesPerCall,
+            Settings
         );
-        TestContext.Current.TestOutputHelper?.WriteLine($"NumbersAsIList, of {Pairs} pairs of calls, {pairs}.");
-
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NumbersAsICollection_ManyCallsThroughThePool_AllocatesNoMoreThanByHand(bool open)
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task NumbersAsICollection_ThreeRowsThroughThePool_AllocatesNoMoreThanByHand(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
-        if (open)
-        {
-            await connection.OpenAsync(token);
-        }
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
 
         var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersAsICollection(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
@@ -277,30 +244,22 @@ public sealed class AllocationTests(SqlServerDatabases sqlServer)
             CountedNumbers
         );
 
-        var pairs = await CallAllocations.MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => connection.NumbersAsICollection(parameters, cancellationToken: token),
             () => NumbersAsListPooledByHandAsync(connection, parameters, cancellationToken: token),
-            WarmUpCalls,
-            Pairs
+            MarginInBytesPerCall,
+            Settings
         );
-        TestContext.Current.TestOutputHelper?.WriteLine($"NumbersAsICollection, of {Pairs} pairs of calls, {pairs}.");
-
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NumbersAsImmutableArray_ManyCallsThroughThePool_AllocatesNoMoreThanByHand(bool open)
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task NumbersAsImmutableArray_ThreeRowsThroughThePool_AllocatesNoMoreThanByHand(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
-        if (open)
-        {
-            await connection.OpenAsync(token);
-        }
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
 
         var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersAsImmutableArray(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
@@ -308,32 +267,22 @@ public sealed class AllocationTests(SqlServerDatabases sqlServer)
             CountedNumbers
         );
 
-        var pairs = await CallAllocations.MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => connection.NumbersAsImmutableArray(parameters, cancellationToken: token),
             () => NumbersAsImmutableArrayPooledByHandAsync(connection, parameters, cancellationToken: token),
-            WarmUpCalls,
-            Pairs
+            MarginInBytesPerCall,
+            Settings
         );
-        TestContext.Current.TestOutputHelper?.WriteLine(
-            $"NumbersAsImmutableArray, of {Pairs} pairs of calls, {pairs}."
-        );
-
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NumbersNoPoolAsList_ManyCalls_AllocatesNoMoreThanByHand(bool open)
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task NumbersNoPoolAsList_ThreeRows_AllocatesNoMoreThanByHand(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
-        if (open)
-        {
-            await connection.OpenAsync(token);
-        }
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
 
         var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersNoPoolAsList(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
@@ -341,30 +290,22 @@ public sealed class AllocationTests(SqlServerDatabases sqlServer)
             CountedNumbers
         );
 
-        var pairs = await CallAllocations.MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => connection.NumbersNoPoolAsList(parameters, cancellationToken: token),
             () => NumbersAsListUnpooledByHandAsync(connection, parameters, cancellationToken: token),
-            WarmUpCalls,
-            Pairs
+            MarginInBytesPerCall,
+            Settings
         );
-        TestContext.Current.TestOutputHelper?.WriteLine($"NumbersNoPoolAsList, of {Pairs} pairs of calls, {pairs}.");
-
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NumbersNoPoolAsIList_ManyCalls_AllocatesNoMoreThanByHand(bool open)
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task NumbersNoPoolAsIList_ThreeRows_AllocatesNoMoreThanByHand(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
-        if (open)
-        {
-            await connection.OpenAsync(token);
-        }
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
 
         var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersNoPoolAsIList(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
@@ -372,30 +313,22 @@ public sealed class AllocationTests(SqlServerDatabases sqlServer)
             CountedNumbers
         );
 
-        var pairs = await CallAllocations.MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => connection.NumbersNoPoolAsIList(parameters, cancellationToken: token),
             () => NumbersAsListUnpooledByHandAsync(connection, parameters, cancellationToken: token),
-            WarmUpCalls,
-            Pairs
+            MarginInBytesPerCall,
+            Settings
         );
-        TestContext.Current.TestOutputHelper?.WriteLine($"NumbersNoPoolAsIList, of {Pairs} pairs of calls, {pairs}.");
-
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NumbersNoPoolAsICollection_ManyCalls_AllocatesNoMoreThanByHand(bool open)
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task NumbersNoPoolAsICollection_ThreeRows_AllocatesNoMoreThanByHand(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
-        if (open)
-        {
-            await connection.OpenAsync(token);
-        }
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
 
         var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersNoPoolAsICollection(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
@@ -403,32 +336,22 @@ public sealed class AllocationTests(SqlServerDatabases sqlServer)
             CountedNumbers
         );
 
-        var pairs = await CallAllocations.MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => connection.NumbersNoPoolAsICollection(parameters, cancellationToken: token),
             () => NumbersAsListUnpooledByHandAsync(connection, parameters, cancellationToken: token),
-            WarmUpCalls,
-            Pairs
+            MarginInBytesPerCall,
+            Settings
         );
-        TestContext.Current.TestOutputHelper?.WriteLine(
-            $"NumbersNoPoolAsICollection, of {Pairs} pairs of calls, {pairs}."
-        );
-
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NumbersNoPoolAsImmutableArray_ManyCalls_AllocatesNoMoreThanByHand(bool open)
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task NumbersNoPoolAsImmutableArray_ThreeRows_AllocatesNoMoreThanByHand(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
-        if (open)
-        {
-            await connection.OpenAsync(token);
-        }
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
 
         var parameters = new NumbersCount(CountedRows);
         (await connection.NumbersNoPoolAsImmutableArray(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
@@ -436,19 +359,12 @@ public sealed class AllocationTests(SqlServerDatabases sqlServer)
             CountedNumbers
         );
 
-        var pairs = await CallAllocations.MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => connection.NumbersNoPoolAsImmutableArray(parameters, cancellationToken: token),
             () => NumbersAsImmutableArrayUnpooledByHandAsync(connection, parameters, cancellationToken: token),
-            WarmUpCalls,
-            Pairs
+            MarginInBytesPerCall,
+            Settings
         );
-        TestContext.Current.TestOutputHelper?.WriteLine(
-            $"NumbersNoPoolAsImmutableArray, of {Pairs} pairs of calls, {pairs}."
-        );
-
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     // Many rows, where the pool matters: a list that grows by doubling to hold 300 rows allocates growth arrays of 4 to
@@ -456,82 +372,63 @@ public sealed class AllocationTests(SqlServerDatabases sqlServer)
     // 300 rows and the final array alone.  So the generated method allocates less than the hand-written one, by about
     // the list's growth arrays.
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NumbersAsArray_ManyCallsOfAFewHundredRows_AllocatesLessThanAListCopiedToAnArray(bool open)
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task NumbersAsArray_AFewHundredRows_AllocatesLessThanAListCopiedToAnArray(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
-        if (open)
-        {
-            await connection.OpenAsync(token);
-        }
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
 
         var parameters = new NumbersCount(FewHundredRows);
         var expected = Enumerable.Range(1, FewHundredRows).Select(n => new CountedNumber(n)).ToArray();
         (await connection.NumbersAsArray(parameters, cancellationToken: token)).ShouldBe(expected);
         (await NumbersAsArrayUnpooledByHandAsync(connection, parameters, cancellationToken: token)).ShouldBe(expected);
 
-        var pairs = await CallAllocations.MeasureAsync(
+        await Allocations.ShouldSaveAtLeastAsync(
             () => connection.NumbersAsArray(parameters, cancellationToken: token),
             () => NumbersAsArrayUnpooledByHandAsync(connection, parameters, cancellationToken: token),
-            WarmUpCalls,
-            Pairs
+            LeastSavingInBytesPerCall,
+            Settings
         );
-        TestContext.Current.TestOutputHelper?.WriteLine($"NumbersAsArray, of {Pairs} pairs of calls, {pairs}.");
-
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-LeastSavingInBytesPerCall);
     }
 
     // Many rows, for the list: the pooled NumbersAsList rents its buffers and copies the rows into a List of the exact
     // size, so it allocates that list and its array of 300 elements.  A List that grows by doubling to hold the rows,
     // returned as it is, allocates growth arrays of 4 to 512 elements and ends with the array of 512.
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NumbersAsList_ManyCallsOfAFewHundredRows_AllocatesLessThanAGrownList(bool open)
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task NumbersAsList_AFewHundredRows_AllocatesLessThanAGrownList(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
-        if (open)
-        {
-            await connection.OpenAsync(token);
-        }
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
 
         var parameters = new NumbersCount(FewHundredRows);
         var expected = Enumerable.Range(1, FewHundredRows).Select(n => new CountedNumber(n)).ToArray();
         (await connection.NumbersAsList(parameters, cancellationToken: token)).ShouldBe(expected);
         (await NumbersAsListUnpooledByHandAsync(connection, parameters, cancellationToken: token)).ShouldBe(expected);
 
-        var pairs = await CallAllocations.MeasureAsync(
+        await Allocations.ShouldSaveAtLeastAsync(
             () => connection.NumbersAsList(parameters, cancellationToken: token),
             () => NumbersAsListUnpooledByHandAsync(connection, parameters, cancellationToken: token),
-            WarmUpCalls,
-            Pairs
+            LeastListSavingInBytesPerCall,
+            Settings
         );
-        TestContext.Current.TestOutputHelper?.WriteLine($"NumbersAsList, of {Pairs} pairs of calls, {pairs}.");
-
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-LeastListSavingInBytesPerCall);
     }
 
     // Many rows, for the immutable array: the pooled NumbersAsImmutableArray rents its buffers and wraps the exact
     // array of 300 elements that it copies the rows into, and a builder that is drained grows through arrays of 16 to
     // 512 elements, then copies the rows into an array of the exact size.
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NumbersAsImmutableArray_ManyCallsOfAFewHundredRows_AllocatesLessThanABuilder(bool open)
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task NumbersAsImmutableArray_AFewHundredRows_AllocatesLessThanABuilder(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
-        if (open)
-        {
-            await connection.OpenAsync(token);
-        }
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
 
         var parameters = new NumbersCount(FewHundredRows);
         var expected = Enumerable.Range(1, FewHundredRows).Select(n => new CountedNumber(n)).ToArray();
@@ -540,42 +437,32 @@ public sealed class AllocationTests(SqlServerDatabases sqlServer)
             expected
         );
 
-        var pairs = await CallAllocations.MeasureAsync(
+        await Allocations.ShouldSaveAtLeastAsync(
             () => connection.NumbersAsImmutableArray(parameters, cancellationToken: token),
             () => NumbersAsImmutableArrayUnpooledByHandAsync(connection, parameters, cancellationToken: token),
-            WarmUpCalls,
-            Pairs
+            LeastImmutableArraySavingInBytesPerCall,
+            Settings
         );
-        TestContext.Current.TestOutputHelper?.WriteLine(
-            $"NumbersAsImmutableArray, of {Pairs} pairs of calls, {pairs}."
-        );
-
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-LeastImmutableArraySavingInBytesPerCall);
     }
 
     // The streaming method returns an iterator and yields each row as the reader reads it, with no buffer, so a call is
     // the method, its iterator and the enumeration to the end, which both sides do: the hand-written iterator makes the
     // calls that the generated one does, so what the generated method allocates beyond it is its own state.
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task StreamAccounts_ManyCalls_AllocatesNoMoreThanByHand(bool open)
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task StreamAccounts_ToTheEnd_AllocatesNoMoreThanByHand(ConnectionState state)
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = EndToEndSources.App(sqlServer);
-        if (open)
-        {
-            await connection.OpenAsync(token);
-        }
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
 
         (await connection.StreamAccounts(cancellationToken: token).ToListAsync(token)).ShouldBe(CollectedAccounts);
         (await StreamAccountsByHand(connection, cancellationToken: token).ToListAsync(token)).ShouldBe(
             CollectedAccounts
         );
 
-        var pairs = await CallAllocations.MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             async () =>
             {
                 var sum = 0;
@@ -598,14 +485,9 @@ public sealed class AllocationTests(SqlServerDatabases sqlServer)
 
                 return sum;
             },
-            WarmUpCalls,
-            Pairs
+            MarginInBytesPerCall,
+            Settings
         );
-        TestContext.Current.TestOutputHelper?.WriteLine($"StreamAccounts, of {Pairs} pairs of calls, {pairs}.");
-
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.Generated.Bytes.ShouldBeGreaterThan(LeastBytesPerCall);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     // SearchAccounts by hand: the arguments of the generated method, and its calls, the rows into RowBufferByHand.

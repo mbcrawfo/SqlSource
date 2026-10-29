@@ -16,6 +16,7 @@ internal sealed class RealisticCorpus
     private RealisticCorpus(string project, string engine, EngineImage image)
     {
         Project = project;
+        Image = image;
         Engine = new RealisticEngine(engine, image.Product, image.RecordedMajors);
     }
 
@@ -28,6 +29,10 @@ internal sealed class RealisticCorpus
     // The engine, whose recorded majors a checkedFrom names one of.  It needs no repository, so that a test of a case
     // that reads no file can build on it.
     public RealisticEngine Engine { get; }
+
+    // The image the corpus was made from, which the describer's checks skip through: on a server whose major is not
+    // recorded, what a test pins is not known.
+    public EngineImage Image { get; }
 
     // The folder of the engine's project under tests/DatabaseTests/, which holds the corpus in Realistic/.
     public string Project { get; }

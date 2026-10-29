@@ -42,6 +42,7 @@ public sealed class TestScopesFileTests
     [InlineData("tests/SqlSource.Tool.Tests/SqlSource.Tool.Tests.csproj", nameof(TestScope.None))]
     [InlineData("tests/DatabaseTests/Postgres/Postgres.csproj", nameof(TestScope.Postgres))]
     [InlineData("tests/DatabaseTests/Postgres.Npgsql8/AppContainer.cs", nameof(TestScope.Postgres))]
+    [InlineData("tests/DatabaseTests/QueryMethodAllocation/QueryMethodAllocation.csproj", nameof(TestScope.None))]
     [InlineData("tests/DatabaseTests/Directory.Build.props", nameof(TestScope.Both))]
     [InlineData("tests/DatabaseTests/README.md", nameof(TestScope.None))]
     [InlineData("tests/DatabaseTests/TestHarness/EngineImage.cs", nameof(TestScope.Both))]

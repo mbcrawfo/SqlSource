@@ -15,6 +15,7 @@
 - **Every test takes its data source from `EndToEndSources`**, and a test that writes runs in a transaction that is rolled back.
 - **A test that must show that a commit succeeds commits only into a temporary table of its own connection**, as the transaction test of `EndToEnd/StreamingQueryTests.cs` does, since a rollback cannot show that the transaction was not aborted.
 - **`EndToEnd/ErrorPaths/` is a fixture project that the test project never compiles or describes**: the `.csproj` removes it from `Compile`, `AdditionalFiles` and `None` and copies it to the output as `Fixtures/Projects/ErrorPaths/`.
+- **`RowBufferQueryTests` is the eight generated methods and their twins handed to `RowBufferReads`** of `tests/DatabaseTests/TestHarness`, which holds the body, so a check of what every collection type returns goes there.
 
 ## `all_types` and the recipe
 
@@ -22,12 +23,5 @@
 - **A type added to the map adds its key to `MapWritten` or `MapLeftOut` of `EndToEnd/ModelShapeTests.cs`.**
 - **A change to `WriteSideLeftOut` changes the list of parameters Dapper cannot send in `docs/manual/recipes.md#dapper-with-postgresql`.**
 - **`EndToEnd/DapperRecipeTests.cs` writes each of its columns by the recipe's remedy and proves the rest of that recipe**, and `EndToEnd/Types/TypedParameter.cs` and `EndToEnd/Types/EmailHandler.cs` are the same code as its samples, in this repository's layout: a change to one changes the other.
-
-## Allocations
-
-- **`AllocationTests.cs` holds each generated method to a hand-written one that makes the same calls**, within a margin.  A change to the calls a method makes changes the hand-written method with it, never the margin.
-- **The streaming `StreamAccounts` has an allocation pair of its own**, against a hand-written static local async iterator, within the same margin.
-- **A pooled result member that copies its rows out needs a test against a hand-written baseline of its own**, as `ToArray`, `ToList` and `ToImmutableArray` have, since the pairs against `RowBufferByHand` cannot see what the buffer costs.  Each `Least*SavingInBytesPerCall` is set from a measure, raised when the pool saves more, and never lowered to make a change pass.
-- **It measures through `CallAllocations` of `tests/DatabaseTests/TestHarness`**, by the commonest difference of pairs of calls, never by a total, a median of blocks or the least of the calls ([why](../../TestHarness/EndToEnd/CallAllocations.cs)).
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

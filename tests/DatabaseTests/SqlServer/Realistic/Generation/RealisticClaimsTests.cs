@@ -1,6 +1,3 @@
-using System.IO;
-using System.Linq;
-using Shouldly;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
@@ -10,60 +7,31 @@ namespace SqlSource.DatabaseTests.SqlServer.Realistic.Generation;
 // exactly one at Models, in the first, and one at CodeGen, in the second, a case refused by the describer or the
 // generator has none, and a claim names a folder of Cases.  So a case added to one file and not the other, a case
 // added without its classes, or a case that comes to be refused or stops being so, fails naming itself.  It reads
-// the source and needs no server; the reading of a claim is tested in tests/SqlSource.Tool.Tests/Realistic.
+// the source and needs no server, and its bodies are the checks of
+// tests/SqlSource.Tool.Testing/Realistic; the reading of a claim is tested in tests/SqlSource.Tool.Tests/Realistic.
 public sealed class RealisticClaimsTests
 {
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
-    public void All_Claims_AreTheCasesWithModelsOnceAtEachOutput(string name)
-    {
-        var found = RealisticCases.Corpus.ReadNamed(name);
-        var claims = RealisticClaims.AllOf(RealisticCases.Corpus).Where(claim => claim.Case == name).ToList();
+    public void All_Claims_AreTheCasesWithModelsOnceAtEachOutput(string name) =>
+        RealisticClaimChecks.ShouldBeTheCasesWithModelsOnceAtEachOutput(RealisticCases.Corpus, name);
 
-        var atModels = claims.Count(claim => claim.Output == RealisticClaims.ModelsOutput);
-        var atCodeGen = claims.Count(claim => claim.Output == RealisticClaims.CodeGenOutput);
-
-        var expected = found.HasModels ? 1 : 0;
-        atModels.ShouldBe(
-            expected,
-            RealisticClaims.ClaimedBy(RealisticCases.Corpus, found, RealisticClaims.ModelsOutput, atModels)
+    [Fact]
+    public void Of_CaseWithModels_IsItsClassAtEachOutput() =>
+        RealisticClaimChecks.ShouldBeItsClassAtEachOutput(
+            RealisticCases.Corpus,
+            "category-tree-recursive",
+            "CategoryTreeRecursiveQuery",
+            "CategoryTreeRecursiveMethod"
         );
-        atCodeGen.ShouldBe(
-            expected,
-            RealisticClaims.ClaimedBy(RealisticCases.Corpus, found, RealisticClaims.CodeGenOutput, atCodeGen)
-        );
-        claims.Count.ShouldBe(2 * expected, $"{found} is claimed at an output other than Models and CodeGen");
-    }
 
     [Fact]
-    public void Of_CaseWithModels_IsItsClassAtEachOutput()
-    {
-        var found = RealisticCases.Corpus.ReadNamed("category-tree-recursive");
-
-        RealisticClaims
-            .Of(RealisticCases.Corpus, found, RealisticClaims.ModelsOutput)
-            .TypeName.ShouldBe("CategoryTreeRecursiveQuery");
-        RealisticClaims
-            .Of(RealisticCases.Corpus, found, RealisticClaims.CodeGenOutput)
-            .TypeName.ShouldBe("CategoryTreeRecursiveMethod");
-    }
+    public void Queries_EveryClaim_IsAtModels() => RealisticClaimChecks.ShouldAllBeAtModels(RealisticCases.Corpus);
 
     [Fact]
-    public void Queries_EveryClaim_IsAtModels() =>
-        RealisticClaims
-            .Parse(File.ReadAllText(RealisticCases.Corpus.Queries))
-            .ShouldAllBe(claim => claim.Output == RealisticClaims.ModelsOutput);
-
-    [Fact]
-    public void Methods_EveryClaim_IsAtCodeGen() =>
-        RealisticClaims
-            .Parse(File.ReadAllText(RealisticCases.Corpus.Methods))
-            .ShouldAllBe(claim => claim.Output == RealisticClaims.CodeGenOutput);
+    public void Methods_EveryClaim_IsAtCodeGen() => RealisticClaimChecks.ShouldAllBeAtCodeGen(RealisticCases.Corpus);
 
     [Fact]
     public void All_Claims_NameOnlyCasesThatExist() =>
-        RealisticClaims
-            .AllOf(RealisticCases.Corpus)
-            .Select(static claim => claim.Case)
-            .ShouldBeSubsetOf(RealisticCases.Corpus.Names);
+        RealisticClaimChecks.ShouldNameOnlyCasesThatExist(RealisticCases.Corpus);
 }

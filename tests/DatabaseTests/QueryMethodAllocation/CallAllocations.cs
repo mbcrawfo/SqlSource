@@ -4,12 +4,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace SqlSource.DatabaseTests.TestHarness.EndToEnd;
+namespace SqlSource.DatabaseTests.QueryMethodAllocation;
 
 // The bytes that a call of a generated method allocates beyond a call of a hand-written method of the same query, for
-// the allocation tests of both end-to-end projects.  The calls are made in pairs, one of each method, one right after
-// the other, each measured on its own, and what the generated method allocates beyond the hand-written one is the
-// commonest difference of a pair.
+// the allocation tests of both engines.  The calls are made in pairs, one of each method, one right after the other,
+// each measured on its own, and what the generated method allocates beyond the hand-written one is the commonest
+// difference of a pair.
 //
 // A call allocates its method's own objects, and then more that it does not choose, by the path the driver takes:
 // SqlClient allocates 48 or 296 bytes more on some calls, and Npgsql takes one of a few paths up to some hundreds of
@@ -30,7 +30,7 @@ namespace SqlSource.DatabaseTests.TestHarness.EndToEnd;
 // allocates in the process it measures, some 4.4 to 4.7 KB on a fifth of the calls here and on half of them on a busy
 // runner in CI, where the calls that bear it alternate, so that the pairs that differ by it outnumber those that do
 // not, and the commonest difference became the collector's bytes and failed the tests at random.  So a measure skips
-// under coverage, or any other profiler, and CI runs the allocation tests in a step of their own without it.
+// under coverage, or any other profiler, and the nightly jobs that run the allocation tests run them without it.
 internal static class CallAllocations
 {
     // The variables a coverage collector or a profiler sets in the process it measures: CODE_COVERAGE_SESSION_NAME of

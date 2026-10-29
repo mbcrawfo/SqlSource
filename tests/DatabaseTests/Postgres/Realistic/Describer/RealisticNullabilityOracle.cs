@@ -1,17 +1,13 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.Realistic.Describer;
-
-// What the server returned for a case's query over the seed: the names of its columns, whether each held a NULL in
-// any row, and how many rows there were.
-internal sealed record NullabilityRun(IReadOnlyList<string> Names, IReadOnlyList<bool> SawNull, int Rows);
 
 // The oracle of the describer's nullability: executes a case's query over the seed, independent of what the describer
 // recorded of it, and says which columns held a NULL.

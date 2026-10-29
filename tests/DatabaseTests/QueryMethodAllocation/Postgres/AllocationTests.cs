@@ -10,10 +10,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
-using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 
-namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
+namespace SqlSource.DatabaseTests.QueryMethodAllocation.Postgres;
 
 // A generated method allocates no more for each call than a hand-written ADO.NET method of the same calls, written as
 // the manual's recipe for your own code writes one and as a careful developer would: it honours the same contract,
@@ -23,7 +22,7 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // both sides; and it reads each column by its ordinal with GetFieldValue into the same model, and the rows into an
 // array, the collection the method returns, through what the generated method reads them into.  So each query has two
 // pairs: its method of AccountQueries, which reads its rows into the pooled buffer, against a hand-written method that
-// reads them into RowBufferByHand of tests/DatabaseTests/TestHarness, the same buffer by hand; and its method of
+// reads them into RowBufferByHand of this project, the same buffer by hand; and its method of
 // UnpooledAccountQueries, the same query under no-array-pool, which reads them into a List and copies it, against a
 // hand-written method that does the same.  The numbers queries of RowBufferQueries have a pair of each kind for the
 // List, IList, ICollection and ImmutableArray, at 3 rows: the pooled method against rows read into RowBufferByHand and
@@ -40,11 +39,12 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // source, with the same token, and ConfigureAwait(false) on each await.  The two are compared by the commonest
 // difference of pairs of calls, one of each method, which CallAllocations explains.  GC.GetTotalAllocatedBytes counts
 // every thread, since an awaited continuation runs where the driver completes it, so the class is in
-// MeasuresAllocations, which runs alone on a container of its own.  That keeps other tests out of the count, but not
-// the process's own background work, which the commonest difference leaves out, and the class skips under coverage,
-// whose collector allocates in the process too often for it to leave out.
-[Collection(MeasuresAllocations.Name)]
-public sealed class AllocationTests(PostgresDatabases postgres)
+// the collection MeasuresPostgres, which runs alone on a container of its own, and the assembly runs no two tests at
+// once.  That keeps other tests out of the count, but not the process's own background work, which the commonest
+// difference leaves out, and the class skips under coverage, whose collector allocates in the process too often for it
+// to leave out.
+[Collection(MeasuresPostgres.Name)]
+public sealed class AllocationTests(PostgresApp postgres)
 {
     // The bytes for each call that the generated method may allocate beyond the hand-written one, by the commonest
     // difference of a pair of calls, the same for every pair.  A call of the accounts queries allocated about 1.6 to
@@ -131,297 +131,308 @@ public sealed class AllocationTests(PostgresDatabases postgres)
         new(3, "carol", null),
     ];
 
+    // Each side must allocate something, or the measure is not of the call at all.
+    private const long LeastBytesPerCall = 0;
+
+    // The margin, the counts and the Least...Saving constants were measured on an open connection alone, so a closed
+    // one would add rows that nothing has measured.
+    private const ConnectionState State = ConnectionState.Open;
+
+    private static readonly MeasureSettings Settings = new(WarmUpCalls, Pairs, LeastBytesPerCall);
+
     [Fact]
-    public async Task GetAccountName_PerCallThroughThePool_AllocatesNoMoreThanHandWritten()
+    public async Task GetAccountName_ThroughThePool_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         var parameters = new GetAccountNameArgs(1);
         (await connection.GetAccountName(parameters, cancellationToken: token)).ShouldBe([new AccountName(1, "alice")]);
-        (await GetAccountNamePooledByHand(connection, 1, cancellationToken: token)).ShouldBe([
+        (await GetAccountNamePooledByHandAsync(connection, 1, cancellationToken: token)).ShouldBe([
             new AccountName(1, "alice"),
         ]);
 
-        var pairs = await MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => connection.GetAccountName(parameters, cancellationToken: token),
-            () => GetAccountNamePooledByHand(connection, 1, cancellationToken: token)
+            () => GetAccountNamePooledByHandAsync(connection, 1, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
         );
-
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     [Fact]
-    public async Task GetAccountName_PerCallUnderNoArrayPool_AllocatesNoMoreThanHandWritten()
+    public async Task GetAccountName_UnderNoArrayPool_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         var parameters = new GetAccountNameArgs(1);
         (await UnpooledAccountQueries.GetAccountName(connection, parameters, cancellationToken: token)).ShouldBe([
             new AccountName(1, "alice"),
         ]);
-        (await GetAccountNameUnpooledByHand(connection, 1, cancellationToken: token)).ShouldBe([
+        (await GetAccountNameUnpooledByHandAsync(connection, 1, cancellationToken: token)).ShouldBe([
             new AccountName(1, "alice"),
         ]);
 
-        var pairs = await MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => UnpooledAccountQueries.GetAccountName(connection, parameters, cancellationToken: token),
-            () => GetAccountNameUnpooledByHand(connection, 1, cancellationToken: token)
+            () => GetAccountNameUnpooledByHandAsync(connection, 1, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
         );
-
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     [Fact]
-    public async Task ListAccounts_PerCallThroughThePool_AllocatesNoMoreThanHandWritten()
+    public async Task ListAccounts_ThroughThePool_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         var accounts = await connection.ListAccounts(cancellationToken: token);
         accounts.Count.ShouldBe(3);
-        (await ListAccountsPooledByHand(connection, cancellationToken: token)).ShouldBe(accounts);
+        (await ListAccountsPooledByHandAsync(connection, cancellationToken: token)).ShouldBe(accounts);
 
-        var pairs = await MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => connection.ListAccounts(cancellationToken: token),
-            () => ListAccountsPooledByHand(connection, cancellationToken: token)
+            () => ListAccountsPooledByHandAsync(connection, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
         );
-
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     [Fact]
-    public async Task ListAccounts_PerCallUnderNoArrayPool_AllocatesNoMoreThanHandWritten()
+    public async Task ListAccounts_UnderNoArrayPool_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         var accounts = await UnpooledAccountQueries.ListAccounts(connection, cancellationToken: token);
         accounts.Count.ShouldBe(3);
-        (await ListAccountsUnpooledByHand(connection, cancellationToken: token)).ShouldBe(accounts);
+        (await ListAccountsUnpooledByHandAsync(connection, cancellationToken: token)).ShouldBe(accounts);
 
-        var pairs = await MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => UnpooledAccountQueries.ListAccounts(connection, cancellationToken: token),
-            () => ListAccountsUnpooledByHand(connection, cancellationToken: token)
+            () => ListAccountsUnpooledByHandAsync(connection, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
         );
-
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     // A query with a parameter and a few rows.
     [Fact]
-    public async Task ListClosedBefore_PerCallThroughThePool_AllocatesNoMoreThanHandWritten()
+    public async Task ListClosedBefore_ThroughThePool_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         var parameters = new ListClosedBeforeArgs(null);
         (await connection.ListClosedBefore(parameters, cancellationToken: token)).ShouldBe(ClosedBeforeRows);
-        (await ListClosedBeforePooledByHand(connection, null, cancellationToken: token)).ShouldBe(ClosedBeforeRows);
-
-        var pairs = await MeasureAsync(
-            () => connection.ListClosedBefore(parameters, cancellationToken: token),
-            () => ListClosedBeforePooledByHand(connection, null, cancellationToken: token)
+        (await ListClosedBeforePooledByHandAsync(connection, null, cancellationToken: token)).ShouldBe(
+            ClosedBeforeRows
         );
 
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
+            () => connection.ListClosedBefore(parameters, cancellationToken: token),
+            () => ListClosedBeforePooledByHandAsync(connection, null, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
+        );
     }
 
     [Fact]
-    public async Task ListClosedBefore_PerCallUnderNoArrayPool_AllocatesNoMoreThanHandWritten()
+    public async Task ListClosedBefore_UnderNoArrayPool_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         var parameters = new ListClosedBeforeArgs(null);
         (await UnpooledAccountQueries.ListClosedBefore(connection, parameters, cancellationToken: token)).ShouldBe(
             ClosedBeforeRows
         );
-        (await ListClosedBeforeUnpooledByHand(connection, null, cancellationToken: token)).ShouldBe(ClosedBeforeRows);
-
-        var pairs = await MeasureAsync(
-            () => UnpooledAccountQueries.ListClosedBefore(connection, parameters, cancellationToken: token),
-            () => ListClosedBeforeUnpooledByHand(connection, null, cancellationToken: token)
+        (await ListClosedBeforeUnpooledByHandAsync(connection, null, cancellationToken: token)).ShouldBe(
+            ClosedBeforeRows
         );
 
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
+            () => UnpooledAccountQueries.ListClosedBefore(connection, parameters, cancellationToken: token),
+            () => ListClosedBeforeUnpooledByHandAsync(connection, null, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
+        );
     }
 
     [Fact]
-    public async Task NumbersAsList_PerCallThroughThePool_AllocatesNoMoreThanHandWritten()
+    public async Task NumbersAsList_ThreeRowsThroughThePool_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         var parameters = new NumbersAsListArgs(CountedRows);
         (await connection.NumbersAsList(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsListPooledByHand(connection, CountedRows, cancellationToken: token)).ShouldBe(CountedNumbers);
-
-        var pairs = await MeasureAsync(
-            () => connection.NumbersAsList(parameters, cancellationToken: token),
-            () => NumbersAsListPooledByHand(connection, CountedRows, cancellationToken: token)
+        (await NumbersAsListPooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
+            CountedNumbers
         );
 
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
+            () => connection.NumbersAsList(parameters, cancellationToken: token),
+            () => NumbersAsListPooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
+        );
     }
 
     [Fact]
-    public async Task NumbersAsIList_PerCallThroughThePool_AllocatesNoMoreThanHandWritten()
+    public async Task NumbersAsIList_ThreeRowsThroughThePool_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         var parameters = new NumbersAsIListArgs(CountedRows);
         (await connection.NumbersAsIList(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsListPooledByHand(connection, CountedRows, cancellationToken: token)).ShouldBe(CountedNumbers);
-
-        var pairs = await MeasureAsync(
-            () => connection.NumbersAsIList(parameters, cancellationToken: token),
-            () => NumbersAsListPooledByHand(connection, CountedRows, cancellationToken: token)
+        (await NumbersAsListPooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
+            CountedNumbers
         );
 
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
+            () => connection.NumbersAsIList(parameters, cancellationToken: token),
+            () => NumbersAsListPooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
+        );
     }
 
     [Fact]
-    public async Task NumbersAsICollection_PerCallThroughThePool_AllocatesNoMoreThanHandWritten()
+    public async Task NumbersAsICollection_ThreeRowsThroughThePool_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         var parameters = new NumbersAsICollectionArgs(CountedRows);
         (await connection.NumbersAsICollection(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsListPooledByHand(connection, CountedRows, cancellationToken: token)).ShouldBe(CountedNumbers);
-
-        var pairs = await MeasureAsync(
-            () => connection.NumbersAsICollection(parameters, cancellationToken: token),
-            () => NumbersAsListPooledByHand(connection, CountedRows, cancellationToken: token)
+        (await NumbersAsListPooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
+            CountedNumbers
         );
 
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
+            () => connection.NumbersAsICollection(parameters, cancellationToken: token),
+            () => NumbersAsListPooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
+        );
     }
 
     [Fact]
-    public async Task NumbersAsImmutableArray_PerCallThroughThePool_AllocatesNoMoreThanHandWritten()
+    public async Task NumbersAsImmutableArray_ThreeRowsThroughThePool_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         var parameters = new NumbersAsImmutableArrayArgs(CountedRows);
         (await connection.NumbersAsImmutableArray(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsImmutableArrayPooledByHand(connection, CountedRows, cancellationToken: token)).ShouldBe(
+        (await NumbersAsImmutableArrayPooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
             CountedNumbers
         );
 
-        var pairs = await MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             () => connection.NumbersAsImmutableArray(parameters, cancellationToken: token),
-            () => NumbersAsImmutableArrayPooledByHand(connection, CountedRows, cancellationToken: token)
+            () => NumbersAsImmutableArrayPooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
         );
-
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
     }
 
     [Fact]
-    public async Task NumbersNoPoolAsList_PerCall_AllocatesNoMoreThanHandWritten()
+    public async Task NumbersNoPoolAsList_ThreeRows_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         var parameters = new NumbersNoPoolAsListArgs(CountedRows);
         (await connection.NumbersNoPoolAsList(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsListUnpooledByHand(connection, CountedRows, cancellationToken: token)).ShouldBe(CountedNumbers);
-
-        var pairs = await MeasureAsync(
-            () => connection.NumbersNoPoolAsList(parameters, cancellationToken: token),
-            () => NumbersAsListUnpooledByHand(connection, CountedRows, cancellationToken: token)
-        );
-
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
-    }
-
-    [Fact]
-    public async Task NumbersNoPoolAsIList_PerCall_AllocatesNoMoreThanHandWritten()
-    {
-        var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
-        var parameters = new NumbersNoPoolAsIListArgs(CountedRows);
-        (await connection.NumbersNoPoolAsIList(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsListUnpooledByHand(connection, CountedRows, cancellationToken: token)).ShouldBe(CountedNumbers);
-
-        var pairs = await MeasureAsync(
-            () => connection.NumbersNoPoolAsIList(parameters, cancellationToken: token),
-            () => NumbersAsListUnpooledByHand(connection, CountedRows, cancellationToken: token)
-        );
-
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
-    }
-
-    [Fact]
-    public async Task NumbersNoPoolAsICollection_PerCall_AllocatesNoMoreThanHandWritten()
-    {
-        var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
-        var parameters = new NumbersNoPoolAsICollectionArgs(CountedRows);
-        (await connection.NumbersNoPoolAsICollection(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsListUnpooledByHand(connection, CountedRows, cancellationToken: token)).ShouldBe(CountedNumbers);
-
-        var pairs = await MeasureAsync(
-            () => connection.NumbersNoPoolAsICollection(parameters, cancellationToken: token),
-            () => NumbersAsListUnpooledByHand(connection, CountedRows, cancellationToken: token)
-        );
-
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
-    }
-
-    [Fact]
-    public async Task NumbersNoPoolAsImmutableArray_PerCall_AllocatesNoMoreThanHandWritten()
-    {
-        var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
-        var parameters = new NumbersNoPoolAsImmutableArrayArgs(CountedRows);
-        (await connection.NumbersNoPoolAsImmutableArray(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
-        (await NumbersAsImmutableArrayUnpooledByHand(connection, CountedRows, cancellationToken: token)).ShouldBe(
+        (await NumbersAsListUnpooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
             CountedNumbers
         );
 
-        var pairs = await MeasureAsync(
-            () => connection.NumbersNoPoolAsImmutableArray(parameters, cancellationToken: token),
-            () => NumbersAsImmutableArrayUnpooledByHand(connection, CountedRows, cancellationToken: token)
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
+            () => connection.NumbersNoPoolAsList(parameters, cancellationToken: token),
+            () => NumbersAsListUnpooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
+        );
+    }
+
+    [Fact]
+    public async Task NumbersNoPoolAsIList_ThreeRows_AllocatesNoMoreThanByHand()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
+        var parameters = new NumbersNoPoolAsIListArgs(CountedRows);
+        (await connection.NumbersNoPoolAsIList(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
+        (await NumbersAsListUnpooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
+            CountedNumbers
         );
 
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
+            () => connection.NumbersNoPoolAsIList(parameters, cancellationToken: token),
+            () => NumbersAsListUnpooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
+        );
+    }
+
+    [Fact]
+    public async Task NumbersNoPoolAsICollection_ThreeRows_AllocatesNoMoreThanByHand()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
+        var parameters = new NumbersNoPoolAsICollectionArgs(CountedRows);
+        (await connection.NumbersNoPoolAsICollection(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
+        (await NumbersAsListUnpooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
+            CountedNumbers
+        );
+
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
+            () => connection.NumbersNoPoolAsICollection(parameters, cancellationToken: token),
+            () => NumbersAsListUnpooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
+        );
+    }
+
+    [Fact]
+    public async Task NumbersNoPoolAsImmutableArray_ThreeRows_AllocatesNoMoreThanByHand()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
+        var parameters = new NumbersNoPoolAsImmutableArrayArgs(CountedRows);
+        (await connection.NumbersNoPoolAsImmutableArray(parameters, cancellationToken: token)).ShouldBe(CountedNumbers);
+        (await NumbersAsImmutableArrayUnpooledByHandAsync(connection, CountedRows, cancellationToken: token)).ShouldBe(
+            CountedNumbers
+        );
+
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
+            () => connection.NumbersNoPoolAsImmutableArray(parameters, cancellationToken: token),
+            () => NumbersAsImmutableArrayUnpooledByHandAsync(connection, CountedRows, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
+        );
     }
 
     // Many rows, where the pool matters: a list that grows by doubling to hold 300 rows allocates growth arrays of 4 to
@@ -429,89 +440,91 @@ public sealed class AllocationTests(PostgresDatabases postgres)
     // 300 rows and the final array alone.  So the generated method allocates less than the hand-written one, by about
     // the list's growth arrays.
     [Fact]
-    public async Task NumbersAsArray_PerCallOfAFewHundredRows_AllocatesLessThanAListCopiedToAnArray()
+    public async Task NumbersAsArray_AFewHundredRows_AllocatesLessThanAListCopiedToAnArray()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         var parameters = new NumbersAsArrayArgs(FewHundredRows);
         var expected = Enumerable.Range(1, FewHundredRows).Select(n => new CountedNumber(n)).ToArray();
         (await connection.NumbersAsArray(parameters, cancellationToken: token)).ShouldBe(expected);
-        (await NumbersAsArrayUnpooledByHand(connection, FewHundredRows, cancellationToken: token)).ShouldBe(expected);
-
-        var pairs = await MeasureAsync(
-            () => connection.NumbersAsArray(parameters, cancellationToken: token),
-            () => NumbersAsArrayUnpooledByHand(connection, FewHundredRows, cancellationToken: token)
+        (await NumbersAsArrayUnpooledByHandAsync(connection, FewHundredRows, cancellationToken: token)).ShouldBe(
+            expected
         );
 
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-LeastSavingInBytesPerCall);
+        await Allocations.ShouldSaveAtLeastAsync(
+            () => connection.NumbersAsArray(parameters, cancellationToken: token),
+            () => NumbersAsArrayUnpooledByHandAsync(connection, FewHundredRows, cancellationToken: token),
+            LeastSavingInBytesPerCall,
+            Settings
+        );
     }
 
     // Many rows, for the list: the pooled NumbersAsList rents its buffers and copies the rows into a List of the exact
     // size, so it allocates that list and its array of 300 elements.  A List that grows by doubling to hold the rows,
     // returned as it is, allocates growth arrays of 4 to 512 elements and ends with the array of 512.
     [Fact]
-    public async Task NumbersAsList_PerCallOfAFewHundredRows_AllocatesLessThanAGrownList()
+    public async Task NumbersAsList_AFewHundredRows_AllocatesLessThanAGrownList()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         var parameters = new NumbersAsListArgs(FewHundredRows);
         var expected = Enumerable.Range(1, FewHundredRows).Select(n => new CountedNumber(n)).ToArray();
         (await connection.NumbersAsList(parameters, cancellationToken: token)).ShouldBe(expected);
-        (await NumbersAsListUnpooledByHand(connection, FewHundredRows, cancellationToken: token)).ShouldBe(expected);
-
-        var pairs = await MeasureAsync(
-            () => connection.NumbersAsList(parameters, cancellationToken: token),
-            () => NumbersAsListUnpooledByHand(connection, FewHundredRows, cancellationToken: token)
+        (await NumbersAsListUnpooledByHandAsync(connection, FewHundredRows, cancellationToken: token)).ShouldBe(
+            expected
         );
 
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-LeastListSavingInBytesPerCall);
+        await Allocations.ShouldSaveAtLeastAsync(
+            () => connection.NumbersAsList(parameters, cancellationToken: token),
+            () => NumbersAsListUnpooledByHandAsync(connection, FewHundredRows, cancellationToken: token),
+            LeastListSavingInBytesPerCall,
+            Settings
+        );
     }
 
     // Many rows, for the immutable array: the pooled NumbersAsImmutableArray rents its buffers and wraps the exact
     // array of 300 elements that it copies the rows into, and a builder that is drained grows through arrays of 16 to
     // 512 elements, then copies the rows into an array of the exact size.
     [Fact]
-    public async Task NumbersAsImmutableArray_PerCallOfAFewHundredRows_AllocatesLessThanABuilder()
+    public async Task NumbersAsImmutableArray_AFewHundredRows_AllocatesLessThanABuilder()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         var parameters = new NumbersAsImmutableArrayArgs(FewHundredRows);
         var expected = Enumerable.Range(1, FewHundredRows).Select(n => new CountedNumber(n)).ToArray();
         (await connection.NumbersAsImmutableArray(parameters, cancellationToken: token)).ShouldBe(expected);
-        (await NumbersAsImmutableArrayUnpooledByHand(connection, FewHundredRows, cancellationToken: token)).ShouldBe(
-            expected
-        );
+        (
+            await NumbersAsImmutableArrayUnpooledByHandAsync(connection, FewHundredRows, cancellationToken: token)
+        ).ShouldBe(expected);
 
-        var pairs = await MeasureAsync(
+        await Allocations.ShouldSaveAtLeastAsync(
             () => connection.NumbersAsImmutableArray(parameters, cancellationToken: token),
-            () => NumbersAsImmutableArrayUnpooledByHand(connection, FewHundredRows, cancellationToken: token)
+            () => NumbersAsImmutableArrayUnpooledByHandAsync(connection, FewHundredRows, cancellationToken: token),
+            LeastImmutableArraySavingInBytesPerCall,
+            Settings
         );
-
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(-LeastImmutableArraySavingInBytesPerCall);
     }
 
     // The streaming method returns an iterator and yields each row as the reader reads it, with no buffer, so a call
     // is the method, its iterator and the enumeration to the end, which both sides do: the hand-written iterator makes
     // the calls that the generated one does, so what the generated method allocates beyond it is its own state.
     [Fact]
-    public async Task StreamAccounts_PerCall_AllocatesNoMoreThanHandWritten()
+    public async Task StreamAccounts_ToTheEnd_AllocatesNoMoreThanByHand()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(token);
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = source.CreateConnection();
+        await Allocations.InStateAsync(connection, State, token);
         (await connection.StreamAccounts(cancellationToken: token).ToListAsync(token)).Count.ShouldBe(3);
         (await StreamAccountsByHand(connection, cancellationToken: token).ToListAsync(token)).Count.ShouldBe(3);
 
-        var pairs = await MeasureAsync(
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
             async () =>
             {
                 var rows = 0;
@@ -533,23 +546,10 @@ public sealed class AllocationTests(PostgresDatabases postgres)
                 }
 
                 return rows;
-            }
+            },
+            MarginInBytesPerCall,
+            Settings
         );
-
-        pairs.Generated.Bytes.ShouldBeGreaterThan(0);
-        pairs.ByHand.Bytes.ShouldBeGreaterThan(0);
-        pairs.GeneratedBeyondByHand.ShouldBeLessThanOrEqualTo(MarginInBytesPerCall);
-    }
-
-    // The pairs of calls of the two methods, after both are warmed up, written to the test's output.
-    private static async Task<CallPairs> MeasureAsync<TGenerated, TByHand>(
-        Func<Task<TGenerated>> generated,
-        Func<Task<TByHand>> handWritten
-    )
-    {
-        var pairs = await CallAllocations.MeasureAsync(generated, handWritten, WarmUpCalls, Pairs);
-        TestContext.Current.TestOutputHelper?.WriteLine($"Of {Pairs} pairs of calls, {pairs}.");
-        return pairs;
     }
 
     // GetAccountName of Queries/Accounts.sql, by hand: the rows into RowBufferByHand.
@@ -558,7 +558,7 @@ public sealed class AllocationTests(PostgresDatabases postgres)
         "CA1849:Call async methods when in an async method",
         Justification = "The row is in memory once ReadAsync returns, as the generated method reads it."
     )]
-    private static async Task<IReadOnlyList<AccountName>> GetAccountNamePooledByHand(
+    private static async Task<IReadOnlyList<AccountName>> GetAccountNamePooledByHandAsync(
         DbConnection connection,
         int accountId,
         DbTransaction? transaction = null,
@@ -621,7 +621,7 @@ public sealed class AllocationTests(PostgresDatabases postgres)
         "CA1849:Call async methods when in an async method",
         Justification = "The row is in memory once ReadAsync returns, as the generated method reads it."
     )]
-    private static async Task<IReadOnlyList<AccountName>> GetAccountNameUnpooledByHand(
+    private static async Task<IReadOnlyList<AccountName>> GetAccountNameUnpooledByHandAsync(
         DbConnection connection,
         int accountId,
         DbTransaction? transaction = null,
@@ -686,7 +686,7 @@ public sealed class AllocationTests(PostgresDatabases postgres)
         "CA1849:Call async methods when in an async method",
         Justification = "The row is in memory once ReadAsync returns, as the generated method reads it."
     )]
-    private static async Task<IReadOnlyList<AccountsDto>> ListAccountsPooledByHand(
+    private static async Task<IReadOnlyList<AccountsDto>> ListAccountsPooledByHandAsync(
         DbConnection connection,
         DbTransaction? transaction = null,
         int? commandTimeout = null,
@@ -749,7 +749,7 @@ public sealed class AllocationTests(PostgresDatabases postgres)
         "CA1849:Call async methods when in an async method",
         Justification = "The row is in memory once ReadAsync returns, as the generated method reads it."
     )]
-    private static async Task<IReadOnlyList<AccountsDto>> ListAccountsUnpooledByHand(
+    private static async Task<IReadOnlyList<AccountsDto>> ListAccountsUnpooledByHandAsync(
         DbConnection connection,
         DbTransaction? transaction = null,
         int? commandTimeout = null,
@@ -814,7 +814,7 @@ public sealed class AllocationTests(PostgresDatabases postgres)
         "CA1849:Call async methods when in an async method",
         Justification = "The row is in memory once ReadAsync returns, as the generated method reads it."
     )]
-    private static async Task<IReadOnlyList<ListClosedBeforeDto>> ListClosedBeforePooledByHand(
+    private static async Task<IReadOnlyList<ListClosedBeforeDto>> ListClosedBeforePooledByHandAsync(
         DbConnection connection,
         DateTimeOffset? closedBefore,
         DbTransaction? transaction = null,
@@ -884,7 +884,7 @@ public sealed class AllocationTests(PostgresDatabases postgres)
         "CA1849:Call async methods when in an async method",
         Justification = "The row is in memory once ReadAsync returns, as the generated method reads it."
     )]
-    private static async Task<IReadOnlyList<ListClosedBeforeDto>> ListClosedBeforeUnpooledByHand(
+    private static async Task<IReadOnlyList<ListClosedBeforeDto>> ListClosedBeforeUnpooledByHandAsync(
         DbConnection connection,
         DateTimeOffset? closedBefore,
         DbTransaction? transaction = null,
@@ -955,7 +955,7 @@ public sealed class AllocationTests(PostgresDatabases postgres)
         "CA1849:Call async methods when in an async method",
         Justification = "The row is in memory once ReadAsync returns, as the generated method reads it."
     )]
-    private static async Task<List<CountedNumber>> NumbersAsListPooledByHand(
+    private static async Task<List<CountedNumber>> NumbersAsListPooledByHandAsync(
         DbConnection connection,
         int count,
         DbTransaction? transaction = null,
@@ -1019,7 +1019,7 @@ public sealed class AllocationTests(PostgresDatabases postgres)
         "CA1849:Call async methods when in an async method",
         Justification = "The row is in memory once ReadAsync returns, as the generated method reads it."
     )]
-    private static async Task<ImmutableArray<CountedNumber>> NumbersAsImmutableArrayPooledByHand(
+    private static async Task<ImmutableArray<CountedNumber>> NumbersAsImmutableArrayPooledByHandAsync(
         DbConnection connection,
         int count,
         DbTransaction? transaction = null,
@@ -1083,7 +1083,7 @@ public sealed class AllocationTests(PostgresDatabases postgres)
         "CA1849:Call async methods when in an async method",
         Justification = "The row is in memory once ReadAsync returns, as the generated method reads it."
     )]
-    private static async Task<List<CountedNumber>> NumbersAsListUnpooledByHand(
+    private static async Task<List<CountedNumber>> NumbersAsListUnpooledByHandAsync(
         DbConnection connection,
         int count,
         DbTransaction? transaction = null,
@@ -1147,7 +1147,7 @@ public sealed class AllocationTests(PostgresDatabases postgres)
         "CA1849:Call async methods when in an async method",
         Justification = "The row is in memory once ReadAsync returns, as the generated method reads it."
     )]
-    private static async Task<ImmutableArray<CountedNumber>> NumbersAsImmutableArrayUnpooledByHand(
+    private static async Task<ImmutableArray<CountedNumber>> NumbersAsImmutableArrayUnpooledByHandAsync(
         DbConnection connection,
         int count,
         DbTransaction? transaction = null,
@@ -1211,7 +1211,7 @@ public sealed class AllocationTests(PostgresDatabases postgres)
         "CA1849:Call async methods when in an async method",
         Justification = "The row is in memory once ReadAsync returns, as the generated method reads it."
     )]
-    private static async Task<CountedNumber[]> NumbersAsArrayUnpooledByHand(
+    private static async Task<CountedNumber[]> NumbersAsArrayUnpooledByHandAsync(
         DbConnection connection,
         int count,
         DbTransaction? transaction = null,
