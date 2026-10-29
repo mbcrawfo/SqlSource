@@ -37,7 +37,7 @@ With the output `models`, the same queries give `Sql.GetUser`, a [constant](#con
 
 ## The attribute
 
-`[SqlSourceGenerate]` marks a type that the generator adds to.  The package puts the attribute, its enums, the [`[SqlSourceConverter]`](settings.md#converters) attribute and the [exception](#unexpected-row-count) that a query method throws in your project, as internal types in the namespace `SqlSource`, so the code above needs `using SqlSource;` and nothing else.
+`[SqlSourceGenerate]` marks a type that the generator adds to.  The package puts the attribute, its enums, the [`[SqlSourceConverter]`](settings.md#converters) attribute and the exceptions that a query method throws, [`UnexpectedRowCountException`](#unexpected-row-count) and [`TransactionRolledBackException`](#transaction-rolled-back), in your project, as internal types in the namespace `SqlSource`, so the code above needs `using SqlSource;` and nothing else.
 
 ```csharp
 [SqlSourceGenerate(Path = "Queries", SqlLocation = SqlLocation.Direct, Parameters = "keep-comments")]
@@ -183,7 +183,7 @@ A token method adds a line for each token and one for the result, and shows its 
 public static string ListFrom(string table, string orderBy)
 ```
 
-A [query method](#query-methods) has the same summary and remarks, a line for each of its arguments and one for what it returns, and, for the shapes `one` and `one-optional`, a line for the [exception](#unexpected-row-count) it throws.  The extension class of the methods has a summary that names the type.
+A [query method](#query-methods) has the same summary and remarks, a line for each of its arguments and one for what it returns, and, for the shapes `one` and `one-optional`, a line for the [exception](#unexpected-row-count) it throws.  On SQL Server, a method of the shapes `one`, `one-optional` and `many` also has a line for [`TransactionRolledBackException`](#transaction-rolled-back).  The extension class of the methods has a summary that names the type.
 
 Every generated member is documented, so a project that treats a missing comment on a public member (CS1591) as an error gets none from generated code.
 
@@ -568,7 +568,7 @@ The [result shape](sql-files.md#result-shapes) after the query's name says what 
 - **`none`** runs the statement and returns nothing.
 - **`rowcount`** runs the statement and returns the count the driver reports: the rows inserted, updated or deleted, those of each statement added up when the query has several, and `-1` for a `SELECT`.  The rows of a `RETURNING` or `OUTPUT` clause are counted.  On PostgreSQL a `WITH` whose last statement is a `SELECT` counts as a `SELECT`, so it is `-1` though its `WITH` updates rows.  On SQL Server, `SET NOCOUNT ON` makes it `-1`, and when a query without parameters sets it, every later count on the connection too: see [known issues](#known-issues).
 
-`none` and `rowcount` read no rows, so they suit an `INSERT ... RETURNING` whose rows you do not want.  `one`, `one-optional` and `many` on a query that returns no rows are [SQLSRC272](diagnostics.md#sqlsrc272).  A SQL Server query of several statements returns the rows of its first result set, as its [model](sqlserver.md#what-can-be-described) has them, and its other statements still run: an error that one of them raises is thrown by every method, which reads the rest of the batch before it returns, and may have rolled back the transaction the method was given, depending on the error and on `XACT_ABORT`: see [what a method reads and throws](sqlserver.md#method-results).
+`none` and `rowcount` read no rows, so they suit an `INSERT ... RETURNING` whose rows you do not want.  `one`, `one-optional` and `many` on a query that returns no rows are [SQLSRC272](diagnostics.md#sqlsrc272).  A SQL Server query of several statements returns the rows of its first result set, as its [model](sqlserver.md#what-can-be-described) has them, and its other statements still run: an error that one of them raises is thrown by every method, which reads the rest of the batch before it returns, and may have rolled back the transaction the method was given, depending on the error and on `XACT_ABORT`.  When the method throws an exception of its own first, such as `UnexpectedRowCountException`, and such an error then rolls the transaction back, it throws [`TransactionRolledBackException`](#transaction-rolled-back): see [what a method reads and throws](sqlserver.md#method-results).
 
 <a id="reading-rows"></a>
 
@@ -610,11 +610,33 @@ The method of a query whose shape is `one` throws `UnexpectedRowCountException` 
 - **It derives from `InvalidOperationException`**, which LINQ's `Single` throws, so code that catches that catches it too.
 - **It is `internal`, in the namespace `SqlSource`**, generated into every project that uses SqlSource, beside the attribute, so another assembly catches it as `InvalidOperationException`: see [known issues](#known-issues).
 
+<a id="transaction-rolled-back"></a>
+
+### `TransactionRolledBackException`
+
+```csharp
+// -- name: GetActiveUser -> one, on SQL Server
+try
+{
+    var user = await connection.GetActiveUser(new GetActiveUserParams(email), transaction: transaction);
+}
+catch (TransactionRolledBackException exception)
+{
+    // exception.QueryName is "GetActiveUser", and exception.InnerException is the UnexpectedRowCountException.
+    // The transaction has completed: begin another to go on.
+}
+```
+
+A SQL Server method of the shape `one`, `one-optional` or `many` throws `TransactionRolledBackException` when it was given a transaction, threw an exception of its own, and an error that the rest of its query raised then rolled the transaction back.  Its own exception is the `InnerException`: `UnexpectedRowCountException`, a null in a column whose property cannot be null, or a converter's exception.  Its message names the query, "The transaction was rolled back by an error that the query 'GetActiveUser' raised after the inner exception was thrown.", and its `QueryName` the query.  Without a transaction, or with the transaction still open, the method throws its own exception as it is.  See [what a method reads and throws](sqlserver.md#method-results).
+
+- **It derives from `InvalidOperationException`**, so code that catches that catches it too.
+- **It is `internal`, in the namespace `SqlSource`**, generated into every project that uses SqlSource, as `UnexpectedRowCountException` is, so another assembly catches it as `InvalidOperationException`: see [known issues](#known-issues).
+
 <a id="projects-that-share-internals"></a>
 
 ## Projects that share internals
 
-A test project usually sees the internals of the project it tests, through `InternalsVisibleTo`.  If both use SqlSource, each has its own copy of the attribute, its enums (`SqlLocation`, `GeneratorOutput`, `GeneratorModelType`, `GeneratorCollectionType` and `MethodLocation`), `UnexpectedRowCountException` and `SqlSourceConverterAttribute`, and the test project sees two of each.  It uses its own.  So a `catch (UnexpectedRowCountException)` in the test project does not catch the exception that a method of the other project throws, which is the other project's copy: catch `InvalidOperationException` there.  The compiler warns about such a conflict (CS0436) wherever the test project's code names one of them, for example at its `[SqlSourceGenerate]`.
+A test project usually sees the internals of the project it tests, through `InternalsVisibleTo`.  If both use SqlSource, each has its own copy of the attribute, its enums (`SqlLocation`, `GeneratorOutput`, `GeneratorModelType`, `GeneratorCollectionType` and `MethodLocation`), `UnexpectedRowCountException`, `TransactionRolledBackException` and `SqlSourceConverterAttribute`, and the test project sees two of each.  It uses its own.  So a `catch (UnexpectedRowCountException)` in the test project does not catch the exception that a method of the other project throws, which is the other project's copy, and nor does a `catch (TransactionRolledBackException)`: catch `InvalidOperationException` there.  The compiler warns about such a conflict (CS0436) wherever the test project's code names one of them, for example at its `[SqlSourceGenerate]`.
 
 SqlSource turns that warning off for these types and for nothing else, as the suppression `SQLSRC901`.  Nothing has to be added to `NoWarn`.  The suppression holds when warnings are errors.  A conflict between two types of your own is still reported, even when one of them is named like a SqlSource type: an `internal class SqlLocation` that you declare in both projects, in a namespace of your own, still gets CS0436.
 
@@ -627,7 +649,7 @@ SqlSource turns that warning off for these types and for nothing else, as the su
 - **The tool reads the attribute without compiling your code.**  `sqlsource describe` finds `[SqlSourceGenerate]` by reading your C# files as text, so `Path` and `Output` must be written out where the attribute is: `Path = "Queries"` and `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation or a cast there compiles, and the tool reports [SQLSRC208](diagnostics.md#sqlsrc208) and describes nothing for the type.  The build then reports [SQLSRC241](diagnostics.md#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none, or, for the file, [SQLSRC209](diagnostics.md#sqlsrc209) under a dialect that has no database to ask, such as `ansi`.  Two more things follow from the same reading.  An alias of the attribute (`using Gen = SqlSource.SqlSourceGenerateAttribute;` and `[Gen]`) works in the build and is not seen by the tool, so the type's queries are not described, and the build reports SQLSRC241 for them in the same way.  An attribute inside `#if` is read with the compilation constants the tool gets from your project, which may not be those of the configuration you build.  Write the attribute under its own name, and outside `#if` where you can.
 - **An input model binds through Dapper only when the query writes its parameters as the model's properties are named.**  Dapper sends a property of a parameter object only to a parameter that the SQL writes as `@` and the property's name, ignoring case but not `_`.  So the property `AccountId` binds to `@accountId`, and a query that writes `@account_id` gets no value from it.  Write the query's parameters in camelCase, or give Dapper the parameters yourself, as in `new { account_id = args.AccountId }`: see [the recipe](recipes.md#models-through-dapper).
 - **Under `Direct`, a query named like a member that the type declares is a compiler error.**  A query `Get` whose output is `sql` or `models`, in a type that declares a method `Get`, gives the compiler's CS0102, in the generated code, and no SQLSRC error.  Rename the query, or use `Nested`.  A query method on the type is checked instead, as [SQLSRC274](diagnostics.md#sqlsrc274).
-- **`UnexpectedRowCountException` cannot be caught by its type in another assembly.**  It is `internal`, so an assembly that calls a `public` method of another cannot name it, and two projects that share internals each have their own copy, so a `catch (UnexpectedRowCountException)` in one does not catch the other's.  Catch `InvalidOperationException`, from which it derives.
+- **`UnexpectedRowCountException` and `TransactionRolledBackException` cannot be caught by their type in another assembly.**  They are `internal`, so an assembly that calls a `public` method of another cannot name them, and two projects that share internals each have their own copy of each, so a `catch (UnexpectedRowCountException)` in one does not catch the other's, nor a `catch (TransactionRolledBackException)`.  Catch `InvalidOperationException`, from which both derive.
 - **A query method with parameters works only on a connection whose commands take its driver's own parameters.**  It works on the connections of the drivers, such as `NpgsqlConnection`, the one an `NpgsqlDataSource` gives, and `SqlConnection`.  A `DbConnection` that wraps one of them, and whose commands create or accept only parameters of their own type, fails before the query is sent: on PostgreSQL with the wrapper's own exception, typically an `InvalidCastException`, and on SQL Server with `InvalidCastException`, "Unable to cast object of type '...' to type 'Microsoft.Data.SqlClient.SqlParameter'.".  Give the method the driver's connection that the wrapper holds, or give the query the output `models` and send its parameters through the wrapper yourself.
 - **On SQL Server, `rowcount` returns `-1` once `SET NOCOUNT ON` has run on the connection's session.**  A query without parameters, or a command of your own without them, that runs `SET NOCOUNT ON` sets it for the session, not for the statement: on a connection you opened, every later `rowcount` method returns `-1` until the connection is closed and its session reset.  A query with parameters, which Microsoft.Data.SqlClient runs through `sp_executesql`, sets it for itself alone, and only its own count is `-1`.  Run `SET NOCOUNT OFF` after it, or do not set it in a query without parameters on a connection that runs a `rowcount` method.
 - **Where the suppression of CS0436 does not run, the warning is shown.**  The suppression is part of the package's analyzers.  A compiler or an editor that does not run it still reports CS0436 in a project that sees the internals of another one that uses SqlSource, and a project that treats warnings as errors then fails to build there.  SqlSource has not been checked in the live analysis of Visual Studio or Rider.  If you see the warning, add `<NoWarn>$(NoWarn);CS0436</NoWarn>` to the project that sees the other's internals.  That also hides a conflict between two types of your own.

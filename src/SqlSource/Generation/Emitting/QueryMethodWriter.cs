@@ -804,7 +804,9 @@ internal static class QueryMethodWriter
     // error, which reports itself, and the caller's cancellation.  With a transaction given, it disposes the reader,
     // which reads the rest of the batch and drops any error there, and when such an error rolled the transaction back,
     // which leaves its Connection null, it throws the exception that says so, with the method's as its inner
-    // exception.  Otherwise it throws the method's own as it is.  A call that does not throw pays nothing for it.
+    // exception.  Otherwise it throws the method's own as it is.  A database error at a row is thrown as it is too, so
+    // a later error of the batch that rolls the transaction back goes unreported (TD-0090).  A call that does not throw
+    // runs none of it, though the await in the catch makes the method's state machine keep room for the exception.
     private static void AppendTransactionCheck(StringBuilder builder, string indent, QueryMethod method, Locals locals)
     {
         var blockIndent = indent + GeneratedText.Indent;

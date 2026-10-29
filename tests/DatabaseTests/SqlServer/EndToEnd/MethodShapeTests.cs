@@ -336,7 +336,8 @@ public sealed class MethodShapeTests(SqlServerDatabases sqlServer)
     // second, error 8134, which SqlClient's read throws.  That is the database's error, which the method throws as it
     // is, and the reader's disposal reads the failed conversion after the rows and drops it.  With XACT_ABORT off the
     // divide by zero alone leaves the transaction open, but the conversion rolls it back, so the caller gets the
-    // divide by zero, the transaction's Connection is null and the commit throws: nothing reports the rollback.
+    // divide by zero, the transaction's Connection is null and the commit throws: nothing reports the rollback
+    // (TD-0090).
     [Fact]
     public async Task ListFailingAtSecondThenFailConversion_InATransaction_ThrowsTheDivideByZeroAndRollsBack()
     {
