@@ -32,10 +32,10 @@ The tool never writes a sidecar with no entry.  A run over the whole run unit th
 
 [`SidecarReader`](../../src/SqlSource/Snapshot/Reading/SidecarReader.cs) reads by these rules, and so accepts more than the schema: the schema says what this version of the tool writes, and the rules what a reader tolerates.  How it reads is [reading a sidecar](generator.md#reading-a-sidecar).
 
-1. **`formatVersion` is read first**, wherever it stands.  A file of another version is read as its version alone, since this reader cannot say whether such a file is well formed; only a second `formatVersion` in it is an error.
+1. **The grammar is checked first, then `formatVersion` is read**, wherever it stands.  A text that is not one strict JSON object nested at most `SidecarTokenizer.MaxDepth` levels is malformed whatever its version.  A file of another version that passes is read as its version alone, since this reader cannot say whether such a file is well formed; only a second `formatVersion` in it is an error.
 2. **An unknown key is skipped with its value**, at every level, inside a type object too.  `bindName` anywhere but on a parameter's own type is an unknown key.  This is what makes adding a key free.
 3. **Key order is not significant.**  An entry's `parameters` or `columns` that comes before its `engine` is read once the entry ends.
-4. **An absent key reads as `null`**, which means unknown or not applicable, so a reader never tells an absent key from a `null` one.  The exceptions are the keys a reader cannot do without, which must be present and not `null`:
+4. **An absent key reads as `null`**, which means unknown or not applicable, and for most keys a reader never tells an absent key from a `null` one.  Two keys a reader can do without are refused as `null` all the same: `bindName`, which is a string when present, and `columns`, which is never `null` whatever the `resultKind`.  The other exceptions are the keys a reader cannot do without, which must be present and not `null`:
    - `formatVersion`, `toolVersion` and `queries` at the top;
    - `hash`, `engine`, `resultKind` and `parameters` of an entry, and `columns` when `resultKind` is `rows`;
    - `name`, `ordinal` and `nullable` of a parameter, and `ordinal`, `name`, `type` and `nullable` of a column, of which a parameter's `type` and either `nullable` may be `null`;
@@ -46,7 +46,7 @@ The tool never writes a sidecar with no entry.  A run over the whole run unit th
    - The types of an entry whose `engine` the reader does not know are each an `OtherEngineType`, with its `name` and, on a parameter's own type, its `bindName`.  The generator reports `SQLSRC242` at each query whose entry it is, since its engine is not the file's dialect.
    - A PostgreSQL `kind` that the reader does not know is kept.  Unless an override or the type map knows the type by its name, `PostgresTypeMap.Map` fails it as `TypeMappingKind.NotWrittenByTheTool`, and the generator reports `SQLSRC246` at the query's name, with the help to describe it again.
    - A `typeSource`, `nullableSource`, `plan` or `tableMatch` that the reader does not know is kept, since the generator never reads them.
-7. **Strings are compared ordinally**, a query's name included, but for two: a parameter's name, which the generator compares with the query's ignoring case, and `database`, which the tool compares ignoring case with `DatabaseName.Comparer`, since two names that differ only in case read one connection variable.
+7. **Strings are compared ordinally**, a query's name included, but for these: a parameter's name, which the generator compares with the query's ignoring case; `database`, which the tool compares ignoring case with `DatabaseName.Comparer`, since two names that differ only in case read one connection variable; and a type's name in the generator's type maps, which look up a PostgreSQL `internalName` of `pg_catalog` or of an extension they know (`PostgresTypeMap`, `TypeKeyNames`) and a SQL Server type's base name (`SqlServerTypeMap`) ignoring case.
 8. **Everything about a query is in its entry**; only `formatVersion` and `toolVersion` come from the top.
 
 ## Compatibility
@@ -60,7 +60,7 @@ A change keeps the version when it adds:
 - a PostgreSQL `kind`, with any keys it needs, whose queries an older generator reports with `SQLSRC246`;
 - a value of `typeSource`, `nullableSource`, `plan` or `tableMatch`, which no generator reads.
 
-So does moving a key between "written when it has a value" and "always written", since a reader reads an absent key as `null`, and spelling the informational `serverVersion` another way.
+So does moving a key that a reader accepts as `null` between "written when it has a value" and "always written", since a reader reads an absent key as `null`, and spelling the informational `serverVersion` another way.
 
 A change raises the version when it:
 
@@ -68,6 +68,8 @@ A change raises the version when it:
 - changes the algorithm or the input of `hash`, [`SqlQueryHash`](../../src/SqlSource/Parsing/SqlQueryHash.cs), since an older generator would call every entry stale and a newer one would take a stale file;
 - adds a `resultKind`, which an older reader refuses as malformed;
 - adds a key that a reader cannot do without, or requires `columns` when `resultKind` is `none`;
+- writes `bindName` or `columns` as `null`, which an older reader refuses as malformed;
+- writes a file that is not one strict JSON object nested at most `SidecarTokenizer.MaxDepth` levels, which an older reader reports as malformed instead of as newer;
 - makes `queries` anything but an object keyed by the query's name;
 - changes an existing engine's type object in any of these ways.
 
