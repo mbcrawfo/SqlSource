@@ -102,31 +102,11 @@ internal static class UsableQueries
     /// <summary>
     /// Each query of the files the type can use, in file order and then query order, with its indices and the
     /// settings in effect for it.  The files that <see cref="FindUsableFiles" /> leaves out give their diagnostics to
-    /// <paramref name="diagnostics" /> when it is given.
+    /// <paramref name="diagnostics" /> when it is given, before this returns.  The sequence resolves each query's
+    /// settings as it is walked and holds no list, so it can be walked again at no cost beyond the resolving.
     /// </summary>
     /// <param name="type">The type with its parsed files.</param>
     /// <param name="diagnostics">Where the diagnostics go, or null when the caller does not report them.</param>
-    public static List<UsableQuery> Of(TypeQueries type, ImmutableArray<DiagnosticInfo>.Builder? diagnostics)
-    {
-        var target = type.Type.Type;
-        var usable = FindUsableFiles(target, type.Files, type.FileSettings, diagnostics);
-        var queries = new List<UsableQuery>();
-        for (var fileIndex = 0; fileIndex < type.Files.Count; fileIndex++)
-        {
-            if (!usable[fileIndex])
-            {
-                continue;
-            }
-
-            var file = type.Files[fileIndex];
-            for (var queryIndex = 0; queryIndex < file.Queries.Count; queryIndex++)
-            {
-                var query = file.Queries[queryIndex];
-                var settings = QuerySettings.Resolve(query.Markers, target.Settings, type.FileSettings[fileIndex]);
-                queries.Add(new UsableQuery(fileIndex, queryIndex, query, settings));
-            }
-        }
-
-        return queries;
-    }
+    public static UsableQuerySequence Of(TypeQueries type, ImmutableArray<DiagnosticInfo>.Builder? diagnostics) =>
+        new(type, FindUsableFiles(type.Type.Type, type.Files, type.FileSettings, diagnostics));
 }

@@ -98,9 +98,8 @@ internal static class MethodPlanner
         var written = WrittenNames(queries);
         var planned = new List<Planned>();
         var engines = CodeGenEngines.None;
-        for (var index = 0; index < queries.Count; index++)
+        foreach (var usable in queries)
         {
-            var usable = queries[index];
             if (usable.Settings.Output != OutputKind.CodeGen)
             {
                 continue;
@@ -128,7 +127,7 @@ internal static class MethodPlanner
 
     // The names of the members the type's file writes for the queries whose output is not CodeGen: each one's constant
     // or token method, in the type itself or in its nested class.
-    private static HashSet<string> WrittenNames(List<UsableQuery> queries)
+    private static HashSet<string> WrittenNames(UsableQuerySequence queries)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var usable in queries)

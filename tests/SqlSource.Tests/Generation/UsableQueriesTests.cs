@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Shouldly;
@@ -27,7 +28,7 @@ public sealed class UsableQueriesTests
             File("Orders.sql", third, fourth)
         );
 
-        var queries = UsableQueries.Of(type, null);
+        var queries = Walk(UsableQueries.Of(type, null));
 
         queries.Select(static each => (each.FileIndex, each.QueryIndex)).ShouldBe([(0, 0), (0, 1), (1, 0), (1, 1)]);
         queries.Select(static each => each.Query).ShouldBe([first, second, third, fourth]);
@@ -51,7 +52,7 @@ public sealed class UsableQueriesTests
         );
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
 
-        var queries = UsableQueries.Of(type, diagnostics);
+        var queries = Walk(UsableQueries.Of(type, diagnostics));
 
         queries.Select(static each => each.Query).ShouldBe([first]);
         diagnostics
@@ -65,7 +66,18 @@ public sealed class UsableQueriesTests
                     "UserRepository"
                 ),
             ]);
-        UsableQueries.Of(type, null).Select(static each => each.Query).ShouldBe([first]);
+        Walk(UsableQueries.Of(type, null)).Select(static each => each.Query).ShouldBe([first]);
+    }
+
+    private static List<UsableQuery> Walk(UsableQuerySequence sequence)
+    {
+        var queries = new List<UsableQuery>();
+        foreach (var query in sequence)
+        {
+            queries.Add(query);
+        }
+
+        return queries;
     }
 
     private static TypeQueries Queries(TargetType type, SettingsLevel[] fileSettings, params ParsedSqlFile[] files) =>
