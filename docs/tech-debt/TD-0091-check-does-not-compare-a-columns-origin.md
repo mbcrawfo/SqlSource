@@ -8,7 +8,7 @@ A table moved to another schema that the `search_path` still finds is one way it
 
 ## Why it exists
 
-The format design classed `origin` as informational and left it out of the comparison.  `columnTypes`, which reads it, came later, and the comparison was not revisited.  The review of TD-0084 found it, and the owner chose to record it and fix it in a unit of its own.
+The format design classed `origin` as informational and left it out of the comparison.  `columnTypes`, which reads it, came later, and the comparison was not revisited.  The review of the change that wrote down the sidecar format found it, and the owner chose to record it and fix it in a unit of its own.
 
 ## Impact
 
