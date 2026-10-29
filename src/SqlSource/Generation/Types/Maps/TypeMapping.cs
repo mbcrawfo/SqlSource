@@ -1,3 +1,5 @@
+using SqlSource.Generation.Types.MappedTypes;
+
 namespace SqlSource.Generation.Types.Maps;
 
 /// <summary>The C# type of a database type, or the reason it has none.</summary>
@@ -24,6 +26,15 @@ namespace SqlSource.Generation.Types.Maps;
 /// <see cref="TypeMappingKind.NeedsSqlServerTypes" />, the package's C# type for the type; and for
 /// <see cref="TypeMappingKind.NeedsNewerSqlClient" />, the version of SqlClient that first has its C# type.
 /// </param>
+/// <param name="Package">
+/// For a found type that the type override, the column types or a marker chose, the short name in it that found a type
+/// of an assembly that only a package the project does not list itself brings, which <c>SQLSRC284</c> names, or null.
+/// An array's or a domain's mapping that is its element's or base's keeps it.
+/// </param>
+/// <param name="Written">
+/// The C# type as the type override, the column types or the marker wrote it, which <c>SQLSRC284</c> names, set
+/// exactly when <paramref name="Package" /> is.
+/// </param>
 internal sealed record TypeMapping(
     TypeMappingKind Kind,
     string Key,
@@ -31,7 +42,9 @@ internal sealed record TypeMapping(
     bool IsValueType,
     bool IsPublic,
     EquatableArray<string> WarningIds,
-    string? Detail
+    string? Detail,
+    PackageBinding? Package = null,
+    string? Written = null
 )
 {
     /// <summary>A public C# type whose use gives no warning.</summary>

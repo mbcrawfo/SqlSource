@@ -56,6 +56,13 @@ public sealed partial class BuildFileTests
     // The target that sets them.
     private const string BuildFoldersTarget = "SqlSourceFindBuildFolders";
 
+    // The names of the referenced assemblies that only a package the project does not list brings, which the targets
+    // set and the compiler is shown.  They are no setting either.
+    private const string PackageAssemblies = "SqlSourceTransitivePackageAssemblies";
+
+    // The target that sets them.
+    private const string PackageAssembliesTarget = "SqlSourceFindTransitivePackageAssemblies";
+
     // The item of that target that holds the NuGet package folders other than the global packages folder.
     private const string PackageFolder = "SqlSourcePackageFolder";
 
@@ -82,15 +89,18 @@ public sealed partial class BuildFileTests
     }
 
     // A source generator sees only the properties that are listed here, and the settings are in settings files, so
-    // the compiler is shown the folders of the build alone.  No metadata is listed: the SDK would write a section
-    // into the file the compiler reads for every item of a type that is.  A project that sets SqlSourceIncludeFiles
-    // to false lists its own .sql files, and still needs the property, so nothing may put a condition on the item.
+    // the compiler is shown the folders of the build and the assemblies that only a package brings, which the targets
+    // set, alone.  No metadata is listed: the SDK would write a section into the file the compiler reads for every
+    // item of a type that is.  A project that sets SqlSourceIncludeFiles to false lists its own .sql files, and still
+    // needs the properties, so nothing may put a condition on the items.
     [Fact]
-    public void Props_OnlyPropertyTheCompilerIsShown_IsTheBuildsFolders()
+    public void Props_PropertiesTheCompilerIsShown_AreTheBuildsFoldersAndThePackageAssemblies()
     {
         var items = Props.Descendants("CompilerVisibleProperty").ToList();
 
-        items.Select(item => item.Attribute("Include").ShouldNotBeNull().Value).ShouldBe([BuildFolders]);
+        items
+            .Select(item => item.Attribute("Include").ShouldNotBeNull().Value)
+            .ShouldBe([BuildFolders, PackageAssemblies]);
         items.SelectMany(ConditionsAround).ShouldBeEmpty();
         Props.Descendants("CompilerVisibleItemMetadata").ShouldBeEmpty();
         Targets.Descendants("CompilerVisibleProperty").ShouldBeEmpty();
@@ -98,8 +108,9 @@ public sealed partial class BuildFileTests
     }
 
     // GenerateMSBuildEditorConfigFileCore is the target of the SDK that writes the file the compiler reads.  The
-    // target of the build's folders runs before it, when every property of the SDK and of the artifacts layout is
-    // set, and in every build that writes the file, a design-time build too.  The search for settings files and the
+    // targets of the build's folders and of the package-brought assemblies run before it, when every property of the
+    // SDK and of the artifacts layout is set and the references are resolved, and in every build that writes the
+    // file, a design-time build too.  The search for settings files and the
     // hash hook it through a property, which SqlSource.AfterSdk.targets empties to run them later: see
     // Targets_SettingsSearch_RunsBeforeTheCompilerWhereverItIsHooked.  The target that writes the manifest is the one
     // that is not of a build, Targets_ManifestTarget_HooksNothing, and the hook for a target that adds .sql files
@@ -113,10 +124,13 @@ public sealed partial class BuildFileTests
             .Where(target => target.Attribute("Name")!.Value is not (ManifestTarget or ListTarget))
             .ToList();
 
-        targets.Count.ShouldBe(3);
+        targets.Count.ShouldBe(4);
         targets
             .Select(target => target.Attribute("BeforeTargets")?.Value)
-            .ShouldBe(["GenerateMSBuildEditorConfigFileCore", SearchHook, SearchHook], ignoreOrder: true);
+            .ShouldBe(
+                ["GenerateMSBuildEditorConfigFileCore", "GenerateMSBuildEditorConfigFileCore", SearchHook, SearchHook],
+                ignoreOrder: true
+            );
         targets.SelectMany(ConditionsAround).ShouldBeEmpty();
     }
 
@@ -283,6 +297,71 @@ public sealed partial class BuildFileTests
                     $"$(SqlSourceBuildFolders)|@({PackageFolder}->'%(SqlSourceFolder)', '|')",
                     $"'@({PackageFolder})' != ''",
                     1
+                ),
+            ]);
+    }
+
+    // A short type name that binds to a type of an assembly that only a package the project does not list brings is
+    // warned of, so the compiler is shown the names of those assemblies: each reference of a package, NuGetPackageId,
+    // but the framework's and a project's, whose package is no PackageReference of the project, compared ignoring
+    // case, by its file's name, once.  It has no DependsOnTargets: a build resolves the references before the file
+    // the compiler reads is written, and run by name with nothing resolved it sets the property empty.  The
+    // metadata is never the argument of a property function, so the names are joined with a /, which no file name
+    // holds, and the list is escaped with the four Replace calls of the build's folders, which
+    // TransitivePackageAssemblies decodes, before each / is made the | that parts the names.  The generator spells
+    // the name in TransitivePackageAssemblies.  TransitivePackageAssembliesTargetTests runs the target.
+    [Fact]
+    public void Targets_PackageAssemblies_AreTheEscapedNamesOfTheReferencesOnlyAPackageBrings()
+    {
+        var target = Target(PackageAssembliesTarget);
+
+        target
+            .Attributes()
+            .ToDictionary(attribute => attribute.Name.LocalName, attribute => attribute.Value)
+            .ShouldBe(
+                new Dictionary<string, string>
+                {
+                    ["Name"] = PackageAssembliesTarget,
+                    ["BeforeTargets"] = "GenerateMSBuildEditorConfigFileCore",
+                }
+            );
+        target.Elements().Select(element => element.Name.LocalName).ShouldBe(["ItemGroup", "PropertyGroup"]);
+        var items = target.Elements("ItemGroup").ShouldHaveSingleItem().Elements().ToList();
+        items
+            .Select(item =>
+                (
+                    item.Name.LocalName,
+                    string.Join(
+                        " ",
+                        item.Attributes().Select(attribute => $"{attribute.Name.LocalName}={attribute.Value}")
+                    )
+                )
+            )
+            .ShouldBe([
+                (
+                    "SqlSourcePackageAssembly",
+                    "Include=@(ReferencePath) Condition='%(ReferencePath.NuGetPackageId)' != ''"
+                        + " and '%(ReferencePath.FrameworkReferenceName)' == ''"
+                        + " and '%(ReferencePath.ReferenceSourceTarget)' != 'ProjectReference'"
+                ),
+                ("SqlSourceListedPackage", "Include=@(PackageReference) NuGetPackageId=%(Identity)"),
+                (
+                    "SqlSourcePackageAssembly",
+                    "Remove=@(SqlSourceListedPackage) MatchOnMetadata=NuGetPackageId"
+                        + " MatchOnMetadataOptions=CaseInsensitive"
+                ),
+                ("SqlSourcePackageAssemblyName", "Include=@(SqlSourcePackageAssembly->'%(Filename)'->Distinct())"),
+            ]);
+        items.ShouldAllBe(item => !item.HasElements);
+        var lines = target.Elements("PropertyGroup").ShouldHaveSingleItem().Elements().ToList();
+        lines
+            .Select(line => (line.Name.LocalName, line.Value, line.Attributes().Count()))
+            .ShouldBe([
+                ("SqlSourcePackageAssemblyNames", "@(SqlSourcePackageAssemblyName, '/')", 0),
+                (
+                    PackageAssemblies,
+                    "$(SqlSourcePackageAssemblyNames" + EscapedForTheCompiler + ".Replace('/', '|'))",
+                    0
                 ),
             ]);
     }
@@ -608,8 +687,11 @@ public sealed partial class BuildFileTests
     // A folder's full path, with its %, |, # and ; escaped for the compiler, each % of an escape written %25 for
     // MSBuild.
     private static string Escaped(string folder) =>
-        $"$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), {folder})"
-        + ".Replace('%', '%2525').Replace('|', '%257C').Replace('#', '%2523').Replace(';', '%253B'))";
+        $"$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), {folder}){EscapedForTheCompiler})";
+
+    // The %, |, # and ; of a value escaped for the compiler, % first, each % of an escape written %25 for MSBuild.
+    private const string EscapedForTheCompiler =
+        ".Replace('%', '%2525').Replace('|', '%257C').Replace('#', '%2523').Replace(';', '%253B')";
 
     private static XElement Target(string name) =>
         Targets.Descendants("Target").Single(target => target.Attribute("Name")!.Value == name);

@@ -21,6 +21,7 @@ public sealed class SqlDiagnosticsTests
         ["SQLSRC245"] = DiagnosticSeverity.Warning,
         ["SQLSRC248"] = DiagnosticSeverity.Info,
         ["SQLSRC268"] = DiagnosticSeverity.Info,
+        ["SQLSRC284"] = DiagnosticSeverity.Warning,
     };
 
     [Fact]

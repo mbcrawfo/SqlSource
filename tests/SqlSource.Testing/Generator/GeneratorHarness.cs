@@ -115,7 +115,8 @@ internal static class GeneratorHarness
         var parseOptions = ParseOptions.WithLanguageVersion(languageVersion);
         var compilation = CreateCompilation(sources, supportedFramework, parseOptions, references);
 
-        // The properties are what MSBuild tells the generator, for the tests of SqlSourceBuildFolders.
+        // The properties are what MSBuild tells the generator, for the tests of SqlSourceBuildFolders and
+        // SqlSourceTransitivePackageAssemblies.
         var options = new TestOptionsProvider(properties);
         var projectSettings = ProjectSettings(output, dialect, generatorParameters, settings);
         var files = WithProjectSettings(sqlFiles, projectSettings);

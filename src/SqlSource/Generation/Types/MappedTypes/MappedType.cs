@@ -25,6 +25,11 @@ namespace SqlSource.Generation.Types.MappedTypes;
 /// types, the full names of those types as a user writes them, <c>App.UserId</c>, and <c>global::UserId</c> for one of
 /// the global namespace, in ordinal order.  Empty otherwise.
 /// </param>
+/// <param name="Package">
+/// For a name that is found, the first short name in it, the name's own before its arguments' in their order, whose
+/// type is of an assembly that only a package the project does not list itself brings.  Null for a name with no such
+/// short name, a full name, a keyword, a type of the project, or a name that is not found.
+/// </param>
 internal sealed record MappedType(
     string Name,
     MappedTypeStatus Status,
@@ -32,5 +37,6 @@ internal sealed record MappedType(
     bool IsPublic,
     EquatableArray<string> WarningIds,
     string Text,
-    EquatableArray<string> Candidates
+    EquatableArray<string> Candidates,
+    PackageBinding? Package
 );

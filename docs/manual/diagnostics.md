@@ -1,6 +1,6 @@
 # Diagnostics
 
-Every problem SqlSource finds is an error, and none can be turned off or made a warning, except two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `codegen` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  An error in a settings file, `sqlsource.json`, is reported at its line and column in that file.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
+Every problem SqlSource finds is an error, and none can be turned off or made a warning, except two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), a warning about a short name of a C# type that you chose, [SQLSRC284](#sqlsrc284), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `codegen` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  An error in a settings file, `sqlsource.json`, is reported at its line and column in that file.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
 
 **Project and attribute**
 
@@ -200,6 +200,12 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC279](#sqlsrc279) | Converters do not convert from the database type |
 | [SQLSRC280](#sqlsrc280) | Converter is missing for one direction |
 
+**A short name of your choice**
+
+| Id | Title |
+|----|----|
+| [SQLSRC284](#sqlsrc284) | Short name finds a type that only a package brings |
+
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 120 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides` or `columnTypes`, is the build's alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
@@ -223,6 +229,8 @@ The ids from `SQLSRC253` to `SQLSRC260` are reported by the build, about the [mo
 The ids from `SQLSRC272` to `SQLSRC276` are reported by the build, about the [method](generator.md#query-methods) of a query whose output is `codegen`.  `SQLSRC272`, `SQLSRC274` and `SQLSRC275` are reported at the query's name, once however many types claim its file, except a `SQLSRC274` whose cause is of one type, which each such type reports, and one for the methods of two types that clash, which each of the two queries gets.  A query of a file that two types of one namespace claim gives each type a method of one signature, so it gets one `SQLSRC274` for each type, each naming the other.  A query gets every one of them that it has, and no method until all are fixed; its models are still generated.  `SQLSRC273` has no file and line, and is reported once for the project and database.  `SQLSRC276` is about the extension class that holds a type's methods, and is reported at the type's `[SqlSourceGenerate]`, once for each type whose methods would go into the class.
 
 The ids from `SQLSRC277` to `SQLSRC280` are reported by the build, about converters, the methods marked `[SqlSourceConverter]`.  `SQLSRC277` and `SQLSRC278` are about the methods of the project's own code: at the method's name, whatever the output of the project, its types and its files, and whether a query uses the method or not.  A converter of a type that a type override, a column type or a `-- param:` marker names, declared in a referenced assembly, has no place in the project, so `SQLSRC277` and `SQLSRC278` are reported for it at the name of each query whose output is `codegen` and whose method would use it.  `SQLSRC279` and `SQLSRC280` are about a column or a parameter of a query whose output is `codegen`, whose C# type a type override, a column type or a `-- param:` marker chose, and whose type has converters that do not serve it.  Each of these at a query is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.  A project whose output is `models` uses no converter, and gets none of them at a query, and neither does a query whose database's driver the project does not reference, which [SQLSRC273](#sqlsrc273) is about.
+
+`SQLSRC284` is reported by the build, as `SQLSRC250` to `SQLSRC252` are, at the name of a query whose output is `models` or `codegen`, once for each column and parameter whose C# type you chose by a short name that it is about.  It is a warning, and the query keeps the type: it gets its models, and under `codegen` its method.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
@@ -2663,3 +2671,32 @@ A type override, a column type or a `-- param:` marker gives a column or a param
 Add the converter that the message names, a static method marked `[SqlSourceConverter]` that takes the one type and returns the other, on the type itself or in a class of the project.  A method that takes a type and returns the same type serves both directions.  For an array whose elements are converted one by one, the message names the element of the column or parameter, and the converter to add is of the element's type.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
 
 See: [Converters](settings.md#converters)
+
+## SQLSRC284
+
+**Short name finds a type that only a package brings**
+
+A C# type that you chose, by the type override, the column types or a `-- param:` or `-- column:` marker, is a short name, of one part, or has one in its type arguments, and the one type of that name that the project can see is of an assembly that the project has only through a package that it does not reference itself, one that another package, or a project that it references, brings.  That may not be the type you meant.  A package can bring a type of a common name, such as `AccountId`, that has nothing to do with yours, and an update of the package can stop bringing it, or bring another of the name.  The type is used all the same.  The message names the column or parameter, what is mapped, the C# type and the place that chose it, as [SQLSRC250](#sqlsrc250) does, then the short name, the full name of the type it finds and that type's assembly.
+
+```console
+/work/App/Queries/Users.sql(1,10): warning SQLSRC284: 'int8' is mapped to 'AccountId' for column 'id', in the typeOverrides of the settings file /work/App/sqlsource.json, and the short name 'AccountId' finds 'Brought.Client.AccountId', of the assembly Brought.Client, which this project has only through a package that it does not reference itself.  If that is the type meant, write its full name, 'Brought.Client.AccountId'; otherwise correct the name.
+```
+
+If that is the type you meant, write its full name, from its namespace, as the message gives it: `Brought.Client.AccountId`.  You may also reference that assembly's own package from the project, which turns the warning off whatever brought it.  If you meant another type, correct the name: write the full name, from its namespace, of the type you meant.  The query's models are generated, and under the output `codegen` its method, whether or not the warning is fixed.
+
+This is a warning, so that a build goes on when an update of a package brings a new type of a name you use.  A project can list it in `NoWarn` to turn it off, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`:
+
+```xml
+<PropertyGroup>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);SQLSRC284</WarningsNotAsErrors>
+</PropertyGroup>
+```
+
+A `.globalconfig` file in the project's folder turns it off too:
+
+```ini
+is_global = true
+dotnet_diagnostic.SQLSRC284.severity = none
+```
+
+See: [Type overrides](settings.md#setting-type-overrides), [column types](settings.md#setting-column-types)

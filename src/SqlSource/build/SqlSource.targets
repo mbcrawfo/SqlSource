@@ -66,6 +66,47 @@
     </Target>
     <!-- editorconfig-checker-enable -->
     <!--
+        Gives the generator SqlSourceTransitivePackageAssemblies, the names of the referenced assemblies that only a
+        NuGet package the project does not list itself brings, each once, after a | from the one before: a short type
+        name of a .sql file that binds to a type of one of them is warned of, since the package that brings it can
+        stop bringing it, or bring another type of that name, when it is updated.  A reference is of a package when
+        it has a NuGetPackageId, and is left out when it is the framework's, which has a FrameworkReferenceName, or a
+        project's, whose ReferenceSourceTarget is ProjectReference, or when its package is a PackageReference of the
+        project, compared ignoring case, as NuGet compares the ids.  The name is the file's, without its extension.
+
+        It has no DependsOnTargets: a build resolves its references, ReferencePath, before the file the compiler
+        reads is written, and run by name with nothing resolved, it sets the property empty, so that no name is warned
+        of.  The manifest does not depend on it: the tool does not resolve types.
+
+        Each name is escaped as SqlSourceFindBuildFolders escapes a folder, and decoded in
+        Generation/Types/MappedTypes/TransitivePackageAssemblies.cs: the escaping and the decoding change together.
+        A name's metadata is never the argument of a property function, so the names are joined with a /, which no
+        file name holds, the joined list is escaped, and each / is then made a |.  Distinct compares ignoring case.
+
+        The expression is long, and a property as written is on one line, so the check of the line length is off.
+    -->
+    <!-- editorconfig-checker-disable -->
+    <Target Name="SqlSourceFindTransitivePackageAssemblies" BeforeTargets="GenerateMSBuildEditorConfigFileCore">
+        <ItemGroup>
+            <SqlSourcePackageAssembly
+                Include="@(ReferencePath)"
+                Condition="'%(ReferencePath.NuGetPackageId)' != '' and '%(ReferencePath.FrameworkReferenceName)' == '' and '%(ReferencePath.ReferenceSourceTarget)' != 'ProjectReference'"
+            />
+            <SqlSourceListedPackage Include="@(PackageReference)" NuGetPackageId="%(Identity)" />
+            <SqlSourcePackageAssembly
+                Remove="@(SqlSourceListedPackage)"
+                MatchOnMetadata="NuGetPackageId"
+                MatchOnMetadataOptions="CaseInsensitive"
+            />
+            <SqlSourcePackageAssemblyName Include="@(SqlSourcePackageAssembly->'%(Filename)'->Distinct())" />
+        </ItemGroup>
+        <PropertyGroup>
+            <SqlSourcePackageAssemblyNames>@(SqlSourcePackageAssemblyName, '/')</SqlSourcePackageAssemblyNames>
+            <SqlSourceTransitivePackageAssemblies>$(SqlSourcePackageAssemblyNames.Replace('%', '%2525').Replace('|', '%257C').Replace('#', '%2523').Replace(';', '%253B').Replace('/', '|'))</SqlSourceTransitivePackageAssemblies>
+        </PropertyGroup>
+    </Target>
+    <!-- editorconfig-checker-enable -->
+    <!--
         The hook for a target of a project that adds a .sql file while the build runs, as one that writes its .sql
         files does: such a target says BeforeTargets="SqlSourceListFiles", wherever it is declared, so that its files
         are searched above and are in the manifest.  The search for settings files and the manifest's target depend on

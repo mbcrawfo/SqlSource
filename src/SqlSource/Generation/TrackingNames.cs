@@ -77,6 +77,8 @@ internal static class TrackingNames
 
     public const string MappedTypeNames = nameof(MappedTypeNames);
 
+    public const string TransitivePackageAssemblies = nameof(TransitivePackageAssemblies);
+
     public const string ResolvedTypes = nameof(ResolvedTypes);
 
     public const string MappedTypes = nameof(MappedTypes);

@@ -33,6 +33,9 @@ namespace SqlSource.Generation.Types.MappedTypes;
 /// several are ambiguous, and their full names are the record's <see cref="MappedType.Candidates" />; none is not
 /// found.  The record's <see cref="MappedType.Text" /> writes each short name found as its type's full name, from
 /// <c>global::</c>, so that generated code needs no <c>using</c> and a short name and its full name are one text.
+/// A short name whose type is of a referenced assembly that <see cref="TransitivePackageAssemblies" /> holds, one that
+/// only a package the project does not list itself brings, is the record's <see cref="MappedType.Package" />: the first
+/// in a name found, its own before its arguments', and none for a name that fails.
 /// </para>
 /// <para>
 /// A name is accessible when each of its types is.  A part with arguments is constructed with them, and each argument
@@ -67,12 +70,14 @@ internal static class MappedTypeResolver
     /// <summary>
     /// One record for each of <paramref name="names" />, in the same order, with the converters of their types of a
     /// referenced assembly, in the order of <see cref="ConverterSet.Comparer" />, and
-    /// <see cref="ResolvedTypes.Empty" /> at once for no names.  Never throws but for
+    /// <see cref="ResolvedTypes.Empty" /> at once for no names.  A short name that finds a type of one of
+    /// <paramref name="packageAssemblies" /> marks its record.  Never throws but for
     /// <paramref name="cancellationToken" />.
     /// </summary>
     public static ResolvedTypes Resolve(
         Compilation compilation,
         EquatableArray<string> names,
+        TransitivePackageAssemblies packageAssemblies,
         CancellationToken cancellationToken
     )
     {
@@ -91,7 +96,7 @@ internal static class MappedTypeResolver
             cancellationToken.ThrowIfCancellationRequested();
             warningIds.Clear();
             var found = ClrTypeName.TryParse(name.AsSpan(), out var parsed)
-                ? ResolveType(compilation, parsed!, Use.Whole, builder, warningIds)
+                ? ResolveType(compilation, packageAssemblies, parsed!, Use.Whole, builder, warningIds)
                 : Resolution.Failed(MappedTypeStatus.NotFound);
             var isFound = found.Status == MappedTypeStatus.Found;
             types.Add(
@@ -104,7 +109,8 @@ internal static class MappedTypeResolver
                     isFound && found.Written is { } written ? written.Text : name,
                     found.Status == MappedTypeStatus.Ambiguous && !found.Candidates.IsDefaultOrEmpty
                         ? new EquatableArray<string>(found.Candidates)
-                        : EquatableArray<string>.Empty
+                        : EquatableArray<string>.Empty,
+                    found.Package
                 )
             );
 
@@ -165,6 +171,7 @@ internal static class MappedTypeResolver
     // warningIds.  Its Written is the name with each short name in it written in full, or null when it has none.
     private static Resolution ResolveType(
         Compilation compilation,
+        TransitivePackageAssemblies packageAssemblies,
         ClrTypeName name,
         Use use,
         StringBuilder builder,
@@ -185,6 +192,7 @@ internal static class MappedTypeResolver
 
         INamedTypeSymbol? type;
         MappedTypeStatus status;
+        PackageBinding? package = null;
         if (!name.IsShort)
         {
             type = FindNamed(compilation, name.Parts, builder, out status);
@@ -199,6 +207,7 @@ internal static class MappedTypeResolver
                     return Resolution.Failed(MappedTypeStatus.NotFound);
                 case 1:
                     type = Find(compilation, compilation.GetTypesByMetadataName(candidates[0]), out status);
+                    package = PackageOf(compilation, packageAssemblies, type, candidates, part.Identifier);
                     break;
                 default:
                     return Resolution.Failed(MappedTypeStatus.Ambiguous, FullNames(candidates, part.Identifier));
@@ -225,6 +234,7 @@ internal static class MappedTypeResolver
                 var argument = part.Arguments[at];
                 var resolved = ResolveType(
                     compilation,
+                    packageAssemblies,
                     argument.Type,
                     argument.Nullable ? Use.NullableArgument : Use.Argument,
                     builder,
@@ -236,6 +246,8 @@ internal static class MappedTypeResolver
                 {
                     ambiguous = resolved.Candidates;
                 }
+
+                package ??= resolved.Package;
 
                 if (resolved.Symbol is { } argumentType)
                 {
@@ -316,13 +328,40 @@ internal static class MappedTypeResolver
         }
 
         var full = name.IsShort ? InFull(type, name, writtenParts) : WrittenWith(name, writtenParts);
+        var isValueType = name.Ranks.Count == 0 && type.IsValueType;
         if (use == Use.Whole)
         {
-            return new Resolution(status, name.Ranks.Count == 0 && type.IsValueType, isPublic, null, constructed, full);
+            return new Resolution(status, isValueType, isPublic, null, constructed, full, Package: package);
         }
 
         var symbol = AsWritten(compilation, constructed, name, use);
-        return new Resolution(status, name.Ranks.Count == 0 && type.IsValueType, isPublic, symbol, null, full);
+        return new Resolution(status, isValueType, isPublic, symbol, null, full, Package: package);
+    }
+
+    // The binding of a short name whose one candidate is the type, when the type is of a referenced assembly that the
+    // set holds.  Null otherwise, and for a type of the project, which wins over a reference's of its full name.
+    private static PackageBinding? PackageOf(
+        Compilation compilation,
+        TransitivePackageAssemblies packageAssemblies,
+        INamedTypeSymbol? type,
+        ImmutableArray<string> candidates,
+        string identifier
+    )
+    {
+        if (
+            type is null
+            || SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, compilation.Assembly)
+            || !packageAssemblies.Contains(type.ContainingAssembly.Identity.Name)
+        )
+        {
+            return null;
+        }
+
+        return new PackageBinding(
+            identifier,
+            FullNames(candidates, identifier)[0],
+            type.ContainingAssembly.Identity.Name
+        );
     }
 
     // The short name as the type's full name: its namespaces, then its one part, with its arguments as written in
@@ -867,7 +906,8 @@ internal static class MappedTypeResolver
     // a failure.  Named is the named type the whole name found, without its ranks, whose converters the resolver reads,
     // and null for an argument, a keyword or a failure.  Written is the name with each short name in it written in
     // full, and null when it has none or for a failure.  Candidates are the full names of the first short name in it
-    // that several types answer, and default when there is none.
+    // that several types answer, and default when there is none.  Package is the first short name in it that finds a
+    // type only a package brings, and null when there is none or for a failure.
     private readonly record struct Resolution(
         MappedTypeStatus Status,
         bool IsValueType,
@@ -875,7 +915,8 @@ internal static class MappedTypeResolver
         ITypeSymbol? Symbol,
         INamedTypeSymbol? Named,
         ClrTypeName? Written = null,
-        ImmutableArray<string> Candidates = default
+        ImmutableArray<string> Candidates = default,
+        PackageBinding? Package = null
     )
     {
         public static Resolution Failed(MappedTypeStatus status, ImmutableArray<string> candidates = default) =>

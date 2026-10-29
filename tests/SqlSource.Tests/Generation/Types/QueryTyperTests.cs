@@ -432,6 +432,7 @@ public sealed class QueryTyperTests
             true,
             EquatableArray<string>.Empty,
             name,
-            EquatableArray<string>.Empty
+            EquatableArray<string>.Empty,
+            null
         );
 }
