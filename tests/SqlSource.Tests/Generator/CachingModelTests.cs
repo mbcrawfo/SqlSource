@@ -494,6 +494,49 @@ public sealed class CachingModelTests
         OutputReasons(result).Distinct().ShouldBe([IncrementalStepRunReason.Cached]);
     }
 
+    // A C# edit gives the steps that gather and arrange the models nothing new: every file's models, their arrangement
+    // by file and each file's slots are taken from the previous run.
+    [Fact]
+    public void Run_CSharpEdit_GathersAndArrangesNoModelAgain()
+    {
+        var compilation = ModelsCompilation();
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders);
+
+        var result = Run(driver, WithMethodBodyEdited(compilation));
+
+        AllReasons(result, TrackingNames.AllFileModels).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.ModelsByFile).ShouldBe([IncrementalStepRunReason.Cached]);
+        ModelSlotReasons(result).Values.ShouldAllBeCached();
+    }
+
+    // An edit of one file's model gathers every file's models and arranges them again, and only that file's slots
+    // change: those of the other files are worked out again from the new arrangement and come out equal.
+    [Fact]
+    public void Run_SqlFileEditedChangingOneModel_ChangesOnlyTheSlotsOfThatFile()
+    {
+        var compilation = ModelsCompilation();
+        var ordersSidecar = TypedSidecar(_scene.Orders, "GetOrder", "int4");
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, [ordersSidecar]);
+
+        var result = Run(
+            driver.ReplaceAdditionalText(ordersSidecar, TypedSidecar(_scene.Orders, "GetOrder", "text")),
+            compilation
+        );
+
+        AllReasons(result, TrackingNames.AllFileModels).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.ModelsByFile).ShouldBe([IncrementalStepRunReason.Modified]);
+        ModelSlotReasons(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Orders.GetOrderDto-Model.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.GetPaymentDto-Model.g.cs"] = IncrementalStepRunReason.Unchanged,
+                    ["App.Users.GetUserDto-Model.g.cs"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+    }
+
     // An edit of the project's settings file's collection type: no model reads it, so the requests of each type come
     // out equal and nothing after them runs.
     [Fact]

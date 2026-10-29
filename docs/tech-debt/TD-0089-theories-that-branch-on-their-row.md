@@ -2,7 +2,7 @@
 
 ## Problem
 
-A theory is clearest when its rows share one arrangement and one set of assertions.  TD-0080 item 12 split the theories whose row chose between two sets of assertions or two arrangements by an `if` and `else`.  These remain, found by scanning every `[Theory]` of `tests/` for an `if` whose condition names one of its parameters.  Paths are under `tests/`.
+A theory is clearest when its rows share one arrangement and one set of assertions.  The theories whose row chose between two sets of assertions or two arrangements by an `if` and `else` were split into facts, or into theories whose rows share their arrangement and assertions.  These remain, found by scanning every `[Theory]` of `tests/` for an `if` whose condition names one of its parameters.  Paths are under `tests/`.
 
 - An `if` that adds a step or an assertion for some rows only:
   - `DatabaseTests/Postgres/Describer/PlanOutputTests.cs`, `Explain_FullJoinCoalesce_IsComputedAtTheJoin` (`mergeJoin`);
@@ -25,7 +25,7 @@ A theory is clearest when its rows share one arrangement and one set of assertio
 
 ## Why it exists
 
-The review of TD-0080's item 12 split the theories it named and the six of the same shape that its review found, and recorded the rest here rather than grow that pull request past its item.
+The cleanup of the tests' uneven conventions split the theories it named and the six of the same shape that its review found, and recorded the rest here rather than grow that pull request past its scope.
 
 ## Impact
 
@@ -33,7 +33,7 @@ Low: a reader must follow the `if` to know what a row checks, and a row that tak
 
 ## Proposed fix
 
-Judge each listed theory: split one whose rows check different things into facts, or into theories whose rows share their arrangement and assertions over a helper of the class, as TD-0080 item 12 did; keep one whose `if` only adds an input the row gives, and say so in its comment.
+Judge each listed theory: split one whose rows check different things into facts, or into theories whose rows share their arrangement and assertions over a helper of the class, as the theories split before were; keep one whose `if` only adds an input the row gives, and say so in its comment.
 
 ## Trigger
 
