@@ -146,7 +146,7 @@ public sealed class MethodConflictTests
     }
 
     [Fact]
-    public void Run_SameNameWithOtherParameters_InTwoExtensionClasses_Compiles()
+    public void Run_SameNameWithOtherParametersInTwoExtensionClasses_Compiles()
     {
         var a = new SqlFile(APath, "-- name: Get\nSELECT id FROM users WHERE id = @id;\n");
         var b = new SqlFile(BPath, "-- name: Get\nSELECT id FROM users;\n");

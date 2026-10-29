@@ -321,7 +321,7 @@ public sealed class ConverterDiagnosticsTests
         "App.Conversions.ToEmail(string)",
         "it is marked [Obsolete] as an error"
     )]
-    public void Run_MarkedMethodWithAFault_ReportsSQLSRC277AtIt(
+    public void Run_MarkedMethodWithAFault_ReportsSqlsrc277AtIt(
         string type,
         string method,
         string displayName,
@@ -366,7 +366,7 @@ public sealed class ConverterDiagnosticsTests
     )]
     [InlineData("string value", "App.Conversions.From<T>(string)", "it is generic", true)]
     [InlineData("string value", "App.Conversions.From<T>(string)", "it is generic", false)]
-    public void Run_OverloadWithAFaultBesideAConverter_ReportsSQLSRC277AtTheOverload(
+    public void Run_OverloadWithAFaultBesideAConverter_ReportsSqlsrc277AtTheOverload(
         string parameter,
         string displayName,
         string fault,
@@ -399,7 +399,7 @@ public sealed class ConverterDiagnosticsTests
 
     // Two local functions of one name in two blocks of one method are two functions, each reported.
     [Fact]
-    public void Run_TwoLocalFunctionsOfOneName_ReportSQLSRC277AtEach()
+    public void Run_TwoLocalFunctionsOfOneName_ReportSqlsrc277AtEach()
     {
         var run = GeneratorHarness.Run(
             OutputKind.Models,
@@ -457,7 +457,7 @@ public sealed class ConverterDiagnosticsTests
     }
 
     [Fact]
-    public void Run_TwoConvertersOfOneEdge_ReportSQLSRC278AtBoth()
+    public void Run_TwoConvertersOfOneEdge_ReportSqlsrc278AtBoth()
     {
         var run = GeneratorHarness.Run(
             OutputKind.Models,
@@ -574,7 +574,7 @@ public sealed class ConverterDiagnosticsTests
 
     // The converters are found whatever the output, so a CodeGen project without a query gets the error too.
     [Fact]
-    public void Run_ConverterUnderCodeGenWithoutQueries_ReportsSQLSRC277()
+    public void Run_ConverterUnderCodeGenWithoutQueries_ReportsSqlsrc277()
     {
         var run = GeneratorHarness.Run(
             OutputKind.CodeGen,

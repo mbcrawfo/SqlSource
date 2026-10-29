@@ -16,7 +16,7 @@ public sealed class ColumnTypeKeyTests
     [InlineData("U&\"us\\0065rs\".id", "\"users\".id")]
     [InlineData("\"a.b\".\"c\"\"d\"", "\"a.b\".\"c\"\"d\"")]
     [InlineData("billing.invoice$lines.line_no", "billing.invoice$lines.line_no")]
-    public void TryNormalize_ValidKey(string key, string normalized)
+    public void TryNormalize_ValidKey_IsTrueAndWritesTheKey(string key, string normalized)
     {
         ColumnTypeKey.TryNormalize(key.AsSpan(), out var written).ShouldBeTrue();
 
@@ -37,5 +37,6 @@ public sealed class ColumnTypeKeyTests
     [InlineData("users.id ")]
     [InlineData("users id")]
     [InlineData("users.U&\"\\zzzz\"")]
-    public void TryNormalize_NotAKey(string key) => ColumnTypeKey.TryNormalize(key.AsSpan(), out _).ShouldBeFalse();
+    public void TryNormalize_NotAKey_IsFalse(string key) =>
+        ColumnTypeKey.TryNormalize(key.AsSpan(), out _).ShouldBeFalse();
 }

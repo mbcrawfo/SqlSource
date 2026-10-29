@@ -115,7 +115,7 @@ public sealed class ParameterTypeTests
     }
 
     [Fact]
-    public void Run_ParamMarker_Null_IsNullable()
+    public void Run_ParamMarkerOfNull_IsNullable()
     {
         var run = RunPosts("-- param: @author null -> UserId\n", nullable: true);
 
@@ -154,7 +154,7 @@ public sealed class ParameterTypeTests
     }
 
     [Fact]
-    public void Run_ParamMarker_MissingType_IsSqlsrc250AtItsPlace()
+    public void Run_ParamMarkerMissingItsType_IsSqlsrc250AtItsPlace()
     {
         var run = RunPosts("-- param: @author -> NoSuchType\n");
 
@@ -179,7 +179,7 @@ public sealed class ParameterTypeTests
         "and no property can have that type.  Choose another type, and for System.Nullable<T> name T, since a column "
             + "that can be null makes its property nullable."
     )]
-    public void Run_ParamMarker_TypeThatCannotBeUsed_IsReportedAtItsPlace(string type, string id, string reason)
+    public void Run_ParamMarkerOfATypeThatCannotBeUsed_IsReportedAtItsPlace(string type, string id, string reason)
     {
         var library = GeneratorHarness.CreateReference(
             OutputKind.Sql,
@@ -202,7 +202,7 @@ public sealed class ParameterTypeTests
 
     // The entry names the parameter as the tool wrote it, and the marker's name is found ignoring case.
     [Fact]
-    public void Run_ParamMarker_EntryNamesTheParameterInAnotherCase_GivesItsType()
+    public void Run_ParamMarkerWhoseEntryNamesTheParameterInAnotherCase_GivesItsType()
     {
         var file = PostsFile("-- param: @author -> UserId\n");
         var entry = Entry(file, "ListPosts", [Parameter("Author", Int8, false)], [Column("id")]);
@@ -215,7 +215,7 @@ public sealed class ParameterTypeTests
 
     // The model's error names what the marker mapped, as the typing's errors do.
     [Fact]
-    public void Run_ParamMarker_TypeNotPublicInAPublicModel_IsSqlsrc251NamingTheParameter()
+    public void Run_ParamMarkerOfATypeNotPublicInAPublicModel_IsSqlsrc251NamingTheParameter()
     {
         var source = UserIdSource.Replace(
             "    public readonly record struct UserId",
@@ -238,7 +238,7 @@ public sealed class ParameterTypeTests
     [InlineData("postgres", "@author -> UserId", "parameter 'author'", "int8")]
     [InlineData("postgres", "@ids -> UserId[]", "element of parameter 'ids'", "int8")]
     [InlineData("mssql", "@author -> UserId", "parameter 'author'", "bigint")]
-    public void Run_ParamMarker_NoConverter_IsSqlsrc279NamingTheDatabaseType(
+    public void Run_ParamMarkerWithoutAConverter_IsSqlsrc279NamingTheDatabaseType(
         string dialect,
         string marker,
         string subject,

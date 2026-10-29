@@ -47,7 +47,7 @@ public sealed class ConversionPlannerTests
     }
 
     [Fact]
-    public void Plan_ReadWithOnlyTheWriteEdge_ReportsSQLSRC280()
+    public void Plan_ReadWithOnlyTheWriteEdge_ReportsSqlsrc280()
     {
         var converters = Of(Project("global::MyApp.Email.To", Email, false, "string", false));
 
@@ -63,7 +63,7 @@ public sealed class ConversionPlannerTests
     }
 
     [Fact]
-    public void Plan_WriteWithOnlyTheReadEdge_ReportsSQLSRC280()
+    public void Plan_WriteWithOnlyTheReadEdge_ReportsSqlsrc280()
     {
         var converters = Of(Project("global::MyApp.Email.From", "string", false, Email, false));
 
@@ -80,7 +80,7 @@ public sealed class ConversionPlannerTests
 
     // An int8 column, read as long, mapped to UserId, whose converters are of int.
     [Fact]
-    public void Plan_LongColumnWithAnIntConverter_ReportsSQLSRC279()
+    public void Plan_LongColumnWithAnIntConverter_ReportsSqlsrc279()
     {
         var type = Overridden(UserId, true, "int8", "long", true);
         var converters = Of(
@@ -159,7 +159,7 @@ public sealed class ConversionPlannerTests
 
     // A composite has no base map type to convert from.
     [Fact]
-    public void Plan_NoBaseTypeWithAConverter_ReportsSQLSRC279()
+    public void Plan_NoBaseTypeWithAConverter_ReportsSqlsrc279()
     {
         var type = Overridden("global::MyApp.Address", false, "public.address", null, false);
         var converters = Of(Project("global::MyApp.Address.Parse", "string", false, "global::MyApp.Address", false));
@@ -177,7 +177,7 @@ public sealed class ConversionPlannerTests
 
     // An array of a composite element that the override maps to a foreign type with converters names the element.
     [Fact]
-    public void Plan_NoBaseTypeOfAnElementWithAConverter_ReportsSQLSRC279ForTheElement()
+    public void Plan_NoBaseTypeOfAnElementWithAConverter_ReportsSqlsrc279ForTheElement()
     {
         var type = Overridden(Email + "[]", false, "public.address", null, false);
         var converters = Of(Project("global::MyApp.Email.From", "string", false, Email, false));
@@ -242,7 +242,7 @@ public sealed class ConversionPlannerTests
     // The element of an array is decided as a type of its own, so a foreign element whose converters are of another
     // type is SQLSRC279, naming the element.
     [Fact]
-    public void Plan_ArrayOfAForeignElementWithConvertersOfAnotherType_ReportsSQLSRC279()
+    public void Plan_ArrayOfAForeignElementWithConvertersOfAnotherType_ReportsSqlsrc279()
     {
         var type = Overridden(UserId + "[]", false, "int8", "long[]", false, elementIsValueType: true);
         var converters = Of(Project("global::MyApp.Ids.ToUserId", "int", true, UserId, true));
@@ -260,7 +260,7 @@ public sealed class ConversionPlannerTests
 
     // An element with the other direction's converter alone is SQLSRC280, naming the element.
     [Fact]
-    public void Plan_ArrayOfAnElementWithOnlyTheWriteEdge_ReportsSQLSRC280ForTheElement()
+    public void Plan_ArrayOfAnElementWithOnlyTheWriteEdge_ReportsSqlsrc280ForTheElement()
     {
         var type = Overridden(Email + "[]", false, "public.email", "string[]", false);
         var converters = Of(Project("global::MyApp.Email.To", Email, true, "string", false));
@@ -318,7 +318,7 @@ public sealed class ConversionPlannerTests
     // A nullable element is decided as the type without its ?, so converters of another type are SQLSRC279 for it,
     // and not a read as the driver reads it.
     [Fact]
-    public void Plan_ArrayOfANullableElementWithConvertersOfAnotherType_ReportsSQLSRC279()
+    public void Plan_ArrayOfANullableElementWithConvertersOfAnotherType_ReportsSqlsrc279()
     {
         var type = Overridden(UserId + "?[]", false, "public.user_id[]", "long[]", false, elementIsValueType: true);
         var converters = Of(Project("global::MyApp.Ids.ToUserId", "int", true, UserId, true));
@@ -353,7 +353,7 @@ public sealed class ConversionPlannerTests
     // A converter of the array type itself, though not to the base map's array, keeps the elements' converters out:
     // the array is foreign with converters of another type.
     [Fact]
-    public void Plan_ArrayWithAConverterOfItsOwnToAnotherType_ReportsSQLSRC279ForTheArray()
+    public void Plan_ArrayWithAConverterOfItsOwnToAnotherType_ReportsSqlsrc279ForTheArray()
     {
         var type = Overridden(UserId + "[]", false, "int8[]", "long[]", false, elementIsValueType: true);
         var converters = Of(
@@ -390,7 +390,7 @@ public sealed class ConversionPlannerTests
     }
 
     [Fact]
-    public void Plan_DoubledEdgeOfAReference_ReportsSQLSRC278()
+    public void Plan_DoubledEdgeOfAReference_ReportsSqlsrc278()
     {
         var converters = Of(
             Reference("global::MyApp.Email.From", "string", Email),
@@ -409,7 +409,7 @@ public sealed class ConversionPlannerTests
 
     // A faulty converter of a reference is SQLSRC277, and with it the edge has one converter, so no SQLSRC278.
     [Fact]
-    public void Plan_EdgeOfAReferenceWithASoundAndAFaultyConverter_ReportsSQLSRC277Alone()
+    public void Plan_EdgeOfAReferenceWithASoundAndAFaultyConverter_ReportsSqlsrc277Alone()
     {
         var converters = Of(
             Reference("global::MyApp.Email.From", "string", Email),
@@ -448,7 +448,7 @@ public sealed class ConversionPlannerTests
     }
 
     [Fact]
-    public void Plan_FaultOfAReference_ReportsSQLSRC277()
+    public void Plan_FaultOfAReference_ReportsSqlsrc277()
     {
         var converters = Of(Reference("global::MyApp.Email.From", "string", Email) with { Fault = "it is not static" });
 

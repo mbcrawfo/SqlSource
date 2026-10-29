@@ -14,7 +14,7 @@ public sealed class ConverterReaderTests
     // A C# 14 extension block is a type of its own, which the generated code cannot call a member of by name, so each
     // marked method in it is SQLSRC277 and the query that would convert through it gets no method.
     [Fact]
-    public void Run_ConvertersInAnExtensionBlock_ReportsSQLSRC277AtEachMethod()
+    public void Run_ConvertersInAnExtensionBlock_ReportsSqlsrc277AtEachMethod()
     {
         const string Source = """
             using SqlSource;

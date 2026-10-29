@@ -107,7 +107,7 @@ public sealed class ColumnTypeMapTests
     // Within one place, a schema weighs more than the spelling: the key with a schema wins though the other is spelled
     // as the origin is and it is not.
     [Fact]
-    public void Find_SchemaWins_OverExactSpelling_InOnePlace()
+    public void Find_KeyWithASchemaAndOneSpelledAsTheOriginInOnePlace_IsTheOneWithTheSchema()
     {
         var map = ColumnTypeMap.Over(Map(Entry("Users.id", "A", Far)), Map(Entry("auth.users.id", "B", Far)))!.Value;
 
