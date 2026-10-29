@@ -96,7 +96,7 @@ public sealed class MethodTests
                                     {
                                         var parameter = new global::Npgsql.NpgsqlParameter<int>();
                                         parameter.ParameterName = "id";
-                                        parameter.DataTypeName = "integer";
+                                        parameter.DataTypeName = "pg_catalog.int4";
                                         parameter.TypedValue = parameters.Id;
                                         command.Parameters.Add(parameter);
                                     }
@@ -561,17 +561,17 @@ public sealed class MethodTests
         run.Sources["App.GetUserParams-Model.g.cs"].ShouldContain("(long Id)");
     }
 
-    // A PostgreSQL parameter is a parameter of Npgsql of the type of the value bound, by the bindName the entry
-    // describes it by, as written: the database's type for a converted one.
+    // A PostgreSQL parameter is a parameter of Npgsql of the type of the value bound, by the canonical name of the type
+    // the entry describes it by: the database's type for a converted one.
     [Theory]
-    [InlineData("base", "int", "integer")]
-    [InlineData("array", "int[]", "integer[]")]
+    [InlineData("base", "int", "pg_catalog.int4")]
+    [InlineData("array", "int[]", "pg_catalog._int4")]
     [InlineData("enum", "string", "public.mood")]
     [InlineData("domain", "string", "public.email")]
-    [InlineData("range", "global::NpgsqlTypes.NpgsqlRange<int>", "int4range")]
-    [InlineData("multirange", "global::NpgsqlTypes.NpgsqlRange<int>[]", "int4multirange")]
-    [InlineData("converted", "long", "bigint")]
-    public void Run_ParameterOfEachKind_BindsItsBindName(string kind, string bound, string bindName)
+    [InlineData("range", "global::NpgsqlTypes.NpgsqlRange<int>", "pg_catalog.int4range")]
+    [InlineData("multirange", "global::NpgsqlTypes.NpgsqlRange<int>[]", "pg_catalog.int4multirange")]
+    [InlineData("converted", "long", "pg_catalog.int8")]
+    public void Run_ParameterOfEachKind_BindsItsCanonicalName(string kind, string bound, string dataTypeName)
     {
         var type = Array.Find(MethodRuns.ParameterKinds, row => row.Kind == kind).Type;
         var file = new SqlFile(
@@ -588,7 +588,7 @@ public sealed class MethodTests
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldContain(" var parameter = new global::Npgsql.NpgsqlParameter<" + bound + ">();\n");
-        methods.ShouldContain(" parameter.DataTypeName = \"" + bindName + "\";\n");
+        methods.ShouldContain(" parameter.DataTypeName = \"" + dataTypeName + "\";\n");
     }
 
     [Fact]
