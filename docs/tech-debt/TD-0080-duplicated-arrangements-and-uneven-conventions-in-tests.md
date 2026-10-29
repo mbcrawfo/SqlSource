@@ -32,7 +32,7 @@ Each engine's tests were written by copying the first engine's, and the helpers 
 
 ## Impact
 
-Low each, Medium together: a fix to one copy leaves the other wrong, as the comparers of item 7 and the names of item 3 already show, and the long literals and theories make a change to the generator's output a change to dozens of lines.
+Low each, Medium together: a fix to one copy leaves the other wrong, as the comparers of item 7 already show, and the long literals and theories make a change to the generator's output a change to dozens of lines.
 
 ## Proposed fix
 
