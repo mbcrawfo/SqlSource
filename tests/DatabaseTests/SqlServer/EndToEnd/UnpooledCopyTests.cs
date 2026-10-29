@@ -5,10 +5,10 @@ using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
-// SearchAccountsUnpooled of Queries/Shapes.sql is SearchAccounts again under no-array-pool, for the allocation tests,
-// which send both through one hand-written SQL.  A query's hash is of its SQL alone, and the project does not build
-// while an entry's hash is not its query's, so the committed entries of the two have one hash as long as the two
-// queries have one SQL.  No server is needed.
+// SearchAccountsUnpooled of Queries/Shapes.sql is SearchAccounts again under no-array-pool, for the allocation tests of
+// tests/DatabaseTests/QueryMethodAllocation, which send both through one hand-written SQL.  A query's hash is of its
+// SQL alone, and the project does not build while an entry's hash is not its query's, so the committed entries of the
+// two have one hash as long as the two queries have one SQL.  No server is needed.
 public sealed class UnpooledCopyTests
 {
     [Fact]

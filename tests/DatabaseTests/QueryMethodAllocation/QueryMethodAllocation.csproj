@@ -1,0 +1,97 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        The allocation tests of both engines: the generated methods of the end-to-end projects' queries against methods
+        written by hand, in a project of their own that only the nightly jobs run, since they need a process of their
+        own and a container each, one at a time.
+        The generator comes from a project reference, which does not bring the package's MSBuild files, so the real
+        ones are imported here and at the end of this file.
+    -->
+    <Import Project="../../../src/SqlSource/build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
+        <!-- SQLSRC240 stays a warning: raising VersionPrefix warns until tools/describe-end-to-end.sh runs. -->
+        <WarningsNotAsErrors>$(WarningsNotAsErrors);SQLSRC240</WarningsNotAsErrors>
+        <!--
+            False keeps the solution's test run and a project run without RunQueryMethodAllocation=true from
+            treating this as a test project, while xunit still generates its entry point, so that `dotnet build
+            SqlSource.slnx` and format.sh cover it.  The nightly jobs set the property.
+        -->
+        <IsTestingPlatformApplication Condition="'$(RunQueryMethodAllocation)' != 'true'"
+            >false</IsTestingPlatformApplication>
+    </PropertyGroup>
+    <ItemGroup>
+        <!--
+            The queries and the sidecars of the end-to-end projects, kept at their own paths for the generator.  The
+            linked queries take the settings files of their own folder, so they are generated with the end-to-end
+            projects' settings.
+        -->
+        <AdditionalFiles
+            Include="../Postgres/EndToEnd/Queries/Accounts.sql"
+            Link="Postgres/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../Postgres/EndToEnd/Queries/Accounts.sql.json"
+            Link="Postgres/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../Postgres/EndToEnd/Queries/RowBuffers.sql"
+            Link="Postgres/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../Postgres/EndToEnd/Queries/RowBuffers.sql.json"
+            Link="Postgres/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../Postgres/EndToEnd/Queries/Streaming.sql"
+            Link="Postgres/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../Postgres/EndToEnd/Queries/Streaming.sql.json"
+            Link="Postgres/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/Queries/Shapes.sql"
+            Link="SqlServer/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/Queries/Shapes.sql.json"
+            Link="SqlServer/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/Queries/RowBuffers.sql"
+            Link="SqlServer/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/Queries/RowBuffers.sql.json"
+            Link="SqlServer/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/Queries/Streaming.sql"
+            Link="SqlServer/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/Queries/Streaming.sql.json"
+            Link="SqlServer/Queries/%(Filename)%(Extension)"
+        />
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="GitHubActionsTestLogger" />
+        <PackageReference Include="Microsoft.Data.SqlClient" />
+        <PackageReference Include="Npgsql" />
+        <PackageReference Include="Shouldly" />
+        <PackageReference Include="Testcontainers.MsSql" />
+        <PackageReference Include="Testcontainers.PostgreSql" />
+        <PackageReference Include="xunit.v3" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference
+            Include="../../../src/SqlSource/SqlSource.csproj"
+            OutputItemType="Analyzer"
+            ReferenceOutputAssembly="true"
+        />
+        <ProjectReference Include="../TestHarness/TestHarness.csproj" />
+    </ItemGroup>
+    <Import Project="../../../src/SqlSource/build/SqlSource.targets" />
+</Project>

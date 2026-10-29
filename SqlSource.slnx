@@ -17,6 +17,7 @@
   <Folder Name="/tests/DatabaseTests/">
     <Project Path="tests/DatabaseTests/Postgres.Npgsql8/Postgres.Npgsql8.csproj" />
     <Project Path="tests/DatabaseTests/Postgres/Postgres.csproj" />
+    <Project Path="tests/DatabaseTests/QueryMethodAllocation/QueryMethodAllocation.csproj" />
     <Project Path="tests/DatabaseTests/SqlServer.SqlClient61/SqlServer.SqlClient61.csproj" />
     <Project Path="tests/DatabaseTests/SqlServer/SqlServer.csproj" />
     <Project Path="tests/DatabaseTests/TestHarness/TestHarness.csproj" />
