@@ -34,9 +34,9 @@
 
 **Interfaces:**
 - Produces, in `StepReasons`: `public static void ShouldAllBe(IncrementalStepRunReason[] reasons, IncrementalStepRunReason reason)` (at least one, and every one is `reason`) and `public static void ShouldAllBeCached(IncrementalStepRunReason[] reasons)`.
-- Produces, in `CachingScene`: `public const string UserMethods = "App.UserQueries-Methods.g.cs"`, `public const string OrderMethods = "App.OrderQueries-Methods.g.cs"`, `public static Dictionary<string, IncrementalStepRunReason> MethodReasonsOf(IncrementalStepRunReason users, IncrementalStepRunReason orders)` (the copies' `Expect`) and `public static string MethodsOf(GeneratorDriverRunResult result, string file)`.
+- Produces, in `CachingScene`: `public const string UserMethods = "App.UserQueries-Methods.g.cs"`, `public const string OrderMethods = "App.OrderQueries-Methods.g.cs"`, `public static Dictionary<string, IncrementalStepRunReason> UsersAndOrders(IncrementalStepRunReason users, IncrementalStepRunReason orders)` (the copies' `Expect`) and `public static string MethodsOf(GeneratorDriverRunResult result, string file)`.
 
-- [ ] **Step 1:** Add the members; delete the copies from `CachingConverterTests` and `CachingMethodTests`, and rename their `Expect` calls to `MethodReasonsOf`.
+- [ ] **Step 1:** Add the members; delete the copies from `CachingConverterTests` and `CachingMethodTests`, and rename their `Expect` calls to `UsersAndOrders`.
 - [ ] **Step 2:** Replace every `X.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached)` of the `Caching*Tests` classes with `ShouldAllBeCached(X)`, and the same form with another reason with `ShouldAllBe(X, IncrementalStepRunReason.<Reason>)`.
 - [ ] **Step 3:** Run `dotnet test --project tests/SqlSource.Tests --filter-class '*Caching*'` and the same on `tests/SqlSource.Tests.RoslynFloor`; expected: all pass.  A failure on an empty set of reasons is handled as Review Focus says.
 - [ ] **Step 4:** `./format.sh`, `./pre-commit-validation.sh`, commit.
@@ -49,7 +49,7 @@
 **Interfaces:**
 - `GeneratorRun.Problems()`: `IReadOnlyList<string>`, after checking that the compilation has no error and the generated code no warning.
 - `GeneratedFile.Continued = "↩"` and `GeneratedFile.Joined(string text)`: each line that ends in the mark joined to the next, whose indentation goes.
-- `StepOutputs.ColumnsOf(GeneratorRun run, string? queryName = null)`: `PropertyType[]`, the column types of the run's one query, or of the query of that name, from `TrackingNames.FileTypes`.  `SettingsFileTests.ColumnOf` becomes `ColumnsOf(run).ShouldHaveSingleItem()`.
+- `StepOutputs.ColumnsOf(GeneratorRun run, string? queryName = null)`: `PropertyType[]`, the column types of the run's one query, of the one value `TrackingNames.FileTypes` gave, or of the query of that name among its values.  `SettingsFileTests.ColumnOf` becomes `ColumnsOf(run).ShouldHaveSingleItem()`.
 - `ModelRuns.Catalog(string internalName, string kind = SidecarValues.Kind.Base, PostgresType? subtype = null)`.
 
 - [ ] **Step 1:** Add the members and delete each copy, calling the shared one.
