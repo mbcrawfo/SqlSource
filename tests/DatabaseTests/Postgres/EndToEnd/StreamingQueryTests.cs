@@ -17,7 +17,8 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // closes it again when the loop ends, however it ends.  The tests hold the connection's state in each of those ways,
 // that a stream can be enumerated twice, that a break leaves the connection usable, and that a throw or a cancellation
 // closes again a connection that the method opened.  Then a query whose rows fail past the row where a loop stops,
-// whose error the disposal throws.
+// whose error the disposal throws, and one whose error comes after its rows, which the loop throws at its end or at a
+// break.
 [Collection(UsesPostgres.Name)]
 public sealed class StreamingQueryTests(PostgresDatabases postgres)
 {
@@ -366,6 +367,57 @@ public sealed class StreamingQueryTests(PostgresDatabases postgres)
         thrown.SqlState.ShouldBe(PostgresErrorCodes.DivisionByZero);
         rows.ShouldBe([new StreamNumbersFailingHalfwayDto(1, 0)]);
         connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
+    // The three accounts are yielded, and the division by zero after them is thrown by the move that would end the
+    // loop; the connection that the method opened is closed again.
+    [Fact]
+    public async Task StreamThenRaise_ErrorAfterTheRows_YieldsTheRowsThenThrows()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = source.CreateConnection();
+        var streamed = new List<CollectedAccount>();
+
+        var thrown = await Should.ThrowAsync<PostgresException>(async () =>
+        {
+            await foreach (var row in connection.StreamThenRaise(cancellationToken: token))
+            {
+                streamed.Add(row);
+            }
+        });
+
+        thrown.SqlState.ShouldBe(PostgresErrorCodes.DivisionByZero);
+        streamed.ShouldBe(Accounts);
+        connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
+    // A break at the first row disposes the stream, whose reader reads the rest of the result, and the division by zero
+    // after the rows is thrown at the break; the open connection is usable after.
+    [Fact]
+    public async Task StreamThenRaise_BreakAtTheFirstRow_ThrowsTheError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        var streamed = new List<CollectedAccount>();
+
+        var thrown = await Should.ThrowAsync<PostgresException>(async () =>
+        {
+            await foreach (var row in connection.StreamThenRaise(cancellationToken: token))
+            {
+                streamed.Add(row);
+                if (streamed.Count == 1)
+                {
+                    break;
+                }
+            }
+        });
+
+        thrown.SqlState.ShouldBe(PostgresErrorCodes.DivisionByZero);
+        streamed.ShouldBe([Accounts[0]]);
+        connection.State.ShouldBe(ConnectionState.Open);
+        (await connection.ListAsArray(cancellationToken: token)).ShouldBe(Accounts);
     }
 
     // The server's error for a row still to come aborts the transaction the stream ran in, as any error of a statement

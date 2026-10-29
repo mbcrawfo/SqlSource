@@ -8,9 +8,10 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 
 // The queries of Queries/Methods.sql, run on the seed of "app" through the methods that MethodQueries gets: each result
 // shape with the rows it allows and those it refuses, what rowcount counts, a token given its sample and another
-// fragment, and a method named with Async after it.  A test that writes runs in a transaction that is rolled back, and
-// gives it to the method.  The others give the method an open connection or a closed one, which the method opens.
-// What the methods declare is read by MethodShapeTests.
+// fragment, a method named with Async after it, and an error the server raises after the rows, which every shape
+// throws.  A test that writes runs in a transaction that is rolled back, and gives it to the method.  The others give
+// the method an open connection or a closed one, which the method opens.  What the methods declare is read by
+// MethodShapeTests.
 [Collection(UsesPostgres.Name)]
 public sealed class MethodQueryTests(PostgresDatabases postgres)
 {
@@ -234,6 +235,82 @@ public sealed class MethodQueryTests(PostgresDatabases postgres)
         count.ShouldBe(-1);
         (await UpdatedInThisTransactionAsync(connection, transaction, 3, token)).ShouldBeTrue();
         await transaction.RollbackAsync(token);
+    }
+
+    // The division by zero after the rows is thrown by a method that reads them into an array, at the read that meets
+    // it after the third account.
+    [Fact]
+    public async Task ListThenRaise_ErrorAfterTheRows_ThrowsTheError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+
+        var thrown = await Should.ThrowAsync<PostgresException>(() =>
+            connection.ListThenRaise(cancellationToken: token)
+        );
+
+        thrown.SqlState.ShouldBe(PostgresErrorCodes.DivisionByZero);
+    }
+
+    // The same under one, whose second read meets the error.
+    [Fact]
+    public async Task GetThenRaise_ErrorAfterTheRow_ThrowsTheError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+
+        var thrown = await Should.ThrowAsync<PostgresException>(() =>
+            connection.GetThenRaise(cancellationToken: token)
+        );
+
+        thrown.SqlState.ShouldBe(PostgresErrorCodes.DivisionByZero);
+    }
+
+    // The same under one-optional.
+    [Fact]
+    public async Task FindThenRaise_ErrorAfterTheRow_ThrowsTheError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+
+        var thrown = await Should.ThrowAsync<PostgresException>(() =>
+            connection.FindThenRaise(cancellationToken: token)
+        );
+
+        thrown.SqlState.ShouldBe(PostgresErrorCodes.DivisionByZero);
+    }
+
+    // The same query under none, which reads no rows.
+    [Fact]
+    public async Task RunThenRaise_ErrorAfterTheRows_ThrowsTheError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+
+        var thrown = await Should.ThrowAsync<PostgresException>(() =>
+            connection.RunThenRaise(cancellationToken: token)
+        );
+
+        thrown.SqlState.ShouldBe(PostgresErrorCodes.DivisionByZero);
+    }
+
+    // The same query under rowcount, which reads no rows either.
+    [Fact]
+    public async Task CountThenRaise_ErrorAfterTheRows_ThrowsTheError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+
+        var thrown = await Should.ThrowAsync<PostgresException>(() =>
+            connection.CountThenRaise(cancellationToken: token)
+        );
+
+        thrown.SqlState.ShouldBe(PostgresErrorCodes.DivisionByZero);
     }
 
     // Whether the transaction wrote the account's row: an update that changes no value still writes a new version of
