@@ -340,41 +340,26 @@ public sealed class MethodShapeTests(SqlServerDatabases sqlServer)
         await session.ShouldHaveRolledBackAsync(token);
     }
 
-    // A write given a transaction that has committed is refused, where SqlClient would run it outside any transaction
-    // and commit it on its own: the status it would have set is not there.  The finally puts the seed back only when
-    // the write ran.
+    // A none method given a transaction that has committed is refused before anything runs, where SqlClient would run
+    // its batch outside any transaction and commit it on its own: the mark that its batch sets on the session is not
+    // there, and the error after it is not raised.
     [Fact]
-    public async Task SetAccountStatus_CommittedTransaction_IsRefusedAndWritesNothing()
+    public async Task RunThenRaise_CommittedTransaction_IsRefusedAndRunsNothing()
     {
         var token = TestContext.Current.CancellationToken;
         await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
         await session.ShouldCommitAsync(token);
-        const string StatusOfBob = "SELECT status FROM dbo.accounts WHERE id = 2";
-        var before = await session.Connection.ExecuteScalarAsync<string>(StatusOfBob);
+        await SessionMark.ClearAsync(session.Connection, token);
 
-        try
-        {
-            var thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
-                session.Connection.SetAccountStatus(
-                    new SetAccountStatusArgs("refused", 2),
-                    transaction: session.Transaction,
-                    cancellationToken: token
-                )
-            );
+        var thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            session.Connection.RunThenRaise(transaction: session.Transaction, cancellationToken: token)
+        );
 
-            thrown.GetType().ShouldBe(typeof(InvalidOperationException));
-            thrown.Message.ShouldBe(
-                "The transaction given to the query 'SetAccountStatus' has completed; it is no longer usable."
-            );
-            (await session.Connection.ExecuteScalarAsync<string>(StatusOfBob)).ShouldBe(before);
-        }
-        finally
-        {
-            _ = await session.Connection.ExecuteAsync(
-                "UPDATE dbo.accounts SET status = @before WHERE id = 2 AND status <> @before",
-                new { before }
-            );
-        }
+        thrown.GetType().ShouldBe(typeof(InvalidOperationException));
+        thrown.Message.ShouldBe(
+            "The transaction given to the query 'RunThenRaise' has completed; it is no longer usable."
+        );
+        (await SessionMark.ReadAsync(session.Connection, token)).ShouldBe(0);
     }
 
     // A rowcount method given a transaction that an error rolled back is refused before anything runs: the mark that
