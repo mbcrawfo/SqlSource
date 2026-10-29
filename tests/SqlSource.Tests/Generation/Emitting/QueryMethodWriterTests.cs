@@ -71,6 +71,13 @@ public sealed class QueryMethodWriterTests
         Collection = CollectionKind.IAsyncEnumerable,
     };
 
+    // GetUser streaming its rows on SQL Server, without parameters.
+    private static readonly QueryMethod SqlServerStream = Stream with
+    {
+        Engine = DatabaseEngine.SqlServer,
+        Input = null,
+    };
+
     [Fact]
     public void Append_OneOptionalWithParametersAndAToken_IsTheWholeMethod()
     {
@@ -1040,17 +1047,77 @@ public sealed class QueryMethodWriterTests
     [Fact]
     public void Append_SqlServerStreams_DrainsAfterTheReadLoop()
     {
-        Write(Stream with { Engine = DatabaseEngine.SqlServer, Input = null })
+        Write(SqlServerStream)
             .ShouldContain(
-                "                yield return new global::App.GetUserDto(reader.GetFieldValue<int>(0), "
-                    + "reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1));\n"
-                    + "            }\n"
+                "                    atRow = false;\n"
+                    + "                }\n"
                     + "\n"
-                    + Drain("            ")
+                    + Drain("                ")
+                    + "            }\n"
+                    + "            finally\n"
+            );
+        Write(Stream).ShouldNotContain("NextResultAsync");
+    }
+
+    // A loop left at a row, by a break, a throw in its body or a disposal, disposes the iterator at its yield, and the
+    // finally reads the later results then, so that an error the rest of the batch raises is thrown.  The row is built
+    // before the flag is set, so an exception of the iterator's own, from a read, a check or a converter, reads none.
+    [Fact]
+    public void Append_SqlServerStreams_DrainsInAFinallyWhenLeftAtARow()
+    {
+        Write(SqlServerStream with { Output = VectorOutput(isNullable: false) })
+            .ShouldContain(
+                "            await using var readerScope = "
+                    + "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);\n"
+                    + "            var atRow = false;\n"
+                    + "            try\n"
+                    + "            {\n"
+                    + "                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
+                    + "                {\n"
+                    + "                    var value1 = reader.GetFieldValue<"
+                    + Vector
+                    + ">(1);\n"
+                    + "                    if (value1.IsNull)\n"
+                    + "                    {\n"
+                    + "                        throw new global::System.InvalidCastException("
+                    + "\"Column 'embedding' is null.\");\n"
+                    + "                    }\n"
+                    + "\n"
+                    + "                    var row = new global::App.GetUserDto("
+                    + "reader.GetFieldValue<int>(0), value1);\n"
+                    + "                    atRow = true;\n"
+                    + "                    yield return row;\n"
+                    + "                    atRow = false;\n"
+                    + "                }\n"
+                    + "\n"
+                    + Drain("                ")
+                    + "            }\n"
+                    + "            finally\n"
+                    + "            {\n"
+                    + "                if (atRow)\n"
+                    + "                {\n"
+                    + Drain("                    ")
+                    + "                }\n"
+                    + "            }\n"
                     + "        }\n"
                     + "        finally\n"
             );
-        Write(Stream).ShouldNotContain("NextResultAsync");
+        Write(Stream).ShouldNotContain("atRow");
+    }
+
+    // A token named as the flag renames the flag, which no argument may hide.
+    [Fact]
+    public void Append_SqlServerStreamsTokenNamedAtRow_RenamesTheFlag()
+    {
+        var text = Write(
+            SqlServerStream with
+            {
+                Segments = TestSidecars.Of(TestModels.Literal("SELECT 1 FROM "), Token("atRow")),
+            }
+        );
+
+        text.ShouldContain("var atRow1 = false;\n");
+        text.ShouldContain("if (atRow1)\n");
     }
 
     [Fact]
@@ -1136,6 +1203,7 @@ public sealed class QueryMethodWriterTests
             Token("App"),
             Token("await"),
             Token("ReadRows"),
+            Token("atRow"),
             Token("yield")
         );
         var withVector = GetUser.Output! with

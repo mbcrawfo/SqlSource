@@ -58,7 +58,7 @@ ORDER BY id;
 SELECT 1;
 
 -- name: StreamThenRaise
--- summary: The accounts, a mark on the session, and then an error that the loop throws after the rows.
+-- summary: The accounts, a mark on the session, and then an error that the loop throws at its end or at a break.
 -- output-model: CollectedAccount
 -- SET CONTEXT_INFO keeps its value for the session, which a test reads from the same connection: the mark is there when
 -- the batch ran as far as the THROW.

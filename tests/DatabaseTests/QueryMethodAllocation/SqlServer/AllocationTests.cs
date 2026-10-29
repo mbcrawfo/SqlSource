@@ -964,7 +964,7 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
 
     // StreamAccounts of Queries/Streaming.sql, by hand: a method that checks its argument at the call and returns a
     // static local iterator, which opens a closed connection, yields each row inside the try, reads the results after
-    // the last row, and closes the connection it opened in the finally.
+    // the last row, or in a finally when the loop is left at a row, and closes the connection it opened in the finally.
     private static IAsyncEnumerable<CollectedAccount> StreamAccountsByHand(
         DbConnection connection,
         DbTransaction? transaction = null,
@@ -1005,20 +1005,43 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                         .ConfigureAwait(false);
                     await using (reader.ConfigureAwait(false))
                     {
-                        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                        // The generated method's flag, true while the iterator is suspended at a row's yield.
+                        var atRow = false;
+                        try
                         {
-                            // The generated method's reads: a row's columns are in its buffer once ReadAsync returns.
+                            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                            {
+                                // The generated method's reads: a row's columns are in its buffer once ReadAsync
+                                // returns.
 #pragma warning disable CA1849
-                            yield return new CollectedAccount(
-                                reader.GetFieldValue<int>(0),
-                                reader.GetFieldValue<string>(1)
-                            );
+                                var row = new CollectedAccount(
+                                    reader.GetFieldValue<int>(0),
+                                    reader.GetFieldValue<string>(1)
+                                );
 #pragma warning restore CA1849
-                        }
+                                // The finally reads the flag when the iterator is disposed at the yield, which the
+                                // analyzer does not see.
+#pragma warning disable S1854
+                                atRow = true;
+#pragma warning restore S1854
+                                yield return row;
+                                atRow = false;
+                            }
 
-                        while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                            {
+                                // The generated method's drain, after the last row.
+                            }
+                        }
+                        finally
                         {
-                            // The generated method's drain, after the last row.
+                            if (atRow)
+                            {
+                                while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                                {
+                                    // The generated method's drain, when the loop was left at a row.
+                                }
+                            }
                         }
                     }
                 }

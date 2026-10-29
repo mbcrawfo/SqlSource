@@ -144,6 +144,33 @@ internal static class MethodRuns
         );
     }
 
+    // A streaming query under mssql, on SqlClient 7, whose token has the name, beside a parameter: SQL Server's
+    // iterator has locals of its own, the flag of a row being yielded among them, which RunTokenNamed's run has not.
+    public static GeneratorRun RunSqlServerTokenNamed(string token, LanguageVersion languageVersion)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: ProbeStream\n-- collection-type: IAsyncEnumerable\n-- token: {{"
+                + token
+                + ":users}}\nSELECT id FROM {{"
+                + token
+                + "}} WHERE id = @id;\n"
+        );
+        var entry = SqlServerEntry(
+            file,
+            "ProbeStream",
+            [TestSidecars.Parameter(0, "id", TestSidecars.SqlServer())],
+            [TestSidecars.Column(0, "id", TestSidecars.SqlServer())]
+        );
+        return Run(
+            file,
+            [entry],
+            references: [SqlClientReferences.SqlClient7],
+            dialect: "mssql",
+            languageVersion: languageVersion
+        );
+    }
+
     // The source of the runs of ParameterKinds: App.Sample, and App.UserId with its converters of long.
     public const string KindsSource = """
         using SqlSource;

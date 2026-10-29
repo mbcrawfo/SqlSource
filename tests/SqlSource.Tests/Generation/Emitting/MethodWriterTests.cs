@@ -332,6 +332,7 @@ public sealed class MethodWriterTests
     [InlineData("value0")]
     [InlineData("element")]
     [InlineData("item")]
+    [InlineData("atRow")]
     public void Run_TokenWithAnAwkwardName_CompilesOnTheNewestCSharp(string name)
     {
         var source = """
@@ -411,6 +412,7 @@ public sealed class MethodWriterTests
     [InlineData("item")]
     [InlineData("ReadRows")]
     [InlineData("yield")]
+    [InlineData("atRow")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_CompilesOnTheNewestCSharp(string name)
     {
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.Latest);
@@ -428,6 +430,14 @@ public sealed class MethodWriterTests
         methods.ShouldContain("global::System.Array.ConvertAll<global::App.UserId, int>(");
         methods.ShouldNotContain("static " + name + " =>");
         methods.ShouldNotContain("is { } " + name + " ?");
+
+        var sqlServer = MethodRuns.RunSqlServerTokenNamed(name, LanguageVersion.Latest);
+
+        sqlServer.ShouldBeClean();
+        // The flag of a row being yielded takes the name atRow unless a token has it, and then atRow1.
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .ShouldContain(name == "atRow" ? "var atRow1 = false;" : "var atRow = false;");
     }
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);
