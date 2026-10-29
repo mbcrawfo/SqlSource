@@ -4,7 +4,7 @@ using System.Globalization;
 namespace SqlSource.Snapshot;
 
 /// <summary>
-/// What <c>describe --check</c> compares, by the sidecar format design, section 3: <c>hash</c>, <c>engine</c>,
+/// What <c>describe --check</c> compares, by docs/architecture/sidecar-format.md: <c>hash</c>, <c>engine</c>,
 /// <c>database</c>, <c>resultKind</c>, <c>matchesTable</c>, and each parameter's and column's <c>name</c>,
 /// <c>ordinal</c>, <c>type</c> and <c>nullable</c>, in that order.  The server's version, provenance, origin,
 /// identity and computed are not compared: they are informational, or differ between machines by design.

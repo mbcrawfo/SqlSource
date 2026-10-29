@@ -4,8 +4,8 @@ using System.Text;
 namespace SqlSource.Snapshot;
 
 /// <summary>
-/// Builds JSON in the layout of the sidecar format design, section 1: two-space indent, line feeds, one key or
-/// array element on a line, an empty array or object on the line of its key, and a trailing newline.
+/// Builds JSON in the layout of docs/architecture/sidecar-format.md, "The text": two-space indent, line feeds, one
+/// key or array element on a line, an empty array or object on the line of its key, and a trailing newline.
 /// </summary>
 /// <remarks>
 /// A null key is an element of an array, or the first object.  A null value is written as <c>null</c>.  A string is
