@@ -1,4 +1,4 @@
-# TD-0087: on PostgreSQL, an error in the rows a stream discards replaces the loop body's exception
+# TD-0087: an error in the rows a stream discards replaces the loop body's exception
 
 ## Problem
 
@@ -10,16 +10,16 @@ The owner chose to drain rather than cancel, since a cancel aborts a PostgreSQL 
 
 ## Impact
 
-Low.  It needs a query whose rows fail beyond the row where the loop stops, such as a division or a cast in a column of a large sorted result, and a body that throws.  The cost is in diagnosis: the caller sees the database's error where its own exception, which may say why the loop stopped, was thrown, and a `catch` of its own exception's type does not run.  The engines differ, so code that relies on either behaviour does not carry from one to the other.
+Low.  It needs a query whose rows fail beyond the row where the loop stops, such as a division or a cast in a column of a large sorted result, and a body that throws.  The cost is in diagnosis: the caller sees the database's error where its own exception, which may say why the loop stopped, was thrown, and a `catch` of its own exception's type does not run.  Both engines behave alike: PostgreSQL through Npgsql's disposal of the reader, and SQL Server through the drain of its iterator's `finally`.
 
 ## Proposed fix
 
-Decide between two ways, each a change to the iterator that `QueryMethodWriter.AppendBody` and `AppendExecution` write, with the allocation pair of `StreamAccounts` in both engines' allocation tests of `tests/DatabaseTests/QueryMethodAllocation` measured before and after.  Either catches a `DbException` from the reader's disposal only when the iterator ends before its last row, which a local set after the read loop tells apart, so a loop that reads to the end still throws the error at its row.
+Decide between two ways, each a change to the iterator that `QueryMethodWriter.AppendBody` and `AppendExecution` write, with the allocation pair of `StreamAccounts` in both engines' allocation tests of `tests/DatabaseTests/QueryMethodAllocation` measured before and after.  Either acts only when the iterator ends before its last row, which SQL Server's `atRow` local already tells apart, so a loop that reads to the end still throws the error at its row.
 
-1. Drop the error on an early exit, as SqlClient does: the `break` throws nothing, the body's exception survives, and the PostgreSQL transaction is still aborted, now with no error to say so, which the manual would then have to say.
+1. Drop the error on an early exit: catch a `DbException` from PostgreSQL's disposal of the reader and from SQL Server's drain in the `finally`, so the `break` throws nothing and the body's exception survives.  The PostgreSQL transaction is still aborted, and a SQL Server one may be rolled back, now with no error to say so, which the manual would then have to say.
 2. Keep the error but not in place of the body's exception: since the iterator cannot see that exception, this needs the caller's help, for instance a generated helper that runs the loop's body as a delegate and throws an `AggregateException` of both, which changes how a stream is consumed.
 
-Flip the PostgreSQL tests named above, and rewrite the streaming rows of `docs/manual/settings.md`, its known issue, and the bullets of `docs/manual/postgresql.md` and `docs/architecture/generator.md` that describe the error.
+Flip the PostgreSQL and SQL Server tests named above, and rewrite the streaming rows of `docs/manual/settings.md`, its known issue, and the bullets of `docs/manual/postgresql.md` and `docs/architecture/generator.md` that describe the error.
 
 ## Trigger
 
