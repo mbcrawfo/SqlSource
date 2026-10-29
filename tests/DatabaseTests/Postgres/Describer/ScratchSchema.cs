@@ -214,8 +214,11 @@ internal static class ScratchSchema
         );
         """;
 
-    /// <summary>The part of a connection string that puts <see cref="ShadowingOperators" /> first.</summary>
-    public const string ShadowingOperatorsPath = "Search Path=shadowing_operators,pg_catalog";
+    /// <summary>
+    /// The part of a connection string that puts <see cref="ShadowingOperators" /> first.  <c>public</c> follows, so
+    /// that <c>format_type</c> writes a type of <c>public</c> without its schema, as on the default path.
+    /// </summary>
+    public const string ShadowingOperatorsPath = "Search Path=shadowing_operators,pg_catalog,public";
 
     /// <summary>
     /// Drops the schema <c>shadowing_operators</c> with what <see cref="ShadowingOperators" /> made in it.  Every
