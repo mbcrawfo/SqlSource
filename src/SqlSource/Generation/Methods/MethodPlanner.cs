@@ -107,9 +107,15 @@ internal static class MethodPlanner
                 continue;
             }
 
+            // Only a describable dialect's query has an entry, so only it can have a method or need a driver.
             var file = typeQueries.Files[fileIndex];
-            var engine = EngineOf(file.Dialect);
-            engines |= engine;
+            if (!SqlDescribableDialects.Contains(file.Dialect))
+            {
+                continue;
+            }
+
+            var engine = SqlDescribableDialects.EngineOf(file.Dialect);
+            engines |= engine.ToCodeGenEngines();
             if (Plan(input, key, file, fileIndex, queryIndex, query, settings, written, engine) is { } plan)
             {
                 planned.Add(plan);
@@ -148,7 +154,7 @@ internal static class MethodPlanner
         SqlQuery query,
         QuerySettings settings,
         HashSet<string> written,
-        CodeGenEngines engine
+        DatabaseEngine engine
     )
     {
         // A query without models has its own error already, reported by its file.
@@ -185,11 +191,8 @@ internal static class MethodPlanner
         // Its models are read whatever its other problems, so that it gets every problem of its converters too.
         var planned = new Planned(problems, name, query.Name, query.NameLocation, null, false, []);
         // A query whose driver is missing gets no method, which SQLSRC273 says, so its converters are not decided.
-        var databaseEngine = SqlDescribableDialects.EngineOf(file.Dialect);
-        var isUsable =
-            (engine == CodeGenEngines.Postgres && input.Drivers.Postgres)
-            || (engine == CodeGenEngines.SqlServer && input.Drivers.SqlServer);
-        var reading = new Reading(databaseEngine, isUsable, query.NameLocation, problems);
+        var isUsable = input.Drivers.Allows(engine);
+        var reading = new Reading(engine, isUsable, query.NameLocation, problems);
         var hasInput = TryReadInput(input, key, file, queryIndex, query, models, reading, out var methodInput);
         var hasOutput = TryReadOutput(input, key, file, queryIndex, settings, models, reading, out var methodOutput);
         if (problems.Count > 0 || !hasInput || !hasOutput)
@@ -203,7 +206,7 @@ internal static class MethodPlanner
             TypeEmitter.GetSummaryXml(query, file.FileName),
             shape,
             settings.CollectionType,
-            databaseEngine,
+            engine,
             settings.KeepComments ? query.KeptSegments ?? query.Segments : query.Segments,
             settings.ValidateTokens,
             settings.UseArrayPool,
@@ -512,17 +515,6 @@ internal static class MethodPlanner
                 warningIds.UnionWith(plan.WarningIds);
             }
         }
-    }
-
-    // The engine of a describable dialect: the methods of no other have an entry.
-    private static CodeGenEngines EngineOf(SqlDialect dialect)
-    {
-        if (dialect == SqlDialect.PostgreSql)
-        {
-            return CodeGenEngines.Postgres;
-        }
-
-        return dialect == SqlDialect.SqlServer ? CodeGenEngines.SqlServer : CodeGenEngines.None;
     }
 
     // The shape as the name marker writes it.

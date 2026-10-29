@@ -1,5 +1,7 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
+using System;
+using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
@@ -69,6 +71,17 @@ public sealed class MethodDriverTests
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
         run.Sources.Keys.ShouldContain(GetUserDtoFile);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
+
+    // A dialect the describer does not know has no entry and no method, so it needs no driver: SQLSRC209 alone.
+    [Fact]
+    public void Run_AnsiCodeGenWithoutDrivers_IsSqlsrc209AndNotSqlsrc273()
+    {
+        var run = MethodRuns.Run(Users, [], references: [], dialect: "ansi");
+
+        run.Diagnostics.ShouldNotContain(diagnostic => diagnostic.StartsWith("SQLSRC273", StringComparison.Ordinal));
+        run.Diagnostics.Count(diagnostic => diagnostic.StartsWith("SQLSRC209", StringComparison.Ordinal)).ShouldBe(1);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 

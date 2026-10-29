@@ -1,4 +1,5 @@
 using SqlSource.Generation.Types.Drivers;
+using SqlSource.Settings;
 
 namespace SqlSource.Generation.Methods;
 
@@ -13,4 +14,7 @@ internal readonly record struct MethodDrivers(bool Postgres, bool SqlServer)
     /// <summary>What the two probes say of the drivers.</summary>
     public static MethodDrivers Of(NpgsqlProbe npgsql, SqlClientProbe sqlClient) =>
         new(npgsql.Referenced && !npgsql.IsBelowTheFloor, sqlClient.Referenced && !sqlClient.IsBelowTheFloor);
+
+    /// <summary>Whether the methods of the engine's queries can be generated.</summary>
+    public bool Allows(DatabaseEngine engine) => engine == DatabaseEngine.SqlServer ? SqlServer : Postgres;
 }
