@@ -40,7 +40,6 @@ Next id: `TD-0092`
 | [TD-0086](TD-0086-short-name-binds-to-a-referenced-packages-type.md) | Open | 2026-10-27 | Low | A short name that the project has no type of binds with no diagnostic to a `public` type of that name in an assembly a package brings, as `AccountId` to `Microsoft.Identity.Client.AccountId` under SqlClient 6.1, which then has no converter and fails when the query runs |
 | [TD-0089](TD-0089-theories-that-branch-on-their-row.md) | Open | 2026-10-29 | Low | Some theories still branch on their row with an `if` or derive their expectations with `?:`, so a reader must follow the branch to know what a row checks |
 | [TD-0090](TD-0090-sql-server-error-at-a-row-hides-a-rollback.md) | Open | 2026-10-29 | Low | On SQL Server, a method whose read throws the database's error at a row, such as a divide by zero, throws it as it is, and an error that the rest of the batch then raises can roll back the caller's transaction with nothing to say so; a caller that catches the first error and goes on finds its own later commands, or Dapper's, committed on their own, where a later generated method refuses the transaction and `Commit` throws |
-| [TD-0091](TD-0091-check-does-not-compare-a-columns-origin.md) | Open | 2026-10-29 | Medium | `describe --check` never compares a column's `origin`, though the generator matches `columnTypes` against it, so a check passes on a sidecar whose next `describe` changes a column's generated type |
 
 ## Columns
 

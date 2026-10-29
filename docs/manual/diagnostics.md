@@ -1260,7 +1260,7 @@ See: [Logs](tool.md#logs)
 | `the sidecar cannot be read`, or `the sidecar has format 2, and this tool writes 1` | The sidecar is no sidecar of this version of the tool.  A merge conflict in it is the usual cause of the first |
 | `the sidecar has no entry` | The query was added, or renamed, since the sidecar was written |
 | `the query has changed since it was described` | The SQL, the type or the nullability of a `-- param:` marker, or the default of a token changed |
-| `columns[2].nullable is true, and the database says false` | The database describes the query another way than the sidecar holds.  A change to the schema is the usual cause |
+| `columns[2].nullable is true, and the database says false` | The database describes the query another way than the sidecar holds, such as a column that can now be null, or one now read from another table (`columns[0].origin.table`).  A change to the schema is the usual cause |
 | `database is "billing", and the project says "reports"` | The query belongs to another database, or another kind of database, than the one it was described against |
 | `the query is not in the file`, or `the query needs no entry` | The sidecar holds an entry for a query that was removed, or whose output is now `sql` |
 | `no query of the file needs an entry` | The sidecar belongs to a file that needs none any more |
@@ -1280,7 +1280,7 @@ See: [Logs](tool.md#logs)
 
 - **Columns and parameters are counted from 0**: `columns[2]` is the third column.
 - **Only the first difference of a query is named.**
-- **What is compared is what changes generated code**: the query as written (its SQL, the types and nullability of its `-- param:` markers, and its tokens' defaults), its database and the kind of that database, whether it returns rows and which table's rows they match, if any, and the name, position, type and nullability of each parameter and column.  The versions of the tool and of the server are not compared.
+- **What is compared is what changes generated code**: the query as written (its SQL, the types and nullability of its `-- param:` markers, and its tokens' defaults), its database and the kind of that database, whether it returns rows and which table's rows they match, if any, the name, position, type and nullability of each parameter and column, and the table column each column is read from.  The versions of the tool and of the server are not compared.
 - **With `--database`**, an entry for a query that is no longer in the file, or that needs none, is reported, whatever its database, when `describe` with the same filters would rewrite the sidecar, which drops it.  A sidecar that such a `describe` leaves as it is, because another query of the file, of a database that `--database` does not name, has changed or was never described, keeps the entry, and the check does not report it.
 
 The tool exits with the code 2 when it reported this error and no other, so that a build can tell a sidecar that is out of date from a check that could not be made.  A query that could not be described has an error of its own, and the exit code is then 1.

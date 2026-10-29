@@ -5,11 +5,11 @@ namespace SqlSource.Snapshot;
 
 /// <summary>
 /// What <c>describe --check</c> compares, by docs/architecture/sidecar-format.md: <c>hash</c>, <c>engine</c>,
-/// <c>database</c>, <c>resultKind</c>, <c>matchesTable</c>, and each parameter's and column's <c>name</c>,
-/// <c>ordinal</c>, <c>type</c> and <c>nullable</c>, in that order.  The server's version, provenance, origin,
-/// identity and computed are not compared: the version differs between machines by design, provenance, identity and
-/// computed are informational, and origin, which column types are matched against, is left out all the same
-/// (TD-0091).
+/// <c>database</c>, <c>resultKind</c>, <c>matchesTable</c>, each parameter's and column's <c>name</c>,
+/// <c>ordinal</c>, <c>type</c> and <c>nullable</c>, and each column's <c>origin</c>, in that order.  The origin is
+/// compared because column types are matched against it, a quoted part exactly, so each of its parts is compared
+/// ordinally.  The server's version, provenance, identity and computed are not compared: the version differs between
+/// machines by design, and provenance, identity and computed are informational.
 /// </summary>
 /// <remarks>
 /// Each comparison returns a difference whose path starts at what it compares, and its caller puts its own path in
@@ -103,7 +103,8 @@ internal static class SidecarComparer
                 Text(SidecarKeys.Name, left[index].Name, right[index].Name)
                 ?? Number(SidecarKeys.Ordinal, left[index].Ordinal, right[index].Ordinal)
                 ?? Type(left[index].Type, right[index].Type)
-                ?? Flag(SidecarKeys.Nullable, left[index].Nullable, right[index].Nullable);
+                ?? Flag(SidecarKeys.Nullable, left[index].Nullable, right[index].Nullable)
+                ?? Origin(left[index].Origin, right[index].Origin);
             if (difference is not null)
             {
                 return Under(Element(SidecarKeys.Columns, index), difference);
@@ -111,6 +112,21 @@ internal static class SidecarComparer
         }
 
         return null;
+    }
+
+    private static SidecarDifference? Origin(SidecarOrigin? committed, SidecarOrigin? described)
+    {
+        if (committed is null || described is null)
+        {
+            return Presence(SidecarKeys.Origin, committed is not null, described is not null, AnObject, Null);
+        }
+
+        return Under(
+            SidecarKeys.Origin,
+            Text(SidecarKeys.Schema, committed.Schema, described.Schema)
+                ?? Text(SidecarKeys.Table, committed.Table, described.Table)
+                ?? Text(SidecarKeys.Column, committed.Column, described.Column)
+        );
     }
 
     private static SidecarDifference? Type(SidecarType? committed, SidecarType? described)
