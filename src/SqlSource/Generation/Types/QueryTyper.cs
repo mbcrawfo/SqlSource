@@ -25,11 +25,13 @@ namespace SqlSource.Generation.Types;
 /// </summary>
 /// <remarks>
 /// A query's parameters are typed before its columns, each in order, and its first failure is its one error, at its
-/// name: the query then has no types.  A type of PostgreSQL goes to <see cref="PostgresTypeMap" />, one of SQL Server
-/// to <see cref="SqlServerTypeMap" />.  The map of a query's type override is the entries of its file's engine, and its
-/// column types those of every level, each merged once for each distinct level of markers, since the queries without
-/// markers of their own share their file header's.  An empty map, as in a project without the override, is not asked
-/// at all.  A column's marker of <c>-&gt; default</c> skips the column types alone.
+/// name: the query then has no types.  A chosen type whose short name found a type that only a package brings is the
+/// warning <c>SQLSRC284</c> at its name, for each column and parameter, and the type is kept.  A type of PostgreSQL
+/// goes to <see cref="PostgresTypeMap" />, one of SQL Server to <see cref="SqlServerTypeMap" />.  The map of a query's
+/// type override is the entries of its file's engine, and its column types those of every level, each merged once for
+/// each distinct level of markers, since the queries without markers of their own share their file header's.  An
+/// empty map, as in a project without the override, is not asked at all.  A column's marker of <c>-&gt; default</c>
+/// skips the column types alone.
 /// </remarks>
 internal static class QueryTyper
 {
@@ -273,6 +275,7 @@ internal static class QueryTyper
         var mapping = MappingOf(typing.MappedTypes, clrType, key, place);
         if (mapping is { Kind: TypeMappingKind.Mapped, Text: { } text })
         {
+            WarnOfPackage(mapping, MessageSubject.Of(owner, name), typing);
             return new PropertyType(
                 text,
                 mapping.IsValueType,
@@ -305,8 +308,9 @@ internal static class QueryTyper
         };
 
     // The mapping of a C# type that a level chose for a key, by the compilation's answer for its name.  A found type is
-    // written as the resolver wrote it, its short names in full; a failure keeps the name for its message, and the
-    // place that chose it in its detail.
+    // written as the resolver wrote it, its short names in full, and keeps the name beside a short name that found a
+    // package's type, for SQLSRC284; a failure keeps the name for its message, and the place that chose it in its
+    // detail.
     private static TypeMapping MappingOf(EquatableArray<MappedType> mappedTypes, string name, string key, string place)
     {
         var mapped = MappedTypeResolver.Find(mappedTypes, name);
@@ -317,9 +321,47 @@ internal static class QueryTyper
             MappedTypeStatus.NotAPropertyType => TypeMappingKind.MappedTypeNotAPropertyType,
             MappedTypeStatus.NotFound or MappedTypeStatus.Ambiguous or _ => TypeMappingKind.MappedTypeNotFound,
         };
-        return kind == TypeMappingKind.Mapped
-            ? new TypeMapping(kind, key, mapped!.Text, mapped.IsValueType, mapped.IsPublic, mapped.WarningIds, place)
-            : new TypeMapping(kind, key, name, false, false, EquatableArray<string>.Empty, place);
+        if (kind != TypeMappingKind.Mapped)
+        {
+            return new TypeMapping(kind, key, name, false, false, EquatableArray<string>.Empty, place);
+        }
+
+        var written = mapped!.Package is null ? null : name;
+        return new TypeMapping(
+            kind,
+            key,
+            mapped.Text,
+            mapped.IsValueType,
+            mapped.IsPublic,
+            mapped.WarningIds,
+            place,
+            mapped.Package,
+            written
+        );
+    }
+
+    // SQLSRC284, a warning, for a found type whose short name found a type that only a package brings.  The column or
+    // parameter keeps the type, so the query is still typed.  Its first four arguments are SQLSRC250's.
+    private static void WarnOfPackage(TypeMapping mapping, string subject, Typing typing)
+    {
+        if (mapping.Package is not { } package)
+        {
+            return;
+        }
+
+        typing.Diagnostics.Add(
+            DiagnosticInfo.Create(
+                SqlDiagnostics.ShortNameFindsAPackagesType,
+                typing.Location,
+                subject,
+                mapping.Key,
+                PostgresTypeMap.AsWritten(mapping.Written ?? ""),
+                mapping.Detail ?? "",
+                package.ShortName,
+                package.FullName,
+                package.Assembly
+            )
+        );
     }
 
     // The types that a short name in the C# type could mean, or null when it has none.
@@ -362,6 +404,7 @@ internal static class QueryTyper
         {
             // A type of the map has no place; one that a type override, a column type or a marker chose has the base
             // map's type beside it.
+            WarnOfPackage(mapping, MessageSubject.Of(owner, name), typing);
             return new PropertyType(
                 text,
                 mapping.IsValueType,

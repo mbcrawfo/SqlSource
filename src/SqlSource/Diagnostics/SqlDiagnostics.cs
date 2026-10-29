@@ -946,6 +946,25 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} to {3} as SQLSRC250's, {4} the short name as written, without its type arguments, {5} the full name of the
+    // type it finds, as a user writes it, and {6} the name of the type's assembly, which only a package that the
+    // project does not reference itself brings.  Reported at the query's name, for each column and parameter.
+    //
+    // A warning a project may configure: the type is used, since it may be the one meant, and an error would break a
+    // build whenever an update of a package brings it a new assembly.  Writing the full name, or listing the id in
+    // NoWarn, turns it off.
+    public static readonly DiagnosticDescriptor ShortNameFindsAPackagesType = new(
+        id: "SQLSRC284",
+        title: "Short name finds a type that only a package brings",
+        messageFormat: "'{1}' is mapped to '{2}' for {0}, in {3}, and the short name '{4}' finds '{5}', of the "
+            + "assembly {6}, which this project has only through a package that it does not reference itself.  If "
+            + "that is the type meant, write its full name, '{5}'; otherwise correct the name.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc284"
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -1025,7 +1044,8 @@ internal static class SqlDiagnostics
             NotAConverter,
             DuplicateConverter,
             ConverterTypeMismatch,
-            ConverterDirectionMissing
+            ConverterDirectionMissing,
+            ShortNameFindsAPackagesType
         );
 
     /// <summary>

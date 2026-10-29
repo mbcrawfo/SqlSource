@@ -7,7 +7,10 @@ namespace SqlSource.Generation.Types;
 /// <param name="Queries">
 /// The types of each query whose entry is usable, in the order of the file.  A query with an error has none.
 /// </param>
-/// <param name="Diagnostics">The errors of the queries, each at its query's name: one at most for a query.</param>
+/// <param name="Diagnostics">
+/// The errors and warnings of the queries, each at its query's name: one error at most for a query, which then has no
+/// types, and <c>SQLSRC284</c>, a warning that leaves a query its types, for each column and parameter it is about.
+/// </param>
 internal sealed record FileTypes(
     string NormalizedPath,
     EquatableArray<QueryTypes> Queries,
