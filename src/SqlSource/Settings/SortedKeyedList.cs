@@ -63,22 +63,22 @@ internal static class SortedKeyedList
     /// </summary>
     public static int IndexOf<T>(List<T> entries, string key, Comparison<string> order, Func<T, string> keyOf)
     {
-        var (low, high) = (0, entries.Count);
-        while (low < high)
-        {
-            var middle = low + ((high - low) / 2);
-            if (order(keyOf(entries[middle]), key) < 0)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle;
-            }
-        }
-
-        return low < entries.Count && order(keyOf(entries[low]), key) == 0 ? low : ~low;
+        var probe = new KeyProbe<T>(entries, key, order, keyOf);
+        var at = SortedSearch.LowerBound(entries.Count, probe);
+        return at < entries.Count && probe.CompareAt(at) == 0 ? at : ~at;
     }
+
+    /// <summary>
+    /// The order of a map whose keys compare by their parts, as <paramref name="compare" /> compares them under a
+    /// <see cref="StringComparison" />: ignoring case, then exactly to break a tie, so that keys that differ only by
+    /// case are two keys.  Build it once, at a static field, so that a call allocates nothing for it.
+    /// </summary>
+    public static Comparison<string> OrderOf(Func<string, string, StringComparison, int> compare) =>
+        (a, b) =>
+        {
+            var order = compare(a, b, StringComparison.OrdinalIgnoreCase);
+            return order != 0 ? order : compare(a, b, StringComparison.Ordinal);
+        };
 
     /// <summary>
     /// Adds <paramref name="entry" /> in its place in a sorted list and gives null, or, when the list has an entry of
@@ -96,5 +96,12 @@ internal static class SortedKeyedList
 
         entries.Insert(~at, entry);
         return null;
+    }
+
+    // A struct, so that SortedSearch does not box it.
+    private readonly struct KeyProbe<T>(List<T> entries, string key, Comparison<string> order, Func<T, string> keyOf)
+        : SortedSearch.IProbe
+    {
+        public int CompareAt(int index) => order(keyOf(entries[index]), key);
     }
 }
