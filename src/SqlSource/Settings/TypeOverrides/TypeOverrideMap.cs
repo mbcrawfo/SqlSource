@@ -19,9 +19,8 @@ namespace SqlSource.Settings.TypeOverrides;
 internal static class TypeOverrideMap
 {
     // The order of the map and the key of an entry, for SortedKeyedList.  Static, so that no call allocates them.
-    private static readonly Comparison<string> KeyOrder = SortedKeyedList.OrderOf(
-        static (a, b, comparison) => Compare(new KeyParts(a), new KeyParts(b), comparison)
-    );
+    private static readonly Comparison<string> KeyOrder = static (a, b) =>
+        SortedKeyedList.Order(a, b, default(KeyComparison));
 
     private static readonly Func<TypeOverride, string> KeyOf = static entry => entry.Key;
 
@@ -161,6 +160,13 @@ internal static class TypeOverrideMap
         // stays, so the first in the order of the map wins.
         public bool IsBetterThan(Match other) =>
             other.Entry is null || Rank > other.Rank || (Rank == other.Rank && IsExact && !other.IsExact);
+    }
+
+    // The map's comparison of two keys, for SortedKeyedList.Order.  A struct, so that it is called directly.
+    private readonly struct KeyComparison : SortedKeyedList.IKeyComparison
+    {
+        public int CompareKeys(string first, string second, StringComparison comparison) =>
+            Compare(new KeyParts(first), new KeyParts(second), comparison);
     }
 
     // A key split once into its parts, as TypeKeyText.TrySplit gives them, so that a search splits the key it looks for

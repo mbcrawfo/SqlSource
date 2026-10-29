@@ -20,9 +20,8 @@ namespace SqlSource.Settings.ColumnTypes;
 internal static class ColumnTypeMap
 {
     // The order of the map and the key of an entry, for SortedKeyedList.  Static, so that no call allocates them.
-    private static readonly Comparison<string> KeyOrder = SortedKeyedList.OrderOf(
-        static (a, b, comparison) => Compare(new KeyParts(a), new KeyParts(b), comparison)
-    );
+    private static readonly Comparison<string> KeyOrder = static (a, b) =>
+        SortedKeyedList.Order(a, b, default(KeyComparison));
 
     private static readonly Func<ColumnType, string> KeyOf = static entry => entry.Key;
 
@@ -78,21 +77,6 @@ internal static class ColumnTypeMap
     /// </summary>
     public static ColumnType? AddOrFind(List<ColumnType> entries, ColumnType entry) =>
         SortedKeyedList.AddOrFind(entries, entry, KeyOrder, KeyOf);
-
-    // By the table, the column, then the schema, a key without one first.  A key that is not well formed does not
-    // reach the map, and would be compared as a whole.
-    private static int Compare(in KeyParts a, in KeyParts b, StringComparison comparison)
-    {
-        if (!a.IsWellFormed || !b.IsWellFormed)
-        {
-            return string.Compare(a.Text, b.Text, comparison);
-        }
-
-        var order = TypeKeyText.ComparePart(a.Table, b.Table, comparison);
-        order = order != 0 ? order : TypeKeyText.ComparePart(a.Column, b.Column, comparison);
-        order = order != 0 ? order : b.Schema.IsEmpty.CompareTo(a.Schema.IsEmpty);
-        return order != 0 || a.Schema.IsEmpty ? order : TypeKeyText.ComparePart(a.Schema, b.Schema, comparison);
-    }
 
     // An entry's table and column against the origin's, which is the order of the map's first two parts.
     private static int CompareColumn(in KeyParts entry, in Origin origin, StringComparison comparison)
@@ -169,19 +153,37 @@ internal static class ColumnTypeMap
         }
     }
 
+    // The map's comparison of two keys, for SortedKeyedList.Order: by the table, the column, then the schema, a key
+    // without one first.  A key that is not well formed does not reach the map, and would be compared as a whole.  A
+    // struct, so that it is called directly.
+    private readonly struct KeyComparison : SortedKeyedList.IKeyComparison
+    {
+        public int CompareKeys(string first, string second, StringComparison comparison)
+        {
+            var a = new KeyParts(first);
+            var b = new KeyParts(second);
+            if (!a.IsWellFormed || !b.IsWellFormed)
+            {
+                return string.Compare(first, second, comparison);
+            }
+
+            var order = TypeKeyText.ComparePart(a.Table, b.Table, comparison);
+            order = order != 0 ? order : TypeKeyText.ComparePart(a.Column, b.Column, comparison);
+            order = order != 0 ? order : b.Schema.IsEmpty.CompareTo(a.Schema.IsEmpty);
+            return order != 0 || a.Schema.IsEmpty ? order : TypeKeyText.ComparePart(a.Schema, b.Schema, comparison);
+        }
+    }
+
     // A key split once into its parts, as ColumnTypeKey.TrySplit gives them.
     private readonly ref struct KeyParts
     {
         public KeyParts(string text)
         {
-            Text = text;
             IsWellFormed = ColumnTypeKey.TrySplit(text.AsSpan(), out var schema, out var table, out var column);
             Schema = schema;
             Table = table;
             Column = column;
         }
-
-        public string Text { get; }
 
         public bool IsWellFormed { get; }
 
