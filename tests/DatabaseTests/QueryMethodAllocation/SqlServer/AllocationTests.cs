@@ -16,20 +16,21 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer;
 
 // The bytes that a generated method allocates for each call, against a hand-written ADO.NET method of the same calls:
 // ShapeQueries.SearchAccounts, with two parameters and three rows of the seed of "app".  The hand-written method makes
-// the generated method's calls, one by one: the open/close rule of the methods, the command and its arguments, the
-// binding of each parameter, the reads of each column, the read of the results after the rows, so that a later
-// statement's error is thrown, and the same rows in the same collection, an IReadOnlyList with an array behind it,
-// which it can only build by copying what it read the rows into, since the count of the rows is not known until they
-// are read.  It reads them into what the generated method does, so there are two pairs:
-// SearchAccounts, which reads its rows into the pooled buffer, against a hand-written method that reads them into
-// RowBufferByHand of this project, the same buffer by hand; and SearchAccountsUnpooled, a copy of
-// the query under no-array-pool, which reads them into a List, against a hand-written method that does the same.  The
-// copy is a query of its own because SearchAccounts' own list of generator parameters, sort-input, replaces the list of
-// any claim's attribute, and UnpooledCopyTests holds its SQL to SearchAccounts'.  The numbers queries of
-// RowBufferQueries have a pair of each kind for the List, IList, ICollection and ImmutableArray, at 3 rows: the pooled
-// method against rows read into RowBufferByHand and copied by ToList or ToImmutableArray, and its twin under
-// no-array-pool against a List that is returned as it is or an ImmutableArray builder that is drained, since those are
-// what the generated method returns.  Three more tests hold the pooled NumbersAsArray, NumbersAsList and
+// the generated method's calls, one by one: the refusal of a transaction that has completed, the open/close rule of
+// the methods, the command and its arguments, the binding of each parameter, the reads of each column, the read of
+// the results after the rows, so that a later statement's error is thrown, the catch that checks a transaction after
+// an exception of the method's own, and the same rows in the same collection, an IReadOnlyList with an array behind
+// it, which it can only build by copying what it read the rows into, since the count of the rows is not known until
+// they are read.  It reads them into what the
+// generated method does, so there are two pairs: SearchAccounts, which reads its rows into the pooled buffer, against a
+// hand-written method that reads them into RowBufferByHand of this project, the same buffer by hand; and
+// SearchAccountsUnpooled, a copy of the query under no-array-pool, which reads them into a List, against a hand-written
+// method that does the same.  The copy is a query of its own because SearchAccounts' own list of generator parameters,
+// sort-input, replaces the list of any claim's attribute, and UnpooledCopyTests holds its SQL to SearchAccounts'.  The
+// numbers queries of RowBufferQueries have a pair of each kind for the List, IList, ICollection and ImmutableArray, at
+// 3 rows: the pooled method against rows read into RowBufferByHand and copied by ToList or ToImmutableArray, and its
+// twin under no-array-pool against a List that is returned as it is or an ImmutableArray builder that is drained, since
+// those are what the generated method returns.  Three more tests hold the pooled NumbersAsArray, NumbersAsList and
 // NumbersAsImmutableArray, at 300 rows, to allocating less than a List copied to an array, a List grown by doubling and
 // an ImmutableArray builder that is drained, each by at least a given number of bytes, since a pooled buffer exists to
 // save a list's growth arrays and the pairs above, against RowBufferByHand, cannot see what the buffer itself costs.
@@ -500,6 +501,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         CancellationToken cancellationToken = default
     )
     {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'SearchAccounts' has completed; it is no longer usable."
+            );
+        }
+
         var wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
         {
@@ -540,22 +549,37 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 .ExecuteReaderAsync(CommandBehavior.Default, cancellationToken)
                 .ConfigureAwait(false);
             await using var readerScope = reader.ConfigureAwait(false);
-            var rows = new RowBufferByHand<SearchAccountsView>();
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            try
             {
-                // The generated method's reads: a row's columns are in its buffer once ReadAsync has returned.
+                var rows = new RowBufferByHand<SearchAccountsView>();
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's reads: a row's columns are in its buffer once ReadAsync has returned.
 #pragma warning disable CA1849
-                rows.Add(new SearchAccountsView(reader.GetFieldValue<int>(0), reader.GetFieldValue<string>(1)));
+                    rows.Add(new SearchAccountsView(reader.GetFieldValue<int>(0), reader.GetFieldValue<string>(1)));
 #pragma warning restore CA1849
-            }
+                }
 
-            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
+                }
+
+                // The array behind the IReadOnlyList.
+                return rows.ToArray();
+            }
+            catch (Exception exception)
+                when (transaction is not null && exception is not (DbException or OperationCanceledException))
             {
-                // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
-            }
+                // The generated method's check of the transaction after an exception of its own.
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("SearchAccounts", exception);
+                }
 
-            // The array behind the IReadOnlyList.
-            return rows.ToArray();
+                throw;
+            }
         }
         finally
         {
@@ -576,6 +600,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         CancellationToken cancellationToken = default
     )
     {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'SearchAccountsUnpooled' has completed; it is no longer usable."
+            );
+        }
+
         var wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
         {
@@ -616,24 +648,39 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 .ExecuteReaderAsync(CommandBehavior.Default, cancellationToken)
                 .ConfigureAwait(false);
             await using var readerScope = reader.ConfigureAwait(false);
-            var rows = new List<SearchAccountsView>();
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            try
             {
-                // The generated method's reads: a row's columns are in its buffer once ReadAsync has returned.
+                var rows = new List<SearchAccountsView>();
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's reads: a row's columns are in its buffer once ReadAsync has returned.
 #pragma warning disable CA1849
-                rows.Add(new SearchAccountsView(reader.GetFieldValue<int>(0), reader.GetFieldValue<string>(1)));
+                    rows.Add(new SearchAccountsView(reader.GetFieldValue<int>(0), reader.GetFieldValue<string>(1)));
 #pragma warning restore CA1849
-            }
+                }
 
-            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
-            {
-                // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
-            }
+                while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
+                }
 
-            // The array behind the IReadOnlyList; a collection expression would wrap it in another object.
+                // The array behind the IReadOnlyList; a collection expression would wrap it in another object.
 #pragma warning disable IDE0305
-            return rows.ToArray();
+                return rows.ToArray();
 #pragma warning restore IDE0305
+            }
+            catch (Exception exception)
+                when (transaction is not null && exception is not (DbException or OperationCanceledException))
+            {
+                // The generated method's check of the transaction after an exception of its own.
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("SearchAccountsUnpooled", exception);
+                }
+
+                throw;
+            }
         }
         finally
         {
@@ -654,6 +701,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         CancellationToken cancellationToken = default
     )
     {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'NumbersAsList' has completed; it is no longer usable."
+            );
+        }
+
         var wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
         {
@@ -682,21 +737,36 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 .ExecuteReaderAsync(CommandBehavior.Default, cancellationToken)
                 .ConfigureAwait(false);
             await using var readerScope = reader.ConfigureAwait(false);
-            var rows = new RowBufferByHand<CountedNumber>();
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            try
             {
-                // The generated method's reads: a row's column is in its buffer once ReadAsync has returned.
+                var rows = new RowBufferByHand<CountedNumber>();
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's reads: a row's column is in its buffer once ReadAsync has returned.
 #pragma warning disable CA1849
-                rows.Add(new CountedNumber(reader.IsDBNull(0) ? null : reader.GetFieldValue<int>(0)));
+                    rows.Add(new CountedNumber(reader.IsDBNull(0) ? null : reader.GetFieldValue<int>(0)));
 #pragma warning restore CA1849
-            }
+                }
 
-            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
+                }
+
+                return rows.ToList();
+            }
+            catch (Exception exception)
+                when (transaction is not null && exception is not (DbException or OperationCanceledException))
             {
-                // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
-            }
+                // The generated method's check of the transaction after an exception of its own.
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("NumbersAsList", exception);
+                }
 
-            return rows.ToList();
+                throw;
+            }
         }
         finally
         {
@@ -717,6 +787,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         CancellationToken cancellationToken = default
     )
     {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'NumbersAsImmutableArray' has completed; it is no longer usable."
+            );
+        }
+
         var wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
         {
@@ -745,21 +823,36 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 .ExecuteReaderAsync(CommandBehavior.Default, cancellationToken)
                 .ConfigureAwait(false);
             await using var readerScope = reader.ConfigureAwait(false);
-            var rows = new RowBufferByHand<CountedNumber>();
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            try
             {
-                // The generated method's reads: a row's column is in its buffer once ReadAsync has returned.
+                var rows = new RowBufferByHand<CountedNumber>();
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's reads: a row's column is in its buffer once ReadAsync has returned.
 #pragma warning disable CA1849
-                rows.Add(new CountedNumber(reader.IsDBNull(0) ? null : reader.GetFieldValue<int>(0)));
+                    rows.Add(new CountedNumber(reader.IsDBNull(0) ? null : reader.GetFieldValue<int>(0)));
 #pragma warning restore CA1849
-            }
+                }
 
-            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
+                }
+
+                return rows.ToImmutableArray();
+            }
+            catch (Exception exception)
+                when (transaction is not null && exception is not (DbException or OperationCanceledException))
             {
-                // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
-            }
+                // The generated method's check of the transaction after an exception of its own.
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("NumbersAsImmutableArray", exception);
+                }
 
-            return rows.ToImmutableArray();
+                throw;
+            }
         }
         finally
         {
@@ -780,6 +873,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         CancellationToken cancellationToken = default
     )
     {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'NumbersNoPoolAsList' has completed; it is no longer usable."
+            );
+        }
+
         var wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
         {
@@ -808,21 +909,36 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 .ExecuteReaderAsync(CommandBehavior.Default, cancellationToken)
                 .ConfigureAwait(false);
             await using var readerScope = reader.ConfigureAwait(false);
-            var rows = new List<CountedNumber>();
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            try
             {
-                // The generated method's reads: a row's column is in its buffer once ReadAsync has returned.
+                var rows = new List<CountedNumber>();
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's reads: a row's column is in its buffer once ReadAsync has returned.
 #pragma warning disable CA1849
-                rows.Add(new CountedNumber(reader.IsDBNull(0) ? null : reader.GetFieldValue<int>(0)));
+                    rows.Add(new CountedNumber(reader.IsDBNull(0) ? null : reader.GetFieldValue<int>(0)));
 #pragma warning restore CA1849
-            }
+                }
 
-            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
+                }
+
+                return rows;
+            }
+            catch (Exception exception)
+                when (transaction is not null && exception is not (DbException or OperationCanceledException))
             {
-                // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
-            }
+                // The generated method's check of the transaction after an exception of its own.
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("NumbersNoPoolAsList", exception);
+                }
 
-            return rows;
+                throw;
+            }
         }
         finally
         {
@@ -843,6 +959,15 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         CancellationToken cancellationToken = default
     )
     {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'NumbersNoPoolAsImmutableArray' has completed; "
+                    + "it is no longer usable."
+            );
+        }
+
         var wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
         {
@@ -871,21 +996,36 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 .ExecuteReaderAsync(CommandBehavior.Default, cancellationToken)
                 .ConfigureAwait(false);
             await using var readerScope = reader.ConfigureAwait(false);
-            var rows = ImmutableArray.CreateBuilder<CountedNumber>();
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            try
             {
-                // The generated method's reads: a row's column is in its buffer once ReadAsync has returned.
+                var rows = ImmutableArray.CreateBuilder<CountedNumber>();
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's reads: a row's column is in its buffer once ReadAsync has returned.
 #pragma warning disable CA1849
-                rows.Add(new CountedNumber(reader.IsDBNull(0) ? null : reader.GetFieldValue<int>(0)));
+                    rows.Add(new CountedNumber(reader.IsDBNull(0) ? null : reader.GetFieldValue<int>(0)));
 #pragma warning restore CA1849
-            }
+                }
 
-            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
+                }
+
+                return rows.DrainToImmutable();
+            }
+            catch (Exception exception)
+                when (transaction is not null && exception is not (DbException or OperationCanceledException))
             {
-                // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
-            }
+                // The generated method's check of the transaction after an exception of its own.
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("NumbersNoPoolAsImmutableArray", exception);
+                }
 
-            return rows.DrainToImmutable();
+                throw;
+            }
         }
         finally
         {
@@ -906,6 +1046,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         CancellationToken cancellationToken = default
     )
     {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'NumbersAsArray' has completed; it is no longer usable."
+            );
+        }
+
         var wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
         {
@@ -934,24 +1082,39 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 .ExecuteReaderAsync(CommandBehavior.Default, cancellationToken)
                 .ConfigureAwait(false);
             await using var readerScope = reader.ConfigureAwait(false);
-            var rows = new List<CountedNumber>();
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            try
             {
-                // The generated method's reads: a row's column is in its buffer once ReadAsync has returned.
+                var rows = new List<CountedNumber>();
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's reads: a row's column is in its buffer once ReadAsync has returned.
 #pragma warning disable CA1849
-                rows.Add(new CountedNumber(reader.IsDBNull(0) ? null : reader.GetFieldValue<int>(0)));
+                    rows.Add(new CountedNumber(reader.IsDBNull(0) ? null : reader.GetFieldValue<int>(0)));
 #pragma warning restore CA1849
-            }
+                }
 
-            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
-            {
-                // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
-            }
+                while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
+                }
 
-            // A collection expression would wrap the array in another object.
+                // A collection expression would wrap the array in another object.
 #pragma warning disable IDE0305
-            return rows.ToArray();
+                return rows.ToArray();
 #pragma warning restore IDE0305
+            }
+            catch (Exception exception)
+                when (transaction is not null && exception is not (DbException or OperationCanceledException))
+            {
+                // The generated method's check of the transaction after an exception of its own.
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("NumbersAsArray", exception);
+                }
+
+                throw;
+            }
         }
         finally
         {
@@ -982,6 +1145,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
             [EnumeratorCancellation] CancellationToken cancellationToken
         )
         {
+            // The generated method's refusal of a transaction that has completed.
+            if (transaction is not null && transaction.Connection is null)
+            {
+                throw new InvalidOperationException(
+                    "The transaction given to the query 'StreamAccounts' has completed; it is no longer usable."
+                );
+            }
+
             var wasClosed = connection.State == ConnectionState.Closed;
             if (wasClosed)
             {
@@ -1011,14 +1182,33 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                         {
                             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                             {
-                                // The generated method's reads: a row's columns are in its buffer once ReadAsync
-                                // returns.
+                                CollectedAccount row;
+                                try
+                                {
+                                    // The generated method's reads: a row's columns are in its buffer once
+                                    // ReadAsync returns.
 #pragma warning disable CA1849
-                                var row = new CollectedAccount(
-                                    reader.GetFieldValue<int>(0),
-                                    reader.GetFieldValue<string>(1)
-                                );
+                                    row = new CollectedAccount(
+                                        reader.GetFieldValue<int>(0),
+                                        reader.GetFieldValue<string>(1)
+                                    );
 #pragma warning restore CA1849
+                                }
+                                catch (Exception exception)
+                                    when (transaction is not null
+                                        && exception is not (DbException or OperationCanceledException)
+                                    )
+                                {
+                                    // The generated method's check of the transaction after an exception of its own.
+                                    await reader.DisposeAsync().ConfigureAwait(false);
+                                    if (transaction.Connection is null)
+                                    {
+                                        throw new TransactionRolledBackException("StreamAccounts", exception);
+                                    }
+
+                                    throw;
+                                }
+
                                 // The finally reads the flag when the iterator is disposed at the yield, which the
                                 // analyzer does not see.
 #pragma warning disable S1854

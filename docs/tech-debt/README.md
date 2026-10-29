@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0090`
+Next id: `TD-0091`
 
 ## Active items
 
@@ -10,7 +10,7 @@ Next id: `TD-0090`
 |----|----|----|----|----|
 | [TD-0003](TD-0003-run-number-limited-by-assembly-version.md) | Open | 2026-10-05 | Low | A run number above 65534 fails the build, because it is a part of the assembly version |
 | [TD-0004](TD-0004-lexer-misreads-dialect-specific-sql.md) | Open | 2026-10-05 | Low | A few constructs are misread whatever the dialect: a MySQL versioned comment that holds `*/` in a string, a block comment of SQLite left open at the end of a file, a carriage return alone as a line end in MySQL, SQLite and CockroachDB, a user variable of MySQL or MariaDB read as a parameter |
-| [TD-0006](TD-0006-attribute-conflicts-across-friend-assemblies.md) | Open | 2026-10-05 | Low | Two projects that share internals and both use SqlSource each hold the generated attribute and `UnexpectedRowCountException`; the package hides the compiler's warning CS0436 for them and does not remove the conflict, so one cannot catch the other's exception by its type |
+| [TD-0006](TD-0006-attribute-conflicts-across-friend-assemblies.md) | Open | 2026-10-05 | Low | Two projects that share internals and both use SqlSource each hold the generated attribute, `UnexpectedRowCountException` and `TransactionRolledBackException`; the package hides the compiler's warning CS0436 for them and does not remove the conflict, so one cannot catch the other's exceptions by their type |
 | [TD-0013](TD-0013-sql-edit-reads-every-attributed-type-again.md) | Open | 2026-10-06 | Low | An edit to a `.sql` file makes the compiler read every attributed type again, because the attribute is added in a post-initialization step |
 | [TD-0016](TD-0016-settings-file-beside-a-late-targets-file-is-missed.md) | Open | 2026-10-06 | Low | In a project that is not of the SDK, or one that drops `SqlSource.AfterSdk.targets` from `AfterMicrosoftNETSdkTargets`, a `.sql` file that a target adds from `GenerateMSBuildEditorConfigFileCore` or `CoreCompile` misses a settings file that only it reaches, unless the target hooks `SqlSourceListFiles` |
 | [TD-0018](TD-0018-token-and-parameter-lists-are-built-in-quadratic-time.md) | Open | 2026-10-08 | Low | The distinct count and the name lookup of a query's tokens, and the lookup of its parameters, are quadratic in their number: a query with 6,000 distinct tokens took about 0.45 s to parse |
@@ -45,8 +45,8 @@ Next id: `TD-0090`
 | [TD-0084](TD-0084-the-sidecar-contract-is-documented-only-in-a-spec.md) | Open | 2026-10-27 | Medium | The sidecar's reader rules, compatibility rules and the meaning of its values are written down only in its design spec, which is never kept current |
 | [TD-0086](TD-0086-short-name-binds-to-a-referenced-packages-type.md) | Open | 2026-10-27 | Low | A short name that the project has no type of binds with no diagnostic to a `public` type of that name in an assembly a package brings, as `AccountId` to `Microsoft.Identity.Client.AccountId` under SqlClient 6.1, which then has no converter and fails when the query runs |
 | [TD-0087](TD-0087-drained-rows-error-replaces-the-loop-bodys-exception.md) | Open | 2026-10-28 | Low | On PostgreSQL, an error that the server raises for a row that a streaming loop left unread is thrown when the loop ends early, at a `break` or in place of the exception the loop's body threw, which is lost, and aborts the transaction; SQL Server does the same, since its iterator drains the rest of the batch at an early exit |
-| [TD-0088](TD-0088-sql-server-unreported-error-rolls-back-the-transaction.md) | Open | 2026-10-28 | Low | On SQL Server, a method that throws its own exception before it has read the rest of its batch, `UnexpectedRowCountException`, a null or a converter's, does not throw an error that the rest raises, which can roll back the caller's transaction, depending on the error and on `XACT_ABORT`; a caller that catches the method's exception and goes on finds later commands committed on their own and only `Commit` throws |
 | [TD-0089](TD-0089-theories-that-branch-on-their-row.md) | Open | 2026-10-29 | Low | Some theories still branch on their row with an `if` or derive their expectations with `?:`, so a reader must follow the branch to know what a row checks |
+| [TD-0090](TD-0090-sql-server-error-at-a-row-hides-a-rollback.md) | Open | 2026-10-29 | Low | On SQL Server, a method whose read throws the database's error at a row, such as a divide by zero, throws it as it is, and an error that the rest of the batch then raises can roll back the caller's transaction with nothing to say so; a caller that catches the first error and goes on finds its own later commands, or Dapper's, committed on their own, where a later generated method refuses the transaction and `Commit` throws |
 
 ## Columns
 

@@ -202,6 +202,7 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("element")]
     [InlineData("item")]
     [InlineData("atRow")]
+    [InlineData("exception")]
     public void Run_TokenWithAnAwkwardName_Compiles(string name)
     {
         var run = GeneratorHarness.Run(
@@ -280,6 +281,7 @@ public sealed class GeneratedSourceMethodTests
     [InlineData("ReadRows")]
     [InlineData("yield")]
     [InlineData("atRow")]
+    [InlineData("exception")]
     public void Run_TokenWithAnAwkwardNameInAQueryMethod_Compiles(string name)
     {
         var run = MethodRuns.RunTokenNamed(name, LanguageVersion.CSharp12);
@@ -305,6 +307,14 @@ public sealed class GeneratedSourceMethodTests
         sqlServer
             .Sources[MethodRuns.MethodsFile]
             .ShouldContain(name == "atRow" ? "var atRow1 = false;" : "var atRow = false;");
+        // The exception the check catches takes the name exception unless a token has it, and then exception1.
+        sqlServer
+            .Sources[MethodRuns.MethodsFile]
+            .ShouldContain(
+                name == "exception"
+                    ? "catch (global::System.Exception exception1) when (transaction is not null && exception1 is not"
+                    : "catch (global::System.Exception exception) when (transaction is not null && exception is not"
+            );
     }
 
     [Fact]

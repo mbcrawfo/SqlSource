@@ -94,6 +94,39 @@ public sealed partial class AttributeSourceTests
         type.GetProperty("QueryName")!.GetValue(exception).ShouldBe("GetUser");
     }
 
+    [Fact]
+    public void Text_CompiledAsCSharp73_DeclaresTransactionRolledBackException()
+    {
+        var compilation = CompileText();
+
+        compilation.GetDiagnostics(TestContext.Current.CancellationToken).ShouldBeEmpty();
+        var exception = compilation
+            .GetTypeByMetadataName(AttributeSource.TransactionRolledBackMetadataName)
+            .ShouldNotBeNull();
+        exception.BaseType!.ToDisplayString().ShouldBe("System.InvalidOperationException");
+    }
+
+    [Fact]
+    public void TransactionRolledBackException_Created_NamesTheQueryAndKeepsTheInnerException()
+    {
+        using var image = new MemoryStream();
+        CompileText().Emit(image, cancellationToken: TestContext.Current.CancellationToken).Success.ShouldBeTrue();
+        var type = Assembly
+            .Load(image.ToArray())
+            .GetType(AttributeSource.TransactionRolledBackMetadataName)
+            .ShouldNotBeNull();
+        var inner = new FormatException("The value is not a number.");
+
+        var exception = (InvalidOperationException)Activator.CreateInstance(type, "GetUser", inner)!;
+
+        exception.Message.ShouldBe(
+            "The transaction was rolled back by an error that the query 'GetUser' raised after the inner exception "
+                + "was thrown."
+        );
+        exception.InnerException.ShouldBeSameAs(inner);
+        type.GetProperty("QueryName")!.GetValue(exception).ShouldBe("GetUser");
+    }
+
     // A library's converters have to be found from the project that references it, so the attribute stays in metadata.
     [Fact]
     public void Text_ConverterAttribute_TargetsMethodsAndIsNotConditional()

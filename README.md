@@ -218,7 +218,7 @@ Hover over the member in your editor: its documentation holds the SQL as it was 
 
 ### My test project sees the internals of my main project
 
-Both projects can use SqlSource.  Each has its own copy of the attributes and enums that SqlSource adds, and SqlSource turns off the compiler's warning about the two copies.  Each also has its own `UnexpectedRowCountException`, so the test project catches `InvalidOperationException`, from which it derives, for a method of the main project.  See [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#test-project-sees-internals).
+Both projects can use SqlSource.  Each has its own copy of the attributes and enums that SqlSource adds, and SqlSource turns off the compiler's warning about the two copies.  Each also has its own `UnexpectedRowCountException` and `TransactionRolledBackException`, so the test project catches `InvalidOperationException`, from which both derive, for a method of the main project.  See [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#test-project-sees-internals).
 
 ## NodaTime and other libraries
 
