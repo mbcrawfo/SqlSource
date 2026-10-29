@@ -144,7 +144,7 @@ The four projects of [`tests/DatabaseTests/`](DatabaseTests/README.md) run again
 
 ## Fixture projects
 
-`tests/SqlSource.Tool.Tests/Fixtures/Projects/` holds small projects that are no part of the solution.  `ManifestTargetTests`, `FixtureProjectTests`, `TerminationTests` and `SettingsFileSearchTests` copy one to a temporary folder outside the repository, with the package's three MSBuild files and `global.json` beside it, and run `dotnet msbuild` on it for real, the second through the tool's own code, the third through the tool started as a process, and the fourth as a design-time build of an IDE, which restores the copy first.  So these tests need the SDK that `global.json` pins, and take a second or two each.
+`tests/SqlSource.Tool.Tests/Fixtures/Projects/` holds small projects that are no part of the solution.  `ManifestTargetTests`, `FixtureProjectTests`, `TerminationTests`, `SettingsFileSearchTests` and `TransitivePackageAssembliesTargetTests` copy one to a temporary folder outside the repository, with the package's three MSBuild files and `global.json` beside it, and run `dotnet msbuild` on it for real, the second through the tool's own code, the third through the tool started as a process, and the fourth as a design-time build of an IDE, which restores the copy first.  So these tests need the SDK that `global.json` pins, and take a second or two each.
 
 MSBuild reads the environment for its properties, and the workflow has a variable named `CONFIGURATION`, so in CI a fixture is evaluated as `Release`.  A test of a fixture expects no `Debug`, in a constant or in a path.
 
