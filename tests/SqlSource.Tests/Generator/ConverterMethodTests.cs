@@ -18,6 +18,12 @@ namespace SqlSource.Tests.Generator;
 // otherwise.
 public sealed class ConverterMethodTests
 {
+    private const string FromDatabase =
+        "[SqlSourceConverter] public static Email FromDatabase(string value) => new(value);";
+
+    private const string ToDatabase =
+        "[SqlSourceConverter] public static string ToDatabase(Email email) => email.Value;";
+
     // The type Email with the converters given, and UserId with those of int.
     private const string EmailSource = """
         using SqlSource;
