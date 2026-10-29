@@ -10,6 +10,7 @@ using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 using static SqlSource.Tool.Tests.SqlServerScript;
 using static SqlSource.Tool.Tests.SqlServerSessionCases;
+using Calls = SqlSource.Tool.Describing.SqlServer.SqlServerCallNames;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer;
 
@@ -35,18 +36,14 @@ public sealed class SqlServerSessionProofTests
     {
         var operands = new SqlServerColumnsRequest(ShownOperands, null);
         var script = Script(Shown, [IdColumn, ExpressionRow(2, "shown"), Rowstat with { ColumnOrdinal = 3 }])
-            .Add(
-                "operands",
-                operands,
-                new SqlServerColumnsAnswer([OperandRow(1, true), OperandRow(2, false)], null, null)
-            );
+            .Operands(operands, new SqlServerColumnsAnswer([OperandRow(1, true), OperandRow(2, false)], null, null));
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Shown));
 
         asked.ShouldBe([
-            Call("parameters", new SqlServerParametersRequest(Shown, null)),
-            Call("columns", new SqlServerColumnsRequest(Shown, null)),
-            Call("operands", operands),
+            Call(Calls.Parameters, new SqlServerParametersRequest(Shown, null)),
+            Call(Calls.Columns, new SqlServerColumnsRequest(Shown, null)),
+            Call(Calls.Operands, operands),
         ]);
         Nullability(described)
             .ShouldBe([(false, SidecarValues.NullableSource.Server), (false, SidecarValues.NullableSource.Expression)]);
@@ -60,12 +57,12 @@ public sealed class SqlServerSessionProofTests
         const string Sql = "SELECT id, nickname FROM dbo.users";
         var table = new SqlServerTableRequest("dbo", "users");
         var script = Script(Sql, [IdColumn, NicknameColumn, Rowstat with { ColumnOrdinal = 3 }])
-            .Add("table", table, new SqlServerColumnsAnswer([IdColumn, NicknameColumn, Rowstat], null, null));
+            .Table(table, new SqlServerColumnsAnswer([IdColumn, NicknameColumn, Rowstat], null, null));
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.Select(static call => call.Method).ShouldBe(["parameters", "columns", "table"]);
-        asked[2].ShouldBe(Call("table", table));
+        asked.Select(static call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns, Calls.Table]);
+        asked[2].ShouldBe(Call(Calls.Table, table));
         Nullability(described)
             .ShouldBe([(false, SidecarValues.NullableSource.Server), (true, SidecarValues.NullableSource.Server)]);
         described.Value.ShouldNotBeNull().TableMatch.ShouldBe(SidecarValues.TableMatch.Matched);
@@ -91,11 +88,11 @@ public sealed class SqlServerSessionProofTests
             _ => new SqlServerColumnsAnswer([OperandRow(1, false)], null, null),
         };
         var script = Script(Sql, [ExpressionRow(1, "n"), ExpressionRow(2, "shown")])
-            .Add("operands", new SqlServerColumnsRequest(ShownOperands, null), answer);
+            .Operands(new SqlServerColumnsRequest(ShownOperands, null), answer);
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.Select(static call => call.Method).ShouldBe(["parameters", "columns", "operands"]);
+        asked.Select(static call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns, Calls.Operands]);
         Nullability(described)
             .ShouldBe([(false, SidecarValues.NullableSource.Expression), (true, SidecarValues.NullableSource.Server)]);
         described.Value.ShouldNotBeNull().TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
@@ -109,7 +106,7 @@ public sealed class SqlServerSessionProofTests
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.Select(static call => call.Method).ShouldBe(["parameters", "columns"]);
+        asked.Select(static call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns]);
         Nullability(described).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
     }
 
@@ -123,29 +120,22 @@ public sealed class SqlServerSessionProofTests
             "@x int"
         );
         var script = new SqlServerScript()
-            .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([IntRow], null))
-            .Add(
-                "columns",
+            .Parameters(new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([IntRow], null))
+            .Columns(
                 new SqlServerColumnsRequest(Sql, "@x int"),
                 new SqlServerColumnsAnswer([ExpressionRow(1, "shown")], null, null)
             )
-            .Add(
-                "operands",
-                operands,
-                new SqlServerColumnsAnswer([OperandRow(1, true), OperandRow(2, false)], null, null)
-            );
+            .Operands(operands, new SqlServerColumnsAnswer([OperandRow(1, true), OperandRow(2, false)], null, null));
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked[^1].ShouldBe(Call("operands", operands));
+        asked[^1].ShouldBe(Call(Calls.Operands, operands));
         Nullability(described).ShouldBe([(false, SidecarValues.NullableSource.Expression)]);
     }
 
     // A script of a query with no parameter whose "columns" answers the rows.
     private static SqlServerScript Script(string sql, IReadOnlyList<SqlServerColumnRow> rows) =>
-        new SqlServerScript()
-            .Add("parameters", new SqlServerParametersRequest(sql, null), new SqlServerParametersAnswer([], null))
-            .Add("columns", new SqlServerColumnsRequest(sql, null), new SqlServerColumnsAnswer(rows, null, null));
+        new SqlServerScript().NoParametersThenColumns(sql, new SqlServerColumnsAnswer(rows, null, null));
 
     private static List<(bool? Nullable, string? Source)> Nullability(
         Outcome<QueryDescription, DescribeFailure> described

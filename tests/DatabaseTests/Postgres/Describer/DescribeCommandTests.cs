@@ -25,9 +25,6 @@ public sealed class DescribeCommandTests : IDisposable
 {
     private const string Database = "app";
 
-    // The member of an event of the log that names it.
-    private const string EventMember = "event";
-
     // The event of the driver's own log, as the describer's log names it.
     private const string DriverEvent = "postgres.driver";
 
@@ -79,8 +76,6 @@ public sealed class DescribeCommandTests : IDisposable
             ServerVersion = "*",
             Database = "*",
         };
-
-    private static string NameOf(JsonElement logged) => logged.GetProperty(EventMember).GetString() ?? "";
 
     [Fact]
     public async Task Describe_FixtureQueries_WritesTheFixturesEntries()
@@ -203,7 +198,8 @@ public sealed class DescribeCommandTests : IDisposable
         LogReader
             .Read(log)
             .ShouldContain(logged =>
-                NameOf(logged) == DriverEvent && logged.GetProperty("category").GetString() == "Npgsql.Command"
+                LogReader.EventOf(logged) == DriverEvent
+                && logged.GetProperty("category").GetString() == "Npgsql.Command"
             );
         var text = await File.ReadAllTextAsync(log, TestContext.Current.CancellationToken);
         foreach (
@@ -237,8 +233,7 @@ public sealed class DescribeCommandTests : IDisposable
 
         result.ExitCode.ShouldBe(0, result.Error);
         var messages = LogReader
-            .Read(log)
-            .Where(static logged => NameOf(logged) == DriverEvent)
+            .Events(log, DriverEvent)
             .Select(static logged => logged.GetProperty("message").GetString() ?? string.Empty)
             .ToList();
         messages.ShouldContain(static message => message.StartsWith("Executing command: ", StringComparison.Ordinal));
@@ -305,7 +300,9 @@ public sealed class DescribeCommandTests : IDisposable
     private static IReadOnlyList<string?> ServerLinesOf(IReadOnlyList<JsonElement> events, string id) =>
         [
             .. events
-                .Where(logged => NameOf(logged) == "diagnostic" && logged.GetProperty("id").GetString() == id)
+                .Where(logged =>
+                    LogReader.EventOf(logged) == "diagnostic" && logged.GetProperty("id").GetString() == id
+                )
                 .ShouldHaveSingleItem()
                 .GetProperty("lines")
                 .EnumerateArray()

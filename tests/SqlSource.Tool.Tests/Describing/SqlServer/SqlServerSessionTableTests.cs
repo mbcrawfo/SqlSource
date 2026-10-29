@@ -9,6 +9,7 @@ using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 using static SqlSource.Tool.Tests.SqlServerScript;
 using static SqlSource.Tool.Tests.SqlServerSessionCases;
+using Calls = SqlSource.Tool.Describing.SqlServer.SqlServerCallNames;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer;
 
@@ -31,13 +32,8 @@ public sealed class SqlServerSessionTableTests
     private static async Task<DescribeFailure> TableAnsweringAsync(string sql, SqlServerColumnsAnswer answer)
     {
         var script = new SqlServerScript()
-            .Add("parameters", new SqlServerParametersRequest(sql, null), new SqlServerParametersAnswer([], null))
-            .Add(
-                "columns",
-                new SqlServerColumnsRequest(sql, null),
-                new SqlServerColumnsAnswer([IdColumn, Rowstat], null, null)
-            )
-            .Add("table", new SqlServerTableRequest("dbo", "users"), answer);
+            .NoParametersThenColumns(sql, new SqlServerColumnsAnswer([IdColumn, Rowstat], null, null))
+            .Table(new SqlServerTableRequest("dbo", "users"), answer);
 
         var (described, _) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, sql));
 
@@ -52,20 +48,15 @@ public sealed class SqlServerSessionTableTests
         var columns = new SqlServerColumnsRequest(Sql, null);
         var table = new SqlServerTableRequest("dbo", "users");
         var script = new SqlServerScript()
-            .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([], null))
-            .Add("columns", columns, new SqlServerColumnsAnswer([IdColumn, NameColumn, Rowstat], null, null))
-            .Add(
-                "table",
-                table,
-                new SqlServerColumnsAnswer([IdColumn, NameColumn, NicknameColumn, Rowstat], null, null)
-            );
+            .NoParametersThenColumns(Sql, new SqlServerColumnsAnswer([IdColumn, NameColumn, Rowstat], null, null))
+            .Table(table, new SqlServerColumnsAnswer([IdColumn, NameColumn, NicknameColumn, Rowstat], null, null));
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
         asked.ShouldBe([
-            Call("parameters", new SqlServerParametersRequest(Sql, null)),
-            Call("columns", columns),
-            Call("table", table),
+            Call(Calls.Parameters, new SqlServerParametersRequest(Sql, null)),
+            Call(Calls.Columns, columns),
+            Call(Calls.Table, table),
         ]);
         var description = described.Value.ShouldNotBeNull();
         description.ResultKind.ShouldBe(SidecarResultKind.Rows);
@@ -81,13 +72,11 @@ public sealed class SqlServerSessionTableTests
     {
         const string Sql = "SELECT id, name_len_p FROM dbo.users WHERE id = @id";
         var script = new SqlServerScript()
-            .Add(
-                "parameters",
+            .Parameters(
                 new SqlServerParametersRequest(Sql, null),
                 new SqlServerParametersAnswer([IntRow with { Name = "@id" }], null)
             )
-            .Add(
-                "columns",
+            .Columns(
                 new SqlServerColumnsRequest(Sql, "@id int"),
                 new SqlServerColumnsAnswer(
                     [IdColumn, PersistedColumn(2), Rowstat with { ColumnOrdinal = 3 }],
@@ -95,8 +84,7 @@ public sealed class SqlServerSessionTableTests
                     null
                 )
             )
-            .Add(
-                "table",
+            .Table(
                 new SqlServerTableRequest("dbo", "users"),
                 new SqlServerColumnsAnswer(
                     [IdColumn, PersistedColumn(2), Rowstat with { ColumnOrdinal = 3 }],
@@ -107,7 +95,7 @@ public sealed class SqlServerSessionTableTests
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.Select(static call => call.Method).ShouldBe(["parameters", "columns", "table"]);
+        asked.Select(static call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns, Calls.Table]);
         var description = described.Value.ShouldNotBeNull();
         description
             .Columns.ShouldNotBeNull()
@@ -129,9 +117,8 @@ public sealed class SqlServerSessionTableTests
             null
         );
         var script = new SqlServerScript()
-            .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([], null))
-            .Add("columns", new SqlServerColumnsRequest(Sql, null), rows)
-            .Add("table", new SqlServerTableRequest("dbo", "users"), rows);
+            .NoParametersThenColumns(Sql, rows)
+            .Table(new SqlServerTableRequest("dbo", "users"), rows);
 
         var (described, _) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
@@ -144,15 +131,15 @@ public sealed class SqlServerSessionTableTests
     public async Task DescribeAsync_TwoTables_AsksNoTable()
     {
         const string Sql = "SELECT u.id, o.id AS order_id FROM dbo.users AS u JOIN dbo.orders AS o ON o.user_id = u.id";
-        var columns = new SqlServerColumnsRequest(Sql, null);
         var orderId = IdColumn with { ColumnOrdinal = 2, Name = "order_id", SourceTable = "orders" };
-        var script = new SqlServerScript()
-            .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([], null))
-            .Add("columns", columns, new SqlServerColumnsAnswer([IdColumn, orderId, Rowstat], null, null));
+        var script = new SqlServerScript().NoParametersThenColumns(
+            Sql,
+            new SqlServerColumnsAnswer([IdColumn, orderId, Rowstat], null, null)
+        );
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.Select(call => call.Method).ShouldBe(["parameters", "columns"]);
+        asked.Select(call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns]);
         var description = described.Value.ShouldNotBeNull();
         description.Columns.ShouldNotBeNull().Count.ShouldBe(2);
         description.MatchesTable.ShouldBeNull();
@@ -165,7 +152,6 @@ public sealed class SqlServerSessionTableTests
     public async Task DescribeAsync_NoOrigin_AsksNoTable()
     {
         const string Sql = "SELECT COUNT(*) AS n FROM dbo.users";
-        var columns = new SqlServerColumnsRequest(Sql, null);
         var count = IdColumn with
         {
             Name = "n",
@@ -178,13 +164,14 @@ public sealed class SqlServerSessionTableTests
             IsIdentityColumn = null,
             IsComputedColumn = null,
         };
-        var script = new SqlServerScript()
-            .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([], null))
-            .Add("columns", columns, new SqlServerColumnsAnswer([count], null, null));
+        var script = new SqlServerScript().NoParametersThenColumns(
+            Sql,
+            new SqlServerColumnsAnswer([count], null, null)
+        );
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.Select(call => call.Method).ShouldBe(["parameters", "columns"]);
+        asked.Select(call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns]);
         var description = described.Value.ShouldNotBeNull();
         description.Columns.ShouldBe([
             new SidecarColumn(0, "n", Int, false, SidecarValues.NullableSource.Expression, null, null, null),
@@ -201,15 +188,15 @@ public sealed class SqlServerSessionTableTests
     public async Task DescribeAsync_ColumnsOfATableValuedFunction_AsksNoTable(string type)
     {
         const string Sql = "SELECT id FROM dbo.orders_of(1)";
-        var columns = new SqlServerColumnsRequest(Sql, null);
         var id = IdColumn with { SourceTable = "orders_of", SourceType = type, IsIdentityColumn = false };
-        var script = new SqlServerScript()
-            .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([], null))
-            .Add("columns", columns, new SqlServerColumnsAnswer([id, Rowstat], null, null));
+        var script = new SqlServerScript().NoParametersThenColumns(
+            Sql,
+            new SqlServerColumnsAnswer([id, Rowstat], null, null)
+        );
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.Select(call => call.Method).ShouldBe(["parameters", "columns"]);
+        asked.Select(call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns]);
         var description = described.Value.ShouldNotBeNull();
         description.Columns.ShouldNotBeNull().Single().Origin.ShouldBeNull();
         description.MatchesTable.ShouldBeNull();

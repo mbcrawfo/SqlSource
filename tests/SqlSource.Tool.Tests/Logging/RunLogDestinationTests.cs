@@ -210,7 +210,7 @@ public sealed class RunLogDestinationTests : IDisposable
         );
         result.Error.Split("error SQLSRC").Length.ShouldBe(2);
         var end = LogReader.Read(Log)[^1];
-        end.GetProperty("event").GetString().ShouldBe("run.end");
+        LogReader.EventOf(end).ShouldBe("run.end");
         end.GetProperty("exitCode").GetInt32().ShouldBe(0);
     }
 

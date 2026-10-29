@@ -9,6 +9,7 @@ using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 using static SqlSource.Tool.Tests.SqlServerScript;
 using static SqlSource.Tool.Tests.SqlServerSessionCases;
+using Calls = SqlSource.Tool.Describing.SqlServer.SqlServerCallNames;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer;
 
@@ -20,9 +21,7 @@ public sealed class SqlServerSessionColumnTests
     // The failure of a describe of the SQL, which has no parameter, when "columns" answers as given.
     private static async Task<DescribeFailure> ColumnsAnsweringAsync(string sql, SqlServerColumnsAnswer answer)
     {
-        var script = new SqlServerScript()
-            .Add("parameters", new SqlServerParametersRequest(sql, null), new SqlServerParametersAnswer([], null))
-            .Add("columns", new SqlServerColumnsRequest(sql, null), answer);
+        var script = new SqlServerScript().NoParametersThenColumns(sql, answer);
 
         var (described, _) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, sql));
 
@@ -37,19 +36,18 @@ public sealed class SqlServerSessionColumnTests
         var columns = new SqlServerColumnsRequest(Sql, "@id int");
         var table = new SqlServerTableRequest("dbo", "users");
         var script = new SqlServerScript()
-            .Add(
-                "parameters",
+            .Parameters(
                 new SqlServerParametersRequest(Sql, null),
                 new SqlServerParametersAnswer([IntRow with { Name = "@id" }], null)
             )
-            .Add("columns", columns, new SqlServerColumnsAnswer([IdColumn, NameColumn, Rowstat], null, null))
-            .Add("table", table, new SqlServerColumnsAnswer([IdColumn, NameColumn, Rowstat], null, null));
+            .Columns(columns, new SqlServerColumnsAnswer([IdColumn, NameColumn, Rowstat], null, null))
+            .Table(table, new SqlServerColumnsAnswer([IdColumn, NameColumn, Rowstat], null, null));
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.Select(call => call.Method).ShouldBe(["parameters", "columns", "table"]);
-        asked[1].ShouldBe(Call("columns", columns));
-        asked[2].ShouldBe(Call("table", table));
+        asked.Select(call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns, Calls.Table]);
+        asked[1].ShouldBe(Call(Calls.Columns, columns));
+        asked[2].ShouldBe(Call(Calls.Table, table));
         var description = described.Value.ShouldNotBeNull();
         description.ResultKind.ShouldBe(SidecarResultKind.Rows);
         description.Columns.ShouldBe([
@@ -86,16 +84,15 @@ public sealed class SqlServerSessionColumnTests
         const string Sql = "UPDATE dbo.users SET nickname = N'x' WHERE id = @id";
         var columns = new SqlServerColumnsRequest(Sql, "@id int");
         var script = new SqlServerScript()
-            .Add(
-                "parameters",
+            .Parameters(
                 new SqlServerParametersRequest(Sql, null),
                 new SqlServerParametersAnswer([IntRow with { Name = "@id" }], null)
             )
-            .Add("columns", columns, NoRows);
+            .Columns(columns, NoRows);
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.Select(call => call.Method).ShouldBe(["parameters", "columns"]);
+        asked.Select(call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns]);
         var description = described.Value.ShouldNotBeNull();
         description.ResultKind.ShouldBe(SidecarResultKind.None);
         description.Columns.ShouldBeNull();
@@ -121,8 +118,7 @@ public sealed class SqlServerSessionColumnTests
             "@tenant int, @email [dbo].[Email], @node hierarchyid, @name nvarchar(100)"
         );
         var script = new SqlServerScript()
-            .Add(
-                "declared",
+            .Declared(
                 new SqlServerDeclaredRequest("SELECT @tenant AS [1]", "@tenant int"),
                 new SqlServerDeclaredAnswer(
                     [new SqlServerDeclaredRow(1, "int", 4, 10, 0, null, null, null)],
@@ -130,8 +126,7 @@ public sealed class SqlServerSessionColumnTests
                     null
                 )
             )
-            .Add(
-                "parameters",
+            .Parameters(
                 new SqlServerParametersRequest(Renamed, "@tenant int"),
                 new SqlServerParametersAnswer(
                     [
@@ -158,13 +153,13 @@ public sealed class SqlServerSessionColumnTests
                     null
                 )
             )
-            .Add("columns", columns, NoRows);
+            .Columns(columns, NoRows);
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql, ("tenant", "int")));
 
         described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
-        asked.Select(call => call.Method).ShouldBe(["declared", "parameters", "columns"]);
-        asked[2].ShouldBe(Call("columns", columns));
+        asked.Select(call => call.Method).ShouldBe([Calls.Declared, Calls.Parameters, Calls.Columns]);
+        asked[2].ShouldBe(Call(Calls.Columns, columns));
     }
 
     // "columns" that fails is the query's failure at describe columns: a lost connection, and the error rows by their
@@ -206,8 +201,7 @@ public sealed class SqlServerSessionColumnTests
         var parameters = new SqlServerParametersRequest(Sql, "@tenant int");
         var columns = new SqlServerColumnsRequest(Sql, "@tenant int");
         var script = new SqlServerScript()
-            .Add(
-                "declared",
+            .Declared(
                 new SqlServerDeclaredRequest("SELECT @tenant AS [1]", "@tenant int"),
                 new SqlServerDeclaredAnswer(
                     [new SqlServerDeclaredRow(1, "int", 4, 10, 0, null, null, null)],
@@ -215,8 +209,7 @@ public sealed class SqlServerSessionColumnTests
                     null
                 )
             )
-            .Add(
-                "parameters",
+            .Parameters(
                 parameters,
                 new SqlServerParametersAnswer(
                     null,
@@ -226,8 +219,7 @@ public sealed class SqlServerSessionColumnTests
                     ])
                 )
             )
-            .Add(
-                "columns",
+            .Columns(
                 columns,
                 new SqlServerColumnsAnswer(
                     null,
@@ -241,8 +233,8 @@ public sealed class SqlServerSessionColumnTests
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql, ("tenant", "int")));
 
-        asked.Select(call => call.Method).ShouldBe(["declared", "parameters", "columns"]);
-        asked[2].ShouldBe(Call("columns", columns));
+        asked.Select(call => call.Method).ShouldBe([Calls.Declared, Calls.Parameters, Calls.Columns]);
+        asked[2].ShouldBe(Call(Calls.Columns, columns));
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC265");
         failure.Step.ShouldBe(DescribeStep.DescribeColumns);
@@ -259,13 +251,13 @@ public sealed class SqlServerSessionColumnTests
         ]);
         var columns = new SqlServerColumnsRequest(Sql, null);
         var script = new SqlServerScript()
-            .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer(null, refused))
-            .Add("columns", columns, new SqlServerColumnsAnswer(null, null, Lost));
+            .Parameters(new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer(null, refused))
+            .Columns(columns, new SqlServerColumnsAnswer(null, null, Lost));
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.Select(call => call.Method).ShouldBe(["parameters", "columns"]);
-        asked[1].ShouldBe(Call("columns", columns));
+        asked.Select(call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns]);
+        asked[1].ShouldBe(Call(Calls.Columns, columns));
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
         failure.Step.ShouldBe(DescribeStep.DescribeParameters);
@@ -279,8 +271,7 @@ public sealed class SqlServerSessionColumnTests
     public async Task DescribeAsync_OtherParametersError_AsksNoColumns()
     {
         const string Sql = "SELECT id FROM dbo.users WHERE id = @p AND name = @p";
-        var script = new SqlServerScript().Add(
-            "parameters",
+        var script = new SqlServerScript().Parameters(
             new SqlServerParametersRequest("SELECT id FROM dbo.users WHERE id = @p_1 AND name = @p_2", null),
             new SqlServerParametersAnswer(
                 null,
@@ -290,7 +281,7 @@ public sealed class SqlServerSessionColumnTests
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.Select(call => call.Method).ShouldBe(["parameters"]);
+        asked.Select(call => call.Method).ShouldBe([Calls.Parameters]);
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
         failure.Step.ShouldBe(DescribeStep.DescribeParameters);
@@ -311,17 +302,14 @@ public sealed class SqlServerSessionColumnTests
             SourceColumn = null,
             SourceType = null,
         };
-        var script = new SqlServerScript()
-            .Add("parameters", new SqlServerParametersRequest(Sql, null), new SqlServerParametersAnswer([], null))
-            .Add(
-                "columns",
-                new SqlServerColumnsRequest(Sql, null),
-                new SqlServerColumnsAnswer([IdColumn, unnamed, Rowstat], null, null)
-            );
+        var script = new SqlServerScript().NoParametersThenColumns(
+            Sql,
+            new SqlServerColumnsAnswer([IdColumn, unnamed, Rowstat], null, null)
+        );
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.Select(call => call.Method).ShouldBe(["parameters", "columns"]);
+        asked.Select(call => call.Method).ShouldBe([Calls.Parameters, Calls.Columns]);
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC266");
         failure.Arguments.ShouldBe(["2", Query]);
