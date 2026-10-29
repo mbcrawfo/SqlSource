@@ -9,7 +9,7 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </summary>
 /// <remarks>
 /// An OID of <c>pg_catalog</c> is fixed for every version of PostgreSQL.  Each constant's name, lower-cased, is its
-/// type's <c>typname</c>, and <c>Catalog_BuiltInTypes_AreNamedSo</c> in <c>PlanOutputTests</c> holds every one to
+/// type's <c>typname</c>, and <c>Catalog_BuiltInTypes_AreNamedSo</c> in <c>CatalogPinTests</c> holds every one to
 /// <c>pg_type</c> by that.
 /// </remarks>
 internal static class BuiltInTypes
@@ -46,7 +46,7 @@ internal static class BuiltInTypes
     /// The internal names of the types that carry a modifier: every built-in type with a typmod input.
     /// <see cref="TypeModifiers" />, <see cref="ColumnFacets" /> and <see cref="PostgresTypeNames" /> each handle
     /// every one in a switch of their own, and <c>BuiltInTypesTests</c> fails for a member one of them leaves out.
-    /// <c>Catalog_TypesWithAModifier_AreTheBuiltInOnesWithATypmodInput</c> in <c>PlanOutputTests</c> holds the set to
+    /// <c>Catalog_TypesWithAModifier_AreTheBuiltInOnesWithATypmodInput</c> in <c>CatalogPinTests</c> holds the set to
     /// <c>pg_type</c>.
     /// </summary>
     public static IReadOnlyList<string> WithModifier { get; } =
