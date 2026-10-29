@@ -182,81 +182,97 @@ public sealed class QueryMethodWriterTests
         nameof(ResultShape.Many),
         "global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<global::App.GetUserDto>>",
         ReaderLine,
-        "<returns>The rows the query returned.</returns>"
+        "<returns>The rows the query returned.</returns>",
+        true
     )]
     [InlineData(
         nameof(ResultShape.One),
         "global::System.Threading.Tasks.Task<global::App.GetUserDto>",
         ReaderLine,
-        "<returns>The row.</returns>"
+        "<returns>The row.</returns>",
+        true
     )]
     [InlineData(
         nameof(ResultShape.OneOptional),
         "global::System.Threading.Tasks.Task<global::App.GetUserDto?>",
         ReaderLine,
-        "<returns>The row, or null when there is none.</returns>"
+        "<returns>The row, or null when there is none.</returns>",
+        true
     )]
     [InlineData(
         nameof(ResultShape.None),
         "global::System.Threading.Tasks.Task",
         "        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);\n    }\n",
-        "<returns>A task that completes when the query has run.</returns>"
+        "<returns>A task that completes when the query has run.</returns>",
+        false
     )]
     [InlineData(
         nameof(ResultShape.RowCount),
         "global::System.Threading.Tasks.Task<int>",
         "        return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);\n    }\n",
-        "<returns>The number of rows the query affected.</returns>"
+        "<returns>The number of rows the query affected.</returns>",
+        false
     )]
     public void Append_EachShape_ReturnsAndExecutesAsTheShapeSays(
         string shapeName,
         string returns,
         string execute,
-        string returnsXml
+        string returnsXml,
+        bool readsRows
     )
     {
-        var shape = Enum.Parse<ResultShape>(shapeName);
-
-        var text = Write(GetUser with { Shape = shape });
+        var text = Write(GetUser with { Shape = Enum.Parse<ResultShape>(shapeName) });
 
         text.ShouldContain("public static async " + returns + " GetUser(\n");
         text.ShouldContain(execute);
         text.ShouldContain("/// " + returnsXml + "\n");
-        var isNonQuery = shape is ResultShape.None or ResultShape.RowCount;
-        text.Contains("ExecuteReaderAsync", StringComparison.Ordinal).ShouldBe(!isNonQuery);
-        text.Contains("ExecuteNonQueryAsync", StringComparison.Ordinal).ShouldBe(isNonQuery);
+        text.Contains("ExecuteReaderAsync", StringComparison.Ordinal).ShouldBe(readsRows);
+        text.Contains("ExecuteNonQueryAsync", StringComparison.Ordinal).ShouldBe(!readsRows);
+    }
 
-        if (shape == ResultShape.One)
-        {
-            text.ShouldContain(
-                "/// <exception cref=\"global::SqlSource.UnexpectedRowCountException\">"
-                    + "The query returned no rows, or more than one.</exception>\n"
-            );
-            text.ShouldNotContain("return null;");
-            text.ShouldContain(
-                "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", false);\n"
-            );
-            text.ShouldContain(
-                "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n"
-            );
-        }
-        else if (shape == ResultShape.OneOptional)
-        {
-            text.ShouldContain(
-                "/// <exception cref=\"global::SqlSource.UnexpectedRowCountException\">"
-                    + "The query returned more than one row.</exception>\n"
-            );
-            text.ShouldContain("            return null;\n");
-            text.ShouldNotContain("UnexpectedRowCountException(\"GetUser\", false)");
-            text.ShouldContain(
-                "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n"
-            );
-        }
-        else
-        {
-            text.ShouldNotContain("UnexpectedRowCountException");
-            text.ShouldNotContain("<exception");
-        }
+    // One row exactly: no row and more than one are each an UnexpectedRowCountException, which the summary names.
+    [Fact]
+    public void Append_ShapeOne_ThrowsOnNoRowAndOnMoreThanOne()
+    {
+        var text = Write(GetUser with { Shape = ResultShape.One });
+
+        text.ShouldContain(
+            "/// <exception cref=\"global::SqlSource.UnexpectedRowCountException\">"
+                + "The query returned no rows, or more than one.</exception>\n"
+        );
+        text.ShouldNotContain("return null;");
+        text.ShouldContain(
+            "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", false);\n"
+        );
+        text.ShouldContain("            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n");
+    }
+
+    // At most one row: no row is null, and more than one an UnexpectedRowCountException, which the summary names.
+    [Fact]
+    public void Append_ShapeOneOptional_ReturnsNullForNoRowAndThrowsOnMoreThanOne()
+    {
+        var text = Write(GetUser with { Shape = ResultShape.OneOptional });
+
+        text.ShouldContain(
+            "/// <exception cref=\"global::SqlSource.UnexpectedRowCountException\">"
+                + "The query returned more than one row.</exception>\n"
+        );
+        text.ShouldContain("            return null;\n");
+        text.ShouldNotContain("UnexpectedRowCountException(\"GetUser\", false)");
+        text.ShouldContain("            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n");
+    }
+
+    // A shape that expects no count of rows throws no UnexpectedRowCountException and documents none.
+    [Theory]
+    [InlineData(nameof(ResultShape.Many))]
+    [InlineData(nameof(ResultShape.None))]
+    [InlineData(nameof(ResultShape.RowCount))]
+    public void Append_ShapeWithoutAnExpectedCount_ThrowsNoUnexpectedRowCount(string shapeName)
+    {
+        var text = Write(GetUser with { Shape = Enum.Parse<ResultShape>(shapeName) });
+
+        text.ShouldNotContain("UnexpectedRowCountException");
+        text.ShouldNotContain("<exception");
     }
 
     [Theory]
