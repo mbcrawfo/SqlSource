@@ -126,7 +126,8 @@ internal sealed partial class PostgresSession
         return Outcome<IReadOnlyList<DescribedParameter>, DescribeFailure>.Of(parameters);
     }
 
-    // A parameter as generated code will bind it: by the name its type binds by, as the sidecar will record it.
+    // A parameter as check binds it: by the bindName the sidecar will record.  Generated code binds by the type's
+    // canonical name, and by this one where none can be derived.
     private static PostgresCheckParameter CheckParameterOf(DescribedParameter parameter) =>
         new(
             parameter.Name,

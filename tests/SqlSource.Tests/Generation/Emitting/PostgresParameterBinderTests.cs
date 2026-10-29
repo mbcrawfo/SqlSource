@@ -85,24 +85,20 @@ public sealed class PostgresParameterBinderTests
         DataTypeNameOf(TestSidecars.Postgres(name: "\"char\"", internalName: "char", bindName: "char"))
             .ShouldBe("    p0.DataTypeName = \"pg_catalog.char\";\n");
 
+    // The bindName differs from the canonical name, pg_catalog.thing, so a kind this version does not know shows which
+    // one is bound.
     [Fact]
     public void Append_UnknownKind_BindsItsBindName() =>
-        DataTypeNameOf(
-                TestSidecars.Postgres(
-                    name: "thing",
-                    kind: "shell",
-                    schema: "public",
-                    internalName: "thing",
-                    bindName: "public.thing"
-                )
-            )
-            .ShouldBe("    p0.DataTypeName = \"public.thing\";\n");
+        DataTypeNameOf(TestSidecars.Postgres(name: "thing", kind: "shell", internalName: "thing", bindName: "thing"))
+            .ShouldBe("    p0.DataTypeName = \"thing\";\n");
 
-    // A dot in the schema or the name would make the canonical name ambiguous.
-    [Fact]
-    public void Append_DotInTheName_BindsItsBindName() =>
-        DataTypeNameOf(TestSidecars.Postgres(name: "t", schema: "my.schema", internalName: "t", bindName: "x.t"))
-            .ShouldBe("    p0.DataTypeName = \"x.t\";\n");
+    // A dot in the schema or the name would make the canonical name another type's.
+    [Theory]
+    [InlineData("my.schema", "t")]
+    [InlineData("public", "a.b")]
+    public void Append_DotInTheName_BindsItsBindName(string schema, string internalName) =>
+        DataTypeNameOf(TestSidecars.Postgres(name: "t", schema: schema, internalName: internalName, bindName: "x.y"))
+            .ShouldBe("    p0.DataTypeName = \"x.y\";\n");
 
     [Fact]
     public void Append_NullableValueType_IsAParameterOfTheNullableType()
