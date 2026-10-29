@@ -6,7 +6,8 @@ using System.Linq;
 namespace SqlSource.Tool.Testing.Fixtures;
 
 // The cases of Fixtures/Describers/<engine>/, which the build copies to the output.  A folder under the engine's
-// is a case; a file there, the engine's schema.sql for one, is none.
+// that holds a query is a case; a file there, the engine's schema.sql for one, is none, and so is a folder without a
+// query, which an incremental build leaves in the output when a case is renamed or removed.
 internal static class FixtureCases
 {
     // Where the build puts the cases.
@@ -29,6 +30,7 @@ internal static class FixtureCases
         [
             .. Directory
                 .GetDirectories(engineFolder)
+                .Where(static path => File.Exists(Path.Combine(path, FixtureCase.QueryFile)))
                 .Select(path => new FixtureCase(engine, Path.GetFileName(path), path))
                 .OrderBy(static found => found.Name, StringComparer.Ordinal),
         ];
