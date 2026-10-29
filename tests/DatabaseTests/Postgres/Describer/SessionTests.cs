@@ -337,6 +337,28 @@ public sealed class SessionTests(PostgresDatabases postgres)
         }
     }
 
+    // An operator "=" of a user's on oid or "char" before pg_catalog leaves Npgsql without the database's types when it
+    // opens the connection, so that it cannot read the text of open's answer.
+    [Theory]
+    [InlineData("oid")]
+    [InlineData("\"char\"")]
+    public async Task OpenAsync_EqualsOfTheUsersBeforeTheCatalog_IsSqlsrc224WithAFixedText(string type)
+    {
+        try
+        {
+            await postgres.ExecuteAsync(ScratchSchema.ShadowingEquals(type));
+
+            var failure = await ShouldNotOpenAsync($"{postgres.ConnectionString};{ScratchSchema.ShadowingEqualsPath}");
+
+            failure.ServerLines.ShouldBe([PostgresConnection.UnreadableTypes]);
+            failure.Help.ShouldBe(PostgresErrors.UnreadableTypesHelp);
+        }
+        finally
+        {
+            await postgres.ExecuteAsync(ScratchSchema.DropShadowingEquals);
+        }
+    }
+
     // No session, SQLSRC224 at no step for the database, and the connection's whole value in no text of it.
     private static async Task<DescribeFailure> ShouldNotOpenAsync(string connection)
     {

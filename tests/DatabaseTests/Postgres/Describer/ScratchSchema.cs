@@ -10,8 +10,9 @@ namespace SqlSource.DatabaseTests.Postgres.Describer;
 // as any other would.  An object that changes what another test sees while it exists, public."numeric", the schema
 // "user", the schema shadow of ShadowCount and ShadowOperators, the aggregate pg_catalog.count(text) of CatalogCount,
 // the operator pg_catalog.* of CatalogOperator, the schema zz of OperatorsAfterTheCatalog, the schema
-// shadowing_operators of ShadowingOperators, describer_canary, command_widgets, error_path_widgets, session_gone and
-// transaction_kept, is made by its test and dropped in a finally.
+// shadowing_operators of ShadowingOperators, the schema shadowing_equals of ShadowingEquals, describer_canary,
+// command_widgets, error_path_widgets, session_gone and transaction_kept, is made by its test and dropped in a
+// finally.
 internal static class ScratchSchema
 {
     /// <summary>
@@ -226,6 +227,29 @@ internal static class ScratchSchema
     /// name for any other test.
     /// </summary>
     public const string DropShadowingOperators = "DROP SCHEMA IF EXISTS shadowing_operators CASCADE";
+
+    /// <summary>
+    /// The schema <c>shadowing_equals</c>, of one operator <c>=</c> on two of <paramref name="type" /> that always
+    /// returns false.  On <see cref="ShadowingEqualsPath" />, Npgsql, which reads the database's types when it opens
+    /// a connection by SQL that compares them with <c>=</c>, cannot read them.  CREATE OPERATOR has no OR REPLACE, so
+    /// the text makes the schema again.
+    /// </summary>
+    public static string ShadowingEquals(string type) =>
+        $"""
+            DROP SCHEMA IF EXISTS shadowing_equals CASCADE;
+            CREATE SCHEMA shadowing_equals;
+            CREATE FUNCTION shadowing_equals.never({type}, {type}) RETURNS boolean LANGUAGE sql AS 'SELECT false';
+            CREATE OPERATOR shadowing_equals.= (leftarg = {type}, rightarg = {type}, function = shadowing_equals.never);
+            """;
+
+    /// <summary>The part of a connection string that puts <see cref="ShadowingEquals" /> first.</summary>
+    public const string ShadowingEqualsPath = "Search Path=shadowing_equals,pg_catalog,public";
+
+    /// <summary>
+    /// Drops the schema <c>shadowing_equals</c>.  Every test that makes it runs this in a finally: while it holds a
+    /// <c>=</c>, <c>overloads</c> answers that name for any other test.
+    /// </summary>
+    public const string DropShadowingEquals = "DROP SCHEMA IF EXISTS shadowing_equals CASCADE";
 
     /// <summary>
     /// The extension <c>postgres_fdw</c> and one loopback server, <c>scratch_loop</c>, to the container's own

@@ -83,6 +83,13 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     public const string GssUnavailable = "GSS authentication is not available on this machine";
 
     /// <summary>
+    /// What is said of a session whose answer to <c>open</c> Npgsql cannot read as text: the driver loaded the
+    /// database's types on open with SQL that the search path changes, and an operator <c>=</c> of a user's on two
+    /// <c>oid</c> or two <c>"char"</c> before <c>pg_catalog</c> leaves it without them.
+    /// </summary>
+    public const string UnreadableTypes = "Npgsql cannot read the database's types";
+
+    /// <summary>
     /// Every text that the describer throws as an <see cref="NpgsqlException" /> of its own, with no inner exception:
     /// the constants above.  <see cref="ConnectionErrors" /> passes each as it is, and answers any other message by
     /// a text of its own.
@@ -96,6 +103,7 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
         UnusableFile,
         UnsupportedSettings,
         GssUnavailable,
+        UnreadableTypes,
     ];
 
     // The type of the runtime whose static constructor loads the GSS library: Interop+NetSecurityNative+GssInitializer.

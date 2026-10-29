@@ -264,6 +264,10 @@ internal sealed class PostgresLive(PostgresConnection connection)
     private const string ProbeSql = "SELECT $1";
 
     /// <summary>Asks <c>open</c>.</summary>
+    /// <remarks>
+    /// Every column of the answer is text, so a column that Npgsql cannot read as a string is a session whose types
+    /// the driver could not load, which is <see cref="PostgresConnection.UnreadableTypes" />.
+    /// </remarks>
     public Task<PostgresOpenAnswer> OpenAsync(CancellationToken token) =>
         AnswerAsync(
             async () =>
@@ -275,12 +279,23 @@ internal sealed class PostgresLive(PostgresConnection connection)
                     throw new InvalidOperationException("The server answered 'open' with no row.");
                 }
 
-                return new PostgresOpenAnswer(
-                    VersionOf(reader.GetString(0)),
-                    PostgresConnection.DriverVersion,
-                    [.. SettingNames.Select((name, index) => new PostgresSetting(name, reader.GetString(index + 1)))],
-                    null
-                );
+                try
+                {
+                    return new PostgresOpenAnswer(
+                        VersionOf(reader.GetString(0)),
+                        PostgresConnection.DriverVersion,
+                        [
+                            .. SettingNames.Select(
+                                (name, index) => new PostgresSetting(name, reader.GetString(index + 1))
+                            ),
+                        ],
+                        null
+                    );
+                }
+                catch (InvalidCastException)
+                {
+                    throw new NpgsqlException(PostgresConnection.UnreadableTypes);
+                }
             },
             ConnectionErrors.AtOpen,
             static error => new PostgresOpenAnswer(null, null, null, error)
