@@ -116,6 +116,19 @@ internal static class StepReasons
             : [.. steps[step].SelectMany(run => run.Outputs).Select(output => output.Reason)];
     }
 
+    // Every reason is this one, and there is at least one, so that a step which gave nothing does not pass.  It takes
+    // the reason itself where Shouldly's ShouldAllBe takes a predicate.
+    public static void ShouldAllBe(this IEnumerable<IncrementalStepRunReason> reasons, IncrementalStepRunReason reason)
+    {
+        var all = reasons.ToArray();
+        all.ShouldNotBeEmpty();
+        all.ShouldAllBe(each => each == reason);
+    }
+
+    // Every reason is Cached, and there is at least one.
+    public static void ShouldAllBeCached(this IEnumerable<IncrementalStepRunReason> reasons) =>
+        reasons.ShouldAllBe(IncrementalStepRunReason.Cached);
+
     // The steps that add source and report diagnostics.
     public static IncrementalStepRunReason[] OutputReasons(GeneratorDriverRunResult result) =>
         [

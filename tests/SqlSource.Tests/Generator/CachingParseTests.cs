@@ -42,7 +42,7 @@ public sealed class CachingParseTests
                 },
                 ignoreOrder: true
             );
-        AllReasons(result, TrackingNames.TypeFiles).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.TypeFiles).ShouldAllBeCached();
         AllReasons(result, TrackingNames.CaseCollisions).ShouldBe([IncrementalStepRunReason.Cached]);
         result
             .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("UserQueries.g.cs", StringComparison.Ordinal))
@@ -60,9 +60,9 @@ public sealed class CachingParseTests
         var result = Run(driver.ReplaceAdditionalText(_scene.Users, edited), compilation);
 
         // The file was parsed again and gave an equal value, so nothing after the parse ran.
-        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBeCached();
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     [Fact]
@@ -120,7 +120,7 @@ public sealed class CachingParseTests
             AllReasons(result, step).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached, step);
         }
 
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // The declaration has a new member, so the names its nested class cannot take changed, and the check ran again.
@@ -162,8 +162,8 @@ public sealed class CachingParseTests
                 },
                 ignoreOrder: true
             );
-        AllReasons(result, TrackingNames.TypeFiles).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.TypeFiles).ShouldAllBeCached();
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // A project that references Npgsql and needs entries of postgres: the probe runs on the new compilation, gives an
@@ -186,7 +186,7 @@ public sealed class CachingParseTests
         AllReasons(result, TrackingNames.UsesPostgresEntries)
             .ShouldHaveSingleItem()
             .ShouldBeOneOf(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Unchanged);
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // A project that references SqlClient and needs entries of mssql: the probe runs on the new compilation, gives an
@@ -212,7 +212,7 @@ public sealed class CachingParseTests
         AllReasons(result, TrackingNames.UsesSqlServerEntries)
             .ShouldHaveSingleItem()
             .ShouldBeOneOf(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Unchanged);
-        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     [Fact]
@@ -227,7 +227,7 @@ public sealed class CachingParseTests
         );
 
         AllReasons(result, TrackingNames.SqlPaths).ShouldBe([IncrementalStepRunReason.Modified]);
-        AllReasons(result, TrackingNames.TypeFiles).ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
+        AllReasons(result, TrackingNames.TypeFiles).ShouldAllBe(IncrementalStepRunReason.Unchanged);
 
         // The files that were read before were not read again: each is the input it was, and so are the claimed
         // paths.  The new file is not listed, here or under ParsedFile: the read gives nothing for a file that no type
@@ -244,8 +244,8 @@ public sealed class CachingParseTests
         AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
         Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
             .Keys.ShouldBe(["Users.sql", "Orders.sql"], ignoreOrder: true);
-        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBeCached();
         result.Diagnostics.ShouldBeEmpty();
     }
 
@@ -263,8 +263,8 @@ public sealed class CachingParseTests
         // The type keeps the file it had, so nothing about it is worked out again.
         AllReasons(result, TrackingNames.CaseCollisions).ShouldBe([IncrementalStepRunReason.Modified]);
         AllReasons(result, TrackingNames.SqlPaths).ShouldBe([IncrementalStepRunReason.Unchanged]);
-        AllReasons(result, TrackingNames.TypeFiles).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.TypeFiles).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBeCached();
         result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC013");
     }
 
