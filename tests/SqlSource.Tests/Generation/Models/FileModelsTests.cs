@@ -22,8 +22,11 @@ public sealed class FileModelsTests
     public void Find_IndexAndName_GivesTheModels(int index, string name) =>
         File.Find(index, name).ShouldNotBeNull().Name.ShouldBe(name);
 
-    [Fact]
-    public void Find_IndexWithAnotherName_IsNull() => File.Find(2, "Third").ShouldBeNull();
+    // At index 0 the models are at the query's own index; at 2 they are found by the search.
+    [Theory]
+    [InlineData(0, "Second")]
+    [InlineData(2, "Third")]
+    public void Find_IndexWithAnotherName_IsNull(int index, string name) => File.Find(index, name).ShouldBeNull();
 
     [Theory]
     [InlineData(1)]

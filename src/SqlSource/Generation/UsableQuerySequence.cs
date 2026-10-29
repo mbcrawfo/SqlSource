@@ -24,15 +24,23 @@ internal readonly struct UsableQuerySequence
     {
         private readonly TypeQueries _type;
         private readonly bool[] _usable;
+        private readonly SettingsLevel _attribute;
         private int _fileIndex;
         private int _queryIndex;
+
+        // The queries and the level of the file being walked, looked up once for the file.
+        private EquatableArray<SqlQuery> _queries;
+        private SettingsLevel _fileLevel;
 
         internal Enumerator(TypeQueries type, bool[] usable)
         {
             _type = type;
             _usable = usable;
+            _attribute = type.Type.Type.Settings;
             _fileIndex = -1;
             _queryIndex = 0;
+            _queries = EquatableArray<SqlQuery>.Empty;
+            _fileLevel = SettingsLevel.None;
             Current = default;
         }
 
@@ -41,20 +49,8 @@ internal readonly struct UsableQuerySequence
         public bool MoveNext()
         {
             _queryIndex++;
-            while (true)
+            while (_queryIndex >= _queries.Count)
             {
-                if (_fileIndex >= 0 && _queryIndex < _type.Files[_fileIndex].Queries.Count)
-                {
-                    var query = _type.Files[_fileIndex].Queries[_queryIndex];
-                    var settings = QuerySettings.Resolve(
-                        query.Markers,
-                        _type.Type.Type.Settings,
-                        _type.FileSettings[_fileIndex]
-                    );
-                    Current = new UsableQuery(_fileIndex, _queryIndex, query, settings);
-                    return true;
-                }
-
                 // The next usable file, from its first query.
                 do
                 {
@@ -65,8 +61,19 @@ internal readonly struct UsableQuerySequence
                     return false;
                 }
 
+                _queries = _type.Files[_fileIndex].Queries;
+                _fileLevel = _type.FileSettings[_fileIndex];
                 _queryIndex = 0;
             }
+
+            var query = _queries[_queryIndex];
+            Current = new UsableQuery(
+                _fileIndex,
+                _queryIndex,
+                query,
+                QuerySettings.Resolve(query.Markers, _attribute, _fileLevel)
+            );
+            return true;
         }
     }
 }

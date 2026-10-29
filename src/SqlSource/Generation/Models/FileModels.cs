@@ -32,7 +32,14 @@ internal sealed record FileModels(
     /// <returns>The models, or null when the query has none or the model at the index has another name.</returns>
     public QueryModels? Find(int queryIndex, string name)
     {
-        var (low, high) = (0, Queries.Count - 1);
+        // A query has models at most once and the indices rise, so its models are at or before its own index, and
+        // at it when every query before it has models, as is usual.
+        var (low, high) = (0, Math.Min(Queries.Count, queryIndex + 1) - 1);
+        if (high >= 0 && Queries[high].Index == queryIndex)
+        {
+            return string.Equals(Queries[high].Name, name, StringComparison.Ordinal) ? Queries[high] : null;
+        }
+
         while (low <= high)
         {
             var middle = low + ((high - low) / 2);
