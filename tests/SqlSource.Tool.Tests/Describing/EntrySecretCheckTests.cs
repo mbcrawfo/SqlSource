@@ -1,5 +1,6 @@
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Testing;
 using Xunit;
@@ -42,8 +43,6 @@ public sealed class EntrySecretCheckTests
 
     private static readonly ConnectionSecret Secret = new(Secrets.Connection);
 
-    private static EquatableArray<SidecarParameter> Parameters(SidecarParameter parameter) => new([parameter]);
-
     [Fact]
     public void Holds_EntryWithoutTheValue_IsFalse() => EntrySecretCheck.Holds(Entry, Secret).ShouldBeFalse();
 
@@ -77,7 +76,7 @@ public sealed class EntrySecretCheckTests
             .Holds(
                 Entry with
                 {
-                    Parameters = Parameters(Id with { Type = new OtherEngineType(Secrets.Connection) }),
+                    Parameters = TestSidecars.Of(Id with { Type = new OtherEngineType(Secrets.Connection) }),
                 },
                 Secret
             )
@@ -86,7 +85,7 @@ public sealed class EntrySecretCheckTests
     [Fact]
     public void Holds_ValueInTheTypeSourceOfAParameter_IsTrue() =>
         EntrySecretCheck
-            .Holds(Entry with { Parameters = Parameters(Id with { TypeSource = Secrets.Connection }) }, Secret)
+            .Holds(Entry with { Parameters = TestSidecars.Of(Id with { TypeSource = Secrets.Connection }) }, Secret)
             .ShouldBeTrue();
 
     [Fact]

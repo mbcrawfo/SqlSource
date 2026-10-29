@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Settings.ColumnTypes;
@@ -17,7 +17,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_TwoPartKey_MatchesAnySchema()
     {
-        var map = Map(Entry("users.id", "UserId", Far));
+        var map = TestSidecars.Of(Entry("users.id", "UserId", Far));
 
         ColumnTypeMap.Find(map, "public", "users", "id")!.Type.ShouldBe("UserId");
         ColumnTypeMap.Find(map, "auth", "users", "id")!.Type.ShouldBe("UserId");
@@ -29,7 +29,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_ThreePartKey_MatchesItsSchemaAlone()
     {
-        var map = Map(Entry("billing.invoices.id", "InvoiceId", Far));
+        var map = TestSidecars.Of(Entry("billing.invoices.id", "InvoiceId", Far));
 
         ColumnTypeMap.Find(map, "billing", "invoices", "id")!.Type.ShouldBe("InvoiceId");
         ColumnTypeMap.Find(map, "BILLING", "Invoices", "ID")!.Type.ShouldBe("InvoiceId");
@@ -40,7 +40,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_SchemaWinsOverNoSchema_InOnePlace()
     {
-        var map = Map(Entry("users.id", "UserId", Near), Entry("auth.users.id", "AuthUserId", Near));
+        var map = TestSidecars.Of(Entry("users.id", "UserId", Near), Entry("auth.users.id", "AuthUserId", Near));
 
         ColumnTypeMap.Find(map, "auth", "users", "id")!.Type.ShouldBe("AuthUserId");
         ColumnTypeMap.Find(map, "public", "users", "id")!.Type.ShouldBe("UserId");
@@ -51,8 +51,8 @@ public sealed class ColumnTypeMapTests
     {
         var map = ColumnTypeMap
             .Over(
-                Map(Entry("users.id", "UserId", SettingPlace.FileHeader)),
-                Map(Entry("auth.users.id", "AuthUserId", Far))
+                TestSidecars.Of(Entry("users.id", "UserId", SettingPlace.FileHeader)),
+                TestSidecars.Of(Entry("auth.users.id", "AuthUserId", Far))
             )!
             .Value;
 
@@ -65,8 +65,8 @@ public sealed class ColumnTypeMapTests
     {
         var map = ColumnTypeMap
             .Over(
-                Map(Entry("users.id", "UserId", SettingPlace.FileHeader)),
-                Map(Entry("public.users.id", "OtherId", Near))
+                TestSidecars.Of(Entry("users.id", "UserId", SettingPlace.FileHeader)),
+                TestSidecars.Of(Entry("public.users.id", "OtherId", Near))
             )!
             .Value;
 
@@ -76,7 +76,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_QuotedPart_ComparesExactly()
     {
-        var map = Map(Entry("\"Users\".id", "UserId", Far));
+        var map = TestSidecars.Of(Entry("\"Users\".id", "UserId", Far));
 
         ColumnTypeMap.Find(map, "public", "Users", "id")!.Type.ShouldBe("UserId");
         ColumnTypeMap.Find(map, "public", "Users", "ID")!.Type.ShouldBe("UserId");
@@ -88,7 +88,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_QuotedSchema_ComparesExactly()
     {
-        var map = Map(Entry("\"Auth\".users.id", "UserId", Far));
+        var map = TestSidecars.Of(Entry("\"Auth\".users.id", "UserId", Far));
 
         ColumnTypeMap.Find(map, "Auth", "users", "id")!.Type.ShouldBe("UserId");
         ColumnTypeMap.Find(map, "auth", "users", "id").ShouldBeNull();
@@ -98,7 +98,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_ExactSpelling_WinsOverAMatchIgnoringCase()
     {
-        var map = Map(Entry("Users.Id", "Upper", Far), Entry("users.id", "Lower", Far));
+        var map = TestSidecars.Of(Entry("Users.Id", "Upper", Far), Entry("users.id", "Lower", Far));
 
         ColumnTypeMap.Find(map, "public", "users", "id")!.Type.ShouldBe("Lower");
         ColumnTypeMap.Find(map, "public", "Users", "Id")!.Type.ShouldBe("Upper");
@@ -109,7 +109,9 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_KeyWithASchemaAndOneSpelledAsTheOriginInOnePlace_IsTheOneWithTheSchema()
     {
-        var map = ColumnTypeMap.Over(Map(Entry("Users.id", "A", Far)), Map(Entry("auth.users.id", "B", Far)))!.Value;
+        var map = ColumnTypeMap
+            .Over(TestSidecars.Of(Entry("Users.id", "A", Far)), TestSidecars.Of(Entry("auth.users.id", "B", Far)))!
+            .Value;
 
         ColumnTypeMap.Find(map, "auth", "Users", "id")!.Type.ShouldBe("B");
     }
@@ -117,7 +119,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Find_TextWithAQuoteInAQuotedPart_IsFound()
     {
-        var map = Map(Entry("\"a\"\"b\".id", "AbId", Far));
+        var map = TestSidecars.Of(Entry("\"a\"\"b\".id", "AbId", Far));
 
         ColumnTypeMap.Find(map, null, "a\"b", "id")!.Type.ShouldBe("AbId");
     }
@@ -129,12 +131,14 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Over_Default_HidesTheKeyBelow()
     {
-        var lower = Map(Entry("posts.id", "PostId", Far), Entry("users.id", "UserId", Far));
-        var higher = Map(Entry("users.id", null, SettingPlace.FileHeader));
+        var lower = TestSidecars.Of(Entry("posts.id", "PostId", Far), Entry("users.id", "UserId", Far));
+        var higher = TestSidecars.Of(Entry("users.id", null, SettingPlace.FileHeader));
 
         var merged = ColumnTypeMap.Over(higher, lower)!.Value;
 
-        merged.ShouldBe(Map(Entry("posts.id", "PostId", Far), Entry("users.id", null, SettingPlace.FileHeader)));
+        merged.ShouldBe(
+            TestSidecars.Of(Entry("posts.id", "PostId", Far), Entry("users.id", null, SettingPlace.FileHeader))
+        );
         ColumnTypeMap.Find(merged, "public", "users", "id").ShouldBeNull();
         ColumnTypeMap.Find(merged, "public", "posts", "id")!.Type.ShouldBe("PostId");
     }
@@ -144,7 +148,10 @@ public sealed class ColumnTypeMapTests
     public void Over_DefaultAbove_WinsOverASchemaBelow()
     {
         var merged = ColumnTypeMap
-            .Over(Map(Entry("users.id", null, Near)), Map(Entry("auth.users.id", "AuthUserId", Far)))!
+            .Over(
+                TestSidecars.Of(Entry("users.id", null, Near)),
+                TestSidecars.Of(Entry("auth.users.id", "AuthUserId", Far))
+            )!
             .Value;
 
         ColumnTypeMap.Find(merged, "auth", "users", "id").ShouldBeNull();
@@ -153,12 +160,12 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Over_Higher_ReplacesOnlyTheKeysItNames()
     {
-        var lower = Map(Entry("posts.id", "PostId", Far), Entry("users.id", "UserId", Far));
-        var higher = Map(Entry("users.id", "global::App.UserId", Near));
+        var lower = TestSidecars.Of(Entry("posts.id", "PostId", Far), Entry("users.id", "UserId", Far));
+        var higher = TestSidecars.Of(Entry("users.id", "global::App.UserId", Near));
 
         ColumnTypeMap
             .Over(higher, lower)
-            .ShouldBe(Map(Entry("posts.id", "PostId", Far), Entry("users.id", "global::App.UserId", Near)));
+            .ShouldBe(TestSidecars.Of(Entry("posts.id", "PostId", Far), Entry("users.id", "global::App.UserId", Near)));
     }
 
     // A quoted part and a plain part of one text are one key, and keys that differ only by case are two.
@@ -166,11 +173,11 @@ public sealed class ColumnTypeMapTests
     public void Over_QuotedAndPlainSpellingOfOneText_AreOneKey()
     {
         ColumnTypeMap
-            .Over(Map(Entry("\"users\".id", "A", Near)), Map(Entry("users.id", "B", Far)))
-            .ShouldBe(Map(Entry("\"users\".id", "A", Near)));
+            .Over(TestSidecars.Of(Entry("\"users\".id", "A", Near)), TestSidecars.Of(Entry("users.id", "B", Far)))
+            .ShouldBe(TestSidecars.Of(Entry("\"users\".id", "A", Near)));
 
         ColumnTypeMap
-            .Over(Map(Entry("Users.id", "A", Near)), Map(Entry("users.id", "B", Far)))!
+            .Over(TestSidecars.Of(Entry("Users.id", "A", Near)), TestSidecars.Of(Entry("users.id", "B", Far)))!
             .Value.Count.ShouldBe(2);
     }
 
@@ -180,8 +187,12 @@ public sealed class ColumnTypeMapTests
     {
         var merged = ColumnTypeMap
             .Over(
-                Map(Entry("posts.id", "P", Near), Entry("z.posts.id", "Z", Near), Entry("a.users.id", "A", Near)),
-                Map(Entry("users.id", "U", Far), Entry("users.name", "N", Far))
+                TestSidecars.Of(
+                    Entry("posts.id", "P", Near),
+                    Entry("z.posts.id", "Z", Near),
+                    Entry("a.users.id", "A", Near)
+                ),
+                TestSidecars.Of(Entry("users.id", "U", Far), Entry("users.name", "N", Far))
             )!
             .Value;
 
@@ -194,7 +205,7 @@ public sealed class ColumnTypeMapTests
     [Fact]
     public void Over_OneSideNull_IsTheOther()
     {
-        var map = Map(Entry("users.id", "UserId", Far));
+        var map = TestSidecars.Of(Entry("users.id", "UserId", Far));
 
         ColumnTypeMap.Over(map, null).ShouldBe(map);
         ColumnTypeMap.Over(null, map).ShouldBe(map);
@@ -212,6 +223,4 @@ public sealed class ColumnTypeMapTests
     }
 
     private static ColumnType Entry(string key, string? type, SettingPlace place) => new(key, type, place);
-
-    private static EquatableArray<ColumnType> Map(params ColumnType[] entries) => new(ImmutableArray.Create(entries));
 }

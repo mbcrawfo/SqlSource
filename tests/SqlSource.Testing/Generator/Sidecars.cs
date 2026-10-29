@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Immutable;
 using System.Linq;
 using SqlSource.Generation.Paths;
 using SqlSource.Parsing;
@@ -31,16 +30,7 @@ internal static class Sidecars
         Of(sqlFile, SidecarFormat.Version, PackageVersion.Prefix, entries);
 
     public static SqlFile Of(SqlFile sqlFile, int formatVersion, string toolVersion, params SidecarEntry[] entries) =>
-        Raw(
-            sqlFile,
-            SidecarWriter.Write(
-                new Sidecar(
-                    formatVersion,
-                    toolVersion,
-                    new EquatableArray<SidecarEntry>(ImmutableArray.Create(entries))
-                )
-            )
-        );
+        Raw(sqlFile, SidecarWriter.Write(new Sidecar(formatVersion, toolVersion, TestSidecars.Of(entries))));
 
     // A sidecar with a current entry for each of the queries, for the engine of the dialect the file is read by.
     public static SqlFile Current(SqlFile sqlFile, SqlDialect dialect, params string[] queryNames)

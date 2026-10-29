@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
@@ -302,8 +301,8 @@ public sealed class QuerySettingsTests
     }
 
     private static SettingsLevel Overrides(params TypeOverride[] entries) =>
-        new() { TypeOverrides = new EquatableArray<TypeOverride>(ImmutableArray.Create(entries)) };
+        new() { TypeOverrides = TestSidecars.Of(entries) };
 
     private static SettingsLevel Columns(params ColumnType[] entries) =>
-        new() { ColumnTypes = new EquatableArray<ColumnType>(ImmutableArray.Create(entries)) };
+        new() { ColumnTypes = TestSidecars.Of(entries) };
 }
