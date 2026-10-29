@@ -90,8 +90,8 @@ FROM dbo.accounts
 WHERE id = @secondId;
 
 -- name: ListThenRaise
--- summary: The accounts into an array, a mark on the session, and then an error that the method does not report.
--- StreamThenRaise of Streaming.sql, read into the default collection type: its test pins that the error is lost by a
+-- summary: The accounts into an array, a mark on the session, and then an error that the method throws.
+-- StreamThenRaise of Streaming.sql, read into the default collection type: its test pins that the error is thrown by a
 -- method that reads its rows into a collection too.  SET CONTEXT_INFO keeps its value for the session, which the test
 -- reads from the same connection: the mark is there when the batch ran as far as the THROW.
 -- output-model: CollectedAccount
@@ -102,9 +102,10 @@ SET CONTEXT_INFO 0x03;
 THROW 50000, 'after the rows', 1;
 
 -- name: ListThenFailConversion
--- summary: The accounts into an array, and then a conversion that fails, an error that the method does not report.
+-- summary: The accounts into an array, and then a conversion that fails, an error that the method throws.
 -- StreamThenFailConversion of Streaming.sql, read into the default collection type: its test pins that the failed
--- conversion rolls back a transaction with XACT_ABORT off for a method that reads its rows into a collection too.
+-- conversion is thrown, and rolls back a transaction with XACT_ABORT off, for a method that reads its rows into a
+-- collection too.
 -- output-model: CollectedAccount
 SELECT id, name
 FROM dbo.accounts
@@ -120,9 +121,9 @@ SET CONTEXT_INFO 0x04;
 THROW 50000, 'after the rows', 1;
 
 -- name: GetThenRaise -> one
--- summary: The first account, a mark on the session, and then an error that the method does not report.
+-- summary: The first account, a mark on the session, and then an error that the method throws.
 -- ListThenRaise under one, which reads its row and then reads again to see that there is no second: its test pins that
--- the error is lost by a method that reads one row too.
+-- the error is thrown by a method that reads one row too.
 -- output-model: CollectedAccount
 SELECT id, name
 FROM dbo.accounts
@@ -131,14 +132,24 @@ SET CONTEXT_INFO 0x05;
 THROW 50000, 'after the rows', 1;
 
 -- name: FindThenRaise -> one-optional
--- summary: The first account, a mark on the session, and then an error that the method does not report.
+-- summary: The first account, a mark on the session, and then an error that the method throws.
 -- ListThenRaise under one-optional, which reads its row and then reads again to see that there is no second: its test
--- pins that the error is lost by a method that reads at most one row too.
+-- pins that the error is thrown by a method that reads at most one row too.
 -- output-model: CollectedAccount
 SELECT id, name
 FROM dbo.accounts
 WHERE id = 1;
 SET CONTEXT_INFO 0x06;
+THROW 50000, 'after the rows', 1;
+
+-- name: FindNoneThenRaise -> one-optional
+-- summary: No account, a mark on the session, and then an error that the method throws rather than return null.
+-- FindThenRaise with no row: its test pins that the error is thrown by a method that finds no row too.
+-- output-model: CollectedAccount
+SELECT id, name
+FROM dbo.accounts
+WHERE id = 0;
+SET CONTEXT_INFO 0x08;
 THROW 50000, 'after the rows', 1;
 
 -- name: CountThenRaise -> rowcount

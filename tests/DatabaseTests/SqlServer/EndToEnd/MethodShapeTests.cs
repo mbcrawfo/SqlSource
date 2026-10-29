@@ -9,10 +9,14 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // The result shapes of Queries/Methods.sql, and its token, run through MethodQueries' methods on the seed of "app": a
 // query with no rows is rowcount by default and runs as none, one and one-optional read their row and refuse the rows
 // their shape does not allow, and a token is given the text of its default or another fragment.  A write runs in a
-// transaction that is rolled back.
+// transaction that is rolled back.  Every shape throws an error that a statement after the rows raises: none and
+// rowcount read no rows, and a shape that reads them reads the results after them before it returns.
 [Collection(UsesSqlServer.Name)]
 public sealed class MethodShapeTests(SqlServerDatabases sqlServer)
 {
+    // The number of SQL Server's error "Conversion failed when converting the varchar value 'x' to data type int.".
+    private const int ConversionFailed = 245;
+
     [Fact]
     public async Task TouchAccount_NoRows_IsRowCountByDefault()
     {
@@ -180,100 +184,105 @@ public sealed class MethodShapeTests(SqlServerDatabases sqlServer)
         accounts.ShouldBe([new ListAccountsWhereDto(3, "carol")]);
     }
 
-    // The error after the rows is lost by a method that reads them into an array, as by the streaming StreamThenRaise:
-    // the rows are returned and nothing is thrown, though the batch ran as far as the THROW, which its mark shows.  A
-    // fix that reports the error flips this test.
+    // A method that reads its rows into an array reads the results after them before it returns, so the THROW after
+    // the rows is thrown, as by the streaming StreamThenRaise, and the mark shows that the batch ran as far as it.
     [Fact]
-    public async Task ListThenRaise_ErrorAfterTheRows_ReturnsTheRowsAndIsNotThrown()
+    public async Task ListThenRaise_ErrorAfterTheRows_ThrowsTheError()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(token);
         await SessionMark.ClearAsync(connection, token);
 
-        var accounts = await connection.ListThenRaise(cancellationToken: token);
+        var thrown = await Should.ThrowAsync<SqlException>(() => connection.ListThenRaise(cancellationToken: token));
 
-        accounts.ShouldBe([
-            new CollectedAccount(1, "alice"),
-            new CollectedAccount(2, "bob"),
-            new CollectedAccount(3, "carol"),
-        ]);
+        thrown.Number.ShouldBe(50000);
+        thrown.Message.ShouldBe("after the rows");
         (await SessionMark.ReadAsync(connection, token)).ShouldBe(3);
     }
 
-    // Under SET XACT_ABORT ON the THROW rolls back the transaction that the method ran in, and the method still returns
-    // the rows and throws nothing, as the streaming StreamThenRaise does: the caller learns of the rollback only at the
-    // commit.
+    // Under SET XACT_ABORT ON the THROW rolls back the transaction that the method ran in, and the method throws the
+    // error, as the streaming StreamThenRaise does, so the caller learns of the rollback from the method.
     [Fact]
-    public async Task ListThenRaise_ErrorAfterTheRowsInATransactionUnderXactAbort_RollsItBackUnreported()
+    public async Task ListThenRaise_ErrorAfterTheRowsInATransactionUnderXactAbort_ThrowsAndRollsItBack()
     {
         var token = TestContext.Current.CancellationToken;
         await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: true, token);
 
-        var accounts = await session.Connection.ListThenRaise(
-            transaction: session.Transaction,
-            cancellationToken: token
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            session.Connection.ListThenRaise(transaction: session.Transaction, cancellationToken: token)
         );
 
-        accounts.ShouldBe([
-            new CollectedAccount(1, "alice"),
-            new CollectedAccount(2, "bob"),
-            new CollectedAccount(3, "carol"),
-        ]);
-        await session.ShouldHaveRolledBackUnreportedAsync(token);
+        thrown.Number.ShouldBe(50000);
+        await session.ShouldHaveRolledBackAsync(token);
     }
 
     // With XACT_ABORT off, as SqlClient leaves it, the failed conversion after the rows rolls back the transaction that
-    // the method ran in, and the method still returns the rows and throws nothing, as the streaming
-    // StreamThenFailConversion does: the caller learns of the rollback only at the commit.
+    // the method ran in, and the method throws the error, as the streaming StreamThenFailConversion does.  The
+    // conversion is a SELECT, whose result set the method moves to before its error is raised.
     [Fact]
-    public async Task ListThenFailConversion_ErrorAfterTheRowsInATransaction_RollsItBackUnreported()
+    public async Task ListThenFailConversion_ErrorAfterTheRowsInATransaction_ThrowsAndRollsItBack()
     {
         var token = TestContext.Current.CancellationToken;
         await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
 
-        var accounts = await session.Connection.ListThenFailConversion(
-            transaction: session.Transaction,
-            cancellationToken: token
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            session.Connection.ListThenFailConversion(transaction: session.Transaction, cancellationToken: token)
         );
 
-        accounts.ShouldBe([
-            new CollectedAccount(1, "alice"),
-            new CollectedAccount(2, "bob"),
-            new CollectedAccount(3, "carol"),
-        ]);
-        await session.ShouldHaveRolledBackUnreportedAsync(token);
+        thrown.Number.ShouldBe(ConversionFailed);
+        await session.ShouldHaveRolledBackAsync(token);
     }
 
-    // The error after the row is lost by one as by many: the row is returned and nothing is thrown, though the batch
-    // ran as far as the THROW.  A fix that reports the error flips this test.
+    // A method of one reads the results after its second read, so the THROW after the row is thrown, as by many.
     [Fact]
-    public async Task GetThenRaise_ErrorAfterTheRow_ReturnsTheRowAndIsNotThrown()
+    public async Task GetThenRaise_ErrorAfterTheRow_ThrowsTheError()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(token);
         await SessionMark.ClearAsync(connection, token);
 
-        var account = await connection.GetThenRaise(cancellationToken: token);
+        var thrown = await Should.ThrowAsync<SqlException>(() => connection.GetThenRaise(cancellationToken: token));
 
-        account.ShouldBe(new CollectedAccount(1, "alice"));
+        thrown.Number.ShouldBe(50000);
+        thrown.Message.ShouldBe("after the rows");
         (await SessionMark.ReadAsync(connection, token)).ShouldBe(5);
     }
 
-    // The same under one-optional.  A fix that reports the error flips this test.
+    // The same under one-optional.
     [Fact]
-    public async Task FindThenRaise_ErrorAfterTheRow_ReturnsTheRowAndIsNotThrown()
+    public async Task FindThenRaise_ErrorAfterTheRow_ThrowsTheError()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(token);
         await SessionMark.ClearAsync(connection, token);
 
-        var account = await connection.FindThenRaise(cancellationToken: token);
+        var thrown = await Should.ThrowAsync<SqlException>(() => connection.FindThenRaise(cancellationToken: token));
 
-        account.ShouldBe(new CollectedAccount(1, "alice"));
+        thrown.Number.ShouldBe(50000);
+        thrown.Message.ShouldBe("after the rows");
         (await SessionMark.ReadAsync(connection, token)).ShouldBe(6);
+    }
+
+    // A method of one-optional that finds no row reads the results after it too, so the error is thrown rather than
+    // hidden behind the null.
+    [Fact]
+    public async Task FindNoneThenRaise_NoRowAndAnErrorAfter_ThrowsTheError()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(token);
+        await SessionMark.ClearAsync(connection, token);
+
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            connection.FindNoneThenRaise(cancellationToken: token)
+        );
+
+        thrown.Number.ShouldBe(50000);
+        thrown.Message.ShouldBe("after the rows");
+        (await SessionMark.ReadAsync(connection, token)).ShouldBe(8);
     }
 
     // The batch of ListThenRaise under none, which reads no rows, reports the error of the THROW.

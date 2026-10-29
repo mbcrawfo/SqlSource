@@ -619,9 +619,15 @@ internal static class QueryMethodWriter
             AppendRow(builder, output, locals);
             _ = builder.Append(streams ? ";\n" : ");\n");
             AppendEnd(builder, indent);
-            if (result is not null)
+            if (streams)
             {
-                _ = builder.Append('\n').Append(indent).Append("return ").Append(result).Append(";\n");
+                AppendDrain(builder, indent, method, locals);
+            }
+            else if (result is not null)
+            {
+                _ = builder.Append('\n');
+                AppendDrain(builder, indent, method, locals);
+                _ = builder.Append(indent).Append("return ").Append(result).Append(";\n");
             }
 
             return;
@@ -636,6 +642,7 @@ internal static class QueryMethodWriter
         }
         else
         {
+            AppendDrain(builder, innerIndent, method, locals);
             _ = builder.Append(innerIndent).Append("return null;\n");
         }
 
@@ -649,7 +656,36 @@ internal static class QueryMethodWriter
         _ = builder.Append(")\n").Append(indent).Append("{\n");
         AppendThrow(builder, innerIndent, method.QueryName, moreThanOne: true);
         AppendEnd(builder, indent);
-        _ = builder.Append('\n').Append(indent).Append("return ").Append(locals.Row).Append(";\n");
+        _ = builder.Append('\n');
+        AppendDrain(builder, indent, method, locals);
+        _ = builder.Append(indent).Append("return ").Append(locals.Row).Append(";\n");
+    }
+
+    // On SQL Server, the results after the rows are read before the method returns, since SqlClient raises an error
+    // that a later statement of the batch holds only when NextResultAsync reaches it, and drops it when the reader is
+    // disposed.  The method's own throws do not drain, so that a later statement's error never replaces one.  A
+    // PostgreSQL query is one statement, so its reader has no later result.  Before a return the loop is followed by a
+    // blank line; after a streaming method's loop it is preceded by one.
+    private static void AppendDrain(StringBuilder builder, string indent, QueryMethod method, Locals locals)
+    {
+        if (method.Engine != DatabaseEngine.SqlServer)
+        {
+            return;
+        }
+
+        var streams = Streams(method);
+        _ = builder
+            .Append(streams ? "\n" : string.Empty)
+            .Append(indent)
+            .Append("while (await ")
+            .Append(locals.Reader)
+            .Append(".NextResultAsync(")
+            .Append(CancellationToken)
+            .Append(").ConfigureAwait(false))\n")
+            .Append(indent)
+            .Append("{\n");
+        AppendEnd(builder, indent);
+        _ = builder.Append(streams ? string.Empty : "\n");
     }
 
     private static void AppendScope(StringBuilder builder, string indent, string scope, string disposable) =>

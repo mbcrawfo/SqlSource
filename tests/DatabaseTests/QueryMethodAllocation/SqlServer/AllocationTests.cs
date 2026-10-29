@@ -17,9 +17,10 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer;
 // The bytes that a generated method allocates for each call, against a hand-written ADO.NET method of the same calls:
 // ShapeQueries.SearchAccounts, with two parameters and three rows of the seed of "app".  The hand-written method makes
 // the generated method's calls, one by one: the open/close rule of the methods, the command and its arguments, the
-// binding of each parameter, the reads of each column, and the same rows in the same collection, an IReadOnlyList with
-// an array behind it, which it can only build by copying what it read the rows into, since the count of the rows is not
-// known until they are read.  It reads them into what the generated method does, so there are two pairs:
+// binding of each parameter, the reads of each column, the read of the results after the rows, so that a later
+// statement's error is thrown, and the same rows in the same collection, an IReadOnlyList with an array behind it,
+// which it can only build by copying what it read the rows into, since the count of the rows is not known until they
+// are read.  It reads them into what the generated method does, so there are two pairs:
 // SearchAccounts, which reads its rows into the pooled buffer, against a hand-written method that reads them into
 // RowBufferByHand of this project, the same buffer by hand; and SearchAccountsUnpooled, a copy of
 // the query under no-array-pool, which reads them into a List, against a hand-written method that does the same.  The
@@ -548,6 +549,11 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
 #pragma warning restore CA1849
             }
 
+            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+            {
+                // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
+            }
+
             // The array behind the IReadOnlyList.
             return rows.ToArray();
         }
@@ -619,6 +625,11 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
 #pragma warning restore CA1849
             }
 
+            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+            {
+                // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
+            }
+
             // The array behind the IReadOnlyList; a collection expression would wrap it in another object.
 #pragma warning disable IDE0305
             return rows.ToArray();
@@ -680,6 +691,11 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
 #pragma warning restore CA1849
             }
 
+            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+            {
+                // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
+            }
+
             return rows.ToList();
         }
         finally
@@ -736,6 +752,11 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
 #pragma warning disable CA1849
                 rows.Add(new CountedNumber(reader.IsDBNull(0) ? null : reader.GetFieldValue<int>(0)));
 #pragma warning restore CA1849
+            }
+
+            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+            {
+                // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
             }
 
             return rows.ToImmutableArray();
@@ -796,6 +817,11 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
 #pragma warning restore CA1849
             }
 
+            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+            {
+                // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
+            }
+
             return rows;
         }
         finally
@@ -852,6 +878,11 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
 #pragma warning disable CA1849
                 rows.Add(new CountedNumber(reader.IsDBNull(0) ? null : reader.GetFieldValue<int>(0)));
 #pragma warning restore CA1849
+            }
+
+            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+            {
+                // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
             }
 
             return rows.DrainToImmutable();
@@ -912,6 +943,11 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
 #pragma warning restore CA1849
             }
 
+            while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+            {
+                // The generated method's drain: the results after the rows, whose error SqlClient raises only here.
+            }
+
             // A collection expression would wrap the array in another object.
 #pragma warning disable IDE0305
             return rows.ToArray();
@@ -927,8 +963,8 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
     }
 
     // StreamAccounts of Queries/Streaming.sql, by hand: a method that checks its argument at the call and returns a
-    // static local iterator, which opens a closed connection, yields each row inside the try and closes the connection
-    // it opened in the finally.
+    // static local iterator, which opens a closed connection, yields each row inside the try, reads the results after
+    // the last row, and closes the connection it opened in the finally.
     private static IAsyncEnumerable<CollectedAccount> StreamAccountsByHand(
         DbConnection connection,
         DbTransaction? transaction = null,
@@ -978,6 +1014,11 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                                 reader.GetFieldValue<string>(1)
                             );
 #pragma warning restore CA1849
+                        }
+
+                        while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                        {
+                            // The generated method's drain, after the last row.
                         }
                     }
                 }

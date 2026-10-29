@@ -18,9 +18,11 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // closes it again when the loop ends, however it ends.  The tests hold the connection's state in each of those ways,
 // that a stream can be enumerated twice, that a break leaves the connection usable, and that a throw or a cancellation
 // closes again a connection that the method opened.  Then a query whose rows fail past the row where a loop stops,
-// whose error the disposal does not report, and the queries of several statements, whose later statements run when
-// the reader is disposed; under SET XACT_ABORT ON either error rolls back the caller's transaction, still unreported,
-// and with it off CAST('x' AS int) after the rows does too, where an overflow leaves it to commit.
+// whose error the disposal does not report, though under SET XACT_ABORT ON it rolls back the caller's transaction; and
+// the queries of several statements, whose later results the iterator reads after the last row, so that the move that
+// ends the loop throws an error that a later statement raises.  Under XACT_ABORT ON that error rolls back the caller's
+// transaction, and with it off CAST('x' AS int) after the rows does too, where a THROW or an overflow leaves it to
+// commit.
 [Collection(UsesSqlServer.Name)]
 public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
 {
@@ -33,6 +35,12 @@ public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
 
     // The number of SQL Server's error "Divide by zero error encountered.".
     private const int DivideByZero = 8134;
+
+    // The number of SQL Server's error "Conversion failed when converting the varchar value 'x' to data type int.".
+    private const int ConversionFailed = 245;
+
+    // The number of SQL Server's error "Arithmetic overflow error for data type tinyint, value = 300.".
+    private const int ArithmeticOverflow = 220;
 
     [Fact]
     public async Task StreamAccounts_EveryAccount_YieldsTheArrayMethodsRows()
@@ -502,8 +510,7 @@ public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
         streamed.ShouldBe([new StreamNoteAccountsDto(new AccountId(1)), new StreamNoteAccountsDto(new AccountId(2))]);
     }
 
-    // The stream reads the first result set and no more, and the second statement's result set is read and discarded
-    // when the reader is disposed.
+    // The stream yields the rows of the first result set alone, and reads past the second's after the last row.
     [Fact]
     public async Task StreamThenSelect_TwoStatements_YieldsTheRowsOfTheFirst()
     {
@@ -516,56 +523,64 @@ public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
         connection.State.ShouldBe(ConnectionState.Closed);
     }
 
-    // The rows of the first statement are yielded and nothing is thrown, though the batch ran as far as the THROW: the
-    // statement before it set a mark on the session, which the test reads back on the same connection, open for that.
-    // The mark shows that the batch reached the THROW, and not that the THROW ran; the error is not reported, which is
-    // likely SqlClient dropping an error that follows the last result set that it was asked for, a cause that these
-    // tests do not show.
+    // The rows of the first statement are yielded, and the iterator reads the results after them, so the THROW is
+    // thrown once the rows are read: the statement before it set a mark on the session, which the test reads back on
+    // the same connection, open for that.
     [Fact]
-    public async Task StreamThenRaise_ErrorAfterTheRows_RunsTheBatchToTheThrowAndIsNotThrown()
+    public async Task StreamThenRaise_ErrorAfterTheRows_YieldsTheRowsThenThrows()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(token);
         await SessionMark.ClearAsync(connection, token);
+        var streamed = new List<CollectedAccount>();
 
-        var streamed = await connection.StreamThenRaise(cancellationToken: token).ToListAsync(token);
+        var thrown = await Should.ThrowAsync<SqlException>(async () =>
+        {
+            await foreach (var row in connection.StreamThenRaise(cancellationToken: token))
+            {
+                streamed.Add(row);
+            }
+        });
 
+        thrown.Number.ShouldBe(50000);
+        thrown.Message.ShouldBe("after the rows");
         streamed.ShouldBe(Accounts);
         (await SessionMark.ReadAsync(connection, token)).ShouldBe(2);
         connection.State.ShouldBe(ConnectionState.Open);
     }
 
-    // The same stream by hand, to see which calls would throw: the MoveNextAsync that ends the loop returns false, and
-    // the DisposeAsync after it returns normally, on an open connection that the disposal leaves usable, with the mark
-    // of the statement before the THROW set.
+    // The same stream by hand, to see which call throws: each of the three rows is a MoveNextAsync that returns true,
+    // the fourth MoveNextAsync, which would end the loop, throws the error, and the DisposeAsync after it returns
+    // normally.
     [Fact]
-    public async Task StreamThenRaise_ErrorAfterTheRows_ThrowsFromNeitherMoveNextAsyncNorDisposeAsync()
+    public async Task StreamThenRaise_ErrorAfterTheRows_ThrowsFromTheLastMoveNextAsync()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(token);
-        await SessionMark.ClearAsync(connection, token);
         var enumerator = connection.StreamThenRaise(cancellationToken: token).GetAsyncEnumerator(token);
         var rows = new List<CollectedAccount>();
 
-        while (await enumerator.MoveNextAsync())
+        for (var index = 0; index < Accounts.Length; index++)
         {
+            (await enumerator.MoveNextAsync()).ShouldBeTrue();
             rows.Add(enumerator.Current);
         }
 
+        var thrown = await Should.ThrowAsync<SqlException>(async () => await enumerator.MoveNextAsync());
         await enumerator.DisposeAsync();
 
+        thrown.Number.ShouldBe(50000);
         rows.ShouldBe(Accounts);
-        (await SessionMark.ReadAsync(connection, token)).ShouldBe(2);
         connection.State.ShouldBe(ConnectionState.Open);
     }
 
     // With XACT_ABORT off, as SqlClient leaves it, the THROW ends the batch and leaves the transaction that the stream
-    // ran in open, so the commit after the loop commits what the transaction did.  The temporary table is the one of
-    // the transaction test of StreamNumbers.
+    // ran in open: the loop throws the error, and the commit after it commits what the transaction did.  The temporary
+    // table is the one of the transaction test of StreamNumbers.
     [Fact]
-    public async Task StreamThenRaise_ErrorAfterTheRowsInATransaction_TheTransactionCommits()
+    public async Task StreamThenRaise_ErrorAfterTheRowsInATransaction_ThrowsAndTheTransactionCommits()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = EndToEndSources.App(sqlServer);
@@ -582,79 +597,92 @@ public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
             _ = await insert.ExecuteNonQueryAsync(token);
         }
 
-        var streamed = await connection
-            .StreamThenRaise(transaction: transaction, cancellationToken: token)
-            .ToListAsync(token);
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            connection.StreamThenRaise(transaction: transaction, cancellationToken: token).ToListAsync(token).AsTask()
+        );
         await transaction.CommitAsync(token);
 
-        streamed.ShouldBe(Accounts);
+        thrown.Number.ShouldBe(50000);
         await using var select = new SqlCommand("SELECT n FROM #streamed", connection);
         (await select.ExecuteScalarAsync(token)).ShouldBe(7);
     }
 
-    // Under SET XACT_ABORT ON the THROW rolls back the transaction that the stream ran in, and the loop still ends as
-    // if the query had succeeded: the caller learns of the rollback only at the commit.
+    // Under SET XACT_ABORT ON the THROW rolls back the transaction that the stream ran in, and the loop throws the
+    // error, so the caller learns of the rollback from the loop.
     [Fact]
-    public async Task StreamThenRaise_ErrorAfterTheRowsInATransactionUnderXactAbort_RollsItBackUnreported()
+    public async Task StreamThenRaise_ErrorAfterTheRowsInATransactionUnderXactAbort_ThrowsAndRollsItBack()
     {
         var token = TestContext.Current.CancellationToken;
         await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: true, token);
 
-        var streamed = await session
-            .Connection.StreamThenRaise(transaction: session.Transaction, cancellationToken: token)
-            .ToListAsync(token);
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            session
+                .Connection.StreamThenRaise(transaction: session.Transaction, cancellationToken: token)
+                .ToListAsync(token)
+                .AsTask()
+        );
 
-        streamed.ShouldBe(Accounts);
-        await session.ShouldHaveRolledBackUnreportedAsync(token);
+        thrown.Number.ShouldBe(50000);
+        await session.ShouldHaveRolledBackAsync(token);
     }
 
     // With XACT_ABORT off, as SqlClient leaves it, where the THROW of StreamThenRaise leaves the transaction to commit,
-    // the failed conversion after the rows rolls it back, and the loop still ends as if the query had succeeded: so
-    // whether an unreported error rolls back the transaction depends on the error, not on XACT_ABORT alone.
+    // the failed conversion after the rows rolls it back, and the loop throws the error: so whether the error rolls
+    // back the transaction depends on the error, not on XACT_ABORT alone.  The conversion is a SELECT, whose result set
+    // the iterator moves to before its error is raised.
     [Fact]
-    public async Task StreamThenFailConversion_ErrorAfterTheRowsInATransaction_RollsItBackUnreported()
+    public async Task StreamThenFailConversion_ErrorAfterTheRowsInATransaction_ThrowsAndRollsItBack()
     {
         var token = TestContext.Current.CancellationToken;
         await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
 
-        var streamed = await session
-            .Connection.StreamThenFailConversion(transaction: session.Transaction, cancellationToken: token)
-            .ToListAsync(token);
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            session
+                .Connection.StreamThenFailConversion(transaction: session.Transaction, cancellationToken: token)
+                .ToListAsync(token)
+                .AsTask()
+        );
 
-        streamed.ShouldBe(Accounts);
-        await session.ShouldHaveRolledBackUnreportedAsync(token);
+        thrown.Number.ShouldBe(ConversionFailed);
+        await session.ShouldHaveRolledBackAsync(token);
     }
 
     // An overflow after the rows, a value too large for tinyint, ends its statement alone with XACT_ABORT off, as a
-    // divide by zero does, so the transaction stays open and commits, where the failed conversion rolls it back.
+    // divide by zero does: the loop throws the error, and the transaction stays open and commits, where the failed
+    // conversion rolls it back.
     [Fact]
-    public async Task StreamThenOverflow_ErrorAfterTheRowsInATransaction_TheTransactionCommits()
+    public async Task StreamThenOverflow_ErrorAfterTheRowsInATransaction_ThrowsAndTheTransactionCommits()
     {
         var token = TestContext.Current.CancellationToken;
         await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
 
-        var streamed = await session
-            .Connection.StreamThenOverflow(transaction: session.Transaction, cancellationToken: token)
-            .ToListAsync(token);
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            session
+                .Connection.StreamThenOverflow(transaction: session.Transaction, cancellationToken: token)
+                .ToListAsync(token)
+                .AsTask()
+        );
 
-        streamed.ShouldBe(Accounts);
+        thrown.Number.ShouldBe(ArithmeticOverflow);
         await session.ShouldCommitAsync(token);
     }
 
-    // Under SET XACT_ABORT ON the same overflow rolls the transaction back, still unreported, which shows that the
-    // overflow is raised: the transaction that commits with XACT_ABORT off survived an error, not its absence.
+    // Under SET XACT_ABORT ON the same overflow rolls the transaction back, and the loop throws it.
     [Fact]
-    public async Task StreamThenOverflow_ErrorAfterTheRowsInATransactionUnderXactAbort_RollsItBackUnreported()
+    public async Task StreamThenOverflow_ErrorAfterTheRowsInATransactionUnderXactAbort_ThrowsAndRollsItBack()
     {
         var token = TestContext.Current.CancellationToken;
         await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: true, token);
 
-        var streamed = await session
-            .Connection.StreamThenOverflow(transaction: session.Transaction, cancellationToken: token)
-            .ToListAsync(token);
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            session
+                .Connection.StreamThenOverflow(transaction: session.Transaction, cancellationToken: token)
+                .ToListAsync(token)
+                .AsTask()
+        );
 
-        streamed.ShouldBe(Accounts);
-        await session.ShouldHaveRolledBackUnreportedAsync(token);
+        thrown.Number.ShouldBe(ArithmeticOverflow);
+        await session.ShouldHaveRolledBackAsync(token);
     }
 
     // A break reads and discards the rest of the result, and the statements after it run: SET CONTEXT_INFO marks the

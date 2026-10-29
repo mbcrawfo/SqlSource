@@ -7,12 +7,13 @@ using Shouldly;
 
 namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 
-// A transaction of a session with XACT_ABORT on or off, for the tests of an error that SqlClient does not report and
-// that may roll the transaction back with nothing thrown: under XACT_ABORT ON nearly any error does, and with it off
-// some errors do, such as CAST('x' AS int), and others, such as an overflow, do not.  The session's setting is checked
-// before the transaction begins, since CAST('x' AS int) rolls back under either setting and could not show which one
-// the test ran under.  The connection is not pooled, so the
-// setting ends with its session when the test disposes it.  The temporary table #outside is made before the
+// A transaction of a session with XACT_ABORT on or off, for the tests of an error after the rows that may roll the
+// transaction back: under XACT_ABORT ON nearly any error does, and with it off some errors do, such as
+// CAST('x' AS int), and others, such as an overflow, do not.  A method that reads to the end of its rows throws such an
+// error; a streaming loop that ends early does not, and its caller learns of the rollback only at the commit.  The
+// session's setting is checked before the transaction begins, since CAST('x' AS int) rolls back under either setting
+// and could not show which one the test ran under.  The connection is not pooled, so the setting ends with its session
+// when the test disposes it.  The temporary table #outside is made before the
 // transaction, so it outlives a rollback and holds what was committed: 7 is written in the transaction before the
 // method is called, and 8 with the transaction after it.
 internal sealed class UnpooledTransaction : IAsyncDisposable
@@ -57,10 +58,14 @@ internal sealed class UnpooledTransaction : IAsyncDisposable
         return new UnpooledTransaction(connection, transaction);
     }
 
-    // What a caller sees after the method: the transaction has completed, so its Connection is null; a command given it
-    // runs outside any transaction, with no error, and commits on its own; and only the commit throws.  The 7 that the
-    // transaction wrote is gone and the 8 written after it stays.
-    public async Task ShouldHaveRolledBackUnreportedAsync(CancellationToken token)
+    // What a caller sees after a method that threw nothing although the error rolled back its transaction, as a
+    // streaming loop that ends early does: the state of ShouldHaveRolledBackAsync, which only the commit reports.
+    public Task ShouldHaveRolledBackUnreportedAsync(CancellationToken token) => ShouldHaveRolledBackAsync(token);
+
+    // What a caller sees after the method, whether or not it threw: the transaction has completed, so its Connection is
+    // null; a command given it runs outside any transaction, with no error, and commits on its own; and the commit
+    // throws.  The 7 that the transaction wrote is gone and the 8 written after it stays.
+    public async Task ShouldHaveRolledBackAsync(CancellationToken token)
     {
         Transaction.Connection.ShouldBeNull();
 

@@ -50,7 +50,7 @@ FROM {{table:dbo.accounts}}
 ORDER BY id;
 
 -- name: StreamThenSelect
--- summary: The accounts, and then a second result set that the stream does not read.
+-- summary: The accounts, and then a second result set, whose rows the stream does not yield.
 -- output-model: CollectedAccount
 SELECT id, name
 FROM dbo.accounts
@@ -58,7 +58,7 @@ ORDER BY id;
 SELECT 1;
 
 -- name: StreamThenRaise
--- summary: The accounts, a mark on the session, and then an error that the method does not report.
+-- summary: The accounts, a mark on the session, and then an error that the loop throws after the rows.
 -- output-model: CollectedAccount
 -- SET CONTEXT_INFO keeps its value for the session, which a test reads from the same connection: the mark is there when
 -- the batch ran as far as the THROW.
@@ -69,7 +69,7 @@ SET CONTEXT_INFO 0x02;
 THROW 50000, 'after the rows', 1;
 
 -- name: StreamThenFailConversion
--- summary: The accounts, and then a conversion that fails, an error that the method does not report.
+-- summary: The accounts, and then a conversion that fails, an error that the loop throws after the rows.
 -- StreamThenRaise with a failed conversion, error 245, in the place of the THROW: with XACT_ABORT off, as SqlClient
 -- leaves it, SQL Server rolls back the transaction for this error, where it leaves it open for the THROW.
 -- output-model: CollectedAccount
@@ -79,7 +79,7 @@ ORDER BY id;
 SELECT CAST('x' AS int);
 
 -- name: StreamThenOverflow
--- summary: The accounts, and then a value too large for its type, an error that the method does not report.
+-- summary: The accounts, and then a value too large for its type, an error that the loop throws after the rows.
 -- StreamThenFailConversion with an overflow, error 220, in the place of the failed conversion: with XACT_ABORT off
 -- SQL Server ends that statement alone and leaves the transaction open, and under XACT_ABORT ON rolls it back.
 -- output-model: CollectedAccount
