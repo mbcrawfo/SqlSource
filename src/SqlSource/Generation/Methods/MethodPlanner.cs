@@ -95,9 +95,7 @@ internal static class MethodPlanner
     )
     {
         var typeQueries = input.Type;
-        var type = typeQueries.Type.Type;
-        var usable = TypeEmitter.FindUsableFiles(type, typeQueries.Files, typeQueries.FileSettings, null);
-        var queries = Resolve(input, usable);
+        var queries = UsableQueries.Of(typeQueries, null);
         var written = WrittenNames(queries);
         var planned = new List<Planned>();
         var engines = CodeGenEngines.None;
@@ -122,46 +120,16 @@ internal static class MethodPlanner
         return engines;
     }
 
-    // Each query of the usable files, in order, with the settings in effect for it here.
-    private static List<(int File, int Query, SqlQuery Value, QuerySettings Settings)> Resolve(
-        MethodsInput input,
-        bool[] usable
-    )
-    {
-        var typeQueries = input.Type;
-        var type = typeQueries.Type.Type;
-        var queries = new List<(int File, int Query, SqlQuery Value, QuerySettings Settings)>();
-        for (var fileIndex = 0; fileIndex < typeQueries.Files.Count; fileIndex++)
-        {
-            if (!usable[fileIndex])
-            {
-                continue;
-            }
-
-            var file = typeQueries.Files[fileIndex];
-            for (var queryIndex = 0; queryIndex < file.Queries.Count; queryIndex++)
-            {
-                var query = file.Queries[queryIndex];
-                var settings = QuerySettings.Resolve(query.Markers, type.Settings, typeQueries.FileSettings[fileIndex]);
-                queries.Add((fileIndex, queryIndex, query, settings));
-            }
-        }
-
-        return queries;
-    }
-
     // The names of the members the type's file writes for the queries whose output is not CodeGen: each one's constant
     // or token method, in the type itself or in its nested class.
-    private static HashSet<string> WrittenNames(
-        List<(int File, int Query, SqlQuery Value, QuerySettings Settings)> queries
-    )
+    private static HashSet<string> WrittenNames(List<UsableQuery> queries)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var (_, _, query, settings) in queries)
+        foreach (var usable in queries)
         {
-            if (settings.Output != OutputKind.CodeGen)
+            if (usable.Settings.Output != OutputKind.CodeGen)
             {
-                _ = names.Add(query.Name);
+                _ = names.Add(usable.Query.Name);
             }
         }
 
@@ -184,7 +152,7 @@ internal static class MethodPlanner
     )
     {
         // A query without models has its own error already, reported by its file.
-        if (FindModels(input.Files[fileIndex], queryIndex, query.Name) is not { } models)
+        if (input.Files[fileIndex].Find(queryIndex, query.Name) is not { } models)
         {
             return null;
         }
@@ -277,33 +245,6 @@ internal static class MethodPlanner
                 ids.AddRange(property.Type.WarningIds);
             }
         }
-    }
-
-    // The query's models, matched by index and name as TypeModels matches them.  The models of a file are in the order
-    // of its queries, so a search finds them.
-    private static QueryModels? FindModels(FileModels file, int queryIndex, string name)
-    {
-        var (low, high) = (0, file.Queries.Count - 1);
-        while (low <= high)
-        {
-            var middle = low + ((high - low) / 2);
-            var models = file.Queries[middle];
-            if (models.Index == queryIndex)
-            {
-                return string.Equals(models.Name, name, StringComparison.Ordinal) ? models : null;
-            }
-
-            if (models.Index < queryIndex)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-
-        return null;
     }
 
     // SQLSRC275 for each token named as a fixed argument.
