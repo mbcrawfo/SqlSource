@@ -22,8 +22,7 @@
     </ItemGroup>
     <ItemGroup>
         <!--
-            The six projects of this folder, QueryMethodAllocation among them before it exists, and the three that
-            read EngineImage or ModelReflection.
+            The five test projects of this folder, and the three that read EngineImage or ModelReflection.
         -->
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres" />
         <InternalsVisibleTo Include="SqlSource.DatabaseTests.Postgres.Npgsql8" />
