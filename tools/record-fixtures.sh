@@ -51,10 +51,10 @@ record() {
         exit 1
     fi
     local image="${!image_variable:-$default_image}"
-    # A case is every folder of the engine's, as the test finds them: one with no query.sql fails its test, and the
-    # recording.
+    # A case is a folder of the engine's that holds a query.sql, as the test finds them: a folder without one is no
+    # case, and is neither recorded nor counted.
     local count
-    count="$(find "$cases" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+    count="$(find "$cases" -mindepth 2 -maxdepth 2 -type f -name query.sql | wc -l | tr -d ' ')"
 
     printf 'Recording %s cases of %s against %s ... ' "$count" "$engine" "$image"
     local output

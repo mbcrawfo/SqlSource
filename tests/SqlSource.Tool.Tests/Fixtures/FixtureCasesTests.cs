@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
@@ -30,5 +31,19 @@ public sealed class FixtureCasesTests : IDisposable
         cases.Select(found => found.Name).ShouldBe(["a", "b"]);
         cases.ShouldAllBe(found => found.Engine == "postgres");
         cases[0].Folder.ShouldBe(_folder.PathOf("postgres/a"));
+    }
+
+    // A folder without a query is no case, whether empty, as an incremental build leaves the folder of a case
+    // renamed or removed in the output, or holding other files of a case.
+    [Fact]
+    public void InFolder_FolderWithoutAQuery_IsNoCase()
+    {
+        _ = FixtureCaseFiles.Create(_folder.Path, SidecarValues.Engine.Postgres, "a", "SELECT 1;\n");
+        _ = Directory.CreateDirectory(_folder.PathOf("postgres/gone"));
+        _ = _folder.WriteFile("postgres/partial/capture.json", "[]\n");
+
+        var cases = FixtureCases.InFolder(_folder.PathOf(SidecarValues.Engine.Postgres));
+
+        cases.Select(found => found.Name).ShouldBe(["a"]);
     }
 }
