@@ -38,6 +38,8 @@ internal static class QueryMethodWriter
 
     private const string ExceptionType = "global::SqlSource.UnexpectedRowCountException";
 
+    private const string RolledBackType = "global::SqlSource.TransactionRolledBackException";
+
     // The lines around the assignment of a command's SQL when its tokens build it.
     private const string SqlFromTokensStart =
         "#pragma warning disable CA2100 // The text of a token is the caller's own choice.\n";
@@ -87,7 +89,8 @@ internal static class QueryMethodWriter
             method.Input,
             method.Shape is ResultShape.None or ResultShape.RowCount ? null : method.Output,
             streams,
-            DrainsWhenLeftAtARow(method)
+            DrainsWhenLeftAtARow(method),
+            ChecksTransaction(method)
         );
         var bodyIndent = indent + GeneratedText.Indent;
         var blockIndent = bodyIndent + GeneratedText.Indent;
@@ -130,6 +133,12 @@ internal static class QueryMethodWriter
     // a row.
     private static bool DrainsWhenLeftAtARow(QueryMethod method) =>
         Streams(method) && method.Engine == DatabaseEngine.SqlServer;
+
+    // A method on SQL Server that reads rows, which can throw an exception of its own before it has read the rest of
+    // the batch, so that the reader's disposal reads it, and an error there can roll back the transaction unannounced.
+    private static bool ChecksTransaction(QueryMethod method) =>
+        method.Engine == DatabaseEngine.SqlServer
+        && method.Shape is ResultShape.Many or ResultShape.One or ResultShape.OneOptional;
 
     // The SQL, the opening of a closed connection, the command, its parameters and its execution, and the closing of
     // the connection in a finally, at the indent of the method's body.
@@ -262,6 +271,17 @@ internal static class QueryMethodWriter
         else if (method.Shape == ResultShape.OneOptional)
         {
             XmlDocWriter.AppendException(builder, indent, ExceptionType, "The query returned more than one row.");
+        }
+
+        if (ChecksTransaction(method))
+        {
+            XmlDocWriter.AppendException(
+                builder,
+                indent,
+                RolledBackType,
+                "The query threw an exception of its own, its inner exception, and an error that the rest of the "
+                    + "query raised rolled back the transaction."
+            );
         }
     }
 
@@ -589,7 +609,6 @@ internal static class QueryMethodWriter
         }
 
         var output = method.Output!;
-        var innerIndent = indent + GeneratedText.Indent;
         _ = builder
             .Append(indent)
             .Append("var ")
@@ -609,6 +628,30 @@ internal static class QueryMethodWriter
             return;
         }
 
+        // On SQL Server the read, its drain and its returns are in a try whose catch checks the transaction.
+        if (!ChecksTransaction(method))
+        {
+            AppendRows(builder, indent, method, output, locals, rowBufferType);
+            return;
+        }
+
+        _ = builder.Append(indent).Append("try\n").Append(indent).Append("{\n");
+        AppendRows(builder, indent + GeneratedText.Indent, method, output, locals, rowBufferType);
+        AppendEnd(builder, indent);
+        AppendTransactionCheck(builder, indent, method, locals);
+    }
+
+    // The rows read into the buffer and the collection returned, or the one row read and returned.
+    private static void AppendRows(
+        StringBuilder builder,
+        string indent,
+        QueryMethod method,
+        MethodOutput output,
+        Locals locals,
+        string rowBufferType
+    )
+    {
+        var innerIndent = indent + GeneratedText.Indent;
         if (method.Shape == ResultShape.Many)
         {
             var (buffer, result) = GetBuffer(method, output.TypeText, locals.Rows, rowBufferType);
@@ -661,7 +704,9 @@ internal static class QueryMethodWriter
     // flag is set once the row is built, so an exception of the iterator's own, from a read, a check or a converter,
     // drains nothing.  The finally's drain takes no token, as the reader's disposal would read the rest: a token the
     // caller cancelled before an early exit neither throws nor cancels the command, and the drain throws only what the
-    // database raises.
+    // database raises.  C# allows no catch on a try that holds a yield return, so each row's checks and construction
+    // are in a try of their own, whose catch checks the transaction when one of them throws.  A read's exception is the
+    // database's or the caller's cancellation, which the catch would throw as it is.
     private static void AppendStream(
         StringBuilder builder,
         string indent,
@@ -689,9 +734,9 @@ internal static class QueryMethodWriter
         _ = builder.Append(loopIndent).Append("while (");
         AppendRead(builder, locals);
         _ = builder.Append(")\n").Append(loopIndent).Append("{\n");
-        AppendVectorChecks(builder, innerIndent, output, locals);
         if (!tracksRow)
         {
+            AppendVectorChecks(builder, innerIndent, output, locals);
             _ = builder.Append(innerIndent).Append("yield return ");
             AppendRow(builder, output, locals);
             _ = builder.Append(";\n");
@@ -699,10 +744,25 @@ internal static class QueryMethodWriter
             return;
         }
 
-        _ = builder.Append(innerIndent).Append("var ").Append(locals.Row).Append(" = ");
-        AppendRow(builder, output, locals);
+        var tryIndent = innerIndent + GeneratedText.Indent;
         _ = builder
+            .Append(innerIndent)
+            .Append(output.TypeText)
+            .Append(' ')
+            .Append(locals.Row)
             .Append(";\n")
+            .Append(innerIndent)
+            .Append("try\n")
+            .Append(innerIndent)
+            .Append("{\n");
+        AppendVectorChecks(builder, tryIndent, output, locals);
+        _ = builder.Append(tryIndent).Append(locals.Row).Append(" = ");
+        AppendRow(builder, output, locals);
+        _ = builder.Append(";\n");
+        AppendEnd(builder, innerIndent);
+        AppendTransactionCheck(builder, innerIndent, method, locals);
+        _ = builder
+            .Append('\n')
             .Append(innerIndent)
             .Append(locals.AtRow)
             .Append(" = true;\n")
@@ -725,7 +785,8 @@ internal static class QueryMethodWriter
 
     // On SQL Server, the results after the rows are read before the method returns, since SqlClient raises an error
     // that a later statement of the batch holds only when NextResultAsync reaches it, and drops it when the reader is
-    // disposed.  The method's own throws do not drain, so that a later statement's error never replaces one.  A
+    // disposed.  The method's own throws do not drain, so that a later statement's error never replaces one; the
+    // catch of AppendTransactionCheck reports the one such an error can leave, a rolled-back transaction.  A
     // PostgreSQL query is one statement, so its reader has no later result.  The loop is followed by a blank line, as
     // a return follows it.
     private static void AppendDrain(StringBuilder builder, string indent, QueryMethod method, Locals locals)
@@ -737,6 +798,45 @@ internal static class QueryMethodWriter
 
         AppendDrainLoop(builder, indent, locals, CancellationToken);
         _ = builder.Append('\n');
+    }
+
+    // The catch of a SQL Server method's read, for an exception of the method's own: every one but the database's
+    // error, which reports itself, and the caller's cancellation.  With a transaction given, it disposes the reader,
+    // which reads the rest of the batch and drops any error there, and when such an error rolled the transaction back,
+    // which leaves its Connection null, it throws the exception that says so, with the method's as its inner
+    // exception.  Otherwise it throws the method's own as it is.  A call that does not throw pays nothing for it.
+    private static void AppendTransactionCheck(StringBuilder builder, string indent, QueryMethod method, Locals locals)
+    {
+        var blockIndent = indent + GeneratedText.Indent;
+        _ = builder
+            .Append(indent)
+            .Append("catch (global::System.Exception ")
+            .Append(locals.Exception)
+            .Append(") when (")
+            .Append(Transaction)
+            .Append(" is not null && ")
+            .Append(locals.Exception)
+            .Append(" is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))\n")
+            .Append(indent)
+            .Append("{\n")
+            .Append(blockIndent)
+            .Append("await ")
+            .Append(locals.Reader)
+            .Append(".DisposeAsync().ConfigureAwait(false);\n");
+        AppendIf(builder, blockIndent, Transaction + ".Connection is null");
+        _ = builder
+            .Append(blockIndent)
+            .Append(GeneratedText.Indent)
+            .Append("throw new ")
+            .Append(RolledBackType)
+            .Append('(')
+            .Append(SymbolDisplay.FormatLiteral(method.QueryName, quote: true))
+            .Append(", ")
+            .Append(locals.Exception)
+            .Append(");\n");
+        AppendEnd(builder, blockIndent);
+        _ = builder.Append('\n').Append(blockIndent).Append("throw;\n");
+        AppendEnd(builder, indent);
     }
 
     // The loop that reads the results after the rows and does nothing with them, with the token given.
@@ -962,11 +1062,19 @@ internal static class QueryMethodWriter
     // The names of the method's locals and of the lambdas' parameters, none of which an argument has.  The locals
     // that read rows are named only for a method that reads them, whose output is given, the value of a converted
     // parameter only for a method that has one, the element of an array and its value only for a method that
-    // converts one by element, the iterator only for a method that streams, and the flag of a row being yielded only
-    // for one that drains when its loop is left at a row.
+    // converts one by element, the iterator only for a method that streams, the flag of a row being yielded only
+    // for one that drains when its loop is left at a row, and the exception its catch takes only for one that checks
+    // the transaction.
     private sealed class Locals
     {
-        public Locals(List<string> tokens, MethodInput? input, MethodOutput? output, bool streams, bool tracksRow)
+        public Locals(
+            List<string> tokens,
+            MethodInput? input,
+            MethodOutput? output,
+            bool streams,
+            bool tracksRow,
+            bool checksTransaction
+        )
         {
             var names = new LocalNames(Seed(tokens));
             Sql = names.Take("sql");
@@ -1006,6 +1114,7 @@ internal static class QueryMethodWriter
             State = names.Take("state");
             Iterator = streams ? names.Take("ReadRows") : string.Empty;
             AtRow = tracksRow ? names.Take("atRow") : string.Empty;
+            Exception = checksTransaction ? names.Take("exception") : string.Empty;
         }
 
         public string Sql { get; }
@@ -1043,6 +1152,9 @@ internal static class QueryMethodWriter
 
         // The flag that is true while the iterator is suspended at the yield of a row.
         public string AtRow { get; }
+
+        // The exception that the catch of a method that checks the transaction takes.
+        public string Exception { get; }
 
         private static bool HasWrite(MethodInput? input) =>
             input is not null && input.Parameters.Any(static parameter => parameter.Write is not null);

@@ -390,15 +390,17 @@ public sealed class QueryMethodWriterTests
     public void Append_SqlServerShapeMany_DrainsTheLaterResultsBeforeItReturns() =>
         Write(SqlServerGetUser with { Shape = ResultShape.Many, Collection = CollectionKind.Array })
             .ShouldContain(
-                "        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
-                    + "        {\n"
-                    + "            rows.Add(new global::App.GetUserDto(reader.GetFieldValue<int>(0), "
+                "            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
+                    + "            {\n"
+                    + "                rows.Add(new global::App.GetUserDto(reader.GetFieldValue<int>(0), "
                     + "reader.IsDBNull(1) ? default(string?) : reader.GetFieldValue<string>(1)));\n"
+                    + "            }\n"
+                    + "\n"
+                    + Drain("            ")
+                    + "\n"
+                    + "            return rows.ToArray();\n"
                     + "        }\n"
-                    + "\n"
-                    + Drain("        ")
-                    + "\n"
-                    + "        return rows.ToArray();\n"
+                    + TransactionCheck("        ")
                     + "    }\n"
                     + "    finally\n"
             );
@@ -410,20 +412,22 @@ public sealed class QueryMethodWriterTests
         var text = Write(SqlServerGetUser with { Shape = ResultShape.One });
 
         text.ShouldContain(
-            "        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
-                + "        {\n"
-                + "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", false);\n"
-                + "        }\n"
+            "            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
+                + "            {\n"
+                + "                throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", false);\n"
+                + "            }\n"
         );
         text.ShouldContain(
-            "        if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
-                + "        {\n"
-                + "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n"
+            "            if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
+                + "            {\n"
+                + "                throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n"
+                + "            }\n"
+                + "\n"
+                + Drain("            ")
+                + "\n"
+                + "            return row;\n"
                 + "        }\n"
-                + "\n"
-                + Drain("        ")
-                + "\n"
-                + "        return row;\n"
+                + TransactionCheck("        ")
         );
         Regex.Count(text, "NextResultAsync", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(1);
     }
@@ -435,22 +439,111 @@ public sealed class QueryMethodWriterTests
         var text = Write(SqlServerGetUser with { Shape = ResultShape.OneOptional });
 
         text.ShouldContain(
-            "        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
-                + "        {\n"
-                + Drain("            ")
+            "            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
+                + "            {\n"
+                + Drain("                ")
                 + "\n"
-                + "            return null;\n"
-                + "        }\n"
+                + "                return null;\n"
+                + "            }\n"
         );
         text.ShouldContain(
-            "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n"
+            "                throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n"
+                + "            }\n"
+                + "\n"
+                + Drain("            ")
+                + "\n"
+                + "            return row;\n"
                 + "        }\n"
-                + "\n"
-                + Drain("        ")
-                + "\n"
-                + "        return row;\n"
+                + TransactionCheck("        ")
         );
         Regex.Count(text, "NextResultAsync", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(2);
+    }
+
+    // On SQL Server an error the rest of the batch raises, read when the reader is disposed after the method's own
+    // exception, can roll back the transaction unannounced, so the whole read is in a try whose catch disposes the
+    // reader and, when the transaction is gone, throws an exception that says so.  The database's error and the
+    // caller's cancellation are thrown as they are, and a method given no transaction catches nothing.
+    [Theory]
+    [InlineData(nameof(ResultShape.Many))]
+    [InlineData(nameof(ResultShape.One))]
+    [InlineData(nameof(ResultShape.OneOptional))]
+    public void Append_SqlServerShapeReadingRows_ChecksTheTransactionWhenTheReadFails(string shapeName)
+    {
+        var text = Write(
+            SqlServerGetUser with
+            {
+                Shape = Enum.Parse<ResultShape>(shapeName),
+                Collection = CollectionKind.Array,
+            }
+        );
+        const string Scope =
+            "        await using var readerScope = "
+            + "global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);\n";
+        const string TryStart = "        try\n        {\n";
+        var end = "        }\n" + TransactionCheck("        ") + "    }\n    finally\n";
+
+        text.ShouldContain(Scope + TryStart);
+        text.ShouldContain(end);
+        var start = text.IndexOf(Scope + TryStart, StringComparison.Ordinal) + Scope.Length + TryStart.Length;
+        var read = text[start..text.IndexOf(end, StringComparison.Ordinal)].Split('\n')[..^1];
+        read.ShouldAllBe(line => line.Length == 0 || line.StartsWith("            ", StringComparison.Ordinal));
+        read[^1].ShouldStartWith("            return ");
+        Regex.Count(text, "catch \\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(1);
+    }
+
+    // Each SQL Server shape that reads rows says when it throws the exception of a rolled-back transaction.
+    [Theory]
+    [InlineData(nameof(ResultShape.Many), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.One), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.OneOptional), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.Many), nameof(CollectionKind.IAsyncEnumerable))]
+    public void Append_SqlServerShapeReadingRows_DocumentsTheRolledBackTransaction(
+        string shapeName,
+        string collectionName
+    ) =>
+        Write(
+                SqlServerGetUser with
+                {
+                    Shape = Enum.Parse<ResultShape>(shapeName),
+                    Collection = Enum.Parse<CollectionKind>(collectionName),
+                }
+            )
+            .ShouldContain(
+                "/// <exception cref=\"global::SqlSource.TransactionRolledBackException\">"
+                    + "The query threw an exception of its own, its inner exception, and an error that the rest of "
+                    + "the query raised rolled back the transaction.</exception>\n"
+            );
+
+    // A PostgreSQL query is one statement, so no error is read after the method's own exception.
+    [Theory]
+    [InlineData(nameof(ResultShape.Many), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.One), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.OneOptional), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.Many), nameof(CollectionKind.IAsyncEnumerable))]
+    public void Append_PostgresShapeReadingRows_DoesNotCheckTheTransaction(string shapeName, string collectionName)
+    {
+        var text = Write(
+            GetUser with
+            {
+                Shape = Enum.Parse<ResultShape>(shapeName),
+                Collection = Enum.Parse<CollectionKind>(collectionName),
+            }
+        );
+
+        text.ShouldNotContain("TransactionRolledBackException");
+        text.ShouldNotContain("catch (");
+    }
+
+    // A SQL Server method that reads no rows throws no exception of its own after the query has run.
+    [Theory]
+    [InlineData(nameof(ResultShape.None))]
+    [InlineData(nameof(ResultShape.RowCount))]
+    public void Append_SqlServerShapeReadingNoRows_DoesNotCheckTheTransaction(string shapeName)
+    {
+        var text = Write(SqlServerGetUser with { Shape = Enum.Parse<ResultShape>(shapeName) });
+
+        text.ShouldNotContain("TransactionRolledBackException");
+        text.ShouldNotContain("catch (");
     }
 
     // A PostgreSQL query is one statement, so its reader never has a later result to read.
@@ -1076,17 +1169,23 @@ public sealed class QueryMethodWriterTests
                     + "            {\n"
                     + "                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
                     + "                {\n"
-                    + "                    var value1 = reader.GetFieldValue<"
+                    + "                    global::App.GetUserDto row;\n"
+                    + "                    try\n"
+                    + "                    {\n"
+                    + "                        var value1 = reader.GetFieldValue<"
                     + Vector
                     + ">(1);\n"
-                    + "                    if (value1.IsNull)\n"
-                    + "                    {\n"
-                    + "                        throw new global::System.InvalidCastException("
+                    + "                        if (value1.IsNull)\n"
+                    + "                        {\n"
+                    + "                            throw new global::System.InvalidCastException("
                     + "\"Column 'embedding' is null.\");\n"
-                    + "                    }\n"
+                    + "                        }\n"
                     + "\n"
-                    + "                    var row = new global::App.GetUserDto("
+                    + "                        row = new global::App.GetUserDto("
                     + "reader.GetFieldValue<int>(0), value1);\n"
+                    + "                    }\n"
+                    + TransactionCheck("                    ")
+                    + "\n"
                     + "                    atRow = true;\n"
                     + "                    yield return row;\n"
                     + "                    atRow = false;\n"
@@ -1106,6 +1205,35 @@ public sealed class QueryMethodWriterTests
             );
         Write(Stream).ShouldNotContain("atRow");
     }
+
+    // C# allows no catch on a try that holds a yield return, so the iterator builds each row in a try of its own, whose
+    // catch disposes the reader and, when the transaction is gone, throws the exception that says so in place of the
+    // iterator's own.
+    [Fact]
+    public void Append_SqlServerStreams_ChecksTheTransactionWhenARowFails() =>
+        Write(SqlServerStream with { Output = VectorOutput(isNullable: false) })
+            .ShouldContain(
+                "                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))\n"
+                    + "                {\n"
+                    + "                    global::App.GetUserDto row;\n"
+                    + "                    try\n"
+                    + "                    {\n"
+                    + "                        var value1 = reader.GetFieldValue<"
+                    + Vector
+                    + ">(1);\n"
+                    + "                        if (value1.IsNull)\n"
+                    + "                        {\n"
+                    + "                            throw new global::System.InvalidCastException("
+                    + "\"Column 'embedding' is null.\");\n"
+                    + "                        }\n"
+                    + "\n"
+                    + "                        row = new global::App.GetUserDto("
+                    + "reader.GetFieldValue<int>(0), value1);\n"
+                    + "                    }\n"
+                    + TransactionCheck("                    ")
+                    + "\n"
+                    + "                    atRow = true;\n"
+            );
 
     // A token named as the flag renames the flag, which no argument may hide.
     [Fact]
@@ -1206,6 +1334,7 @@ public sealed class QueryMethodWriterTests
             Token("await"),
             Token("ReadRows"),
             Token("atRow"),
+            Token("exception"),
             Token("yield")
         );
         var withVector = GetUser.Output! with
@@ -1285,6 +1414,11 @@ public sealed class QueryMethodWriterTests
                 {
                     public UnexpectedRowCountException(string queryName, bool moreThanOne) { }
                 }
+
+                internal sealed class TransactionRolledBackException : global::System.InvalidOperationException
+                {
+                    public TransactionRolledBackException(string queryName, global::System.Exception innerException) { }
+                }
             }
 
             namespace App
@@ -1327,6 +1461,35 @@ public sealed class QueryMethodWriterTests
         + ").ConfigureAwait(false))\n"
         + indent
         + "{\n"
+        + indent
+        + "}\n";
+
+    // The catch of a SQL Server method that reads rows, at an indent, with the exception's name unless another is
+    // given.
+    private static string TransactionCheck(string indent, string exception = "exception") =>
+        indent
+        + "catch (global::System.Exception "
+        + exception
+        + ") when (transaction is not null && "
+        + exception
+        + " is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))\n"
+        + indent
+        + "{\n"
+        + indent
+        + "    await reader.DisposeAsync().ConfigureAwait(false);\n"
+        + indent
+        + "    if (transaction.Connection is null)\n"
+        + indent
+        + "    {\n"
+        + indent
+        + "        throw new global::SqlSource.TransactionRolledBackException(\"GetUser\", "
+        + exception
+        + ");\n"
+        + indent
+        + "    }\n"
+        + "\n"
+        + indent
+        + "    throw;\n"
         + indent
         + "}\n";
 
