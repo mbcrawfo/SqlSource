@@ -26,8 +26,7 @@ public sealed class RowBufferTests
     private static readonly string HandWrittenCopy = RepositoryRoot.Path(
         "tests",
         "DatabaseTests",
-        "TestHarness",
-        "EndToEnd",
+        "QueryMethodAllocation",
         "RowBufferByHand.cs"
     );
 

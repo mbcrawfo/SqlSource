@@ -10,7 +10,6 @@ using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Shouldly;
 using SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer.Shapes;
-using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer;
@@ -22,7 +21,7 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer;
 // an array behind it, which it can only build by copying what it read the rows into, since the count of the rows is not
 // known until they are read.  It reads them into what the generated method does, so there are two pairs:
 // SearchAccounts, which reads its rows into the pooled buffer, against a hand-written method that reads them into
-// RowBufferByHand of tests/DatabaseTests/TestHarness, the same buffer by hand; and SearchAccountsUnpooled, a copy of
+// RowBufferByHand of this project, the same buffer by hand; and SearchAccountsUnpooled, a copy of
 // the query under no-array-pool, which reads them into a List, against a hand-written method that does the same.  The
 // copy is a query of its own because SearchAccounts' own list of generator parameters, sort-input, replaces the list of
 // any claim's attribute, and UnpooledCopyTests holds its SQL to SearchAccounts'.  The numbers queries of

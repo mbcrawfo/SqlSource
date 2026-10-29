@@ -4,12 +4,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace SqlSource.DatabaseTests.TestHarness.EndToEnd;
+namespace SqlSource.DatabaseTests.QueryMethodAllocation;
 
 // The bytes that a call of a generated method allocates beyond a call of a hand-written method of the same query, for
-// the allocation tests of tests/DatabaseTests/QueryMethodAllocation.  The calls are made in pairs, one of each method,
-// one right after the other, each measured on its own, and what the generated method allocates beyond the hand-written
-// one is the commonest difference of a pair.
+// the allocation tests of both engines.  The calls are made in pairs, one of each method, one right after the other,
+// each measured on its own, and what the generated method allocates beyond the hand-written one is the commonest
+// difference of a pair.
 //
 // A call allocates its method's own objects, and then more that it does not choose, by the path the driver takes:
 // SqlClient allocates 48 or 296 bytes more on some calls, and Npgsql takes one of a few paths up to some hundreds of

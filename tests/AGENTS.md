@@ -36,7 +36,7 @@
 
 - **A test holds on CI's busy runner and under coverage, not only on a quiet machine.**  Each flaky failure so far assumed that nothing else acts during the test.
   - Never let a timer keep a command running or decide an order: SQL Server ends a `WAITFOR` early when it runs short of threads.  Hold the command on a row lock or an application lock, and wait for the state through `Eventually` or `ProcessGate` before acting, as `RunTimeArgumentTests` and `SessionTests` of `tests/DatabaseTests/SqlServer` do.
-  - Measure synchronous code's allocations with `GC.GetAllocatedBytesForCurrentThread`, which coverage and other threads leave alone.  A whole-process measure, `GC.GetTotalAllocatedBytes`, goes through `CallAllocations`, which skips under coverage or a profiler, in `tests/DatabaseTests/QueryMethodAllocation`, which runs serially and only in the nightly ([why](DatabaseTests/TestHarness/EndToEnd/CallAllocations.cs)).
+  - Measure synchronous code's allocations with `GC.GetAllocatedBytesForCurrentThread`, which coverage and other threads leave alone.  A whole-process measure, `GC.GetTotalAllocatedBytes`, goes through `CallAllocations`, which skips under coverage or a profiler, in `tests/DatabaseTests/QueryMethodAllocation`, which runs serially and only in the nightly ([why](DatabaseTests/QueryMethodAllocation/CallAllocations.cs)).
   - A threshold or margin set from what a test measures is measured again as the job that runs it does: CI's `build` job with the whole solution at once and with `--coverage`, or an allocation test's nightly job, alone and without it, as well as alone, and its comment says how.
 
 ## Allocation budgets

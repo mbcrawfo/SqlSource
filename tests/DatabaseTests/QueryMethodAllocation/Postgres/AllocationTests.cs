@@ -10,7 +10,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
-using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.QueryMethodAllocation.Postgres;
@@ -23,7 +22,7 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.Postgres;
 // both sides; and it reads each column by its ordinal with GetFieldValue into the same model, and the rows into an
 // array, the collection the method returns, through what the generated method reads them into.  So each query has two
 // pairs: its method of AccountQueries, which reads its rows into the pooled buffer, against a hand-written method that
-// reads them into RowBufferByHand of tests/DatabaseTests/TestHarness, the same buffer by hand; and its method of
+// reads them into RowBufferByHand of this project, the same buffer by hand; and its method of
 // UnpooledAccountQueries, the same query under no-array-pool, which reads them into a List and copies it, against a
 // hand-written method that does the same.  The numbers queries of RowBufferQueries have a pair of each kind for the
 // List, IList, ICollection and ImmutableArray, at 3 rows: the pooled method against rows read into RowBufferByHand and

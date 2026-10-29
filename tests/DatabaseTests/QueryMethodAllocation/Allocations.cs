@@ -4,7 +4,6 @@ using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.DatabaseTests.TestHarness.EndToEnd;
 using Xunit;
 using Xunit.Sdk;
 using Xunit.v3;
