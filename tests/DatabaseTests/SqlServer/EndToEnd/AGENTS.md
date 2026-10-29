@@ -19,6 +19,7 @@
 - **A test that must show that a commit succeeds commits only into a temporary table of its own connection**, as the transaction test of `EndToEnd/StreamingQueryTests.cs` does, since a rollback cannot show that the transaction was not aborted.
 - **A test that changes a setting of the session, such as `SET XACT_ABORT ON`, takes a connection that is not pooled from `EndToEndSources.AppUnpooled`**, as `EndToEnd/UnpooledTransaction.cs` does, so that no other test gets the session.
 - **`EndToEnd/ErrorPaths/` is a fixture project that the test project never compiles or describes**: the `.csproj` removes it from `Compile`, `AdditionalFiles` and `None` and copies it to the output as `Fixtures/Projects/ErrorPaths/`.
+- **`RowBufferQueryTests` is the eight generated methods and their twins handed to `RowBufferReads`** of `tests/DatabaseTests/TestHarness`, which holds the body, so a check of what every collection type returns goes there.
 
 ## `all_types` and the recipe
 
