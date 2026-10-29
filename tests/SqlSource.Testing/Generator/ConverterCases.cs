@@ -5,20 +5,15 @@ using static SqlSource.Testing.Generator.ModelRuns;
 
 namespace SqlSource.Testing.Generator;
 
-// What the converter tests of tests/SqlSource.Tests/Generator/ share, ConverterMethodTests, ConverterObsoleteTests and
-// ConverterArrayTests: the types of App that the converted reads and writes use, the domain email over text and the
-// texts of its converters, and a run of a column or a parameter of email.
+// What the converter tests of tests/SqlSource.Tests/Generator/, ConverterMethodTests, ConverterObsoleteTests and
+// ConverterArrayTests, share, each member with at least two of them: the types of App that the converted reads and
+// writes use, the domain email over text, the kinds of type an Email is declared as, the expected read and write of
+// an email, and a run of a column or a parameter of email.
 //
 // Like the other files of this folder, it stays within Roslyn 4.8.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
 internal static class ConverterCases
 {
-    public const string FromDatabase =
-        "[SqlSourceConverter] public static Email FromDatabase(string value) => new(value);";
-
-    public const string ToDatabase =
-        "[SqlSourceConverter] public static string ToDatabase(Email email) => email.Value;";
-
     // The types of App that the converted reads and writes use: UserId, a value type over long, whose converters are
     // on Conversions, and Email, a value type or a reference type as KIND says, whose converters are its own.
     private const string AppSource = """

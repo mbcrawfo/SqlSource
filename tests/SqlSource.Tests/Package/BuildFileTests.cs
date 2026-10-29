@@ -230,7 +230,7 @@ public sealed partial class BuildFileTests
     // reads a value up to its first # or ;, and | parts the folders, so each folder's %, |, # and ; are escaped as
     // %25, %7C, %23 and %3B, % first, which BuildFolders decodes; MSBuild reads %XX in the file as the character it
     // stands for, so each escape is written with its % as %25.  The generator spells the name in BuildFolders, and
-    // SettingsFileTests runs it on it.  ManifestTargetTests runs the target.
+    // SettingsFileBuildFoldersTests runs it on it.  ManifestTargetTests runs the target.
     [Fact]
     public void Targets_BuildFolders_AreTheEscapedFullPathsOfEveryFolderTheBuildWritesInto()
     {

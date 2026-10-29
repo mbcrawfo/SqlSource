@@ -10,10 +10,10 @@ using Xunit;
 
 namespace SqlSource.Tests.Generator;
 
-// The C# and .sql files that no settings file applies to, since they are under a folder that the build writes into
-// and gives the generator in SqlSourceBuildFolders, a build input and no setting, and those under a folder it does not
-// give, whose chain climbs to the file above the project's root.  Split from SettingsFileTests, which holds which
-// level of the settings wins.
+// The settings files a file reaches by the folders the build gives the generator in SqlSourceBuildFolders, a build
+// input and no setting: a C# file under such a folder reaches none, a C# file under a folder the build does not give
+// climbs to the file above the project's root, and a .sql file reaches its chain wherever it is.  Split from
+// SettingsFileTests, which holds which level of the settings wins.
 public sealed class SettingsFileBuildFoldersTests
 {
     // The attribute of the assembly that the SDK writes under obj, here under the intermediate folder of the artifacts
