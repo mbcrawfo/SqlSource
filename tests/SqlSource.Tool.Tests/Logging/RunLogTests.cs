@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -196,7 +197,7 @@ public sealed class RunLogTests : IDisposable
         var events = await RunThatDescribesSkipsAndFailsAsync();
 
         events
-            .Select(line => Text(line, "event"))
+            .Select(LogReader.EventOf)
             .ShouldBe([
                 "run.start",
                 "project",
@@ -295,7 +296,7 @@ public sealed class RunLogTests : IDisposable
     private string? ActionOf(string sidecarPath) =>
         LogReader
             .Read(Log)
-            .Where(line => Text(line, "event") == "sidecar" && Text(line, "path") == sidecarPath)
+            .Where(line => LogReader.EventOf(line) == "sidecar" && Text(line, "path") == sidecarPath)
             .Select(line => Text(line, "action"))
             .ShouldHaveSingleItem();
 
@@ -409,11 +410,10 @@ public sealed class RunLogTests : IDisposable
         var result = await _scene.DescribeAsync("--check", "--verbose", "--log", "run.log");
 
         result.ExitCode.ShouldBe(1);
-        LogReader.Read(Log).ShouldNotContain(line => Text(line, "event") == "sidecar");
+        LogReader.Events(Log, "sidecar").ShouldBeEmpty();
         result.Out.ShouldNotContain("sidecar '");
         LogReader
-            .Read(Log)
-            .Where(line => Text(line, "event") == "query")
+            .Events(Log, "query")
             .Select(line => $"{Text(line, "name")} {Text(line, "decision")}")
             .ShouldBe(["GetUser described", "ListUsers failed"]);
     }
@@ -445,7 +445,7 @@ public sealed class RunLogTests : IDisposable
 
         var events = LogReader.Read(Log);
         events
-            .Select(line => Text(line, "event"))
+            .Select(LogReader.EventOf)
             .Skip(3)
             .ShouldBe([
                 "database",
@@ -470,7 +470,7 @@ public sealed class RunLogTests : IDisposable
 
         _ = await _scene.DescribeAsync("--log", "run.log");
 
-        var line = LogReader.Read(Log).Single(e => Text(e, "event") == "postgres.x");
+        var line = LogReader.Events(Log, "postgres.x").ShouldHaveSingleItem();
         Text(line, "_event").ShouldBe("run.end");
         Text(line, "_time").ShouldBe("never");
         Text(line, "time").ShouldBe(TestClock.StartIso);
@@ -484,11 +484,11 @@ public sealed class RunLogTests : IDisposable
         _ = await _scene.DescribeAsync("--log", "run.log");
 
         var events = LogReader.Read(Log);
-        var database = events.Single(line => Text(line, "event") == "database");
+        var database = events.Single(line => LogReader.EventOf(line) == "database");
         database.GetProperty("describer").GetBoolean().ShouldBeFalse();
-        events.ShouldNotContain(line => Text(line, "event") == "database.open");
+        events.ShouldNotContain(line => LogReader.EventOf(line) == "database.open");
         events
-            .Where(line => Text(line, "event") == "query")
+            .Where(line => LogReader.EventOf(line) == "query")
             .Select(line => $"{Text(line, "decision")} {Text(line, "error")}")
             .ShouldBe(["failed SQLSRC216", "failed SQLSRC216"]);
     }
@@ -501,9 +501,9 @@ public sealed class RunLogTests : IDisposable
         _ = await _scene.DescribeAsync("--log", "run.log");
 
         var events = LogReader.Read(Log);
-        Text(events.Single(line => Text(line, "event") == "database"), "connectionSource").ShouldBe("none");
+        Text(events.Single(line => LogReader.EventOf(line) == "database"), "connectionSource").ShouldBe("none");
         events
-            .Where(line => Text(line, "event") == "query")
+            .Where(line => LogReader.EventOf(line) == "query")
             .Select(line => Text(line, "error"))
             .ShouldBe(["SQLSRC213", "SQLSRC213"]);
     }
@@ -515,7 +515,7 @@ public sealed class RunLogTests : IDisposable
 
         _ = await _scene.DescribeAsync("--log", "run.log");
 
-        var open = LogReader.Read(Log).Single(line => Text(line, "event") == "database.open");
+        var open = LogReader.Events(Log, "database.open").ShouldHaveSingleItem();
         Text(open, "name").ShouldBe("postgres");
         Text(open, "error").ShouldBe("SQLSRC999");
         open.TryGetProperty("serverVersion", out _).ShouldBeFalse();
@@ -532,7 +532,7 @@ public sealed class RunLogTests : IDisposable
 
         _ = await _scene.DescribeAsync("App.slnx", "--project", "App.csproj", "--log", "run.log");
 
-        var projects = LogReader.Read(Log).Where(line => Text(line, "event") == "project").ToArray();
+        var projects = LogReader.Events(Log, "project");
         projects.Select(line => Text(line, "path")).ShouldBe([lib.ProjectPath, _scene.Project.ProjectPath]);
         projects[0].GetProperty("inRun").GetBoolean().ShouldBeFalse();
         projects[0].TryGetProperty("usesSqlSource", out _).ShouldBeFalse();
@@ -562,14 +562,14 @@ public sealed class RunLogTests : IDisposable
 
         _ = await _scene.DescribeAsync("All.slnx", "--log", "run.log");
 
-        var projects = LogReader.Read(Log).Where(line => Text(line, "event") == "project").ToArray();
+        var projects = LogReader.Events(Log, "project");
         UsesSqlSource(projects, tools).ShouldBe(JsonValueKind.False);
         UsesSqlSource(projects, fresh).ShouldBe(JsonValueKind.Null);
         UsesSqlSource(projects, broken).ShouldBe(JsonValueKind.Null);
         UsesSqlSource(projects, _scene.Project.ProjectPath).ShouldBe(JsonValueKind.True);
     }
 
-    private static JsonValueKind UsesSqlSource(JsonElement[] projects, string path) =>
+    private static JsonValueKind UsesSqlSource(IReadOnlyList<JsonElement> projects, string path) =>
         projects.Single(line => Text(line, "path") == path).GetProperty("usesSqlSource").ValueKind;
 
     [Fact]
@@ -580,7 +580,7 @@ public sealed class RunLogTests : IDisposable
 
         _ = await _scene.DescribeAsync("--log", "run.log");
 
-        var files = LogReader.Read(Log).Where(line => Text(line, "event") == "file").ToArray();
+        var files = LogReader.Events(Log, "file");
         Text(files.Single(line => Text(line, "path") == broken), "state").ShouldBe("has-parse-errors");
         Text(files.Single(line => Text(line, "path") == ansi), "state").ShouldBe("not-describable");
         Text(files.Single(line => Text(line, "path") == _users), "state").ShouldBe("ready");
@@ -596,7 +596,7 @@ public sealed class RunLogTests : IDisposable
 
         _ = await _scene.DescribeAsync("--log", "run.log");
 
-        var files = LogReader.Read(Log).Where(line => Text(line, "event") == "file").ToArray();
+        var files = LogReader.Events(Log, "file");
         Text(files.Single(line => Text(line, "path") == latin1), "state").ShouldBe("not-utf-8");
     }
 
@@ -608,7 +608,7 @@ public sealed class RunLogTests : IDisposable
 
         _ = await _scene.DescribeAsync("--database", "postgres", "--log", "run.log");
 
-        var queries = LogReader.Read(Log).Where(line => Text(line, "event") == "query").ToArray();
+        var queries = LogReader.Events(Log, "query");
         var left = queries.Single(line => Text(line, "name") == "ListInvoices");
         left.GetProperty("selected").GetBoolean().ShouldBeFalse();
         Text(left, "decision").ShouldBe("left-out");

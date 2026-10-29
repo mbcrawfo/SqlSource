@@ -4,6 +4,7 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Models;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Methods;
@@ -110,7 +111,7 @@ public sealed class MethodConflictsTests
     public void Find_ExtensionClassTakenByTheProject_BlocksTheTypeWithSqlsrc276(int reason, string part, string because)
     {
         var conflicts = MethodConflicts.Find(
-            Sorted(
+            TestSidecars.Of(
                 Signature("App.Sample", "SampleExtensions", "Get"),
                 Signature("App.Sample", "SampleExtensions", "List")
             ),
@@ -136,7 +137,7 @@ public sealed class MethodConflictsTests
     public void Find_ExtensionClassNamedAsAModel_BlocksTheTypeWithSqlsrc276(string model, string because)
     {
         var conflicts = MethodConflicts.Find(
-            Sorted(Signature("App.Sample", "SampleExtensions", "Get")),
+            TestSidecars.Of(Signature("App.Sample", "SampleExtensions", "Get")),
             EquatableArray<TakenName>.Empty,
             new EquatableArray<string>(["App.GetDto", model])
         );
@@ -179,7 +180,7 @@ public sealed class MethodConflictsTests
     public void Find_MethodOfABlockedType_ClashesWithNothing()
     {
         var conflicts = MethodConflicts.Find(
-            Sorted(
+            TestSidecars.Of(
                 Signature("App.First", "FirstExtensions", "Get"),
                 Signature("App.Second", "SecondExtensions", "Get", path: "b.sql")
             ),
@@ -242,7 +243,7 @@ public sealed class MethodConflictsTests
     public void Find_ExtensionClassTakenAndOfTwoAccessibilities_ReportsTheTakenNameOnceForEachType()
     {
         var conflicts = MethodConflicts.Find(
-            Sorted(
+            TestSidecars.Of(
                 Signature("App.First.Queries", "QueriesExtensions", "GetA", attributePath: "First.cs"),
                 Signature(
                     "App.Second.Queries",
@@ -316,8 +317,6 @@ public sealed class MethodConflictsTests
             EquatableArray<TakenName>.Empty,
             EquatableArray<string>.Empty
         );
-
-    private static EquatableArray<MethodSignature> Sorted(params MethodSignature[] signatures) => new([.. signatures]);
 
     // The type's key is its full name, which no test gives a type parameter.
     private static MethodSignature Signature(
