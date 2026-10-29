@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing;
+using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -245,6 +246,38 @@ public sealed class CheckTests : IDisposable
         );
         await ShouldBeUntouchedAsync(before);
     }
+
+    // A column type is matched against the column's origin, so a column read from another table can change its
+    // generated type, though its name and its type in the database stay the same.
+    [Fact]
+    public async Task Check_ColumnNowReadFromAnotherTable_NamesTheOriginAndTheTwoValues()
+    {
+        ListUsersReadsFrom("users");
+        var before = await DescribeFirstAsync();
+        ListUsersReadsFrom("accounts");
+
+        var result = await _scene.DescribeAsync("--check");
+
+        result.ExitCode.ShouldBe(2);
+        result.Error.ShouldBe(
+            Difference(
+                $"{_users}(4,10)",
+                "ListUsers",
+                "columns[0].origin.table is \"users\", and the database says \"accounts\"",
+                ForceHelp
+            )
+        );
+        await ShouldBeUntouchedAsync(before);
+    }
+
+    // ListUsers is described as rows of one column, id, read from the table of that name.
+    private void ListUsersReadsFrom(string table) =>
+        _scene.Describer.Descriptions["ListUsers"] = FakeDescriber.Rows with
+        {
+            Columns = TestSidecars.Of(
+                TestSidecars.Column(0, "id", TestSidecars.Postgres(), origin: new SidecarOrigin("public", table, "id"))
+            ),
+        };
 
     // The differences of a file are in the order of its queries, whatever the order of the entries in the sidecar.
     [Fact]

@@ -65,4 +65,45 @@ public sealed class DescribeCommandTests(SqlServerDatabases sqlServer) : IDispos
         result.ExitCode.ShouldBe(0, result.Error);
         result.Out.ShouldBe("fixtures (mssql): 1 same, 0 differ, 0 failed\n");
     }
+
+    // A synonym's column has the synonym's table as its origin.  The query, its hash and its column's type stay the
+    // same, but a column type that names the first table would no longer apply, so the origin is what differs.  The
+    // query reads a column of two, so that it matches no table, whose name would differ first.
+    [Fact]
+    public async Task Check_SynonymPointedAtAnotherTable_DiffersInTheOrigin()
+    {
+        await sqlServer.ExecuteAsync(
+            "CREATE TABLE dbo.command_first (id int NOT NULL PRIMARY KEY, note nvarchar(10) NULL); "
+                + "CREATE TABLE dbo.command_second (id int NOT NULL PRIMARY KEY, note nvarchar(10) NULL); "
+                + "CREATE SYNONYM dbo.command_alias FOR dbo.command_first;"
+        );
+        try
+        {
+            var project = _fixtures.Copy("SqlServer");
+            _ = _fixtures.WriteFile(
+                "SqlServer/Queries/Aliased.sql",
+                "-- name: GetAliased\nSELECT id FROM dbo.command_alias;\n"
+            );
+            var described = await DescribeAsync(project);
+            described.ExitCode.ShouldBe(0, described.Error);
+            await sqlServer.ExecuteAsync(
+                "DROP SYNONYM dbo.command_alias; CREATE SYNONYM dbo.command_alias FOR dbo.command_second;"
+            );
+
+            var check = await DescribeAsync(project, "--check");
+
+            check.ExitCode.ShouldBe(2, check.Error);
+            check.Error.ShouldContain(
+                "'GetAliased': columns[0].origin.table is \"command_first\", and the database says \"command_second\""
+            );
+            check.Out.ShouldBe("fixtures (mssql): 1 same, 1 differ, 0 failed\n");
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync(
+                "DROP SYNONYM IF EXISTS dbo.command_alias; DROP TABLE IF EXISTS dbo.command_first; "
+                    + "DROP TABLE IF EXISTS dbo.command_second;"
+            );
+        }
+    }
 }

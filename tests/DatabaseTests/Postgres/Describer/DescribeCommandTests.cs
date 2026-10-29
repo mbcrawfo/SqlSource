@@ -159,6 +159,42 @@ public sealed class DescribeCommandTests : IDisposable
         }
     }
 
+    // The query, its hash and its column's type stay the same, but a column type that names the old schema would no
+    // longer apply, so the origin is what differs.  The query reads a column of two, so that it matches no table,
+    // whose schema would differ first.
+    [Fact]
+    public async Task Check_TableMovedToAnotherSchemaOnTheSearchPath_DiffersInTheOrigin()
+    {
+        await _postgres.ExecuteAsync(
+            "CREATE SCHEMA command_old; CREATE SCHEMA command_new; "
+                + "CREATE TABLE command_old.command_moved (id integer PRIMARY KEY, note text)"
+        );
+        try
+        {
+            var connection = new NpgsqlConnectionStringBuilder(_postgres.ConnectionString)
+            {
+                SearchPath = "command_old,command_new",
+            }.ConnectionString;
+            _ = _project.AddSql("moved.sql", "-- name: GetMoved\nSELECT id FROM command_moved;\n");
+            var described = await DescribeWithAsync(connection);
+            described.ExitCode.ShouldBe(0, described.Error);
+            await _postgres.ExecuteAsync("ALTER TABLE command_old.command_moved SET SCHEMA command_new");
+
+            var check = await DescribeWithAsync(connection, "--check");
+
+            check.ExitCode.ShouldBe(2, check.Error);
+            check.Error.ShouldContain(
+                "'GetMoved': columns[0].origin.schema is \"command_old\", and the database says \"command_new\""
+            );
+        }
+        finally
+        {
+            await _postgres.ExecuteAsync(
+                "DROP SCHEMA IF EXISTS command_old CASCADE; DROP SCHEMA IF EXISTS command_new CASCADE"
+            );
+        }
+    }
+
     [Fact]
     public async Task Describe_RejectedQueryBesideAnAcceptedOne_IsSqlsrc225AndSqlsrc217()
     {
