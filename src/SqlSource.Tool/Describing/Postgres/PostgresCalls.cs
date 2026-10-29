@@ -245,7 +245,10 @@ internal sealed record PostgresAttributeRow(
 /// <param name="Parameters">The parameters of the query's list, in order.</param>
 internal sealed record PostgresCheckRequest(string Sql, IReadOnlyList<PostgresCheckParameter> Parameters);
 
-/// <summary>A parameter as generated code will bind it.</summary>
+/// <summary>
+/// A parameter as <c>check</c> binds it, by its <c>bindName</c>.  Generated code binds by the type's canonical name,
+/// and by the <c>bindName</c> where none can be derived.
+/// </summary>
 /// <param name="Name">The name, as the query's list has it.</param>
 /// <param name="DataTypeName">
 /// The <c>bindName</c> of the type the describer gave the parameter (<see cref="PostgresBindNames" />).  A capture

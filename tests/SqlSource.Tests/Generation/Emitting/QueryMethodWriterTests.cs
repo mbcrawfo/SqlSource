@@ -158,7 +158,7 @@ public sealed class QueryMethodWriterTests
                                 {
                                     var parameter = new global::Npgsql.NpgsqlParameter<int>();
                                     parameter.ParameterName = "id";
-                                    parameter.DataTypeName = "integer";
+                                    parameter.DataTypeName = "pg_catalog.int4";
                                     parameter.TypedValue = parameters.Id;
                                     command.Parameters.Add(parameter);
                                 }
@@ -897,7 +897,7 @@ public sealed class QueryMethodWriterTests
                                 "string",
                                 false,
                                 false,
-                                Described: TestSidecars.Postgres(bindName: "text")
+                                Described: TestSidecars.Postgres(name: "text", internalName: "text", bindName: "text")
                             )
                         )
                     ),
@@ -911,7 +911,7 @@ public sealed class QueryMethodWriterTests
                     + "        {\n"
                     + "            var parameter = new global::Npgsql.NpgsqlParameter<string>();\n"
                     + "            parameter.ParameterName = \"name\";\n"
-                    + "            parameter.DataTypeName = \"text\";\n"
+                    + "            parameter.DataTypeName = \"pg_catalog.text\";\n"
                     + "            parameter.TypedValue = parameters.Name;\n"
                     + "            command.Parameters.Add(parameter);\n"
                     + "        }\n"
@@ -1130,7 +1130,7 @@ public sealed class QueryMethodWriterTests
                                 {
                                     var parameter = new global::Npgsql.NpgsqlParameter<int>();
                                     parameter.ParameterName = "id";
-                                    parameter.DataTypeName = "integer";
+                                    parameter.DataTypeName = "pg_catalog.int4";
                                     parameter.TypedValue = parameters.Id;
                                     command.Parameters.Add(parameter);
                                 }
