@@ -40,6 +40,8 @@ internal static class QueryMethodWriter
 
     private const string RolledBackType = "global::SqlSource.TransactionRolledBackException";
 
+    private const string CompletedTransactionType = "global::System.InvalidOperationException";
+
     // The lines around the assignment of a command's SQL when its tokens build it.
     private const string SqlFromTokensStart =
         "#pragma warning disable CA2100 // The text of a token is the caller's own choice.\n";
@@ -140,8 +142,9 @@ internal static class QueryMethodWriter
         method.Engine == DatabaseEngine.SqlServer
         && method.Shape is ResultShape.Many or ResultShape.One or ResultShape.OneOptional;
 
-    // The SQL, the opening of a closed connection, the command, its parameters and its execution, and the closing of
-    // the connection in a finally, at the indent of the method's body.
+    // On SQL Server the refusal of a completed transaction, then the SQL, the opening of a closed connection, the
+    // command, its parameters and its execution, and the closing of the connection in a finally, at the indent of the
+    // method's body.
     private static void AppendBody(
         StringBuilder builder,
         string indent,
@@ -154,6 +157,7 @@ internal static class QueryMethodWriter
     )
     {
         var blockIndent = indent + GeneratedText.Indent;
+        AppendCompletedTransactionCheck(builder, indent, method);
         AppendSql(builder, indent, method, tokens, arguments, locals);
 
         _ = builder
@@ -207,6 +211,38 @@ internal static class QueryMethodWriter
             .Append(".CloseAsync().ConfigureAwait(false);\n");
         AppendEnd(builder, blockIndent);
         AppendEnd(builder, indent);
+    }
+
+    // On SQL Server a transaction that has completed, whose Connection is null, is refused before anything runs: a
+    // command given it would run outside any transaction and commit on its own, and the catch of
+    // AppendTransactionCheck would blame this query for a rollback it did not cause.  A streaming method checks when
+    // its loop starts, so a transaction that completes between the call and the loop is refused too.  The check is
+    // followed by a blank line, as the SQL follows it.
+    private static void AppendCompletedTransactionCheck(StringBuilder builder, string indent, QueryMethod method)
+    {
+        if (method.Engine != DatabaseEngine.SqlServer)
+        {
+            return;
+        }
+
+        AppendIf(builder, indent, Transaction + " is not null && " + Transaction + ".Connection is null");
+        _ = builder
+            .Append(indent)
+            .Append(GeneratedText.Indent)
+            .Append("throw new ")
+            .Append(CompletedTransactionType)
+            .Append('(')
+            .Append(
+                SymbolDisplay.FormatLiteral(
+                    "The transaction given to the query '"
+                        + method.QueryName
+                        + "' has completed; it is no longer usable.",
+                    quote: true
+                )
+            )
+            .Append(");\n");
+        AppendEnd(builder, indent);
+        _ = builder.Append('\n');
     }
 
     private static void AppendDocumentation(
@@ -271,6 +307,16 @@ internal static class QueryMethodWriter
         else if (method.Shape == ResultShape.OneOptional)
         {
             XmlDocWriter.AppendException(builder, indent, ExceptionType, "The query returned more than one row.");
+        }
+
+        if (method.Engine == DatabaseEngine.SqlServer)
+        {
+            XmlDocWriter.AppendException(
+                builder,
+                indent,
+                CompletedTransactionType,
+                "The transaction has completed: it was committed or rolled back before the query ran."
+            );
         }
 
         if (ChecksTransaction(method))
@@ -804,9 +850,11 @@ internal static class QueryMethodWriter
     // error, which reports itself, and the caller's cancellation.  With a transaction given, it disposes the reader,
     // which reads the rest of the batch and drops any error there, and when such an error rolled the transaction back,
     // which leaves its Connection null, it throws the exception that says so, with the method's as its inner
-    // exception.  Otherwise it throws the method's own as it is.  A database error at a row is thrown as it is too, so
-    // a later error of the batch that rolls the transaction back goes unreported (TD-0090).  A call that does not throw
-    // runs none of it, though the await in the catch makes the method's state machine keep room for the exception.
+    // exception.  A transaction that had completed before the query ran was refused by
+    // AppendCompletedTransactionCheck, so a null Connection here comes from this query's batch.  Otherwise it throws
+    // the method's own as it is.  A database error at a row is thrown as it is too, so a later error of the batch that
+    // rolls the transaction back goes unreported (TD-0090).  A call that does not throw runs none of it, though the
+    // await in the catch makes the method's state machine keep room for the exception.
     private static void AppendTransactionCheck(StringBuilder builder, string indent, QueryMethod method, Locals locals)
     {
         var blockIndent = indent + GeneratedText.Indent;

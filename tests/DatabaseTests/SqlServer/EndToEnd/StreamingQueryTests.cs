@@ -23,7 +23,8 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // the batch raises is thrown, in place of the body's exception too.  Under XACT_ABORT ON that error rolls back the
 // caller's transaction, and with it off CAST('x' AS int) after the rows does too, where a THROW, a divide by zero or
 // an overflow leaves it to commit.  When a row throws an exception of the iterator's own, the reader's disposal drops
-// such an error, and the iterator throws TransactionRolledBackException when it rolled the transaction back.
+// such an error, and the iterator throws TransactionRolledBackException when it rolled the transaction back.  A
+// transaction that has completed is refused at the first MoveNextAsync.
 [Collection(UsesSqlServer.Name)]
 public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
 {
@@ -207,6 +208,28 @@ public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
         await stream.GetAsyncEnumerator(token).DisposeAsync();
 
         connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
+    // A transaction that has committed is refused when the loop starts, at the first MoveNextAsync, and not at the
+    // call, so one that completes between the call and the loop is refused too.  The connection, closed after the
+    // commit, is not opened.
+    [Fact]
+    public async Task StreamAccounts_TransactionCompletedBeforeTheLoop_IsRefusedAtTheFirstMoveNextAsync()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+        var stream = session.Connection.StreamAccounts(transaction: session.Transaction, cancellationToken: token);
+        await session.ShouldCommitAsync(token);
+        await session.Connection.CloseAsync();
+        await using var enumerator = stream.GetAsyncEnumerator(token);
+
+        var thrown = await Should.ThrowAsync<InvalidOperationException>(async () => await enumerator.MoveNextAsync());
+
+        thrown.GetType().ShouldBe(typeof(InvalidOperationException));
+        thrown.Message.ShouldBe(
+            "The transaction given to the query 'StreamAccounts' has completed; it is no longer usable."
+        );
+        session.Connection.State.ShouldBe(ConnectionState.Closed);
     }
 
     // SQL Server has no second command on a connection that a reader is reading, and the loop's body is where a caller

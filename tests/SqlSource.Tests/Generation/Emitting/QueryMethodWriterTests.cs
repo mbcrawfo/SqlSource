@@ -19,6 +19,10 @@ public sealed class QueryMethodWriterTests
 {
     private const string Vector = "global::Microsoft.Data.SqlTypes.SqlVector<float>";
 
+    private const string CompletedTransactionDocumentation =
+        "/// <exception cref=\"global::System.InvalidOperationException\">"
+        + "The transaction has completed: it was committed or rolled back before the query ran.</exception>\n";
+
     private const string ReaderLine =
         "var reader = await command.ExecuteReaderAsync("
         + "global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);\n";
@@ -553,6 +557,99 @@ public sealed class QueryMethodWriterTests
     [InlineData(nameof(ResultShape.OneOptional))]
     public void Append_PostgresShapeReadingRows_DoesNotDrain(string shapeName) =>
         Write(GetUser with { Shape = Enum.Parse<ResultShape>(shapeName) }).ShouldNotContain("NextResultAsync");
+
+    // A transaction that has completed is refused before anything runs, since a command given it would run outside
+    // any transaction, on SQL Server, before the SQL is built and the connection opened.
+    [Theory]
+    [InlineData(nameof(ResultShape.None))]
+    [InlineData(nameof(ResultShape.RowCount))]
+    [InlineData(nameof(ResultShape.One))]
+    [InlineData(nameof(ResultShape.OneOptional))]
+    [InlineData(nameof(ResultShape.Many))]
+    public void Append_SqlServerEachShape_RefusesACompletedTransactionBeforeItOpensTheConnection(string shapeName)
+    {
+        var text = Write(
+            SqlServerGetUser with
+            {
+                Shape = Enum.Parse<ResultShape>(shapeName),
+                Collection = CollectionKind.Array,
+            }
+        );
+
+        text.ShouldContain(
+            "    global::System.ArgumentException.ThrowIfNullOrWhiteSpace(orderBy);\n"
+                + CompletedTransactionCheck("    ")
+                + "\n"
+                + "    var sql = string.Create(\n"
+        );
+        Regex
+            .Count(text, "\\.Connection is null\\)\n", RegexOptions.None, TimeSpan.FromSeconds(1))
+            .ShouldBe(shapeName is nameof(ResultShape.None) or nameof(ResultShape.RowCount) ? 1 : 2);
+        text.IndexOf(CompletedTransactionCheck("    "), StringComparison.Ordinal)
+            .ShouldBeLessThan(text.IndexOf("var wasClosed", StringComparison.Ordinal));
+    }
+
+    // A streaming method checks when its loop starts, inside the iterator, so a transaction that completes between the
+    // call and the loop is refused too.
+    [Fact]
+    public void Append_SqlServerStreams_RefusesACompletedTransactionInsideTheIterator()
+    {
+        var text = Write(SqlServerStream);
+
+        text.ShouldContain(
+            "[global::System.Runtime.CompilerServices.EnumeratorCancellation] "
+                + "global::System.Threading.CancellationToken cancellationToken)\n"
+                + "    {\n"
+                + CompletedTransactionCheck("        ")
+                + "\n"
+                + "        var sql = string.Create(\n"
+        );
+        text.IndexOf(CompletedTransactionCheck("        "), StringComparison.Ordinal)
+            .ShouldBeGreaterThan(text.IndexOf("static async ", StringComparison.Ordinal));
+        text.IndexOf(CompletedTransactionCheck("        "), StringComparison.Ordinal)
+            .ShouldBeLessThan(text.IndexOf("var wasClosed", StringComparison.Ordinal));
+    }
+
+    // Each SQL Server method says that it refuses a transaction that has completed.
+    [Theory]
+    [InlineData(nameof(ResultShape.None), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.RowCount), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.One), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.OneOptional), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.Many), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.Many), nameof(CollectionKind.IAsyncEnumerable))]
+    public void Append_SqlServerEachShape_DocumentsTheCompletedTransaction(string shapeName, string collectionName) =>
+        Write(
+                SqlServerGetUser with
+                {
+                    Shape = Enum.Parse<ResultShape>(shapeName),
+                    Collection = Enum.Parse<CollectionKind>(collectionName),
+                }
+            )
+            .ShouldContain(CompletedTransactionDocumentation);
+
+    // The refusal is SQL Server's alone, whose driver runs a command given a completed transaction outside any
+    // transaction, so a PostgreSQL method neither checks nor documents it.
+    [Theory]
+    [InlineData(nameof(ResultShape.None), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.RowCount), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.One), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.OneOptional), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.Many), nameof(CollectionKind.Array))]
+    [InlineData(nameof(ResultShape.Many), nameof(CollectionKind.IAsyncEnumerable))]
+    public void Append_PostgresEachShape_DoesNotRefuseACompletedTransaction(string shapeName, string collectionName)
+    {
+        var text = Write(
+            GetUser with
+            {
+                Shape = Enum.Parse<ResultShape>(shapeName),
+                Collection = Enum.Parse<CollectionKind>(collectionName),
+            }
+        );
+
+        text.ShouldNotContain("transaction.Connection");
+        text.ShouldNotContain("global::System.InvalidOperationException");
+    }
 
     // Under no-array-pool the types the buffer serves read their rows as before the buffer.
     [Theory]
@@ -1490,6 +1587,18 @@ public sealed class QueryMethodWriterTests
         + "\n"
         + indent
         + "    throw;\n"
+        + indent
+        + "}\n";
+
+    // The refusal of a completed transaction by a SQL Server method of GetUser, at an indent.
+    private static string CompletedTransactionCheck(string indent) =>
+        indent
+        + "if (transaction is not null && transaction.Connection is null)\n"
+        + indent
+        + "{\n"
+        + indent
+        + "    throw new global::System.InvalidOperationException("
+        + "\"The transaction given to the query 'GetUser' has completed; it is no longer usable.\");\n"
         + indent
         + "}\n";
 

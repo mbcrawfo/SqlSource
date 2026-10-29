@@ -16,11 +16,12 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer;
 
 // The bytes that a generated method allocates for each call, against a hand-written ADO.NET method of the same calls:
 // ShapeQueries.SearchAccounts, with two parameters and three rows of the seed of "app".  The hand-written method makes
-// the generated method's calls, one by one: the open/close rule of the methods, the command and its arguments, the
-// binding of each parameter, the reads of each column, the read of the results after the rows, so that a later
-// statement's error is thrown, the catch that checks a transaction after an exception of the method's own, and the same
-// rows in the same collection, an IReadOnlyList with an array behind it, which it can only build by copying what it
-// read the rows into, since the count of the rows is not known until they are read.  It reads them into what the
+// the generated method's calls, one by one: the refusal of a transaction that has completed, the open/close rule of
+// the methods, the command and its arguments, the binding of each parameter, the reads of each column, the read of
+// the results after the rows, so that a later statement's error is thrown, the catch that checks a transaction after
+// an exception of the method's own, and the same rows in the same collection, an IReadOnlyList with an array behind
+// it, which it can only build by copying what it read the rows into, since the count of the rows is not known until
+// they are read.  It reads them into what the
 // generated method does, so there are two pairs: SearchAccounts, which reads its rows into the pooled buffer, against a
 // hand-written method that reads them into RowBufferByHand of this project, the same buffer by hand; and
 // SearchAccountsUnpooled, a copy of the query under no-array-pool, which reads them into a List, against a hand-written
@@ -500,6 +501,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         CancellationToken cancellationToken = default
     )
     {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'SearchAccounts' has completed; it is no longer usable."
+            );
+        }
+
         var wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
         {
@@ -591,6 +600,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         CancellationToken cancellationToken = default
     )
     {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'SearchAccountsUnpooled' has completed; it is no longer usable."
+            );
+        }
+
         var wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
         {
@@ -684,6 +701,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         CancellationToken cancellationToken = default
     )
     {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'NumbersAsList' has completed; it is no longer usable."
+            );
+        }
+
         var wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
         {
@@ -762,6 +787,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         CancellationToken cancellationToken = default
     )
     {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'NumbersAsImmutableArray' has completed; it is no longer usable."
+            );
+        }
+
         var wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
         {
@@ -840,6 +873,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         CancellationToken cancellationToken = default
     )
     {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'NumbersNoPoolAsList' has completed; it is no longer usable."
+            );
+        }
+
         var wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
         {
@@ -918,6 +959,15 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         CancellationToken cancellationToken = default
     )
     {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'NumbersNoPoolAsImmutableArray' has completed; "
+                    + "it is no longer usable."
+            );
+        }
+
         var wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
         {
@@ -996,6 +1046,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
         CancellationToken cancellationToken = default
     )
     {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'NumbersAsArray' has completed; it is no longer usable."
+            );
+        }
+
         var wasClosed = connection.State == ConnectionState.Closed;
         if (wasClosed)
         {
@@ -1087,6 +1145,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
             [EnumeratorCancellation] CancellationToken cancellationToken
         )
         {
+            // The generated method's refusal of a transaction that has completed.
+            if (transaction is not null && transaction.Connection is null)
+            {
+                throw new InvalidOperationException(
+                    "The transaction given to the query 'StreamAccounts' has completed; it is no longer usable."
+                );
+            }
+
             var wasClosed = connection.State == ConnectionState.Closed;
             if (wasClosed)
             {
