@@ -70,7 +70,7 @@
           "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/tableRef" }]
         },
         "plan": {
-          "description": "Provenance: whether the nullability plan walk ran. 'not-needed': no column is one a plan could answer, the query having no outer-join keyword and no column of no origin. 'walked': the walk read the plan. 'unavailable': there was no plan, or none the walk could use, and the log says why. 'skipped': the engine has no walk, as SQL Server. The generator never reads it.",
+          "description": "Provenance: whether the nullability plan walk ran. 'not-needed': no column is one a plan could answer, the query holding no word of the outer-join gate, such as LEFT or ROLLUP, and no column of no origin. 'walked': the walk read the plan. 'unavailable': there was no plan, or none the walk could use, and the log says why. 'skipped': the engine has no walk, as SQL Server. The generator never reads it.",
           "type": "string",
           "enum": ["not-needed", "walked", "unavailable", "skipped"]
         },
@@ -175,7 +175,7 @@
           "enum": ["server", "catalog", "outer-join", "view", "foreign-table", "expression", "set-operation", "no-origin", "heuristic"]
         },
         "origin": {
-          "description": "The table column the result's column comes from, or null for an expression, an aggregate, a cast, a set operation's column or a USING column. Informational.",
+          "description": "The table column the result's column comes from, or null for an expression, an aggregate, a cast, a set operation's column or a USING column. The generator matches the keys of columnTypes against it, and names it in the property's documentation.",
           "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/origin" }]
         },
         "identity": {

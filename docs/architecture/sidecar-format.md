@@ -46,7 +46,10 @@ The tool never writes a sidecar with no entry.  A run over the whole run unit th
    - The types of an entry whose `engine` the reader does not know are each an `OtherEngineType`, with its `name` and, on a parameter's own type, its `bindName`.  The generator reports `SQLSRC242` at each query whose entry it is, since its engine is not the file's dialect.
    - A PostgreSQL `kind` that the reader does not know is kept.  Unless an override or the type map knows the type by its name, `PostgresTypeMap.Map` fails it as `TypeMappingKind.NotWrittenByTheTool`, and the generator reports `SQLSRC246` at the query's name, with the help to describe it again.
    - A `typeSource`, `nullableSource`, `plan` or `tableMatch` that the reader does not know is kept, since the generator never reads them.
-7. **Strings are compared ordinally**, a query's name included, but for these: a parameter's name, which the generator compares with the query's ignoring case; `database`, which the tool compares ignoring case with `DatabaseName.Comparer`, since two names that differ only in case read one connection variable; and a type's name in the generator's type maps, which look up a PostgreSQL `internalName` of `pg_catalog` or of an extension they know (`PostgresTypeMap`, `TypeKeyNames`) and a SQL Server type's base name (`SqlServerTypeMap`) ignoring case.
+7. **Strings are compared ordinally**, a query's name included, except where the generator or the tool matches one with a name a user writes, or with a table of its own, which ignores case:
+   - a parameter's `name` against the query's parameter (`QueryTyper`), and `database` against the query's (`DatabaseName.Comparer`), since two names that differ only in case read one connection variable;
+   - a column's `name` against a `-- column:` marker (`ModelReader`), its `origin` against the keys of `columnTypes` (`ColumnTypeMap`), and a type's `schema` and `internalName` against the keys of `typeOverrides` (`TypeOverrideMap`), as the manual's [type overrides](../manual/settings.md#type-overrides) and [column types](../manual/settings.md#column-types) say;
+   - a PostgreSQL `internalName` of `pg_catalog` or of an extension the type map knows (`PostgresTypeMap`, `TypeKeyNames`), and a SQL Server type's base name in the type map and the binder's table (`SqlServerTypeMap`, `SqlServerBinding`).
 8. **Everything about a query is in its entry**; only `formatVersion` and `toolVersion` come from the top.
 
 ## Compatibility
@@ -56,11 +59,11 @@ The tool never writes a sidecar with no entry.  A run over the whole run unit th
 A change keeps the version when it adds:
 
 - a key anywhere: at the top, on an entry, a parameter, a column, an `origin`, a `matchesTable` or a type object, which an older reader skips;
-- an `engine` with its own type shape, whose entries an older generator reports with `SQLSRC242`;
+- an `engine` with its own type shape, whose entries an older generator reports with `SQLSRC242`, as long as every type object has a string `name` and no column's `type` is `null`, which an older reader needs of any engine;
 - a PostgreSQL `kind`, with any keys it needs, whose queries an older generator reports with `SQLSRC246`;
 - a value of `typeSource`, `nullableSource`, `plan` or `tableMatch`, which no generator reads.
 
-So does moving a key that a reader accepts as `null` between "written when it has a value" and "always written", since a reader reads an absent key as `null`, and spelling the informational `serverVersion` another way.
+So does moving a key that a reader neither requires nor refuses as `null` between "written when it has a value" and "always written", since a reader reads an absent key as `null`, and spelling the informational `serverVersion` another way.
 
 A change raises the version when it:
 
@@ -68,7 +71,7 @@ A change raises the version when it:
 - changes the algorithm or the input of `hash`, [`SqlQueryHash`](../../src/SqlSource/Parsing/SqlQueryHash.cs), since an older generator would call every entry stale and a newer one would take a stale file;
 - adds a `resultKind`, which an older reader refuses as malformed;
 - adds a key that a reader cannot do without, or requires `columns` when `resultKind` is `none`;
-- writes `bindName` or `columns` as `null`, which an older reader refuses as malformed;
+- writes `bindName` or `columns` as `null`, leaves out a parameter's or a column's `nullable`, or gives a new engine a type object without a string `name` or a column a `null` `type`, each of which an older reader refuses as malformed;
 - writes a file that is not one strict JSON object nested at most `SidecarTokenizer.MaxDepth` levels, which an older reader reports as malformed instead of as newer;
 - makes `queries` anything but an object keyed by the query's name;
 - changes an existing engine's type object in any of these ways.
@@ -99,4 +102,4 @@ What the tool does, in `RunDecisions` and `FileOutcomes`:
 
 ## What `--check` compares
 
-`--check` compares each query's described entry with its committed one, as [a describe run](tool.md#a-describe-run) describes, through [`SidecarComparer.FindDifference`](../../src/SqlSource/Snapshot/SidecarComparer.cs): `hash`, `engine`, `database`, `resultKind`, `matchesTable`, and each parameter's and column's `name`, `ordinal`, `type` and `nullable`, in that order.  A `type` is compared whole, `bindName` included, since it changes what the generated code does.  `_WARNING`, `$schema`, `formatVersion`, `toolVersion`, `serverVersion`, `typeSource`, `nullableSource`, `plan`, `tableMatch`, `origin`, `identity` and `computed` are not compared: the versions and the server differ between a developer's machine and CI by design, and the rest is informational.
+`--check` compares each query's described entry with its committed one, as [a describe run](tool.md#a-describe-run) describes, through [`SidecarComparer.FindDifference`](../../src/SqlSource/Snapshot/SidecarComparer.cs): `hash`, `engine`, `database`, `resultKind`, `matchesTable`, and each parameter's and column's `name`, `ordinal`, `type` and `nullable`, in that order.  A `type` is compared whole, `bindName` included, since it changes what the generated code does.  `_WARNING`, `$schema`, `formatVersion`, `toolVersion`, `serverVersion`, `typeSource`, `nullableSource`, `plan`, `tableMatch`, `origin`, `identity` and `computed` are not compared: the versions and the server differ between a developer's machine and CI by design, provenance, `identity` and `computed` are informational, and `origin`, which decides a column's type through `columnTypes`, is not compared all the same.
