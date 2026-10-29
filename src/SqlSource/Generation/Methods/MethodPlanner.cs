@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using SqlSource.Diagnostics;
-using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Models;
 using SqlSource.Parsing;
@@ -101,14 +100,14 @@ internal static class MethodPlanner
         var engines = CodeGenEngines.None;
         for (var index = 0; index < queries.Count; index++)
         {
-            var (fileIndex, queryIndex, query, settings) = queries[index];
-            if (settings.Output != OutputKind.CodeGen)
+            var usable = queries[index];
+            if (usable.Settings.Output != OutputKind.CodeGen)
             {
                 continue;
             }
 
             // Only a describable dialect's query has an entry, so only it can have a method or need a driver.
-            var file = typeQueries.Files[fileIndex];
+            var file = typeQueries.Files[usable.FileIndex];
             if (!SqlDescribableDialects.Contains(file.Dialect))
             {
                 continue;
@@ -116,7 +115,8 @@ internal static class MethodPlanner
 
             var engine = SqlDescribableDialects.EngineOf(file.Dialect);
             engines |= engine.ToCodeGenEngines();
-            if (Plan(input, key, file, fileIndex, queryIndex, query, settings, written, engine) is { } plan)
+            var context = new QueryContext(input, key, file, engine, usable);
+            if (Plan(context, written) is { } plan)
             {
                 planned.Add(plan);
             }
@@ -145,20 +145,12 @@ internal static class MethodPlanner
     // The plan of one query whose output is CodeGen, or null when it gets nothing and reports nothing here.  Every
     // problem of SQLSRC272, SQLSRC275, SQLSRC274 and its converters that the query has is reported, and any one leaves
     // it no method.
-    private static Planned? Plan(
-        MethodsInput input,
-        string key,
-        ParsedSqlFile file,
-        int fileIndex,
-        int queryIndex,
-        SqlQuery query,
-        QuerySettings settings,
-        HashSet<string> written,
-        DatabaseEngine engine
-    )
+    private static Planned? Plan(QueryContext context, HashSet<string> written)
     {
+        var (input, _, file, engine, usable) = context;
+        var (_, queryIndex, query, settings) = usable;
         // A query without models has its own error already, reported by its file.
-        if (input.Files[fileIndex].Find(queryIndex, query.Name) is not { } models)
+        if (input.Files[usable.FileIndex].Find(queryIndex, query.Name) is not { } models)
         {
             return null;
         }
@@ -192,9 +184,12 @@ internal static class MethodPlanner
         var planned = new Planned(problems, name, query.Name, query.NameLocation, null, false, []);
         // A query whose driver is missing gets no method, which SQLSRC273 says, so its converters are not decided.
         var isUsable = input.Drivers.Allows(engine);
-        var reading = new Reading(engine, isUsable, query.NameLocation, problems);
-        var hasInput = TryReadInput(input, key, file, queryIndex, query, models, reading, out var methodInput);
-        var hasOutput = TryReadOutput(input, key, file, queryIndex, settings, models, reading, out var methodOutput);
+        var reading = new Reading(
+            isUsable,
+            new ConversionContext(engine, input.Converters, query.NameLocation, problems)
+        );
+        var hasInput = TryReadInput(context, models, reading, out var methodInput);
+        var hasOutput = TryReadOutput(context, models, reading, out var methodOutput);
         if (problems.Count > 0 || !hasInput || !hasOutput)
         {
             return planned;
@@ -268,16 +263,14 @@ internal static class MethodPlanner
     // The input model, or null when the query has no parameters.  False when it needs one and has none, when its
     // properties do not match its parameters, which is never thrown on, or when a parameter's converter blocks it.
     private static bool TryReadInput(
-        MethodsInput input,
-        string key,
-        ParsedSqlFile file,
-        int queryIndex,
-        SqlQuery query,
+        QueryContext context,
         QueryModels models,
         Reading reading,
         out MethodInput? methodInput
     )
     {
+        var (input, key, file, _, usable) = context;
+        var (_, queryIndex, query, _) = usable;
         methodInput = null;
         if (models.Input is not { } properties)
         {
@@ -297,7 +290,7 @@ internal static class MethodPlanner
         for (var index = 0; index < properties.Count; index++)
         {
             var property = properties[index];
-            var write = reading.ConversionOf(property, false, input.Converters, ref isBlocked);
+            var write = reading.ConversionOf(property, false, ref isBlocked);
             parameters.Add(
                 new MethodParameter(
                     query.Parameters[index].Name,
@@ -321,16 +314,14 @@ internal static class MethodPlanner
     // The output model, or null when the query's entry has no rows.  False when it needs one and has none, when its
     // columns' names do not match its properties, or when a column's converter blocks it.
     private static bool TryReadOutput(
-        MethodsInput input,
-        string key,
-        ParsedSqlFile file,
-        int queryIndex,
-        QuerySettings settings,
+        QueryContext context,
         QueryModels models,
         Reading reading,
         out MethodOutput? methodOutput
     )
     {
+        var (input, key, file, _, usable) = context;
+        var (_, queryIndex, _, settings) = usable;
         methodOutput = null;
         if (models.Output is not { } properties)
         {
@@ -352,7 +343,7 @@ internal static class MethodPlanner
         for (var index = 0; index < properties.Count; index++)
         {
             var property = properties[index];
-            var read = reading.ConversionOf(property, true, input.Converters, ref isBlocked);
+            var read = reading.ConversionOf(property, true, ref isBlocked);
             columns.Add(new MethodColumn(names[index], property.Name, property.Type.Text, property.IsNullable, read));
         }
 
@@ -528,22 +519,22 @@ internal static class MethodPlanner
             ResultShape.RowCount or _ => "rowcount",
         };
 
-    // What deciding the converters of one query's properties reads: the engine of its file, whether its driver allows
-    // a method, without which nothing is decided, the query's name, where a problem goes, and its problems.
-    private readonly record struct Reading(
+    // The values that planning one query reads from its type and its file: the type's input and key, the query's file
+    // and the engine of its dialect, and the query with its place and settings.
+    private readonly record struct QueryContext(
+        MethodsInput Input,
+        string Key,
+        ParsedSqlFile File,
         DatabaseEngine Engine,
-        bool IsDriverUsable,
-        LocationInfo At,
-        List<DiagnosticInfo> Problems
-    )
+        UsableQuery Query
+    );
+
+    // What deciding the converters of one query's properties reads: whether its driver allows a method, without which
+    // nothing is decided, and the context of its conversions.
+    private readonly record struct Reading(bool IsDriverUsable, ConversionContext Conversions)
     {
         // The property's conversion, null with nothing decided when the driver allows no method.  A block is OR-ed in.
-        public Conversion? ConversionOf(
-            ModelProperty property,
-            bool isRead,
-            EquatableArray<Converter> converters,
-            ref bool isBlocked
-        )
+        public Conversion? ConversionOf(ModelProperty property, bool isRead, ref bool isBlocked)
         {
             if (!IsDriverUsable)
             {
@@ -553,11 +544,8 @@ internal static class MethodPlanner
             var conversion = ConversionPlanner.Plan(
                 property.Type,
                 isRead,
-                Engine,
-                converters,
                 property.Subject,
-                At,
-                Problems,
+                Conversions,
                 out var blocked
             );
             isBlocked |= blocked;
