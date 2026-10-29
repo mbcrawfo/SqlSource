@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -8,6 +7,7 @@ using SqlSource.Generation;
 using SqlSource.Generation.Converters;
 using SqlSource.Generation.Types.MappedTypes;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
 
@@ -434,7 +434,9 @@ public sealed class MappedTypeResolverTests
         string warningIds
     )
     {
-        var types = MappedTypeResolver.Resolve(Project.Value, Names(name), TestContext.Current.CancellationToken).Types;
+        var types = MappedTypeResolver
+            .Resolve(Project.Value, TestSidecars.Of(name), TestContext.Current.CancellationToken)
+            .Types;
 
         types
             .ShouldHaveSingleItem()
@@ -444,7 +446,7 @@ public sealed class MappedTypeResolverTests
                     Enum.Parse<MappedTypeStatus>(status),
                     isValueType,
                     isPublic,
-                    warningIds.Length == 0 ? NoWarnings : Names(warningIds.Split(',')),
+                    warningIds.Length == 0 ? NoWarnings : TestSidecars.Of(warningIds.Split(',')),
                     name,
                     NoCandidates
                 )
@@ -536,7 +538,9 @@ public sealed class MappedTypeResolverTests
     [InlineData("global::MyApp.ValueBox<int?[]>", false)]
     public void Resolve_GenericName_IsFoundWhenItsArgumentsMeetTheConstraints(string name, bool meets)
     {
-        var types = MappedTypeResolver.Resolve(Project.Value, Names(name), TestContext.Current.CancellationToken).Types;
+        var types = MappedTypeResolver
+            .Resolve(Project.Value, TestSidecars.Of(name), TestContext.Current.CancellationToken)
+            .Types;
 
         var reports = CompilerReports(name);
         if (meets)
@@ -575,7 +579,9 @@ public sealed class MappedTypeResolverTests
     )]
     public void Resolve_NameWithTwoFailures_GivesTheFirstInTheOrderOfTheStatuses(string name, string status)
     {
-        var types = MappedTypeResolver.Resolve(Project.Value, Names(name), TestContext.Current.CancellationToken).Types;
+        var types = MappedTypeResolver
+            .Resolve(Project.Value, TestSidecars.Of(name), TestContext.Current.CancellationToken)
+            .Types;
 
         types.ShouldHaveSingleItem().Status.ShouldBe(Enum.Parse<MappedTypeStatus>(status));
     }
@@ -583,7 +589,7 @@ public sealed class MappedTypeResolverTests
     [Fact]
     public void Resolve_SeveralNames_GivesOneRecordForEachInTheirOrder()
     {
-        var names = Names("global::MyApp.Missing", "global::MyApp.UserId", "int");
+        var names = TestSidecars.Of("global::MyApp.Missing", "global::MyApp.UserId", "int");
 
         var types = MappedTypeResolver.Resolve(Project.Value, names, TestContext.Current.CancellationToken).Types;
 
@@ -630,7 +636,7 @@ public sealed class MappedTypeResolverTests
     public void Resolve_TextThatIsNoType_IsNotFound()
     {
         var types = MappedTypeResolver
-            .Resolve(Project.Value, Names("not a type"), TestContext.Current.CancellationToken)
+            .Resolve(Project.Value, TestSidecars.Of("not a type"), TestContext.Current.CancellationToken)
             .Types;
 
         types.ShouldHaveSingleItem().Status.ShouldBe(MappedTypeStatus.NotFound);
@@ -641,7 +647,7 @@ public sealed class MappedTypeResolverTests
     {
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
-            Names("global::Lib.Email"),
+            TestSidecars.Of("global::Lib.Email"),
             TestContext.Current.CancellationToken
         );
 
@@ -658,7 +664,7 @@ public sealed class MappedTypeResolverTests
     {
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
-            Names("global::Lib.Email[]"),
+            TestSidecars.Of("global::Lib.Email[]"),
             TestContext.Current.CancellationToken
         );
 
@@ -671,7 +677,7 @@ public sealed class MappedTypeResolverTests
     {
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
-            Names("global::Lib.Email", "global::Lib.Email[]"),
+            TestSidecars.Of("global::Lib.Email", "global::Lib.Email[]"),
             TestContext.Current.CancellationToken
         );
 
@@ -684,7 +690,7 @@ public sealed class MappedTypeResolverTests
     {
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
-            Names("global::Lib.Locked"),
+            TestSidecars.Of("global::Lib.Locked"),
             TestContext.Current.CancellationToken
         );
 
@@ -700,7 +706,7 @@ public sealed class MappedTypeResolverTests
     {
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
-            Names("global::Lib.Celsius"),
+            TestSidecars.Of("global::Lib.Celsius"),
             TestContext.Current.CancellationToken
         );
 
@@ -717,7 +723,7 @@ public sealed class MappedTypeResolverTests
     {
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
-            Names("global::Lib.Hidden"),
+            TestSidecars.Of("global::Lib.Hidden"),
             TestContext.Current.CancellationToken
         );
 
@@ -754,7 +760,7 @@ public sealed class MappedTypeResolverTests
     {
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
-            Names("global::MyApp.Phone"),
+            TestSidecars.Of("global::MyApp.Phone"),
             TestContext.Current.CancellationToken
         );
 
@@ -767,7 +773,7 @@ public sealed class MappedTypeResolverTests
     {
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
-            Names("global::Lib.Plain", "global::System.Uri", "int"),
+            TestSidecars.Of("global::Lib.Plain", "global::System.Uri", "int"),
             TestContext.Current.CancellationToken
         );
 
@@ -781,7 +787,7 @@ public sealed class MappedTypeResolverTests
     {
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
-            Names("global::Lib.Conversions"),
+            TestSidecars.Of("global::Lib.Conversions"),
             TestContext.Current.CancellationToken
         );
 
@@ -793,7 +799,7 @@ public sealed class MappedTypeResolverTests
     public void Find_NameNotResolved_GivesNull()
     {
         var types = MappedTypeResolver
-            .Resolve(Project.Value, Names("int"), TestContext.Current.CancellationToken)
+            .Resolve(Project.Value, TestSidecars.Of("int"), TestContext.Current.CancellationToken)
             .Types;
 
         MappedTypeResolver.Find(types, "long").ShouldBeNull();
@@ -886,10 +892,8 @@ public sealed class MappedTypeResolverTests
         );
         return MappedTypeResolver.Resolve(
             project,
-            Names("global::TestedLib.Hidden"),
+            TestSidecars.Of("global::TestedLib.Hidden"),
             TestContext.Current.CancellationToken
         );
     }
-
-    private static EquatableArray<string> Names(params string[] names) => new(ImmutableArray.Create(names));
 }
