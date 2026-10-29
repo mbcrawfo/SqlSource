@@ -394,6 +394,11 @@ public sealed class ShortNameTests
 
     private static MappedType Resolve(Compilation compilation, string name) =>
         MappedTypeResolver
-            .Resolve(compilation, new EquatableArray<string>([name]), TestContext.Current.CancellationToken)
+            .Resolve(
+                compilation,
+                new EquatableArray<string>([name]),
+                TransitivePackageAssemblies.None,
+                TestContext.Current.CancellationToken
+            )
             .Types.ShouldHaveSingleItem();
 }

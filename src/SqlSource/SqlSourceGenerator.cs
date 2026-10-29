@@ -456,6 +456,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => MappedTypeNames.Collect(input.Left, input.Right))
             .WithTrackingName(TrackingNames.MappedTypeNames);
 
+        // The referenced assemblies that only a package the project does not list itself brings, as the build names
+        // them, which mark a short name that finds a type of one.  Its value is equal until the build's list changes.
+        var transitivePackageAssemblies = context
+            .AnalyzerConfigOptionsProvider.Select(
+                static (options, _) => TransitivePackageAssemblies.Read(options.GlobalOptions)
+            )
+            .WithTrackingName(TrackingNames.TransitivePackageAssemblies);
+
         // Those types resolved against the compilation, with the converters declared on those of a referenced
         // assembly.  Like the probe, it runs on every run, since the driver gives a new compilation each time: a few
         // lookups for each name, and none without an override.  A short name reads the index of each reference, which
@@ -463,9 +471,10 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // goes or changes, so nothing after it runs again.
         var resolvedTypes = context
             .CompilationProvider.Combine(mappedTypeNames)
+            .Combine(transitivePackageAssemblies)
             .Select(
                 static (input, cancellationToken) =>
-                    MappedTypeResolver.Resolve(input.Left, input.Right, cancellationToken)
+                    MappedTypeResolver.Resolve(input.Left.Left, input.Left.Right, input.Right, cancellationToken)
             )
             .WithTrackingName(TrackingNames.ResolvedTypes);
 
