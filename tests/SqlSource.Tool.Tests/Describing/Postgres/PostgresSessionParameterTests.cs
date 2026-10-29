@@ -264,42 +264,25 @@ public sealed class PostgresSessionParameterTests
     }
 
     // No value has a pseudo-type, so the query is not described.  The script answers no call after "types".
-    [Theory]
-    [InlineData(false, "record")]
-    [InlineData(true, "record[]")]
-    public async Task DescribeAsync_ColumnOfAPseudoType_IsSqlsrc229NamingTheColumnAndTheType(bool array, string type)
+    [Fact]
+    public async Task DescribeAsync_ColumnOfAPseudoType_IsSqlsrc229NamingTheColumnAndTheType()
     {
-        var pseudo = array ? PostgresRows.RecordArray : PostgresRows.Record;
-        var script = new PostgresScript().Open();
-        _ = script.Prepares(1, "SELECT 1 AS one, ROW(1, 2) AS pair, ROW(3) AS other", [], new([], null));
-        _ = script.Columns(
-            1,
-            0,
-            PostgresTables.ExpressionOf(0, "one", PostgresRows.Int4.Oid),
-            PostgresTables.ExpressionOf(1, "pair", pseudo.Oid),
-            PostgresTables.ExpressionOf(2, "other", pseudo.Oid)
+        await ShouldFailOnAColumnOfThePseudoTypeAsync(
+            PostgresRows.Record,
+            [PostgresRows.Int4, PostgresRows.Record],
+            "record"
         );
+    }
 
-        // The request names the types of the columns; the closure the server answers holds an array's element too.
-        PostgresTypeRow[] closure = array
-            ? [PostgresRows.Int4, PostgresRows.Record, pseudo]
-            : [PostgresRows.Int4, pseudo];
-        _ = script.Resolves([23, pseudo.Oid], closure);
-        var exchange = script.Frees(1).Play();
-        await using var session = await PostgresScript.SessionAsync(exchange);
-
-        var described = await session.DescribeAsync(
-            Listed("SELECT 1 AS one, ROW(1, 2) AS pair, ROW(3) AS other"),
-            TestContext.Current.CancellationToken
+    // The same for an array of one, whose closure the server answers with the element too.
+    [Fact]
+    public async Task DescribeAsync_ColumnOfAnArrayOfAPseudoType_IsSqlsrc229NamingTheColumnAndTheType()
+    {
+        await ShouldFailOnAColumnOfThePseudoTypeAsync(
+            PostgresRows.RecordArray,
+            [PostgresRows.Int4, PostgresRows.Record, PostgresRows.RecordArray],
+            "record[]"
         );
-
-        var failure = described.Failure.ShouldNotBeNull();
-        failure.Descriptor.Id.ShouldBe("SQLSRC229");
-        failure.Arguments.ShouldBe(["pair", "Q", type]);
-        failure.Step.ShouldBe(DescribeStep.ResolveType);
-        failure.ServerLines.ShouldBeEmpty();
-        failure.Help.ShouldBe(PostgresErrors.ColumnTypeHelp);
-        exchange.Unused.ShouldBeEmpty();
     }
 
     // The parameters are typed before the columns are built: a pseudo-type that is a parameter's and so a
@@ -320,6 +303,42 @@ public sealed class PostgresSessionParameterTests
         );
 
         described.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC228");
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // A describe of a query whose second and third columns are of the pseudo-type, the request of "types" naming the
+    // types of the columns and its answer the closure given, fails at resolving the type with SQLSRC229 naming the
+    // first such column and the type.
+    private static async Task ShouldFailOnAColumnOfThePseudoTypeAsync(
+        PostgresTypeRow pseudo,
+        PostgresTypeRow[] closure,
+        string type
+    )
+    {
+        var script = new PostgresScript().Open();
+        _ = script.Prepares(1, "SELECT 1 AS one, ROW(1, 2) AS pair, ROW(3) AS other", [], new([], null));
+        _ = script.Columns(
+            1,
+            0,
+            PostgresTables.ExpressionOf(0, "one", PostgresRows.Int4.Oid),
+            PostgresTables.ExpressionOf(1, "pair", pseudo.Oid),
+            PostgresTables.ExpressionOf(2, "other", pseudo.Oid)
+        );
+        _ = script.Resolves([23, pseudo.Oid], closure);
+        var exchange = script.Frees(1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Listed("SELECT 1 AS one, ROW(1, 2) AS pair, ROW(3) AS other"),
+            TestContext.Current.CancellationToken
+        );
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC229");
+        failure.Arguments.ShouldBe(["pair", "Q", type]);
+        failure.Step.ShouldBe(DescribeStep.ResolveType);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.ColumnTypeHelp);
         exchange.Unused.ShouldBeEmpty();
     }
 }
