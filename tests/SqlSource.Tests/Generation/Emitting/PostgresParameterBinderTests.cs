@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using Shouldly;
 using SqlSource.Generation.Emitting;
@@ -15,18 +16,93 @@ public sealed class PostgresParameterBinderTests
     private static readonly Conversion ToLong = new("global::App.Ids.ToLong", "long", true, false, null, false);
 
     [Fact]
-    public void For_NotNullValueType_BindsATypedParameterByItsBindName() =>
+    public void Append_BaseType_BindsTheCanonicalName() =>
         Write(new MethodParameter("user_id", "UserId", "int", true, false, Described: BoundAs("integer")))
             .ShouldBe(
                 """
                     var p0 = new global::Npgsql.NpgsqlParameter<int>();
                     p0.ParameterName = "user_id";
-                    p0.DataTypeName = "integer";
+                    p0.DataTypeName = "pg_catalog.int4";
                     p0.TypedValue = parameters.UserId;
                     command.Parameters.Add(p0);
 
                 """
             );
+
+    [Fact]
+    public void Append_Array_BindsTheArraysOwnName() =>
+        DataTypeNameOf(
+                TestSidecars.Postgres(
+                    name: "integer[]",
+                    kind: SidecarValues.Kind.Array,
+                    internalName: "_int4",
+                    element: TestSidecars.Postgres(),
+                    bindName: "integer[]"
+                )
+            )
+            .ShouldBe("    p0.DataTypeName = \"pg_catalog._int4\";\n");
+
+    [Fact]
+    public void Append_ArrayOfADomain_BindsTheArraysOwnName() =>
+        DataTypeNameOf(
+                TestSidecars.Postgres(
+                    name: "email[]",
+                    kind: SidecarValues.Kind.Array,
+                    schema: "public",
+                    internalName: "_email",
+                    element: Email,
+                    bindName: "public.email[]"
+                )
+            )
+            .ShouldBe("    p0.DataTypeName = \"public._email\";\n");
+
+    [Fact]
+    public void Append_Domain_BindsItsOwnName() =>
+        DataTypeNameOf(Email with { BindName = "public.email" }).ShouldBe("    p0.DataTypeName = \"public.email\";\n");
+
+    // Npgsql refuses a domain over a domain by its own name, but binds its innermost base.
+    [Fact]
+    public void Append_DomainOverADomain_BindsItsInnermostBase() =>
+        DataTypeNameOf(WorkEmail with { BindName = "text" }).ShouldBe("    p0.DataTypeName = \"pg_catalog.text\";\n");
+
+    // Npgsql 8 refuses the array of a domain over a domain by its own name.
+    [Fact]
+    public void Append_ArrayOfADomainOverADomain_BindsItsBindName() =>
+        DataTypeNameOf(
+                TestSidecars.Postgres(
+                    name: "work_email[]",
+                    kind: SidecarValues.Kind.Array,
+                    schema: "public",
+                    internalName: "_work_email",
+                    element: WorkEmail,
+                    bindName: "text[]"
+                )
+            )
+            .ShouldBe("    p0.DataTypeName = \"text[]\";\n");
+
+    [Fact]
+    public void Append_CatalogChar_BindsCatalogChar() =>
+        DataTypeNameOf(TestSidecars.Postgres(name: "\"char\"", internalName: "char", bindName: "char"))
+            .ShouldBe("    p0.DataTypeName = \"pg_catalog.char\";\n");
+
+    [Fact]
+    public void Append_UnknownKind_BindsItsBindName() =>
+        DataTypeNameOf(
+                TestSidecars.Postgres(
+                    name: "thing",
+                    kind: "shell",
+                    schema: "public",
+                    internalName: "thing",
+                    bindName: "public.thing"
+                )
+            )
+            .ShouldBe("    p0.DataTypeName = \"public.thing\";\n");
+
+    // A dot in the schema or the name would make the canonical name ambiguous.
+    [Fact]
+    public void Append_DotInTheName_BindsItsBindName() =>
+        DataTypeNameOf(TestSidecars.Postgres(name: "t", schema: "my.schema", internalName: "t", bindName: "x.t"))
+            .ShouldBe("    p0.DataTypeName = \"x.t\";\n");
 
     [Fact]
     public void Append_NullableValueType_IsAParameterOfTheNullableType()
@@ -41,11 +117,20 @@ public sealed class PostgresParameterBinderTests
     public void Append_ReferenceType_IsAParameterOfTheType()
     {
         var written = Write(
-            new MethodParameter("email", "Email", "string", false, false, Described: BoundAs("public.email"))
+            new MethodParameter(
+                "email",
+                "Email",
+                "string",
+                false,
+                false,
+                Described: Email with
+                {
+                    BindName = "public.email",
+                }
+            )
         );
 
         written.ShouldContain("    var p0 = new global::Npgsql.NpgsqlParameter<string>();\n");
-        written.ShouldContain("    p0.DataTypeName = \"public.email\";\n");
     }
 
     [Fact]
@@ -53,18 +138,18 @@ public sealed class PostgresParameterBinderTests
         Write(new MethodParameter("user_id", "UserId", "int", true, false)).ShouldNotContain("DataTypeName");
 
     [Fact]
-    public void Append_BindNameWithAQuote_IsWrittenAsALiteral() =>
-        Write(
-                new MethodParameter(
-                    "name",
-                    "Name",
-                    "string",
-                    false,
-                    false,
-                    Described: BoundAs("public.\"Odd \"\"name\"\"\"")
+    public void Append_NameWithASpaceAndAQuote_IsWrittenAsALiteral() =>
+        DataTypeNameOf(
+                TestSidecars.Postgres(
+                    name: "\"Odd \"\"name\"\"\"",
+                    kind: SidecarValues.Kind.Enum,
+                    schema: "public",
+                    internalName: "Odd \"name\"",
+                    labels: ["a"],
+                    bindName: "public.\"Odd \"\"name\"\"\""
                 )
             )
-            .ShouldContain("    p0.DataTypeName = \"public.\\\"Odd \\\"\\\"name\\\"\\\"\\\"\";\n");
+            .ShouldBe("    p0.DataTypeName = \"public.Odd \\\"name\\\"\";\n");
 
     [Fact]
     public void Append_NotNullValueTypeWithAConverter_BindsTheDatabaseType()
@@ -153,8 +238,34 @@ public sealed class PostgresParameterBinderTests
         written.ShouldContain("    p0.TypedValue = parameters.Ids is { } v1 ? " + converted + " : null;\n");
     }
 
-    // A parameter's type as the sidecar describes it, bound by the name.
+    // The domain public.email over text.
+    private static readonly PostgresType Email = TestSidecars.Postgres(
+        name: "email",
+        kind: SidecarValues.Kind.Domain,
+        schema: "public",
+        internalName: "email",
+        baseType: TestSidecars.Postgres(name: "text", internalName: "text")
+    );
+
+    // The domain public.work_email over public.email.
+    private static readonly PostgresType WorkEmail = TestSidecars.Postgres(
+        name: "work_email",
+        kind: SidecarValues.Kind.Domain,
+        schema: "public",
+        internalName: "work_email",
+        baseType: Email
+    );
+
+    // A parameter's type as the sidecar describes it, int4 bound by the name.
     private static PostgresType BoundAs(string bindName) => TestSidecars.Postgres(bindName: bindName);
+
+    // The line of DataTypeName that a string parameter described as the type is bound with.
+    private static string DataTypeNameOf(PostgresType described)
+    {
+        var written = Write(new MethodParameter("p", "P", "string", false, false, Described: described));
+        var start = written.IndexOf("    p0.DataTypeName", StringComparison.Ordinal);
+        return start < 0 ? written : written.Substring(start, written.IndexOf('\n', start) - start + 1);
+    }
 
     private static string Write(MethodParameter bound, string value = "value")
     {

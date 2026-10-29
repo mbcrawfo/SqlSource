@@ -1,5 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
+using System;
 using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
@@ -152,8 +153,9 @@ public sealed class MethodCompileTests
         methods.ShouldContain(" ListFrom(\n");
     }
 
-    // A parameter of each kind PostgreSQL binds, each a parameter of Npgsql by its bindName, and an integer that can be
-    // null, a parameter of int?, compile alike on every Npgsql, the setter of DataTypeName and TypedValue included.
+    // A parameter of each kind PostgreSQL binds, each a parameter of Npgsql by its canonical name, and an integer that
+    // can be null, a parameter of int?, compile alike on every Npgsql, the setter of DataTypeName and TypedValue
+    // included.
     [Theory]
     [InlineData(8)]
     [InlineData(9)]
@@ -190,13 +192,18 @@ public sealed class MethodCompileTests
         run.ShouldBeClean();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        foreach (var (kind, type) in kinds)
+        foreach (var row in kinds)
         {
-            methods.ShouldContain(" parameter.DataTypeName = \"" + type.BindName + "\";\n", customMessage: kind);
+            methods.ShouldContain(" parameter.DataTypeName = \"" + row.DataTypeName + "\";\n", customMessage: row.Kind);
         }
 
-        methods.ShouldContain(" var parameter = new global::Npgsql.NpgsqlParameter<int?>();\n");
-        methods.ShouldContain(" parameter.TypedValue = parameters.Maybe;\n");
+        // The block that binds maybe, from its declaration to its Add.
+        var named = methods.IndexOf(" parameter.ParameterName = \"maybe\";\n", StringComparison.Ordinal);
+        var start = methods.LastIndexOf(" var parameter = ", named, StringComparison.Ordinal);
+        var maybe = methods[start..methods.IndexOf(" command.Parameters.Add(", named, StringComparison.Ordinal)];
+        maybe.ShouldContain(" var parameter = new global::Npgsql.NpgsqlParameter<int?>();\n");
+        maybe.ShouldContain(" parameter.DataTypeName = \"pg_catalog.int4\";\n");
+        maybe.ShouldContain(" parameter.TypedValue = parameters.Maybe;\n");
     }
 
     // SqlClient reads a NULL of vector as SqlVector<float>.Null, so the method checks a not-null one with IsNull.  The
