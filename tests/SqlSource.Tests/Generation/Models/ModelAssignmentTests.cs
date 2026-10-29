@@ -2,6 +2,7 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Generation.Models;
 using SqlSource.Settings;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Models;
@@ -34,7 +35,7 @@ public sealed class ModelAssignmentTests
         ModelAssignment.FirstOf(EquatableArray<ModelAssignment>.Empty, "App.A").ShouldBe(-1);
 
     private static EquatableArray<ModelAssignment> Sorted(params string[] claimingTypes) =>
-        TestModels.Array([
+        TestSidecars.Of([
             .. claimingTypes.Select(
                 (claimingType, index) =>
                     new ModelAssignment(

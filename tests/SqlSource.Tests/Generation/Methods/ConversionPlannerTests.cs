@@ -9,6 +9,7 @@ using SqlSource.Generation.Methods;
 using SqlSource.Generation.Types;
 using SqlSource.Generation.Types.Maps;
 using SqlSource.Settings;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Methods;
@@ -584,7 +585,7 @@ public sealed class ConversionPlannerTests
 
     // The converters in the order of the set.
     private static EquatableArray<Converter> Of(params Converter[] converters) =>
-        TestModels.Array(converters.OrderBy(converter => converter, ConverterSet.Comparer).ToArray());
+        TestSidecars.Of(converters.OrderBy(converter => converter, ConverterSet.Comparer).ToArray());
 
     private static EquatableArray<T> Of<T>()
         where T : System.IEquatable<T> => EquatableArray<T>.Empty;

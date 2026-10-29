@@ -64,7 +64,7 @@ public sealed class QueryTypesTests
         StepOutputs
             .Single<FileTypes>(run, TrackingNames.FileTypes)
             .Queries.ShouldHaveSingleItem()
-            .ShouldBe(new QueryTypes("GetUser", Of(Int), Of(Int)));
+            .ShouldBe(new QueryTypes("GetUser", TestSidecars.Of(Int), TestSidecars.Of(Int)));
     }
 
     [Theory]
@@ -470,7 +470,7 @@ public sealed class QueryTypesTests
         StepOutputs
             .Single<FileTypes>(run, TrackingNames.FileTypes)
             .Queries.ShouldHaveSingleItem()
-            .ShouldBe(new QueryTypes("ListUsers", Of<PropertyType>(), Of(Int)));
+            .ShouldBe(new QueryTypes("ListUsers", TestSidecars.Of<PropertyType>(), TestSidecars.Of(Int)));
     }
 
     // GetUser needs no entry at Sql, so it has none to type, and ListUsers, at Models, has its own.
@@ -515,7 +515,7 @@ public sealed class QueryTypesTests
             .ShouldBe(
                 new FileTypes(
                     GeneratorHarness.UsersNormalizedPath,
-                    Of<QueryTypes>(),
+                    TestSidecars.Of<QueryTypes>(),
                     EquatableArray<DiagnosticInfo>.Empty
                 )
             );
@@ -544,10 +544,10 @@ public sealed class QueryTypesTests
             .Queries.ShouldBe([
                 new QueryTypes(
                     "GetUser",
-                    Of<PropertyType>(),
-                    Of(Int, new PropertyType("string", false, true, NoWarnings, "text", null))
+                    TestSidecars.Of<PropertyType>(),
+                    TestSidecars.Of(Int, new PropertyType("string", false, true, NoWarnings, "text", null))
                 ),
-                new QueryTypes("DeleteUser", Of(Int), null),
+                new QueryTypes("DeleteUser", TestSidecars.Of(Int), null),
             ]);
     }
 
@@ -746,7 +746,4 @@ public sealed class QueryTypesTests
 
     private static PostgresType Extension(string internalName) =>
         TestSidecars.Postgres(name: internalName, schema: "public", internalName: internalName);
-
-    private static EquatableArray<T> Of<T>(params T[] items)
-        where T : IEquatable<T> => TestSidecars.Of(items);
 }

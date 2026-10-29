@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using Shouldly;
 using SqlSource.Generation.Emitting;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
@@ -53,13 +54,13 @@ public sealed class HintNameTests
     [Fact]
     public void MakeUnique_NameThatIsNotAmbiguous_IsKept() =>
         HintName
-            .MakeUnique("App.Other.g.cs", TestModels.Array("App.Sample.g.cs", "App.sample.g.cs"))
+            .MakeUnique("App.Other.g.cs", TestSidecars.Of("App.Sample.g.cs", "App.sample.g.cs"))
             .ShouldBe("App.Other.g.cs");
 
     [Fact]
     public void MakeUnique_AmbiguousName_GainsAHashOfItsExactSpelling()
     {
-        var ambiguous = TestModels.Array("App.Sample.g.cs", "App.sample.g.cs");
+        var ambiguous = TestSidecars.Of("App.Sample.g.cs", "App.sample.g.cs");
 
         // The values are fixed: a name must not change from one build to the next.
         HintName.MakeUnique("App.Sample.g.cs", ambiguous).ShouldBe("App.Sample.22B482A5.g.cs");

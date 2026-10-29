@@ -9,6 +9,7 @@ using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 using SqlSource.Testing;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation;
@@ -177,8 +178,8 @@ public sealed class SqlFileReaderTests
     {
         var query = Read("SELECT 1; -- c\n", commentsWanted: commentsWanted).Queries.ShouldHaveSingleItem();
 
-        query.Segments.ShouldBe(TestModels.Array(TestModels.Literal("SELECT 1;")));
-        query.KeptSegments.ShouldBe(expected is null ? null : TestModels.Array(TestModels.Literal(expected)));
+        query.Segments.ShouldBe(TestSidecars.Of(TestModels.Literal("SELECT 1;")));
+        query.KeptSegments.ShouldBe(expected is null ? null : TestSidecars.Of(TestModels.Literal(expected)));
     }
 
     // "{{class}}" is the 9 characters from 23, on the second line.  Only a type that keeps the comments reports it.
@@ -217,7 +218,7 @@ public sealed class SqlFileReaderTests
 
         Read(Text, dialect: SqlDialect.MySql)
             .Queries.ShouldHaveSingleItem()
-            .Segments.ShouldBe(TestModels.Array(TestModels.Literal("SELECT 'a\\'b'")));
+            .Segments.ShouldBe(TestSidecars.Of(TestModels.Literal("SELECT 'a\\'b'")));
         Read(Text).Errors.ShouldHaveSingleItem().Descriptor.ShouldBe(SqlDiagnostics.UnterminatedQuote);
     }
 
@@ -239,7 +240,7 @@ public sealed class SqlFileReaderTests
         );
 
         file.NormalizedPath.ShouldBe(GeneratorHarness.UsersNormalizedPath);
-        file.Queries.ShouldHaveSingleItem().Segments.ShouldBe(TestModels.Array(TestModels.Literal("SELECT 1")));
+        file.Queries.ShouldHaveSingleItem().Segments.ShouldBe(TestSidecars.Of(TestModels.Literal("SELECT 1")));
     }
 
     [Fact]
@@ -253,7 +254,7 @@ public sealed class SqlFileReaderTests
         );
 
         file.Queries.ShouldHaveSingleItem()
-            .KeptSegments.ShouldBe(TestModels.Array(TestModels.Literal("SELECT 1; -- c")));
+            .KeptSegments.ShouldBe(TestSidecars.Of(TestModels.Literal("SELECT 1; -- c")));
     }
 
     private static ParsedSqlFile Read(

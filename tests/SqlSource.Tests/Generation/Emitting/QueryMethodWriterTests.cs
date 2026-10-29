@@ -38,21 +38,21 @@ public sealed class QueryMethodWriterTests
         ResultShape.OneOptional,
         CollectionKind.List,
         DatabaseEngine.PostgreSql,
-        TestModels.Array(TestModels.Literal("SELECT id, name FROM users WHERE id = @id ORDER BY "), Token("orderBy")),
+        TestSidecars.Of(TestModels.Literal("SELECT id, name FROM users WHERE id = @id ORDER BY "), Token("orderBy")),
         true,
         true,
         new MethodInput(
             "global::App.GetUserParams",
-            TestModels.Array(new MethodParameter("id", "Id", "int", true, false, Described: Integer))
+            TestSidecars.Of(new MethodParameter("id", "Id", "int", true, false, Described: Integer))
         ),
         new MethodOutput(
             "global::App.GetUserDto",
             true,
-            TestModels.Array(
+            TestSidecars.Of(
                 new MethodColumn("id", "Id", "int", false),
                 new MethodColumn("name", "Name", "string", true)
             ),
-            TestModels.Array(0, 1)
+            TestSidecars.Of(0, 1)
         ),
         TestModels.NameLocation("Users.sql")
     );
@@ -444,7 +444,7 @@ public sealed class QueryMethodWriterTests
         var text = Write(
             GetUser with
             {
-                Segments = TestModels.Array(TestModels.Literal("SELECT id, name\nFROM users;")),
+                Segments = TestSidecars.Of(TestModels.Literal("SELECT id, name\nFROM users;")),
             }
         );
 
@@ -506,12 +506,12 @@ public sealed class QueryMethodWriterTests
                     Output = new MethodOutput(
                         "global::App.GetUserDto",
                         true,
-                        TestModels.Array(
+                        TestSidecars.Of(
                             new MethodColumn("name", "Name", "string", false),
                             new MethodColumn("id", "Id", "int", false),
                             new MethodColumn("email", "Email", "string", true)
                         ),
-                        TestModels.Array(2, 1, 0)
+                        TestSidecars.Of(2, 1, 0)
                     ),
                 }
             )
@@ -531,13 +531,13 @@ public sealed class QueryMethodWriterTests
                 Output = GetUser.Output! with
                 {
                     IsRecord = false,
-                    Columns = TestModels.Array(
+                    Columns = TestSidecars.Of(
                         new MethodColumn("a", "A", "int", false),
                         new MethodColumn("b", "B", "int", true),
                         new MethodColumn("c", "C", "string", false),
                         new MethodColumn("d", "D", "string", true)
                     ),
-                    ConstructorOrder = TestModels.Array(0, 1, 2, 3),
+                    ConstructorOrder = TestSidecars.Of(0, 1, 2, 3),
                 },
             }
         );
@@ -592,7 +592,7 @@ public sealed class QueryMethodWriterTests
                 {
                     Input = new MethodInput(
                         "global::App.GetUserParams",
-                        TestModels.Array(
+                        TestSidecars.Of(
                             new MethodParameter("id", "Id", "int", true, false, Described: Integer),
                             new MethodParameter(
                                 "name",
@@ -627,7 +627,7 @@ public sealed class QueryMethodWriterTests
         var text = Write(
             GetUser with
             {
-                Segments = TestModels.Array(TestModels.Literal("SELECT 1 FROM "), Token("sql"), Token("span")),
+                Segments = TestSidecars.Of(TestModels.Literal("SELECT 1 FROM "), Token("sql"), Token("span")),
             }
         );
 
@@ -648,7 +648,7 @@ public sealed class QueryMethodWriterTests
         var text = Write(
             GetUser with
             {
-                Segments = TestModels.Array(TestModels.Literal("SELECT 1 FROM "), Token("await"), Token("b")),
+                Segments = TestSidecars.Of(TestModels.Literal("SELECT 1 FROM "), Token("await"), Token("b")),
             }
         );
 
@@ -704,8 +704,8 @@ public sealed class QueryMethodWriterTests
             {
                 Output = GetUser.Output! with
                 {
-                    Columns = TestModels.Array(column),
-                    ConstructorOrder = TestModels.Array(0),
+                    Columns = TestSidecars.Of(column),
+                    ConstructorOrder = TestSidecars.Of(0),
                 },
             }
         );
@@ -736,8 +736,8 @@ public sealed class QueryMethodWriterTests
             {
                 Output = GetUser.Output! with
                 {
-                    Columns = TestModels.Array(column),
-                    ConstructorOrder = TestModels.Array(0),
+                    Columns = TestSidecars.Of(column),
+                    ConstructorOrder = TestSidecars.Of(0),
                 },
             }
         );
@@ -897,7 +897,7 @@ public sealed class QueryMethodWriterTests
         var text = Write(
             Stream with
             {
-                Segments = TestModels.Array(TestModels.Literal("SELECT 1 FROM "), Token("ReadRows")),
+                Segments = TestSidecars.Of(TestModels.Literal("SELECT 1 FROM "), Token("ReadRows")),
             }
         );
 
@@ -916,7 +916,7 @@ public sealed class QueryMethodWriterTests
         var text = Write(
             Stream with
             {
-                Segments = TestModels.Array(TestModels.Literal("SELECT 1 FROM "), Token("await"), Token("b")),
+                Segments = TestSidecars.Of(TestModels.Literal("SELECT 1 FROM "), Token("await"), Token("b")),
             }
         );
 
@@ -1000,7 +1000,7 @@ public sealed class QueryMethodWriterTests
     [Fact]
     public void Append_EveryShapeAndCollectionType_Compiles()
     {
-        var awkward = TestModels.Array(
+        var awkward = TestSidecars.Of(
             TestModels.Literal("SELECT 1 FROM "),
             Token("sql"),
             Token("command"),
@@ -1022,13 +1022,13 @@ public sealed class QueryMethodWriterTests
         );
         var withVector = GetUser.Output! with
         {
-            Columns = TestModels.Array(
+            Columns = TestSidecars.Of(
                 new MethodColumn("id", "Id", "int", false),
                 new MethodColumn("name", "Name", "string", true),
                 new MethodColumn("embedding", "Embedding", Vector, false),
                 new MethodColumn("other", "Other", Vector, true)
             ),
-            ConstructorOrder = TestModels.Array(0, 1, 2, 3),
+            ConstructorOrder = TestSidecars.Of(0, 1, 2, 3),
         };
         var asClass = withVector with { TypeText = "global::App.GetUserClass", IsRecord = false };
         var builder = new StringBuilder("namespace App\n{\n    internal static class Queries\n    {\n");
@@ -1118,7 +1118,7 @@ public sealed class QueryMethodWriterTests
     private static MethodOutput VectorOutput(bool isNullable) =>
         GetUser.Output! with
         {
-            Columns = TestModels.Array(
+            Columns = TestSidecars.Of(
                 new MethodColumn("id", "Id", "int", false),
                 new MethodColumn("embedding", "Embedding", Vector, isNullable)
             ),

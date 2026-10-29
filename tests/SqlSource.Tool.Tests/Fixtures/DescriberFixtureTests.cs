@@ -66,127 +66,124 @@ public sealed class DescriberFixtureTests : IDisposable
         replayed.ShouldBe(fixture.Expected);
     }
 
-    // The cases of the PostgreSQL describer.  A build that copied none would leave the theory with nothing to run.
+    // The cases of the PostgreSQL describer, every one and no other: a case recorded later is added here, and a build
+    // that copied none, which would leave the theory with nothing to run, fails.
     [Fact]
-    public void Cases_OfPostgres_HoldEveryCase()
+    public void Cases_OfPostgres_AreTheListedCases()
     {
-        var names = Found.Select(static found => found.ToString()).ToList();
-
-        foreach (
-            var name in new[]
-            {
-                "postgres/delete-declared-only",
-                "postgres/insert-declared",
-                "postgres/insert-returning",
-                "postgres/match-alias",
-                "postgres/match-explicit-list",
-                "postgres/match-expression",
-                "postgres/match-left-join-nullability",
-                "postgres/match-missing-column",
-                "postgres/match-reordered",
-                "postgres/match-star",
-                "postgres/match-suffix",
-                "postgres/match-twice",
-                "postgres/match-two-tables",
-                "postgres/match-view-star",
-                "postgres/select-declared-domain",
-                "postgres/select-domain-parameter",
-                "postgres/select-expressions",
-                "postgres/select-left-join",
-                "postgres/select-modifiers",
-                "postgres/select-modifiers-expression",
-                "postgres/select-other-schema",
-                "postgres/select-plain",
-                "postgres/select-range-intersection",
-                "postgres/select-suffix-names",
-                "postgres/select-view",
-                "postgres/update-array-and-range",
-                "postgres/update-inferred",
-                "postgres/walk-aggregate",
-                "postgres/walk-anti",
-                "postgres/walk-chain",
-                "postgres/walk-count-argument",
-                "postgres/walk-cte-inlined",
-                "postgres/walk-cte-materialized",
-                "postgres/walk-cube",
-                "postgres/walk-full",
-                "postgres/walk-full-hash",
-                "postgres/walk-full-merge",
-                "postgres/walk-grouping-sets",
-                "postgres/walk-lateral",
-                "postgres/walk-left",
-                "postgres/walk-left-hash",
-                "postgres/walk-left-merge",
-                "postgres/walk-left-nestloop",
-                "postgres/walk-natural",
-                "postgres/walk-nested",
-                "postgres/walk-order-by-unselected",
-                "postgres/walk-proved-empty",
-                "postgres/walk-quoted-alias",
-                "postgres/walk-reduced-by-join",
-                "postgres/walk-reduced-by-where",
-                "postgres/walk-removed",
-                "postgres/walk-returning",
-                "postgres/walk-right",
-                "postgres/walk-right-hash",
-                "postgres/walk-right-merge",
-                "postgres/walk-right-nestloop",
-                "postgres/walk-rollup",
-                "postgres/walk-self-join",
-                "postgres/walk-semi-anti",
-                "postgres/walk-subquery-flattened",
-                "postgres/walk-subquery-kept",
-                "postgres/walk-union",
-                "postgres/walk-using",
-                "postgres/walk-view",
-                "postgres/walk-view-nullable-side",
-            }
-        )
-        {
-            names.ShouldContain(name);
-        }
+        Found
+            .Where(static found => found.Engine == "postgres")
+            .Select(static found => found.ToString())
+            .ShouldBe(
+                [
+                    "postgres/delete-declared-only",
+                    "postgres/insert-declared",
+                    "postgres/insert-returning",
+                    "postgres/match-alias",
+                    "postgres/match-explicit-list",
+                    "postgres/match-expression",
+                    "postgres/match-left-join-nullability",
+                    "postgres/match-missing-column",
+                    "postgres/match-reordered",
+                    "postgres/match-star",
+                    "postgres/match-suffix",
+                    "postgres/match-twice",
+                    "postgres/match-two-tables",
+                    "postgres/match-view-star",
+                    "postgres/select-declared-domain",
+                    "postgres/select-domain-parameter",
+                    "postgres/select-expressions",
+                    "postgres/select-left-join",
+                    "postgres/select-modifiers",
+                    "postgres/select-modifiers-expression",
+                    "postgres/select-other-schema",
+                    "postgres/select-plain",
+                    "postgres/select-range-intersection",
+                    "postgres/select-suffix-names",
+                    "postgres/select-view",
+                    "postgres/update-array-and-range",
+                    "postgres/update-inferred",
+                    "postgres/walk-aggregate",
+                    "postgres/walk-anti",
+                    "postgres/walk-chain",
+                    "postgres/walk-count-argument",
+                    "postgres/walk-cte-inlined",
+                    "postgres/walk-cte-materialized",
+                    "postgres/walk-cube",
+                    "postgres/walk-full",
+                    "postgres/walk-full-hash",
+                    "postgres/walk-full-merge",
+                    "postgres/walk-grouping-sets",
+                    "postgres/walk-lateral",
+                    "postgres/walk-left",
+                    "postgres/walk-left-hash",
+                    "postgres/walk-left-merge",
+                    "postgres/walk-left-nestloop",
+                    "postgres/walk-natural",
+                    "postgres/walk-nested",
+                    "postgres/walk-order-by-unselected",
+                    "postgres/walk-proved-empty",
+                    "postgres/walk-quoted-alias",
+                    "postgres/walk-reduced-by-join",
+                    "postgres/walk-reduced-by-where",
+                    "postgres/walk-removed",
+                    "postgres/walk-returning",
+                    "postgres/walk-right",
+                    "postgres/walk-right-hash",
+                    "postgres/walk-right-merge",
+                    "postgres/walk-right-nestloop",
+                    "postgres/walk-rollup",
+                    "postgres/walk-self-join",
+                    "postgres/walk-semi-anti",
+                    "postgres/walk-subquery-flattened",
+                    "postgres/walk-subquery-kept",
+                    "postgres/walk-union",
+                    "postgres/walk-using",
+                    "postgres/walk-view",
+                    "postgres/walk-view-nullable-side",
+                ],
+                ignoreOrder: true
+            );
     }
 
-    // The cases of the SQL Server describer.  A build that copied none would leave the theory with nothing to run.
+    // The cases of the SQL Server describer, every one and no other, as those of PostgreSQL.
     [Fact]
-    public void Cases_OfSqlServer_HoldEveryCase()
+    public void Cases_OfSqlServer_AreTheListedCases()
     {
-        var names = Found.Select(static found => found.ToString()).ToList();
-
-        foreach (
-            var name in new[]
-            {
-                "mssql/delete-declared-only",
-                "mssql/insert-declared",
-                "mssql/insert-output",
-                "mssql/merge-output",
-                "mssql/select-aggregates",
-                "mssql/select-alias-and-clr",
-                "mssql/select-columns-differ",
-                "mssql/select-computed-not-null",
-                "mssql/select-computed-outer-join",
-                "mssql/select-first-result-set",
-                "mssql/select-hidden-period",
-                "mssql/select-left-join",
-                "mssql/select-names-differ",
-                "mssql/select-nullability-differs",
-                "mssql/select-order-differs",
-                "mssql/select-other-database",
-                "mssql/select-proved-forms",
-                "mssql/select-several-tables",
-                "mssql/select-table-function",
-                "mssql/select-table-star",
-                "mssql/select-temporal-all",
-                "mssql/select-view-star",
-                "mssql/update-copies-agree",
-                "mssql/update-inferred",
-                "mssql/update-optional-filter",
-                "mssql/update-wide-types",
-            }
-        )
-        {
-            names.ShouldContain(name);
-        }
+        Found
+            .Where(static found => found.Engine == "mssql")
+            .Select(static found => found.ToString())
+            .ShouldBe(
+                [
+                    "mssql/delete-declared-only",
+                    "mssql/insert-declared",
+                    "mssql/insert-output",
+                    "mssql/merge-output",
+                    "mssql/select-aggregates",
+                    "mssql/select-alias-and-clr",
+                    "mssql/select-columns-differ",
+                    "mssql/select-computed-not-null",
+                    "mssql/select-computed-outer-join",
+                    "mssql/select-first-result-set",
+                    "mssql/select-hidden-period",
+                    "mssql/select-left-join",
+                    "mssql/select-names-differ",
+                    "mssql/select-nullability-differs",
+                    "mssql/select-order-differs",
+                    "mssql/select-other-database",
+                    "mssql/select-proved-forms",
+                    "mssql/select-several-tables",
+                    "mssql/select-table-function",
+                    "mssql/select-table-star",
+                    "mssql/select-temporal-all",
+                    "mssql/select-view-star",
+                    "mssql/update-copies-agree",
+                    "mssql/update-inferred",
+                    "mssql/update-optional-filter",
+                    "mssql/update-wide-types",
+                ],
+                ignoreOrder: true
+            );
     }
 
     // A describer whose calls changed fails its fixtures, and never passes silently.

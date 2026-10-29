@@ -2,6 +2,7 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Paths;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Paths;
@@ -9,7 +10,7 @@ namespace SqlSource.Tests.Generation.Paths;
 public sealed class PathResolverTests
 {
     // Normalised and in order, as the pipeline supplies them.
-    private static readonly EquatableArray<string> SqlPaths = TestModels.Array(
+    private static readonly EquatableArray<string> SqlPaths = TestSidecars.Of(
         "app/Queries/Orders.sql",
         "app/Queries/Users.sql",
         "app/Repo/Admin/Roles.sql",
@@ -116,7 +117,7 @@ public sealed class PathResolverTests
     public void Resolve_SourceFileWithWindowsPath_MatchesTheSameFolder()
     {
         var type = TestModels.Type(filePath: "C:\\App\\REPO\\UserRepository.cs");
-        var paths = TestModels.Array("c:/app/repo/Users.sql", "c:/app/repo2/Users.sql");
+        var paths = TestSidecars.Of("c:/app/repo/Users.sql", "c:/app/repo2/Users.sql");
 
         PathResolver
             .Resolve(type, paths, isSupportedFramework: true, unsupportedLanguageVersion: null)
@@ -129,7 +130,7 @@ public sealed class PathResolverTests
     [InlineData("/app/Repo/UserRepository.cs", "../..")]
     public void Resolve_FolderThatIsTheRoot_TakesTheFilesWithNoFolder(string filePath, string? path)
     {
-        var paths = TestModels.Array(GeneratorHarness.UsersNormalizedPath, "app/Root.sql", "Root.sql", "zeta.sql");
+        var paths = TestSidecars.Of(GeneratorHarness.UsersNormalizedPath, "app/Root.sql", "Root.sql", "zeta.sql");
 
         var result = PathResolver.Resolve(
             TestModels.Type(path, filePath: filePath),
@@ -146,7 +147,7 @@ public sealed class PathResolverTests
     public void Resolve_FolderWhoseNeighboursStartWithItsName_TakesOnlyItsOwnFiles()
     {
         // In order: the names sort before and after the separator that follows the folder's own.
-        var paths = TestModels.Array(
+        var paths = TestSidecars.Of(
             "app/Repo-old/Users.sql",
             "app/Repo.sql",
             "app/Repo/Sub/Users.sql",
