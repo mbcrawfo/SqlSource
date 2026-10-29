@@ -43,8 +43,8 @@ public sealed class EngineImageTests
             .Message.ShouldEndWith(message);
 
     [Theory]
-    [InlineData("postgres:18.6", "18.6")]
-    [InlineData("mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04", "2025-CU9-GDR1-ubuntu-24.04")]
+    [InlineData("postgres:99.99", "99.99")]
+    [InlineData("mcr.microsoft.com/mssql/server:2099-CU99-GDR99-ubuntu-99.04", "2099-CU99-GDR99-ubuntu-99.04")]
     public void TagOf_PinnedImage_IsWhatFollowsTheLastColon(string image, string tag) =>
         EngineImage.TagOf(image).ShouldBe(tag);
 

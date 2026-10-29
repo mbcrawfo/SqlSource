@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
@@ -125,12 +124,9 @@ public sealed class RealisticMethodTests(PostgresDatabases postgres)
     {
         var (_, parameters) = await RealisticCases.Describe.DescribedAsync(found, postgres.RealisticConnectionString);
         var request = RealisticDescribe.RequestOf(found);
-        var types = parameters
-            .Where(static parameter => parameter.Type is not null)
-            .ToDictionary(static parameter => parameter.Name, static parameter => parameter.Type!.Name);
         var run = await RealisticNullabilityOracle.RunAsync(
             postgres.RealisticConnectionString,
-            RealisticSamples.Substitute(request.Sql, sample, types)
+            RealisticSamples.Substitute(request.Sql, sample, parameters)
         );
         return RealisticCalls.NullColumnsOf(found, output, run.Names, run.SawNull);
     }

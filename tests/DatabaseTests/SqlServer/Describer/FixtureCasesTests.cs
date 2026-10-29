@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using SqlSource.DatabaseTests.TestHarness;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Testing.Fixtures;
@@ -15,7 +16,9 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 [Collection(UsesSqlServer.Name)]
 public sealed class FixtureCasesTests(SqlServerDatabases sqlServer)
 {
-    private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.InFolder(RepositoryPaths.DescriberFixtures);
+    private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.InFolder(
+        DescriberFixtures.SqlServer.Folder
+    );
 
     public static TheoryData<string> Cases => [with(Found.Select(static found => found.Name))];
 

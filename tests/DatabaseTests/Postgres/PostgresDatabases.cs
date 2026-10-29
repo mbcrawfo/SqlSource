@@ -34,7 +34,7 @@ public sealed class PostgresDatabases() : PostgresContainer(NpgsqlFactory.Instan
 
     protected override IReadOnlyList<(string Name, IReadOnlyList<string> Scripts)> DatabasesOf(int major) =>
         [
-            (Database, [RepositoryPaths.PostgresSchema]),
+            (Database, [DescriberFixtures.Postgres.Schema]),
             // The seed relies on a hole of PostgreSQL: the NOT NULL of a domain is not checked again for a NULL that
             // is already of the domain, which gives invoice 4 its NULL amount.  A major that closes it fails the seed
             // here, and so the start of the container, and the truths of table-statement, cte-materialized,

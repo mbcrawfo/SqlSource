@@ -100,6 +100,84 @@ public sealed class ProjectIncludesTests : IDisposable
             .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/Shared.props is None"]);
     }
 
+    // MSBuild reads the items of an imported file as the project's, from the project's folder.
+    [Fact]
+    public void Refused_ItemOfAnImportedFile_IsJudgedFromTheProject()
+    {
+        var scopes = Scopes("none tests/Other/*");
+        WriteProject("tests/Shared.props", Item("None", "../Other/File.cs"));
+        WriteProject(Import("../Shared.props"));
+
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/File.cs is None"]);
+    }
+
+    // $(MSBuildThisFileDirectory) in an imported file is that file's folder, here tests/Shared/Deep, and not the
+    // project's: the file sits a folder deeper than the project, so resolving from the wrong one misses the file.
+    [Fact]
+    public void Refused_ThisFileDirectoryInAnImportedFile_IsJudgedFromThatFile()
+    {
+        var scopes = Scopes("none tests/Other/*");
+        WriteProject("tests/Shared/Deep/Shared.props", Item("None", "$(MSBuildThisFileDirectory)../../Other/File.cs"));
+        WriteProject(Import("../Shared/Deep/Shared.props"));
+
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/File.cs is None"]);
+    }
+
+    // An imported file's own imports resolve from its folder, and are read too.
+    [Fact]
+    public void Refused_ImportOfAnImportedFile_IsRead()
+    {
+        var scopes = Scopes("none tests/Other/*");
+        WriteProject("tests/Shared/Second.props", Item("None", "../Other/File.cs"));
+        WriteProject("tests/Shared/First.props", Import("Second.props"));
+        WriteProject(Import("../Shared/First.props"));
+
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/File.cs is None"]);
+    }
+
+    [Fact]
+    public void Refused_ImportCycle_Terminates()
+    {
+        var scopes = Scopes("none tests/Other/*");
+        WriteProject("tests/Shared/First.props", Import("Second.props"));
+        WriteProject("tests/Shared/Second.props", Import("First.props"), Item("None", "../Other/File.cs"));
+        WriteProject(Import("../Shared/First.props"));
+
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/File.cs is None"]);
+    }
+
+    // MSBuild allows an Import of a file that is not there, under a Condition; the import is judged by its path alone.
+    [Fact]
+    public void Refused_ImportOfAFileThatDoesNotExist_IsJudgedByItsPathAlone()
+    {
+        var scopes = Scopes("none tests/Other/*");
+        WriteProject(Import("../Other/Missing.props"));
+
+        ProjectIncludes
+            .Refused(scopes, _root.FullName)
+            .ShouldBe([TestScopes.AssemblyPrefix + "App: tests/Other/Missing.props is None"]);
+    }
+
+    // A file outside tests/ is the code under test, whose items reach the project through its scope alone, as a
+    // referenced project outside tests/ does.  Its item, resolved from the project's folder, would be docs/Readme.md.
+    [Fact]
+    public void Refused_ImportOutsideTests_IsNotRead()
+    {
+        var scopes = Scopes("none docs/*");
+        WriteProject("src/Shared.props", Item("None", "../../docs/Readme.md"));
+        WriteProject(Import("../../src/Shared.props"));
+
+        ProjectIncludes.Refused(scopes, _root.FullName).ShouldBeEmpty();
+    }
+
     [Fact]
     public void Refused_PropertyThatIsNotResolved_SaysSo()
     {

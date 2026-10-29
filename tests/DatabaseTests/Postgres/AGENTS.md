@@ -6,7 +6,7 @@
 - **The container runs on `EngineImage.Postgres.Image` of `tests/DatabaseTests/TestHarness`, the one place a test takes the image from**: the image that `DefaultImages.Postgres` names, unless the variable `EngineImage.Postgres.Variable` names another.  Another tag in `tests/` is a sample that no test reads as the default ([the image](README.md#the-image)).
 - **A container starts through `EngineImage.Postgres.StartAsync`, never through the container's own `StartAsync`**, since it disposes a container whose start threw, which xunit does not.  The harness starts every container so.
 - **Its databases are `fixtures`, `realistic`, and `app` and `billing` for `EndToEnd/`**, built from `EndToEnd/app/` and `EndToEnd/billing/`, each through `EndToEndFiles` of the harness (schema first, then seed), as the Npgsql 8 project builds its own.
-- **The project reads `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/` from the repository** through `RepositoryRoot.Path`, and not from an output folder.
+- **The project reads `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/` from the repository** through `DescriberFixtures.Postgres` of the harness, found through `RepositoryRoot.Path`, and not from an output folder.
 
 ## Versions
 

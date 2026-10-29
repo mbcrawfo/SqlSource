@@ -21,28 +21,12 @@
         <!--
             Fixtures/Projects holds projects that the tests run "dotnet msbuild" on.  They are no code of this
             project.  Fixtures/FixtureProjects.cs of tests/SqlSource.Tool.Testing copies one out of the repository
-            before it is used, with the package's MSBuild files and the repository's global.json beside it, so all of
-            them go to the output.
+            before it is used, so they go to the output.  The package's MSBuild files and the repository's
+            global.json come beside them from ../Fixtures.props.
         -->
         <Compile Remove="Fixtures/Projects/**" />
         <None Remove="Fixtures/Projects/**" />
         <None Include="Fixtures/Projects/**" CopyToOutputDirectory="PreserveNewest" />
-        <None
-            Include="../../src/SqlSource/build/SqlSource.props"
-            Link="Fixtures/build/SqlSource.props"
-            CopyToOutputDirectory="PreserveNewest"
-        />
-        <None
-            Include="../../src/SqlSource/build/SqlSource.targets"
-            Link="Fixtures/build/SqlSource.targets"
-            CopyToOutputDirectory="PreserveNewest"
-        />
-        <None
-            Include="../../src/SqlSource/build/SqlSource.AfterSdk.targets"
-            Link="Fixtures/build/SqlSource.AfterSdk.targets"
-            CopyToOutputDirectory="PreserveNewest"
-        />
-        <None Include="../../global.json" Link="Fixtures/global.json" CopyToOutputDirectory="PreserveNewest" />
         <!--
             Fixtures/Describers holds the cases of the describers, under a folder for each engine: a query, the
             capture of describing it and the sidecar expected of it.  Fixtures/FixtureCases.cs of
@@ -51,6 +35,7 @@
         <None Remove="Fixtures/Describers/**" />
         <None Include="Fixtures/Describers/**" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
+    <Import Project="../Fixtures.props" />
     <ItemGroup>
         <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
         <ProjectReference Include="../SqlSource.Testing/SqlSource.Testing.csproj" />

@@ -63,7 +63,9 @@ internal static class ProjectIncludes
     // let it skip, as "<project>: <path> is <scope>", and one for each path it cannot resolve.  A ProjectReference
     // counts as the .csproj it names.  The files read are those whose items reach the project: its .csproj, each
     // Directory.Build.props and .targets from its folder up to the root, and the same of each project under tests/
-    // that it references, directly or not, each of which is judged from its own folder.
+    // that it references, directly or not, each of which is judged from its own folder.  Every file under tests/ that
+    // an Import of any of those names is read too, judged from the project's folder; one that does not exist is judged
+    // by its path alone.
     public static IReadOnlyList<string> Refused(TestScopes scopes, string repositoryRoot)
     {
         var refused = new List<string>();
@@ -98,7 +100,9 @@ internal static class ProjectIncludes
     }
 
     // Each file read for the project, with the folder of the project that it is read for: the .csproj and the
-    // Directory.Build files above it, of the project and of each library under tests/ that it references.  A project
+    // Directory.Build files above it, of the project and of each library under tests/ that it references, and every
+    // file under tests/ that an Import of any of those names, followed through the imports of those in turn.  An
+    // imported file's items resolve from the project's folder, its own imports from its own.  A project
     // outside tests/ is code under test, which reaches the project through its scope.  MSBuild imports only the nearest
     // Directory.Build.props, but one may import the next, so every one up to the root is read.  A file above two
     // projects is read for each, since its items resolve from the project's folder.
@@ -112,23 +116,52 @@ internal static class ProjectIncludes
         while (pending.TryDequeue(out var current))
         {
             var folder = Path.GetDirectoryName(current)!;
-            foreach (var file in DirectoryBuildChain(root, folder).Prepend(current))
+            var files = new Queue<string>(DirectoryBuildChain(root, folder).Prepend(current));
+            while (files.TryDequeue(out var file))
             {
-                if (read.Add((file, folder)))
+                if (!read.Add((file, folder)))
                 {
-                    yield return (file, folder);
+                    continue;
                 }
-            }
 
-            foreach (var (_, reference) in Outside(folder, folder, XDocument.Load(current), IsReference))
-            {
-                if (reference?.StartsWith(tests, StringComparison.Ordinal) == true && seen.Add(reference))
+                yield return (file, folder);
+                var document = XDocument.Load(file);
+                foreach (var import in Imports(Path.GetDirectoryName(file)!, folder, document))
                 {
-                    pending.Enqueue(reference);
+                    if (import.StartsWith(tests, StringComparison.Ordinal) && File.Exists(import))
+                    {
+                        files.Enqueue(import);
+                    }
+                }
+
+                if (file != current)
+                {
+                    continue;
+                }
+
+                foreach (var (_, reference) in Outside(folder, folder, document, IsReference))
+                {
+                    if (reference?.StartsWith(tests, StringComparison.Ordinal) == true && seen.Add(reference))
+                    {
+                        pending.Enqueue(reference);
+                    }
                 }
             }
         }
     }
+
+    // The full path of each Import of the file that can be resolved, inside the project's folder or not.
+    private static IEnumerable<string> Imports(string fileFolder, string projectFolder, XDocument file) =>
+        file.Descendants()
+            .Where(static item => item.Name.LocalName == "Import")
+            .SelectMany(static item =>
+                ((string?)item.Attribute("Project") ?? "").Split(
+                    ';',
+                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+                )
+            )
+            .Select(project => Resolve(fileFolder, fileFolder, projectFolder, project))
+            .OfType<string>();
 
     // Every Directory.Build.props and .targets from the folder up to the root.
     private static IEnumerable<string> DirectoryBuildChain(string root, string folder)

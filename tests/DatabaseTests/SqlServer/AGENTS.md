@@ -8,7 +8,7 @@
 
 ## Databases and scripts
 
-- **The project reads the files of its databases from the repository through `RepositoryPaths`**, found through `RepositoryRoot.Path` ([which files](README.md#running)).
+- **The project reads the files of its databases from the repository through `RepositoryPaths` and `DescriberFixtures` of the harness**, found through `RepositoryRoot.Path` ([which files](README.md#running)).
 - **A script is applied through `EndToEndFiles` of the harness with `EndToEndEngine.SqlServer`**, whose `SqlServerBatches` splits it at the lines that hold `GO` alone, never through `sqlcmd`, whose `QUOTED_IDENTIFIER` is off.
 
 ## Versions

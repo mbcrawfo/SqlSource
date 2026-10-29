@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.SqlServer.Realistic.Generation;
@@ -20,27 +21,32 @@ public sealed class RealisticParametersTests
     [Fact]
     public void SelectOf_Sample_CastsEachExpressionToItsType() =>
         RealisticParameters
-            .SelectOf(Sample(("q", "N'a'"), ("limit", "10")), Parameters)
+            .SelectOf(RealisticSample.Of(("q", "N'a'"), ("limit", "10")), Parameters)
             .ShouldBe("SELECT CAST((\n10\n) AS bigint), CAST((\nN'a'\n) AS nvarchar(10))");
 
+    // Over a sample that compares by ordinal, so that it is SelectOf that finds the name ignoring case, and not the
+    // dictionary.
     [Fact]
     public void SelectOf_SampleNamedInAnotherCase_IsFound() =>
         RealisticParameters
-            .SelectOf(Sample(("Q", "N'a'"), ("LIMIT", "10")), Parameters)
+            .SelectOf(
+                new Dictionary<string, string>(StringComparer.Ordinal) { ["Q"] = "N'a'", ["LIMIT"] = "10" },
+                Parameters
+            )
             .ShouldBe("SELECT CAST((\n10\n) AS bigint), CAST((\nN'a'\n) AS nvarchar(10))");
 
     // A comment at the end of a sample runs to the end of its line, so a parenthesis on that line would be lost.
     [Fact]
     public void SelectOf_SampleEndingInAComment_KeepsItsParenthesis() =>
         RealisticParameters
-            .SelectOf(Sample(("q", "N'a' -- any"), ("limit", "10")), Parameters)
+            .SelectOf(RealisticSample.Of(("q", "N'a' -- any"), ("limit", "10")), Parameters)
             .ShouldBe("SELECT CAST((\n10\n) AS bigint), CAST((\nN'a' -- any\n) AS nvarchar(10))");
 
     [Fact]
     public void SelectOf_SampleWithoutAParameter_ThrowsNamingIt()
     {
         var thrown = Should.Throw<InvalidOperationException>(() =>
-            RealisticParameters.SelectOf(Sample(("limit", "10")), Parameters)
+            RealisticParameters.SelectOf(RealisticSample.Of(("limit", "10")), Parameters)
         );
 
         thrown.Message.ShouldContain("@q");
@@ -50,20 +56,12 @@ public sealed class RealisticParametersTests
     public void SelectOf_ParameterWithoutAType_ThrowsNamingIt()
     {
         var thrown = Should.Throw<InvalidOperationException>(() =>
-            RealisticParameters.SelectOf(Sample(("id", "1")), [new SidecarParameter("id", 0, null, null, null)])
+            RealisticParameters.SelectOf(
+                RealisticSample.Of(("id", "1")),
+                [new SidecarParameter("id", 0, null, null, null)]
+            )
         );
 
         thrown.Message.ShouldContain("@id");
-    }
-
-    private static Dictionary<string, string> Sample(params (string Name, string Expression)[] values)
-    {
-        var sample = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (name, expression) in values)
-        {
-            sample.Add(name, expression);
-        }
-
-        return sample;
     }
 }

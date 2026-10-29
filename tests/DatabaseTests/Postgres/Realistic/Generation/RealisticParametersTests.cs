@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
 namespace SqlSource.DatabaseTests.Postgres.Realistic.Generation;
@@ -20,14 +20,14 @@ public sealed class RealisticParametersTests
     [Fact]
     public void SelectOf_Sample_CastsEachLiteralToItsType() =>
         RealisticParameters
-            .SelectOf(Sample(("q", "'a'"), ("limit", "10")), Parameters)
+            .SelectOf(RealisticSample.Of(("q", "'a'"), ("limit", "10")), Parameters)
             .ShouldBe("SELECT (10)::bigint, ('a')::text");
 
     [Fact]
     public void SelectOf_SampleWithoutAParameter_ThrowsNamingIt()
     {
         var thrown = Should.Throw<InvalidOperationException>(() =>
-            RealisticParameters.SelectOf(Sample(("limit", "10")), Parameters)
+            RealisticParameters.SelectOf(RealisticSample.Of(("limit", "10")), Parameters)
         );
 
         thrown.Message.ShouldContain("@q");
@@ -37,20 +37,12 @@ public sealed class RealisticParametersTests
     public void SelectOf_ParameterWithoutAType_ThrowsNamingIt()
     {
         var thrown = Should.Throw<InvalidOperationException>(() =>
-            RealisticParameters.SelectOf(Sample(("id", "1")), [new SidecarParameter("id", 0, null, null, null)])
+            RealisticParameters.SelectOf(
+                RealisticSample.Of(("id", "1")),
+                [new SidecarParameter("id", 0, null, null, null)]
+            )
         );
 
         thrown.Message.ShouldContain("@id");
-    }
-
-    private static Dictionary<string, string> Sample(params (string Name, string Literal)[] values)
-    {
-        var sample = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (name, literal) in values)
-        {
-            sample.Add(name, literal);
-        }
-
-        return sample;
     }
 }

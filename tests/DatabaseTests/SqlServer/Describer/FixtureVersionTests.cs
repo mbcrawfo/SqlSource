@@ -14,7 +14,9 @@ namespace SqlSource.DatabaseTests.SqlServer.Describer;
 // what fails when the default image moves and the cases are not recorded again.  It needs no server.
 public sealed partial class FixtureVersionTests
 {
-    private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.InFolder(RepositoryPaths.DescriberFixtures);
+    private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.InFolder(
+        DescriberFixtures.SqlServer.Folder
+    );
 
     public static TheoryData<string> Cases => [with(Found.Select(static found => found.Name))];
 

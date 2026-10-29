@@ -28,7 +28,7 @@ public sealed class SqlServerDatabases() : SqlServerContainer(SqlClientFactory.I
 
     protected override IReadOnlyList<(string Name, IReadOnlyList<string> Scripts)> DatabasesOf(int major) =>
         [
-            (Database, [RepositoryPaths.SqlServerSchema]),
+            (Database, [DescriberFixtures.SqlServer.Schema]),
             // The database of the corpus, built after "fixtures" from its schema, then its seed.
             (RealisticDatabase, [RealisticCases.Corpus.Schema, RealisticCases.Corpus.Seed]),
             // The databases of the end-to-end tests: each is built from its schema and its seed, and "app" then gets

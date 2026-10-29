@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Threading.Tasks;
 using SqlSource.Tool.Testing.Realistic;
 using Xunit;
@@ -19,13 +18,7 @@ public sealed class RealisticNullabilitySafetyTests(PostgresDatabases postgres)
         (request, parameters, sample) =>
             RealisticNullabilityOracle.RunAsync(
                 postgres.RealisticConnectionString,
-                RealisticSamples.Substitute(
-                    request.Sql,
-                    sample,
-                    parameters
-                        .Where(static parameter => parameter.Type is not null)
-                        .ToDictionary(static parameter => parameter.Name, static parameter => parameter.Type!.Name)
-                )
+                RealisticSamples.Substitute(request.Sql, sample, parameters)
             )
     );
 

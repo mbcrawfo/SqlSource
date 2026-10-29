@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
+using SqlSource.DatabaseTests.TestHarness;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
 using SqlSource.Tool.Describing.Postgres;
@@ -42,7 +43,7 @@ public sealed class DescribeCommandTests : IDisposable
     private static readonly IReadOnlyList<FixtureCase> Cases =
     [
         .. FixtureCases
-            .InFolder(RepositoryPaths.DescriberFixtures)
+            .InFolder(DescriberFixtures.Postgres.Folder)
             .Where(static found => !File.Exists(Path.Combine(found.Folder, FixtureCase.ExplainSettingsFile))),
     ];
 

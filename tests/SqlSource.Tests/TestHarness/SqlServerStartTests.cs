@@ -14,7 +14,7 @@ namespace SqlSource.Tests.TestHarness;
 // happen on a developer's machine, so no container is started here.
 public sealed class SqlServerStartTests
 {
-    private const string ImageName = "mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04";
+    private const string ImageName = DefaultImages.SqlServer;
 
     private const string CrashLog =
         $"SQL Server 2025 will run as non-root by default.\n{SqlServerStart.FatalError}\n"
