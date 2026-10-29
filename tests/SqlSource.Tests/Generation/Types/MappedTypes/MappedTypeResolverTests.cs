@@ -455,106 +455,100 @@ public sealed class MappedTypeResolverTests
 
     // A generic type is found exactly when the compiler takes it as a property's type, in a file with nullable
     // annotations on as a model's is, without an error or a warning: for each kind of constraint, a type argument
-    // that meets it and one that does not.  A constraint that forbids null is a warning to break.
+    // that meets it.
     [Theory]
-    [InlineData("global::MyApp.ValueBox<int>", true)]
-    [InlineData("global::MyApp.ValueBox<global::MyApp.Dot>", true)]
-    [InlineData("global::MyApp.RefBox<string>", true)]
-    [InlineData("global::MyApp.RefBox<int[]>", true)]
-    [InlineData("global::MyApp.RefBox<global::MyApp.IShape>", true)]
-    [InlineData("global::MyApp.MaybeRefBox<string?>", true)]
-    [InlineData("global::MyApp.RawBox<int>", true)]
-    [InlineData("global::MyApp.RawBox<global::MyApp.Dot>", true)]
-    [InlineData("global::MyApp.KeyBox<string>", true)]
-    [InlineData("global::MyApp.KeyBox<int>", true)]
-    [InlineData("global::System.Collections.Generic.Dictionary<int, string?>", true)]
-    [InlineData("global::MyApp.NewBox<global::MyApp.Circle>", true)]
-    [InlineData("global::MyApp.NewBox<int>", true)]
-    [InlineData("global::MyApp.NewBox<int?>", true)]
-    [InlineData("global::MyApp.NewBox<global::MyApp.UserId>", true)]
-    [InlineData("global::MyApp.NewBox<global::MyApp.SetForm>", true)]
-    [InlineData("global::MyApp.ShapeBox<global::MyApp.Circle>", true)]
-    [InlineData("global::MyApp.ShapeBox<global::MyApp.Dot>", true)]
-    [InlineData("global::MyApp.ShapeBox<global::MyApp.IShape>", true)]
-    [InlineData("global::MyApp.BaseBox<global::MyApp.Derived>", true)]
-    [InlineData("global::MyApp.BaseBox<global::MyApp.Base>", true)]
-    [InlineData("global::MyApp.SelfBox<int>", true)]
-    [InlineData("global::MyApp.SelfBox<string>", true)]
-    [InlineData("global::MyApp.PairBox<object, string>", true)]
-    [InlineData("global::MyApp.PairBox<object, int>", true)]
-    [InlineData("global::MyApp.PairBox<string?, string?>", true)]
-    [InlineData("global::MyApp.PairBox<string?, string>", true)]
-    [InlineData("global::MyApp.Nest<global::MyApp.Base>.Inner<global::MyApp.Derived>", true)]
-    [InlineData("global::MyApp.ValueBox<int>[]", true)]
-    [InlineData("global::System.Collections.Generic.List<global::MyApp.ValueBox<int>?>", true)]
-    [InlineData("global::System.Collections.Generic.List<global::System.Nullable<string>>", false)]
-    [InlineData("global::MyApp.ValueBox<string>", false)]
-    [InlineData("global::MyApp.ValueBox<int?>", false)]
-    [InlineData("global::MyApp.ValueBox<global::System.Nullable<int>>", false)]
-    [InlineData("global::MyApp.RefBox<int>", false)]
-    [InlineData("global::MyApp.RefBox<string?>", false)]
-    [InlineData("global::MyApp.RawBox<string>", false)]
-    [InlineData("global::MyApp.RawBox<global::System.Collections.Generic.KeyValuePair<int, string>>", false)]
-    [InlineData("global::MyApp.RawBox<int?>", false)]
-    [InlineData("global::MyApp.KeyBox<string?>", false)]
-    [InlineData("global::MyApp.KeyBox<int?>", false)]
-    [InlineData("global::System.Collections.Generic.Dictionary<int?, string>", false)]
-    [InlineData("global::System.Collections.Generic.Dictionary<string?, int>", false)]
-    [InlineData("global::MyApp.EnumBox<global::MyApp.Color>", true)]
-    [InlineData("global::System.Collections.Generic.List<global::MyApp.IMakesByDefault>", true)]
-    [InlineData("global::System.Collections.Generic.List<global::MyApp.IMadeHere>", true)]
-    [InlineData("global::System.Collections.Generic.List<global::MyApp.IMakes[]>", true)]
-    [InlineData("global::System.Collections.Generic.List<global::System.Numerics.INumber<int>[]>", true)]
-    [InlineData("global::System.Collections.Generic.Dictionary<int, string>.KeyCollection", true)]
-    [InlineData("global::System.Collections.Immutable.ImmutableArray<int>.Builder", true)]
-    [InlineData("global::System.Collections.Immutable.ImmutableArray<int>", true)]
-    [InlineData("global::System.Collections.Generic.IEnumerable<string>", true)]
-    [InlineData("global::System.Memory<byte>", true)]
-    [InlineData("global::System.Collections.Generic.KeyValuePair<string, int?>", true)]
-    [InlineData("global::System.Collections.Generic.List<global::System.Nullable<int>>", true)]
-    [InlineData("global::MyApp.PairBox<object?, int?>", true)]
-    [InlineData("global::MyApp.PairBox<global::System.ValueType?, int?>", true)]
-    [InlineData("global::MyApp.EnumBox<global::MyApp.Color?>", false)]
-    [InlineData("global::MyApp.PairBox<global::System.Enum, global::MyApp.Color?>", false)]
-    [InlineData("global::MyApp.PairBox<object, int?>", false)]
-    [InlineData("global::System.Collections.Generic.List<global::System.Numerics.INumber<int>>", false)]
-    [InlineData("global::System.Collections.Generic.List<global::MyApp.IMakes>", false)]
-    [InlineData("global::MyApp.NewBox<string>", false)]
-    [InlineData("global::MyApp.NewBox<global::MyApp.Sketch>", false)]
-    [InlineData("global::MyApp.NewBox<global::MyApp.NoDefault>", false)]
-    [InlineData("global::MyApp.NewBox<global::MyApp.Form>", false)]
-    [InlineData("global::MyApp.NewBox<int[]>", false)]
-    [InlineData("global::MyApp.NewBox<global::MyApp.IShape>", false)]
-    [InlineData("global::MyApp.ShapeBox<global::MyApp.Square>", false)]
-    [InlineData("global::MyApp.ShapeBox<global::MyApp.Dot?>", false)]
-    [InlineData("global::MyApp.ShapeBox<global::MyApp.Circle?>", false)]
-    [InlineData("global::MyApp.BaseBox<object>", false)]
-    [InlineData("global::MyApp.SelfBox<global::MyApp.UserId>", false)]
-    [InlineData("global::MyApp.PairBox<string, object>", false)]
-    [InlineData("global::MyApp.PairBox<string, string?>", false)]
-    [InlineData("global::MyApp.Nest<global::MyApp.Derived>.Inner<global::MyApp.Base>", false)]
-    [InlineData("global::System.Collections.Generic.Dictionary<string, global::MyApp.ValueBox<string>>", false)]
-    [InlineData("global::MyApp.ValueBox<string>[]", false)]
-    [InlineData("global::MyApp.ValueBox<int?[]>", false)]
-    public void Resolve_GenericName_IsFoundWhenItsArgumentsMeetTheConstraints(string name, bool meets)
+    [InlineData("global::MyApp.ValueBox<int>")]
+    [InlineData("global::MyApp.ValueBox<global::MyApp.Dot>")]
+    [InlineData("global::MyApp.RefBox<string>")]
+    [InlineData("global::MyApp.RefBox<int[]>")]
+    [InlineData("global::MyApp.RefBox<global::MyApp.IShape>")]
+    [InlineData("global::MyApp.MaybeRefBox<string?>")]
+    [InlineData("global::MyApp.RawBox<int>")]
+    [InlineData("global::MyApp.RawBox<global::MyApp.Dot>")]
+    [InlineData("global::MyApp.KeyBox<string>")]
+    [InlineData("global::MyApp.KeyBox<int>")]
+    [InlineData("global::System.Collections.Generic.Dictionary<int, string?>")]
+    [InlineData("global::MyApp.NewBox<global::MyApp.Circle>")]
+    [InlineData("global::MyApp.NewBox<int>")]
+    [InlineData("global::MyApp.NewBox<int?>")]
+    [InlineData("global::MyApp.NewBox<global::MyApp.UserId>")]
+    [InlineData("global::MyApp.NewBox<global::MyApp.SetForm>")]
+    [InlineData("global::MyApp.ShapeBox<global::MyApp.Circle>")]
+    [InlineData("global::MyApp.ShapeBox<global::MyApp.Dot>")]
+    [InlineData("global::MyApp.ShapeBox<global::MyApp.IShape>")]
+    [InlineData("global::MyApp.BaseBox<global::MyApp.Derived>")]
+    [InlineData("global::MyApp.BaseBox<global::MyApp.Base>")]
+    [InlineData("global::MyApp.SelfBox<int>")]
+    [InlineData("global::MyApp.SelfBox<string>")]
+    [InlineData("global::MyApp.PairBox<object, string>")]
+    [InlineData("global::MyApp.PairBox<object, int>")]
+    [InlineData("global::MyApp.PairBox<string?, string?>")]
+    [InlineData("global::MyApp.PairBox<string?, string>")]
+    [InlineData("global::MyApp.Nest<global::MyApp.Base>.Inner<global::MyApp.Derived>")]
+    [InlineData("global::MyApp.ValueBox<int>[]")]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.ValueBox<int>?>")]
+    [InlineData("global::MyApp.EnumBox<global::MyApp.Color>")]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IMakesByDefault>")]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IMadeHere>")]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IMakes[]>")]
+    [InlineData("global::System.Collections.Generic.List<global::System.Numerics.INumber<int>[]>")]
+    [InlineData("global::System.Collections.Generic.Dictionary<int, string>.KeyCollection")]
+    [InlineData("global::System.Collections.Immutable.ImmutableArray<int>.Builder")]
+    [InlineData("global::System.Collections.Immutable.ImmutableArray<int>")]
+    [InlineData("global::System.Collections.Generic.IEnumerable<string>")]
+    [InlineData("global::System.Memory<byte>")]
+    [InlineData("global::System.Collections.Generic.KeyValuePair<string, int?>")]
+    [InlineData("global::System.Collections.Generic.List<global::System.Nullable<int>>")]
+    [InlineData("global::MyApp.PairBox<object?, int?>")]
+    [InlineData("global::MyApp.PairBox<global::System.ValueType?, int?>")]
+    public void Resolve_GenericNameWhoseArgumentsMeetTheConstraints_IsFound(string name)
     {
-        var types = MappedTypeResolver
-            .Resolve(Project.Value, TestSidecars.Of(name), TestContext.Current.CancellationToken)
-            .Types;
+        CompilerReports(name).ShouldBeEmpty();
+        ResolvedStatusOf(name).ShouldBe(MappedTypeStatus.Found);
+    }
 
-        var reports = CompilerReports(name);
-        if (meets)
-        {
-            reports.ShouldBeEmpty();
-        }
-        else
-        {
-            reports.ShouldNotBeEmpty();
-        }
-
-        types
-            .ShouldHaveSingleItem()
-            .Status.ShouldBe(meets ? MappedTypeStatus.Found : MappedTypeStatus.NotAPropertyType);
+    // The same with a type argument that does not meet its constraint, where the compiler reports an error or a
+    // warning: the name is no property's type.  A constraint that forbids null is a warning to break.
+    [Theory]
+    [InlineData("global::System.Collections.Generic.List<global::System.Nullable<string>>")]
+    [InlineData("global::MyApp.ValueBox<string>")]
+    [InlineData("global::MyApp.ValueBox<int?>")]
+    [InlineData("global::MyApp.ValueBox<global::System.Nullable<int>>")]
+    [InlineData("global::MyApp.RefBox<int>")]
+    [InlineData("global::MyApp.RefBox<string?>")]
+    [InlineData("global::MyApp.RawBox<string>")]
+    [InlineData("global::MyApp.RawBox<global::System.Collections.Generic.KeyValuePair<int, string>>")]
+    [InlineData("global::MyApp.RawBox<int?>")]
+    [InlineData("global::MyApp.KeyBox<string?>")]
+    [InlineData("global::MyApp.KeyBox<int?>")]
+    [InlineData("global::System.Collections.Generic.Dictionary<int?, string>")]
+    [InlineData("global::System.Collections.Generic.Dictionary<string?, int>")]
+    [InlineData("global::MyApp.EnumBox<global::MyApp.Color?>")]
+    [InlineData("global::MyApp.PairBox<global::System.Enum, global::MyApp.Color?>")]
+    [InlineData("global::MyApp.PairBox<object, int?>")]
+    [InlineData("global::System.Collections.Generic.List<global::System.Numerics.INumber<int>>")]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IMakes>")]
+    [InlineData("global::MyApp.NewBox<string>")]
+    [InlineData("global::MyApp.NewBox<global::MyApp.Sketch>")]
+    [InlineData("global::MyApp.NewBox<global::MyApp.NoDefault>")]
+    [InlineData("global::MyApp.NewBox<global::MyApp.Form>")]
+    [InlineData("global::MyApp.NewBox<int[]>")]
+    [InlineData("global::MyApp.NewBox<global::MyApp.IShape>")]
+    [InlineData("global::MyApp.ShapeBox<global::MyApp.Square>")]
+    [InlineData("global::MyApp.ShapeBox<global::MyApp.Dot?>")]
+    [InlineData("global::MyApp.ShapeBox<global::MyApp.Circle?>")]
+    [InlineData("global::MyApp.BaseBox<object>")]
+    [InlineData("global::MyApp.SelfBox<global::MyApp.UserId>")]
+    [InlineData("global::MyApp.PairBox<string, object>")]
+    [InlineData("global::MyApp.PairBox<string, string?>")]
+    [InlineData("global::MyApp.Nest<global::MyApp.Derived>.Inner<global::MyApp.Base>")]
+    [InlineData("global::System.Collections.Generic.Dictionary<string, global::MyApp.ValueBox<string>>")]
+    [InlineData("global::MyApp.ValueBox<string>[]")]
+    [InlineData("global::MyApp.ValueBox<int?[]>")]
+    public void Resolve_GenericNameWhoseArgumentsBreakAConstraint_IsNotAPropertyType(string name)
+    {
+        CompilerReports(name).ShouldNotBeEmpty();
+        ResolvedStatusOf(name).ShouldBe(MappedTypeStatus.NotAPropertyType);
     }
 
     // Of two failures in one name, the first in the order of the statuses is the whole's: a missing argument over an
@@ -896,4 +890,11 @@ public sealed class MappedTypeResolverTests
             TestContext.Current.CancellationToken
         );
     }
+
+    // The status the resolver gives the one name.
+    private static MappedTypeStatus ResolvedStatusOf(string name) =>
+        MappedTypeResolver
+            .Resolve(Project.Value, TestSidecars.Of(name), TestContext.Current.CancellationToken)
+            .Types.ShouldHaveSingleItem()
+            .Status;
 }

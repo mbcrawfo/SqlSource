@@ -274,14 +274,25 @@ public sealed class PostgresSessionParameterTests
         );
     }
 
-    // The same for an array of one, whose closure the server answers with the element too.
+    // The same for record[], which the server has as a pseudo-type itself, so that its closure holds no element.
+    [Fact]
+    public async Task DescribeAsync_ColumnOfRecordArray_IsSqlsrc229NamingTheColumnAndTheType()
+    {
+        await ShouldFailOnAColumnOfThePseudoTypeAsync(
+            PostgresRows.RecordArray,
+            [PostgresRows.Int4, PostgresRows.RecordArray],
+            "record[]"
+        );
+    }
+
+    // The same for cstring[], a base array whose element is a pseudo-type, which the server answers in the closure.
     [Fact]
     public async Task DescribeAsync_ColumnOfAnArrayOfAPseudoType_IsSqlsrc229NamingTheColumnAndTheType()
     {
         await ShouldFailOnAColumnOfThePseudoTypeAsync(
-            PostgresRows.RecordArray,
-            [PostgresRows.Int4, PostgresRows.Record, PostgresRows.RecordArray],
-            "record[]"
+            PostgresRows.CstringArray,
+            [PostgresRows.Int4, PostgresRows.CstringArray, PostgresRows.Cstring],
+            "cstring[]"
         );
     }
 

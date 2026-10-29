@@ -67,8 +67,9 @@ public sealed class GeneratorParameterLevelTests
         generated.ShouldNotContain("Throw");
     }
 
-    // The levels whose most specific list does not keep comments, though a farther one does: the list comes whole
-    // from the most specific level, so the comment goes and the token is checked.
+    // The levels whose most specific list does not keep comments, though a farther one does, and the run where no level
+    // gives a list, so that the default leaves them out: the list comes whole from the most specific level, so the
+    // comment goes and the token is checked.
     [Theory]
     // project's file, folder's file, attribute, preamble, query
     [InlineData(null, null, null, null, null)]

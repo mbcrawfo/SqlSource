@@ -14,7 +14,7 @@ Low.  The model compiles, with a warning for its property, which fails the build
 
 ## Proposed fix
 
-In `MappedTypeResolver.MeetsConstraints`, after the conversion is found, walk the argument and the substituted constraint type together: for each pair of nested type arguments, an argument that can be null where the other cannot breaks the constraint, unless the variance of the type parameter allows it (an `out` parameter takes a non-null argument where the constraint's can be null, an `in` parameter the reverse).  A failure is `MappedTypeStatus.NotAPropertyType`, with cases in `Resolve_GenericName_IsFoundWhenItsArgumentsMeetTheConstraints` of `tests/SqlSource.Tests/Generation/Types/MappedTypes/MappedTypeResolverTests.cs`, which compares each with the compiler.
+In `MappedTypeResolver.MeetsConstraints`, after the conversion is found, walk the argument and the substituted constraint type together: for each pair of nested type arguments, an argument that can be null where the other cannot breaks the constraint, unless the variance of the type parameter allows it (an `out` parameter takes a non-null argument where the constraint's can be null, an `in` parameter the reverse).  A failure is `MappedTypeStatus.NotAPropertyType`, with cases in `Resolve_GenericNameWhoseArgumentsMeetTheConstraints_IsFound` and `Resolve_GenericNameWhoseArgumentsBreakAConstraint_IsNotAPropertyType` of `tests/SqlSource.Tests/Generation/Types/MappedTypes/MappedTypeResolverTests.cs`, which compares each with the compiler.
 
 ## Trigger
 
