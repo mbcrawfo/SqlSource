@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Converters;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Converters;
@@ -14,8 +14,10 @@ public sealed class ConverterSetTests
     [Fact]
     public void Of_ProjectAndMappedTypeOfOneEdge_KeepsTheProjects()
     {
-        var project = Of(ProjectConverter("global::App.Conversions.ToEmail", "string", "global::Lib.Email", 3));
-        var mapped = Of(
+        var project = TestSidecars.Of(
+            ProjectConverter("global::App.Conversions.ToEmail", "string", "global::Lib.Email", 3)
+        );
+        var mapped = TestSidecars.Of(
             MappedTypeConverter("global::Lib.Email.From", "string", "global::Lib.Email"),
             MappedTypeConverter("global::Lib.Email.To", "global::Lib.Email", "string")
         );
@@ -30,13 +32,13 @@ public sealed class ConverterSetTests
     [Fact]
     public void Of_Converters_AreSortedByArgumentThenReturn()
     {
-        var project = Of(
+        var project = TestSidecars.Of(
             ProjectConverter("global::App.C.A", "string", "global::App.Email", 1),
             ProjectConverter("global::App.C.B", "long", "global::App.UserId", 2),
             ProjectConverter("global::App.C.C", "global::App.Email", "string", 3),
             ProjectConverter("global::App.C.D", "long", "global::App.OrderId", 4)
         );
-        var mapped = Of(MappedTypeConverter("global::Lib.Id.From", "int", "global::Lib.Id"));
+        var mapped = TestSidecars.Of(MappedTypeConverter("global::Lib.Id.From", "int", "global::Lib.Id"));
 
         var set = ConverterSet.Of(project, mapped);
 
@@ -54,14 +56,14 @@ public sealed class ConverterSetTests
     public void Touching_Type_GivesTheEdgesFromAndToIt()
     {
         var set = ConverterSet.Of(
-            Of(
+            TestSidecars.Of(
                 ProjectConverter("global::App.C.FromEmail", "global::App.Email", "string", 1),
                 ProjectConverter("global::App.C.ToEmail", "string", "global::App.Email", 2),
                 ProjectConverter("global::App.C.ToUserId", "long", "global::App.UserId", 3),
                 ProjectConverter("global::App.C.Trim", "global::App.Email", "global::App.Email", 4),
                 ProjectConverter("global::App.C.FromUserId", "global::App.UserId", "long", 5)
             ),
-            Of(MappedTypeConverter("global::Lib.Email.Parse", "byte[]", "global::App.Email"))
+            TestSidecars.Of(MappedTypeConverter("global::Lib.Email.Parse", "byte[]", "global::App.Email"))
         );
 
         set.Touching("global::App.Email")
@@ -77,9 +79,6 @@ public sealed class ConverterSetTests
             .ShouldBe(["global::App.C.FromUserId", "global::App.C.ToUserId"]);
         set.Touching("int").ShouldBeEmpty();
     }
-
-    private static EquatableArray<Converter> Of(params Converter[] converters) =>
-        new(ImmutableArray.Create(converters));
 
     private static Converter ProjectConverter(string method, string argument, string result, int line) =>
         new(

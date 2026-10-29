@@ -1,6 +1,7 @@
 using System;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres.Statements;
 using Xunit;
@@ -12,24 +13,24 @@ namespace SqlSource.Tool.Tests.Describing.Postgres.Statements;
 // PREPARE.  A text in which the lexer finds several statements is never sent.
 public sealed class ParameterPlaceholdersTests
 {
-    private static EquatableArray<SqlQueryParameter> List(params SqlQueryParameter[] parameters) =>
-        new([.. parameters]);
-
     [Fact]
     public void Rewrite_ParameterOnceAndTwice_HasOneOrdinal() =>
         ParameterPlaceholders
-            .Rewrite("SELECT @id, @id + 1 FROM users WHERE id = @id", List(Inferred("id")))
+            .Rewrite("SELECT @id, @id + 1 FROM users WHERE id = @id", TestSidecars.Of(Inferred("id")))
             .ShouldBe("SELECT $1, $1 + 1 FROM users WHERE id = $1");
 
     [Fact]
     public void Rewrite_TwoParameters_AreNumberedByTheList() =>
         ParameterPlaceholders
-            .Rewrite("SELECT 1 WHERE @b = 1 AND @a = 2", List(Inferred("b"), Inferred("a"), Declared("c", "int")))
+            .Rewrite(
+                "SELECT 1 WHERE @b = 1 AND @a = 2",
+                TestSidecars.Of(Inferred("b"), Inferred("a"), Declared("c", "int"))
+            )
             .ShouldBe("SELECT 1 WHERE $1 = 1 AND $2 = 2");
 
     [Fact]
     public void Rewrite_NameInAnotherCase_IsTheSameParameter() =>
-        ParameterPlaceholders.Rewrite("SELECT @ID, @Id", List(Inferred("id"))).ShouldBe("SELECT $1, $1");
+        ParameterPlaceholders.Rewrite("SELECT @ID, @Id", TestSidecars.Of(Inferred("id"))).ShouldBe("SELECT $1, $1");
 
     [Theory]
     [InlineData("SELECT '@id'")]
@@ -38,24 +39,27 @@ public sealed class ParameterPlaceholdersTests
     [InlineData("SELECT \"@id\" FROM users")]
     [InlineData("SELECT $q$ @id $q$")]
     public void Rewrite_AtSignThatIsNoParameter_IsLeftAlone(string sql) =>
-        ParameterPlaceholders.Rewrite(sql, List()).ShouldBe(sql);
+        ParameterPlaceholders.Rewrite(sql, TestSidecars.Of<SqlQueryParameter>()).ShouldBe(sql);
 
     [Fact]
     public void Rewrite_TrailingSemicolonWithSpaceAndCommentsAfterIt_IsDroppedWithThem() =>
         ParameterPlaceholders
-            .Rewrite("DELETE FROM users WHERE id = @id ; -- done\n/* end */ ", List(Inferred("id")))
+            .Rewrite("DELETE FROM users WHERE id = @id ; -- done\n/* end */ ", TestSidecars.Of(Inferred("id")))
             .ShouldBe("DELETE FROM users WHERE id = $1 ");
 
     [Fact]
     public void Rewrite_SemicolonInAStringOrADollarQuote_IsKept() =>
-        ParameterPlaceholders.Rewrite("SELECT ';', $x$;$x$", List()).ShouldBe("SELECT ';', $x$;$x$");
+        ParameterPlaceholders
+            .Rewrite("SELECT ';', $x$;$x$", TestSidecars.Of<SqlQueryParameter>())
+            .ShouldBe("SELECT ';', $x$;$x$");
 
     [Theory]
     [InlineData("SELECT 1; SELECT 2")]
     [InlineData("SELECT 1; SELECT 2;")]
     [InlineData("SELECT 1;;")]
     [InlineData("SELECT 1; -- one\nDROP TABLE users")]
-    public void Rewrite_SecondStatement_IsNull(string sql) => ParameterPlaceholders.Rewrite(sql, List()).ShouldBeNull();
+    public void Rewrite_SecondStatement_IsNull(string sql) =>
+        ParameterPlaceholders.Rewrite(sql, TestSidecars.Of<SqlQueryParameter>()).ShouldBeNull();
 
     // PostgreSQL reads any character above U+007F as part of a name, so "§$x$" is one identifier and the lexer finds
     // the text two statements and a comment, as the server does.
@@ -63,21 +67,23 @@ public sealed class ParameterPlaceholdersTests
     [InlineData("SELECT 1 AS §$x$; DROP TABLE users; --$x$")]
     [InlineData("SELECT 1 AS £$x$; DROP TABLE users; --$x$")]
     public void Rewrite_DollarSignAfterANonAsciiCharacter_OpensNoQuoteSoTheSecondStatementIsFound(string sql) =>
-        ParameterPlaceholders.Rewrite(sql, List()).ShouldBeNull();
+        ParameterPlaceholders.Rewrite(sql, TestSidecars.Of<SqlQueryParameter>()).ShouldBeNull();
 
     // The run's planner made the list from the same SQL with the generator's parser, so a parameter outside it is a bug
     // there.
     [Fact]
     public void Rewrite_ParameterTheListDoesNotHold_Throws() =>
         Should
-            .Throw<InvalidOperationException>(() => ParameterPlaceholders.Rewrite("SELECT @id", List()))
+            .Throw<InvalidOperationException>(() =>
+                ParameterPlaceholders.Rewrite("SELECT @id", TestSidecars.Of<SqlQueryParameter>())
+            )
             .Message.ShouldContain("'id'");
 
     [Fact]
     public void TypeList_DeclaredAndInferred_HasTheTypeAsWrittenOrUnknownInTheListsOrder()
     {
         var types = ParameterPlaceholders.TypeList(
-            List(Inferred("id"), Declared("name", " varchar(50) "), Declared("tenant", "public.tenant_id"))
+            TestSidecars.Of(Inferred("id"), Declared("name", " varchar(50) "), Declared("tenant", "public.tenant_id"))
         );
 
         types.Value.ShouldBe(["unknown", "varchar(50)", "public.tenant_id"]);
@@ -88,7 +94,9 @@ public sealed class ParameterPlaceholdersTests
     {
         var refused = Declared("b", "int) AS SELECT 1");
 
-        var types = ParameterPlaceholders.TypeList(List(Declared("a", "int"), refused, Declared("c", "nope nope")));
+        var types = ParameterPlaceholders.TypeList(
+            TestSidecars.Of(Declared("a", "int"), refused, Declared("c", "nope nope"))
+        );
 
         types.Value.ShouldBeNull();
         types.Failure.ShouldBe((refused, DescribeFailures.NotATypeName));
