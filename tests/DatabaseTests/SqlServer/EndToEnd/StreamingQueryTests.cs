@@ -22,7 +22,8 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // finally when the loop is left at a row, by a break, a throw in its body or a disposal, so that an error the rest of
 // the batch raises is thrown, in place of the body's exception too.  Under XACT_ABORT ON that error rolls back the
 // caller's transaction, and with it off CAST('x' AS int) after the rows does too, where a THROW, a divide by zero or
-// an overflow leaves it to commit.
+// an overflow leaves it to commit.  When a row throws an exception of the iterator's own, the reader's disposal drops
+// such an error, and the iterator throws TransactionRolledBackException when it rolled the transaction back.
 [Collection(UsesSqlServer.Name)]
 public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
 {
@@ -563,6 +564,35 @@ public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
 
         rows.ShouldBe([new StreamNullAtThirdDto(1, "alice"), new StreamNullAtThirdDto(2, "bob")]);
         connection.State.ShouldBe(ConnectionState.Closed);
+    }
+
+    // The same NULL, and then a failed conversion after the rows, which the reader's disposal reads and which with
+    // XACT_ABORT off rolls back the transaction: the first two rows are handed to the loop, and then the iterator
+    // throws the rollback, with the NULL's exception inside it, so the caller learns of the rollback from the loop.
+    [Fact]
+    public async Task StreamNullAtThirdThenFailConversion_InATransaction_ThrowsTheRollbackAfterTwoRows()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+        var rows = new List<CollectedAccount>();
+
+        var thrown = await Should.ThrowAsync<TransactionRolledBackException>(async () =>
+        {
+            await foreach (
+                var row in session.Connection.StreamNullAtThirdThenFailConversion(
+                    transaction: session.Transaction,
+                    cancellationToken: token
+                )
+            )
+            {
+                rows.Add(row);
+            }
+        });
+
+        rows.ShouldBe([Accounts[0], Accounts[1]]);
+        thrown.QueryName.ShouldBe("StreamNullAtThirdThenFailConversion");
+        _ = thrown.InnerException.ShouldBeOfType<SqlNullValueException>();
+        await session.ShouldHaveRolledBackAsync(token);
     }
 
     // StreamNoteAccounts is a query of Notes.sql, which converts account_id to an AccountId through the converters of

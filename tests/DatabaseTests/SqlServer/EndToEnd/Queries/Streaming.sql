@@ -24,6 +24,17 @@ SELECT id, CASE WHEN id = 3 THEN NULL ELSE name END AS name
 FROM dbo.accounts
 ORDER BY id;
 
+-- name: StreamNullAtThirdThenFailConversion
+-- summary: StreamNullAtThird, and then a conversion that fails, an error that the NULL's exception hides.
+-- The iterator throws at the third row, and the reader's disposal reads the failed conversion, which with XACT_ABORT
+-- off rolls back a transaction: its test pins that the loop throws the rollback after the first two rows.
+-- output-model: CollectedAccount
+-- column: name not null
+SELECT id, CASE WHEN id = 3 THEN NULL ELSE name END AS name
+FROM dbo.accounts
+ORDER BY id;
+SELECT CAST('x' AS int);
+
 -- name: StreamNumbers
 -- summary: The numbers from 1 to a count, for a break and a cancellation partway through many rows.
 -- The cross join of six digits is a million numbers, which SQL Server must sort before it sends the first, so that it

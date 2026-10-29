@@ -112,6 +112,49 @@ FROM dbo.accounts
 ORDER BY id;
 SELECT CAST('x' AS int);
 
+-- name: GetTwoThenFailConversion -> one
+-- summary: Two accounts, which one refuses, and then a conversion that fails, an error that the refusal hides.
+-- The method throws at the second row, and the reader's disposal reads the failed conversion, which with XACT_ABORT
+-- off rolls back a transaction: its tests pin that the method throws the rollback with the refusal inside it.
+-- output-model: CollectedAccount
+SELECT id, name
+FROM dbo.accounts
+WHERE id <= 2
+ORDER BY id;
+SELECT CAST('x' AS int);
+
+-- name: GetTwoThenRaise -> one
+-- summary: Two accounts, which one refuses, and then an error that the refusal hides.
+-- GetTwoThenFailConversion with a THROW in the place of the failed conversion: with XACT_ABORT off the THROW leaves
+-- a transaction open, and under XACT_ABORT ON rolls it back.
+-- output-model: CollectedAccount
+SELECT id, name
+FROM dbo.accounts
+WHERE id <= 2
+ORDER BY id;
+THROW 50000, 'after the rows', 1;
+
+-- name: ListNullAtThirdThenFailConversion
+-- summary: Every account, with a NULL for the name of the third, which the marker says is never NULL, and then a
+-- conversion that fails, an error that the NULL's exception hides.
+-- StreamNullAtThirdThenFailConversion of Streaming.sql, read into the default collection type.
+-- output-model: CollectedAccount
+-- column: name not null
+SELECT id, CASE WHEN id = 3 THEN NULL ELSE name END AS name
+FROM dbo.accounts
+ORDER BY id;
+SELECT CAST('x' AS int);
+
+-- name: ListFailingAtSecondThenFailConversion
+-- summary: Every account with 10 divided by its id less 2, which fails at the second, and then a conversion that
+-- fails.
+-- The divide by zero is the database's error, which the method throws as it is, and the reader's disposal reads the
+-- failed conversion after it.
+SELECT id, 10 / (id - 2) AS quotient
+FROM dbo.accounts
+ORDER BY id;
+SELECT CAST('x' AS int);
+
 -- name: RunThenRaise -> none
 -- summary: The accounts, a mark on the session, and then an error, which a method that reads no rows reports.
 SELECT id, name

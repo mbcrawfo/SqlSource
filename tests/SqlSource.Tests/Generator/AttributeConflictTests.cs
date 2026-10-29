@@ -31,6 +31,10 @@ public sealed class AttributeConflictTests
     [InlineData("internal class Sample { object o = SqlSource.GeneratorOutput.Sql; }", "(1,36)-(1,61)")]
     [InlineData("internal class Sample { object o = typeof(SqlSource.UnexpectedRowCountException); }", "(1,53)-(1,80)")]
     [InlineData(
+        "internal class Sample { object o = typeof(SqlSource.TransactionRolledBackException); }",
+        "(1,53)-(1,83)"
+    )]
+    [InlineData(
         "internal static class C { [SqlSource.SqlSourceConverter] internal static int F(long v) => (int)v; }",
         "(1,38)-(1,56)"
     )]
