@@ -39,7 +39,6 @@ Next id: `TD-0092`
 | [TD-0079](TD-0079-duplicated-logic-and-uneven-conventions-in-src.md) | Open | 2026-10-27 | Low | Rules of `src/` are written in several places: a type's usable files, the describers' own errors and connection texts, the comparison of parameter names, SQL Server's names, the binders' shapes, a file's engine; the sidecar reader's switches read an unknown key as the last; `MappedTypeResolver` and `QueryMethodWriter` are long, the planners pass long lists, and one member is dead |
 | [TD-0089](TD-0089-theories-that-branch-on-their-row.md) | Open | 2026-10-29 | Low | Some theories still branch on their row with an `if` or derive their expectations with `?:`, so a reader must follow the branch to know what a row checks |
 | [TD-0090](TD-0090-sql-server-error-at-a-row-hides-a-rollback.md) | Open | 2026-10-29 | Low | On SQL Server, a method whose read throws the database's error at a row, such as a divide by zero, throws it as it is, and an error that the rest of the batch then raises can roll back the caller's transaction with nothing to say so; a caller that catches the first error and goes on finds its own later commands, or Dapper's, committed on their own, where a later generated method refuses the transaction and `Commit` throws |
-| [TD-0091](TD-0091-check-does-not-compare-a-columns-origin.md) | Open | 2026-10-29 | Medium | `describe --check` never compares a column's `origin`, though the generator matches `columnTypes` against it, so a check passes on a sidecar whose next `describe` changes a column's generated type |
 
 ## Columns
 

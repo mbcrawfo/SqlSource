@@ -36,8 +36,8 @@ internal sealed class RealisticDescriptionChecks(RealisticDescribe describe, int
         _ = RealisticDescriptions.ColumnsOf(found, described);
     }
 
-    // The entry of each case with models is the one its sidecar holds, whole: what --check compares, and the
-    // provenance and the origins, which it does not.  Only the server's version and where the query's name stands in
+    // The entry of each case with models is the one its sidecar holds, whole: what --check compares, the origins
+    // among it, and the provenance, which it does not.  Only the server's version and where the query's name stands in
     // the text are left out.  A case that an earlier major describes otherwise is left out on it by its checkedFrom.
     public async Task ShouldBeItsCommittedEntryAsync(string name)
     {

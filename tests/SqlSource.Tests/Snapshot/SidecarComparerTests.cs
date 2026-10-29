@@ -133,6 +133,56 @@ public sealed class SidecarComparerTests
         );
     }
 
+    // Column types are matched against the origin, a quoted part of a key exactly, so a part that differs in case
+    // alone is a difference.
+    [Fact]
+    public void FindDifference_Origin_IsComparedAsAnObjectAndThenByItsKeys()
+    {
+        ShouldDiffer(
+            entry => WithColumn(entry, 0, column => column with { Origin = null }),
+            "columns[0].origin",
+            "an object",
+            "null"
+        );
+        ShouldDiffer(
+            entry =>
+                WithColumn(entry, 1, column => column with { Origin = new SidecarOrigin("public", "users", "name") }),
+            "columns[1].origin",
+            "null",
+            "an object"
+        );
+        ShouldDiffer(
+            entry => WithColumn(entry, 0, column => column with { Origin = new SidecarOrigin("sales", "users", "id") }),
+            "columns[0].origin.schema",
+            "\"public\"",
+            "\"sales\""
+        );
+        ShouldDiffer(
+            entry => WithColumn(entry, 0, column => column with { Origin = new SidecarOrigin(null, "users", "id") }),
+            "columns[0].origin.schema",
+            "\"public\"",
+            "null"
+        );
+        ShouldDiffer(
+            entry =>
+                WithColumn(entry, 0, column => column with { Origin = new SidecarOrigin("public", "Users", "id") }),
+            "columns[0].origin.table",
+            "\"users\"",
+            "\"Users\""
+        );
+        ShouldDiffer(
+            entry =>
+                WithColumn(
+                    entry,
+                    0,
+                    column => column with { Origin = new SidecarOrigin("public", "users", "user_id") }
+                ),
+            "columns[0].origin.column",
+            "\"id\"",
+            "\"user_id\""
+        );
+    }
+
     [Fact]
     public void FindDifference_PostgresType_IsComparedKeyByKey()
     {
@@ -283,8 +333,8 @@ public sealed class SidecarComparerTests
     public void FindDifference_ValueWithACharacterTheFormatEscapes_IsShownEscaped() =>
         ShouldDiffer(entry => entry with { Hash = "a\"b\n" }, "hash", "\"h\"", "\"a\\\"b\\n\"");
 
-    // The versions and the server differ between a developer's machine and CI by design, and provenance, origin,
-    // identity and computed are informational.  An entry's name and its span are not compared either.
+    // The versions and the server differ between a developer's machine and CI by design, and provenance, identity
+    // and computed are informational.  An entry's name and its span are not compared either.
     [Fact]
     public void FindDifference_MemberThatCheckDoesNotCompare_IsNull()
     {
@@ -299,7 +349,6 @@ public sealed class SidecarComparerTests
         ShouldNotDiffer(entry =>
             WithColumn(entry, 0, column => column with { NullableSource = SidecarValues.NullableSource.View })
         );
-        ShouldNotDiffer(entry => WithColumn(entry, 0, column => column with { Origin = null }));
         ShouldNotDiffer(entry => WithColumn(entry, 0, column => column with { Identity = false }));
         ShouldNotDiffer(entry => WithColumn(entry, 0, column => column with { Computed = true }));
     }
@@ -366,6 +415,23 @@ public sealed class SidecarComparerTests
                 ),
             "columns[0].nullable",
             "false",
+            "null"
+        );
+        ShouldDiffer(
+            entry => WithColumn(entry, 0, column => column with { Nullable = null, Origin = null }),
+            "columns[0].nullable",
+            "false",
+            "null"
+        );
+        ShouldDiffer(
+            entry =>
+                WithColumn(
+                    WithColumn(entry, 0, column => column with { Origin = null }),
+                    1,
+                    column => column with { Name = "x" }
+                ),
+            "columns[0].origin",
+            "an object",
             "null"
         );
     }
