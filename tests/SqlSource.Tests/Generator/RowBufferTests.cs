@@ -317,7 +317,7 @@ public sealed class RowBufferTests
     // The file of ListUsers's methods on App.Sample, its rows read into the given buffer, the pooled one or a list, and
     // the end after the extension class: the buffer's struct and the namespace's brace, or the brace alone.
     private static string ListUsersMethods(string buffer, string end) =>
-        Joined(
+        GeneratedFile.Joined(
             $$$"""
             {{{GeneratedFile.ModelHeader}}}
             namespace App
@@ -409,8 +409,4 @@ public sealed class RowBufferTests
 
     private static int Count(string text, string part) =>
         Regex.Count(text, Regex.Escape(part), RegexOptions.None, TimeSpan.FromSeconds(1));
-
-    // An expected text with each line that ends in the mark joined to the next, whose indentation goes.
-    private static string Joined(string text) =>
-        Regex.Replace(text, "↩\n *", string.Empty, RegexOptions.None, TimeSpan.FromSeconds(1));
 }

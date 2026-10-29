@@ -1,6 +1,5 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
-using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Testing.Generator;
 using Xunit;
@@ -26,7 +25,7 @@ public sealed class MethodDiagnosticsTests
 
         var run = MethodRuns.Run(file, [Entry(file, "SetName", [], null)]);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC272 /app/Repo/Users.sql(1,10)-(1,17): The query 'SetName' has the shape '"
                     + shape
@@ -80,7 +79,7 @@ public sealed class MethodDiagnosticsTests
 
         var run = MethodRuns.Run(file, [Entry(file, "SetName", [], null)], Source);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC272 /app/Repo/Users.sql(1,10)-(1,17): The query 'SetName' has the shape 'one', and its "
                     + "statement returns no rows.  Remove the shape, or write 'rowcount' or 'none'.",
@@ -98,7 +97,7 @@ public sealed class MethodDiagnosticsTests
 
         var run = MethodRuns.Run(file, [Entry(file, "SetName", [], null)]);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC272 /app/Repo/Users.sql(1,10)-(1,17): The query 'SetName' has the shape 'one', and its "
                     + "statement returns no rows.  Remove the shape, or write 'rowcount' or 'none'.",
@@ -119,7 +118,7 @@ public sealed class MethodDiagnosticsTests
 
         var run = MethodRuns.Run(file, [Entry(file, "List", [], [Column("id")])]);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC275 /app/Repo/Users.sql(1,10)-(1,14): The token 'transaction' of the query 'List' has the "
                     + "name of an argument that every query method has: connection, parameters, transaction, "
@@ -138,7 +137,7 @@ public sealed class MethodDiagnosticsTests
 
         var run = MethodRuns.Run(file, [Entry(file, name, [], [Column("id")])]);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 $"SQLSRC274 /app/Repo/Users.sql(1,10)-(1,{10 + name.Length}): The method of the query '{name}' "
                     + $"cannot be named '{name}', because DbConnection has a member of that name, which a call on a "
@@ -154,7 +153,7 @@ public sealed class MethodDiagnosticsTests
 
         var run = MethodRuns.Run(file, [Entry(file, "SampleExtensions", [], [Column("id")])]);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,26): The method of the query 'SampleExtensions' cannot be "
                     + "named 'SampleExtensions', because the class that holds the method has that name.  Rename the "
@@ -182,7 +181,7 @@ public sealed class MethodDiagnosticsTests
 
         var run = MethodRuns.Run(file, [Entry(file, "Count", [], [Column("id")])], Source);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,15): The method of the query 'Count' cannot be named 'Count', "
                     + "because 'App.Sample' has a member of that name.  Rename the query.",
@@ -201,7 +200,7 @@ public sealed class MethodDiagnosticsTests
             MethodRuns.SampleSource("MethodLocation = MethodLocation.Public")
         );
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,16): The method of the query 'Sample' cannot be named "
                     + "'Sample', because it is the name of the type 'App.Sample' that holds the method.  Rename the "
@@ -222,7 +221,7 @@ public sealed class MethodDiagnosticsTests
             MethodRuns.SampleSource("SqlLocation = SqlLocation.Direct, MethodLocation = MethodLocation.Public")
         );
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,16): The method of the query 'Sample' cannot be named "
                     + "'Sample', because it is the name of the type 'App.Sample' that holds the method.  Rename the "
@@ -247,7 +246,7 @@ public sealed class MethodDiagnosticsTests
 
         var run = MethodRuns.Run(file, [Entry(file, "TRow", [], [Column("id")])], Source);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,14): The method of the query 'TRow' cannot be named 'TRow', "
                     + "because 'App.Sample<TRow>' has a type parameter of that name.  Rename the query.",
@@ -272,7 +271,7 @@ public sealed class MethodDiagnosticsTests
             MethodRuns.SampleSource("MethodLocation = MethodLocation.Public, NestedClass = \"GetAsync\"")
         );
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'GetAsync', "
                     + "because the class of the queries of 'App.Sample' has that name.  Rename the query.",
@@ -296,7 +295,7 @@ public sealed class MethodDiagnosticsTests
 
         var run = MethodRuns.Run(file, [Entry(file, "Get", [], [Column("id")])], source);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'GetAsync', "
                     + "because the query 'GetAsync' of 'App.Sample' has a constant or method of that name.  Rename the "
@@ -320,7 +319,7 @@ public sealed class MethodDiagnosticsTests
             [Entry(file, "Get", [], [Column("id")]), Entry(file, "GetAsync", [], [Column("id")])]
         );
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'GetAsync', "
                     + "because the method of the query 'GetAsync' has that name too.  Rename the query.",
@@ -343,7 +342,7 @@ public sealed class MethodDiagnosticsTests
 
         var run = MethodRuns.Run(file, [Entry(file, "GetAsync", [], null), Entry(file, "Get", [], [Column("id")])]);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC272 /app/Repo/Users.sql(1,10)-(1,18): The query 'GetAsync' has the shape 'one', and its "
                     + "statement returns no rows.  Remove the shape, or write 'rowcount' or 'none'.",
@@ -381,20 +380,12 @@ public sealed class MethodDiagnosticsTests
 
         var run = MethodRuns.Run(file, [Entry(file, "Count", [], [Column("id")])], Source);
 
-        Problems(run)
+        run.Problems()
             .ShouldBe([
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,15): The method of the query 'Count' cannot be named 'Count', "
                     + "because 'App.A.Sample' has a member of that name.  Rename the query.",
                 "SQLSRC274 /app/Repo/Users.sql(1,10)-(1,15): The method of the query 'Count' cannot be named 'Count', "
                     + "because 'App.B.Sample' has a member of that name.  Rename the query.",
             ]);
-    }
-
-    // The diagnostics of a run whose generated code compiles with no error and no warning.
-    private static IReadOnlyList<string> Problems(GeneratorRun run)
-    {
-        run.CompilationErrors.ShouldBeEmpty();
-        run.GeneratedCodeWarnings.ShouldBeEmpty();
-        return run.Diagnostics;
     }
 }

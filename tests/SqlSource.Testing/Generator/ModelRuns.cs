@@ -96,9 +96,13 @@ internal static class ModelRuns
         bool? computed = null
     ) => TestSidecars.Column(0, name, type ?? Int4, nullable, origin: origin, identity: identity, computed: computed);
 
-    // A type of pg_catalog, by its internal name, which is also its name.
-    public static PostgresType Catalog(string internalName) =>
-        TestSidecars.Postgres(name: internalName, internalName: internalName);
+    // A type of pg_catalog, by its internal name, which is also its name, of the kind given and with the subtype of a
+    // range.
+    public static PostgresType Catalog(
+        string internalName,
+        string kind = SidecarValues.Kind.Base,
+        PostgresType? subtype = null
+    ) => TestSidecars.Postgres(name: internalName, kind: kind, internalName: internalName, subtype: subtype);
 
     // The array of the element, in its schema, under the name the database gives it.
     public static PostgresType ArrayOf(PostgresType element, string internalName) =>

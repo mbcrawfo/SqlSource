@@ -1,5 +1,7 @@
 using System.Linq;
 using Shouldly;
+using SqlSource.Generation;
+using SqlSource.Generation.Types;
 
 namespace SqlSource.Testing.Generator;
 
@@ -19,4 +21,12 @@ internal static class StepOutputs
 
     // The one value the step gave, for a step that runs once for the compilation, or once for the one file a run has.
     public static T Single<T>(GeneratorRun run, string step) => Of<T>(run, step).ShouldHaveSingleItem();
+
+    // The types of the columns of the run's one query, or of its query of the name, as the types of its file gave them.
+    public static PropertyType[] ColumnsOf(GeneratorRun run, string? queryName = null)
+    {
+        var queries = Of<FileTypes>(run, TrackingNames.FileTypes).SelectMany(file => file.Queries);
+        var query = queryName is null ? queries.ShouldHaveSingleItem() : queries.Single(each => each.Name == queryName);
+        return [.. query.Columns.ShouldNotBeNull()];
+    }
 }

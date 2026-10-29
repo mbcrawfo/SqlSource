@@ -2,10 +2,8 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Shouldly;
 using SqlSource.Generation;
-using SqlSource.Generation.Types;
 using SqlSource.Settings;
 using SqlSource.Snapshot;
 using SqlSource.Testing;
@@ -338,7 +336,7 @@ public sealed class SettingsFileTests
         );
 
         run.ShouldBeClean();
-        var column = ColumnOf(run);
+        var column = StepOutputs.ColumnsOf(run).ShouldHaveSingleItem();
         column.Text.ShouldBe("global::System.Uri");
         column.Place.ShouldBe("the typeOverrides of the settings file " + SettingsPath);
         column.Key.ShouldBe("public.status");
@@ -374,7 +372,7 @@ public sealed class SettingsFileTests
         );
 
         run.ShouldBeClean();
-        var column = ColumnOf(run);
+        var column = StepOutputs.ColumnsOf(run).ShouldHaveSingleItem();
         column.Text.ShouldBe("global::App.UserId");
         column.Place.ShouldBe("the columnTypes of the settings file " + SettingsPath);
         column.Mapped.ShouldBe("users.id");
@@ -964,13 +962,4 @@ public sealed class SettingsFileTests
             [.. settingsFiles, file, Sidecars.Of(file, Entry(file, "GetUser", [], [Column("c0", Int4)]))]
         );
     }
-
-    // The type of the one column of the run's one query.
-    private static PropertyType ColumnOf(GeneratorRun run) =>
-        StepOutputs
-            .Of<FileTypes>(run, TrackingNames.FileTypes)
-            .SelectMany(file => file.Queries)
-            .ShouldHaveSingleItem()
-            .Columns.ShouldNotBeNull()
-            .ShouldHaveSingleItem();
 }
