@@ -23,8 +23,9 @@ internal sealed record FileModels(
 )
 {
     /// <summary>
-    /// The models of the query at an index in the file, matched by index and name as <see cref="TypeModels" />
-    /// matches them.  The models are in the order of the file's queries, so a search finds them.
+    /// The models of the query at an index in the file, matched by index and name: the models are read from the same
+    /// parse, so the two agree, and a mismatch is passed over rather than thrown on.  The models are in the order of
+    /// the file's queries, so a search finds them.
     /// </summary>
     /// <param name="queryIndex">The query's index among the queries of the file.</param>
     /// <param name="name">The query's name.</param>
