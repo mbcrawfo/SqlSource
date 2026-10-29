@@ -8,6 +8,7 @@ using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 using static SqlSource.Tool.Tests.SqlServerScript;
 using static SqlSource.Tool.Tests.SqlServerSessionCases;
+using Calls = SqlSource.Tool.Describing.SqlServer.SqlServerCallNames;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer;
 
@@ -23,16 +24,15 @@ public sealed class SqlServerSessionParameterTests
         var parameters = new SqlServerParametersRequest(Sql, null);
         var columns = new SqlServerColumnsRequest(Sql, "@id int, @name nvarchar(100)");
         var script = new SqlServerScript()
-            .Add(
-                "parameters",
+            .Parameters(
                 parameters,
                 new SqlServerParametersAnswer([IntRow with { Name = "@id" }, Name100Row with { Name = "@name" }], null)
             )
-            .Add("columns", columns, NoRows);
+            .Columns(columns, NoRows);
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.ShouldBe([Call("parameters", parameters), Call("columns", columns)]);
+        asked.ShouldBe([Call(Calls.Parameters, parameters), Call(Calls.Columns, columns)]);
         var description = described.Value.ShouldNotBeNull();
         description.ResultKind.ShouldBe(SidecarResultKind.None);
         description.Columns.ShouldBeNull();
@@ -55,27 +55,26 @@ public sealed class SqlServerSessionParameterTests
         var xmlSecond = new SqlServerProbeRequest(Renamed, "@name_1 int, @name_2 xml");
         var columns = new SqlServerColumnsRequest(Sql, "@name nvarchar(100)");
         var script = new SqlServerScript()
-            .Add(
-                "parameters",
+            .Parameters(
                 parameters,
                 new SqlServerParametersAnswer(
                     [IntRow with { Name = "@name_1" }, Name100Row with { Name = "@name_2" }],
                     null
                 )
             )
-            .Add("probe", xmlFirst, new SqlServerProbeAnswer(true, null))
-            .Add("probe", intFirst, new SqlServerProbeAnswer(true, null))
-            .Add("probe", xmlSecond, new SqlServerProbeAnswer(false, null))
-            .Add("columns", columns, NoRows);
+            .Probe(xmlFirst, new SqlServerProbeAnswer(true, null))
+            .Probe(intFirst, new SqlServerProbeAnswer(true, null))
+            .Probe(xmlSecond, new SqlServerProbeAnswer(false, null))
+            .Columns(columns, NoRows);
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
         asked.ShouldBe([
-            Call("parameters", parameters),
-            Call("probe", xmlFirst),
-            Call("probe", intFirst),
-            Call("probe", xmlSecond),
-            Call("columns", columns),
+            Call(Calls.Parameters, parameters),
+            Call(Calls.Probe, xmlFirst),
+            Call(Calls.Probe, intFirst),
+            Call(Calls.Probe, xmlSecond),
+            Call(Calls.Columns, columns),
         ]);
         described
             .Value.ShouldNotBeNull()
@@ -92,16 +91,15 @@ public sealed class SqlServerSessionParameterTests
         var parameters = new SqlServerParametersRequest(Renamed, null);
         var columns = new SqlServerColumnsRequest(Sql, "@p int");
         var script = new SqlServerScript()
-            .Add(
-                "parameters",
+            .Parameters(
                 parameters,
                 new SqlServerParametersAnswer([IntRow with { Name = "@p_1" }, IntRow with { Name = "@p_2" }], null)
             )
-            .Add("columns", columns, NoRows);
+            .Columns(columns, NoRows);
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql));
 
-        asked.ShouldBe([Call("parameters", parameters), Call("columns", columns)]);
+        asked.ShouldBe([Call(Calls.Parameters, parameters), Call(Calls.Columns, columns)]);
         described
             .Value.ShouldNotBeNull()
             .Parameters.ShouldBe([new DescribedParameter("p", Int, SidecarValues.TypeSource.InferredFromCopies)]);
@@ -117,8 +115,7 @@ public sealed class SqlServerSessionParameterTests
         var parameters = new SqlServerParametersRequest(Sql, "@tenant int");
         var columns = new SqlServerColumnsRequest(Sql, "@tenant int, @id int");
         var script = new SqlServerScript()
-            .Add(
-                "declared",
+            .Declared(
                 declared,
                 new SqlServerDeclaredAnswer(
                     [new SqlServerDeclaredRow(1, "int", 4, 10, 0, null, null, null)],
@@ -126,12 +123,16 @@ public sealed class SqlServerSessionParameterTests
                     null
                 )
             )
-            .Add("parameters", parameters, new SqlServerParametersAnswer([IntRow with { Name = "@id" }], null))
-            .Add("columns", columns, NoRows);
+            .Parameters(parameters, new SqlServerParametersAnswer([IntRow with { Name = "@id" }], null))
+            .Columns(columns, NoRows);
 
         var (described, asked) = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql, ("tenant", " int ")));
 
-        asked.ShouldBe([Call("declared", declared), Call("parameters", parameters), Call("columns", columns)]);
+        asked.ShouldBe([
+            Call(Calls.Declared, declared),
+            Call(Calls.Parameters, parameters),
+            Call(Calls.Columns, columns),
+        ]);
         described
             .Value.ShouldNotBeNull()
             .Parameters.ShouldBe([
@@ -161,8 +162,7 @@ public sealed class SqlServerSessionParameterTests
     {
         const string Sql = "SELECT TOP (@n) id, @p + 1 AS q FROM dbo.users";
         var parameters = new SqlServerParametersRequest(Sql, null);
-        var script = new SqlServerScript().Add(
-            "parameters",
+        var script = new SqlServerScript().Parameters(
             parameters,
             new SqlServerParametersAnswer(
                 [new SqlServerParameterRow("@n", "bigint", 8, 19, 0, null, null, null), IntRow with { Name = "@p" }],
@@ -172,7 +172,7 @@ public sealed class SqlServerSessionParameterTests
 
         var (described, asked) = await script.DescribeAsync(Listed(Sql, Inferred("n")));
 
-        asked.ShouldBe([Call("parameters", parameters)]);
+        asked.ShouldBe([Call(Calls.Parameters, parameters)]);
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
         failure.Arguments.ShouldBe([
@@ -188,8 +188,7 @@ public sealed class SqlServerSessionParameterTests
     {
         const string Renamed = "SELECT id FROM dbo.users WHERE id = @p_1 AND name = @p_2 AND id = @q";
         var parameters = new SqlServerParametersRequest(Renamed, null);
-        var script = new SqlServerScript().Add(
-            "parameters",
+        var script = new SqlServerScript().Parameters(
             parameters,
             new SqlServerParametersAnswer(
                 [IntRow with { Name = "@p_1" }, Name100Row with { Name = "@p_2" }, IntRow with { Name = "@q" }],
@@ -201,7 +200,7 @@ public sealed class SqlServerSessionParameterTests
             Listed("SELECT id FROM dbo.users WHERE id = @p AND name = @p AND id = @q", Inferred("p"))
         );
 
-        asked.ShouldBe([Call("parameters", parameters)]);
+        asked.ShouldBe([Call(Calls.Parameters, parameters)]);
         described.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC231");
     }
 
@@ -211,21 +210,15 @@ public sealed class SqlServerSessionParameterTests
         const string Renamed = "SELECT id FROM dbo.users WHERE id = @p_1 AND name = @p_2";
         var parameters = new SqlServerParametersRequest(Renamed, null);
         var script = new SqlServerScript()
-            .Add(
-                "parameters",
+            .Parameters(
                 parameters,
                 new SqlServerParametersAnswer([IntRow with { Name = "@p_1" }, Name100Row with { Name = "@p_2" }], null)
             )
-            .Add(
-                "probe",
+            .Probe(
                 new SqlServerProbeRequest(Renamed, "@p_1 xml, @p_2 nvarchar(100)"),
                 new SqlServerProbeAnswer(false, null)
             )
-            .Add(
-                "probe",
-                new SqlServerProbeRequest(Renamed, "@p_1 int, @p_2 xml"),
-                new SqlServerProbeAnswer(false, null)
-            );
+            .Probe(new SqlServerProbeRequest(Renamed, "@p_1 int, @p_2 xml"), new SqlServerProbeAnswer(false, null));
 
         var (described, _) = await script.DescribeAsync(
             Of(SqlDialectRules.SqlServer, "SELECT id FROM dbo.users WHERE id = @p AND name = @p")
@@ -242,13 +235,11 @@ public sealed class SqlServerSessionParameterTests
     {
         const string Renamed = "SELECT id FROM dbo.users WHERE id = @p_1 AND name = @p_2";
         var script = new SqlServerScript()
-            .Add(
-                "parameters",
+            .Parameters(
                 new SqlServerParametersRequest(Renamed, null),
                 new SqlServerParametersAnswer([IntRow with { Name = "@p_1" }, Name100Row with { Name = "@p_2" }], null)
             )
-            .Add(
-                "probe",
+            .Probe(
                 new SqlServerProbeRequest(Renamed, "@p_1 xml, @p_2 nvarchar(100)"),
                 new SqlServerProbeAnswer(null, Lost)
             );
@@ -267,8 +258,7 @@ public sealed class SqlServerSessionParameterTests
     public async Task DescribeAsync_DeclaredAnswersErrorRows_IsSqlsrc228AndAsksNoParameters()
     {
         var declared = new SqlServerDeclaredRequest("SELECT @p AS [1]", "@p dbo.Nope");
-        var script = new SqlServerScript().Add(
-            "declared",
+        var script = new SqlServerScript().Declared(
             declared,
             new SqlServerDeclaredAnswer(
                 null,
@@ -287,7 +277,7 @@ public sealed class SqlServerSessionParameterTests
             Of(SqlDialectRules.SqlServer, "SELECT id FROM dbo.users WHERE email = @p", ("p", "dbo.Nope"))
         );
 
-        asked.ShouldBe([Call("declared", declared)]);
+        asked.ShouldBe([Call(Calls.Declared, declared)]);
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC228");
         failure.Arguments[3].ShouldBe(DescribeFailures.NoSuchType);

@@ -20,7 +20,7 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// <para>
 /// <c>pg_cast</c> holds one row for a pair, so no user can add another cast between two of these types, and none of
 /// the built-in casts returns <c>NULL</c> for a value that is not.  <c>Catalog_CastFamilies_AreBuiltInBothWays</c>
-/// in <c>PlanOutputTests</c> pins that every ordered pair of a family has such a row on the servers the tool
+/// in <c>CatalogPinTests</c> pins that every ordered pair of a family has such a row on the servers the tool
 /// supports.
 /// </para>
 /// </remarks>

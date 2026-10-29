@@ -26,9 +26,6 @@ public sealed class QueryMethodWriterTests
     // The row buffer as the methods of a file in the namespace App name it.
     private const string RowBufferType = "global::App.SqlSourceRowBuffer";
 
-    // Ends a line of an expected text that goes on in the next, written so to keep within the width of a line.
-    private const string Continued = "\u21a9";
-
     // The type integer, as the entry of a parameter describes it.
     private static readonly PostgresType Integer = TestSidecars.Postgres(bindName: "integer");
 
@@ -41,21 +38,21 @@ public sealed class QueryMethodWriterTests
         ResultShape.OneOptional,
         CollectionKind.List,
         DatabaseEngine.PostgreSql,
-        TestModels.Array(TestModels.Literal("SELECT id, name FROM users WHERE id = @id ORDER BY "), Token("orderBy")),
+        TestSidecars.Of(TestModels.Literal("SELECT id, name FROM users WHERE id = @id ORDER BY "), Token("orderBy")),
         true,
         true,
         new MethodInput(
             "global::App.GetUserParams",
-            TestModels.Array(new MethodParameter("id", "Id", "int", true, false, Described: Integer))
+            TestSidecars.Of(new MethodParameter("id", "Id", "int", true, false, Described: Integer))
         ),
         new MethodOutput(
             "global::App.GetUserDto",
             true,
-            TestModels.Array(
+            TestSidecars.Of(
                 new MethodColumn("id", "Id", "int", false),
                 new MethodColumn("name", "Name", "string", true)
             ),
-            TestModels.Array(0, 1)
+            TestSidecars.Of(0, 1)
         ),
         TestModels.NameLocation("Users.sql")
     );
@@ -77,7 +74,7 @@ public sealed class QueryMethodWriterTests
         builder
             .ToString()
             .ShouldBe(
-                Joined(
+                GeneratedFile.Joined(
                     """
                     before
                         /// <summary>
@@ -185,81 +182,97 @@ public sealed class QueryMethodWriterTests
         nameof(ResultShape.Many),
         "global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<global::App.GetUserDto>>",
         ReaderLine,
-        "<returns>The rows the query returned.</returns>"
+        "<returns>The rows the query returned.</returns>",
+        true
     )]
     [InlineData(
         nameof(ResultShape.One),
         "global::System.Threading.Tasks.Task<global::App.GetUserDto>",
         ReaderLine,
-        "<returns>The row.</returns>"
+        "<returns>The row.</returns>",
+        true
     )]
     [InlineData(
         nameof(ResultShape.OneOptional),
         "global::System.Threading.Tasks.Task<global::App.GetUserDto?>",
         ReaderLine,
-        "<returns>The row, or null when there is none.</returns>"
+        "<returns>The row, or null when there is none.</returns>",
+        true
     )]
     [InlineData(
         nameof(ResultShape.None),
         "global::System.Threading.Tasks.Task",
         "        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);\n    }\n",
-        "<returns>A task that completes when the query has run.</returns>"
+        "<returns>A task that completes when the query has run.</returns>",
+        false
     )]
     [InlineData(
         nameof(ResultShape.RowCount),
         "global::System.Threading.Tasks.Task<int>",
         "        return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);\n    }\n",
-        "<returns>The number of rows the query affected.</returns>"
+        "<returns>The number of rows the query affected.</returns>",
+        false
     )]
     public void Append_EachShape_ReturnsAndExecutesAsTheShapeSays(
         string shapeName,
         string returns,
         string execute,
-        string returnsXml
+        string returnsXml,
+        bool readsRows
     )
     {
-        var shape = Enum.Parse<ResultShape>(shapeName);
-
-        var text = Write(GetUser with { Shape = shape });
+        var text = Write(GetUser with { Shape = Enum.Parse<ResultShape>(shapeName) });
 
         text.ShouldContain("public static async " + returns + " GetUser(\n");
         text.ShouldContain(execute);
         text.ShouldContain("/// " + returnsXml + "\n");
-        var isNonQuery = shape is ResultShape.None or ResultShape.RowCount;
-        text.Contains("ExecuteReaderAsync", StringComparison.Ordinal).ShouldBe(!isNonQuery);
-        text.Contains("ExecuteNonQueryAsync", StringComparison.Ordinal).ShouldBe(isNonQuery);
+        text.Contains("ExecuteReaderAsync", StringComparison.Ordinal).ShouldBe(readsRows);
+        text.Contains("ExecuteNonQueryAsync", StringComparison.Ordinal).ShouldBe(!readsRows);
+    }
 
-        if (shape == ResultShape.One)
-        {
-            text.ShouldContain(
-                "/// <exception cref=\"global::SqlSource.UnexpectedRowCountException\">"
-                    + "The query returned no rows, or more than one.</exception>\n"
-            );
-            text.ShouldNotContain("return null;");
-            text.ShouldContain(
-                "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", false);\n"
-            );
-            text.ShouldContain(
-                "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n"
-            );
-        }
-        else if (shape == ResultShape.OneOptional)
-        {
-            text.ShouldContain(
-                "/// <exception cref=\"global::SqlSource.UnexpectedRowCountException\">"
-                    + "The query returned more than one row.</exception>\n"
-            );
-            text.ShouldContain("            return null;\n");
-            text.ShouldNotContain("UnexpectedRowCountException(\"GetUser\", false)");
-            text.ShouldContain(
-                "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n"
-            );
-        }
-        else
-        {
-            text.ShouldNotContain("UnexpectedRowCountException");
-            text.ShouldNotContain("<exception");
-        }
+    // One row exactly: no row and more than one are each an UnexpectedRowCountException, which the summary names.
+    [Fact]
+    public void Append_ShapeOne_ThrowsOnNoRowAndOnMoreThanOne()
+    {
+        var text = Write(GetUser with { Shape = ResultShape.One });
+
+        text.ShouldContain(
+            "/// <exception cref=\"global::SqlSource.UnexpectedRowCountException\">"
+                + "The query returned no rows, or more than one.</exception>\n"
+        );
+        text.ShouldNotContain("return null;");
+        text.ShouldContain(
+            "            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", false);\n"
+        );
+        text.ShouldContain("            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n");
+    }
+
+    // At most one row: no row is null, and more than one an UnexpectedRowCountException, which the summary names.
+    [Fact]
+    public void Append_ShapeOneOptional_ReturnsNullForNoRowAndThrowsOnMoreThanOne()
+    {
+        var text = Write(GetUser with { Shape = ResultShape.OneOptional });
+
+        text.ShouldContain(
+            "/// <exception cref=\"global::SqlSource.UnexpectedRowCountException\">"
+                + "The query returned more than one row.</exception>\n"
+        );
+        text.ShouldContain("            return null;\n");
+        text.ShouldNotContain("UnexpectedRowCountException(\"GetUser\", false)");
+        text.ShouldContain("            throw new global::SqlSource.UnexpectedRowCountException(\"GetUser\", true);\n");
+    }
+
+    // A shape that expects no count of rows throws no UnexpectedRowCountException and documents none.
+    [Theory]
+    [InlineData(nameof(ResultShape.Many))]
+    [InlineData(nameof(ResultShape.None))]
+    [InlineData(nameof(ResultShape.RowCount))]
+    public void Append_ShapeWithoutAnExpectedCount_ThrowsNoUnexpectedRowCount(string shapeName)
+    {
+        var text = Write(GetUser with { Shape = Enum.Parse<ResultShape>(shapeName) });
+
+        text.ShouldNotContain("UnexpectedRowCountException");
+        text.ShouldNotContain("<exception");
     }
 
     [Theory]
@@ -447,7 +460,7 @@ public sealed class QueryMethodWriterTests
         var text = Write(
             GetUser with
             {
-                Segments = TestModels.Array(TestModels.Literal("SELECT id, name\nFROM users;")),
+                Segments = TestSidecars.Of(TestModels.Literal("SELECT id, name\nFROM users;")),
             }
         );
 
@@ -509,12 +522,12 @@ public sealed class QueryMethodWriterTests
                     Output = new MethodOutput(
                         "global::App.GetUserDto",
                         true,
-                        TestModels.Array(
+                        TestSidecars.Of(
                             new MethodColumn("name", "Name", "string", false),
                             new MethodColumn("id", "Id", "int", false),
                             new MethodColumn("email", "Email", "string", true)
                         ),
-                        TestModels.Array(2, 1, 0)
+                        TestSidecars.Of(2, 1, 0)
                     ),
                 }
             )
@@ -534,13 +547,13 @@ public sealed class QueryMethodWriterTests
                 Output = GetUser.Output! with
                 {
                     IsRecord = false,
-                    Columns = TestModels.Array(
+                    Columns = TestSidecars.Of(
                         new MethodColumn("a", "A", "int", false),
                         new MethodColumn("b", "B", "int", true),
                         new MethodColumn("c", "C", "string", false),
                         new MethodColumn("d", "D", "string", true)
                     ),
-                    ConstructorOrder = TestModels.Array(0, 1, 2, 3),
+                    ConstructorOrder = TestSidecars.Of(0, 1, 2, 3),
                 },
             }
         );
@@ -595,7 +608,7 @@ public sealed class QueryMethodWriterTests
                 {
                     Input = new MethodInput(
                         "global::App.GetUserParams",
-                        TestModels.Array(
+                        TestSidecars.Of(
                             new MethodParameter("id", "Id", "int", true, false, Described: Integer),
                             new MethodParameter(
                                 "name",
@@ -630,7 +643,7 @@ public sealed class QueryMethodWriterTests
         var text = Write(
             GetUser with
             {
-                Segments = TestModels.Array(TestModels.Literal("SELECT 1 FROM "), Token("sql"), Token("span")),
+                Segments = TestSidecars.Of(TestModels.Literal("SELECT 1 FROM "), Token("sql"), Token("span")),
             }
         );
 
@@ -651,7 +664,7 @@ public sealed class QueryMethodWriterTests
         var text = Write(
             GetUser with
             {
-                Segments = TestModels.Array(TestModels.Literal("SELECT 1 FROM "), Token("await"), Token("b")),
+                Segments = TestSidecars.Of(TestModels.Literal("SELECT 1 FROM "), Token("await"), Token("b")),
             }
         );
 
@@ -707,8 +720,8 @@ public sealed class QueryMethodWriterTests
             {
                 Output = GetUser.Output! with
                 {
-                    Columns = TestModels.Array(column),
-                    ConstructorOrder = TestModels.Array(0),
+                    Columns = TestSidecars.Of(column),
+                    ConstructorOrder = TestSidecars.Of(0),
                 },
             }
         );
@@ -739,8 +752,8 @@ public sealed class QueryMethodWriterTests
             {
                 Output = GetUser.Output! with
                 {
-                    Columns = TestModels.Array(column),
-                    ConstructorOrder = TestModels.Array(0),
+                    Columns = TestSidecars.Of(column),
+                    ConstructorOrder = TestSidecars.Of(0),
                 },
             }
         );
@@ -759,7 +772,7 @@ public sealed class QueryMethodWriterTests
     public void Append_IAsyncEnumerable_IsTheWholeMethod() =>
         Write(Stream)
             .ShouldBe(
-                Joined(
+                GeneratedFile.Joined(
                     """
                     /// <summary>
                     /// The <c>GetUser</c> query from <c>Users.sql</c>.
@@ -900,7 +913,7 @@ public sealed class QueryMethodWriterTests
         var text = Write(
             Stream with
             {
-                Segments = TestModels.Array(TestModels.Literal("SELECT 1 FROM "), Token("ReadRows")),
+                Segments = TestSidecars.Of(TestModels.Literal("SELECT 1 FROM "), Token("ReadRows")),
             }
         );
 
@@ -919,7 +932,7 @@ public sealed class QueryMethodWriterTests
         var text = Write(
             Stream with
             {
-                Segments = TestModels.Array(TestModels.Literal("SELECT 1 FROM "), Token("await"), Token("b")),
+                Segments = TestSidecars.Of(TestModels.Literal("SELECT 1 FROM "), Token("await"), Token("b")),
             }
         );
 
@@ -1003,7 +1016,7 @@ public sealed class QueryMethodWriterTests
     [Fact]
     public void Append_EveryShapeAndCollectionType_Compiles()
     {
-        var awkward = TestModels.Array(
+        var awkward = TestSidecars.Of(
             TestModels.Literal("SELECT 1 FROM "),
             Token("sql"),
             Token("command"),
@@ -1025,13 +1038,13 @@ public sealed class QueryMethodWriterTests
         );
         var withVector = GetUser.Output! with
         {
-            Columns = TestModels.Array(
+            Columns = TestSidecars.Of(
                 new MethodColumn("id", "Id", "int", false),
                 new MethodColumn("name", "Name", "string", true),
                 new MethodColumn("embedding", "Embedding", Vector, false),
                 new MethodColumn("other", "Other", Vector, true)
             ),
-            ConstructorOrder = TestModels.Array(0, 1, 2, 3),
+            ConstructorOrder = TestSidecars.Of(0, 1, 2, 3),
         };
         var asClass = withVector with { TypeText = "global::App.GetUserClass", IsRecord = false };
         var builder = new StringBuilder("namespace App\n{\n    internal static class Queries\n    {\n");
@@ -1121,15 +1134,11 @@ public sealed class QueryMethodWriterTests
     private static MethodOutput VectorOutput(bool isNullable) =>
         GetUser.Output! with
         {
-            Columns = TestModels.Array(
+            Columns = TestSidecars.Of(
                 new MethodColumn("id", "Id", "int", false),
                 new MethodColumn("embedding", "Embedding", Vector, isNullable)
             ),
         };
-
-    // The text with each line that ends in the mark joined to the next, whose indentation is dropped.
-    private static string Joined(string text) =>
-        Regex.Replace(text, Continued + "\n *", string.Empty, RegexOptions.None, TimeSpan.FromSeconds(1));
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);
 

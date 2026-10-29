@@ -1,8 +1,8 @@
-using System.Collections.Immutable;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.TypeOverrides;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Settings;
@@ -210,15 +210,15 @@ public sealed class QuerySettingsTests
     {
         var file = new SettingsLevel
         {
-            TypeOverrides = Array(new TypeOverride("int4", "long", SettingsFile)),
-            SqlServerTypeOverrides = Array(
+            TypeOverrides = TestSidecars.Of(new TypeOverride("int4", "long", SettingsFile)),
+            SqlServerTypeOverrides = TestSidecars.Of(
                 new TypeOverride("int", "short", SettingsFile),
                 new TypeOverride("nvarchar", "string", SettingsFile)
             ),
         };
         var markers = new SettingsLevel
         {
-            SqlServerTypeOverrides = Array(new TypeOverride("nvarchar", null, SettingPlace.Query)),
+            SqlServerTypeOverrides = TestSidecars.Of(new TypeOverride("nvarchar", null, SettingPlace.Query)),
         };
 
         QuerySettings
@@ -237,11 +237,11 @@ public sealed class QuerySettingsTests
     {
         var query = new SettingsLevel
         {
-            SqlServerTypeOverrides = Array(new TypeOverride("int", null, SettingPlace.Query)),
+            SqlServerTypeOverrides = TestSidecars.Of(new TypeOverride("int", null, SettingPlace.Query)),
         };
         var preamble = new SettingsLevel
         {
-            SqlServerTypeOverrides = Array(
+            SqlServerTypeOverrides = TestSidecars.Of(
                 new TypeOverride("bigint", "decimal", SettingPlace.FileHeader),
                 new TypeOverride("int", "long", SettingPlace.FileHeader)
             ),
@@ -300,12 +300,9 @@ public sealed class QuerySettingsTests
             ]);
     }
 
-    private static EquatableArray<TypeOverride> Array(params TypeOverride[] entries) =>
-        new(ImmutableArray.Create(entries));
-
     private static SettingsLevel Overrides(params TypeOverride[] entries) =>
-        new() { TypeOverrides = new EquatableArray<TypeOverride>(ImmutableArray.Create(entries)) };
+        new() { TypeOverrides = TestSidecars.Of(entries) };
 
     private static SettingsLevel Columns(params ColumnType[] entries) =>
-        new() { ColumnTypes = new EquatableArray<ColumnType>(ImmutableArray.Create(entries)) };
+        new() { ColumnTypes = TestSidecars.Of(entries) };
 }

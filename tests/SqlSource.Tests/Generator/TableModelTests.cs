@@ -125,9 +125,8 @@ public sealed class TableModelTests
         );
 
         run.ShouldBeClean();
-        ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs"]);
-        run.Sources["App.GetUserDto-Model.g.cs"]
-            .ShouldContain("    /// A row of the query <c>GetUser</c> from <c>Users.sql</c>.\n");
+        ModelFiles(run).ShouldBe([GetUserDtoFile]);
+        run.Sources[GetUserDtoFile].ShouldContain("    /// A row of the query <c>GetUser</c> from <c>Users.sql</c>.\n");
     }
 
     // A parameter list that does not name no-table-models leaves table models on, whatever else it holds.
@@ -189,9 +188,8 @@ public sealed class TableModelTests
         var run = Run(Users, Entry(Users, "GetUser", [], [Column("id")], new SidecarTable(schema, table)));
 
         run.ShouldBeClean();
-        ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs"]);
-        run.Sources["App.GetUserDto-Model.g.cs"]
-            .ShouldContain("    /// A row of the query <c>GetUser</c> from <c>Users.sql</c>.\n");
+        ModelFiles(run).ShouldBe([GetUserDtoFile]);
+        run.Sources[GetUserDtoFile].ShouldContain("    /// A row of the query <c>GetUser</c> from <c>Users.sql</c>.\n");
     }
 
     [Fact]

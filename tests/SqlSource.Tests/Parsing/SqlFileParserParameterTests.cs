@@ -266,7 +266,7 @@ public sealed class SqlFileParserParameterTests
     [InlineData("-- param: @a ->")]
     [InlineData("-- param: @a int4 -> UserId more")]
     [InlineData("-- param: @a -> -> UserId")]
-    public void Parse_ParamMarker_BadCSharpType_IsSQLSRC111(string marker)
+    public void Parse_ParamMarkerOfABadCSharpType_IsSqlsrc111(string marker)
     {
         var text = "-- name: Q\n" + marker + "\nSELECT @a\n";
         var value = marker["-- param: ".Length..];
@@ -286,7 +286,7 @@ public sealed class SqlFileParserParameterTests
     [InlineData("@a -> OtherId")]
     [InlineData("@a -> App.UserId")]
     [InlineData("@a")]
-    public void Parse_TwoParamMarkers_DifferentCSharpTypes_IsSQLSRC112(string second)
+    public void Parse_TwoParamMarkersOfDifferentCSharpTypes_IsSqlsrc112(string second)
     {
         var text = "-- name: Q\n-- param: @a -> UserId\n-- param: " + second + "\nSELECT @a\n";
 
@@ -304,7 +304,7 @@ public sealed class SqlFileParserParameterTests
     }
 
     [Fact]
-    public void Parse_TwoParamMarkers_TheSameCSharpType_IsNotAConflict() =>
+    public void Parse_TwoParamMarkersOfTheSameCSharpType_IsNotAConflict() =>
         Blocks("-- name: Q\n-- param: @a -> UserId\n-- param: @A  ->  UserId\nSELECT @a\n")
             .ShouldHaveSingleItem()
             .Parameters.ShouldBe([new SqlQueryParameter("a", null, null, true, "UserId")]);

@@ -8,6 +8,7 @@ using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Testing;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Types.MappedTypes;
@@ -22,7 +23,7 @@ public sealed class MappedTypeNamesTests
     [Fact]
     public void Collect_NoOverride_GivesNoNames()
     {
-        var names = MappedTypeNames.Collect(EquatableArray<FileLevel>.Empty, TestModels.Array(Read(SqlTexts.GetUser)));
+        var names = MappedTypeNames.Collect(EquatableArray<FileLevel>.Empty, TestSidecars.Of(Read(SqlTexts.GetUser)));
 
         names.ShouldBeEmpty();
     }
@@ -32,7 +33,7 @@ public sealed class MappedTypeNamesTests
     [Fact]
     public void Collect_EveryLevel_GivesEachTypeOnceInOrdinalOrder()
     {
-        var files = TestModels.Array(
+        var files = TestSidecars.Of(
             new FileLevel(
                 "app/Other.sql",
                 Level(new TypeOverride("int4", "long", Farther), new TypeOverride("uuid", null, Farther))
@@ -42,7 +43,7 @@ public sealed class MappedTypeNamesTests
                 Level(new TypeOverride("text", "global::MyApp.Name", Nearer))
             )
         );
-        var parsed = TestModels.Array(
+        var parsed = TestSidecars.Of(
             Read(
                 "-- type-override: int8 = MyApp.Header\n\n"
                     + "-- name: GetUser\n-- type-override: numeric = System.Decimal\nSELECT 1;\n\n"
@@ -59,13 +60,13 @@ public sealed class MappedTypeNamesTests
     [Fact]
     public void Collect_ColumnTypes_GiveTheirTypes()
     {
-        var files = TestModels.Array(
+        var files = TestSidecars.Of(
             new FileLevel(
                 "app/Other.sql",
                 new SettingsLevel
                 {
-                    TypeOverrides = TestModels.Array(new TypeOverride("int4", "long", Farther)),
-                    ColumnTypes = TestModels.Array(
+                    TypeOverrides = TestSidecars.Of(new TypeOverride("int4", "long", Farther)),
+                    ColumnTypes = TestSidecars.Of(
                         new ColumnType("posts.id", null, Farther),
                         new ColumnType("users.id", "UserId", Farther)
                     ),
@@ -75,12 +76,12 @@ public sealed class MappedTypeNamesTests
                 GeneratorHarness.UsersNormalizedPath,
                 new SettingsLevel
                 {
-                    ColumnTypes = TestModels.Array(new ColumnType("users.id", "global::MyApp.UserId", Nearer)),
+                    ColumnTypes = TestSidecars.Of(new ColumnType("users.id", "global::MyApp.UserId", Nearer)),
                 }
             )
         );
 
-        var names = MappedTypeNames.Collect(files, TestModels.Array(Read(SqlTexts.GetUser)));
+        var names = MappedTypeNames.Collect(files, TestSidecars.Of(Read(SqlTexts.GetUser)));
 
         names.ShouldBe(["UserId", "global::MyApp.UserId", "long"]);
     }
@@ -90,14 +91,14 @@ public sealed class MappedTypeNamesTests
     [Fact]
     public void Collect_FilesOfOneChain_GiveItsTypesOnce()
     {
-        var chain = new SettingsLevel { TypeOverrides = TestModels.Array(new TypeOverride("int4", "long", Farther)) };
-        var files = TestModels.Array(
+        var chain = new SettingsLevel { TypeOverrides = TestSidecars.Of(new TypeOverride("int4", "long", Farther)) };
+        var files = TestSidecars.Of(
             new FileLevel("app/Repo/A.sql", chain),
             new FileLevel("app/Repo/B.sql", Level(new TypeOverride("text", "global::MyApp.Name", Nearer)).Over(chain)),
             new FileLevel("app/Repo/C.sql", chain)
         );
 
-        var names = MappedTypeNames.Collect(files, TestModels.Array(Read(SqlTexts.GetUser)));
+        var names = MappedTypeNames.Collect(files, TestSidecars.Of(Read(SqlTexts.GetUser)));
 
         names.ShouldBe(["global::MyApp.Name", "long"]);
     }
@@ -106,7 +107,7 @@ public sealed class MappedTypeNamesTests
     [Fact]
     public void Collect_ColumnMarkers_GiveTheirTypes()
     {
-        var parsed = TestModels.Array(
+        var parsed = TestSidecars.Of(
             Read(
                 "-- column: posts.id -> MyApp.PostId\n-- column: users.id -> default\n\n"
                     + "-- name: GetUser\n-- column: total -> PostCount\n-- column: note null\n"
@@ -120,7 +121,7 @@ public sealed class MappedTypeNamesTests
     }
 
     private static SettingsLevel Level(params TypeOverride[] entries) =>
-        new() { TypeOverrides = TestModels.Array(entries) };
+        new() { TypeOverrides = TestSidecars.Of(entries) };
 
     private static ParsedSqlFile Read(string text) =>
         SqlFileReader.Read(

@@ -208,7 +208,7 @@ public sealed class ColumnMarkerTests
     [Theory]
     [InlineData("string")]
     [InlineData("default")]
-    public void Run_TypeOnlyMarker_OnMarkedColumn_IsNoError(string type)
+    public void Run_TypeOnlyMarkerOnAMarkedColumn_IsNoError(string type)
     {
         var file = Query("-- column: display_name -> " + type + "\n", "SELECT name AS \"display_name!\" FROM users;");
 
@@ -245,7 +245,7 @@ public sealed class ColumnMarkerTests
     }
 
     [Fact]
-    public void Run_TypeMarker_NamingNoColumn_IsSqlsrc260()
+    public void Run_TypeMarkerNamingNoColumn_IsSqlsrc260()
     {
         var file = Query("-- column: nope -> string\n", "SELECT 1 AS id;");
 
@@ -260,7 +260,7 @@ public sealed class ColumnMarkerTests
 
     // Of a type marker and a nullability marker on a column with a mark, only the second says the nullability twice.
     [Fact]
-    public void Run_TypeAndNullabilityMarkers_OnMarkedColumn_ReportTheNullabilityOne()
+    public void Run_TypeAndNullabilityMarkersOnAMarkedColumn_ReportTheNullabilityOne()
     {
         var file = Query(
             "-- column: total -> long\n-- column: total not null\n",

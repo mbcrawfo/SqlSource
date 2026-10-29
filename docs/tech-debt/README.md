@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0089`
+Next id: `TD-0090`
 
 ## Active items
 
@@ -39,7 +39,6 @@ Next id: `TD-0089`
 | [TD-0077](TD-0077-describer-catalog-sql-takes-a-users-operators.md) | Open | 2026-10-23 | Low | The SQL of the PostgreSQL describer's catalog calls runs under the user's `search_path` and writes its operators without `pg_catalog`, so a user's operator on a system type before `pg_catalog`, or after it for a comparison of no exact operator of `pg_catalog`'s, changes what the catalog answers |
 | [TD-0078](TD-0078-datatypename-is-resolved-on-every-call.md) | Open | 2026-10-25 | Low | A generated PostgreSQL method sets each parameter's `DataTypeName` to the sidecar's display name, `integer`, which Npgsql resolves on every call at about 115 bytes per parameter, where the canonical internal name, `pg_catalog.int4`, costs about 22 to 58 |
 | [TD-0079](TD-0079-duplicated-logic-and-uneven-conventions-in-src.md) | Open | 2026-10-27 | Low | Rules of `src/` are written in several places: a type's usable files, binary searches, the describers' own errors and connection texts, the comparison of parameter names, SQL Server's names, the binders' shapes, a file's engine; the sidecar reader's switches read an unknown key as the last; `MappedTypeResolver` and `QueryMethodWriter` are long, the planners pass long lists, and one member is dead |
-| [TD-0080](TD-0080-duplicated-arrangements-and-uneven-conventions-in-tests.md) | Open | 2026-10-27 | Low | The generator tests copy small helpers and write file names, call names and SQL texts as literals, some theories change their arrangement by row, test names are uneven, and some named steps have no caching test |
 | [TD-0081](TD-0081-a-test-starts-mkfifo-itself.md) | Open | 2026-10-27 | Low | `PostgresDescriberTests` starts `mkfifo` with `Process.Start` and no skip where it is missing, against the rule that a test starts a program through `Programs` |
 | [TD-0082](TD-0082-a-test-converter-holds-its-token-in-a-static.md) | Open | 2026-10-27 | Low | The test converter `CancelOnRead` holds the token it cancels in a static that a test sets, so two tests reading through it in parallel would cancel each other's |
 | [TD-0083](TD-0083-two-tool-tests-wait-on-limits-of-their-own.md) | Open | 2026-10-27 | Low | `ProgramsTests` and `TerminationTests` wait on limits of their own, 20 and 60 seconds, beside `Eventually.Patience`, which `tests/AGENTS.md` makes the one limit |
@@ -48,6 +47,7 @@ Next id: `TD-0089`
 | [TD-0086](TD-0086-short-name-binds-to-a-referenced-packages-type.md) | Open | 2026-10-27 | Low | A short name that the project has no type of binds with no diagnostic to a `public` type of that name in an assembly a package brings, as `AccountId` to `Microsoft.Identity.Client.AccountId` under SqlClient 6.1, which then has no converter and fails when the query runs |
 | [TD-0087](TD-0087-drained-rows-error-replaces-the-loop-bodys-exception.md) | Open | 2026-10-28 | Low | On PostgreSQL, an error that the server raises for a row that a streaming loop left unread is thrown when the loop ends early, at a `break` or in place of the exception the loop's body threw, which is lost, and aborts the transaction; SQL Server drops it |
 | [TD-0088](TD-0088-sql-server-unreported-error-rolls-back-the-transaction.md) | Open | 2026-10-28 | Medium | On SQL Server, an error that no method reports, after the rows of a query or in the rows a streaming loop left unread, can roll back the caller's transaction with nothing thrown, depending on the error and on `XACT_ABORT`: under `SET XACT_ABORT ON` nearly any error, and with it off some errors and not others, such as `CAST('x' AS int)` and not a divide by zero; later commands given the transaction commit on their own and only `Commit` throws |
+| [TD-0089](TD-0089-theories-that-branch-on-their-row.md) | Open | 2026-10-29 | Low | Some theories still branch on their row with an `if` or derive their expectations with `?:`, so a reader must follow the branch to know what a row checks |
 
 ## Columns
 

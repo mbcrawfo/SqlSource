@@ -47,6 +47,6 @@ public sealed class ModelRunsTests
             Entry(GeneratorHarness.UsersFile, "GetUser", [Parameter("id")], [Column("id")])
         );
 
-        ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs", "App.GetUserParams-Model.g.cs"]);
+        ModelFiles(run).ShouldBe([GetUserDtoFile, "App.GetUserParams-Model.g.cs"]);
     }
 }

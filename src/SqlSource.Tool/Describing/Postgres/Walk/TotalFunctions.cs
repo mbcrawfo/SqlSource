@@ -32,7 +32,7 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// rest of the comparisons; <c>xideq</c>, which compares an <c>xid</c> with an <c>integer</c> too, <c>textcat</c>,
 /// <c>lower</c>, <c>upper</c>, <c>textlen</c>, <c>timestamp_trunc</c> and <c>timestamptz_trunc</c>.  Each raises an
 /// error where it cannot compute, an overflow or a division by zero, and returns a value otherwise.
-/// <c>Catalog_TotalFunctions_ArePgCatalogsOwn</c> in <c>PlanOutputTests</c> holds every row to the catalog, its
+/// <c>Catalog_TotalFunctions_ArePgCatalogsOwn</c> in <c>CatalogPinTests</c> holds every row to the catalog, its
 /// implementation included.
 /// </para>
 /// <para>
@@ -51,7 +51,7 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// </para>
 /// <para>
 /// So a row goes in this table only for one that is total, never merely strict, with the C function that implements
-/// it, which the <c>Catalog_Total*</c> tests of <c>PlanOutputTests</c> pin on PostgreSQL 14 and 18.
+/// it, which the <c>Catalog_Total*</c> tests of <c>CatalogPinTests</c> pin on PostgreSQL 14 and 18.
 /// </para>
 /// </remarks>
 internal static class TotalFunctions

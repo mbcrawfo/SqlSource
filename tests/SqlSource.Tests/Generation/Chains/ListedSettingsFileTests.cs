@@ -93,7 +93,7 @@ public sealed class ListedSettingsFileTests
     }
 
     [Fact]
-    public void Read_InvalidDatabase_IsNotReportedByTheBuild_AndIsByTheTool()
+    public void Read_InvalidDatabase_IsReportedByTheToolAndNotByTheBuild()
     {
         const string Text = /*lang=json,strict*/
             """{"database": " a b "}""";

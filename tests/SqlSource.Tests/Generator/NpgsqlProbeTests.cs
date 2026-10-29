@@ -55,27 +55,27 @@ public sealed class NpgsqlProbeTests
     // Each type whose C# type differs between Npgsql 8 and 9 and Npgsql 10, or comes from one that does, by name.
     private static readonly Dictionary<string, PostgresType> Differing = new()
     {
-        ["date"] = Catalog("date"),
-        ["time"] = Catalog("time"),
-        ["cidr"] = Catalog("cidr"),
-        ["daterange"] = Catalog("daterange", SidecarValues.Kind.Range, subtype: Catalog("date")),
-        ["datemultirange"] = Catalog(
+        ["date"] = ModelRuns.Catalog("date"),
+        ["time"] = ModelRuns.Catalog("time"),
+        ["cidr"] = ModelRuns.Catalog("cidr"),
+        ["daterange"] = ModelRuns.Catalog("daterange", SidecarValues.Kind.Range, subtype: ModelRuns.Catalog("date")),
+        ["datemultirange"] = ModelRuns.Catalog(
             "datemultirange",
             SidecarValues.Kind.Multirange,
-            subtype: Catalog("daterange", SidecarValues.Kind.Range, subtype: Catalog("date"))
+            subtype: ModelRuns.Catalog("daterange", SidecarValues.Kind.Range, subtype: ModelRuns.Catalog("date"))
         ),
         ["array of date"] = TestSidecars.Postgres(
             name: "date[]",
             kind: SidecarValues.Kind.Array,
             internalName: "_date",
-            element: Catalog("date")
+            element: ModelRuns.Catalog("date")
         ),
         ["domain over time"] = TestSidecars.Postgres(
             name: "clock",
             kind: SidecarValues.Kind.Domain,
             schema: "public",
             internalName: "clock",
-            baseType: Catalog("time")
+            baseType: ModelRuns.Catalog("time")
         ),
     };
 
@@ -383,7 +383,7 @@ public sealed class NpgsqlProbeTests
     [Fact]
     public void Run_TypeOfNpgsqlTypesWithoutNpgsql_IsSqlsrc249()
     {
-        var run = RunWithColumn(Catalog("point"), overrides: null);
+        var run = RunWithColumn(ModelRuns.Catalog("point"), overrides: null);
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC249 {GeneratorHarness.UsersPath}(1,10)-(1,17): The column 'value' has the type 'point', whose C# "
@@ -401,7 +401,7 @@ public sealed class NpgsqlProbeTests
         bool isValueType
     )
     {
-        var run = RunWithColumn(Catalog(internalName), overrides: null);
+        var run = RunWithColumn(ModelRuns.Catalog(internalName), overrides: null);
 
         run.Diagnostics.ShouldBeEmpty();
         StepOutputs
@@ -464,12 +464,6 @@ public sealed class NpgsqlProbeTests
             settings: overrides is null ? null : "{\"typeOverrides\": " + overrides + "}"
         );
     }
-
-    private static PostgresType Catalog(
-        string internalName,
-        string kind = SidecarValues.Kind.Base,
-        PostgresType? subtype = null
-    ) => TestSidecars.Postgres(name: internalName, kind: kind, internalName: internalName, subtype: subtype);
 
     // The sidecar of the file with a current entry of the query under postgres.
     private static SqlFile CurrentSidecar(SqlFile file, string queryName) =>

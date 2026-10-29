@@ -88,7 +88,7 @@ public sealed class SqlQueryHashTests
         Hash("-- name: Q\n-- param: @id -> UserId\nSELECT @id;").ShouldBe(Hash("-- name: Q\nSELECT @id;"));
 
     [Fact]
-    public void Compute_ParamMarker_AddingACSharpType_KeepsTheHash() =>
+    public void Compute_ParamMarkerGainingACSharpType_KeepsTheHash() =>
         Hash("-- name: Q\n-- param: @id int4 -> UserId\nSELECT @id;")
             .ShouldBe(Hash("-- name: Q\n-- param: @id int4\nSELECT @id;"));
 

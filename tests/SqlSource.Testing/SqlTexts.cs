@@ -17,6 +17,12 @@ internal static class SqlTexts
     // Users, and a query that needs no entry.
     public const string UsersAndPlain = Users + "\n-- name: Plain\n-- output: sql\nSELECT 3;\n";
 
+    // One query of the database "billing" alone.
+    public const string ListInvoices = "-- name: ListInvoices\n-- database: billing\nSELECT 3;\n";
+
+    // One query that needs no entry.
+    public const string Plain = "-- name: Plain\n-- output: sql\nSELECT 4;\n";
+
     // The text with the SQL of its second query changed, so that the query has another hash.
     public static string WithSecondQueryEdited(string text) =>
         text.Replace("SELECT 2;", "SELECT 22;", StringComparison.Ordinal);

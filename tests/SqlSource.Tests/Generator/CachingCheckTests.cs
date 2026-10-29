@@ -82,8 +82,8 @@ public sealed class CachingCheckTests
                 },
                 ignoreOrder: true
             );
-        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.TypeNeeds).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.TypeNeeds).ShouldAllBeCached();
         result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC244");
     }
 
@@ -142,41 +142,17 @@ public sealed class CachingCheckTests
         result.Diagnostics.ShouldBeEmpty();
     }
 
-    // A path listed twice, under one spelling or two, has a node for each listing, and is checked once, from the
-    // collected files: its stale entry is reported once.  The second spelling is a collision, SQLSRC013, as it is for
-    // any claimed file.  When the first listing goes, the second is checked from its own node, once.
-    [Theory]
-    [InlineData("/app/Users/Users.sql")]
-    [InlineData("/app/Users/users.sql")]
-    public void Run_FileListedTwice_ChecksItOnce(string spelling)
-    {
-        var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var usersAgain = new InMemoryAdditionalText(
-            spelling,
-            _scene.Users.GetText(TestContext.Current.CancellationToken)!.ToString()
-        );
-        var stale = Sidecars.Of(ToSqlFile(_scene.Users), Sidecars.Entry("GetUser", "stale"));
-        var staleSidecar = new InMemoryAdditionalText(stale.Path, stale.Text);
-        var driver = CreateDriver(
-                ProjectFile(OutputKind.Models, "postgres"),
-                [_scene.Users, usersAgain, _scene.Orders, _scene.OrdersSidecar, staleSidecar]
-            )
-            .RunGenerators(compilation, TestContext.Current.CancellationToken);
-        var collides = spelling != _scene.Users.Path;
+    // A path listed twice under one spelling has a node for each listing, and is checked once, from the collected
+    // files: its stale entry is reported once.  When the first listing goes, the second is checked from its own node,
+    // once.
+    [Fact]
+    public void Run_FileListedTwice_ChecksItOnce() =>
+        ShouldCheckUsersOnceWhenListedAgainAt("/app/Users/Users.sql", ["SQLSRC244"]);
 
-        var first = driver.GetRunResult();
-
-        first.Results.Single().Exception.ShouldBeNull();
-        first
-            .Diagnostics.Select(diagnostic => diagnostic.Id)
-            .ShouldBe(collides ? ["SQLSRC013", "SQLSRC244"] : ["SQLSRC244"], ignoreOrder: true);
-        Checks(first).Keys.Count(path => path.StartsWith("app/Users/", StringComparison.Ordinal)).ShouldBe(1);
-
-        var result = Run(driver.RemoveAdditionalTexts([_scene.Users]), compilation);
-
-        result.Results.Single().Exception.ShouldBeNull();
-        result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC244");
-    }
+    // The same under a second spelling, a collision, SQLSRC013, as it is for any claimed file.
+    [Fact]
+    public void Run_FileListedTwiceUnderTwoSpellings_ChecksItOnce() =>
+        ShouldCheckUsersOnceWhenListedAgainAt("/app/Users/users.sql", ["SQLSRC013", "SQLSRC244"]);
 
     // The attribute changes the type, so its needs are found again, and they are the same.
     [Fact]
@@ -195,7 +171,7 @@ public sealed class CachingCheckTests
             .ShouldAllBe(reason =>
                 reason == IncrementalStepRunReason.Unchanged || reason == IncrementalStepRunReason.Cached
             );
-        Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        Checks(result).Values.ShouldAllBeCached();
     }
 
     // An edit of the project's settings file's model suffix: every type's needs are found again and are the same, so
@@ -216,14 +192,12 @@ public sealed class CachingCheckTests
         );
         var result = Run(driver.ReplaceAdditionalText(project, edited), compilation);
 
-        AllReasons(result, TrackingNames.TypeNeeds).ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
+        AllReasons(result, TrackingNames.TypeNeeds).ShouldAllBe(IncrementalStepRunReason.Unchanged);
         AllReasons(result, TrackingNames.FileNeeds).ShouldBe([IncrementalStepRunReason.Cached]);
-        AllReasons(result, TrackingNames.SidecarCheckInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.FileTypesInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
-        AllReasons(result, TrackingNames.FileTypes).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.SidecarCheckInput).ShouldAllBeCached();
+        Checks(result).Values.ShouldAllBeCached();
+        AllReasons(result, TrackingNames.FileTypesInput).ShouldAllBe(IncrementalStepRunReason.Unchanged);
+        AllReasons(result, TrackingNames.FileTypes).ShouldAllBeCached();
     }
 
     // A project at Sql with no sidecar: no query needs an entry, so no check has anything to do and no hash is
@@ -241,5 +215,34 @@ public sealed class CachingCheckTests
         Outputs(result, TrackingNames.SidecarCheck)
             .Select(output => (SidecarCheckResult)output.Value)
             .ShouldAllBe(check => check.Diagnostics.Count == 0 && check.UsableEntries.Count == 0);
+    }
+
+    // Users listed a second time at the path, with a stale entry: the first run reports the ids given and checks Users
+    // once, and once the first listing goes, the stale entry is still reported once.
+    private void ShouldCheckUsersOnceWhenListedAgainAt(string spelling, string[] firstIds)
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var usersAgain = new InMemoryAdditionalText(
+            spelling,
+            _scene.Users.GetText(TestContext.Current.CancellationToken)!.ToString()
+        );
+        var stale = Sidecars.Of(ToSqlFile(_scene.Users), Sidecars.Entry("GetUser", "stale"));
+        var staleSidecar = new InMemoryAdditionalText(stale.Path, stale.Text);
+        var driver = CreateDriver(
+                ProjectFile(OutputKind.Models, "postgres"),
+                [_scene.Users, usersAgain, _scene.Orders, _scene.OrdersSidecar, staleSidecar]
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+
+        var first = driver.GetRunResult();
+
+        first.Results.Single().Exception.ShouldBeNull();
+        first.Diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(firstIds, ignoreOrder: true);
+        Checks(first).Keys.Count(path => path.StartsWith("app/Users/", StringComparison.Ordinal)).ShouldBe(1);
+
+        var result = Run(driver.RemoveAdditionalTexts([_scene.Users]), compilation);
+
+        result.Results.Single().Exception.ShouldBeNull();
+        result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC244");
     }
 }

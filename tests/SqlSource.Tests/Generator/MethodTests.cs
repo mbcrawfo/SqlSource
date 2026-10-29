@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
@@ -40,7 +39,7 @@ public sealed class MethodTests
         run.ShouldBeClean();
         run.Sources[MethodRuns.MethodsFile]
             .ShouldBe(
-                Joined(
+                GeneratedFile.Joined(
                     $$$"""
                     {{{GeneratedFile.ModelHeader}}}
                     namespace App
@@ -167,7 +166,7 @@ public sealed class MethodTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldNotContain("GetUser");
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
         run.Sources[MethodRuns.MethodsFile]
             .ShouldContain(
                 "        public static async global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(\n"
@@ -188,7 +187,7 @@ public sealed class MethodTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldNotContain("class GetUserAsync");
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("class GetUserAsync");
         run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUserAsync(\n");
     }
 
@@ -211,8 +210,8 @@ public sealed class MethodTests
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC008 /app/Repo/Zed.sql(");
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldNotContain("class GetUserAsync");
-        run.Sources["App.Sample.g.cs"].ShouldNotContain("SELECT 2;");
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("class GetUserAsync");
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("SELECT 2;");
         run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUserAsync(\n");
     }
 
@@ -245,7 +244,8 @@ public sealed class MethodTests
 
         if (other.Contains("GetName", StringComparison.Ordinal))
         {
-            run.Sources["App.Sample.g.cs"].ShouldContain("public const string GetName = \"SELECT name FROM users;\";");
+            run.Sources[GeneratorHarness.SampleFile]
+                .ShouldContain("public const string GetName = \"SELECT name FROM users;\";");
         }
     }
 
@@ -321,7 +321,7 @@ public sealed class MethodTests
         );
 
         run.ShouldBeClean();
-        var type = run.Sources["App.Sample.g.cs"];
+        var type = run.Sources[GeneratorHarness.SampleFile];
         type.ShouldContain("public const string GetName = \"SELECT name FROM users WHERE id = @id;\";\n");
         type.ShouldContain("public const string GetEmail = \"SELECT email FROM users WHERE id = @id;\";\n");
         type.ShouldNotContain("GetUser");
@@ -333,7 +333,7 @@ public sealed class MethodTests
             .ShouldBe([
                 "App.GetEmailDto-Model.g.cs",
                 "App.GetEmailParams-Model.g.cs",
-                "App.GetUserDto-Model.g.cs",
+                GetUserDtoFile,
                 "App.GetUserParams-Model.g.cs",
             ]);
     }
@@ -440,7 +440,7 @@ public sealed class MethodTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain("record GetUserDto(int Alpha, int Zeta);");
+        run.Sources[GetUserDtoFile].ShouldContain("record GetUserDto(int Alpha, int Zeta);");
         run.Sources[MethodRuns.MethodsFile]
             .ShouldContain(
                 "rows.Add(new global::App.GetUserDto(reader.GetFieldValue<int>(1), reader.GetFieldValue<int>(0)));\n"
@@ -597,7 +597,7 @@ public sealed class MethodTests
         var run = MethodRuns.Run(Users, UsersEntries, MethodRuns.SampleSource("Output = GeneratorOutput.Models"));
 
         run.ShouldBeClean();
-        run.Sources.Keys.ShouldContain("App.GetUserDto-Model.g.cs");
+        run.Sources.Keys.ShouldContain(GetUserDtoFile);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
@@ -618,8 +618,4 @@ public sealed class MethodTests
         run.CompilationErrors.ShouldBeEmpty();
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
-
-    // An expected text with each line that ends in the mark joined to the next, whose indentation goes.
-    private static string Joined(string text) =>
-        Regex.Replace(text, "\u21a9\n *", string.Empty, RegexOptions.None, TimeSpan.FromSeconds(1));
 }

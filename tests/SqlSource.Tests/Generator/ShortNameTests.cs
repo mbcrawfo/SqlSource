@@ -48,17 +48,17 @@ public sealed class ShortNameTests
     private static readonly PostgresType Int8 = Catalog("int8");
 
     [Fact]
-    public void Run_ShortName_OfTheProject_IsItsFullName()
+    public void Run_ShortNameOfTheProject_IsItsFullName()
     {
         var run = RunOf(Source + AppUserId, "int8", "UserId", Int8);
 
         run.ShouldBeClean();
         TextOf(run).ShouldBe("global::App.UserId");
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain("global::App.UserId Id");
+        run.Sources[GetUserDtoFile].ShouldContain("global::App.UserId Id");
     }
 
     [Fact]
-    public void Run_ShortName_OfAReference_IsItsFullName()
+    public void Run_ShortNameOfAReference_IsItsFullName()
     {
         var library = GeneratorHarness.CreateReference(OutputKind.Sql, "Lib", LibraryUserId);
 
@@ -78,7 +78,7 @@ public sealed class ShortNameTests
     }
 
     [Fact]
-    public void Run_ShortName_TwoCandidates_IsSqlsrc250()
+    public void Run_ShortNameOfTwoCandidates_IsSqlsrc250()
     {
         var run = RunOf(Source + AppUserId + OtherUserId, "int8", "UserId", Int8);
 
@@ -92,7 +92,7 @@ public sealed class ShortNameTests
 
     // The first three candidates are named, and the rest counted.
     [Fact]
-    public void Run_ShortName_FiveCandidates_NamesThreeAndCountsTheRest()
+    public void Run_ShortNameOfFiveCandidates_NamesThreeAndCountsTheRest()
     {
         var source = Source;
         foreach (var space in new[] { "A", "B", "C", "D", "E" })
@@ -110,7 +110,7 @@ public sealed class ShortNameTests
 
     // A type of the global namespace is one more candidate of a short name, not the one it means.
     [Fact]
-    public void Resolve_ShortName_GlobalAndNamespacedType_IsAmbiguous()
+    public void Resolve_ShortNameOfAGlobalAndANamespacedType_IsAmbiguous()
     {
         var compilation = GeneratorHarness.CreateCompilation([
             new SourceFile("/app/App.cs", "public sealed class UserId;\n" + AppUserId),
@@ -138,7 +138,7 @@ public sealed class ShortNameTests
 
     // The reference's internal UserId, which it shows the project no internals of, is no candidate beside App's.
     [Fact]
-    public void Run_ShortName_NotAccessibleInAReference_IsNotACandidate()
+    public void Run_ShortNameNotAccessibleInAReference_IsNotACandidate()
     {
         var library = GeneratorHarness.CreateReference(
             OutputKind.Sql,
@@ -154,7 +154,7 @@ public sealed class ShortNameTests
 
     // A file-local type has a name no other file can write, so it is no candidate beside App.UserId.
     [Fact]
-    public void Run_ShortName_FileLocalTypeBesideAPublicOne_IsThePublicOne()
+    public void Run_ShortNameOfAFileLocalTypeBesideAPublicOne_IsThePublicOne()
     {
         const string FileLocal = """
 
@@ -171,7 +171,7 @@ public sealed class ShortNameTests
     }
 
     [Fact]
-    public void Run_ShortName_OnlyAFileLocalType_IsSqlsrc250()
+    public void Run_ShortNameOfOnlyAFileLocalType_IsSqlsrc250()
     {
         const string FileLocal = """
 
@@ -190,7 +190,7 @@ public sealed class ShortNameTests
     // A reference that gives the project its internals makes its internal type a candidate.  A model of it is then
     // SQLSRC251 unless the claiming type is internal, which is another rule, so the resolution is asked alone.
     [Fact]
-    public void Resolve_ShortName_InternalOfAReferenceThatShowsItsInternals_IsItsFullName()
+    public void Resolve_ShortNameOfAnInternalOfAReferenceThatShowsItsInternals_IsItsFullName()
     {
         var library = GeneratorHarness.CreateReference(
             OutputKind.Sql,
@@ -245,7 +245,7 @@ public sealed class ShortNameTests
     }
 
     [Fact]
-    public void Run_ShortName_NestedType_IsNotFound()
+    public void Run_ShortNameOfANestedType_IsNotFound()
     {
         const string Nested = """
 
@@ -265,7 +265,7 @@ public sealed class ShortNameTests
 
     // One assembly referenced twice gives its type's full name once, which then resolves as a full name does.
     [Fact]
-    public void Resolve_ShortName_SameFullNameInTwoReferences_IsOneCandidate()
+    public void Resolve_ShortNameOfOneFullNameInTwoReferences_IsOneCandidate()
     {
         var image = GeneratorHarness.CreateReference(OutputKind.Sql, "Lib", LibraryUserId);
         var copy = ((AssemblyMetadata)((PortableExecutableReference)image).GetMetadata()).GetReference();
@@ -284,7 +284,7 @@ public sealed class ShortNameTests
     // The project's own App.UserId and a reference's of one full name are one candidate, and the project's is the type:
     // its struct, not the reference's class.
     [Fact]
-    public void Resolve_ShortName_SameFullNameInTheProjectAndAReference_IsTheProjects()
+    public void Resolve_ShortNameOfOneFullNameInTheProjectAndAReference_IsTheProjects()
     {
         var library = GeneratorHarness.CreateReference(
             OutputKind.Sql,

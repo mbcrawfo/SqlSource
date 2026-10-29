@@ -6,7 +6,7 @@ using SqlSource.DatabaseTests.TestHarness;
 
 namespace SqlSource.Tests.TestHarness;
 
-// The one fake of IStartingContainer, for the tests of EngineImage and SqlServerStart (TD-0080 item 9).  Its start
+// The one fake of IStartingContainer, for the tests of EngineImage and SqlServerStart.  Its start
 // throws the failure it is given, or succeeds when it has none, and it counts what is done to it.
 internal sealed class FakeStartingContainer(Exception? failure = null) : IStartingContainer
 {

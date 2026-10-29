@@ -7,6 +7,7 @@ using SqlSource.Parsing;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
@@ -211,20 +212,20 @@ public sealed class TypeEmitterTests
         );
         var typeFiles = new TypeFiles(
             TestModels.Type(),
-            TestModels.Array(GeneratorHarness.UsersNormalizedPath),
-            TestModels.Array(problem)
+            TestSidecars.Of(GeneratorHarness.UsersNormalizedPath),
+            TestSidecars.Of(problem)
         );
 
         var output = TypeEmitter.Emit(
             new TypeQueries(
                 typeFiles,
-                TestModels.Array(File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"))),
-                TestModels.Array(new SettingsLevel { Output = OutputKind.Sql }),
+                TestSidecars.Of(File("Users.sql", TestModels.Query("GetUser", "SELECT 1;"))),
+                TestSidecars.Of(new SettingsLevel { Output = OutputKind.Sql }),
                 "App.UserRepository.g.cs"
             )
         );
 
-        output.ShouldBe(new TypeOutput("App.UserRepository.g.cs", null, TestModels.Array(problem)));
+        output.ShouldBe(new TypeOutput("App.UserRepository.g.cs", null, TestSidecars.Of(problem)));
     }
 
     [Fact]
@@ -416,37 +417,29 @@ public sealed class TypeEmitterTests
         source.ShouldNotContain("class Sql");
     }
 
-    // The query's own generator parameter, then what the project asks for.
+    // The query's own generator parameter, then what the project asks for: the token is validated.
     [Theory]
-    [InlineData(null, true, true)]
-    [InlineData(null, false, false)]
-    [InlineData(true, false, true)]
-    [InlineData(true, true, true)]
-    [InlineData(false, true, false)]
-    [InlineData(false, false, false)]
-    public void Emit_QueryWithAToken_ValidatesByItsGeneratorParameterAndThenByTheProject(
+    [InlineData(null, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Emit_QueryWithATokenValidatedByItsGeneratorParameterOrTheProject_ChecksTheToken(
         bool? parameter,
-        bool project,
-        bool expected
+        bool project
     )
     {
-        var output = Emit(
-            OutputKind.Sql,
-            TestModels.Type(),
-            project,
-            File("Users.sql", TokenQuery("ListFrom", parameter))
-        );
-
-        var source = output.Source.ShouldNotBeNull();
-        if (expected)
-        {
-            source.ShouldContain("global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);\n");
-        }
-        else
-        {
-            source.ShouldNotContain("Throw");
-        }
+        EmitTokenQuery(parameter, project)
+            .ShouldContain("global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);\n");
     }
+
+    // The same, where the query's parameter or else the project turns validation off.
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void Emit_QueryWithATokenNotValidatedByItsGeneratorParameterOrTheProject_ChecksNothing(
+        bool? parameter,
+        bool project
+    ) => EmitTokenQuery(parameter, project).ShouldNotContain("Throw");
 
     [Fact]
     public void Emit_ValidationOff_LeavesAConstantAsItIs()
@@ -469,13 +462,13 @@ public sealed class TypeEmitterTests
             new TypeQueries(
                 new TypeFiles(
                     TestModels.Type(settings: none),
-                    TestModels.Array<string>(),
-                    TestModels.Array<DiagnosticInfo>()
+                    TestSidecars.Of<string>(),
+                    TestSidecars.Of<DiagnosticInfo>()
                 ),
-                TestModels.Array(
+                TestSidecars.Of(
                     File("Users.sql", Kept("FromTheAttribute", SettingsLevel.None), Kept("FromItsMarker", keep))
                 ),
-                TestModels.Array(keep with { Output = OutputKind.Sql }),
+                TestSidecars.Of(keep with { Output = OutputKind.Sql }),
                 "App.UserRepository.g.cs"
             )
         );
@@ -696,45 +689,29 @@ public sealed class TypeEmitterTests
     // The error of a kept form is the type's only when it emits that form: a type that does not keep the comments
     // uses the file.  The query is in the second file, whose level alone decides, and the first file's level says the
     // opposite, so the settings must be those of the query's own file.
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void Emit_QueryWithAnErrorInItsKeptForm_IsAnErrorAndItsFileGivesNoMembersOnlyWhereItKeepsComments(
-        bool keepComments
-    )
+    [Fact]
+    public void Emit_QueryWithAnErrorInItsKeptFormWhereItKeepsComments_IsAnErrorAndItsFileGivesNoMembers()
     {
-        var keep = new SettingsLevel { Parameters = GeneratorParameters.KeepComments };
-        var none = new SettingsLevel { Parameters = GeneratorParameters.None };
-        var error = DiagnosticInfo.Create(SqlDiagnostics.ReservedTokenName, TestModels.NameLocation("B.sql"), "class");
-        var output = Emit(
-            OutputKind.Sql,
-            TestModels.Type(),
-            keepComments ? [none, keep] : [keep, none],
-            File("A.sql", TestModels.Query("Kept", "SELECT 3;")),
-            File(
-                "B.sql",
-                TestModels.Query("Other", "SELECT 1;", nameLocation: TestModels.NameLocation("B.sql")),
-                TestModels.Query("GetUser", "SELECT 2;", nameLocation: TestModels.NameLocation("B.sql")) with
-                {
-                    KeptErrors = TestModels.Array(error),
-                }
-            )
-        );
+        var output = EmitWithAnErrorInTheKeptFormOfB(keepComments: true);
 
+        output.Diagnostics.ShouldBe([KeptFormError]);
         var source = output.Source.ShouldNotBeNull();
         source.ShouldContain("public const string Kept = \"SELECT 3;\";");
-        if (keepComments)
-        {
-            output.Diagnostics.ShouldBe([error]);
-            source.ShouldNotContain("SELECT 1;");
-            source.ShouldNotContain("SELECT 2;");
-        }
-        else
-        {
-            output.Diagnostics.ShouldBeEmpty();
-            source.ShouldContain("public const string Other = \"SELECT 1;\";");
-            source.ShouldContain("public const string GetUser = \"SELECT 2;\";");
-        }
+        source.ShouldNotContain("SELECT 1;");
+        source.ShouldNotContain("SELECT 2;");
+    }
+
+    // The same where the file's form is the one without comments, which has no error: every member is given.
+    [Fact]
+    public void Emit_QueryWithAnErrorInItsKeptFormWhereItStripsComments_IsNoErrorAndItsFileGivesItsMembers()
+    {
+        var output = EmitWithAnErrorInTheKeptFormOfB(keepComments: false);
+
+        output.Diagnostics.ShouldBeEmpty();
+        var source = output.Source.ShouldNotBeNull();
+        source.ShouldContain("public const string Kept = \"SELECT 3;\";");
+        source.ShouldContain("public const string Other = \"SELECT 1;\";");
+        source.ShouldContain("public const string GetUser = \"SELECT 2;\";");
     }
 
     [Fact]
@@ -776,9 +753,9 @@ public sealed class TypeEmitterTests
     ) =>
         TypeEmitter.Emit(
             new TypeQueries(
-                new TypeFiles(type, TestModels.Array<string>(), TestModels.Array<DiagnosticInfo>()),
-                TestModels.Array(files),
-                TestModels.Array(Array.ConvertAll(fileSettings, level => level with { Output = output })),
+                new TypeFiles(type, TestSidecars.Of<string>(), TestSidecars.Of<DiagnosticInfo>()),
+                TestSidecars.Of(files),
+                TestSidecars.Of(Array.ConvertAll(fileSettings, level => level with { Output = output })),
                 HintName.Create(type)
             )
         );
@@ -787,8 +764,8 @@ public sealed class TypeEmitterTests
         new(
             "app/Repo/" + fileName,
             fileName,
-            TestModels.Array(queries),
-            TestModels.Array<DiagnosticInfo>(),
+            TestSidecars.Of(queries),
+            TestSidecars.Of<DiagnosticInfo>(),
             SqlDialect.Ansi
         );
 
@@ -799,13 +776,13 @@ public sealed class TypeEmitterTests
             TestModels.NameLocation(file),
             null,
             null,
-            TestModels.Array(
+            TestSidecars.Of(
                 TestModels.Literal("SELECT * FROM "),
                 new SqlSegment(SqlSegmentKind.Token, "table"),
                 TestModels.Literal(";")
             ),
             null,
-            TestModels.Array(new SqlToken("table", null)),
+            TestSidecars.Of(new SqlToken("table", null)),
             EquatableArray<SqlQueryParameter>.Empty,
             tokenValidation switch
             {
@@ -818,4 +795,38 @@ public sealed class TypeEmitterTests
             EquatableArray<ColumnMarker>.Empty,
             EquatableArray<DiagnosticInfo>.Empty
         );
+
+    // The error of a reserved token name in B.sql's kept form.
+    private static readonly DiagnosticInfo KeptFormError = DiagnosticInfo.Create(
+        SqlDiagnostics.ReservedTokenName,
+        TestModels.NameLocation("B.sql"),
+        "class"
+    );
+
+    // A query ListFrom with a token, under the query's generator parameter and the project's validation.
+    private static string EmitTokenQuery(bool? parameter, bool project) =>
+        Emit(OutputKind.Sql, TestModels.Type(), project, File("Users.sql", TokenQuery("ListFrom", parameter)))
+            .Source.ShouldNotBeNull();
+
+    // A.sql and B.sql, whose GetUser has an error in its kept form, under levels whose nearer one keeps comments or
+    // turns them off.
+    private static TypeOutput EmitWithAnErrorInTheKeptFormOfB(bool keepComments)
+    {
+        var keep = new SettingsLevel { Parameters = GeneratorParameters.KeepComments };
+        var none = new SettingsLevel { Parameters = GeneratorParameters.None };
+        return Emit(
+            OutputKind.Sql,
+            TestModels.Type(),
+            keepComments ? [none, keep] : [keep, none],
+            File("A.sql", TestModels.Query("Kept", "SELECT 3;")),
+            File(
+                "B.sql",
+                TestModels.Query("Other", "SELECT 1;", nameLocation: TestModels.NameLocation("B.sql")),
+                TestModels.Query("GetUser", "SELECT 2;", nameLocation: TestModels.NameLocation("B.sql")) with
+                {
+                    KeptErrors = TestSidecars.Of(KeptFormError),
+                }
+            )
+        );
+    }
 }

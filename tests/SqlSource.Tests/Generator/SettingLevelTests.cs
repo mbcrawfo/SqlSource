@@ -65,24 +65,9 @@ public sealed class SettingLevelTests
     // Each level with each output.  The project's file is the least specific level, and codegen is both the default and
     // the output MethodRuns gives the project, so a project's file of codegen would decide nothing: that row is left
     // out.
-    public static TheoryData<SettingLevel, string> OutputLevels =>
-        new()
-        {
-            { SettingLevel.ProjectFile, "Sql" },
-            { SettingLevel.ProjectFile, "Models" },
-            { SettingLevel.FolderFile, "Sql" },
-            { SettingLevel.FolderFile, "Models" },
-            { SettingLevel.FolderFile, "CodeGen" },
-            { SettingLevel.Attribute, "Sql" },
-            { SettingLevel.Attribute, "Models" },
-            { SettingLevel.Attribute, "CodeGen" },
-            { SettingLevel.Header, "Sql" },
-            { SettingLevel.Header, "Models" },
-            { SettingLevel.Header, "CodeGen" },
-            { SettingLevel.Query, "Sql" },
-            { SettingLevel.Query, "Models" },
-            { SettingLevel.Query, "CodeGen" },
-        };
+    // Every level below the project's file.
+    public static TheoryData<SettingLevel> LevelsBelowTheProjectFile =>
+        [SettingLevel.FolderFile, SettingLevel.Attribute, SettingLevel.Header, SettingLevel.Query];
 
     // Every level of a setting that the attribute has too.
     public static TheoryData<SettingLevel> Levels =>
@@ -115,8 +100,8 @@ public sealed class SettingLevelTests
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
-        plain.Sources["App.Sample.g.cs"].ShouldContain(Constant);
-        run.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
+        plain.Sources[GeneratorHarness.SampleFile].ShouldContain(Constant);
+        run.Sources[GeneratorHarness.SampleFile].ShouldBe(plain.Sources[GeneratorHarness.SampleFile]);
     }
 
     [Theory]
@@ -149,7 +134,7 @@ public sealed class SettingLevelTests
             .ShouldHaveSingleItem();
         diagnostic.ShouldStartWith("SQLSRC006 /app/Repo/Sample.cs(5,2)-");
         diagnostic.ShouldEndWith(": '" + value + "' is not a valid value of " + property);
-        run.Sources.Keys.ShouldNotContain("App.Sample.g.cs");
+        run.Sources.Keys.ShouldNotContain(GeneratorHarness.SampleFile);
     }
 
     // The markers that change no type's file without a dialect, in a preamble and in a query: the type's file is the
@@ -182,8 +167,8 @@ public sealed class SettingLevelTests
         run.GeneratedCodeWarnings.ShouldBeEmpty();
 
         // The query has its constant or token method, so the comparison of the two files compares a member.
-        plain.Sources["App.Sample.g.cs"].ShouldMatch(@"public (const string Q = |static string Q\()");
-        run.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
+        plain.Sources[GeneratorHarness.SampleFile].ShouldMatch(@"public (const string Q = |static string Q\()");
+        run.Sources[GeneratorHarness.SampleFile].ShouldBe(plain.Sources[GeneratorHarness.SampleFile]);
     }
 
     // At sql, so that the query has a constant, which shows the marker's line stripped as a comment.
@@ -198,57 +183,44 @@ public sealed class SettingLevelTests
 
         // The line is an ordinary comment.
         run.Diagnostics.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("\"SELECT 1;\"");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("\"SELECT 1;\"");
     }
 
-    // Below the level the project's file says another output, sql for codegen and codegen otherwise, so that the
-    // level is what decides.
+    // Sql at each level, below which the project's file says codegen, so that the level is what decides: the query is a
+    // constant, with no method and no model.  At sql the query needs no entry, and one would be SQLSRC245.
     [Theory]
-    [MemberData(nameof(OutputLevels))]
-    public void Run_OutputAtEachLevel_DecidesBetweenConstantAndMethod(SettingLevel level, string output)
+    [MemberData(nameof(Levels))]
+    public void Run_SqlOutputAtEachLevel_GivesAConstant(SettingLevel level)
     {
-        var settings = new LevelSettings();
-        if (level != SettingLevel.ProjectFile)
-        {
-            _ = settings.At(
-                SettingLevel.ProjectFile,
-                Setting.Output,
-                LevelSettings.StringAt(SettingLevel.ProjectFile, output == "CodeGen" ? "Sql" : "CodeGen")
-            );
-        }
+        var run = RunWithOutputAt(level, "Sql", belowIt: "CodeGen", withEntry: false);
 
-        _ = settings.At(level, Setting.Output, LevelSettings.StringAt(level, output));
-        var files = settings.Files(Users);
-        var file = files[0];
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain(GetUserConstant);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+        ModelRuns.ModelFiles(run).ShouldBeEmpty();
+    }
 
-        // An output of the project's file among the settings replaces the one MethodRuns gives the project, codegen.
-        // At sql the query needs no entry, and one would be SQLSRC245.
-        var run = MethodRuns.Run(
-            file,
-            output == "Sql"
-                ? []
-                : [ModelRuns.Entry(file, "GetUser", [ModelRuns.Parameter("id")], [ModelRuns.Column("id")])],
-            settings.Source(MethodRuns.Source),
-            settings: settings.ProjectSettings,
-            otherFiles: files[1..]
-        );
+    // Models at each level, below which the project's file says codegen: the query is a constant with its models.
+    [Theory]
+    [MemberData(nameof(Levels))]
+    public void Run_ModelsOutputAtEachLevel_GivesAConstantAndTheModels(SettingLevel level)
+    {
+        var run = RunWithOutputAt(level, "Models", belowIt: "CodeGen", withEntry: true);
 
-        run.ShouldBeClean();
-        var type = run.Sources["App.Sample.g.cs"];
-        if (output == "CodeGen")
-        {
-            type.ShouldNotContain("GetUser");
-            run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUser(\n");
-            ModelRuns.ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs", "App.GetUserParams-Model.g.cs"]);
-        }
-        else
-        {
-            type.ShouldContain("public const string GetUser = \"SELECT id FROM users WHERE id = @id;\";\n");
-            run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
-            ModelRuns
-                .ModelFiles(run)
-                .ShouldBe(output == "Models" ? ["App.GetUserDto-Model.g.cs", "App.GetUserParams-Model.g.cs"] : []);
-        }
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain(GetUserConstant);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+        ModelRuns.ModelFiles(run).ShouldBe([ModelRuns.GetUserDtoFile, "App.GetUserParams-Model.g.cs"]);
+    }
+
+    // CodeGen at each level below the project's file, which says sql: the query is a method with its models.
+    [Theory]
+    [MemberData(nameof(LevelsBelowTheProjectFile))]
+    public void Run_CodeGenOutputAtEachLevel_GivesAMethodAndTheModels(SettingLevel level)
+    {
+        var run = RunWithOutputAt(level, "CodeGen", belowIt: "Sql", withEntry: true);
+
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(" GetUser(\n");
+        ModelRuns.ModelFiles(run).ShouldBe([ModelRuns.GetUserDtoFile, "App.GetUserParams-Model.g.cs"]);
     }
 
     [Theory]
@@ -308,7 +280,7 @@ public sealed class SettingLevelTests
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldContain(holder);
         methods.ShouldContain(modifiers + "global::System.Threading.Tasks.Task<global::App.GetUserDto[]> GetUser(\n");
-        run.Sources["App.Sample.g.cs"].ShouldNotContain("GetUser");
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("GetUser");
     }
 
     // SQLSRC209 for the query Q at this line, under the default dialect.
@@ -321,4 +293,37 @@ public sealed class SettingLevelTests
     private static string NoDefault(string token, string output, int line) =>
         $"SQLSRC210 /app/Repo/Q.sql({line},10)-({line},11): The token '{token}' has no default, which a query whose "
         + $"output is '{output}' needs.  Give it a default, or set the output to 'sql'.";
+
+    // GetUser of Users as a constant of Sample.
+    private const string GetUserConstant = "public const string GetUser = \"SELECT id FROM users WHERE id = @id;\";\n";
+
+    // Users with the output at the level, and the other output at the project's file below it unless the level is the
+    // project's file, with an entry of GetUser when one is given.  An output of the project's file among the settings
+    // replaces the one MethodRuns gives the project, codegen.
+    private static GeneratorRun RunWithOutputAt(SettingLevel level, string output, string belowIt, bool withEntry)
+    {
+        var settings = new LevelSettings();
+        if (level != SettingLevel.ProjectFile)
+        {
+            _ = settings.At(
+                SettingLevel.ProjectFile,
+                Setting.Output,
+                LevelSettings.StringAt(SettingLevel.ProjectFile, belowIt)
+            );
+        }
+
+        _ = settings.At(level, Setting.Output, LevelSettings.StringAt(level, output));
+        var files = settings.Files(Users);
+        var file = files[0];
+        var run = MethodRuns.Run(
+            file,
+            withEntry ? [ModelRuns.Entry(file, "GetUser", [ModelRuns.Parameter("id")], [ModelRuns.Column("id")])] : [],
+            settings.Source(MethodRuns.Source),
+            settings: settings.ProjectSettings,
+            otherFiles: files[1..]
+        );
+
+        run.ShouldBeClean();
+        return run;
+    }
 }

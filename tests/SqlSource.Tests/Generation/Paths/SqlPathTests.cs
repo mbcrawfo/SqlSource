@@ -4,6 +4,7 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Generation.Paths;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Paths;
@@ -135,7 +136,7 @@ public sealed class SqlPathTests
     public void Contains_SortedPaths_FindsEachPathIgnoringCaseAndNothingElse()
     {
         string[] paths = ["app/A.sql", "app/b.sql", "app/C.sql", "app/sub/a.sql", "b/a.sql"];
-        var sorted = TestModels.Array([.. paths.OrderBy(path => path, SqlPath.Comparer)]);
+        var sorted = TestSidecars.Of([.. paths.OrderBy(path => path, SqlPath.Comparer)]);
 
         foreach (var path in paths)
         {
@@ -146,16 +147,14 @@ public sealed class SqlPathTests
         SqlPath.Contains(sorted, "app/D.sql").ShouldBeFalse();
         SqlPath.Contains(sorted, "").ShouldBeFalse();
         SqlPath.Contains(sorted, "zzz").ShouldBeFalse();
-        SqlPath.Contains(TestModels.Array<string>(), "app/A.sql").ShouldBeFalse();
+        SqlPath.Contains(TestSidecars.Of<string>(), "app/A.sql").ShouldBeFalse();
     }
 
     [Fact]
     public void IndexOf_SortedItems_FindsEachByItsPathIgnoringCaseAndNothingElse()
     {
         string[] paths = ["app/A.sql", "app/b.sql", "app/C.sql", "app/sub/a.sql", "b/a.sql"];
-        var sorted = TestModels.Array([
-            .. paths.OrderBy(path => path, SqlPath.Comparer).Select(path => new Item(path)),
-        ]);
+        var sorted = TestSidecars.Of([.. paths.OrderBy(path => path, SqlPath.Comparer).Select(path => new Item(path))]);
 
         for (var index = 0; index < sorted.Count; index++)
         {
@@ -166,7 +165,7 @@ public sealed class SqlPathTests
         SqlPath.IndexOf(sorted, "app/D.sql", static item => item.Path).ShouldBe(-1);
         SqlPath.IndexOf(sorted, "", static item => item.Path).ShouldBe(-1);
         SqlPath.IndexOf(sorted, "zzz", static item => item.Path).ShouldBe(-1);
-        SqlPath.IndexOf(TestModels.Array<Item>(), "app/A.sql", static item => item.Path).ShouldBe(-1);
+        SqlPath.IndexOf(TestSidecars.Of<Item>(), "app/A.sql", static item => item.Path).ShouldBe(-1);
     }
 
     [Fact]
@@ -174,7 +173,7 @@ public sealed class SqlPathTests
     {
         // '-' sorts before the separator, and a letter that is not ASCII after every ASCII one, ignoring its case.
         string[] folders = ["", "app", "app-tests", "app/Queries", "Zed", "Äpp", "äpp/Queries"];
-        var sorted = TestModels.Array([
+        var sorted = TestSidecars.Of([
             .. folders
                 .Distinct(SqlPath.Comparer)
                 .OrderBy(folder => folder, SqlPath.Comparer)
@@ -206,7 +205,7 @@ public sealed class SqlPathTests
             .ShouldBe(["b/B.sql", "c/C.sql"]);
 
     private static EquatableArray<string> FindRepeated(string[] files, string[] sortedPaths) =>
-        SqlPath.FindRepeated([.. files.Select(path => SqlFilePath.Create(path)!)], TestModels.Array(sortedPaths));
+        SqlPath.FindRepeated([.. files.Select(path => SqlFilePath.Create(path)!)], TestSidecars.Of(sortedPaths));
 
     [Theory]
     [InlineData("repo/obj/App.AssemblyInfo.cs", "repo/obj")]
@@ -256,8 +255,8 @@ public sealed class SqlPathTests
     [Fact]
     public void FindInFolder_NoPaths_IsEmpty()
     {
-        SqlPath.FindInFolder(TestModels.Array<string>(), "app").ShouldBeEmpty();
-        SqlPath.FindInFolder(TestModels.Array<string>(), "").ShouldBeEmpty();
+        SqlPath.FindInFolder(TestSidecars.Of<string>(), "app").ShouldBeEmpty();
+        SqlPath.FindInFolder(TestSidecars.Of<string>(), "").ShouldBeEmpty();
     }
 
     // Checked against the plain definition: a file is in a folder when the folder of its path is that folder.
@@ -267,7 +266,7 @@ public sealed class SqlPathTests
         // Names that sort before, at and after the separator, that differ only by case, and that are not ASCII.
         string[] names = ["a", "B", "a-b", "a.b", "a0", "a b", "ab", "é", "É2", "😀", "_", "Z"];
         string[] files = ["a.sql", "a0.sql", "_.sql"];
-        var paths = TestModels.Array([
+        var paths = TestSidecars.Of([
             .. Nest(names, 2)
                 .Concat(Nest(["a", "a-b", "a0"], 4))
                 .SelectMany(folder => files.Select(file => Join(folder, file)))
@@ -300,7 +299,7 @@ public sealed class SqlPathTests
 
     // In the order of SqlPath.Comparer, as the pipeline supplies them.  The files of app/Repo are not adjacent: those
     // of its subfolders sort among them, and its neighbours' names sort on both sides of the separator.
-    private static readonly EquatableArray<string> FolderPaths = TestModels.Array([
+    private static readonly EquatableArray<string> FolderPaths = TestSidecars.Of([
         .. new[]
         {
             "Root.sql",

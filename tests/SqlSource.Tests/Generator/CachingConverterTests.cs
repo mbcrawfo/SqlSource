@@ -21,10 +21,6 @@ namespace SqlSource.Tests.Generator;
 // App.Conversions, so UserQueries' method reads its column through ToUserId; Orders has no override.
 public sealed class CachingConverterTests
 {
-    private const string UserMethods = "App.UserQueries-Methods.g.cs";
-
-    private const string OrderMethods = "App.OrderQueries-Methods.g.cs";
-
     private const string ConversionsPath = "/app/Conversions.cs";
 
     // UserId's converters come before UserId, so that an edit of UserId moves no converter.
@@ -89,8 +85,11 @@ public sealed class CachingConverterTests
             );
         AllReasons(result, TrackingNames.Converters).ShouldBe([IncrementalStepRunReason.Cached]);
         MethodReasons(result, TrackingNames.MethodsInput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
-        ShouldAllBeCached(OutputReasons(result));
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // The converter that UserQueries' method reads its column through is renamed, so the methods of UserQueries are
@@ -114,11 +113,20 @@ public sealed class CachingConverterTests
         result.Diagnostics.ShouldBeEmpty();
         AllReasons(result, TrackingNames.Converters).ShouldBe([IncrementalStepRunReason.Modified]);
         MethodReasons(result, TrackingNames.MethodsInput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Unchanged), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Unchanged),
+                ignoreOrder: true
+            );
         MethodReasons(result, TrackingNames.TypeMethods)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         AllReasons(result, TrackingNames.TypedFile)
             .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.FileModels)
@@ -157,8 +165,11 @@ public sealed class CachingConverterTests
         AllReasons(result, TrackingNames.ResolvedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.Converters).ShouldBe([IncrementalStepRunReason.Cached]);
         MethodReasons(result, TrackingNames.MethodsInput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
-        ShouldAllBeCached(OutputReasons(result));
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // A converter of OrderId, which no override chose, is added after the others: the project's converters change,
@@ -186,14 +197,20 @@ public sealed class CachingConverterTests
         ConvertersOf(result).Select(converter => converter.Method).ShouldContain("global::App.Conversions.ToOrderId");
         MethodReasons(result, TrackingNames.MethodsInput)
             .ShouldBe(
-                Expect(IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Unchanged),
+                UsersAndOrders(IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Unchanged),
                 ignoreOrder: true
             );
         MethodReasons(result, TrackingNames.TypeMethods)
-            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
-        ShouldAllBeCached(OutputReasons(result));
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // Conversions has a method marked as a converter that returns nothing, SQLSRC277 at its name.  A line added above
@@ -241,13 +258,19 @@ public sealed class CachingConverterTests
         ProjectLines(result).ShouldBe(linesBefore.Select(line => line + 1));
         MethodReasons(result, TrackingNames.MethodsInput)
             .ShouldBe(
-                Expect(IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Unchanged),
+                UsersAndOrders(IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Unchanged),
                 ignoreOrder: true
             );
         MethodReasons(result, TrackingNames.TypeMethods)
-            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
     }
 
     // Both types' sources, and Conversions with this source.
@@ -297,21 +320,4 @@ public sealed class CachingConverterTests
                 .Where(converter => converter.Origin == ConverterOrigin.Project)
                 .Select(converter => converter.Location.ShouldNotBeNull().LineSpan.Start.Line),
         ];
-
-    // Every reason is Cached, and there is at least one.
-    private static void ShouldAllBeCached(IncrementalStepRunReason[] reasons)
-    {
-        reasons.ShouldNotBeEmpty();
-        reasons.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-    }
-
-    // The reasons of UserQueries' and OrderQueries' methods at a step of their own.
-    private static Dictionary<string, IncrementalStepRunReason> Expect(
-        IncrementalStepRunReason users,
-        IncrementalStepRunReason orders
-    ) => new() { [UserMethods] = users, [OrderMethods] = orders };
-
-    // The text of the file of a type's methods.
-    private static string MethodsOf(GeneratorDriverRunResult result, string file) =>
-        result.GeneratedTrees.Single(tree => tree.FilePath.EndsWith(file, StringComparison.Ordinal)).ToString();
 }

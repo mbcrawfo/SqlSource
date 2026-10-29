@@ -3,6 +3,7 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Generation.Paths;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Paths;
@@ -44,7 +45,7 @@ public sealed class PathCollisionTests
     private static EquatableArray<PathCollision> Find(params string[] paths)
     {
         var files = paths.Select(path => SqlFilePath.Create(path)!).ToImmutableArray();
-        var sortedPaths = TestModels.Array([
+        var sortedPaths = TestSidecars.Of([
             .. files
                 .Select(file => file.NormalizedPath)
                 .Distinct(SqlPath.Comparer)

@@ -1,13 +1,14 @@
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation;
 
 public sealed class QueryNamesTests
 {
-    private static readonly EquatableArray<SqlQuery> Queries = TestModels.Array(
+    private static readonly EquatableArray<SqlQuery> Queries = TestSidecars.Of(
         Query("GetUser"),
         Query("ListUsers"),
         Query("GetUser")
@@ -31,7 +32,7 @@ public sealed class QueryNamesTests
     [Fact]
     public void IndexOf_NameOfAnotherCase_IsMinusOne()
     {
-        var queries = TestModels.Array(Query("Q"));
+        var queries = TestSidecars.Of(Query("Q"));
 
         QueryNames.IndexOf(queries, "q", 0).ShouldBe(-1);
     }

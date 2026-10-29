@@ -36,8 +36,8 @@ public sealed class NestedClassTests
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("private static class Queries\n");
-        run.Sources["App.Sample.g.cs"].ShouldNotContain("class Sql");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("private static class Queries\n");
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("class Sql");
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public sealed class NestedClassTests
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("private static class Statements\n");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("private static class Statements\n");
     }
 
     [Fact]
@@ -99,7 +99,7 @@ public sealed class NestedClassTests
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldNotContain("static class");
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("static class");
     }
 
     // The member named Sql is no problem once the class has another name.

@@ -51,7 +51,7 @@ public sealed class MethodDriverTests
         ]);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
-        run.Sources.Keys.ShouldContain("App.GetUserDto-Model.g.cs");
+        run.Sources.Keys.ShouldContain(GetUserDtoFile);
         run.Sources.Keys.ShouldContain("App.ListUsersDto-Model.g.cs");
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
@@ -68,7 +68,7 @@ public sealed class MethodDriverTests
         ]);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
-        run.Sources.Keys.ShouldContain("App.GetUserDto-Model.g.cs");
+        run.Sources.Keys.ShouldContain(GetUserDtoFile);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
@@ -135,7 +135,7 @@ public sealed class MethodDriverTests
         ]);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
-        run.Sources.Keys.ShouldContain("App.GetUserDto-Model.g.cs");
+        run.Sources.Keys.ShouldContain(GetUserDtoFile);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
@@ -150,7 +150,7 @@ public sealed class MethodDriverTests
         ]);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
-        run.Sources.Keys.ShouldContain("App.GetUserDto-Model.g.cs");
+        run.Sources.Keys.ShouldContain(GetUserDtoFile);
         run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 }

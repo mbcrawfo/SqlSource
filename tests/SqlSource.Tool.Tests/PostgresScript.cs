@@ -48,7 +48,7 @@ internal sealed class PostgresScript
         return this;
     }
 
-    public PostgresScript Open() => Answer("open", PostgresOpenRequest.Instance, Opened);
+    public PostgresScript Open() => Answer(PostgresCallNames.Open, PostgresOpenRequest.Instance, Opened);
 
     // The name the session gives the statement of its describe of that number in the session.
     public static string Statement(int number) => $"sqlsource_{number}";
@@ -74,7 +74,7 @@ internal sealed class PostgresScript
 
     // "prepare" alone: for a describe that ends there, and for one whose columns the test writes.
     public PostgresScript Prepares(int number, string sql, string[] types, PostgresPrepareAnswer answer) =>
-        Answer("prepare", new PostgresPrepareRequest(Statement(number), sql, types), answer);
+        Answer(PostgresCallNames.Prepare, new PostgresPrepareRequest(Statement(number), sql, types), answer);
 
     // "prepare", and "columns" answering no column when the statement was prepared with a type for each parameter
     // of the list: most of the tests that use it are about the parameters.
@@ -88,13 +88,13 @@ internal sealed class PostgresScript
 
     public PostgresScript Columns(int number, int parameters, params PostgresColumnRow[] columns) =>
         Answer(
-            "columns",
+            PostgresCallNames.Columns,
             new PostgresColumnsRequest(Statement(number), parameters),
             new PostgresColumnsAnswer(columns, null)
         );
 
     public PostgresScript Frees(int number, PostgresDeallocateAnswer? answer = null) =>
-        Answer("deallocate", new PostgresDeallocateRequest(Statement(number)), answer ?? Freed);
+        Answer(PostgresCallNames.Deallocate, new PostgresDeallocateRequest(Statement(number)), answer ?? Freed);
 
     // "check" answering the columns the test gives: see Agreeing.
     public PostgresScript Checks(
@@ -103,7 +103,7 @@ internal sealed class PostgresScript
         params PostgresColumnRow[] columns
     ) =>
         Answer(
-            "check",
+            PostgresCallNames.Check,
             new PostgresCheckRequest(
                 sql,
                 [.. parameters.Select(static parameter => new PostgresCheckParameter(parameter.Name, parameter.Type))]
@@ -113,21 +113,21 @@ internal sealed class PostgresScript
 
     // "explain" for the statement, with no setting, answering what the test gives.
     public PostgresScript Explains(int number, int parameters, PostgresExplainAnswer answer) =>
-        Answer("explain", new PostgresExplainRequest(Statement(number), parameters, []), answer);
+        Answer(PostgresCallNames.Explain, new PostgresExplainRequest(Statement(number), parameters, []), answer);
 
     // "explain" answering NoPlan.
     public PostgresScript PlansNothing(int number, int parameters) => Explains(number, parameters, NoPlan);
 
     public PostgresScript Resolves(long[] oids, params PostgresTypeRow[] rows) =>
-        Answer("types", new PostgresTypesRequest(oids), new PostgresTypesAnswer(rows, null));
+        Answer(PostgresCallNames.Types, new PostgresTypesRequest(oids), new PostgresTypesAnswer(rows, null));
 
     public PostgresScript Tables(long[] oids, params PostgresTableRow[] tables) =>
-        Answer("tables", new PostgresTablesRequest(oids), new PostgresTablesAnswer(tables, null));
+        Answer(PostgresCallNames.Tables, new PostgresTablesRequest(oids), new PostgresTablesAnswer(tables, null));
 
     // "spellings" answering the server's text for each pair the test gives, in the order it gives them.
     public PostgresScript Spells(params (long Oid, int Modifier, string FormatType)[] rows) =>
         Answer(
-            "spellings",
+            PostgresCallNames.Spellings,
             new PostgresSpellingsRequest([.. rows.Select(static row => new PostgresTypmodPair(row.Oid, row.Modifier))]),
             new PostgresSpellingsAnswer(
                 [.. rows.Select(static row => new PostgresSpellingRow(row.Oid, row.Modifier, row.FormatType))],
@@ -136,18 +136,18 @@ internal sealed class PostgresScript
         );
 
     public PostgresScript Partitions(PostgresPartitionsRequest request, PostgresPartitionsAnswer answer) =>
-        Answer("partitions", request, answer);
+        Answer(PostgresCallNames.Partitions, request, answer);
 
     // "relations" answers tables, as "tables" does.
     public PostgresScript Relations(PostgresRelationsRequest request, PostgresTablesAnswer answer) =>
-        Answer("relations", request, answer);
+        Answer(PostgresCallNames.Relations, request, answer);
 
     // "relations" for the relations the test names, in schema and name order, answering the rows it gives.
     public PostgresScript Relations(IReadOnlyList<PostgresRelationName> names, params PostgresTableRow[] tables) =>
         Relations(new PostgresRelationsRequest(names), new PostgresTablesAnswer(tables, null));
 
     public PostgresScript Overloads(PostgresOverloadsRequest request, PostgresOverloadsAnswer answer) =>
-        Answer("overloads", request, answer);
+        Answer(PostgresCallNames.Overloads, request, answer);
 
     // "overloads" answering that no schema but pg_catalog holds any of the names the test gives.
     public PostgresScript Overloads(IReadOnlyList<string> functions, IReadOnlyList<string> operators) =>

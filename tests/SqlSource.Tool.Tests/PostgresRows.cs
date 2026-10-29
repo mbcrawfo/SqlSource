@@ -80,7 +80,19 @@ internal static class PostgresRows
 
     public static PostgresTypeRow Record { get; } = PseudoOf(2249, "record");
 
-    public static PostgresTypeRow RecordArray { get; } = ArrayOf(2287, "_record", Record);
+    // record[] is a pseudo-type itself, as the server has it: its element is no part of the closure the server
+    // answers, which follows the element of a base array alone.
+    public static PostgresTypeRow RecordArray { get; } =
+        PseudoOf(2287, "_record") with
+        {
+            Typelem = Record.Oid,
+            FormatType = "record[]",
+        };
+
+    public static PostgresTypeRow Cstring { get; } = PseudoOf(2275, "cstring");
+
+    // cstring[] is the one base array of a pseudo-type that the server has.
+    public static PostgresTypeRow CstringArray { get; } = ArrayOf(1263, "_cstring", Cstring);
 
     public static PostgresTypeRow BaseOf(
         long oid,

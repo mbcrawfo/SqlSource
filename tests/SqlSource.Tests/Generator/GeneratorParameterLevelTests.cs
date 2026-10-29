@@ -28,65 +28,69 @@ public sealed class GeneratorParameterLevelTests
 
     private const string Check = "global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);";
 
+    // The type Plain, which turns comments off, and Kept, which keeps them as the settings files do.
+    private const string PlainAndKeptSource = """
+        using SqlSource;
+
+        namespace App;
+
+        [SqlSourceGenerate(SqlLocation = SqlLocation.Direct, Parameters = "default")]
+        public partial class Plain
+        {
+            public const string Sql = Q;
+        }
+
+        [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+        public partial class Kept { }
+        """;
+
+    // The levels whose most specific list keeps comments: the comment stays and the token is not checked.
     [Theory]
     // project's file, folder's file, attribute, preamble, query
-    [InlineData(null, null, null, null, null, false)]
-    [InlineData(On, null, null, null, null, true)]
-    [InlineData(On, Default, null, null, null, false)]
-    [InlineData(On, Other, null, null, null, false)]
-    [InlineData(null, On, null, null, null, true)]
-    [InlineData(Other, On, Default, null, null, false)]
-    [InlineData(null, null, On, null, null, true)]
-    [InlineData(Default, Other, On, null, null, true)]
-    [InlineData(On, On, On, Default, null, false)]
-    [InlineData(null, null, null, On, null, true)]
-    [InlineData(On, On, On, On, Default, false)]
-    [InlineData(On, On, On, On, Other, false)]
-    [InlineData(null, null, null, Default, On, true)]
-    public void Run_GeneratorParameters_ComeWholeFromTheMostSpecificLevelThatGivesAList(
+    [InlineData(On, null, null, null, null)]
+    [InlineData(null, On, null, null, null)]
+    [InlineData(null, null, On, null, null)]
+    [InlineData(Default, Other, On, null, null)]
+    [InlineData(null, null, null, On, null)]
+    [InlineData(null, null, null, Default, On)]
+    public void Run_GeneratorParametersWhoseMostSpecificListKeepsComments_KeepTheComment(
         string? projectFile,
         string? folderFile,
         string? attribute,
         string? preamble,
-        string? query,
-        bool expected
+        string? query
     )
     {
-        var settings = new LevelSettings();
-        if (folderFile is not null)
-        {
-            _ = settings.At(
-                SettingLevel.FolderFile,
-                Setting.GeneratorParameters,
-                LevelSettings.WordsAt(SettingLevel.FolderFile, folderFile)
-            );
-        }
+        var generated = ListFromAt(projectFile, folderFile, attribute, preamble, query);
 
-        var sql =
-            (preamble is null ? string.Empty : "-- generator: " + preamble + "\n")
-            + "-- name: ListFrom\n"
-            + (query is null ? string.Empty : "-- generator: " + query + "\n")
-            + "SELECT * FROM {{table}}; -- kept\n";
+        generated.ShouldContain("-- kept");
+        generated.ShouldNotContain("Throw");
+    }
 
-        var run = GeneratorHarness.Run(
-            OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, Source(attribute))],
-            settings.Files(new SqlFile(GeneratorHarness.UsersPath, sql)),
-            generatorParameters: projectFile
-        );
+    // The levels whose most specific list does not keep comments, though a farther one does, and the run where no level
+    // gives a list, so that the default leaves them out: the list comes whole from the most specific level, so the
+    // comment goes and the token is checked.
+    [Theory]
+    // project's file, folder's file, attribute, preamble, query
+    [InlineData(null, null, null, null, null)]
+    [InlineData(On, Default, null, null, null)]
+    [InlineData(On, Other, null, null, null)]
+    [InlineData(Other, On, Default, null, null)]
+    [InlineData(On, On, On, Default, null)]
+    [InlineData(On, On, On, On, Default)]
+    [InlineData(On, On, On, On, Other)]
+    public void Run_GeneratorParametersWhoseMostSpecificListLeavesCommentsOut_DropTheCommentAndCheckTheToken(
+        string? projectFile,
+        string? folderFile,
+        string? attribute,
+        string? preamble,
+        string? query
+    )
+    {
+        var generated = ListFromAt(projectFile, folderFile, attribute, preamble, query);
 
-        run.ShouldBeClean();
-        var generated = run.Sources["App.Sample.g.cs"];
-        if (expected)
-        {
-            generated.ShouldContain("-- kept");
-            generated.ShouldNotContain("Throw");
-        }
-        else
-        {
-            generated.ShouldNotContain("-- kept");
-            generated.ShouldContain(Check);
-        }
+        generated.ShouldNotContain("-- kept");
+        generated.ShouldContain(Check);
     }
 
     // One type asks for comments and the other does not.  The token stands only in a comment, so one gets a method
@@ -124,53 +128,39 @@ public sealed class GeneratorParameterLevelTests
         run.Sources["App.Kept.g.cs"].ShouldContain("public static string Q(string note)");
     }
 
-    // The project's settings file, or the settings file of the file's folder, keeps comments and one type turns them
-    // off.  The keyword stands only in a comment, so it is an error only for the type that keeps it, whose file then
-    // gives no members, and the other type uses the file.
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Run_ReservedTokenInAComment_IsReportedOnlyForATypeThatKeepsComments(bool fromFolderFile)
+    // The project's settings file keeps comments and one type turns them off.  The keyword stands only in a comment,
+    // so it is an error only for the type that keeps it, whose file then gives no members, and the other type uses the
+    // file.
+    [Fact]
+    public void Run_ReservedTokenInACommentWhereTheProjectFileKeepsComments_IsReportedOnlyForATypeThatKeepsComments()
     {
-        const string Source = """
-            using SqlSource;
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [new SourceFile(GeneratorHarness.SourcePath, PlainAndKeptSource)],
+            [new SqlFile("/app/Repo/Q.sql", ReservedTokenInAComment)],
+            generatorParameters: "keep-comments"
+        );
 
-            namespace App;
+        ShouldReportTheTokenForKeptAlone(run);
+    }
 
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct, Parameters = "default")]
-            public partial class Plain
-            {
-                public const string Sql = Q;
-            }
-
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
-            public partial class Kept { }
-            """;
-        var file = new SqlFile("/app/Repo/Q.sql", ReservedTokenInAComment);
-        SqlFile[] files = fromFolderFile
-            ?
+    // The same, where the settings file of the file's folder keeps comments.
+    [Fact]
+    public void Run_ReservedTokenInACommentWhereTheFolderFileKeepsComments_IsReportedOnlyForATypeThatKeepsComments()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [new SourceFile(GeneratorHarness.SourcePath, PlainAndKeptSource)],
             [
-                file,
+                new SqlFile("/app/Repo/Q.sql", ReservedTokenInAComment),
                 GeneratorHarness.SettingsFile(
                     "/app/Repo/sqlsource.json", /*lang=json,strict*/
                     """{"generatorParameters": ["keep-comments"]}"""
                 ),
             ]
-            : [file];
-
-        var run = GeneratorHarness.Run(
-            OutputKind.Sql,
-            [new SourceFile(GeneratorHarness.SourcePath, Source)],
-            files,
-            generatorParameters: fromFolderFile ? null : "keep-comments"
         );
 
-        run.Diagnostics.ShouldBe([
-            "SQLSRC114 /app/Repo/Q.sql(2,13)-(2,22): The token name 'class' is a reserved C# keyword",
-        ]);
-        run.CompilationErrors.ShouldBeEmpty();
-        run.Sources["App.Plain.g.cs"].ShouldContain("public const string Q = \"SELECT 1\";");
-        run.Sources["App.Kept.g.cs"].ShouldNotContain("string Q");
+        ShouldReportTheTokenForKeptAlone(run);
     }
 
     // The token and the comment overlap, so with the comments kept the query reads other tokens: the comment opens a
@@ -235,7 +225,7 @@ public sealed class GeneratorParameterLevelTests
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"SELECT 1\";");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"SELECT 1\";");
         var query = StepOutputs.Single<ParsedSqlFile>(run, TrackingNames.ParsedFile).Queries.ShouldHaveSingleItem();
         query.KeptSegments.ShouldBeNull();
         query.KeptErrors.ShouldBeEmpty();
@@ -258,7 +248,7 @@ public sealed class GeneratorParameterLevelTests
         var run = Run(OutputKind.Sql, "keep-comments", value);
 
         run.Diagnostics.ShouldBeEmpty();
-        run.Sources["App.Sample.g.cs"].ShouldContain("-- kept");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("-- kept");
     }
 
     private static string Source(string? attribute) =>
@@ -272,4 +262,52 @@ public sealed class GeneratorParameterLevelTests
             [new SqlFile(GeneratorHarness.UsersPath, "-- name: ListFrom\nSELECT * FROM {{table}}; -- kept\n")],
             generatorParameters: projectFile
         );
+
+    // The reserved token is reported once, for Kept, whose file gives no members, and Plain uses the file.
+    private static void ShouldReportTheTokenForKeptAlone(GeneratorRun run)
+    {
+        run.Diagnostics.ShouldBe([
+            "SQLSRC114 /app/Repo/Q.sql(2,13)-(2,22): The token name 'class' is a reserved C# keyword",
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources["App.Plain.g.cs"].ShouldContain("public const string Q = \"SELECT 1\";");
+        run.Sources["App.Kept.g.cs"].ShouldNotContain("string Q");
+    }
+
+    // The file of Sample for a query ListFrom with a token and a kept comment, with each level's generator parameters
+    // given, none where null.
+    private static string ListFromAt(
+        string? projectFile,
+        string? folderFile,
+        string? attribute,
+        string? preamble,
+        string? query
+    )
+    {
+        var settings = new LevelSettings();
+        if (folderFile is not null)
+        {
+            _ = settings.At(
+                SettingLevel.FolderFile,
+                Setting.GeneratorParameters,
+                LevelSettings.WordsAt(SettingLevel.FolderFile, folderFile)
+            );
+        }
+
+        var sql =
+            (preamble is null ? string.Empty : "-- generator: " + preamble + "\n")
+            + "-- name: ListFrom\n"
+            + (query is null ? string.Empty : "-- generator: " + query + "\n")
+            + "SELECT * FROM {{table}}; -- kept\n";
+
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [new SourceFile(GeneratorHarness.SourcePath, Source(attribute))],
+            settings.Files(new SqlFile(GeneratorHarness.UsersPath, sql)),
+            generatorParameters: projectFile
+        );
+
+        run.ShouldBeClean();
+        return run.Sources[GeneratorHarness.SampleFile];
+    }
 }

@@ -21,8 +21,8 @@ public sealed class FilterRunTests : IDisposable
 
     public FilterRunTests()
     {
-        _invoices = _scene.Project.AddSql("Invoices.sql", "-- name: ListInvoices\n-- database: billing\nSELECT 3;\n");
-        _plain = _scene.Project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 4;\n");
+        _invoices = _scene.Project.AddSql("Invoices.sql", SqlTexts.ListInvoices);
+        _plain = _scene.Project.AddSql("Plain.sql", SqlTexts.Plain);
         _users = _scene.Project.AddSql("Users.sql", SqlTexts.Users);
     }
 

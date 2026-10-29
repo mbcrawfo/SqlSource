@@ -3,7 +3,6 @@
 using System.Linq;
 using System.Text.Json.Nodes;
 using Shouldly;
-using SqlSource.Generation;
 using SqlSource.Generation.Types;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
@@ -71,7 +70,8 @@ public sealed class ColumnTypeTests
         var run = RunPosts(ListPosts, UsersIdIs("UserId"));
 
         run.ShouldBeClean();
-        ColumnsOf(run)
+        StepOutputs
+            .ColumnsOf(run)
             .ShouldBe([
                 new PropertyType(
                     UserId,
@@ -98,7 +98,7 @@ public sealed class ColumnTypeTests
         );
 
         run.ShouldBeClean();
-        var column = ColumnsOf(run).ShouldHaveSingleItem();
+        var column = StepOutputs.ColumnsOf(run).ShouldHaveSingleItem();
         column.Text.ShouldBe(UserId);
         column.Place.ShouldBe(TheFolderFilePlace);
         column.Mapped.ShouldBe("public.users.id");
@@ -116,7 +116,7 @@ public sealed class ColumnTypeTests
         );
 
         run.ShouldBeClean();
-        var column = ColumnsOf(run).ShouldHaveSingleItem();
+        var column = StepOutputs.ColumnsOf(run).ShouldHaveSingleItem();
         column.Text.ShouldBe(UserId);
         column.Place.ShouldBe(TheHeaderPlace);
     }
@@ -129,7 +129,8 @@ public sealed class ColumnTypeTests
         );
 
         run.ShouldBeClean();
-        ColumnsOf(run)
+        StepOutputs
+            .ColumnsOf(run)
             .ShouldBe([
                 new PropertyType(
                     UserId,
@@ -156,7 +157,7 @@ public sealed class ColumnTypeTests
         var run = Run(IdsSource, [file, Sidecars.Of(file, PostsEntry(file, Column("Id", Int8, origin: UsersId)))]);
 
         run.ShouldBeClean();
-        ColumnsOf(run).ShouldHaveSingleItem().Text.ShouldBe(UserId);
+        StepOutputs.ColumnsOf(run).ShouldHaveSingleItem().Text.ShouldBe(UserId);
     }
 
     // -> default takes the column out of the column types of every level, and the type override gives its type.
@@ -171,7 +172,7 @@ public sealed class ColumnTypeTests
         );
 
         run.ShouldBeClean();
-        var column = ColumnsOf(run).ShouldHaveSingleItem();
+        var column = StepOutputs.ColumnsOf(run).ShouldHaveSingleItem();
         column.Text.ShouldBe("long");
         column.Place.ShouldBe("the typeOverrides of the settings file " + GeneratorHarness.ProjectSettingsPath);
     }
@@ -187,7 +188,7 @@ public sealed class ColumnTypeTests
         );
 
         run.ShouldBeClean();
-        var column = ColumnsOf(run).ShouldHaveSingleItem();
+        var column = StepOutputs.ColumnsOf(run).ShouldHaveSingleItem();
         column.Text.ShouldBe(UserId);
         column.Place.ShouldBe(TheProjectFilePlace);
     }
@@ -199,7 +200,7 @@ public sealed class ColumnTypeTests
         var run = RunPosts("-- name: ListPosts\n-- column: id null\nSELECT id FROM users;\n", UsersIdIs("UserId"));
 
         run.ShouldBeClean();
-        ColumnsOf(run).ShouldHaveSingleItem().Place.ShouldBe(TheProjectFilePlace);
+        StepOutputs.ColumnsOf(run).ShouldHaveSingleItem().Place.ShouldBe(TheProjectFilePlace);
         run.Sources[DtoModel].ShouldContain("(global::App.UserId? Id)");
     }
 
@@ -217,7 +218,7 @@ public sealed class ColumnTypeTests
         var run = Run(IdsSource, [file, Sidecars.Of(file, entry)], Settings(UsersIdIs("UserId")));
 
         run.ShouldBeClean();
-        ColumnsOf(run).Select(column => column.Text).ShouldBe(["long", "long"]);
+        StepOutputs.ColumnsOf(run).Select(column => column.Text).ShouldBe(["long", "long"]);
     }
 
     // A column read through a view has the view's origin, so an entry of the table under it does not match it.
@@ -237,9 +238,9 @@ public sealed class ColumnTypeTests
         );
 
         ofTheTable.ShouldBeClean();
-        ColumnsOf(ofTheTable).ShouldHaveSingleItem().Text.ShouldBe("long");
+        StepOutputs.ColumnsOf(ofTheTable).ShouldHaveSingleItem().Text.ShouldBe("long");
         ofTheView.ShouldBeClean();
-        ColumnsOf(ofTheView).ShouldHaveSingleItem().Text.ShouldBe(UserId);
+        StepOutputs.ColumnsOf(ofTheView).ShouldHaveSingleItem().Text.ShouldBe(UserId);
     }
 
     // The nullability stays the column's: a column that can be null is a UserId?, and a type-only marker may name a
@@ -302,7 +303,7 @@ public sealed class ColumnTypeTests
     [InlineData("folderFile", "users.id", TheFolderFilePlace)]
     [InlineData("header", "users.id", TheHeaderPlace)]
     [InlineData("query", "id", TheQueryPlace)]
-    public void Run_ColumnType_MissingType_IsSqlsrc250AtItsPlace(string level, string key, string place)
+    public void Run_ColumnTypeMissingItsType_IsSqlsrc250AtItsPlace(string level, string key, string place)
     {
         var text = level switch
         {
@@ -328,7 +329,7 @@ public sealed class ColumnTypeTests
 
     // An array mapped to an array of a foreign type is read as the base map's array and converted element by element.
     [Fact]
-    public void Run_ColumnType_ArrayOfAForeignType_ConvertsByElement()
+    public void Run_ColumnTypeOfAnArrayOfAForeignType_ConvertsByElement()
     {
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListPosts\nSELECT tag_ids FROM posts;\n");
         var column = Column("tag_ids", ArrayOf(Catalog("int8"), "_int8"), origin: new("public", "posts", "tag_ids"));
@@ -410,14 +411,4 @@ public sealed class ColumnTypeTests
             Settings(projectFile, typeOverrides)
         );
     }
-
-    // The types of the columns of the run's one query.
-    private static PropertyType[] ColumnsOf(GeneratorRun run) =>
-        [
-            .. StepOutputs
-                .Of<FileTypes>(run, TrackingNames.FileTypes)
-                .SelectMany(file => file.Queries)
-                .ShouldHaveSingleItem()
-                .Columns.ShouldNotBeNull(),
-        ];
 }

@@ -28,6 +28,9 @@ public sealed class DialectTests
 
     private const string QueryPath = "/app/Repo/Q.sql";
 
+    // A bytes literal that ends with an escaped quote.
+    private const string BytesWithAnEscapedQuote = "SELECT b'\\'' AS x; -- c\n";
+
     [Theory]
     // Nothing set.
     [InlineData(null, null, null, Ansi)]
@@ -54,7 +57,7 @@ public sealed class DialectTests
         var run = Run(projectFile, Files(QueryPath, Query, marker, folderFile));
 
         run.ShouldBeClean();
-        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + expected + "\";");
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string Q = \"" + expected + "\";");
     }
 
     // Each file in a folder of its own, claimed by a type of that folder: A under the project's file alone, B under its
@@ -127,24 +130,25 @@ public sealed class DialectTests
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC111 /app/Repo/Q.sql(1,13)-(1,33): ");
     }
 
-    // A bytes literal that ends with an escaped quote.  PostgreSQL has no escape there, and does not close it.
+    // A bytes literal that ends with an escaped quote, which CockroachDB reads, under either of its names.
     [Theory]
-    [InlineData("cockroachdb", null)]
-    [InlineData("Cockroach", null)]
-    [InlineData("postgres", "SQLSRC101 ")]
-    public void Run_BytesLiteralWithAnEscapedQuote_IsReadOnlyByCockroachDb(string dialect, string? error)
+    [InlineData("cockroachdb")]
+    [InlineData("Cockroach")]
+    public void Run_BytesLiteralWithAnEscapedQuoteUnderCockroachDb_IsRead(string dialect)
     {
-        var run = Run(dialect, new SqlFile(QueryPath, "SELECT b'\\'' AS x; -- c\n"));
+        var run = Run(dialect, new SqlFile(QueryPath, BytesWithAnEscapedQuote));
 
-        if (error is null)
-        {
-            run.Diagnostics.ShouldBeEmpty();
-            run.CompilationErrors.ShouldBeEmpty();
-        }
-        else
-        {
-            run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith(error);
-        }
+        run.Diagnostics.ShouldBeEmpty();
+        run.CompilationErrors.ShouldBeEmpty();
+    }
+
+    // The same under PostgreSQL, which has no escape there and does not close it.
+    [Fact]
+    public void Run_BytesLiteralWithAnEscapedQuoteUnderPostgres_IsSqlsrc101()
+    {
+        var run = Run("postgres", new SqlFile(QueryPath, BytesWithAnEscapedQuote));
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC101 ");
     }
 
     // The files at sql under the project's file of the dialect, or of none when it is null.

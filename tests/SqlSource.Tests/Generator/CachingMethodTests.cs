@@ -23,10 +23,6 @@ namespace SqlSource.Tests.Generator;
 // Users too.
 public sealed class CachingMethodTests
 {
-    private const string UserMethods = "App.UserQueries-Methods.g.cs";
-
-    private const string OrderMethods = "App.OrderQueries-Methods.g.cs";
-
     private const string AdminMethods = "App.Admin.AdminQueries-Methods.g.cs";
 
     private readonly CachingScene _scene = new();
@@ -60,11 +56,20 @@ public sealed class CachingMethodTests
 
         // The models are as they were, so OrderQueries' input is taken from the previous run.
         MethodReasons(result, TrackingNames.MethodsInput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         MethodReasons(result, TrackingNames.TypeMethods)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         TypeReasons(result)["App.OrderQueries.g.cs"].ShouldBe(IncrementalStepRunReason.Cached);
         MethodsOf(result, UserMethods).ShouldContain("SELECT 10;");
     }
@@ -88,9 +93,15 @@ public sealed class CachingMethodTests
         AllReasons(result, TrackingNames.TypeOutput)
             .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
         MethodReasons(result, TrackingNames.TypeMethods)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
 
         // A call gives no column, so the signatures are equal and the conflicts are not looked for again.
         AllReasons(result, TrackingNames.MethodSignatures).ShouldBe([IncrementalStepRunReason.Cached]);
@@ -112,7 +123,10 @@ public sealed class CachingMethodTests
 
         result.Diagnostics.ShouldBeEmpty();
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         AllReasons(result, TrackingNames.ExtensionClassNames).ShouldBe([IncrementalStepRunReason.Modified]);
         AllReasons(result, TrackingNames.MethodConflicts).ShouldBe([IncrementalStepRunReason.Unchanged]);
         var methods = MethodsOf(result, UserMethods);
@@ -132,9 +146,15 @@ public sealed class CachingMethodTests
 
         result.Diagnostics.ShouldBeEmpty();
         MethodReasons(result, TrackingNames.MethodsInput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Unchanged), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Unchanged),
+                ignoreOrder: true
+            );
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         AllReasons(result, TrackingNames.MethodConflicts).ShouldBe([IncrementalStepRunReason.Unchanged]);
         MethodsOf(result, UserMethods).ShouldContain("global::App.GetUserRow");
     }
@@ -156,12 +176,21 @@ public sealed class CachingMethodTests
         result.Diagnostics.ShouldBeEmpty();
         AllReasons(result, TrackingNames.TypeMemberNames).ShouldBe([IncrementalStepRunReason.Modified]);
         MethodReasons(result, TrackingNames.MethodsInput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Unchanged), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Unchanged),
+                ignoreOrder: true
+            );
         MethodReasons(result, TrackingNames.TypeMethods)
-            .ShouldBe(Expect(IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
-        ShouldAllBeCached(OutputReasons(result));
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // A C# edit gives the generator a new compilation, so the probes and the lookup of the extension classes run
@@ -181,8 +210,11 @@ public sealed class CachingMethodTests
         AllReasons(result, TrackingNames.MethodDrivers).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.TakenExtensionClasses).ShouldBe([IncrementalStepRunReason.Unchanged]);
         MethodReasons(result, TrackingNames.MethodsInput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
-        ShouldAllBeCached(OutputReasons(result));
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
+        OutputReasons(result).ShouldAllBeCached();
     }
 
     // Npgsql 9 allows the methods as Npgsql 10 does, so the drivers' value is equal, and no type gathers its input
@@ -198,9 +230,15 @@ public sealed class CachingMethodTests
         result.Diagnostics.ShouldBeEmpty();
         AllReasons(result, TrackingNames.MethodDrivers).ShouldBe([IncrementalStepRunReason.Unchanged]);
         MethodReasons(result, TrackingNames.MethodsInput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
     }
 
     // A class of the project takes the name of UserQueries' extension class, which SQLSRC276 reports, and UserQueries
@@ -223,9 +261,15 @@ public sealed class CachingMethodTests
         AllReasons(result, TrackingNames.TakenExtensionClasses).ShouldBe([IncrementalStepRunReason.Modified]);
         AllReasons(result, TrackingNames.MethodConflicts).ShouldBe([IncrementalStepRunReason.Modified]);
         MethodReasons(result, TrackingNames.TypeMethods)
-            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         result.GeneratedTrees.ShouldNotContain(tree => tree.FilePath.EndsWith(UserMethods, StringComparison.Ordinal));
     }
 
@@ -244,9 +288,15 @@ public sealed class CachingMethodTests
         result.Diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(["SQLSRC274", "SQLSRC274"]);
         AllReasons(result, TrackingNames.MethodConflicts).ShouldBe([IncrementalStepRunReason.Modified]);
         MethodReasons(result, TrackingNames.TypeMethods)
-            .ShouldBe(Expect(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Modified), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Modified),
+                ignoreOrder: true
+            );
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Modified), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Modified),
+                ignoreOrder: true
+            );
         result.GeneratedTrees.ShouldNotContain(tree =>
             tree.FilePath.EndsWith("-Methods.g.cs", StringComparison.Ordinal)
         );
@@ -273,7 +323,10 @@ public sealed class CachingMethodTests
         result.Diagnostics.ShouldBeEmpty();
         AllReasons(result, TrackingNames.MethodConflicts).ShouldBe([IncrementalStepRunReason.Modified]);
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Modified), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Modified),
+                ignoreOrder: true
+            );
         MethodsOf(result, UserMethods).ShouldContain("GetUser(");
         MethodsOf(result, OrderMethods).ShouldContain("GetOrder(");
     }
@@ -292,7 +345,10 @@ public sealed class CachingMethodTests
 
         result.Diagnostics.ShouldBeEmpty();
         MethodReasons(result, TrackingNames.TypeMethods)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         AllReasons(result, TrackingNames.MethodSignatures).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.ExtensionClassNames).ShouldBe([IncrementalStepRunReason.Cached]);
 
@@ -350,7 +406,10 @@ public sealed class CachingMethodTests
         AllReasons(result, TrackingNames.MethodSignatures).ShouldBe([IncrementalStepRunReason.Modified]);
         AllReasons(result, TrackingNames.MethodConflicts).ShouldBe([IncrementalStepRunReason.Unchanged]);
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         MethodsOf(result, UserMethods).ShouldContain("FindUser(");
     }
 
@@ -375,7 +434,10 @@ public sealed class CachingMethodTests
         result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC272");
         AllReasons(result, TrackingNames.MethodDiagnostics).ShouldBe([IncrementalStepRunReason.Modified]);
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
     }
 
     // Both types are at Models by their attributes, so the project has no CodeGen query, and then UserQueries is at
@@ -392,7 +454,10 @@ public sealed class CachingMethodTests
         result.Diagnostics.ShouldBeEmpty();
         AllReasons(result, TrackingNames.CodeGenEngines).ShouldBe([IncrementalStepRunReason.Modified]);
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         MethodsOf(result, UserMethods).ShouldContain("GetUser(");
     }
 
@@ -427,7 +492,10 @@ public sealed class CachingMethodTests
         AllReasons(result, TrackingNames.TypeOutput)
             .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
         MethodReasons(result, TrackingNames.MethodOutput)
-            .ShouldBe(Expect(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached), ignoreOrder: true);
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
         var methods = MethodsOf(result, UserMethods);
         methods.ShouldContain("parameter.Size = 60;\n");
         methods.ShouldNotContain("parameter.Size = 50;\n");
@@ -436,23 +504,6 @@ public sealed class CachingMethodTests
     // The source of UserQueries, in the namespace App, with these arguments on its attribute and these members.
     private static string UserQueries(string? arguments = null, string members = "") =>
         TypeSource("App", "UserQueries", arguments, members);
-
-    // Every reason is Cached, and there is at least one.
-    private static void ShouldAllBeCached(IncrementalStepRunReason[] reasons)
-    {
-        reasons.ShouldNotBeEmpty();
-        reasons.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-    }
-
-    // The reasons of UserQueries' and OrderQueries' methods at a step of their own.
-    private static Dictionary<string, IncrementalStepRunReason> Expect(
-        IncrementalStepRunReason users,
-        IncrementalStepRunReason orders
-    ) => new() { [UserMethods] = users, [OrderMethods] = orders };
-
-    // The text of the file of a type's methods.
-    private static string MethodsOf(GeneratorDriverRunResult result, string file) =>
-        result.GeneratedTrees.Single(tree => tree.FilePath.EndsWith(file, StringComparison.Ordinal)).ToString();
 
     // A current mssql sidecar of the file whose entry has one column, of int, and a parameter called name of this
     // type when it is given.

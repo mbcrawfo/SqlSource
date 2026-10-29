@@ -55,10 +55,9 @@ public sealed class CachingOptionsTests
                 ignoreOrder: true
             );
         AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
-        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.FileLevel).ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
-        AllReasons(result, TrackingNames.TypeQueries)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.FileLevel).ShouldAllBe(IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.TypeQueries).ShouldAllBe(IncrementalStepRunReason.Modified);
 
         // Both types were emitted again.  Only the one with a method came out different.
         Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
@@ -89,11 +88,9 @@ public sealed class CachingOptionsTests
         var result = Run(driver.ReplaceAdditionalText(project, ProjectFile(OutputKind.Sql, "postgres")), compilation);
 
         AllReasons(result, TrackingNames.SettingsFile).ShouldBe([IncrementalStepRunReason.Modified]);
-        AllReasons(result, TrackingNames.FileParseInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
-        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
-        AllReasons(result, TrackingNames.TypeOutput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
+        AllReasons(result, TrackingNames.FileParseInput).ShouldAllBe(IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(IncrementalStepRunReason.Unchanged);
 
         // Two steps that report ran again and reported the same nothing: that of the problems of the files, for files
         // that are not the ones it had, and that of the problems of the settings files, whose set changed.  The steps
@@ -123,8 +120,7 @@ public sealed class CachingOptionsTests
         );
         var result = Run(driver.ReplaceAdditionalText(project, edited), compilation);
 
-        AllReasons(result, TrackingNames.FileParseInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.FileParseInput).ShouldAllBe(IncrementalStepRunReason.Modified);
         Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
@@ -196,7 +192,7 @@ public sealed class CachingOptionsTests
                 ignoreOrder: true
             );
         AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
-        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBeCached();
         Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>

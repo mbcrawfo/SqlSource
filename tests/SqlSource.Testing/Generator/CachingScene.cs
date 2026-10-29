@@ -31,6 +31,11 @@ internal sealed class CachingScene
 
     public const string OrdersSourcePath = "/app/Orders/OrderQueries.cs";
 
+    // The files of the methods of UserQueries and OrderQueries in the namespace App, as MethodsCompilation has them.
+    public const string UserMethods = "App.UserQueries-Methods.g.cs";
+
+    public const string OrderMethods = "App.OrderQueries-Methods.g.cs";
+
     public static readonly string UsersSource = TypeSource(
         "App.Users",
         "UserQueries",
@@ -356,6 +361,16 @@ internal sealed class CachingScene
                 ignoreOrder: true
             );
     }
+
+    // The reasons of UserQueries' and OrderQueries' methods at a step of their own, keyed as MethodReasons keys them.
+    public static Dictionary<string, IncrementalStepRunReason> UsersAndOrders(
+        IncrementalStepRunReason users,
+        IncrementalStepRunReason orders
+    ) => new() { [UserMethods] = users, [OrderMethods] = orders };
+
+    // The text of the file of a type's methods.
+    public static string MethodsOf(GeneratorDriverRunResult result, string file) =>
+        result.GeneratedTrees.Single(tree => tree.FilePath.EndsWith(file, StringComparison.Ordinal)).ToString();
 
     public static SqlFile ToSqlFile(InMemoryAdditionalText file) => new(file.Path, file.GetText()!.ToString());
 

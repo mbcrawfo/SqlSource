@@ -6,6 +6,7 @@ using SqlSource.Generation.Types.Drivers;
 using SqlSource.Generation.Types.Maps;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
+using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
 
@@ -33,25 +34,25 @@ public sealed class PostgresTypeMapTests
         ),
         ["enum"] = new(UserStatus(), "string", false, "public.user_status"),
         ["int4range"] = new(
-            Catalog("int4range", SidecarValues.Kind.Range, subtype: TestSidecars.Postgres()),
+            ModelRuns.Catalog("int4range", SidecarValues.Kind.Range, subtype: TestSidecars.Postgres()),
             $"{Range}<int>",
             true,
             "int4range"
         ),
         ["tstzrange"] = new(
-            Catalog("tstzrange", SidecarValues.Kind.Range, subtype: Catalog("timestamptz")),
+            ModelRuns.Catalog("tstzrange", SidecarValues.Kind.Range, subtype: ModelRuns.Catalog("timestamptz")),
             $"{Range}<{DateTime}>",
             true,
             "tstzrange"
         ),
         ["int4multirange"] = new(
-            Catalog("int4multirange", SidecarValues.Kind.Multirange, subtype: Catalog("int4range")),
+            ModelRuns.Catalog("int4multirange", SidecarValues.Kind.Multirange, subtype: ModelRuns.Catalog("int4range")),
             $"{Range}<int>[]",
             false,
             "int4multirange"
         ),
         ["range of a subtype the map does not list"] = new(
-            User("floatrange", SidecarValues.Kind.Range, subtype: Catalog("float8")),
+            User("floatrange", SidecarValues.Kind.Range, subtype: ModelRuns.Catalog("float8")),
             "!UserDefinedRange",
             false,
             "public.floatrange"
@@ -79,9 +80,9 @@ public sealed class PostgresTypeMapTests
             false,
             "public.geometry"
         ),
-        ["base type of pg_catalog the map lacks"] = new(Catalog("aclitem"), "!CastToText", false, "aclitem"),
+        ["base type of pg_catalog the map lacks"] = new(ModelRuns.Catalog("aclitem"), "!CastToText", false, "aclitem"),
         ["composite of pg_catalog"] = new(
-            Catalog("pg_class", SidecarValues.Kind.Composite),
+            ModelRuns.Catalog("pg_class", SidecarValues.Kind.Composite),
             "!Unreadable",
             false,
             "pg_class"
@@ -330,13 +331,13 @@ public sealed class PostgresTypeMapTests
     public void Map_ArrayOrDomainOfATypeThatDiffers_DiffersWithoutTheDriver()
     {
         ShouldMapTo(
-            PostgresTypeMap.Map(ArrayOf(Catalog("date")), NpgsqlColumn.None),
+            PostgresTypeMap.Map(ArrayOf(ModelRuns.Catalog("date")), NpgsqlColumn.None),
             "!DiffersByDriver",
             false,
             "date"
         );
         ShouldMapTo(
-            PostgresTypeMap.Map(DomainOf("birthday", Catalog("date")), NpgsqlColumn.None),
+            PostgresTypeMap.Map(DomainOf("birthday", ModelRuns.Catalog("date")), NpgsqlColumn.None),
             "!DiffersByDriver",
             false,
             "date"
@@ -351,16 +352,16 @@ public sealed class PostgresTypeMapTests
     [InlineData("daterange", null)]
     [InlineData("datemultirange", null)]
     public void Map_TypeThatDiffersWithoutTheDriver_NamesTheEntryForEachDriver(string internalName, string? detail) =>
-        PostgresTypeMap.Map(Catalog(internalName), NpgsqlColumn.None).Detail.ShouldBe(detail);
+        PostgresTypeMap.Map(ModelRuns.Catalog(internalName), NpgsqlColumn.None).Detail.ShouldBe(detail);
 
     // The cast reads an array of the type as an array of oid.
     [Fact]
     public void Map_TypeReadByACastToOid_NamesTheCastOfItsRank()
     {
-        PostgresTypeMap.Map(Catalog("regclass"), NpgsqlColumn.Npgsql10).Detail.ShouldBe("oid");
-        PostgresTypeMap.Map(ArrayOf(Catalog("regclass")), NpgsqlColumn.Npgsql10).Detail.ShouldBe("oid[]");
+        PostgresTypeMap.Map(ModelRuns.Catalog("regclass"), NpgsqlColumn.Npgsql10).Detail.ShouldBe("oid");
+        PostgresTypeMap.Map(ArrayOf(ModelRuns.Catalog("regclass")), NpgsqlColumn.Npgsql10).Detail.ShouldBe("oid[]");
         PostgresTypeMap
-            .Map(ArrayOf(DomainOf("relation", Catalog("regclass"))), NpgsqlColumn.Npgsql10)
+            .Map(ArrayOf(DomainOf("relation", ModelRuns.Catalog("regclass"))), NpgsqlColumn.Npgsql10)
             .Detail.ShouldBe("oid[]");
     }
 
@@ -380,7 +381,12 @@ public sealed class PostgresTypeMapTests
 
     [Fact]
     public void Map_ArrayOfATypeOfNpgsqlTypes_NeedsTheDriverWithoutIt() =>
-        ShouldMapTo(PostgresTypeMap.Map(ArrayOf(Catalog("point")), NpgsqlColumn.None), "!NeedsDriver", false, "point");
+        ShouldMapTo(
+            PostgresTypeMap.Map(ArrayOf(ModelRuns.Catalog("point")), NpgsqlColumn.None),
+            "!NeedsDriver",
+            false,
+            "point"
+        );
 
     [Fact]
     public void Map_Override_IsAskedAtEveryLevelFirst()
@@ -406,7 +412,7 @@ public sealed class PostgresTypeMapTests
             "int4"
         );
         ShouldMapTo(
-            PostgresTypeMap.Map(Catalog("date"), NpgsqlColumn.None, Overrides(("date", DateOnly, true))),
+            PostgresTypeMap.Map(ModelRuns.Catalog("date"), NpgsqlColumn.None, Overrides(("date", DateOnly, true))),
             DateOnly,
             true,
             "date"
@@ -495,12 +501,6 @@ public sealed class PostgresTypeMapTests
             return entry.Key is null ? null : TypeMapping.Mapped(entry.Key, entry.Text, entry.IsValueType);
         };
 
-    private static PostgresType Catalog(
-        string internalName,
-        string kind = SidecarValues.Kind.Base,
-        PostgresType? subtype = null
-    ) => TestSidecars.Postgres(name: internalName, kind: kind, internalName: internalName, subtype: subtype);
-
     private static PostgresType User(string internalName, string kind, PostgresType? subtype = null) =>
         TestSidecars.Postgres(
             name: internalName,
@@ -510,7 +510,7 @@ public sealed class PostgresTypeMapTests
             subtype: subtype
         );
 
-    private static PostgresType Text() => Catalog("text");
+    private static PostgresType Text() => ModelRuns.Catalog("text");
 
     private static PostgresType Bit(string internalName, int? length) =>
         TestSidecars.Postgres(name: internalName, internalName: internalName, length: length);

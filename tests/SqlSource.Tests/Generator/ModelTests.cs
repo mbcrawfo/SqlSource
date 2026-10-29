@@ -208,7 +208,7 @@ public sealed class ModelTests
         var run = Run(Users, Entry(Users, "GetUser", [Parameter("id")], [Column("id")]));
 
         run.ShouldBeClean();
-        ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs", "App.GetUserParams-Model.g.cs"]);
+        ModelFiles(run).ShouldBe([GetUserDtoFile, "App.GetUserParams-Model.g.cs"]);
     }
 
     [Fact]
@@ -217,7 +217,7 @@ public sealed class ModelTests
         var run = Run(Users, Entry(Users, "GetUser", [], [Column("id")]));
 
         run.ShouldBeClean();
-        ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs"]);
+        ModelFiles(run).ShouldBe([GetUserDtoFile]);
     }
 
     [Fact]
@@ -256,7 +256,7 @@ public sealed class ModelTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldBe(expected);
+        run.Sources[GetUserDtoFile].ShouldBe(expected);
     }
 
     [Theory]
@@ -287,7 +287,7 @@ public sealed class ModelTests
         var run = Run(Users, Entry(Users, "GetUser", [], []));
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"]
+        run.Sources[GetUserDtoFile]
             .ShouldBe(
                 $$"""
                 {{GeneratedFile.ModelHeader}}
@@ -314,7 +314,7 @@ public sealed class ModelTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"]
+        run.Sources[GetUserDtoFile]
             .ShouldBe(
                 $$"""
                 {{GeneratedFile.ModelHeader}}
@@ -494,7 +494,7 @@ public sealed class ModelTests
         var run = Run(source, [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("id")]))]);
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain($"    {expected} sealed record GetUserDto(int Id);\n");
+        run.Sources[GetUserDtoFile].ShouldContain($"    {expected} sealed record GetUserDto(int Id);\n");
     }
 
     // The parameters are in the order of the query's list, which puts one that only a -- param: marker declares last.
@@ -536,7 +536,7 @@ public sealed class ModelTests
 
         run.ShouldBeClean();
         run.Sources["App.GetUserParams-Model.g.cs"].ShouldContain("record GetUserParams(int A, int BX, int Ba);");
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain("record GetUserDto(int Ba, int BX, int A);");
+        run.Sources[GetUserDtoFile].ShouldContain("record GetUserDto(int Ba, int BX, int A);");
     }
 
     [Fact]
@@ -558,7 +558,7 @@ public sealed class ModelTests
 
         run.ShouldBeClean();
         run.Sources["App.GetUserParams-Model.g.cs"].ShouldContain("record GetUserParams(int Ba, int BX, int A);");
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain("record GetUserDto(int A, int BX, int Ba);");
+        run.Sources[GetUserDtoFile].ShouldContain("record GetUserDto(int A, int BX, int Ba);");
     }
 
     // The summary comes first, escaped, then the sentence that names the query.
@@ -574,7 +574,7 @@ public sealed class ModelTests
         var run = Run(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")]));
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"]
+        run.Sources[GetUserDtoFile]
             .ShouldContain(
                 "    /// <summary>\n"
                     + "    /// Loads one user by &lt;id&gt; &amp; name.\n"
@@ -599,7 +599,7 @@ public sealed class ModelTests
         var run = Run(file, Entry(file, "GetUser", [], [Column("id")]));
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"]
+        run.Sources[GetUserDtoFile]
             .ShouldContain(
                 "    /// <summary>\n"
                     + "    /// A row of the query <c>GetUser</c> from <c>A&amp;B.sql</c>.\n"
@@ -617,7 +617,7 @@ public sealed class ModelTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"]
+        run.Sources[GetUserDtoFile]
             .ShouldContain(
                 "    /// <param name=\"Id\">The column <c>id</c>, <c>integer</c>, from <c>public.my\n"
                     + "    /// table.id</c>.</param>\n"
@@ -648,7 +648,7 @@ public sealed class ModelTests
         );
 
         run.ShouldBeClean();
-        ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs", "App.GetUserParams-Model.g.cs"]);
+        ModelFiles(run).ShouldBe([GetUserDtoFile, "App.GetUserParams-Model.g.cs"]);
     }
 
     // The type that asks for the SQL alone gets no models, and the other type's are in its namespace.
@@ -702,7 +702,7 @@ public sealed class ModelTests
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC001 ");
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
-        ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs"]);
+        ModelFiles(run).ShouldBe([GetUserDtoFile]);
     }
 
     // First claims both files, and loses Users.sql to SQLSRC008, since Other.sql comes first and has a query of the
@@ -740,8 +740,8 @@ public sealed class ModelTests
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC008 ");
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
-        ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs", "Other.GetUserDto-Model.g.cs"]);
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain("record GetUserDto(int One);");
+        ModelFiles(run).ShouldBe([GetUserDtoFile, "Other.GetUserDto-Model.g.cs"]);
+        run.Sources[GetUserDtoFile].ShouldContain("record GetUserDto(int One);");
         run.Sources["Other.GetUserDto-Model.g.cs"].ShouldContain("record GetUserDto(int Id);");
     }
 
@@ -819,7 +819,7 @@ public sealed class ModelTests
         );
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldBe(OutputRecordWithArrays);
+        run.Sources[GetUserDtoFile].ShouldBe(OutputRecordWithArrays);
     }
 
     [Fact]
@@ -833,7 +833,7 @@ public sealed class ModelTests
         );
 
         run.ShouldBeClean();
-        var model = run.Sources["App.GetUserDto-Model.g.cs"];
+        var model = run.Sources[GetUserDtoFile];
         model.ShouldContain("public record GetUserDto(int Id, int[]? Scores)");
         model.ShouldContain("private GetUserDto() : this(default(int), default(int[]?)) { }");
     }
@@ -844,7 +844,7 @@ public sealed class ModelTests
         var run = Run(Users, Entry(Users, "GetUser", [], [Column("scores", IntArray, nullable: true)]));
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain(": this(default(int[]?)) { }");
+        run.Sources[GetUserDtoFile].ShouldContain(": this(default(int[]?)) { }");
     }
 
     [Fact]
@@ -861,7 +861,7 @@ public sealed class ModelTests
         var run = Run(Users, Entry(Users, "GetUser", [], [Column("scores", domain)]));
 
         run.ShouldBeClean();
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain("private GetUserDto() : this(");
+        run.Sources[GetUserDtoFile].ShouldContain("private GetUserDto() : this(");
     }
 
     [Fact]
@@ -870,7 +870,7 @@ public sealed class ModelTests
         var run = Run(Users, Entry(Users, "GetUser", [], [Column("id")]));
 
         run.ShouldBeClean();
-        var model = run.Sources["App.GetUserDto-Model.g.cs"];
+        var model = run.Sources[GetUserDtoFile];
         model.ShouldContain("public sealed record GetUserDto(int Id);");
         model.ShouldNotContain("private GetUserDto()");
     }
@@ -895,8 +895,8 @@ public sealed class ModelTests
         );
 
         run.ShouldBeClean();
-        ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs", "App.GetUserParams-Model.g.cs"]);
-        run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain("public class GetUserDto");
+        ModelFiles(run).ShouldBe([GetUserDtoFile, "App.GetUserParams-Model.g.cs"]);
+        run.Sources[GetUserDtoFile].ShouldContain("public class GetUserDto");
         run.Sources["App.GetUserParams-Model.g.cs"].ShouldContain("public sealed record GetUserParams(string[] Tags);");
         foreach (var name in ModelFiles(run))
         {
@@ -976,7 +976,7 @@ public sealed class ModelTests
         );
 
         run.ShouldBeClean();
-        run.Sources.ShouldContainKey("App.Sample.g.cs");
+        run.Sources.ShouldContainKey(GeneratorHarness.SampleFile);
         ModelFiles(run).ShouldBeEmpty();
     }
 

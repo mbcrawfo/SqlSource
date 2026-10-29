@@ -96,7 +96,7 @@ public sealed class RunLogRedactionTests : IDisposable
         var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
 
         text.ShouldNotContain(Secrets.Marker);
-        var line = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "postgres.connect ***");
+        var line = LogReader.Events(Log, "postgres.connect ***").ShouldHaveSingleItem();
         line.GetProperty("***").GetString().ShouldBe("***");
         line.GetProperty("message").GetString().ShouldBe("cannot connect with '***'");
         line.GetProperty("list")[0].GetProperty("deep").GetString().ShouldBe("***");
@@ -113,8 +113,8 @@ public sealed class RunLogRedactionTests : IDisposable
 
         text.ShouldNotContain(Secrets.Word);
         LogReader
-            .Read(Log)
-            .Single(e => e.GetProperty("event").GetString() == "postgres.connect")
+            .Events(Log, "postgres.connect")
+            .ShouldHaveSingleItem()
             .GetProperty("with")
             .GetString()
             .ShouldBe("<***>");
@@ -131,8 +131,8 @@ public sealed class RunLogRedactionTests : IDisposable
         _ = await LoggedWithAsync("Host=db;Password=test");
 
         LogReader
-            .Read(Log)
-            .Single(e => e.GetProperty("event").GetString() == "postgres.connect")
+            .Events(Log, "postgres.connect")
+            .ShouldHaveSingleItem()
             .GetProperty("message")
             .GetString()
             .ShouldBe("password *** refused, table latest_orders");
@@ -164,10 +164,7 @@ public sealed class RunLogRedactionTests : IDisposable
         var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
 
         text.ShouldNotContain(Secrets.Marker);
-        var events = LogReader
-            .Read(Log)
-            .Where(e => e.GetProperty("event").GetString() == "postgres.parameters")
-            .ToList();
+        var events = LogReader.Events(Log, "postgres.parameters");
         events.Count.ShouldBe(2);
         events[0].GetProperty("sql").GetString().ShouldBe("SELECT '***'");
         events[0].GetProperty("params").GetString().ShouldBe("@p nvarchar(10) /* *** */");
@@ -197,7 +194,7 @@ public sealed class RunLogRedactionTests : IDisposable
         var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
 
         text.ShouldNotContain(Secrets.Marker);
-        var events = LogReader.Read(Log).Where(e => e.GetProperty("event").GetString() == "postgres.probe").ToList();
+        var events = LogReader.Events(Log, "postgres.probe");
         events.Count.ShouldBe(2);
         events[0].GetProperty("sql").GetString().ShouldBe("SELECT '***'");
         events[0].GetProperty("params").GetString().ShouldBe("@p_1 nvarchar(10) /* *** */");
@@ -227,7 +224,7 @@ public sealed class RunLogRedactionTests : IDisposable
         var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
 
         text.ShouldNotContain(Secrets.Marker);
-        var events = LogReader.Read(Log).Where(e => e.GetProperty("event").GetString() == "postgres.declared").ToList();
+        var events = LogReader.Events(Log, "postgres.declared");
         events.Count.ShouldBe(3);
         events[0].GetProperty("sql").GetString().ShouldBe("SELECT @p AS [1] /* *** */");
         events[0].GetProperty("params").GetString().ShouldBe("@p ***");
@@ -317,7 +314,7 @@ public sealed class RunLogRedactionTests : IDisposable
         var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
 
         text.ShouldNotContain(Secrets.Marker);
-        var events = LogReader.Read(Log).Where(e => e.GetProperty("event").GetString() == "postgres.columns").ToList();
+        var events = LogReader.Events(Log, "postgres.columns");
         events.Count.ShouldBe(3);
         events[0].GetProperty("sql").GetString().ShouldBe("SELECT '***'");
         events[0].GetProperty("params").GetString().ShouldBe("@p nvarchar(10) /* *** */");
@@ -341,7 +338,7 @@ public sealed class RunLogRedactionTests : IDisposable
         var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
 
         text.ShouldNotContain(Secrets.Marker);
-        var events = LogReader.Read(Log).Where(e => e.GetProperty("event").GetString() == "postgres.table").ToList();
+        var events = LogReader.Events(Log, "postgres.table");
         events.Count.ShouldBe(3);
         events[0].GetProperty("schema").GetString().ShouldBe("***");
         events[0].GetProperty("table").GetString().ShouldBe("***");
@@ -365,7 +362,7 @@ public sealed class RunLogRedactionTests : IDisposable
         var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
 
         text.ShouldNotContain(Secrets.Marker);
-        var events = LogReader.Read(Log).Where(e => e.GetProperty("event").GetString() == "postgres.column").ToList();
+        var events = LogReader.Events(Log, "postgres.column");
         events.Count.ShouldBe(2);
         events[0].GetProperty("name").GetString().ShouldBe("***");
         events[0].GetProperty("type").GetString().ShouldBe("***");
@@ -389,7 +386,7 @@ public sealed class RunLogRedactionTests : IDisposable
         var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
 
         text.ShouldNotContain(Secrets.Marker);
-        var logged = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "postgres.table-match");
+        var logged = LogReader.Events(Log, "postgres.table-match").ShouldHaveSingleItem();
         logged.GetProperty("tableMatch").GetString().ShouldBe("***");
         logged.GetProperty("table").GetProperty("schema").GetString().ShouldBe("***");
         logged.GetProperty("table").GetProperty("table").GetString().ShouldBe("***");
@@ -407,7 +404,7 @@ public sealed class RunLogRedactionTests : IDisposable
         var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
 
         text.ShouldNotContain(Secrets.Marker);
-        var logged = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "postgres.table-match");
+        var logged = LogReader.Events(Log, "postgres.table-match").ShouldHaveSingleItem();
         logged.GetProperty("result").GetString().ShouldBe("***");
         logged.GetProperty("tableMatch").GetString().ShouldBe("***");
         logged.GetProperty("table").GetProperty("schema").GetString().ShouldBe("***");
@@ -435,8 +432,8 @@ public sealed class RunLogRedactionTests : IDisposable
 
         text.ShouldNotContain(Secrets.Marker);
         LogReader
-            .Read(Log)
-            .Single(e => e.GetProperty("event").GetString() == "postgres.driver")
+            .Events(Log, "postgres.driver")
+            .ShouldHaveSingleItem()
             .GetProperty("commandText")
             .GetString()
             .ShouldBe("SELECT '***'");
@@ -471,7 +468,7 @@ public sealed class RunLogRedactionTests : IDisposable
         var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
 
         text.ShouldNotContain(Secrets.Marker);
-        var open = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "database.open");
+        var open = LogReader.Events(Log, "database.open").ShouldHaveSingleItem();
         open.GetProperty("serverVersion").GetString().ShouldBe("***");
         open.GetProperty("driver").GetString().ShouldBe("***");
         open.GetProperty("driverVersion").GetString().ShouldBe("***");
@@ -511,8 +508,7 @@ public sealed class RunLogRedactionTests : IDisposable
 
         text.ShouldNotContain(Secrets.Marker);
         LogReader
-            .Read(Log)
-            .Where(e => e.GetProperty("event").GetString() == "diagnostic")
+            .Events(Log, "diagnostic")
             .Select(e => e.GetProperty("id").GetString())
             .ShouldBe(["SQLSRC999", "SQLSRC200"]);
     }
@@ -529,7 +525,7 @@ public sealed class RunLogRedactionTests : IDisposable
         var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
 
         text.ShouldNotContain(Secrets.Marker);
-        var diagnostic = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "diagnostic");
+        var diagnostic = LogReader.Events(Log, "diagnostic").ShouldHaveSingleItem();
         diagnostic.GetProperty("id").GetString().ShouldBe("***");
         diagnostic.GetProperty("message").GetString().ShouldBe("*** rejected the query 'GetUser'");
     }
@@ -543,7 +539,7 @@ public sealed class RunLogRedactionTests : IDisposable
 
         _ = await LoggedWithAsync(FakeDescriber.Rejected.Id);
 
-        var open = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "database.open");
+        var open = LogReader.Events(Log, "database.open").ShouldHaveSingleItem();
         open.GetProperty("error").GetString().ShouldBe("***");
     }
 
@@ -554,7 +550,7 @@ public sealed class RunLogRedactionTests : IDisposable
 
         _ = await LoggedWithAsync(FakeDescriber.Rejected.Id);
 
-        var query = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "query");
+        var query = LogReader.Events(Log, "query").ShouldHaveSingleItem();
         query.GetProperty("error").GetString().ShouldBe("***");
     }
 }
