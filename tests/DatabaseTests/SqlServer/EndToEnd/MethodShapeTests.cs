@@ -1,3 +1,5 @@
+using System;
+using System.Data.SqlTypes;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Data.SqlClient;
@@ -10,12 +12,19 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // query with no rows is rowcount by default and runs as none, one and one-optional read their row and refuse the rows
 // their shape does not allow, and a token is given the text of its default or another fragment.  A write runs in a
 // transaction that is rolled back.  Every shape throws an error that a statement after the rows raises: none and
-// rowcount read no rows, and a shape that reads them reads the results after them before it returns.
+// rowcount read no rows, and a shape that reads them reads the results after them before it returns.  When a shape
+// that reads rows throws an exception of its own, the reader's disposal reads those results and drops their error, and
+// when that error rolled back the caller's transaction the method throws TransactionRolledBackException, with its own
+// exception inside; a database error at a row is thrown as it is, and what that leaves is pinned too.  A transaction
+// that has completed, committed or rolled back by an earlier error, is refused before anything runs.
 [Collection(UsesSqlServer.Name)]
 public sealed class MethodShapeTests(SqlServerDatabases sqlServer)
 {
     // The number of SQL Server's error "Conversion failed when converting the varchar value 'x' to data type int.".
     private const int ConversionFailed = 245;
+
+    // The number of SQL Server's error "Divide by zero error encountered.".
+    private const int DivideByZero = 8134;
 
     [Fact]
     public async Task TouchAccount_NoRows_IsRowCountByDefault()
@@ -231,6 +240,193 @@ public sealed class MethodShapeTests(SqlServerDatabases sqlServer)
         );
 
         thrown.Number.ShouldBe(ConversionFailed);
+        await session.ShouldHaveRolledBackAsync(token);
+    }
+
+    // The second row makes one throw its refusal, and the reader's disposal reads the failed conversion after the
+    // rows, which with XACT_ABORT off rolls back the transaction and is dropped: the method throws the rollback, with
+    // the refusal inside it, so the caller learns of the rollback from the method.
+    [Fact]
+    public async Task GetTwoThenFailConversion_SecondRowInATransaction_ThrowsTheRollbackWithTheRowCountInside()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+
+        var thrown = await Should.ThrowAsync<TransactionRolledBackException>(() =>
+            session.Connection.GetTwoThenFailConversion(transaction: session.Transaction, cancellationToken: token)
+        );
+
+        thrown.QueryName.ShouldBe("GetTwoThenFailConversion");
+        thrown.Message.ShouldBe(
+            "The transaction was rolled back by an error that the query 'GetTwoThenFailConversion' raised after the "
+                + "inner exception was thrown."
+        );
+        var inner = thrown.InnerException.ShouldBeOfType<UnexpectedRowCountException>();
+        inner.QueryName.ShouldBe("GetTwoThenFailConversion");
+        inner.Message.ShouldBe("The query 'GetTwoThenFailConversion' returned more than one row.");
+        await session.ShouldHaveRolledBackAsync(token);
+    }
+
+    // With no transaction there is none to check, and the method throws its refusal as it is.
+    [Fact]
+    public async Task GetTwoThenFailConversion_SecondRowWithoutATransaction_ThrowsTheRowCount()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+
+        var thrown = await Should.ThrowAsync<UnexpectedRowCountException>(() =>
+            connection.GetTwoThenFailConversion(cancellationToken: TestContext.Current.CancellationToken)
+        );
+
+        thrown.QueryName.ShouldBe("GetTwoThenFailConversion");
+        thrown.Message.ShouldBe("The query 'GetTwoThenFailConversion' returned more than one row.");
+    }
+
+    // With XACT_ABORT off the THROW after the rows leaves the transaction open, so the method throws its refusal as
+    // it is, and the commit after it commits what the transaction did.
+    [Fact]
+    public async Task GetTwoThenRaise_SecondRowInATransaction_ThrowsTheRowCountAndCommits()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+
+        var thrown = await Should.ThrowAsync<UnexpectedRowCountException>(() =>
+            session.Connection.GetTwoThenRaise(transaction: session.Transaction, cancellationToken: token)
+        );
+
+        thrown.QueryName.ShouldBe("GetTwoThenRaise");
+        await session.ShouldCommitAsync(token);
+    }
+
+    // Under SET XACT_ABORT ON the same THROW rolls the transaction back, and the method throws the rollback, with its
+    // refusal inside it.
+    [Fact]
+    public async Task GetTwoThenRaise_SecondRowInATransactionUnderXactAbort_ThrowsTheRollback()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: true, token);
+
+        var thrown = await Should.ThrowAsync<TransactionRolledBackException>(() =>
+            session.Connection.GetTwoThenRaise(transaction: session.Transaction, cancellationToken: token)
+        );
+
+        thrown.QueryName.ShouldBe("GetTwoThenRaise");
+        _ = thrown.InnerException.ShouldBeOfType<UnexpectedRowCountException>();
+        await session.ShouldHaveRolledBackAsync(token);
+    }
+
+    // The caller catches an error that rolled back its transaction and goes on to give that transaction to a method,
+    // which SqlClient would run outside any transaction: the method refuses it before it runs the query, so its
+    // refusal of the second row is not reported as a rollback that the query did not cause.  The transaction is as the
+    // error left it.
+    [Fact]
+    public async Task GetTwoThenRaise_TransactionRolledBackByAnEarlierError_IsRefused()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+        await using (var fail = new SqlCommand("SELECT CAST('x' AS int);", session.Connection, session.Transaction))
+        {
+            var error = await Should.ThrowAsync<SqlException>(() => fail.ExecuteScalarAsync(token));
+            error.Number.ShouldBe(ConversionFailed);
+        }
+
+        var thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            session.Connection.GetTwoThenRaise(transaction: session.Transaction, cancellationToken: token)
+        );
+
+        thrown.GetType().ShouldBe(typeof(InvalidOperationException));
+        thrown.Message.ShouldBe(
+            "The transaction given to the query 'GetTwoThenRaise' has completed; it is no longer usable."
+        );
+        await session.ShouldHaveRolledBackAsync(token);
+    }
+
+    // A none method given a transaction that has committed is refused before anything runs, where SqlClient would run
+    // its batch outside any transaction and commit it on its own: the mark that its batch sets on the session is not
+    // there, and the error after it is not raised.
+    [Fact]
+    public async Task RunThenRaise_CommittedTransaction_IsRefusedAndRunsNothing()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+        await session.ShouldCommitAsync(token);
+        await SessionMark.ClearAsync(session.Connection, token);
+
+        var thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            session.Connection.RunThenRaise(transaction: session.Transaction, cancellationToken: token)
+        );
+
+        thrown.GetType().ShouldBe(typeof(InvalidOperationException));
+        thrown.Message.ShouldBe(
+            "The transaction given to the query 'RunThenRaise' has completed; it is no longer usable."
+        );
+        (await SessionMark.ReadAsync(session.Connection, token)).ShouldBe(0);
+    }
+
+    // A rowcount method given a transaction that an error rolled back is refused before anything runs: the mark that
+    // its batch sets on the session is not there, and the error after it is not raised.
+    [Fact]
+    public async Task CountThenRaise_TransactionRolledBackByAnEarlierError_IsRefusedAndRunsNothing()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+        await using (var fail = new SqlCommand("SELECT CAST('x' AS int);", session.Connection, session.Transaction))
+        {
+            _ = await Should.ThrowAsync<SqlException>(() => fail.ExecuteScalarAsync(token));
+        }
+
+        await SessionMark.ClearAsync(session.Connection, token);
+
+        var thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            session.Connection.CountThenRaise(transaction: session.Transaction, cancellationToken: token)
+        );
+
+        thrown.GetType().ShouldBe(typeof(InvalidOperationException));
+        thrown.Message.ShouldBe(
+            "The transaction given to the query 'CountThenRaise' has completed; it is no longer usable."
+        );
+        (await SessionMark.ReadAsync(session.Connection, token)).ShouldBe(0);
+    }
+
+    // A method that reads its rows into a collection throws at the NULL of the third row, and the failed conversion
+    // after the rows rolls back the transaction: the method throws the rollback, with the NULL's exception inside it.
+    [Fact]
+    public async Task ListNullAtThirdThenFailConversion_InATransaction_ThrowsTheRollbackWithTheNullInside()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+
+        var thrown = await Should.ThrowAsync<TransactionRolledBackException>(() =>
+            session.Connection.ListNullAtThirdThenFailConversion(
+                transaction: session.Transaction,
+                cancellationToken: token
+            )
+        );
+
+        thrown.QueryName.ShouldBe("ListNullAtThirdThenFailConversion");
+        _ = thrown.InnerException.ShouldBeOfType<SqlNullValueException>();
+        await session.ShouldHaveRolledBackAsync(token);
+    }
+
+    // What is observed, on 2025 and on 2017: the server sends the first row, then raises the divide by zero at the
+    // second, error 8134, which SqlClient's read throws.  That is the database's error, which the method throws as it
+    // is, and the reader's disposal reads the failed conversion after the rows and drops it.  With XACT_ABORT off the
+    // divide by zero alone leaves the transaction open, but the conversion rolls it back, so the caller gets the
+    // divide by zero, the transaction's Connection is null and the commit throws: nothing reports the rollback
+    // (TD-0090).
+    [Fact]
+    public async Task ListFailingAtSecondThenFailConversion_InATransaction_ThrowsTheDivideByZeroAndRollsBack()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var session = await UnpooledTransaction.BeginAsync(sqlServer, xactAbort: false, token);
+
+        var thrown = await Should.ThrowAsync<SqlException>(() =>
+            session.Connection.ListFailingAtSecondThenFailConversion(
+                transaction: session.Transaction,
+                cancellationToken: token
+            )
+        );
+
+        thrown.Number.ShouldBe(DivideByZero);
         await session.ShouldHaveRolledBackAsync(token);
     }
 

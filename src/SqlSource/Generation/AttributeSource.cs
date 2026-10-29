@@ -23,6 +23,8 @@ internal static class AttributeSource
 
     public const string UnexpectedRowCountMetadataName = "SqlSource.UnexpectedRowCountException";
 
+    public const string TransactionRolledBackMetadataName = "SqlSource.TransactionRolledBackException";
+
     public const string ConverterAttributeMetadataName = "SqlSource.SqlSourceConverterAttribute";
 
     public const string PathProperty = "Path";
@@ -63,6 +65,7 @@ internal static class AttributeSource
             CollectionTypeMetadataName,
             MethodLocationMetadataName,
             UnexpectedRowCountMetadataName,
+            TransactionRolledBackMetadataName,
             ConverterAttributeMetadataName
         );
 
@@ -255,6 +258,36 @@ internal static class AttributeSource
                 public UnexpectedRowCountException(string queryName, bool moreThanOne)
                     : base(
                         "The query '" + queryName + "' returned " + (moreThanOne ? "more than one row." : "no rows.")
+                    )
+                {
+                    QueryName = queryName;
+                }
+
+                /// <summary>
+                /// The name of the query.
+                /// </summary>
+                public string QueryName { get; }
+            }
+
+            /// <summary>
+            /// What a generated SQL Server method throws when it was given a transaction, threw an exception of its
+            /// own, and an error that the rest of its query raised then rolled the transaction back.  Its inner
+            /// exception is the method's own.  It derives from <see cref="global::System.InvalidOperationException" />,
+            /// so a caller in another assembly that does not know this type catches that.
+            /// </summary>
+            internal sealed class TransactionRolledBackException : global::System.InvalidOperationException
+            {
+                /// <summary>
+                /// Creates the exception for a query.
+                /// </summary>
+                /// <param name="queryName">The name of the query.</param>
+                /// <param name="innerException">The exception that the method threw.</param>
+                public TransactionRolledBackException(string queryName, global::System.Exception innerException)
+                    : base(
+                        "The transaction was rolled back by an error that the query '"
+                            + queryName
+                            + "' raised after the inner exception was thrown.",
+                        innerException
                     )
                 {
                     QueryName = queryName;
