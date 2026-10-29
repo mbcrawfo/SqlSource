@@ -117,8 +117,9 @@ internal sealed record BuildFolders(EquatableArray<string> Folders)
             : null;
 
     // The entry with %25, %7C, %23 and %3B, in either case, made the character each stands for, in one pass, so that
-    // %2523 is %23.  Any other % is kept.  An entry without a % is returned as it is.
-    private static string Unescape(string entry)
+    // %2523 is %23.  Any other % is kept.  An entry without a % is returned as it is.  TransitivePackageAssemblies
+    // decodes its names with it, since the targets escape them as they escape a folder.
+    internal static string Unescape(string entry)
     {
         var start = entry.IndexOf('%');
         if (start < 0)

@@ -3,8 +3,9 @@ using System;
 namespace SqlSource.Snapshot;
 
 /// <summary>
-/// A sidecar: what <c>sqlsource describe</c> learned about the queries of one <c>.sql</c> file.  The sidecar format
-/// design is the contract, and this is its model.
+/// A sidecar: what <c>sqlsource describe</c> learned about the queries of one <c>.sql</c> file.  The format is the
+/// contract, and this is its model: its shape is schemas/sidecar-v1.schema.json and its rules are
+/// docs/architecture/sidecar-format.md.
 /// </summary>
 /// <param name="FormatVersion">The version of the format.</param>
 /// <param name="ToolVersion">The version of the tool that wrote the file, as <c>major.minor.patch</c>.</param>

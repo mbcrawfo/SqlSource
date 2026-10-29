@@ -1,8 +1,9 @@
 namespace SqlSource.Snapshot;
 
 /// <summary>
-/// The values the format design lists, which the tool writes.  A reader keeps an engine or a provenance value it does
-/// not know, so those lists are open; a result kind it does not know is an error of the sidecar.
+/// The values that schemas/sidecar-v1.schema.json lists and describes, which the tool writes.  A reader keeps an
+/// engine or a provenance value it does not know, so those lists are open; a result kind it does not know is an error
+/// of the sidecar.
 /// </summary>
 internal static class SidecarValues
 {

@@ -287,6 +287,17 @@ public sealed class MappedTypeResolverTests
         }
         """;
 
+    // A library whose assembly, Brought.Client, only a package that the project does not list itself brings, when the
+    // build names it so.
+    private const string BroughtSource = """
+        namespace Brought.Client
+        {
+            public sealed class AccountId { }
+
+            public sealed class Range<T> { }
+        }
+        """;
+
     private static readonly EquatableArray<string> NoWarnings = EquatableArray<string>.Empty;
 
     private static readonly EquatableArray<string> NoCandidates = EquatableArray<string>.Empty;
@@ -315,6 +326,14 @@ public sealed class MappedTypeResolverTests
                 GeneratorHarness.CreateReference(OutputKind.Sql, "Friend", FriendSource),
                 GeneratorHarness.CreateReference(OutputKind.Sql, "Lab", LabSource),
             ]
+        )
+    );
+
+    // A project with Brought.Client as a reference.
+    private static readonly Lazy<CSharpCompilation> BroughtProject = new(() =>
+        GeneratorHarness.CreateCompilation(
+            [new SourceFile("/app/MyApp.cs", "namespace MyApp;\n\npublic sealed class Local;\n")],
+            references: [GeneratorHarness.CreateReference(OutputKind.Sql, "Brought.Client", BroughtSource)]
         )
     );
 
@@ -435,7 +454,12 @@ public sealed class MappedTypeResolverTests
     )
     {
         var types = MappedTypeResolver
-            .Resolve(Project.Value, TestSidecars.Of(name), TestContext.Current.CancellationToken)
+            .Resolve(
+                Project.Value,
+                TestSidecars.Of(name),
+                TransitivePackageAssemblies.None,
+                TestContext.Current.CancellationToken
+            )
             .Types;
 
         types
@@ -448,7 +472,8 @@ public sealed class MappedTypeResolverTests
                     isPublic,
                     warningIds.Length == 0 ? NoWarnings : TestSidecars.Of(warningIds.Split(',')),
                     name,
-                    NoCandidates
+                    NoCandidates,
+                    null
                 )
             );
     }
@@ -574,7 +599,12 @@ public sealed class MappedTypeResolverTests
     public void Resolve_NameWithTwoFailures_GivesTheFirstInTheOrderOfTheStatuses(string name, string status)
     {
         var types = MappedTypeResolver
-            .Resolve(Project.Value, TestSidecars.Of(name), TestContext.Current.CancellationToken)
+            .Resolve(
+                Project.Value,
+                TestSidecars.Of(name),
+                TransitivePackageAssemblies.None,
+                TestContext.Current.CancellationToken
+            )
             .Types;
 
         types.ShouldHaveSingleItem().Status.ShouldBe(Enum.Parse<MappedTypeStatus>(status));
@@ -585,7 +615,9 @@ public sealed class MappedTypeResolverTests
     {
         var names = TestSidecars.Of("global::MyApp.Missing", "global::MyApp.UserId", "int");
 
-        var types = MappedTypeResolver.Resolve(Project.Value, names, TestContext.Current.CancellationToken).Types;
+        var types = MappedTypeResolver
+            .Resolve(Project.Value, names, TransitivePackageAssemblies.None, TestContext.Current.CancellationToken)
+            .Types;
 
         types.ShouldBe([
             new MappedType(
@@ -595,7 +627,8 @@ public sealed class MappedTypeResolverTests
                 false,
                 NoWarnings,
                 "global::MyApp.Missing",
-                NoCandidates
+                NoCandidates,
+                null
             ),
             new MappedType(
                 "global::MyApp.UserId",
@@ -604,9 +637,10 @@ public sealed class MappedTypeResolverTests
                 true,
                 NoWarnings,
                 "global::MyApp.UserId",
-                NoCandidates
+                NoCandidates,
+                null
             ),
-            new MappedType("int", MappedTypeStatus.Found, true, true, NoWarnings, "int", NoCandidates),
+            new MappedType("int", MappedTypeStatus.Found, true, true, NoWarnings, "int", NoCandidates, null),
         ]);
         MappedTypeResolver.Find(types, "global::MyApp.UserId").ShouldBe(types[1]);
         MappedTypeResolver.Find(types, "int").ShouldBe(types[2]);
@@ -619,6 +653,7 @@ public sealed class MappedTypeResolverTests
         var resolved = MappedTypeResolver.Resolve(
             Project.Value,
             EquatableArray<string>.Empty,
+            TransitivePackageAssemblies.None,
             TestContext.Current.CancellationToken
         );
 
@@ -630,7 +665,12 @@ public sealed class MappedTypeResolverTests
     public void Resolve_TextThatIsNoType_IsNotFound()
     {
         var types = MappedTypeResolver
-            .Resolve(Project.Value, TestSidecars.Of("not a type"), TestContext.Current.CancellationToken)
+            .Resolve(
+                Project.Value,
+                TestSidecars.Of("not a type"),
+                TransitivePackageAssemblies.None,
+                TestContext.Current.CancellationToken
+            )
             .Types;
 
         types.ShouldHaveSingleItem().Status.ShouldBe(MappedTypeStatus.NotFound);
@@ -642,6 +682,7 @@ public sealed class MappedTypeResolverTests
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
             TestSidecars.Of("global::Lib.Email"),
+            TransitivePackageAssemblies.None,
             TestContext.Current.CancellationToken
         );
 
@@ -659,6 +700,7 @@ public sealed class MappedTypeResolverTests
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
             TestSidecars.Of("global::Lib.Email[]"),
+            TransitivePackageAssemblies.None,
             TestContext.Current.CancellationToken
         );
 
@@ -672,6 +714,7 @@ public sealed class MappedTypeResolverTests
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
             TestSidecars.Of("global::Lib.Email", "global::Lib.Email[]"),
+            TransitivePackageAssemblies.None,
             TestContext.Current.CancellationToken
         );
 
@@ -685,6 +728,7 @@ public sealed class MappedTypeResolverTests
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
             TestSidecars.Of("global::Lib.Locked"),
+            TransitivePackageAssemblies.None,
             TestContext.Current.CancellationToken
         );
 
@@ -701,6 +745,7 @@ public sealed class MappedTypeResolverTests
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
             TestSidecars.Of("global::Lib.Celsius"),
+            TransitivePackageAssemblies.None,
             TestContext.Current.CancellationToken
         );
 
@@ -718,6 +763,7 @@ public sealed class MappedTypeResolverTests
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
             TestSidecars.Of("global::Lib.Hidden"),
+            TransitivePackageAssemblies.None,
             TestContext.Current.CancellationToken
         );
 
@@ -755,6 +801,7 @@ public sealed class MappedTypeResolverTests
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
             TestSidecars.Of("global::MyApp.Phone"),
+            TransitivePackageAssemblies.None,
             TestContext.Current.CancellationToken
         );
 
@@ -768,6 +815,7 @@ public sealed class MappedTypeResolverTests
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
             TestSidecars.Of("global::Lib.Plain", "global::System.Uri", "int"),
+            TransitivePackageAssemblies.None,
             TestContext.Current.CancellationToken
         );
 
@@ -782,6 +830,7 @@ public sealed class MappedTypeResolverTests
         var resolved = MappedTypeResolver.Resolve(
             ConvertingProject.Value,
             TestSidecars.Of("global::Lib.Conversions"),
+            TransitivePackageAssemblies.None,
             TestContext.Current.CancellationToken
         );
 
@@ -789,11 +838,101 @@ public sealed class MappedTypeResolverTests
         resolved.Converters.ShouldBeEmpty();
     }
 
+    // A short name of a type that only a package brings is marked with the name, the type's full name and its
+    // assembly.
+    [Fact]
+    public void Resolve_ShortNameOfATransitivePackagesType_HasItsBinding()
+    {
+        var type = ResolveBrought("AccountId", TransitivePackageAssemblies.Of("Brought.Client"));
+
+        type.Status.ShouldBe(MappedTypeStatus.Found);
+        type.Text.ShouldBe("global::Brought.Client.AccountId");
+        type.Package.ShouldBe(new PackageBinding("AccountId", "Brought.Client.AccountId", "Brought.Client"));
+    }
+
+    // The short name is the one written, without its arguments, and the full name has none either.
+    [Fact]
+    public void Resolve_GenericShortNameOfATransitivePackagesType_HasItsNameWithoutArguments()
+    {
+        var type = ResolveBrought("Range<int>", TransitivePackageAssemblies.Of("Brought.Client"));
+
+        type.Status.ShouldBe(MappedTypeStatus.Found);
+        type.Package.ShouldBe(new PackageBinding("Range", "Brought.Client.Range", "Brought.Client"));
+    }
+
+    // A name whose own short name and an argument's both find a package's type is marked by its own, before its
+    // arguments'.
+    [Fact]
+    public void Resolve_ShortNameAndItsArgumentOfTransitivePackagesTypes_HasTheNamesOwnBinding()
+    {
+        var type = ResolveBrought("Range<AccountId>", TransitivePackageAssemblies.Of("Brought.Client"));
+
+        type.Status.ShouldBe(MappedTypeStatus.Found);
+        type.Package.ShouldBe(new PackageBinding("Range", "Brought.Client.Range", "Brought.Client"));
+    }
+
+    // A full name says which type it means, whatever assembly has it.
+    [Fact]
+    public void Resolve_FullNameOfATransitivePackagesType_HasNoBinding()
+    {
+        var type = ResolveBrought("Brought.Client.AccountId", TransitivePackageAssemblies.Of("Brought.Client"));
+
+        type.Status.ShouldBe(MappedTypeStatus.Found);
+        type.Package.ShouldBeNull();
+    }
+
+    // The same library, which the build does not name: a reference of the project's own.
+    [Fact]
+    public void Resolve_ShortNameOfADirectReferencesType_HasNoBinding()
+    {
+        var type = ResolveBrought("AccountId", TransitivePackageAssemblies.None);
+
+        type.Status.ShouldBe(MappedTypeStatus.Found);
+        type.Package.ShouldBeNull();
+    }
+
+    // A short name inside a full name's arguments is marked, rather than the type around it.
+    [Fact]
+    public void Resolve_ShortNameAsATypeArgument_HasTheArgumentsBinding()
+    {
+        var type = ResolveBrought(
+            "System.Collections.Generic.List<AccountId>",
+            TransitivePackageAssemblies.Of("Brought.Client")
+        );
+
+        type.Status.ShouldBe(MappedTypeStatus.Found);
+        type.Package.ShouldBe(new PackageBinding("AccountId", "Brought.Client.AccountId", "Brought.Client"));
+    }
+
+    // An assembly's name is matched ignoring case, and the binding has the assembly's own spelling.
+    [Fact]
+    public void Resolve_AssemblyNameInAnotherCase_HasItsBinding()
+    {
+        var type = ResolveBrought("AccountId", TransitivePackageAssemblies.Of("brought.client"));
+
+        type.Package.ShouldBe(new PackageBinding("AccountId", "Brought.Client.AccountId", "Brought.Client"));
+    }
+
+    // A name that no type has, not even of the framework, as System.Reflection.Missing would be.
+    [Fact]
+    public void Resolve_ShortNameNotFound_HasNoBinding()
+    {
+        var type = ResolveBrought("AccountKey", TransitivePackageAssemblies.Of("Brought.Client"));
+
+        type.Status.ShouldBe(MappedTypeStatus.NotFound);
+        type.Package.ShouldBeNull();
+    }
+
     [Fact]
     public void Find_NameNotResolved_GivesNull()
     {
         var types = MappedTypeResolver
-            .Resolve(Project.Value, TestSidecars.Of("int"), TestContext.Current.CancellationToken)
+            .Resolve(
+                Project.Value,
+                TestSidecars.Of("int"),
+                TransitivePackageAssemblies.None,
+                TestContext.Current.CancellationToken
+            )
             .Types;
 
         MappedTypeResolver.Find(types, "long").ShouldBeNull();
@@ -887,14 +1026,31 @@ public sealed class MappedTypeResolverTests
         return MappedTypeResolver.Resolve(
             project,
             TestSidecars.Of("global::TestedLib.Hidden"),
+            TransitivePackageAssemblies.None,
             TestContext.Current.CancellationToken
         );
     }
 
+    // The record of the one name in the project that references Brought.Client, whose package assemblies are these.
+    private static MappedType ResolveBrought(string name, TransitivePackageAssemblies packageAssemblies) =>
+        MappedTypeResolver
+            .Resolve(
+                BroughtProject.Value,
+                TestSidecars.Of(name),
+                packageAssemblies,
+                TestContext.Current.CancellationToken
+            )
+            .Types.ShouldHaveSingleItem();
+
     // The status the resolver gives the one name.
     private static MappedTypeStatus ResolvedStatusOf(string name) =>
         MappedTypeResolver
-            .Resolve(Project.Value, TestSidecars.Of(name), TestContext.Current.CancellationToken)
+            .Resolve(
+                Project.Value,
+                TestSidecars.Of(name),
+                TransitivePackageAssemblies.None,
+                TestContext.Current.CancellationToken
+            )
             .Types.ShouldHaveSingleItem()
             .Status;
 }

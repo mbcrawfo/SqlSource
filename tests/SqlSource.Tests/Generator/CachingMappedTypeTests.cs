@@ -1,6 +1,7 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -32,6 +33,13 @@ public sealed class CachingMappedTypeTests
             [SqlSource.SqlSourceConverter]
             public static string To(Email e) => e.Value;
         }
+        """;
+
+    // A library whose assembly only a package that the project does not list itself brings, when the build names it so.
+    private const string BroughtSource = """
+        namespace Brought.Client;
+
+        public sealed class AccountId { }
         """;
 
     private readonly CachingScene _scene = new();
@@ -88,6 +96,48 @@ public sealed class CachingMappedTypeTests
 
         AllReasons(result, TrackingNames.ResolvedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
         Outputs(result, TrackingNames.MappedTypes).ShouldHaveSingleItem().Value.ShouldBe(before);
+        OutputReasons(result).ShouldAllBeCached();
+    }
+
+    // The build names the assembly of the type that a short name finds.  An edit of a comment reads the same names
+    // from the same options, and the resolution, run on the new compilation, gives an equal value with its binding.
+    [Fact]
+    public void Run_CSharpEdit_ReadsTheSamePackageAssembliesAndResolvesToAnEqualValue()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(
+            Sources,
+            references: [GeneratorHarness.CreateReference(OutputKind.Sql, "Brought.Client", BroughtSource)]
+        );
+        var driver = CreateDriver(
+                ProjectFile(
+                    OutputKind.Sql,
+                    settings: /*lang=json,strict*/
+                    """{"typeOverrides": {"uuid": "AccountId"}}"""
+                ),
+                [_scene.Users, _scene.Orders]
+            )
+            .WithUpdatedAnalyzerConfigOptions(
+                new TestOptionsProvider(
+                    properties: new Dictionary<string, string?>
+                    {
+                        [TransitivePackageAssemblies.PropertyName] = "Brought.Client",
+                    }
+                )
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        var before = Outputs(driver.GetRunResult(), TrackingNames.MappedTypes).ShouldHaveSingleItem().Value;
+        ((EquatableArray<MappedType>)before)
+            .ShouldHaveSingleItem()
+            .Package.ShouldBe(new PackageBinding("AccountId", "Brought.Client.AccountId", "Brought.Client"));
+
+        var result = Run(driver, WithUsersSource(compilation, UsersSource + "\n// A comment.\n"));
+
+        AllReasons(result, TrackingNames.TransitivePackageAssemblies).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.ResolvedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        var (types, reason) = Outputs(result, TrackingNames.MappedTypes).ShouldHaveSingleItem();
+        reason.ShouldBe(IncrementalStepRunReason.Cached);
+        types.ShouldBe(before);
         OutputReasons(result).ShouldAllBeCached();
     }
 

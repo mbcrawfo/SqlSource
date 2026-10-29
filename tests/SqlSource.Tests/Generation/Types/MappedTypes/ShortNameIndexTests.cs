@@ -82,6 +82,7 @@ public sealed class ShortNameIndexTests
             .Resolve(
                 compilation,
                 new EquatableArray<string>(["global::Lib.UserId"]),
+                TransitivePackageAssemblies.None,
                 TestContext.Current.CancellationToken
             )
             .Types;
