@@ -1060,8 +1060,10 @@ public sealed class QueryMethodWriterTests
     }
 
     // A loop left at a row, by a break, a throw in its body or a disposal, disposes the iterator at its yield, and the
-    // finally reads the later results then, so that an error the rest of the batch raises is thrown.  The row is built
-    // before the flag is set, so an exception of the iterator's own, from a read, a check or a converter, reads none.
+    // finally reads the later results then, so that an error the rest of the batch raises is thrown.  It reads them
+    // without the token, as the reader's disposal would, so a token the caller cancelled neither throws nor cancels the
+    // command.  The row is built before the flag is set, so an exception of the iterator's own, from a read, a check or
+    // a converter, reads none.
     [Fact]
     public void Append_SqlServerStreams_DrainsInAFinallyWhenLeftAtARow()
     {
@@ -1096,7 +1098,7 @@ public sealed class QueryMethodWriterTests
                     + "            {\n"
                     + "                if (atRow)\n"
                     + "                {\n"
-                    + Drain("                    ")
+                    + Drain("                    ", "global::System.Threading.CancellationToken.None")
                     + "                }\n"
                     + "            }\n"
                     + "        }\n"
@@ -1317,10 +1319,12 @@ public sealed class QueryMethodWriterTests
 
     private static SqlSegment Token(string name) => new(SqlSegmentKind.Token, name);
 
-    // The loop that reads the results after the rows, at an indent.
-    private static string Drain(string indent) =>
+    // The loop that reads the results after the rows, at an indent, with the method's token unless another is given.
+    private static string Drain(string indent, string token = "cancellationToken") =>
         indent
-        + "while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))\n"
+        + "while (await reader.NextResultAsync("
+        + token
+        + ").ConfigureAwait(false))\n"
         + indent
         + "{\n"
         + indent

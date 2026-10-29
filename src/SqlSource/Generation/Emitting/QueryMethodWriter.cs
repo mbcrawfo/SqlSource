@@ -33,6 +33,9 @@ internal static class QueryMethodWriter
 
     private const string CancellationToken = "cancellationToken";
 
+    // The token of a call that nothing cancels.
+    private const string NoCancellation = "global::System.Threading.CancellationToken.None";
+
     private const string ExceptionType = "global::SqlSource.UnexpectedRowCountException";
 
     // The lines around the assignment of a command's SQL when its tokens build it.
@@ -656,7 +659,9 @@ internal static class QueryMethodWriter
     // a try whose finally drains when the loop was left at a row: a break, a throw in the loop's body or a disposal
     // disposes the iterator at its yield, and the rest of the batch can hold an error that the caller is to see.  The
     // flag is set once the row is built, so an exception of the iterator's own, from a read, a check or a converter,
-    // drains nothing.
+    // drains nothing.  The finally's drain takes no token, as the reader's disposal would read the rest: a token the
+    // caller cancelled before an early exit neither throws nor cancels the command, and the drain throws only what the
+    // database raises.
     private static void AppendStream(
         StringBuilder builder,
         string indent,
@@ -710,10 +715,10 @@ internal static class QueryMethodWriter
             .Append(" = false;\n");
         AppendEnd(builder, loopIndent);
         _ = builder.Append('\n');
-        AppendDrainLoop(builder, loopIndent, locals);
+        AppendDrainLoop(builder, loopIndent, locals, CancellationToken);
         _ = builder.Append(indent).Append("}\n").Append(indent).Append("finally\n").Append(indent).Append("{\n");
         AppendIf(builder, loopIndent, locals.AtRow);
-        AppendDrainLoop(builder, innerIndent, locals);
+        AppendDrainLoop(builder, innerIndent, locals, NoCancellation);
         AppendEnd(builder, loopIndent);
         AppendEnd(builder, indent);
     }
@@ -730,19 +735,19 @@ internal static class QueryMethodWriter
             return;
         }
 
-        AppendDrainLoop(builder, indent, locals);
+        AppendDrainLoop(builder, indent, locals, CancellationToken);
         _ = builder.Append('\n');
     }
 
-    // The loop that reads the results after the rows and does nothing with them.
-    private static void AppendDrainLoop(StringBuilder builder, string indent, Locals locals)
+    // The loop that reads the results after the rows and does nothing with them, with the token given.
+    private static void AppendDrainLoop(StringBuilder builder, string indent, Locals locals, string token)
     {
         _ = builder
             .Append(indent)
             .Append("while (await ")
             .Append(locals.Reader)
             .Append(".NextResultAsync(")
-            .Append(CancellationToken)
+            .Append(token)
             .Append(").ConfigureAwait(false))\n")
             .Append(indent)
             .Append("{\n");

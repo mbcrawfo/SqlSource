@@ -230,6 +230,65 @@ public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
         connection.State.ShouldBe(ConnectionState.Open);
     }
 
+    // A break disposes the stream at its row, and the iterator reads the rest of the batch as the reader's disposal
+    // would, with no token: a token that the loop's body cancelled before the break neither throws nor cancels it.
+    [Fact]
+    public async Task StreamAccounts_BreakAfterTheTokenIsCancelled_ThrowsNothing()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var rows = 0;
+
+        await foreach (var account in connection.StreamAccounts(cancellationToken: cancellation.Token))
+        {
+            if (++rows == 1)
+            {
+                await cancellation.CancelAsync();
+                break;
+            }
+        }
+
+        rows.ShouldBe(1);
+        connection.State.ShouldBe(ConnectionState.Open);
+        (
+            await MarkerCollectionQueries.ListAccountsInArray(
+                connection,
+                cancellationToken: TestContext.Current.CancellationToken
+            )
+        ).ShouldBe(Accounts);
+    }
+
+    // The same with a throw in the loop's body in place of the break: the body's exception is the one the loop throws.
+    [Fact]
+    public async Task StreamAccounts_ThrowInTheLoopBodyAfterTheTokenIsCancelled_ThrowsTheBodysException()
+    {
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+
+        var thrown = await Should.ThrowAsync<InvalidOperationException>(async () =>
+        {
+            await foreach (var account in connection.StreamAccounts(cancellationToken: cancellation.Token))
+            {
+                if (account.Id == 1)
+                {
+                    await cancellation.CancelAsync();
+                    throw new InvalidOperationException("The body throws after cancelling.");
+                }
+            }
+        });
+
+        thrown.Message.ShouldBe("The body throws after cancelling.");
+        connection.State.ShouldBe(ConnectionState.Open);
+        (
+            await MarkerCollectionQueries.ListAccountsInArray(
+                connection,
+                cancellationToken: TestContext.Current.CancellationToken
+            )
+        ).ShouldBe(Accounts);
+    }
+
     [Fact]
     public async Task StreamNumbers_BreakPartway_LeavesTheConnectionUsable()
     {
@@ -722,6 +781,36 @@ public sealed class StreamingQueryTests(SqlServerDatabases sqlServer)
 
         thrown.Number.ShouldBe(ArithmeticOverflow);
         await session.ShouldHaveRolledBackAsync(token);
+    }
+
+    // A token cancelled before a break, with a million numbers still to send, cancels nothing: the iterator reads the
+    // rest of the batch without it, so the statement after the numbers runs and marks the session.
+    [Fact]
+    public async Task StreamNumbersThenMark_BreakAfterTheTokenIsCancelled_RunsTheStatementAfterTheNumbers()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(token);
+        await SessionMark.ClearAsync(connection, token);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
+
+        var rows = 0;
+        await foreach (
+            var row in connection.StreamNumbersThenMark(
+                new StreamNumbersThenMarkArgs(ManyRows),
+                cancellationToken: cancellation.Token
+            )
+        )
+        {
+            if (++rows == 10)
+            {
+                await cancellation.CancelAsync();
+                break;
+            }
+        }
+
+        rows.ShouldBe(10);
+        (await SessionMark.ReadAsync(connection, token)).ShouldBe(1);
     }
 
     // A break reads and discards the rest of the result, and the statements after it run: SET CONTEXT_INFO marks the

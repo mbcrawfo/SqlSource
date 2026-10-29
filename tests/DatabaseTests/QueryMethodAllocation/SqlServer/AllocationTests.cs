@@ -1037,9 +1037,9 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                         {
                             if (atRow)
                             {
-                                while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                                while (await reader.NextResultAsync(CancellationToken.None).ConfigureAwait(false))
                                 {
-                                    // The generated method's drain, when the loop was left at a row.
+                                    // The generated method's drain, when the loop was left at a row, without the token.
                                 }
                             }
                         }
