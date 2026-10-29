@@ -21,7 +21,7 @@
 ## Sessions and requests
 
 - **A test opens, describes and captures through `Describer/Sessions.cs`**, which opens through `Describers.OpenAsync` of `tests/SqlSource.Tool.Testing`, and builds its requests with `DescribeRequests` of the same library.
-- **Two kinds of test are the exceptions**: the tests of the live calls below a session (`ModifierCallTests`, `ExplainTests`, `RelationsCallTests`, `OverloadsCallTests`, `HiddenTypesCallTests`, and the calls `TransactionTests` makes below a session), and `FixtureCasesTests`, which describes through `FixtureCaseRuns.ShouldDescribeOrRecordAsync` of `tests/SqlSource.Tool.Testing/Fixtures/` ([what it does](README.md#the-describers-fixtures)).
+- **Two kinds of test are the exceptions**: the tests of the live calls below a session (`ModifierCallTests`, `ExplainTests`, `RelationsCallTests`, `OverloadsCallTests`, `HiddenTypesCallTests`, `ShadowingOperatorsCallTests`, and the calls `TransactionTests` makes below a session), and `FixtureCasesTests`, which describes through `FixtureCaseRuns.ShouldDescribeOrRecordAsync` of `tests/SqlSource.Tool.Testing/Fixtures/` ([what it does](README.md#the-describers-fixtures)).
 - **The three tests of `ErrorPathTests` and the one of `ToolProcessTests` are the bodies of `ErrorPaths` and `ToolProcess` in `tests/SqlSource.Tool.Testing`**, called with the engine's own statements, connection and describers.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

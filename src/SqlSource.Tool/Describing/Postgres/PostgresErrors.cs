@@ -19,6 +19,10 @@ internal static class PostgresErrors
 {
     public const string OpenHelp = "check that the database is running and that the connection string names it";
 
+    public const string UnreadableTypesHelp =
+        "put pg_catalog first on the search path of the connection the tool uses: a schema before it may define an "
+        + "operator = on oid or \"char\"";
+
     /// <summary>
     /// Built from <see cref="PostgresSession.MinimumMajorVersion" />, so that the floor is one constant.
     /// </summary>
@@ -101,12 +105,19 @@ internal static class PostgresErrors
     /// <summary>
     /// <c>SQLSRC224</c>: no session.  Every failure of <c>open</c> is this one, whatever its SQLSTATE: a wrong
     /// password and a missing database are not the server rejecting a query.  The one exception is the tool's own
-    /// refusal of <c>Multiplexing=true</c>, <c>SQLSRC236</c>.
+    /// refusal of <c>Multiplexing=true</c>, <c>SQLSRC236</c>.  Types the driver could not read get their own help.
     /// </summary>
     public static DescribeFailure Open(PostgresServerError error, string database) =>
-        error.SqlState is null && error.Message == PostgresConnection.MultiplexingRefused
-            ? SessionNotKept(database, null, ServerLines(error, 0))
-            : DescribeFailures.Open(database, ServerLines(error, 0), OpenHelp);
+        (error.SqlState, error.Message) switch
+        {
+            (null, PostgresConnection.MultiplexingRefused) => SessionNotKept(database, null, ServerLines(error, 0)),
+            (null, PostgresConnection.UnreadableTypes) => DescribeFailures.Open(
+                database,
+                ServerLines(error, 0),
+                UnreadableTypesHelp
+            ),
+            _ => DescribeFailures.Open(database, ServerLines(error, 0), OpenHelp),
+        };
 
     /// <summary>
     /// <c>SQLSRC236</c>: the connection does not keep one session, so the statement the tool prepared is not there

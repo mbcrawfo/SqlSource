@@ -195,12 +195,12 @@ internal static class MethodRuns
     public const string KindsOverride = "-- type-override: int8=App.UserId\n";
 
     // A parameter's type of each kind that PostgreSQL binds, by the name of its kind, with the bindName the tool writes
-    // for it: a base type, an array, an enum, a domain, a range, a multirange, and an int8 converted under
-    // KindsOverride.
-    public static readonly (string Kind, PostgresType Type)[] ParameterKinds =
+    // for it and the canonical name the method binds it by: a base type, an array, an enum, a domain, a range, a
+    // multirange, and an int8 converted under KindsOverride.
+    public static readonly (string Kind, PostgresType Type, string DataTypeName)[] ParameterKinds =
     [
-        ("base", ModelRuns.Int4 with { BindName = "integer" }),
-        ("array", ModelRuns.ArrayOf(ModelRuns.Int4, "_int4") with { BindName = "integer[]" }),
+        ("base", ModelRuns.Int4 with { BindName = "integer" }, "pg_catalog.int4"),
+        ("array", ModelRuns.ArrayOf(ModelRuns.Int4, "_int4") with { BindName = "integer[]" }, "pg_catalog._int4"),
         (
             "enum",
             TestSidecars.Postgres(
@@ -210,7 +210,8 @@ internal static class MethodRuns
                 internalName: "mood",
                 labels: ["happy", "sad"],
                 bindName: "public.mood"
-            )
+            ),
+            "public.mood"
         ),
         (
             "domain",
@@ -221,9 +222,10 @@ internal static class MethodRuns
                 internalName: "email",
                 baseType: ModelRuns.Text,
                 bindName: "public.email"
-            )
+            ),
+            "public.email"
         ),
-        ("range", Int4Range with { BindName = "int4range" }),
+        ("range", Int4Range with { BindName = "int4range" }, "pg_catalog.int4range"),
         (
             "multirange",
             TestSidecars.Postgres(
@@ -232,9 +234,10 @@ internal static class MethodRuns
                 internalName: "int4multirange",
                 subtype: Int4Range,
                 bindName: "int4multirange"
-            )
+            ),
+            "pg_catalog.int4multirange"
         ),
-        ("converted", ModelRuns.Catalog("int8") with { Name = "bigint", BindName = "bigint" }),
+        ("converted", ModelRuns.Catalog("int8") with { Name = "bigint", BindName = "bigint" }, "pg_catalog.int8"),
     ];
 
     // The type int4range, as a multirange nests it, without a bindName.

@@ -1386,6 +1386,7 @@ The `server:` line is one of these.  A SQLSTATE is PostgreSQL's code of the erro
 | `a file that the connection string or the environment names is not what Npgsql expects: it is not in the right form, or its password is wrong` | Such a file was read and could not be used, as when a line of a password file is no entry |
 | `Npgsql does not support these settings of the connection string together` | A `Target Session Attributes` other than `Any` for one host, or a `Replication Mode` for several |
 | `GSS authentication is not available on this machine` | The server asks for GSS, and the operating system's GSS library cannot be loaded |
+| `Npgsql cannot read the database's types` | Npgsql read the database's types when it connected and could not use them: a schema before `pg_catalog` on the connection's search path defines an operator `=` on two `oid` or two `"char"`.  Put `pg_catalog` first on the search path of the connection the tool uses, or leave that schema off it |
 
 For SQL Server, the line starts with `Msg <number>, Level <level>, State <state>:` when the server or SqlClient numbered the error, as in `Msg 18456, Level 14, State 1: the server refused the login`.  The number is SQL Server's, listed in [Database Engine errors](https://learn.microsoft.com/sql/relational-databases/errors-events/database-engine-events-and-errors).  The text is one of these:
 
