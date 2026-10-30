@@ -39,6 +39,11 @@ namespace SqlSource.Generation.Methods;
 /// The libraries whose generated conversion a method calls, to read a column or bind a parameter, in the order of
 /// <see cref="Settings.Libraries.SqlLibrary" />, each once: the classes of conversions that the project gets.
 /// </param>
+/// <param name="UsedLibraries">
+/// The libraries that a query of the type whose output is <c>CodeGen</c> uses, in the order of
+/// <see cref="Settings.Libraries.SqlLibrary" />, each once: of a property that a library's row typed, or of a conversion
+/// that is a library's generated one.  The project gets <c>SQLSRC282</c> for each of them that is older than its floor.
+/// </param>
 internal sealed record TypeMethods(
     string TypeKey,
     string HintName,
@@ -54,7 +59,8 @@ internal sealed record TypeMethods(
     EquatableArray<SettingsFileLibraryUse> SettingsFileLibraries,
     CodeGenEngines CodeGenEngines,
     EquatableArray<string> WarningIds,
-    EquatableArray<ConversionLibrary> ConversionLibraries
+    EquatableArray<LibraryValue> ConversionLibraries,
+    EquatableArray<LibraryValue> UsedLibraries
 )
 {
     /// <summary>

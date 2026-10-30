@@ -618,6 +618,70 @@ public sealed class CachingMethodTests
         MethodsOf(result, UserMethods).ShouldContain("global::SqlSource.NodaTimeConversions.InstantFromDateTime(");
     }
 
+    // Under postgres, Users reads a timestamptz, which the plugin's row makes NodaTime's Instant.  A reference that moves
+    // NodaTime's version and keeps it above the floor changes the probe and leaves the libraries below the floor as
+    // they were, so no type plans its methods again.
+    [Fact]
+    public void Run_NodaTimeVersionChangeAboveTheFloor_PlansNothingAgain()
+    {
+        var older = LibraryReferences.Synthetic("3.2.0.0", nodaTimeTypes: true, pluginExtensions: true);
+        var (compilation, driver) = FirstRunWithSyntheticNodaTime(older);
+
+        var result = Run(
+            driver,
+            compilation.ReplaceReference(
+                older,
+                LibraryReferences.Synthetic("3.3.0.0", nodaTimeTypes: true, pluginExtensions: true)
+            )
+        );
+
+        result.Diagnostics.ShouldBeEmpty();
+        AllReasons(result, TrackingNames.LibraryProbe).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.LibrariesBelowTheFloor).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.MethodsInput).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.TypeMethods).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.UsedLibraries).ShouldBe([IncrementalStepRunReason.Cached]);
+    }
+
+    // The same reference moved below the floor: every type plans its methods again, and UserQueries, whose query uses
+    // NodaTime, loses its method to SQLSRC282, while OrderQueries keeps its own.
+    [Fact]
+    public void Run_NodaTimeVersionBelowTheFloor_PlansAgainAndReports282()
+    {
+        var older = LibraryReferences.Synthetic("3.2.0.0", nodaTimeTypes: true, pluginExtensions: true);
+        var (compilation, driver) = FirstRunWithSyntheticNodaTime(older);
+
+        var result = Run(
+            driver,
+            compilation.ReplaceReference(
+                older,
+                LibraryReferences.Synthetic("3.1.8.0", nodaTimeTypes: true, pluginExtensions: true)
+            )
+        );
+
+        result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC282");
+        AllReasons(result, TrackingNames.LibrariesBelowTheFloor).ShouldBe([IncrementalStepRunReason.Modified]);
+        MethodReasons(result, TrackingNames.TypeMethods)
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Unchanged),
+                ignoreOrder: true
+            );
+        GeneratedFiles(result).ShouldNotContain(UserMethods);
+        GeneratedFiles(result).ShouldContain(OrderMethods);
+    }
+
+    // Both types at CodeGen under postgres on Npgsql 10 with this assembly of NodaTime and its plugin, Users reading a
+    // timestamptz and Orders an int4: the compilation, and the driver after a first run that reports nothing.
+    private (CSharpCompilation Compilation, GeneratorDriver Driver) FirstRunWithSyntheticNodaTime(
+        MetadataReference nodaTime
+    )
+    {
+        var compilation = MethodsCompilation(UserQueries()).AddReferences(nodaTime);
+        var driver = _scene.FirstRunOfMethods(compilation, TypedSidecar(_scene.Users, "GetUser", "timestamptz"));
+        MethodsOf(driver.GetRunResult(), UserMethods).ShouldContain("global::NodaTime.Instant");
+        return (compilation, driver);
+    }
+
     // The source of UserQueries, in the namespace App, with these arguments on its attribute and these members.
     private static string UserQueries(string? arguments = null, string members = "") =>
         TypeSource("App", "UserQueries", arguments, members);

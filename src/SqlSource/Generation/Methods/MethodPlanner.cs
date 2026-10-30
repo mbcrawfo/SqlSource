@@ -19,7 +19,9 @@ namespace SqlSource.Generation.Methods;
 /// <see cref="ConversionPlanner" />, <c>SQLSRC279</c>, <c>SQLSRC280</c>, and <c>SQLSRC277</c> and <c>SQLSRC278</c> for
 /// a converter of a referenced assembly.  It also reports <c>SQLSRC281</c> for a library that is on for a query and
 /// that the project cannot use, which leaves the query its method, with the base map's types: at a marker as a
-/// diagnostic, and for a settings file as a <see cref="SettingsFileLibraryUse" />, which is located at the end.
+/// diagnostic, and for a settings file as a <see cref="SettingsFileLibraryUse" />, which is located at the end.  A query
+/// that uses a library older than its floor gets no method and reports nothing here: the project gets
+/// <c>SQLSRC282</c> from the libraries that the type's queries use.
 /// </summary>
 internal static class MethodPlanner
 {
@@ -40,8 +42,8 @@ internal static class MethodPlanner
     /// <summary>
     /// The methods of the type: one for each query of a file it can use whose output is
     /// <see cref="OutputKind.CodeGen" />, whose entry has the models it needs, whose shape, name, tokens and
-    /// converters a method can have, and whose engine's driver the project references at or above the floor.  A type
-    /// with a diagnostic of its own, or with no file, has none.
+    /// converters a method can have, whose engine's driver the project references at or above the floor, and which
+    /// uses no library older than its floor.  A type with a diagnostic of its own, or with no file, has none.
     /// </summary>
     public static TypeMethods Plan(MethodsInput input)
     {
@@ -53,10 +55,21 @@ internal static class MethodPlanner
         var libraryUses = ImmutableArray.CreateBuilder<SettingsFileLibraryUse>();
         var engines = CodeGenEngines.None;
         var warningIds = new SortedSet<string>(StringComparer.Ordinal);
-        var conversionLibraries = new SortedSet<SqlLibrary>();
+        // Made only when a first library is added, so that a type that uses none allocates nothing for them.
+        SortedSet<SqlLibrary>? conversionLibraries = null;
+        SortedSet<SqlLibrary>? usedLibraries = null;
         if (typeQueries.Type.Diagnostics.Count == 0 && typeQueries.Files.Count > 0)
         {
-            engines = Collect(input, key, methods, diagnostics, libraryUses, warningIds, conversionLibraries);
+            engines = Collect(
+                input,
+                key,
+                methods,
+                diagnostics,
+                libraryUses,
+                warningIds,
+                ref conversionLibraries,
+                ref usedLibraries
+            );
         }
 
         return new TypeMethods(
@@ -74,11 +87,8 @@ internal static class MethodPlanner
             new EquatableArray<SettingsFileLibraryUse>(libraryUses.ToImmutable()),
             engines,
             new EquatableArray<string>(warningIds.ToImmutableArray()),
-            conversionLibraries.Count == 0
-                ? EquatableArray<ConversionLibrary>.Empty
-                : new EquatableArray<ConversionLibrary>(
-                    conversionLibraries.Select(static library => new ConversionLibrary(library)).ToImmutableArray()
-                )
+            ToValues(conversionLibraries),
+            ToValues(usedLibraries)
         );
     }
 
@@ -105,7 +115,8 @@ internal static class MethodPlanner
         ImmutableArray<DiagnosticInfo>.Builder diagnostics,
         ImmutableArray<SettingsFileLibraryUse>.Builder libraryUses,
         SortedSet<string> warningIds,
-        SortedSet<SqlLibrary> conversionLibraries
+        ref SortedSet<SqlLibrary>? conversionLibraries,
+        ref SortedSet<SqlLibrary>? usedLibraries
     )
     {
         var typeQueries = input.Type;
@@ -133,13 +144,13 @@ internal static class MethodPlanner
             var context = new QueryContext(input, key, file, engine, usable);
             AddUnavailableLibraries(context, diagnostics, libraryUses);
             var target = ConverterTargetsExtensions.Of(engine, input.Drivers.PostgresAtLeast10);
-            if (Plan(context, written, target, served.Of(target)) is { } plan)
+            if (Plan(context, written, target, served.Of(target), ref usedLibraries) is { } plan)
             {
                 planned.Add(plan);
             }
         }
 
-        AddPlanned(planned, methods, diagnostics, warningIds, conversionLibraries);
+        AddPlanned(planned, methods, diagnostics, warningIds, ref conversionLibraries);
         return engines;
     }
 
@@ -161,12 +172,14 @@ internal static class MethodPlanner
 
     // The plan of one query whose output is CodeGen, or null when it gets nothing and reports nothing here.  Every
     // problem of SQLSRC272, SQLSRC275, SQLSRC274 and its converters that the query has is reported, and any one leaves
-    // it no method.  Its conversions see the converters of the type's slice that serve its target.
+    // it no method.  Its conversions see the converters of the type's slice that serve its target.  The libraries it
+    // uses are added to the type's, and one older than its floor leaves it no method and no problem.
     private static Planned? Plan(
         QueryContext context,
         HashSet<string> written,
         ConverterTargets target,
-        EquatableArray<Converter> converters
+        EquatableArray<Converter> converters,
+        ref SortedSet<SqlLibrary>? usedLibraries
     )
     {
         var (input, _, file, engine, usable) = context;
@@ -212,6 +225,12 @@ internal static class MethodPlanner
         );
         var hasInput = TryReadInput(context, models, reading, out var methodInput);
         var hasOutput = TryReadOutput(context, models, reading, out var methodOutput);
+        if (AddUsedLibraries(input, models, methodInput, methodOutput, ref usedLibraries))
+        {
+            // SQLSRC282, for the project, says why the query has no method, so its own problems are left unsaid.
+            return planned with { Problems = [] };
+        }
+
         if (problems.Count > 0 || !hasInput || !hasOutput)
         {
             return planned;
@@ -284,6 +303,81 @@ internal static class MethodPlanner
         {
             SqlLibrary.NodaTime or _ => "NodaTime",
         };
+
+    // The libraries that the query uses, added to the type's, which are made only when the first is added: of each
+    // property that a library's row typed, and of each conversion of its parameters and columns that is a library's
+    // generated one.  True when one of them is older than its floor.  By index, so that the passes box no enumerator.
+    private static bool AddUsedLibraries(
+        MethodsInput input,
+        QueryModels models,
+        MethodInput? methodInput,
+        MethodOutput? methodOutput,
+        ref SortedSet<SqlLibrary>? used
+    )
+    {
+        var isBelowTheFloor = false;
+        AddProperties(input, models.Input, ref used, ref isBelowTheFloor);
+        AddProperties(input, models.Output, ref used, ref isBelowTheFloor);
+        if (methodInput is { Parameters: var parameters })
+        {
+            for (var index = 0; index < parameters.Count; index++)
+            {
+                Add(input, parameters[index].Write?.Library, ref used, ref isBelowTheFloor);
+            }
+        }
+
+        if (methodOutput is { Columns: var columns })
+        {
+            for (var index = 0; index < columns.Count; index++)
+            {
+                Add(input, columns[index].Read?.Library, ref used, ref isBelowTheFloor);
+            }
+        }
+
+        return isBelowTheFloor;
+    }
+
+    private static void AddProperties(
+        MethodsInput input,
+        EquatableArray<ModelProperty>? properties,
+        ref SortedSet<SqlLibrary>? used,
+        ref bool isBelowTheFloor
+    )
+    {
+        if (properties is not { } each)
+        {
+            return;
+        }
+
+        for (var index = 0; index < each.Count; index++)
+        {
+            Add(input, each[index].Type.Library, ref used, ref isBelowTheFloor);
+        }
+    }
+
+    private static void Add(
+        MethodsInput input,
+        SqlLibrary? library,
+        ref SortedSet<SqlLibrary>? used,
+        ref bool isBelowTheFloor
+    )
+    {
+        if (library is not { } value)
+        {
+            return;
+        }
+
+        _ = (used ??= []).Add(value);
+        isBelowTheFloor |= input.IsBelowTheFloor(value);
+    }
+
+    // The libraries in order, or the empty array when there are none.
+    private static EquatableArray<LibraryValue> ToValues(SortedSet<SqlLibrary>? libraries) =>
+        libraries is null
+            ? EquatableArray<LibraryValue>.Empty
+            : new EquatableArray<LibraryValue>(
+                libraries.Select(static library => new LibraryValue(library)).ToImmutableArray()
+            );
 
     // The ids of the warnings that a method gives: of each property type it reads or binds, which it names as its
     // model does, and of each converter it calls.
@@ -519,7 +613,7 @@ internal static class MethodPlanner
         ImmutableArray<QueryMethod>.Builder methods,
         ImmutableArray<DiagnosticInfo>.Builder diagnostics,
         SortedSet<string> warningIds,
-        SortedSet<SqlLibrary> conversionLibraries
+        ref SortedSet<SqlLibrary>? conversionLibraries
     )
     {
         var byName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
@@ -554,20 +648,20 @@ internal static class MethodPlanner
             {
                 methods.Add(method);
                 warningIds.UnionWith(plan.WarningIds);
-                AddConversionLibraries(method, conversionLibraries);
+                AddConversionLibraries(method, ref conversionLibraries);
             }
         }
     }
 
     // The library of each conversion of the method that is a library's generated one, a column's read or a
-    // parameter's write.
-    private static void AddConversionLibraries(QueryMethod method, SortedSet<SqlLibrary> libraries)
+    // parameter's write, into a set made only when the first is added.
+    private static void AddConversionLibraries(QueryMethod method, ref SortedSet<SqlLibrary>? libraries)
     {
         foreach (var parameter in method.Input?.Parameters ?? EquatableArray<MethodParameter>.Empty)
         {
             if (parameter.Write?.Library is { } library)
             {
-                _ = libraries.Add(library);
+                _ = (libraries ??= []).Add(library);
             }
         }
 
@@ -575,7 +669,7 @@ internal static class MethodPlanner
         {
             if (column.Read?.Library is { } library)
             {
-                _ = libraries.Add(library);
+                _ = (libraries ??= []).Add(library);
             }
         }
     }

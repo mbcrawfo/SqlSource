@@ -178,6 +178,7 @@ public sealed class RowBufferTests
             EquatableArray<SettingsFileLibraryUse>.Empty,
             CodeGenEngines.Postgres,
             EquatableArray<string>.Empty,
-            EquatableArray<ConversionLibrary>.Empty
+            EquatableArray<LibraryValue>.Empty,
+            EquatableArray<LibraryValue>.Empty
         );
 }

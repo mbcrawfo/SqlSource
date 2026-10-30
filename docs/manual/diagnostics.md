@@ -206,6 +206,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | Id | Title |
 |----|----|
 | [SQLSRC281](#sqlsrc281) | A library that is on is not referenced |
+| [SQLSRC282](#sqlsrc282) | A library is older than SqlSource supports |
 
 **A short name of your choice**
 
@@ -237,7 +238,7 @@ The ids from `SQLSRC272` to `SQLSRC276` are reported by the build, about the [me
 
 The ids from `SQLSRC277` to `SQLSRC280` are reported by the build, about converters, the methods marked `[SqlSourceConverter]`.  `SQLSRC277` and `SQLSRC278` are about the methods of the project's own code: at the method's name, whatever the output of the project, its types and its files, and whether a query uses the method or not.  A converter of a type that a type override, a column type or a `-- param:` marker names, declared in a referenced assembly, has no place in the project, so `SQLSRC277` and `SQLSRC278` are reported for it at the name of each query whose output is `codegen` and whose method would use it.  `SQLSRC279` and `SQLSRC280` are about a column or a parameter of a query whose output is `codegen`, whose C# type a type override, a column type or a `-- param:` marker chose, and whose type has converters that do not serve it.  Each of these at a query is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.  A project whose output is `models` uses no converter, and gets none of them at a query, and neither does a query whose database's driver the project does not reference, which [SQLSRC273](#sqlsrc273) is about.
 
-`SQLSRC281` is reported by the build, about the [library types](settings.md#setting-library-types) of a query whose output is `codegen`: at the entry of a settings file or the marker that turns a library on, once for each database whose queries it reaches, and never for a query whose output is `models` or `sql`.  The query keeps its models and its method.
+`SQLSRC281` is reported by the build, about the [library types](settings.md#setting-library-types) of a query whose output is `codegen`: at the entry of a settings file or the marker that turns a library on, once for each database whose queries it reaches, and never for a query whose output is `models` or `sql`.  The query keeps its models and its method.  `SQLSRC282` is reported by the build, about the version of a library that a query whose output is `codegen` uses: with no file and line, once for the project and library, however many queries use it.  Those queries get no method until it is fixed; their models are still generated.
 
 `SQLSRC284` is reported by the build, as `SQLSRC250` to `SQLSRC252` are, at the name of a query whose output is `models` or `codegen`, once for each column and parameter whose C# type you chose by a short name that it is about.  It is a warning, and the query keeps the type: it gets its models, and under `codegen` its method.
 
@@ -2735,6 +2736,20 @@ The `libraryTypes` of a settings file, or a `-- library-types:` marker, turns a 
 ```
 
 Reference the package the message names from the project.  Or, where the error points, set the library to `off`, or remove the entry, for those queries: a library that nothing turns on is on only where the project references what it needs.  The error is reported at the entry that says `on`, the member of the settings file or the line of the marker, once for each database whose `codegen` queries it reaches, however many queries, files and types those are.  A query whose output is `models` or `sql` is not reported.  The queries keep their methods and their models, with the C# types they have while the library is off.
+
+See: [Library types](settings.md#setting-library-types)
+
+## SQLSRC282
+
+**A library is older than SqlSource supports**
+
+The project references a version of a library older than SqlSource supports, and a query whose output is `codegen` uses the library: a column or parameter of the query has one of the library's types, which the [library types](settings.md#setting-library-types) give it or which SqlSource converts for it.  SqlSource needs NodaTime 3.1.9 or later.  The message names the library, the version the project references and the oldest that SqlSource supports.
+
+```console
+CSC : error SQLSRC282: This project references NodaTime 3.1.8, and SqlSource needs NodaTime 3.1.9 or later for the query methods that use it, so they are not generated.  Update the package.
+```
+
+Until the package is updated, a query that uses the library gets no method, and no other error about its method is reported; its models are still generated, with the library's types.  The queries that do not use the library keep their methods.  Update the package to the version the message gives or later.  When another package brings the older version, reference the library's package from the project itself, at the version you want.  The error has no file and line, because it is about the project's references, and it is reported once for the project and library, however many queries use the library, and never for a query whose output is `models` or `sql`.
 
 See: [Library types](settings.md#setting-library-types)
 

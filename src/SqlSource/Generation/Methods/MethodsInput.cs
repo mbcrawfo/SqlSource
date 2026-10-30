@@ -6,7 +6,9 @@ using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Models;
 using SqlSource.Generation.Paths;
+using SqlSource.Generation.Types.Drivers;
 using SqlSource.Settings.ClrTypes;
+using SqlSource.Settings.Libraries;
 
 namespace SqlSource.Generation.Methods;
 
@@ -34,15 +36,44 @@ namespace SqlSource.Generation.Methods;
 /// the order of <see cref="ConverterSet.Comparer" />, and without its location, so that an edit that only moves a
 /// converter plans no method again.
 /// </param>
+/// <param name="LibrariesBelowTheFloor">
+/// The libraries that the project references older than their floor, from <see cref="BelowTheFloorOf" />, in the
+/// order of <see cref="SqlLibrary" />: a query that uses one gets no method.  Without the versions, so that a version
+/// that stays on one side of the floor plans no method again.
+/// </param>
 internal sealed record MethodsInput(
     TypeQueries Type,
     EquatableArray<FileModels> Files,
     EquatableArray<ModelAssignment> Assignments,
     EquatableArray<string> MemberNames,
     MethodDrivers Drivers,
-    EquatableArray<Converter> Converters
+    EquatableArray<Converter> Converters,
+    EquatableArray<LibraryValue> LibrariesBelowTheFloor
 )
 {
+    /// <summary>
+    /// The libraries that <paramref name="probe" /> says the project references older than their floor, in the order
+    /// of <see cref="SqlLibrary" />.
+    /// </summary>
+    public static EquatableArray<LibraryValue> BelowTheFloorOf(LibraryProbe probe) =>
+        probe.IsBelowTheFloor(SqlLibrary.NodaTime)
+            ? new EquatableArray<LibraryValue>(ImmutableArray.Create(new LibraryValue(SqlLibrary.NodaTime)))
+            : EquatableArray<LibraryValue>.Empty;
+
+    /// <summary>Whether <paramref name="library" /> is one of <see cref="LibrariesBelowTheFloor" />.</summary>
+    public bool IsBelowTheFloor(SqlLibrary library)
+    {
+        for (var index = 0; index < LibrariesBelowTheFloor.Count; index++)
+        {
+            if (LibrariesBelowTheFloor[index].Library == library)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// Takes from what the project gives what the type needs: a search for each of its files, for its assignments and
     /// for its names, so that the cost does not grow with the other types.
@@ -53,13 +84,15 @@ internal sealed record MethodsInput(
     /// <param name="memberNames">The names of every type whose methods go on itself, sorted by key ordinally.</param>
     /// <param name="drivers">Which engines' methods the project's drivers allow.</param>
     /// <param name="converters">Every converter of the project.</param>
+    /// <param name="librariesBelowTheFloor">The libraries that the project references older than their floor.</param>
     public static MethodsInput Gather(
         TypeQueries type,
         EquatableArray<FileModels> allFileModels,
         EquatableArray<ModelAssignment> assignments,
         EquatableArray<TypeMemberNames> memberNames,
         MethodDrivers drivers,
-        ConverterSet converters
+        ConverterSet converters,
+        EquatableArray<LibraryValue> librariesBelowTheFloor
     )
     {
         var files = ImmutableArray.CreateBuilder<FileModels>(type.Files.Count);
@@ -78,7 +111,8 @@ internal sealed record MethodsInput(
             SliceOf(assignments, key),
             names < 0 ? EquatableArray<string>.Empty : memberNames[names].Names,
             drivers,
-            ConvertersOf(slice, converters)
+            ConvertersOf(slice, converters),
+            librariesBelowTheFloor
         );
     }
 

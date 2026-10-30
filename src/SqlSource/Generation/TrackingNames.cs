@@ -75,6 +75,8 @@ internal static class TrackingNames
 
     public const string LibraryProbe = nameof(LibraryProbe);
 
+    public const string LibrariesBelowTheFloor = nameof(LibrariesBelowTheFloor);
+
     public const string UsesSqlServerEntries = nameof(UsesSqlServerEntries);
 
     public const string MappedTypeNames = nameof(MappedTypeNames);
@@ -148,4 +150,6 @@ internal static class TrackingNames
     public const string ConversionLibraries = nameof(ConversionLibraries);
 
     public const string LibraryConversionOutput = nameof(LibraryConversionOutput);
+
+    public const string UsedLibraries = nameof(UsedLibraries);
 }

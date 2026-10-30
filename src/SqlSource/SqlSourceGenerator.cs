@@ -62,6 +62,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             claims.TypeMemberNames,
             typing.NpgsqlProbe,
             typing.SqlClientProbe,
+            typing.LibraryProbe,
             converters
         );
     }
@@ -772,8 +773,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     }
 
     // The file of each type's methods, and their diagnostics, with the clashes across types, SQLSRC281 at each member
-    // of a settings file that turns on a library the project cannot use, and SQLSRC273 for each engine whose methods
-    // have no driver.
+    // of a settings file that turns on a library the project cannot use, SQLSRC273 for each engine whose methods have
+    // no driver, and SQLSRC282 for each library older than its floor that a query uses.
     private static void RegisterMethodSources(
         IncrementalGeneratorInitializationContext context,
         IncrementalValueProvider<SettingsFileSet> settingsFiles,
@@ -784,6 +785,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<EquatableArray<TypeMemberNames>> typeMemberNames,
         IncrementalValueProvider<NpgsqlProbe> npgsqlProbe,
         IncrementalValueProvider<SqlClientProbe> sqlClientProbe,
+        IncrementalValueProvider<LibraryProbe> libraryProbe,
         IncrementalValueProvider<ConverterSet> converters
     )
     {
@@ -795,12 +797,18 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         var assignments = models.Select(static (set, _) => set.Assignments);
 
+        // The libraries that the project references older than their floor, without their versions, which are the same
+        // value while a version stays on one side of its floor.
+        var librariesBelowTheFloor = libraryProbe
+            .Select(static (probe, _) => MethodsInput.BelowTheFloorOf(probe))
+            .WithTrackingName(TrackingNames.LibrariesBelowTheFloor);
+
         // Each type's own slice of what its methods need, which is equal until something of the type changes: its
-        // queries, its files' models, the models its queries got, its names, the drivers or the converters of the
-        // types that its type overrides, column types and markers chose.
+        // queries, its files' models, the models its queries got, its names, the drivers, the converters of the types
+        // that its type overrides, column types and markers chose, or the libraries below their floor.
         var typeMethods = typeQueries
             .Combine(allFileModels.Combine(assignments))
-            .Combine(typeMemberNames.Combine(drivers.Combine(converters)))
+            .Combine(typeMemberNames.Combine(drivers.Combine(converters.Combine(librariesBelowTheFloor))))
             .Select(
                 static (input, _) =>
                     MethodsInput.Gather(
@@ -809,7 +817,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                         input.Left.Right.Right,
                         input.Right.Left,
                         input.Right.Right.Left,
-                        input.Right.Right.Right
+                        input.Right.Right.Right.Left,
+                        input.Right.Right.Right.Right
                     )
             )
             .WithTrackingName(TrackingNames.MethodsInput)
@@ -921,6 +930,16 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .WithTrackingName(TrackingNames.LibraryConversionOutput);
 
         context.RegisterSourceOutput(libraryConversionOutputs, AddFile);
+
+        // The libraries that the CodeGen queries use, each once, which almost never change.
+        var usedLibraries = typeMethods
+            .Select(static (methods, _) => methods.UsedLibraries)
+            .Collect()
+            .Select(static (each, _) => DistinctLibraries(each))
+            .WithTrackingName(TrackingNames.UsedLibraries);
+
+        // Not located, and once for the project and library, however many of its queries use the library.
+        context.RegisterSourceOutput(usedLibraries.Combine(libraryProbe), ReportLibrariesBelowTheFloor);
     }
 
     private static void ReportChecks(SourceProductionContext output, SidecarCheckResult check) =>
@@ -947,17 +966,36 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         }
     }
 
-    // The libraries of every type, each once, in the order of SqlLibrary, so that the value does not depend on the order
-    // of the compilation's types.
-    private static EquatableArray<ConversionLibrary> DistinctLibraries(
-        ImmutableArray<EquatableArray<ConversionLibrary>> each
-    ) =>
+    // The libraries of every type, conversions' or used ones, each once, in the order of SqlLibrary, so that the value
+    // does not depend on the order of the compilation's types.
+    private static EquatableArray<LibraryValue> DistinctLibraries(ImmutableArray<EquatableArray<LibraryValue>> each) =>
         new(
             each.SelectMany(static libraries => libraries)
                 .Distinct()
                 .OrderBy(static library => library.Library)
                 .ToImmutableArray()
         );
+
+    // SQLSRC282 for each library that a CodeGen query uses and that the project references older than its floor.
+    private static void ReportLibrariesBelowTheFloor(
+        SourceProductionContext output,
+        (EquatableArray<LibraryValue> Libraries, LibraryProbe Probe) input
+    )
+    {
+        var probe = input.Probe;
+        foreach (var library in input.Libraries.Select(static used => used.Library).Where(probe.IsBelowTheFloor))
+        {
+            output.ReportDiagnostic(
+                Diagnostic.Create(
+                    SqlDiagnostics.LibraryBelowTheFloor,
+                    Location.None,
+                    MethodPlanner.LibraryName(library),
+                    probe.VersionTextOf(library),
+                    LibraryProbe.FloorOf(library)
+                )
+            );
+        }
+    }
 
     // SQLSRC273 for each engine that a CodeGen query has and whose driver the project does not reference.
     private static void ReportMissingDrivers(

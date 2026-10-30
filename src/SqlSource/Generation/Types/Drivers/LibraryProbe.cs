@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using SqlSource.Settings;
 using SqlSource.Settings.Libraries;
@@ -22,6 +23,9 @@ namespace SqlSource.Generation.Types.Drivers;
 internal sealed record LibraryProbe(bool NodaTime, bool NpgsqlNodaTime, Version? NodaTimeVersion)
 {
     private const string NodaTimeAssemblyName = "NodaTime";
+
+    // The oldest NodaTime whose types SqlSource's rows and conversions name.
+    private static readonly Version NodaTimeFloor = new(3, 1, 9, 0);
 
     /// <summary>
     /// Whether the project references what <paramref name="library" /> needs on <paramref name="engine" />: on
@@ -54,6 +58,37 @@ internal sealed record LibraryProbe(bool NodaTime, bool NpgsqlNodaTime, Version?
         };
 
     /// <summary>
+    /// Whether the project references <paramref name="library" /> older than its floor: for NodaTime, an assembly
+    /// named <c>NodaTime</c> older than 3.1.9 that has its types.  A library whose assembly gives no version, as one
+    /// merged into an assembly of another name, is not below it.
+    /// </summary>
+    public bool IsBelowTheFloor(SqlLibrary library) =>
+        library switch
+        {
+            SqlLibrary.NodaTime => NodaTime && NodaTimeVersion is { } version && version < NodaTimeFloor,
+            _ => false,
+        };
+
+    /// <summary>
+    /// The oldest version of <paramref name="library" /> that SqlSource supports, as a diagnostic gives it.
+    /// </summary>
+    public static string FloorOf(SqlLibrary library) =>
+        library switch
+        {
+            SqlLibrary.NodaTime or _ => TextOf(NodaTimeFloor),
+        };
+
+    /// <summary>
+    /// The version of <paramref name="library" /> that the project references, as a diagnostic gives it: the major,
+    /// the minor and the build, as <c>3.1.8</c>.  Empty when there is none.
+    /// </summary>
+    public string VersionTextOf(SqlLibrary library) =>
+        library switch
+        {
+            SqlLibrary.NodaTime or _ => NodaTimeVersion is { } version ? TextOf(version) : "",
+        };
+
+    /// <summary>
     /// Reads the probe from <paramref name="compilation" />: two type lookups and the identities of its references.
     /// Of two references named <c>NodaTime</c>, the newer gives the version.  Never throws.
     /// </summary>
@@ -77,4 +112,14 @@ internal sealed record LibraryProbe(bool NodaTime, bool NpgsqlNodaTime, Version?
             version
         );
     }
+
+    // The major, the minor and the build, which a version of an assembly always has, without throwing on one that has
+    // fewer.
+    private static string TextOf(Version version) =>
+        string.Join(
+            ".",
+            version.Major.ToString(CultureInfo.InvariantCulture),
+            version.Minor.ToString(CultureInfo.InvariantCulture),
+            Math.Max(version.Build, 0).ToString(CultureInfo.InvariantCulture)
+        );
 }

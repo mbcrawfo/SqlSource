@@ -977,6 +977,21 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the library, as "NodaTime", {1} the version the project references, as "3.1.8", and {2} the oldest that
+    // SqlSource supports.  Reported with no position, once for the project and library, when a codegen query uses the
+    // library; the queries that use it get no method.  The library is an argument, so every library's floor shares it.
+    public static readonly DiagnosticDescriptor LibraryBelowTheFloor = new(
+        id: "SQLSRC282",
+        title: "A library is older than SqlSource supports",
+        messageFormat: "This project references {0} {1}, and SqlSource needs {0} {2} or later for the query methods "
+            + "that use it, so they are not generated.  Update the package.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc282",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     // {0} to {3} as SQLSRC250's, {4} the short name as written, without its type arguments, {5} the full name of the
     // type it finds, as a user writes it, and {6} the name of the type's assembly, which only a package that the
     // project does not reference itself brings.  Reported at the query's name, for each column and parameter.
@@ -1078,6 +1093,7 @@ internal static class SqlDiagnostics
             ConverterTypeMismatch,
             ConverterDirectionMissing,
             LibraryNotReferenced,
+            LibraryBelowTheFloor,
             ShortNameFindsAPackagesType
         );
 

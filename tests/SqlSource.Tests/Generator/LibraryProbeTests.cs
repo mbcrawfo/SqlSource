@@ -101,8 +101,8 @@ public sealed class LibraryProbeTests
     {
         var probe = LibraryProbe.Read(
             CompilationOf(
-                LibraryReferences.Synthetic("3.2.1.0", instant: true, pluginExtensions: false),
-                LibraryReferences.Synthetic("3.4.0.0", instant: true, pluginExtensions: false)
+                LibraryReferences.Synthetic("3.2.1.0", nodaTimeTypes: true, pluginExtensions: false),
+                LibraryReferences.Synthetic("3.4.0.0", nodaTimeTypes: true, pluginExtensions: false)
             )
         );
 
@@ -116,7 +116,12 @@ public sealed class LibraryProbeTests
     {
         var probe = LibraryProbe.Read(
             CompilationOf(
-                LibraryReferences.Synthetic("1.0.0.0", instant: true, pluginExtensions: true, assemblyName: "Merged")
+                LibraryReferences.Synthetic(
+                    "1.0.0.0",
+                    nodaTimeTypes: true,
+                    pluginExtensions: true,
+                    assemblyName: "Merged"
+                )
             )
         );
 
@@ -129,6 +134,60 @@ public sealed class LibraryProbeTests
         var probe = new LibraryProbe(NodaTime: true, NpgsqlNodaTime: true, NodaTimeVersion: new Version(3, 3, 0, 0));
 
         probe.DefaultOf(SqlLibrary.NodaTime, DatabaseEngine.SqlServer).ShouldBe(LibraryState.Off);
+    }
+
+    // NodaTime's floor is 3.1.9, told by the version of the assembly named NodaTime.
+    [Fact]
+    public void IsBelowTheFloor_NodaTime318_IsTrue()
+    {
+        var probe = LibraryProbe.Read(
+            CompilationOf(LibraryReferences.Synthetic("3.1.8.0", nodaTimeTypes: true, pluginExtensions: false))
+        );
+
+        probe.IsBelowTheFloor(SqlLibrary.NodaTime).ShouldBeTrue();
+        probe.VersionTextOf(SqlLibrary.NodaTime).ShouldBe("3.1.8");
+        LibraryProbe.FloorOf(SqlLibrary.NodaTime).ShouldBe("3.1.9");
+    }
+
+    [Fact]
+    public void IsBelowTheFloor_NodaTime319_IsFalse()
+    {
+        var probe = LibraryProbe.Read(
+            CompilationOf(LibraryReferences.Synthetic("3.1.9.0", nodaTimeTypes: true, pluginExtensions: false))
+        );
+
+        probe.IsBelowTheFloor(SqlLibrary.NodaTime).ShouldBeFalse();
+    }
+
+    // No NodaTime, or its types in an assembly of another name, which gives no version: nothing is below the floor.
+    [Fact]
+    public void IsBelowTheFloor_NoNodaTime_IsFalse()
+    {
+        var none = LibraryProbe.Read(CompilationOf());
+        var merged = LibraryProbe.Read(
+            CompilationOf(
+                LibraryReferences.Synthetic(
+                    "1.0.0.0",
+                    nodaTimeTypes: true,
+                    pluginExtensions: false,
+                    assemblyName: "Merged"
+                )
+            )
+        );
+
+        none.IsBelowTheFloor(SqlLibrary.NodaTime).ShouldBeFalse();
+        merged.IsBelowTheFloor(SqlLibrary.NodaTime).ShouldBeFalse();
+    }
+
+    // An assembly named NodaTime without its types is not NodaTime, whatever its version.
+    [Fact]
+    public void IsBelowTheFloor_AssemblyWithoutTheTypes_IsFalse()
+    {
+        var probe = LibraryProbe.Read(
+            CompilationOf(LibraryReferences.Synthetic("2.0.0.0", nodaTimeTypes: false, pluginExtensions: false))
+        );
+
+        probe.IsBelowTheFloor(SqlLibrary.NodaTime).ShouldBeFalse();
     }
 
     [Fact]

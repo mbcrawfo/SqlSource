@@ -19,6 +19,20 @@ namespace SqlSource.Testing.Generator;
 // references this library.
 internal static class LibraryReferences
 {
+    // The value types of NodaTime that its rows of SQL Server and of the plugin name, as declarations.
+    private const string NodaTimeTypes = """
+
+        namespace NodaTime
+        {
+            public readonly struct Instant;
+            public readonly struct LocalDate;
+            public readonly struct LocalTime;
+            public readonly struct LocalDateTime;
+            public readonly struct OffsetDateTime;
+        }
+
+        """;
+
     // NodaTime 3.1.9 is the oldest the support floor of the library allows, and 3.3.7 the newest.
     public static MetadataReference NodaTime(string version) =>
         Downloaded("nodatime", version, "netstandard2.0", "NodaTime");
@@ -32,18 +46,20 @@ internal static class LibraryReferences
             "Npgsql.NodaTime"
         );
 
-    // An assembly of the AssemblyVersion, with NodaTime.Instant and Npgsql.NpgsqlNodaTimeExtensions when asked for.  It
-    // is named NodaTime, unless another name is given, as for a library merged into an assembly of another name.
+    // An assembly of the AssemblyVersion, with NodaTime's value types that a row names, Instant among them, and
+    // Npgsql.NpgsqlNodaTimeExtensions, when asked for.  It is named NodaTime, unless another name is given, as for a
+    // library merged into an assembly of another name.  The types have no members: a model can name them, and a method
+    // that converts them does not compile.
     public static MetadataReference Synthetic(
         string version,
-        bool instant,
+        bool nodaTimeTypes,
         bool pluginExtensions,
         string assemblyName = "NodaTime"
     )
     {
         var source =
             $"[assembly: System.Reflection.AssemblyVersion(\"{version}\")]\n"
-            + (instant ? "\nnamespace NodaTime\n{\n    public readonly struct Instant;\n}\n" : "")
+            + (nodaTimeTypes ? NodaTimeTypes : "")
             + (pluginExtensions ? "\nnamespace Npgsql\n{\n    public static class NpgsqlNodaTimeExtensions;\n}\n" : "");
         var compilation = GeneratorHarness.CreateCompilation(
             [new SourceFile("/nodatime/NodaTime.cs", source)],

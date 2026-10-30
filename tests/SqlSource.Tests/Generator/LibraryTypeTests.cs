@@ -274,7 +274,7 @@ public sealed class LibraryTypeTests
         var run = Run(
             Source,
             [file, Sidecars.Of(file, entry)],
-            references: [LibraryReferences.Synthetic("3.3.0.0", instant: true, pluginExtensions: true)]
+            references: [LibraryReferences.Synthetic("3.3.0.0", nodaTimeTypes: true, pluginExtensions: true)]
         );
 
         run.CompilationErrors.ShouldBeEmpty();
