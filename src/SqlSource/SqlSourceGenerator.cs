@@ -46,7 +46,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var typeQueries = SelectTypeQueries(claims.ClaimingTypes, parsedFiles.Sorted, fileLevels);
         var sidecars = CheckSidecars(context, claims.ClaimedPaths, typeQueries, parsedFiles, claims.RepeatedPaths);
         var typing = TypeFiles(context, sidecars.Checks, parsedFiles.Sorted, fileLevels);
-        var converters = FindConverters(context, typing.MappedTypeConverters);
+        var converters = FindConverters(context, typing.MappedTypeConverters, typing.TypingLibraryProbe);
         var models = CollectModels(context, typing.Files, typeQueries);
         ReportDrivers(context, typing.NpgsqlProbe, typing.SqlClientProbe, sidecars.Needs, parsedFiles.Sorted);
         ReportProblems(context, sidecars.Checks, typing.FileTypes, models.FileModels, models.Models);
@@ -62,6 +62,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             claims.TypeMemberNames,
             typing.NpgsqlProbe,
             typing.SqlClientProbe,
+            typing.LibraryProbe,
             converters
         );
     }
@@ -528,14 +529,23 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (resolved, _) => resolved.Converters)
             .WithTrackingName(TrackingNames.MappedTypeConverters);
 
-        return new TypedFiles(npgsqlProbe, sqlClientProbe, libraryProbe, typedFiles, fileTypes, mappedTypeConverters);
+        return new TypedFiles(
+            npgsqlProbe,
+            sqlClientProbe,
+            libraryProbe,
+            typingLibraryProbe,
+            typedFiles,
+            fileTypes,
+            mappedTypeConverters
+        );
     }
 
-    // The project's converters, from the methods of its source that carry the converter attribute and from the mapped
-    // types, with the problems of its methods reported, whatever the output.
+    // The project's converters, from the methods of its source that carry the converter attribute, from the mapped
+    // types and from the libraries it references, with the problems of its methods reported, whatever the output.
     private static IncrementalValueProvider<ConverterSet> FindConverters(
         IncrementalGeneratorInitializationContext context,
-        IncrementalValueProvider<EquatableArray<Converter>> mappedTypeConverters
+        IncrementalValueProvider<EquatableArray<Converter>> mappedTypeConverters,
+        IncrementalValueProvider<LibraryProbe> typingLibraryProbe
     )
     {
         // An edit to a method's declaration reads that method again, and goes no further unless the converter changes.
@@ -549,9 +559,16 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Collect()
             .Select(static (converters, _) => ConverterSet.Sort(converters));
 
+        // The edges of the libraries the project references, from the probe without NodaTime's version, which they do
+        // not read, so that a change of the version alone finds none again.
+        var libraryConverters = typingLibraryProbe
+            .Select(static (probe, _) => LibraryConverters.Of(probe))
+            .WithTrackingName(TrackingNames.LibraryConverters);
+
         var converters = projectConverters
             .Combine(mappedTypeConverters)
-            .Select(static (input, _) => ConverterSet.Of(input.Left, input.Right))
+            .Combine(libraryConverters)
+            .Select(static (input, _) => ConverterSet.Of(input.Left.Left, input.Left.Right, input.Right))
             .WithTrackingName(TrackingNames.Converters);
 
         // The problems alone, so that an edit that changes none of them reports nothing again.
@@ -756,8 +773,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     }
 
     // The file of each type's methods, and their diagnostics, with the clashes across types, SQLSRC281 at each member
-    // of a settings file that turns on a library the project cannot use, and SQLSRC273 for each engine whose methods
-    // have no driver.
+    // of a settings file that turns on a library the project cannot use, SQLSRC273 for each engine whose methods have
+    // no driver, and SQLSRC282 for each library older than its floor that a query uses.
     private static void RegisterMethodSources(
         IncrementalGeneratorInitializationContext context,
         IncrementalValueProvider<SettingsFileSet> settingsFiles,
@@ -768,6 +785,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<EquatableArray<TypeMemberNames>> typeMemberNames,
         IncrementalValueProvider<NpgsqlProbe> npgsqlProbe,
         IncrementalValueProvider<SqlClientProbe> sqlClientProbe,
+        IncrementalValueProvider<LibraryProbe> libraryProbe,
         IncrementalValueProvider<ConverterSet> converters
     )
     {
@@ -779,12 +797,18 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         var assignments = models.Select(static (set, _) => set.Assignments);
 
+        // The libraries that the project references older than their floor, without their versions, which are the same
+        // value while a version stays on one side of its floor.
+        var librariesBelowTheFloor = libraryProbe
+            .Select(static (probe, _) => MethodsInput.BelowTheFloorOf(probe))
+            .WithTrackingName(TrackingNames.LibrariesBelowTheFloor);
+
         // Each type's own slice of what its methods need, which is equal until something of the type changes: its
-        // queries, its files' models, the models its queries got, its names, the drivers or the converters of the
-        // types that its type overrides, column types and markers chose.
+        // queries, its files' models, the models its queries got, its names, the drivers, the converters of the types
+        // that its type overrides, column types and markers chose, or the libraries below their floor.
         var typeMethods = typeQueries
             .Combine(allFileModels.Combine(assignments))
-            .Combine(typeMemberNames.Combine(drivers.Combine(converters)))
+            .Combine(typeMemberNames.Combine(drivers.Combine(converters.Combine(librariesBelowTheFloor))))
             .Select(
                 static (input, _) =>
                     MethodsInput.Gather(
@@ -793,7 +817,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                         input.Left.Right.Right,
                         input.Right.Left,
                         input.Right.Right.Left,
-                        input.Right.Right.Right
+                        input.Right.Right.Right.Left,
+                        input.Right.Right.Right.Right
                     )
             )
             .WithTrackingName(TrackingNames.MethodsInput)
@@ -872,7 +897,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(methodDiagnostics, ReportAll);
         context.RegisterSourceOutput(settingsFileLibraryDiagnostics, ReportAll);
         context.RegisterSourceOutput(conflicts, ReportConflicts);
-        context.RegisterSourceOutput(methodOutputs, AddMethods);
+        context.RegisterSourceOutput(methodOutputs, AddFile);
 
         // The engines of the project's CodeGen queries, which almost never change.
         var codeGenEngines = typeMethods
@@ -883,6 +908,38 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         // Not located, and once for the project and engine, however many of its queries need the driver.
         context.RegisterSourceOutput(codeGenEngines.Combine(npgsqlProbe.Combine(sqlClientProbe)), ReportMissingDrivers);
+
+        // The libraries whose generated conversion a method calls, each once, which almost never change.
+        var conversionLibraries = typeMethods
+            .Select(static (methods, _) => methods.ConversionLibraries)
+            .Collect()
+            .Select(static (each, _) => DistinctLibraries(each))
+            .WithTrackingName(TrackingNames.ConversionLibraries);
+
+        // The class of each of those libraries, in a file of its own, once for the project however many methods call
+        // it.
+        var libraryConversionOutputs = conversionLibraries
+            .SelectMany(static (libraries, _) => libraries)
+            .Select(
+                static (used, _) =>
+                    (
+                        HintName: LibraryConverters.HintNameOf(used.Library),
+                        Source: LibraryConverters.SourceOf(used.Library)
+                    )
+            )
+            .WithTrackingName(TrackingNames.LibraryConversionOutput);
+
+        context.RegisterSourceOutput(libraryConversionOutputs, AddFile);
+
+        // The libraries that the CodeGen queries use, each once, which almost never change.
+        var usedLibraries = typeMethods
+            .Select(static (methods, _) => methods.UsedLibraries)
+            .Collect()
+            .Select(static (each, _) => DistinctLibraries(each))
+            .WithTrackingName(TrackingNames.UsedLibraries);
+
+        // Not located, and once for the project and library, however many of its queries use the library.
+        context.RegisterSourceOutput(usedLibraries.Combine(libraryProbe), ReportLibrariesBelowTheFloor);
     }
 
     private static void ReportChecks(SourceProductionContext output, SidecarCheckResult check) =>
@@ -900,11 +957,43 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     private static void ReportConflicts(SourceProductionContext output, MethodConflicts conflicts) =>
         ReportAll(output, conflicts.Diagnostics);
 
-    private static void AddMethods(SourceProductionContext output, (string HintName, string? Source) methods)
+    // A file of a type's methods or of a library's conversions, when it has a source.
+    private static void AddFile(SourceProductionContext output, (string HintName, string? Source) file)
     {
-        if (methods.Source is not null)
+        if (file.Source is not null)
         {
-            output.AddSource(methods.HintName, SourceText.From(methods.Source, Encoding.UTF8));
+            output.AddSource(file.HintName, SourceText.From(file.Source, Encoding.UTF8));
+        }
+    }
+
+    // The libraries of every type, conversions' or used ones, each once, in the order of SqlLibrary, so that the value
+    // does not depend on the order of the compilation's types.
+    private static EquatableArray<LibraryValue> DistinctLibraries(ImmutableArray<EquatableArray<LibraryValue>> each) =>
+        new(
+            each.SelectMany(static libraries => libraries)
+                .Distinct()
+                .OrderBy(static library => library.Library)
+                .ToImmutableArray()
+        );
+
+    // SQLSRC282 for each library that a CodeGen query uses and that the project references older than its floor.
+    private static void ReportLibrariesBelowTheFloor(
+        SourceProductionContext output,
+        (EquatableArray<LibraryValue> Libraries, LibraryProbe Probe) input
+    )
+    {
+        var probe = input.Probe;
+        foreach (var library in input.Libraries.Select(static used => used.Library).Where(probe.IsBelowTheFloor))
+        {
+            output.ReportDiagnostic(
+                Diagnostic.Create(
+                    SqlDiagnostics.LibraryBelowTheFloor,
+                    Location.None,
+                    MethodPlanner.LibraryName(library),
+                    probe.VersionTextOf(library),
+                    LibraryProbe.FloorOf(library)
+                )
+            );
         }
     }
 
@@ -1109,6 +1198,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<NpgsqlProbe> NpgsqlProbe,
         IncrementalValueProvider<SqlClientProbe> SqlClientProbe,
         IncrementalValueProvider<LibraryProbe> LibraryProbe,
+        IncrementalValueProvider<LibraryProbe> TypingLibraryProbe,
         FileNodes<TypedFile> Files,
         FileNodes<FileTypes> FileTypes,
         IncrementalValueProvider<EquatableArray<Converter>> MappedTypeConverters

@@ -6,7 +6,9 @@ using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Models;
 using SqlSource.Generation.Paths;
+using SqlSource.Generation.Types.Drivers;
 using SqlSource.Settings.ClrTypes;
+using SqlSource.Settings.Libraries;
 
 namespace SqlSource.Generation.Methods;
 
@@ -27,11 +29,17 @@ namespace SqlSource.Generation.Methods;
 /// </param>
 /// <param name="Drivers">Which engines' methods the project's drivers allow.</param>
 /// <param name="Converters">
-/// The converters that touch the type of a property of the type's files' models that a type override, a column type or
-/// a marker chose, or its element's for an array, each as <see cref="ClrTypeName.KeywordTextOf" /> writes it,
-/// without the <c>?</c> of an element written nullable (<see cref="ConversionPlanner.EdgeElementOf" />), each once, in
-/// the order of <see cref="ConverterSet.Comparer" />, and each without its location, so that an edit that only moves a
+/// The converters that touch the type of a property of the type's files' models that a type override, a column type, a
+/// marker or a library's row chose, or its element's for an array, each type as
+/// <see cref="ClrTypeName.KeywordTextOf" /> writes it, without the <c>?</c> of an element written nullable
+/// (<see cref="ConversionPlanner.EdgeElementOf" />); each converter once, whatever engines and drivers it serves, in
+/// the order of <see cref="ConverterSet.Comparer" />, and without its location, so that an edit that only moves a
 /// converter plans no method again.
+/// </param>
+/// <param name="LibrariesBelowTheFloor">
+/// The libraries that the project references older than their floor, from <see cref="BelowTheFloorOf" />, in the
+/// order of <see cref="SqlLibrary" />: a query that uses one gets no method.  Without the versions, so that a version
+/// that stays on one side of the floor plans no method again.
 /// </param>
 internal sealed record MethodsInput(
     TypeQueries Type,
@@ -39,9 +47,33 @@ internal sealed record MethodsInput(
     EquatableArray<ModelAssignment> Assignments,
     EquatableArray<string> MemberNames,
     MethodDrivers Drivers,
-    EquatableArray<Converter> Converters
+    EquatableArray<Converter> Converters,
+    EquatableArray<LibraryValue> LibrariesBelowTheFloor
 )
 {
+    /// <summary>
+    /// The libraries that <paramref name="probe" /> says the project references older than their floor, in the order
+    /// of <see cref="SqlLibrary" />.
+    /// </summary>
+    public static EquatableArray<LibraryValue> BelowTheFloorOf(LibraryProbe probe) =>
+        probe.IsBelowTheFloor(SqlLibrary.NodaTime)
+            ? new EquatableArray<LibraryValue>(ImmutableArray.Create(new LibraryValue(SqlLibrary.NodaTime)))
+            : EquatableArray<LibraryValue>.Empty;
+
+    /// <summary>Whether <paramref name="library" /> is one of <see cref="LibrariesBelowTheFloor" />.</summary>
+    public bool IsBelowTheFloor(SqlLibrary library)
+    {
+        for (var index = 0; index < LibrariesBelowTheFloor.Count; index++)
+        {
+            if (LibrariesBelowTheFloor[index].Library == library)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// Takes from what the project gives what the type needs: a search for each of its files, for its assignments and
     /// for its names, so that the cost does not grow with the other types.
@@ -52,13 +84,15 @@ internal sealed record MethodsInput(
     /// <param name="memberNames">The names of every type whose methods go on itself, sorted by key ordinally.</param>
     /// <param name="drivers">Which engines' methods the project's drivers allow.</param>
     /// <param name="converters">Every converter of the project.</param>
+    /// <param name="librariesBelowTheFloor">The libraries that the project references older than their floor.</param>
     public static MethodsInput Gather(
         TypeQueries type,
         EquatableArray<FileModels> allFileModels,
         EquatableArray<ModelAssignment> assignments,
         EquatableArray<TypeMemberNames> memberNames,
         MethodDrivers drivers,
-        ConverterSet converters
+        ConverterSet converters,
+        EquatableArray<LibraryValue> librariesBelowTheFloor
     )
     {
         var files = ImmutableArray.CreateBuilder<FileModels>(type.Files.Count);
@@ -77,12 +111,14 @@ internal sealed record MethodsInput(
             SliceOf(assignments, key),
             names < 0 ? EquatableArray<string>.Empty : memberNames[names].Names,
             drivers,
-            ConvertersOf(slice, converters)
+            ConvertersOf(slice, converters),
+            librariesBelowTheFloor
         );
     }
 
     // The converters of the chosen properties' types: a pass over the properties, and a search of the set only for a
-    // type that a type override, a column type or a marker chose, so that a type without one costs no search.
+    // type that a type override, a column type, a marker or a library's row chose, so that a type without one costs no
+    // search.
     private static EquatableArray<Converter> ConvertersOf(EquatableArray<FileModels> files, ConverterSet converters)
     {
         if (converters.Converters.Count == 0)

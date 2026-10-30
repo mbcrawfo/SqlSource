@@ -24,6 +24,11 @@
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
         <PackageReference Include="Microsoft.Data.SqlClient" />
         <PackageReference Include="Microsoft.SqlServer.Types" />
+        <!--
+            The library of the queries of EndToEnd/NodaTime/, whose settings file turns it on: SQL Server's default is
+            off.
+        -->
+        <PackageReference Include="NodaTime" />
         <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
         <PackageReference Include="Shouldly" />
         <PackageReference Include="xunit.v3" />

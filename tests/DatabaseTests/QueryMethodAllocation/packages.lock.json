@@ -27,6 +27,12 @@
           "System.Threading.RateLimiting": "9.0.18"
         }
       },
+      "NodaTime": {
+        "type": "Direct",
+        "requested": "[3.3.7, )",
+        "resolved": "3.3.7",
+        "contentHash": "4Rc3zup1sZqtlcgkWZOsjoVbhm+RkDvxrFDJfIxi7nr32ZgzVW+zCTBr827+KG/4r5owpchUjqx8tO4K2ZtpOw=="
+      },
       "Npgsql": {
         "type": "Direct",
         "requested": "[10.0.3, )",

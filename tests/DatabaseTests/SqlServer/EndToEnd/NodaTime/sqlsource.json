@@ -1,0 +1,11 @@
+{
+  "libraryTypes": {
+    // NodaTime on, over SQL Server's default, which is off whether the project references NodaTime or not.
+    "nodaTime": "on",
+  },
+  "typeOverrides": {
+    // The type map's own C# type for date, which is NodaTime's LocalDate here: the override of the project's settings
+    // file would otherwise win over the library's row.
+    "date": "default",
+  },
+}

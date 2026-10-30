@@ -30,11 +30,17 @@ internal static class SqlServerTypeMap
 
     /// <summary>
     /// The C# type of <paramref name="type" /> under <paramref name="column" />.  At each level,
-    /// <paramref name="overrideOf" /> is asked first.  A type with a user type is asked by the user type's key, and an
-    /// alias type then maps as its base; a CLR type of <c>sys</c> is a row by its name, and any other is unreadable.
-    /// Never throws.
+    /// <paramref name="overrideOf" /> is asked first, then <paramref name="libraries" />, the rows of the libraries
+    /// that are on, or none when it is null, then the map's row.  A type with a user type is asked by the user type's
+    /// key, and an alias type then maps as its base; a CLR type of <c>sys</c> is a row by its name, and any other is
+    /// unreadable, and neither takes a library's row.  Never throws.
     /// </summary>
-    public static TypeMapping Map(SqlServerType type, SqlClientColumn column, SqlServerOverrideOf? overrideOf = null)
+    public static TypeMapping Map(
+        SqlServerType type,
+        SqlClientColumn column,
+        SqlServerOverrideOf? overrideOf = null,
+        LibraryRows? libraries = null
+    )
     {
         if (UserTypeOf(type) is { } userType)
         {
@@ -46,7 +52,7 @@ internal static class SqlServerTypeMap
 
             if (string.IsNullOrEmpty(userType.AssemblyQualifiedName))
             {
-                return Map(type with { UserType = null }, column, overrideOf);
+                return Map(type with { UserType = null }, column, overrideOf, libraries);
             }
 
             // Only the CLR types are rows by their name: an assembly-qualified sys.int is not int.
@@ -64,6 +70,11 @@ internal static class SqlServerTypeMap
         if (string.IsNullOrEmpty(type.Name))
         {
             return TypeMapping.Failed(TypeMappingKind.NotWrittenByTheTool, key);
+        }
+
+        if (libraries?.Find(type) is { } fromLibrary)
+        {
+            return fromLibrary;
         }
 
         return Rows.TryGetValue(BaseName(type.Name), out var row)

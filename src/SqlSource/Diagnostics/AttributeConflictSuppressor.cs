@@ -4,12 +4,13 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Generation.Converters;
 
 namespace SqlSource.Diagnostics;
 
 /// <summary>
 /// Turns off the compiler's warning that a type conflicts with an imported one (CS0436) where the type is one that
-/// the generator adds to every project.
+/// the generator adds to the project: one it adds to every project, or a library's class of conversions.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class AttributeConflictSuppressor : DiagnosticSuppressor
@@ -17,7 +18,7 @@ public sealed class AttributeConflictSuppressor : DiagnosticSuppressor
     private static readonly SuppressionDescriptor Descriptor = new(
         id: "SQLSRC901",
         suppressedDiagnosticId: "CS0436",
-        justification: "SqlSource adds this type to every project that uses it, and each project uses its own copy"
+        justification: "SqlSource adds this type to the project, and each project uses its own copy"
     );
 
     /// <inheritdoc />
@@ -29,8 +30,10 @@ public sealed class AttributeConflictSuppressor : DiagnosticSuppressor
     {
         // The project's own copies.  A type of the same name that the project declares elsewhere is not one of them.
         var assembly = context.Compilation.Assembly;
-        var generated = new List<INamedTypeSymbol>(AttributeSource.GeneratedTypes.Length);
-        foreach (var name in AttributeSource.GeneratedTypes)
+        var generated = new List<INamedTypeSymbol>(
+            AttributeSource.GeneratedTypes.Length + LibraryConverters.ClassMetadataNames.Length
+        );
+        foreach (var name in AttributeSource.GeneratedTypes.Concat(LibraryConverters.ClassMetadataNames))
         {
             if (assembly.GetTypeByMetadataName(name) is { } own)
             {

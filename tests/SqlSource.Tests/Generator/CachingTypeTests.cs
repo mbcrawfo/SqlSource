@@ -590,7 +590,7 @@ public sealed class CachingTypeTests
     [Fact]
     public void NodaTimeVersion_Changed_TypesNoFileAgain()
     {
-        var older = LibraryReferences.Synthetic("3.2.0.0", instant: true, pluginExtensions: true);
+        var older = LibraryReferences.Synthetic("3.2.0.0", nodaTimeTypes: true, pluginExtensions: true);
         var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10, older]);
         var driver = _scene.FirstRunWithTypes(
             compilation,
@@ -604,7 +604,7 @@ public sealed class CachingTypeTests
             driver,
             compilation.ReplaceReference(
                 older,
-                LibraryReferences.Synthetic("3.3.0.0", instant: true, pluginExtensions: true)
+                LibraryReferences.Synthetic("3.3.0.0", nodaTimeTypes: true, pluginExtensions: true)
             )
         );
 

@@ -12,8 +12,9 @@ namespace SqlSource.Generation.Methods;
 
 /// <summary>
 /// Decides the converter that a column is read through, or a parameter bound through, where a type override, a column
-/// type or a marker chose its type, with <c>SQLSRC279</c> and <c>SQLSRC280</c> for a type whose converters do not serve
-/// it, and <c>SQLSRC277</c> and <c>SQLSRC278</c> for a converter of a referenced assembly that it would use.
+/// type, a marker or a library's row chose its type, with <c>SQLSRC279</c> and <c>SQLSRC280</c> for a type whose
+/// converters do not serve it, and <c>SQLSRC277</c> and <c>SQLSRC278</c> for a converter of a referenced assembly that
+/// it would use.
 /// </summary>
 /// <remarks>
 /// A converter is an edge from its argument's type to its return type.  For a property of type <c>T</c> whose database
@@ -21,7 +22,10 @@ namespace SqlSource.Generation.Methods;
 /// <c>X[]</c> over <c>Y[]</c> that no converter touches is converted element by element, by the edges of <c>X</c>
 /// and <c>Y</c>, and so is <c>X?[]</c>.  A type the base map gives, as <c>DateTimeOffset</c>, is never an error, so
 /// that a converter between it and another type does not touch the columns the override reads as it.  Anything else
-/// is read and bound as the driver reads and binds the type.
+/// is read and bound as the driver reads and binds the type.  Only the converters that serve the query's engine and
+/// driver are seen, so a library's edge for SQL Server never converts a PostgreSQL column.  A type that a library's row
+/// chose is never <c>SQLSRC279</c> or <c>SQLSRC280</c>: where no edge fits, the driver reads and binds it, as the
+/// plugin does on PostgreSQL.
 /// </remarks>
 internal static class ConversionPlanner
 {
@@ -62,7 +66,7 @@ internal static class ConversionPlanner
             return null;
         }
 
-        var decision = new Decision(isRead, subject, context);
+        var decision = new Decision(isRead, subject, context, type.Library is not null);
         // Matched as a converter's types are written, a keyword's type by its keyword and System.Nullable<T> as T?,
         // which the element of a conversion by element keeps, so that a nullable element is seen as one.
         var text = ClrTypeName.KeywordTextOf(type.Text);
@@ -95,7 +99,8 @@ internal static class ConversionPlanner
                     false,
                     null,
                     false,
-                    whole.WarningIds
+                    whole.WarningIds,
+                    whole.Library?.Library
                 );
         }
 
@@ -119,7 +124,8 @@ internal static class ConversionPlanner
                     true,
                     ElementOf(text),
                     elementIsValueType,
-                    byElement.WarningIds
+                    byElement.WarningIds,
+                    byElement.Library?.Library
                 );
             }
 
@@ -155,14 +161,16 @@ internal static class ConversionPlanner
     private static string ElementKeyOf(string key) =>
         key.EndsWith("[]", StringComparison.Ordinal) ? key.Substring(0, key.Length - 2) : key;
 
-    // The steps of the decision for one pair of types, the property's or its element's and the base map's.
-    private readonly struct Decision(bool isRead, string subject, ConversionContext context)
+    // The steps of the decision for one pair of types, the property's or its element's and the base map's.  One that is
+    // exempt, of a type that a library's row chose, reports neither SQLSRC279 nor SQLSRC280.
+    private readonly struct Decision(bool isRead, string subject, ConversionContext context, bool isExempt)
     {
         // The decision for the element of the array that the subject is.
-        public Decision OfElement() => new(isRead, ElementSubject + subject, context);
+        public Decision OfElement() => new(isRead, ElementSubject + subject, context, isExempt);
 
         // True when the pair decides the conversion: the edge it needs, used or blocked, or the other direction's,
-        // SQLSRC280, blocked.  False when neither edge exists.
+        // SQLSRC280, blocked.  False when neither edge exists, or when only the other direction does and the decision
+        // is exempt.
         public bool TryEdge(string type, string database, out Converter? used, out bool blocked)
         {
             var (argument, returns) = isRead ? (database, type) : (type, database);
@@ -174,7 +182,7 @@ internal static class ConversionPlanner
             }
 
             used = null;
-            if (EdgeOf(returns, argument).Count == 0)
+            if (isExempt || EdgeOf(returns, argument).Count == 0)
             {
                 blocked = false;
                 return false;
@@ -216,13 +224,18 @@ internal static class ConversionPlanner
                 )
             );
 
-        // Whether any converter takes or returns the type.
-        public bool Touches(string type) =>
-            context.Converters.Any(converter =>
-                IsText(converter.ArgumentText, type) || IsText(converter.ReturnText, type)
+        // Whether any converter that serves the target takes or returns the type.
+        public bool Touches(string type)
+        {
+            var target = context.Target;
+            return context.Converters.Any(converter =>
+                converter.Serves(target) && (IsText(converter.ArgumentText, type) || IsText(converter.ReturnText, type))
             );
+        }
 
-        public bool IsForeignWithConverters(string type) => IsForeign(type) && Touches(type);
+        // Whether the type is foreign with converters, so that a missing base type or edge is SQLSRC279: never for an
+        // exempt decision.
+        public bool IsForeignWithConverters(string type) => !isExempt && IsForeign(type) && Touches(type);
 
         // SQLSRC279 for a foreign type whose converters are of other types than the database's, which blocks the
         // query; false, and nothing, for any other.
@@ -233,9 +246,11 @@ internal static class ConversionPlanner
                 return false;
             }
 
+            var target = context.Target;
             var others = context
                 .Converters.Where(converter =>
-                    IsText(converter.ArgumentText, type) || IsText(converter.ReturnText, type)
+                    converter.Serves(target)
+                    && (IsText(converter.ArgumentText, type) || IsText(converter.ReturnText, type))
                 )
                 .Select(converter =>
                     IsText(converter.ArgumentText, type) ? converter.ReturnText : converter.ArgumentText
@@ -299,13 +314,17 @@ internal static class ConversionPlanner
             return blocked ? null : sound[0];
         }
 
-        // The converters from the one type to the other.
-        private List<Converter> EdgeOf(string from, string to) =>
+        // The converters that serve the target from the one type to the other.
+        private List<Converter> EdgeOf(string from, string to)
+        {
+            var target = context.Target;
+            return
             [
                 .. context.Converters.Where(converter =>
-                    IsText(converter.ArgumentText, from) && IsText(converter.ReturnText, to)
+                    converter.Serves(target) && IsText(converter.ArgumentText, from) && IsText(converter.ReturnText, to)
                 ),
             ];
+        }
 
         private bool IsForeign(string type) =>
             context.Engine == DatabaseEngine.SqlServer ? !SqlServerTypeMap.Gives(type) : !PostgresTypeMap.Gives(type);

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Generation.Types.Drivers;
 using SqlSource.Generation.Types.Maps;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
@@ -319,6 +320,133 @@ public sealed class SqlServerTypeMapTests
 
         mapping.Text.ShouldBe("MyInt");
         mapping.Key.ShouldBe("int");
+    }
+
+    private const string Noda = "global::NodaTime.";
+
+    // NodaTime's rows: the type each gives with the library on, all of them value types.
+    public static TheoryData<string, string> NodaTimeRows =>
+        new()
+        {
+            { "date", Noda + "LocalDate" },
+            { "time", Noda + "LocalTime" },
+            { "datetime2", Noda + "LocalDateTime" },
+            { "datetime", Noda + "LocalDateTime" },
+            { "smalldatetime", Noda + "LocalDateTime" },
+            { "datetimeoffset", Noda + "OffsetDateTime" },
+        };
+
+    private static LibraryRows NodaTimeOn => LibraryRows.Of([SqlLibrary.NodaTime])!;
+
+    [Theory]
+    [MemberData(nameof(NodaTimeRows))]
+    public void Map_NodaTimeOn_GivesEachRow(string name, string expected)
+    {
+        foreach (var column in Enum.GetValues<SqlClientColumn>())
+        {
+            var mapping = SqlServerTypeMap.Map(TestSidecars.SqlServer(name: name), column, libraries: NodaTimeOn);
+
+            ShouldMapTo(mapping, expected, true, name);
+            mapping.Library.ShouldBe(SqlLibrary.NodaTime);
+            mapping.Detail.ShouldBe("the NodaTime library");
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(NodaTimeRows))]
+    public void Map_NodaTimeOff_IsTheBaseMap(string name, string notExpected)
+    {
+        var mapping = SqlServerTypeMap.Map(TestSidecars.SqlServer(name: name), SqlClientColumn.SqlClient7);
+
+        mapping.Text.ShouldNotBe(notExpected);
+        mapping.Library.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Map_NodaTimeOn_OtherTypesUnchanged()
+    {
+        foreach (var name in new[] { "int", "nvarchar(50)", "uniqueidentifier", "varbinary(max)", "bit" })
+        {
+            var type = TestSidecars.SqlServer(name: name);
+
+            var on = SqlServerTypeMap.Map(type, SqlClientColumn.SqlClient7, libraries: NodaTimeOn);
+
+            on.Text.ShouldBe(SqlServerTypeMap.Map(type, SqlClientColumn.SqlClient7).Text);
+            on.Library.ShouldBeNull();
+        }
+    }
+
+    [Fact]
+    public void Map_NodaTimeOnForDatetime2WithFacets_GivesLocalDateTime()
+    {
+        var mapping = SqlServerTypeMap.Map(
+            TestSidecars.SqlServer(name: "datetime2(3)"),
+            SqlClientColumn.SqlClient7,
+            libraries: NodaTimeOn
+        );
+
+        mapping.Text.ShouldBe(Noda + "LocalDateTime");
+        mapping.Key.ShouldBe("datetime2");
+        mapping.Library.ShouldBe(SqlLibrary.NodaTime);
+    }
+
+    [Fact]
+    public void Map_NodaTimeOn_MatchesTheNameIgnoringCase()
+    {
+        var mapping = SqlServerTypeMap.Map(
+            TestSidecars.SqlServer(name: "DATE"),
+            SqlClientColumn.SqlClient7,
+            libraries: NodaTimeOn
+        );
+
+        mapping.Text.ShouldBe(Noda + "LocalDate");
+    }
+
+    [Fact]
+    public void Map_OverrideAndLibrary_OverrideWins()
+    {
+        var mapping = SqlServerTypeMap.Map(
+            TestSidecars.SqlServer(name: "date"),
+            SqlClientColumn.SqlClient7,
+            Overrides(("date", "global::System.DateOnly")),
+            NodaTimeOn
+        );
+
+        mapping.Text.ShouldBe("global::System.DateOnly");
+        mapping.Library.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Map_AliasTypeOverDate_GivesLocalDate()
+    {
+        var birthday = TestSidecars.SqlServer(name: "date", userType: new SqlServerUserType("dbo", "Birthday", null));
+        var asked = new List<string>();
+
+        var mapping = SqlServerTypeMap.Map(birthday, SqlClientColumn.SqlClient7, Recording(asked), NodaTimeOn);
+
+        mapping.Text.ShouldBe(Noda + "LocalDate");
+        mapping.Key.ShouldBe("date");
+        mapping.Library.ShouldBe(SqlLibrary.NodaTime);
+        asked.ShouldBe(["dbo.\"Birthday\"", "date"]);
+    }
+
+    [Fact]
+    public void Map_ClrUserType_TakesNoRow()
+    {
+        var clr = TestSidecars.SqlServer(name: "date", userType: new SqlServerUserType("sys", "date", Assembly));
+        var other = TestSidecars.SqlServer(name: "date", userType: new SqlServerUserType("dbo", "date", Assembly));
+        var geography = TestSidecars.SqlServer(
+            name: "geography",
+            userType: new SqlServerUserType("sys", "geography", Assembly)
+        );
+
+        foreach (var type in new[] { clr, other, geography })
+        {
+            var mapping = SqlServerTypeMap.Map(type, SqlClientColumn.SqlClient7, libraries: NodaTimeOn);
+
+            mapping.Kind.ShouldNotBe(TypeMappingKind.Mapped);
+            mapping.Library.ShouldBeNull();
+        }
     }
 
     private static bool IsClr(string name) => name is "hierarchyid" or "geography" or "geometry";

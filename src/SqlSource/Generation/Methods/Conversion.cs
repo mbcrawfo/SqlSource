@@ -1,4 +1,5 @@
 using System;
+using SqlSource.Settings.Libraries;
 
 namespace SqlSource.Generation.Methods;
 
@@ -33,6 +34,10 @@ namespace SqlSource.Generation.Methods;
 /// The ids of the compiler's warnings that a call of the converter gives, which the file of its method disables, in
 /// ordinal order: the converter's <see cref="Converters.Converter.WarningIds" />.
 /// </param>
+/// <param name="Library">
+/// The library whose generated conversion the converter is, for an edge of origin
+/// <see cref="Converters.ConverterOrigin.Library" />; null for any other.
+/// </param>
 internal sealed record Conversion(
     string Method,
     string DatabaseText,
@@ -40,7 +45,8 @@ internal sealed record Conversion(
     bool IsByElement,
     string? ElementText,
     bool ElementIsValueType,
-    EquatableArray<string> WarningIds = default
+    EquatableArray<string> WarningIds = default,
+    SqlLibrary? Library = null
 )
 {
     /// <summary>

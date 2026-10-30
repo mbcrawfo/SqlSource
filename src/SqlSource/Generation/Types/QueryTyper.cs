@@ -36,7 +36,7 @@ namespace SqlSource.Generation.Types;
 /// skips the column types alone.  The libraries that are on are resolved once for each distinct level of markers too:
 /// a library is on when its winning entry says <c>on</c>, or when no entry or <c>default</c> wins and the probe's
 /// default for the engine is on.  One whose assemblies the project lacks gives no rows, and its entry is recorded on
-/// each query of the level.  SQL Server has no library rows yet.
+/// each query of the level.
 /// </remarks>
 internal static class QueryTyper
 {
@@ -400,7 +400,22 @@ internal static class QueryTyper
                 engine = DatabaseEngine.PostgreSql;
                 break;
             case SqlServerType sqlServer:
-                mapping = SqlServerTypeMap.Map(sqlServer, typing.SqlClientColumn, typing.Lookup?.OfSqlServer);
+                var overrideOfSqlServer = typing.Lookup?.OfSqlServer;
+                mapping = SqlServerTypeMap.Map(
+                    sqlServer,
+                    typing.SqlClientColumn,
+                    overrideOfSqlServer,
+                    typing.Libraries
+                );
+                if (mapping.Library is not null)
+                {
+                    withoutLibrary = SqlServerTypeMap.Map(sqlServer, typing.SqlClientColumn, overrideOfSqlServer);
+                    if (withoutLibrary.Kind != TypeMappingKind.Mapped)
+                    {
+                        (mapping, withoutLibrary) = (withoutLibrary, null);
+                    }
+                }
+
                 engine = DatabaseEngine.SqlServer;
                 break;
             default:
@@ -433,8 +448,9 @@ internal static class QueryTyper
         return null;
     }
 
-    // The property type of a found mapping.  A type of the map or of a library's row has no place, so the driver reads
-    // it as it is; one that a type override chose has the base map's type beside it, for its converters.
+    // The property type of a found mapping.  A type of the map has no place, so the driver reads it as it is; one that
+    // a type override, a column type, a marker or a library's row chose has the base map's type beside it, for its
+    // converters.
     private static PropertyType PropertyOf(TypeMapping mapping, string text, SidecarType type, Typing typing) =>
         new(
             text,
@@ -718,10 +734,10 @@ internal static class QueryTyper
         return made;
     }
 
-    // The rows of the libraries that are on and that the project can use, or null when there are none or the engine
-    // has no rows, and the winning entry of each library that is on and that it cannot use.  A library is on when its
-    // winning entry says on, or when none or a default wins and the probe's default for the engine is on, which it is
-    // only for a library the project can use.
+    // The rows of the libraries that are on and that the project can use, or null when there are none, and the winning
+    // entry of each library that is on and that it cannot use.  A library is on when its winning entry says on, or when
+    // none or a default wins and the probe's default for the engine is on, which it is only for a library the project
+    // can use.
     private static (LibraryRows? Rows, EquatableArray<LibrarySetting> Unavailable) LibrariesOf(
         EquatableArray<LibrarySetting> entries,
         LibraryProbe probe,
@@ -755,8 +771,7 @@ internal static class QueryTyper
             }
         }
 
-        // SQL Server has no library rows yet.
-        var rows = on is not null && engine == DatabaseEngine.PostgreSql ? LibraryRows.Of(on) : null;
+        var rows = on is not null ? LibraryRows.Of(on) : null;
         return (
             rows,
             unavailable is null

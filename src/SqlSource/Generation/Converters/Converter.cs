@@ -26,6 +26,10 @@ namespace SqlSource.Generation.Converters;
 /// </param>
 /// <param name="Origin">Where it was found.</param>
 /// <param name="Location">The method's name, or null for a method of a referenced assembly.</param>
+/// <param name="Library">
+/// The library an edge of origin <see cref="ConverterOrigin.Library" /> belongs to and the engines and drivers it
+/// serves; null for any other.
+/// </param>
 internal sealed record Converter(
     string Method,
     string DisplayName,
@@ -36,5 +40,13 @@ internal sealed record Converter(
     EquatableArray<string> WarningIds,
     string? Fault,
     ConverterOrigin Origin,
-    LocationInfo? Location
-);
+    LocationInfo? Location,
+    LibraryScope? Library = null
+)
+{
+    /// <summary>
+    /// Whether the converter serves <paramref name="target" />: always for one that is not a library's, else when its
+    /// scope holds the target.
+    /// </summary>
+    public bool Serves(ConverterTargets target) => Library is null || (Library.Targets & target) != 0;
+}

@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Generation;
+using SqlSource.Generation.Converters;
 using SqlSource.Generation.Types;
 using SqlSource.Settings;
 using SqlSource.Settings.Libraries;
@@ -52,14 +53,16 @@ public sealed class LibraryTypeTests
         null
     );
 
-    // What NodaTime's row gives it, with the base map's type beside it.
+    // What NodaTime's row gives it, a place of its own whose database side is the base map's type, with the base map's
+    // type beside it.
     private static readonly PropertyType InstantOfTheLibrary = new(
         Instant,
         true,
         true,
         EquatableArray<string>.Empty,
         "timestamptz",
-        null,
+        "the NodaTime library",
+        new DatabaseType(DateTime, true, false),
         Library: SqlLibrary.NodaTime,
         WithoutLibrary: DateTimeOfTheMap
     );
@@ -271,7 +274,7 @@ public sealed class LibraryTypeTests
         var run = Run(
             Source,
             [file, Sidecars.Of(file, entry)],
-            references: [LibraryReferences.Synthetic("3.3.0.0", instant: true, pluginExtensions: true)]
+            references: [LibraryReferences.Synthetic("3.3.0.0", nodaTimeTypes: true, pluginExtensions: true)]
         );
 
         run.CompilationErrors.ShouldBeEmpty();
@@ -296,19 +299,66 @@ public sealed class LibraryTypeTests
         entry.Place.Path.ShouldBe(GeneratorHarness.ProjectSettingsPath);
     }
 
-    // SQL Server has no rows of NodaTime yet, so the library being on changes no type.
+    // SQL Server has NodaTime's rows, and the library is on only when something says so.
     [Fact]
-    public void SqlServer_NodaTimeOn_KeepsTheBaseTypes()
+    public void Run_SqlServerNodaTimeOn_GivesCodeGenModelsNodaTimeTypes()
     {
-        var run = RunOrders([SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")]);
+        var run = RunDates(
+            "-- library-types: nodatime=on\n\n-- name: ListDates\nSELECT d FROM dates;\n",
+            [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")]
+        );
 
         run.ShouldBeClean();
-        var query = QueryOf(run);
-        var column = query.Columns.ShouldNotBeNull().ShouldHaveSingleItem();
+        var column = QueryOf(run).Columns.ShouldNotBeNull().ShouldHaveSingleItem();
+        column.Text.ShouldBe("global::NodaTime.LocalDate");
+        column.Library.ShouldBe(SqlLibrary.NodaTime);
+        run.Sources[ModelFiles(run).ShouldHaveSingleItem()].ShouldContain("(global::NodaTime.LocalDate? D);");
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("global::NodaTime.LocalDate");
+    }
+
+    [Fact]
+    public void Run_SqlServerNodaTimeOn_ModelsClaimKeepsDateTime()
+    {
+        const string Models = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                public partial class Rows;
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- library-types: nodatime=on\n\n-- name: ListDates\nSELECT d FROM dates;\n"
+        );
+
+        var run = MethodRuns.RunSqlServer(
+            file,
+            [DatesEntry(file)],
+            Models,
+            [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")]
+        );
+
+        run.ShouldBeClean();
+        var model = ModelFiles(run).ShouldHaveSingleItem();
+        run.Sources[model].ShouldContain("(" + DateTime + "? D);");
+        run.Sources[model].ShouldNotContain("NodaTime");
+    }
+
+    [Fact]
+    public void Run_SqlServerNodaTimeDefault_IsOff()
+    {
+        var run = RunDates(
+            "-- name: ListDates\nSELECT d FROM dates;\n",
+            [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")]
+        );
+
+        run.ShouldBeClean();
+        var column = QueryOf(run).Columns.ShouldNotBeNull().ShouldHaveSingleItem();
         column.Text.ShouldBe(DateTime);
         column.Library.ShouldBeNull();
-        column.WithoutLibrary.ShouldBeNull();
-        query.UnavailableLibraries.ShouldBeEmpty();
+        run.Sources[ModelFiles(run).ShouldHaveSingleItem()].ShouldContain("(" + DateTime + "? D);");
     }
 
     [Fact]
@@ -457,6 +507,54 @@ public sealed class LibraryTypeTests
         methods.ShouldContain("global::NpgsqlTypes.NpgsqlRange<global::NodaTime.LocalDate>[]");
     }
 
+    // A project's converter between Instant and another type leaves the plugin's row to the driver, with no error.
+    [Fact]
+    public void Run_PluginRowWithAProjectConverterOfAnotherType_HasNoError()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class Sample;
+
+                public static class Moments
+                {
+                    [SqlSourceConverter]
+                    public static global::System.DateTimeOffset ToOffset(global::NodaTime.Instant value) =>
+                        value.ToDateTimeOffset();
+
+                    [SqlSourceConverter]
+                    public static global::NodaTime.Instant FromOffset(global::System.DateTimeOffset value) =>
+                        global::NodaTime.Instant.FromDateTimeOffset(value);
+                }
+            }
+            """;
+        var file = new SqlFile(GeneratorHarness.UsersPath, ListEvents);
+
+        var run = MethodRuns.Run(file, [EventsEntry(file)], Source, WithThePlugin);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("reader.GetFieldValue<" + Instant + ">(0)");
+    }
+
+    // NodaTime without its plugin on PostgreSQL: an override to Instant goes to the driver, since NodaTime's edges
+    // serve SQL Server alone, and no class of conversions is written.
+    [Fact]
+    public void Run_InstantOverrideWithoutThePlugin_KeepsTheDriversRead()
+    {
+        var run = RunEvents(
+            ListEvents,
+            [NpgsqlReferences.Npgsql10, LibraryReferences.NodaTime("3.3.7")],
+            Settings("typeOverrides", new JsonObject { ["timestamptz"] = "NodaTime.Instant" })
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("reader.GetFieldValue<" + Instant + ">(0)");
+        run.Sources.Keys.ShouldNotContain(LibraryConverters.HintNameOf(SqlLibrary.NodaTime));
+    }
+
     // ListEvents of the file, or the query of the name, whose one column, at, is a timestamptz read from
     // public.events.at.
     private static SidecarEntry EventsEntry(SqlFile file, string name = "ListEvents") =>
@@ -490,6 +588,22 @@ public sealed class LibraryTypeTests
             settings: settings,
             otherFiles: folderFile is null ? null : [GeneratorHarness.SettingsFile(FolderSettingsPath, folderFile)]
         );
+    }
+
+    // ListDates of the file, whose one column, d, is a nullable date.
+    private static SidecarEntry DatesEntry(SqlFile file) =>
+        MethodRuns.SqlServerEntry(
+            file,
+            "ListDates",
+            [],
+            [TestSidecars.Column(0, "d", TestSidecars.SqlServer("date", 3), nullable: true)]
+        );
+
+    // ListDates of this text at CodeGen under mssql.
+    private static GeneratorRun RunDates(string text, MetadataReference[] references)
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, text);
+        return MethodRuns.RunSqlServer(file, [DatesEntry(file)], references: references);
     }
 
     // ListOrders under mssql, whose one column, placed_at, is a datetime2, with NodaTime on in the project's settings

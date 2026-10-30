@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 using static SqlSource.Testing.Generator.ModelRuns;
 using OutputKind = SqlSource.Settings.OutputKind;
@@ -19,6 +20,12 @@ public sealed class AttributeConflictTests
 {
     private const string InternalsVisible =
         "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"TestAssembly\")]\n";
+
+    // The file of the class of NodaTime's conversions.
+    private const string ConversionsFile = "SqlSource-NodaTimeConversions.g.cs";
+
+    // The folder of the generated files, as the compiler names it in a diagnostic.
+    private const string GeneratedPath = "SqlSource/SqlSource.SqlSourceGenerator/";
 
     [Theory]
     [InlineData("using SqlSource;\n[SqlSourceGenerate]\ninternal partial class Sample { }", "(2,2)-(2,19)")]
@@ -265,6 +272,61 @@ public sealed class AttributeConflictTests
         Places(diagnostics).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(5,2)-(5,19)"]);
         sources[MethodRuns.MethodsFile].ShouldContain("file struct SqlSourceRowBuffer<T>\n");
         builtSources[MethodRuns.MethodsFile].ShouldContain("file struct SqlSourceRowBuffer<T>\n");
+    }
+
+    // Both projects call a conversion of NodaTime's, so both hold SqlSource.NodaTimeConversions, and the methods this
+    // project generates name it where the other's is seen too.  The package hides that conflict as it hides the
+    // attribute's.  The queries have different names, so that their models are not a conflict of their own.
+    [Fact]
+    public async Task Run_NodaTimeConversionsSeenTwice_IsSuppressed()
+    {
+        const string Source =
+            "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate]\ninternal partial class Sample;\n";
+        const string OtherSource =
+            "using SqlSource;\n"
+            + InternalsVisible
+            + "namespace App { [SqlSourceGenerate] public partial class Sample; }";
+        const string Override = "-- type-override: datetime2=NodaTime.Instant\n\n";
+        var otherFile = new SqlFile("/other/Events.sql", Override + "-- name: ListEvents\nSELECT at FROM events;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, Override + "-- name: ListOthers\nSELECT at FROM events;\n");
+        var at = TestSidecars.Column(0, "at", TestSidecars.SqlServer("datetime2", 8, 27, 7));
+        MetadataReference[] references = [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")];
+        var (reference, sources) = GeneratorHarness.CreateProject(
+            OutputKind.CodeGen,
+            "Other",
+            OtherSource,
+            [otherFile, Sidecars.Of(otherFile, MethodRuns.SqlServerEntry(otherFile, "ListEvents", [], [at]))],
+            references,
+            "mssql"
+        );
+        SqlFile[] files = [file, Sidecars.Of(file, MethodRuns.SqlServerEntry(file, "ListOthers", [], [at]))];
+
+        var (compilerAlone, builtSources) = await GeneratorHarness.BuildProjectAsync(
+            OutputKind.CodeGen,
+            Source,
+            files,
+            [reference, .. references],
+            packageAnalyzers: false,
+            dialect: "mssql"
+        );
+        var build = await GeneratorHarness.BuildAsync(
+            OutputKind.CodeGen,
+            Source,
+            files,
+            [reference, .. references],
+            dialect: "mssql"
+        );
+
+        sources.Keys.ShouldContain(ConversionsFile);
+        builtSources.Keys.ShouldContain(ConversionsFile);
+        Places(compilerAlone)
+            .ShouldContain(place =>
+                place.StartsWith(
+                    "CS0436 " + GeneratedPath + MethodRuns.MethodsFile + "(",
+                    System.StringComparison.Ordinal
+                )
+            );
+        build.ShouldBeEmpty();
     }
 
     // The other project, compiled with the generator: it holds the attribute and the enums too.

@@ -189,6 +189,26 @@ public sealed class SqlDiagnosticsTests
             );
 
     [Fact]
+    public void LibraryBelowTheFloor_Descriptor_IsAnErrorThatCannotBeConfigured()
+    {
+        var descriptor = SqlDiagnostics.LibraryBelowTheFloor;
+
+        descriptor.Id.ShouldBe("SQLSRC282");
+        descriptor.Title.ToString(CultureInfo.InvariantCulture).ShouldBe("A library is older than SqlSource supports");
+        descriptor.DefaultSeverity.ShouldBe(DiagnosticSeverity.Error);
+        descriptor.CustomTags.ShouldContain(WellKnownDiagnosticTags.NotConfigurable);
+        SqlDiagnostics.All.ShouldContain(descriptor);
+    }
+
+    [Fact]
+    public void LibraryBelowTheFloor_Message_HoldsTheLibraryTheVersionAndTheFloor() =>
+        Format(SqlDiagnostics.LibraryBelowTheFloor, "NodaTime", "3.1.8", "3.1.9")
+            .ShouldBe(
+                "This project references NodaTime 3.1.8, and SqlSource needs NodaTime 3.1.9 or later for the query "
+                    + "methods that use it, so they are not generated.  Update the package."
+            );
+
+    [Fact]
     public void NpgsqlNewerThanKnown_Message_HoldsTheVersion() =>
         Format(SqlDiagnostics.NpgsqlNewerThanKnown, "11.0.0")
             .ShouldBe(

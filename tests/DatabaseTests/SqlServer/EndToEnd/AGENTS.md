@@ -4,7 +4,7 @@
 
 ## Sidecars and majors
 
-- **Every sidecar of `EndToEnd/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
+- **Every sidecar of `EndToEnd/Queries/` and `EndToEnd/NodaTime/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
 - **`CheckTests` runs `--check` over the real project, never a copy, through `CliRun.Real`**, as `ErrorPathTests` does.
 - **No entry differs between the supported majors**, since `CheckTests` runs on each, 2017 and 2025 in CI and 2019 and 2022 every night: a parameter that two majors type differently declares its type with `-- param:`.
 - **A query of a type that 2017 lacks goes into `Queries/NewTypes.sql`**, which `CheckTests` leaves out below 17, and its test skips by `SkipBelow(17, ...)`.
@@ -20,6 +20,11 @@
 - **A test that changes a setting of the session, such as `SET XACT_ABORT ON`, takes a connection that is not pooled from `EndToEndSources.AppUnpooled`**, as `EndToEnd/UnpooledTransaction.cs` does, so that no other test gets the session.
 - **`EndToEnd/ErrorPaths/` is a fixture project that the test project never compiles or describes**: the `.csproj` removes it from `Compile`, `AdditionalFiles` and `None` and copies it to the output as `Fixtures/Projects/ErrorPaths/`.
 - **`RowBufferQueryTests` is the eight generated methods and their twins handed to `RowBufferReads`** of `tests/DatabaseTests/TestHarness`, which holds the body, so a check of what every collection type returns goes there.
+
+## NodaTime
+
+- **NodaTime is on in `EndToEnd/NodaTime/` alone**, by its `sqlsource.json`, which also gives `date` back to the type map over the project's `DateOnly`.  A query that needs NodaTime's types goes in that folder, whose files `CheckTests` names below 2025 with those of `EndToEnd/Queries/`.
+- **A column of `noda_values` changes `EndToEnd/app/schema.sql`, the queries of `NodaTime/Queries/` and the rows of `NodaTime/NodaTimeQueryTests.cs` and of its copy in `tests/DatabaseTests/SqlServer.SqlClient61` together.**
 
 ## `all_types` and the recipe
 
