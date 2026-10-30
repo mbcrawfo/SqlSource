@@ -1579,7 +1579,7 @@ See: [Parameters](postgresql.md#parameters)
 
 A `-- param:` marker gives a parameter a type, and the tool asks the server to resolve that type and to check it against every use of the parameter.  This type cannot be used, for the reason the message ends with:
 
-- `it is not written as a type name`: the text is not a type name as a column definition writes one, with at most one modifier in parentheses and `[]`.  On PostgreSQL the modifier holds numbers alone, so a modifier of words, as in PostGIS's `geometry(Point,4326)`, is refused: write the type without it, which gives a parameter the same type.  The server can give the same reason for a type it cannot use, such as `numeric(2,-3)` on PostgreSQL 14, which has no negative scale; the `server:` line then says what the server made of the type.
+- `it is not written as a type name`: the text is not a type name as a column definition writes one, with at most one modifier in parentheses and `[]`.  On PostgreSQL the modifier holds numbers alone, so a modifier of words, as in PostGIS's `geometry(Point,4326)`, is refused: see [the known issue](parameters-and-tokens.md#known-issues) for what to write instead.  The server can give the same reason for a type it cannot use, such as `numeric(2,-3)` on PostgreSQL 14, which has no negative scale; the `server:` line then says what the server made of the type.
 - `the database has no such type`: the server knows no type of that name on the session's search path.
 - `it is a pseudo-type`: the server knows the name, and no value has that type, `record` and `anyelement` for two, or it is an array of such a type, `cstring[]`.
 
@@ -1713,7 +1713,8 @@ The tool checks that Npgsql can send each parameter's type, given by its name, b
 - a composite type, `public.pair`, and an array of one;
 - a table's row type, and an array of one;
 - `regclass`, which `WHERE c.oid = @t::regclass` gives a parameter, and the other types of the system catalogs that Npgsql does not load, such as `aclitem`, `txid_snapshot` and `pg_node_tree`;
-- a type whose schema or whose name holds a `.`, which cannot be written to Npgsql without ambiguity, since `a.b.c` could name more than one type.
+- a type whose schema or whose name holds a `.`, which cannot be written to Npgsql without ambiguity, since `a.b.c` could name more than one type;
+- a type of an extension that Npgsql cannot send, such as PostGIS's `geometry` and `geography`, or `seg`.
 
 A type whose name or whose schema's name needs quotes (`"My Schema"."Status"`), `"char"`, the one-byte type of the system catalogs, a domain over another domain, the bit string type without a length, and an array of a type whose name is 63 characters long are bound.
 

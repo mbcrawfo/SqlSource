@@ -65,7 +65,7 @@ The tool describes a query that is one statement of these kinds: `SELECT` (witho
 | `CALL`, `CREATE`, `SET`, `SHOW` and other commands, `SELECT ... INTO` | [SQLSRC233](diagnostics.md#sqlsrc233) | Give it `-- output: sql`.  For `SELECT ... INTO`, write `CREATE TABLE ... AS` with `-- output: sql` |
 | Two statements under one `-- name:` | [SQLSRC230](diagnostics.md#sqlsrc230) | Give each statement a `-- name:` of its own |
 | A parameter written `$1` | [SQLSRC234](diagnostics.md#sqlsrc234) | Write it as `@name` |
-| A parameter of a composite type, a table's row type or `regclass`, which Npgsql cannot send | [SQLSRC232](diagnostics.md#sqlsrc232) | Declare it `text` and cast it where it is used: `-- param: @pair text` with `@pair::public.pair` |
+| A parameter of a composite type, a table's row type, `regclass`, or an extension's type such as PostGIS's `geometry`, which Npgsql cannot send | [SQLSRC232](diagnostics.md#sqlsrc232) | Declare it `text` and cast it where it is used: `-- param: @pair text` with `@pair::public.pair` |
 | A column of type `record`, such as `ROW(a, b)` | [SQLSRC229](diagnostics.md#sqlsrc229) | Select the fields as columns of their own, or cast the row to a composite type |
 | A `@` or a `:` that SqlSource and Npgsql read differently | [SQLSRC231](diagnostics.md#sqlsrc231) | Put a space before the parameter, or do what the error's `help:` line says |
 
