@@ -259,6 +259,31 @@ public sealed class SqlPathTests
         SqlPath.FindInFolder(TestSidecars.Of<string>(), "").ShouldBeEmpty();
     }
 
+    // FindInFolder steps over a subfolder with one search, from inside it; its output is the same if Seek steps one
+    // path at a time, so only these pin the step.
+    [Fact]
+    public void Seek_PastASubfolderFromInsideIt_IsTheIndexAfterItsLastPath()
+    {
+        var first = SqlPath.IndexOf(FolderPaths, "app/Repo/Admin/Deep/x.sql", static path => path);
+        var last = SqlPath.IndexOf(FolderPaths, "app/Repo/Admin/Roles.sql", static path => path);
+
+        SqlPath
+            .Seek(FolderPaths, first + 1, "app/Repo/Admin/Roles.sql", "app/Repo/Admin".Length, past: true)
+            .ShouldBe(last + 1);
+    }
+
+    [Fact]
+    public void Seek_NotPast_IsTheFirstPathUnderTheFolder() =>
+        SqlPath
+            .Seek(FolderPaths, 0, "app/Repo/Admin", "app/Repo/Admin".Length, past: false)
+            .ShouldBe(SqlPath.IndexOf(FolderPaths, "app/Repo/Admin/Deep/x.sql", static path => path));
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Seek_FromTheEnd_IsTheEnd(bool past) =>
+        SqlPath.Seek(FolderPaths, FolderPaths.Count, "app", "app".Length, past).ShouldBe(FolderPaths.Count);
+
     // Checked against the plain definition: a file is in a folder when the folder of its path is that folder.
     [Fact]
     public void FindInFolder_GeneratedPaths_AgreesWithTheFolderOfEachPath()

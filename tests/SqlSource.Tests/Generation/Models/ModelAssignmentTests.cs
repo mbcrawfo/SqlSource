@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using SqlSource.Generation.Models;
@@ -33,6 +34,53 @@ public sealed class ModelAssignmentTests
     [Fact]
     public void FirstOf_NoAssignments_GivesMinusOne() =>
         ModelAssignment.FirstOf(EquatableArray<ModelAssignment>.Empty, "App.A").ShouldBe(-1);
+
+    [Fact]
+    public void IndexOf_AssignmentInTheList_IsItsIndex()
+    {
+        var assignments = new List<ModelAssignment>();
+        foreach (var type in (string[])["App.B", "App.A"])
+        {
+            foreach (var path in (string[])["app/Users.sql", "app/Orders.sql"])
+            {
+                foreach (var role in (ModelRole[])[ModelRole.Input, ModelRole.Output])
+                {
+                    assignments.Add(new(type, path, 3, role, "global::App.Dto", ModelKind.Record));
+                }
+            }
+        }
+
+        assignments.Sort(ModelAssignment.Order);
+        var sorted = TestSidecars.Of([.. assignments]);
+
+        sorted.Count.ShouldBe(8);
+        for (var index = 0; index < sorted.Count; index++)
+        {
+            var assignment = sorted[index];
+            ModelAssignment
+                .IndexOf(
+                    sorted,
+                    assignment.ClaimingType,
+                    assignment.NormalizedPath,
+                    assignment.QueryIndex,
+                    assignment.Role
+                )
+                .ShouldBe(index);
+        }
+    }
+
+    [Fact]
+    public void IndexOf_NoSuchAssignment_IsMinusOne()
+    {
+        var sorted = Sorted("App.A", "App.B");
+
+        ModelAssignment.IndexOf(sorted, "App.A", "app/Users.sql", 0, ModelRole.Input).ShouldBe(-1);
+        ModelAssignment.IndexOf(sorted, "App.A", "app/Users.sql", 5, ModelRole.Output).ShouldBe(-1);
+        ModelAssignment.IndexOf(sorted, "App.A", "app/Orders.sql", 0, ModelRole.Output).ShouldBe(-1);
+        ModelAssignment
+            .IndexOf(EquatableArray<ModelAssignment>.Empty, "App.A", "app/Users.sql", 0, ModelRole.Output)
+            .ShouldBe(-1);
+    }
 
     private static EquatableArray<ModelAssignment> Sorted(params string[] claimingTypes) =>
         TestSidecars.Of([

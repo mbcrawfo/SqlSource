@@ -37,7 +37,7 @@ See [the column types](../../../docs/architecture/generator.md#the-column-types)
 
 - **The column types follow the type override's rules, in `Settings/ColumnTypes/`, with one array for both engines.**
 - **`ColumnTypeMap` merges and weighs them as `TypeOverrideMap` does the type override's**, so never drop a `default` before `ColumnTypeMap.Find`, and compare keys only through it.
-- **The two maps share their sorted list, `Settings/SortedKeyedList.cs`, and their ranking of a place, `SettingPlaces.Specificity`**, so a change to either changes both settings.
+- **The two maps share their sorted list and the rule of its order, `Settings/SortedKeyedList.cs`, and their ranking of a place, `SettingPlaces.Specificity`**, so a change to either changes both settings.
 - **`ColumnTypeGrammar` is their one reader**, and reads every type with `TypeOverrideGrammar`'s `TryReadType`, so a change to that changes both settings.
 
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.

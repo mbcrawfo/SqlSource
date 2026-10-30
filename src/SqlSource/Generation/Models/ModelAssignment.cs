@@ -34,23 +34,21 @@ internal sealed record ModelAssignment(
     public static IComparer<ModelAssignment> Order { get; } =
         Comparer<ModelAssignment>.Create(
             static (left, right) =>
-            {
-                var byType = string.CompareOrdinal(left.ClaimingType, right.ClaimingType);
-                if (byType != 0)
-                {
-                    return byType;
-                }
-
-                var byPath = SqlPath.Comparer.Compare(left.NormalizedPath, right.NormalizedPath);
-                if (byPath != 0)
-                {
-                    return byPath;
-                }
-
-                var byIndex = left.QueryIndex.CompareTo(right.QueryIndex);
-                return byIndex != 0 ? byIndex : left.Role.CompareTo(right.Role);
-            }
+                Compare(left, right.ClaimingType, right.NormalizedPath, right.QueryIndex, right.Role)
         );
+
+    /// <summary>
+    /// The index in <paramref name="sorted" />, which is ordered by <see cref="Order" />, of the assignment of the
+    /// query at <paramref name="queryIndex" /> of the file at <paramref name="normalizedPath" /> in the role
+    /// <paramref name="role" /> to <paramref name="claimingType" />, or -1 when there is none.
+    /// </summary>
+    public static int IndexOf(
+        EquatableArray<ModelAssignment> sorted,
+        string claimingType,
+        string normalizedPath,
+        int queryIndex,
+        ModelRole role
+    ) => SortedSearch.IndexOf(sorted.Count, new KeyProbe(sorted, claimingType, normalizedPath, queryIndex, role));
 
     /// <summary>
     /// The index in <paramref name="sorted" />, which is ordered by <see cref="Order" />, of the first assignment of
@@ -58,23 +56,52 @@ internal sealed record ModelAssignment(
     /// </summary>
     public static int FirstOf(EquatableArray<ModelAssignment> sorted, string claimingType)
     {
-        // The first index whose type is not before the type.
-        var (low, high) = (0, sorted.Count);
-        while (low < high)
+        var at = SortedSearch.LowerBound(sorted.Count, new TypeProbe(sorted, claimingType));
+        return at < sorted.Count && string.Equals(sorted[at].ClaimingType, claimingType, StringComparison.Ordinal)
+            ? at
+            : -1;
+    }
+
+    // How the item sorts against the key, by the one order that Order gives.  The role is compared as its number, so
+    // that no value is boxed.
+    private static int Compare(
+        ModelAssignment item,
+        string claimingType,
+        string normalizedPath,
+        int queryIndex,
+        ModelRole role
+    )
+    {
+        var byType = string.CompareOrdinal(item.ClaimingType, claimingType);
+        if (byType != 0)
         {
-            var middle = low + ((high - low) / 2);
-            if (string.CompareOrdinal(sorted[middle].ClaimingType, claimingType) < 0)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle;
-            }
+            return byType;
         }
 
-        return low < sorted.Count && string.Equals(sorted[low].ClaimingType, claimingType, StringComparison.Ordinal)
-            ? low
-            : -1;
+        var byPath = SqlPath.Comparer.Compare(item.NormalizedPath, normalizedPath);
+        if (byPath != 0)
+        {
+            return byPath;
+        }
+
+        var byIndex = item.QueryIndex.CompareTo(queryIndex);
+        return byIndex != 0 ? byIndex : ((int)item.Role).CompareTo((int)role);
+    }
+
+    // Structs, so that SortedSearch does not box them.
+    private readonly struct KeyProbe(
+        EquatableArray<ModelAssignment> sorted,
+        string claimingType,
+        string normalizedPath,
+        int queryIndex,
+        ModelRole role
+    ) : SortedSearch.IProbe
+    {
+        public int CompareAt(int index) => Compare(sorted[index], claimingType, normalizedPath, queryIndex, role);
+    }
+
+    private readonly struct TypeProbe(EquatableArray<ModelAssignment> sorted, string claimingType) : SortedSearch.IProbe
+    {
+        public int CompareAt(int index) => string.CompareOrdinal(sorted[index].ClaimingType, claimingType);
     }
 }
