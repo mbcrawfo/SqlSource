@@ -11,7 +11,7 @@ namespace SqlSource.Parsing;
 /// <remarks>
 /// SqlSource reads two names that differ only in case as one parameter, so a name is compared ordinal ignoring case
 /// wherever a parameter is matched by its name.  The drivers bind such names as one, and so does a SQL Server whose
-/// instance collation ignores case; one whose collation is case-sensitive reads them as two variables.
+/// instance collation ignores case; one whose collation is case-sensitive reads them as two variables (TD-0092).
 /// </remarks>
 internal static class SqlParameterName
 {
