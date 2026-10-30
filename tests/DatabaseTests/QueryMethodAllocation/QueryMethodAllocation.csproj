@@ -75,10 +75,20 @@
             Include="../SqlServer/EndToEnd/Queries/Streaming.sql.json"
             Link="SqlServer/Queries/%(Filename)%(Extension)"
         />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/NodaTime/Queries/NodaTime.sql"
+            Link="SqlServer/NodaTime/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/NodaTime/Queries/NodaTime.sql.json"
+            Link="SqlServer/NodaTime/Queries/%(Filename)%(Extension)"
+        />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="GitHubActionsTestLogger" />
         <PackageReference Include="Microsoft.Data.SqlClient" />
+        <!-- The library of the linked queries of SQL Server's EndToEnd/NodaTime/, whose settings file turns it on. -->
+        <PackageReference Include="NodaTime" />
         <PackageReference Include="Npgsql" />
         <PackageReference Include="Shouldly" />
         <PackageReference Include="Testcontainers.MsSql" />

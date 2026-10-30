@@ -40,9 +40,11 @@
         <!-- Reads .sln and .slnx files for the tool, as the dotnet command does with the same library. -->
         <PackageVersion Include="Microsoft.VisualStudio.SolutionPersistence" Version="1.0.52" />
         <!--
-            The library of NodaTime's types, which tests/DatabaseTests/Postgres gets from Npgsql.NodaTime.
-            tests/DatabaseTests/Postgres.Npgsql8 overrides it to 3.1.9, the floor that Npgsql.NodaTime 8 needs: central
-            transitive pinning would otherwise hold it here.
+            The library of NodaTime's types, which tests/DatabaseTests/Postgres gets from Npgsql.NodaTime and
+            tests/DatabaseTests/SqlServer and tests/DatabaseTests/QueryMethodAllocation reference.
+            tests/DatabaseTests/Postgres.Npgsql8 overrides it to 3.1.9, the floor that Npgsql.NodaTime 8 needs, and
+            tests/DatabaseTests/SqlServer.SqlClient61 to 3.1.9, SqlSource's floor: central transitive pinning would
+            otherwise hold it here.
         -->
         <PackageVersion Include="NodaTime" Version="3.3.7" />
         <!--

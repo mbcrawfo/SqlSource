@@ -84,3 +84,20 @@ CREATE TABLE dbo.external_refs (
     account_id int NOT NULL REFERENCES dbo.accounts (id),
     external_id dbo.ExternalId NOT NULL
 );
+
+-- One nullable column for each date and time type that NodaTime's rows map, read and written by the queries of
+-- EndToEnd/NodaTime/, whose folder turns NodaTime on, and three that their type overrides make an Instant, through
+-- datetime2 and datetimeoffset, and a Duration, through time.  It has no seed: each test writes its rows in a
+-- transaction that is rolled back.
+CREATE TABLE dbo.noda_values (
+    id int PRIMARY KEY,
+    date_value date NULL,
+    time_value time(7) NULL,
+    datetime2_value datetime2(7) NULL,
+    datetime_value datetime NULL,
+    smalldatetime_value smalldatetime NULL,
+    datetimeoffset_value datetimeoffset(7) NULL,
+    instant_value datetime2(7) NULL,
+    instant_offset_value datetimeoffset(7) NULL,
+    duration_value time(7) NULL
+);

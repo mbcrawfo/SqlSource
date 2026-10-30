@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
         The end-to-end read of all_types and new_types through Dapper, and their write and read through the generated
-        methods, on Microsoft.Data.SqlClient 6.1.7, the newest release of 6.1, the oldest version that is supported.  A
-        project of its own, since the end-to-end project gets SqlClient 7 through the tool it references.  The generator
+        methods, and the write and read of noda_values through the methods and NodaTime 3.1.9, on
+        Microsoft.Data.SqlClient 6.1.7, the newest release of 6.1, the oldest version that is supported.  A project of
+        its own, since the end-to-end project gets SqlClient 7 through the tool it references.  The generator
         comes from a project reference, which does not bring the package's MSBuild files, so the real ones are imported
         here and at the end of this file.
     -->
@@ -35,6 +36,22 @@
             Include="../SqlServer/EndToEnd/Queries/Streaming.sql.json"
             Link="Queries/%(Filename)%(Extension)"
         />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/NodaTime/Queries/NodaTime.sql"
+            Link="NodaTime/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/NodaTime/Queries/NodaTime.sql.json"
+            Link="NodaTime/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/NodaTime/Queries/NodaTimeOverrides.sql"
+            Link="NodaTime/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/NodaTime/Queries/NodaTimeOverrides.sql.json"
+            Link="NodaTime/Queries/%(Filename)%(Extension)"
+        />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Dapper" />
@@ -42,6 +59,11 @@
         <!-- The newest 6.1 release, the floor's driver: the end-to-end project gets 7 from the tool. -->
         <PackageReference Include="Microsoft.Data.SqlClient" VersionOverride="6.1.7" />
         <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+        <!--
+            NodaTime at 3.1.9, the oldest version that SqlSource supports, for the queries of EndToEnd/NodaTime/: central
+            pinning would otherwise give it the end-to-end project's version.
+        -->
+        <PackageReference Include="NodaTime" VersionOverride="3.1.9" />
         <PackageReference Include="Shouldly" />
         <PackageReference Include="xunit.v3" />
     </ItemGroup>

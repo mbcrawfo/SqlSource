@@ -11,9 +11,9 @@
 #   It then writes the sidecars of examples/PostgresExamples the same way, against a database "examples" made from its
 #   schema.sql, and runs after a change to a query or to the schema of the examples too.
 # - SQL Server: the .sql.json files of the realistic cases under tests/DatabaseTests/SqlServer/Realistic/Cases and of
-#   the end-to-end queries under tests/DatabaseTests/SqlServer/EndToEnd/Queries, against the databases "realistic",
-#   "app" and "billing", each made from the schema.sql and seed.sql of Realistic/, EndToEnd/app/ and EndToEnd/billing/,
-#   with EndToEnd/app/new-types.sql after the seed of "app".  It then writes the sidecars of examples/SqlServerExamples
+#   the end-to-end queries under tests/DatabaseTests/SqlServer/EndToEnd/Queries and EndToEnd/NodaTime/Queries, against
+#   the databases "realistic", "app" and "billing", each made from the schema.sql and seed.sql of Realistic/,
+#   EndToEnd/app/ and EndToEnd/billing/, with EndToEnd/app/new-types.sql after the seed of "app".  It then writes the sidecars of examples/SqlServerExamples
 #   the same way, against a database "examples" made from its schema.sql, and runs after a change to a query or to the
 #   schema of those examples too.
 # It runs the tool as a project, where the other recording scripts run a test: a test project does not build until its
@@ -189,7 +189,8 @@ describe_sqlserver() {
         connections+=(--connection "$database=$connection;Database=$database")
     done
 
-    find "$SQLSERVER_END_TO_END/Queries" "$SQLSERVER_REALISTIC/Cases" -name '*.sql.json' -type f -delete
+    find "$SQLSERVER_END_TO_END/Queries" "$SQLSERVER_END_TO_END/NodaTime/Queries" "$SQLSERVER_REALISTIC/Cases" \
+        -name '*.sql.json' -type f -delete
 
     dotnet run --project src/SqlSource.Tool -- \
         describe --force "$SQLSERVER_PROJECT/SqlServer.csproj" "${connections[@]}"

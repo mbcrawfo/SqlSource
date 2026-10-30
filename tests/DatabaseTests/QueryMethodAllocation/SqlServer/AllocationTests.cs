@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
+using NodaTime;
 using Shouldly;
 using SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer.Shapes;
 using Xunit;
@@ -36,7 +37,9 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation.SqlServer;
 // save a list's growth arrays and the pairs above, against RowBufferByHand, cannot see what the buffer itself costs.
 // The streaming StreamAccounts of StreamingQueries has a pair of its own, against a hand-written static local async
 // iterator that makes the same calls and yields each row, for the whole of a call, from the first MoveNextAsync to the
-// disposal.  In each pair the two make the same calls, so any object that the generated method allocates on each call
+// disposal.  InsertNodaValues and GetNodaValues of NodaTimeQueries, whose models are in NodaTime's types, have a pair
+// each, against hand-written methods that convert each value by the NodaTime members that the generated conversions
+// call.  In each pair the two make the same calls, so any object that the generated method allocates on each call
 // and the hand-written one does not fails the test.  The two are compared by the commonest difference of pairs of
 // calls, one of each method, which CallAllocations explains.  GC.GetTotalAllocatedBytes(true) counts every thread,
 // where the driver completes the continuations of an asynchronous call, so the class is in the collection
@@ -68,11 +71,14 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
     // that the generated methods take; given the model, they fell to 0.)  It does not move with the driver's share of
     // a call or with another thread's work.  The streaming StreamAccounts allocated about 5.0 KB a call on an open
     // connection and 5.4 KB on a closed one, the same as its hand-written iterator: 0 by the commonest difference, in
-    // more than four pairs in five, on every one of four runs, three on SQL Server 2025 and one on 2017.  The margin is
-    // below the 24 bytes of the smallest object of a 64-bit process, so that any object the generated method allocates
-    // for each call and the hand-written does not fails the test, and an extra object did, at 24 bytes, and an array of
-    // 64 bytes, at 88, failed both pairs of SearchAccounts.  It lets the generated method's state machine hold up to
-    // two more fields of 8 bytes than the hand-written one's.  Never raise it to make a change pass.
+    // more than four pairs in five, on every one of four runs, three on SQL Server 2025 and one on 2017.
+    // InsertNodaValues and GetNodaValues, each value converted to or from NodaTime's types, were 0 by the commonest
+    // difference too, in more than four pairs in five, on both connections, on each of two runs on SQL Server 2025 when
+    // they were added.  The margin is below the 24 bytes of the smallest object of a 64-bit process, so that any object
+    // the generated method allocates for each call and the hand-written does not fails the test, and an extra object
+    // did, at 24 bytes, and an array of 64 bytes, at 88, failed both pairs of SearchAccounts.  It lets the generated
+    // method's state machine hold up to two more fields of 8 bytes than the hand-written one's.  Never raise it to make
+    // a change pass.
     private const long MarginInBytesPerCall = 16;
 
     // A call allocates its command, its parameters, its reader and its rows: some kilobytes on the drivers that the
@@ -81,6 +87,18 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
 
     // The SQL of StreamAccounts, as the generated method sends it.
     private const string StreamAccountsSql = "SELECT id, name\nFROM dbo.accounts\nORDER BY id;";
+
+    // The SQL of InsertNodaValues and GetNodaValues of NodaTime.sql, as the generated methods send it.
+    private const string InsertNodaValuesSql =
+        "INSERT INTO dbo.noda_values (\n"
+        + "    id, date_value, time_value, datetime2_value, datetime_value, smalldatetime_value, "
+        + "datetimeoffset_value\n) VALUES (\n"
+        + "    @id, @dateValue, @timeValue, @datetime2Value, @datetimeValue, @smalldatetimeValue, "
+        + "@datetimeoffsetValue\n);";
+
+    private const string GetNodaValuesSql =
+        "SELECT id, date_value, time_value, datetime2_value, datetime_value, smalldatetime_value, "
+        + "datetimeoffset_value\nFROM dbo.noda_values\nWHERE id = @id;";
 
     // The SQL of the numbers queries of RowBuffers.sql, as the generated methods send it.
     private const string NumbersSql =
@@ -128,6 +146,17 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
     // 5,896 bytes only, at the commonest, which is far below 8,000 and fails the test, as does one that did not return
     // its last buffer.  It is raised when the pool saves more and never lowered to make a change pass.
     private const long LeastImmutableArraySavingInBytesPerCall = 8_000;
+
+    // A row of noda_values with a value in each column, so that every conversion runs, at an id that each call sets.
+    private static readonly InsertNodaValuesArgs NodaValues = new(
+        Id: 0,
+        DateValue: new LocalDate(2024, 2, 29),
+        TimeValue: new LocalTime(13, 14, 15).PlusTicks(1_234_567),
+        Datetime2Value: new LocalDateTime(2024, 1, 2, 3, 4, 5).PlusTicks(1_234_567),
+        DatetimeValue: new LocalDateTime(2024, 1, 2, 3, 4, 5, 120),
+        SmalldatetimeValue: new LocalDateTime(2024, 1, 2, 3, 4),
+        DatetimeoffsetValue: new OffsetDateTime(new LocalDateTime(2024, 1, 2, 3, 4, 5), Offset.FromHours(2))
+    );
 
     // "%o%" matches bob and carol, and the id alice.
     private static readonly SearchAccountsFilter Filter = new() { Name = "%o%", AccountId = 1 };
@@ -487,6 +516,69 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
 
                 return sum;
             },
+            MarginInBytesPerCall,
+            Settings
+        );
+    }
+
+    // The insert of a row of noda_values, each parameter converted from NodaTime's type to SqlClient's.  Every call
+    // writes a row, which commits, at an id of its own, from a table that the test empties first: the arguments of
+    // each call are a copy of the row with its id, made the same way on both sides.
+    [Theory]
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task InsertNodaValues_EveryColumn_AllocatesNoMoreThanByHand(ConnectionState state)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await DeleteNodaValuesAsync(token);
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
+        var id = 0;
+
+        (await connection.InsertNodaValues(NodaValues with { Id = ++id }, cancellationToken: token)).ShouldBe(1);
+        (
+            await InsertNodaValuesByHandAsync(connection, NodaValues with { Id = ++id }, cancellationToken: token)
+        ).ShouldBe(1);
+
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
+            () => connection.InsertNodaValues(NodaValues with { Id = ++id }, cancellationToken: token),
+            () => InsertNodaValuesByHandAsync(connection, NodaValues with { Id = ++id }, cancellationToken: token),
+            MarginInBytesPerCall,
+            Settings
+        );
+    }
+
+    // The read of a row of noda_values, each column converted from SqlClient's type to NodaTime's.
+    [Theory]
+    [InlineData(ConnectionState.Closed)]
+    [InlineData(ConnectionState.Open)]
+    public async Task GetNodaValues_EveryColumn_AllocatesNoMoreThanByHand(ConnectionState state)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await DeleteNodaValuesAsync(token);
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await Allocations.InStateAsync(connection, state, token);
+        var row = NodaValues with { Id = 1 };
+        _ = await connection.InsertNodaValues(row, cancellationToken: token);
+        var parameters = new GetNodaValuesArgs(row.Id);
+
+        var generatedRow = await connection.GetNodaValues(parameters, cancellationToken: token);
+        generatedRow.ShouldBe(
+            new GetNodaValuesDto(
+                row.Id,
+                row.DateValue,
+                row.TimeValue,
+                row.Datetime2Value,
+                row.DatetimeValue,
+                row.SmalldatetimeValue,
+                row.DatetimeoffsetValue
+            )
+        );
+        (await GetNodaValuesByHandAsync(connection, parameters, cancellationToken: token)).ShouldBe(generatedRow);
+
+        await Allocations.ShouldAllocateNoMoreThanByHandAsync(
+            () => connection.GetNodaValues(parameters, cancellationToken: token),
+            () => GetNodaValuesByHandAsync(connection, parameters, cancellationToken: token),
             MarginInBytesPerCall,
             Settings
         );
@@ -1244,5 +1336,225 @@ public sealed class AllocationTests(SqlServerApp sqlServer)
                 }
             }
         }
+    }
+
+    // InsertNodaValues of NodaTime.sql, by hand: the arguments of the generated method, and its calls, each value
+    // converted by the NodaTime members that the generated conversions call, and boxed as the generated method boxes
+    // it, the conditional being typed by the object it is assigned to.
+    private static async Task<int> InsertNodaValuesByHandAsync(
+        DbConnection connection,
+        InsertNodaValuesArgs parameters,
+        DbTransaction? transaction = null,
+        int? commandTimeout = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'InsertNodaValues' has completed; it is no longer usable."
+            );
+        }
+
+        var wasClosed = connection.State == ConnectionState.Closed;
+        if (wasClosed)
+        {
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        try
+        {
+            var command = connection.CreateCommand();
+            await using var commandScope = command.ConfigureAwait(false);
+            command.CommandText = InsertNodaValuesSql;
+            command.Transaction = transaction;
+            if (commandTimeout.HasValue)
+            {
+                command.CommandTimeout = commandTimeout.Value;
+            }
+
+            var id = (SqlParameter)command.CreateParameter();
+            id.ParameterName = "id";
+            id.SqlDbType = SqlDbType.Int;
+            id.Value = parameters.Id;
+            _ = command.Parameters.Add(id);
+
+            var date = (SqlParameter)command.CreateParameter();
+            date.ParameterName = "dateValue";
+            date.SqlDbType = SqlDbType.Date;
+            date.Value = parameters.DateValue is { } dateValue ? dateValue.ToDateTimeUnspecified() : DBNull.Value;
+            _ = command.Parameters.Add(date);
+
+            var time = (SqlParameter)command.CreateParameter();
+            time.ParameterName = "timeValue";
+            time.SqlDbType = SqlDbType.Time;
+            time.Scale = 7;
+            time.Value = parameters.TimeValue is { } timeValue ? new TimeSpan(timeValue.TickOfDay) : DBNull.Value;
+            _ = command.Parameters.Add(time);
+
+            var datetime2 = (SqlParameter)command.CreateParameter();
+            datetime2.ParameterName = "datetime2Value";
+            datetime2.SqlDbType = SqlDbType.DateTime2;
+            datetime2.Scale = 7;
+            datetime2.Value = parameters.Datetime2Value is { } datetime2Value
+                ? datetime2Value.ToDateTimeUnspecified()
+                : DBNull.Value;
+            _ = command.Parameters.Add(datetime2);
+
+            var datetime = (SqlParameter)command.CreateParameter();
+            datetime.ParameterName = "datetimeValue";
+            datetime.SqlDbType = SqlDbType.DateTime;
+            datetime.Value = parameters.DatetimeValue is { } datetimeValue
+                ? datetimeValue.ToDateTimeUnspecified()
+                : DBNull.Value;
+            _ = command.Parameters.Add(datetime);
+
+            var smalldatetime = (SqlParameter)command.CreateParameter();
+            smalldatetime.ParameterName = "smalldatetimeValue";
+            smalldatetime.SqlDbType = SqlDbType.SmallDateTime;
+            smalldatetime.Value = parameters.SmalldatetimeValue is { } smalldatetimeValue
+                ? smalldatetimeValue.ToDateTimeUnspecified()
+                : DBNull.Value;
+            _ = command.Parameters.Add(smalldatetime);
+
+            var datetimeoffset = (SqlParameter)command.CreateParameter();
+            datetimeoffset.ParameterName = "datetimeoffsetValue";
+            datetimeoffset.SqlDbType = SqlDbType.DateTimeOffset;
+            datetimeoffset.Scale = 7;
+            datetimeoffset.Value = parameters.DatetimeoffsetValue is { } datetimeoffsetValue
+                ? datetimeoffsetValue.ToDateTimeOffset()
+                : DBNull.Value;
+            _ = command.Parameters.Add(datetimeoffset);
+
+            return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (wasClosed)
+            {
+                await connection.CloseAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    // GetNodaValues of NodaTime.sql, by hand: the arguments of the generated method, and its calls, each column read as
+    // SqlClient's type and converted by the NodaTime members that the generated conversions call.
+    private static async Task<GetNodaValuesDto> GetNodaValuesByHandAsync(
+        DbConnection connection,
+        GetNodaValuesArgs parameters,
+        DbTransaction? transaction = null,
+        int? commandTimeout = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        // The generated method's refusal of a transaction that has completed.
+        if (transaction is not null && transaction.Connection is null)
+        {
+            throw new InvalidOperationException(
+                "The transaction given to the query 'GetNodaValues' has completed; it is no longer usable."
+            );
+        }
+
+        var wasClosed = connection.State == ConnectionState.Closed;
+        if (wasClosed)
+        {
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        try
+        {
+            var command = connection.CreateCommand();
+            await using var commandScope = command.ConfigureAwait(false);
+            command.CommandText = GetNodaValuesSql;
+            command.Transaction = transaction;
+            if (commandTimeout.HasValue)
+            {
+                command.CommandTimeout = commandTimeout.Value;
+            }
+
+            var id = (SqlParameter)command.CreateParameter();
+            id.ParameterName = "id";
+            id.SqlDbType = SqlDbType.Int;
+            id.Value = parameters.Id;
+            _ = command.Parameters.Add(id);
+
+            var reader = await command
+                .ExecuteReaderAsync(CommandBehavior.Default, cancellationToken)
+                .ConfigureAwait(false);
+            await using var readerScope = reader.ConfigureAwait(false);
+            try
+            {
+                if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    throw new UnexpectedRowCountException("GetNodaValues", false);
+                }
+
+                // The generated method's reads: a row's columns are in its buffer once ReadAsync has returned.
+#pragma warning disable CA1849
+                var row = new GetNodaValuesDto(
+                    reader.GetFieldValue<int>(0),
+                    reader.IsDBNull(1)
+                        ? default(LocalDate?)
+                        : LocalDate.FromDateTime(reader.GetFieldValue<DateTime>(1)),
+                    reader.IsDBNull(2)
+                        ? default(LocalTime?)
+                        : LocalTime.FromTicksSinceMidnight(reader.GetFieldValue<TimeSpan>(2).Ticks),
+                    reader.IsDBNull(3)
+                        ? default(LocalDateTime?)
+                        : LocalDateTime.FromDateTime(reader.GetFieldValue<DateTime>(3)),
+                    reader.IsDBNull(4)
+                        ? default(LocalDateTime?)
+                        : LocalDateTime.FromDateTime(reader.GetFieldValue<DateTime>(4)),
+                    reader.IsDBNull(5)
+                        ? default(LocalDateTime?)
+                        : LocalDateTime.FromDateTime(reader.GetFieldValue<DateTime>(5)),
+                    reader.IsDBNull(6)
+                        ? default(OffsetDateTime?)
+                        : OffsetDateTime.FromDateTimeOffset(reader.GetFieldValue<DateTimeOffset>(6))
+                );
+#pragma warning restore CA1849
+                if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    throw new UnexpectedRowCountException("GetNodaValues", true);
+                }
+
+                while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    // The generated method's drain: the results after the row, whose error SqlClient raises only here.
+                }
+
+                return row;
+            }
+            catch (Exception exception)
+                when (transaction is not null && exception is not (DbException or OperationCanceledException))
+            {
+                // The generated method's check of the transaction after an exception of its own.
+                await reader.DisposeAsync().ConfigureAwait(false);
+                if (transaction.Connection is null)
+                {
+                    throw new TransactionRolledBackException("GetNodaValues", exception);
+                }
+
+                throw;
+            }
+        }
+        finally
+        {
+            if (wasClosed)
+            {
+                await connection.CloseAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    // Empties noda_values, which the seed leaves empty and the NodaTime tests write to, on a connection of its own, so
+    // that a test's ids start again at 1.
+    private async Task DeleteNodaValuesAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = new SqlConnection(sqlServer.ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var delete = new SqlCommand("DELETE FROM dbo.noda_values", connection);
+        _ = await delete.ExecuteNonQueryAsync(cancellationToken);
     }
 }

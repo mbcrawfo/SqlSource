@@ -59,9 +59,10 @@ public sealed class CheckTests(SqlServerDatabases sqlServer)
         // A server before major 17 cannot describe NewTypes.sql, whose table is not made there, and no server
         // describes as their sidecars hold the realistic cases that a minimumMajor or a checkedFrom leaves out on it.
         // A filtered check compares only what it names, so the run names every other query file of EndToEnd/Queries/
-        // and the query.sql of each realistic case that it checks, by their paths.  A "--database" filter would take
-        // the files it leaves out in with the rest.  SQL Server 2017, which CI runs, and 2019 and 2022, which the
-        // nightly run runs, take this path: a local run on the default image does not exercise it.
+        // and of EndToEnd/NodaTime/Queries/ and the query.sql of each realistic case that it checks, by their paths.
+        // A "--database" filter would take the files it leaves out in with the rest.  SQL Server 2017, which CI runs,
+        // and 2019 and 2022, which the nightly run runs, take this path: a local run on the default image does not
+        // exercise it.
         var leavesOutNewTypes = sqlServer.Major < 17;
         var newTypes = CommittedEntries.Count(
             [RepositoryPaths.NewTypesQueries + ".json"],
@@ -71,8 +72,8 @@ public sealed class CheckTests(SqlServerDatabases sqlServer)
         checkedHere.ShouldNotBeEmpty();
         // The named files include Constants.sql, whose only query has no sidecar and counts nothing; NewTypes.sql is
         // the one file of EndToEnd/Queries/ that only 2025 describes.
-        var named = Directory
-            .EnumerateFiles(RepositoryPaths.EndToEndQueries, "*.sql", SearchOption.AllDirectories)
+        var named = new[] { RepositoryPaths.EndToEndQueries, RepositoryPaths.EndToEndNodaTimeQueries }
+            .SelectMany(static folder => Directory.EnumerateFiles(folder, "*.sql", SearchOption.AllDirectories))
             .Where(path => !leavesOutNewTypes || path != RepositoryPaths.NewTypesQueries)
             .Order()
             .Concat(checkedHere.Select(static found => Path.Combine(found.Folder, RealisticCase.QueryFile)))

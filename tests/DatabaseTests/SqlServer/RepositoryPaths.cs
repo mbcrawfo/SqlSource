@@ -21,6 +21,9 @@ internal static class RepositoryPaths
     // The folder of the end-to-end queries and their sidecars.
     public static string EndToEndQueries { get; } = Path.Combine(EndToEnd, "Queries");
 
+    // The folder of the end-to-end queries whose folder turns NodaTime on, and their sidecars.
+    public static string EndToEndNodaTimeQueries { get; } = Path.Combine(EndToEnd, "NodaTime", "Queries");
+
     // The file of the queries of those types, NewTypes.sql, which a server before major 17 cannot describe.
     public static string NewTypesQueries { get; } = Path.Combine(EndToEndQueries, "NewTypes.sql");
 }
