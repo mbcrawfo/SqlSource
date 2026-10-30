@@ -197,4 +197,5 @@ With validation off the method checks nothing.  An empty argument leaves nothing
 ## Known issues
 
 - **Under `mssql`, a parameter can be taken for a declared variable.**  After a `DECLARE` with no `;`, a statement that starts with a word SqlSource does not know to start a statement, such as `SEND` or a label, does not end the list.  A parameter after a comma in it, outside parentheses, is then taken for a variable and left out of the parameter list.  End the `DECLARE` with a `;`, or declare the parameter with its type: `-- param: @id int`.
+- **Under `mssql`, two spellings of one parameter fail on a server whose collation is case-sensitive.**  SqlSource reads `@Id` and `@id` as one parameter, but such a server reads them as two variables, so the query fails when it runs: see [SQL Server's known issues](sqlserver.md#known-issues).  Write each parameter in one spelling throughout a query.
 - **A user variable of MySQL or MariaDB, and a parameter of a procedure that the SQL creates, are listed as parameters.**  See [names that are read as parameters](#names-read-as-parameters).
