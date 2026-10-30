@@ -44,6 +44,17 @@
           "Microsoft.Extensions.Logging.Abstractions": "10.0.0"
         }
       },
+      "Npgsql.NetTopologySuite": {
+        "type": "Direct",
+        "requested": "[10.0.3, )",
+        "resolved": "10.0.3",
+        "contentHash": "roOLWX0vokdN5cdRAwOfCWqhGFztsj2PYcvmFsPBoaSdwkboSkviaOu6hxjcX/+xAKUWUS4Al6VmwNlRQzun4g==",
+        "dependencies": {
+          "NetTopologySuite": "2.6.0",
+          "NetTopologySuite.IO.PostGIS": "2.1.0",
+          "Npgsql": "10.0.3"
+        }
+      },
       "Npgsql.NodaTime": {
         "type": "Direct",
         "requested": "[10.0.3, )",
@@ -577,17 +588,6 @@
         "requested": "[3.3.7, )",
         "resolved": "3.3.7",
         "contentHash": "4Rc3zup1sZqtlcgkWZOsjoVbhm+RkDvxrFDJfIxi7nr32ZgzVW+zCTBr827+KG/4r5owpchUjqx8tO4K2ZtpOw=="
-      },
-      "Npgsql.NetTopologySuite": {
-        "type": "CentralTransitive",
-        "requested": "[10.0.3, )",
-        "resolved": "10.0.3",
-        "contentHash": "roOLWX0vokdN5cdRAwOfCWqhGFztsj2PYcvmFsPBoaSdwkboSkviaOu6hxjcX/+xAKUWUS4Al6VmwNlRQzun4g==",
-        "dependencies": {
-          "NetTopologySuite": "2.6.0",
-          "NetTopologySuite.IO.PostGIS": "2.1.0",
-          "Npgsql": "10.0.3"
-        }
       },
       "System.CommandLine": {
         "type": "CentralTransitive",

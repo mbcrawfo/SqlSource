@@ -4,8 +4,9 @@
 
 ## Sidecars
 
-- **Every sidecar of `EndToEnd/Queries/` and `EndToEnd/NodaTime/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
+- **Every sidecar of `EndToEnd/Queries/`, `EndToEnd/NodaTime/Queries/` and `EndToEnd/NetTopologySuite/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
 - **`CheckTests` runs `--check` over the real project, never a copy, through `CliRun.Real`**, which reads the test process's environment and runs the real MSBuild, as `ErrorPathTests` does.
+- **`CheckTests` names each database of `PostgresDatabases` with `--database`, and `NetTopologySuite/GisCheckTests` checks `gis` on the PostGIS container**, since a check of a database without its connection fails: a database added to either container is named by its own check.
 
 ## Queries and tests
 
@@ -21,6 +22,12 @@
 
 - **NodaTime is on in `EndToEnd/NodaTime/` alone**: the project's `sqlsource.json` turns it off, so that the other queries, the realistic corpus and the Dapper tests keep the base map's types.  A query that needs NodaTime's types goes in that folder, and its methods run on `EndToEndSources.AppWithNodaTime`.
 - **A column of `noda_values` changes `EndToEnd/app/schema.sql`, `NodaTime/Queries/NodaTime.sql` and the rows of `NodaTime/NodaTimeQueryTests.cs` and of its copy in `tests/DatabaseTests/Postgres.Npgsql8` together.**
+
+## NetTopologySuite
+
+- **NetTopologySuite is on in `EndToEnd/NetTopologySuite/` alone, whose `sqlsource.json` also names the database `gis`**: the project's `sqlsource.json` turns it off, since the project gets `Npgsql.NetTopologySuite` through the tool.  Its methods run on `EndToEndSources.GisWithNetTopologySuite`, in the collection `UsesPostgis`.
+- **A column of `spatial_values` changes `EndToEnd/gis/schema.sql`, `EndToEnd/gis/seed.sql`, `NetTopologySuite/Queries/NetTopologySuite.sql` and the rows of `NetTopologySuite/NetTopologySuiteQueryTests.cs` and of its copy in `tests/DatabaseTests/Postgres.Npgsql8` together.**
+- **A subtype such as `Point` is given by a query's `-- type-override:` of `public.geometry`**, never the file header's, since every column of `geometry` has that one key, whatever its modifier.
 
 ## `all_types` and the recipe
 

@@ -5,9 +5,12 @@
 # request that raises VersionPrefix, since every sidecar holds the tool's version, and reads the diff of what it wrote
 # before committing it.  It has a part for each engine, which starts its own container and removes it:
 # - PostgreSQL: the .sql.json files of the realistic cases under tests/DatabaseTests/Postgres/Realistic/Cases and of
-#   the end-to-end queries under tests/DatabaseTests/Postgres/EndToEnd/Queries and EndToEnd/NodaTime/Queries, against
-#   the databases "realistic", "app" and "billing", each made from the schema.sql and seed.sql of Realistic/,
-#   EndToEnd/app/ and EndToEnd/billing/.
+#   the end-to-end queries under tests/DatabaseTests/Postgres/EndToEnd/Queries, EndToEnd/NodaTime/Queries and
+#   EndToEnd/NetTopologySuite/Queries, against the databases "realistic", "app" and "billing", each made from the
+#   schema.sql and seed.sql of Realistic/, EndToEnd/app/ and EndToEnd/billing/, and "gis", made from those of
+#   EndToEnd/gis/ in a second container, of the PostGIS image that the harness's PostgisContainer builds from
+#   tests/DatabaseTests/TestHarness/Postgis/Dockerfile on the same postgres image.  That image is kept, as the tests
+#   keep it.
 #   It then writes the sidecars of examples/PostgresExamples the same way, against a database "examples" made from its
 #   schema.sql, and runs after a change to a query or to the schema of the examples too.
 # - SQL Server: the .sql.json files of the realistic cases under tests/DatabaseTests/SqlServer/Realistic/Cases and of
@@ -23,11 +26,15 @@
 set -euo pipefail
 
 IMAGES='tests/DatabaseTests/TestHarness/DefaultImages.cs'
+POSTGIS_CONTAINER='tests/DatabaseTests/TestHarness/PostgisContainer.cs'
+POSTGIS_DOCKERFILE='tests/DatabaseTests/TestHarness/Postgis'
 
 POSTGRES_PROJECT='tests/DatabaseTests/Postgres'
 POSTGRES_END_TO_END="$POSTGRES_PROJECT/EndToEnd"
 POSTGRES_REALISTIC="$POSTGRES_PROJECT/Realistic"
 POSTGRES_DATABASES=(realistic app billing)
+# The database of PostGIS, on its own container.
+POSTGIS_DATABASE='gis'
 POSTGRES_PASSWORD='postgres'
 POSTGRES_EXAMPLES='examples/PostgresExamples'
 # The database of each engine's examples.
@@ -55,10 +62,11 @@ cd "$repo_root"
 
 # The containers that are running, which are removed however the script ends.
 postgres_container=''
+postgis_container=''
 sqlserver_container=''
 remove_containers() {
     local container
-    for container in "$postgres_container" "$sqlserver_container"; do
+    for container in "$postgres_container" "$postgis_container" "$sqlserver_container"; do
         if [[ -n $container ]]; then
             docker rm -f "$container" >/dev/null
         fi
@@ -77,18 +85,29 @@ default_image() {
     echo "$image"
 }
 
-describe_postgres() {
-    local image port ready database folder file connection connections=()
-    image="$(default_image Postgres)"
+# The package of PostGIS that the harness's PostgisContainer installs, read from its line, and not repeated here.
+postgis_package() {
+    local package
+    package="$(sed -n 's/.*const string Package = "\(.*\)";.*/\1/p' "$POSTGIS_CONTAINER")"
+    if [[ -z "$package" ]]; then
+        echo "$POSTGIS_CONTAINER has no line that declares Package as a string." >&2
+        exit 1
+    fi
+    echo "$package"
+}
 
+# Starts a container of a PostgreSQL image, sets the variable named by the second argument to it, so that the trap
+# removes it, and waits until the server answers.
+start_postgres() {
+    local image="$1" variable="$2" container ready
     printf 'Starting %s ... ' "$image"
-    postgres_container="$(docker run -d -e "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" -p 127.0.0.1::5432 "$image")"
-    port="$(docker port "$postgres_container" 5432/tcp | head -n 1 | sed 's/.*://')"
+    container="$(docker run -d -e "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" -p 127.0.0.1::5432 "$image")"
+    printf -v "$variable" '%s' "$container"
 
     # The entrypoint's first server listens on its socket alone, so the check asks over TCP, as the tool will.
     ready=false
     for _ in $(seq 60); do
-        if docker exec "$postgres_container" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then
+        if docker exec "$container" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then
             ready=true
             break
         fi
@@ -99,30 +118,66 @@ describe_postgres() {
         exit 1
     fi
     echo 'done'
+}
+
+# The port on the host of a PostgreSQL container.
+postgres_port() {
+    docker port "$1" 5432/tcp | head -n 1 | sed 's/.*://'
+}
+
+# Creates the database on the container and runs the schema.sql and seed.sql of the folder on it.
+create_postgres_database() {
+    local container="$1" database="$2" folder="$3" file
+    printf 'Creating the database %s ... ' "$database"
+    docker exec "$container" psql -v ON_ERROR_STOP=1 -q -U postgres -c "CREATE DATABASE $database" >/dev/null
+    for file in schema.sql seed.sql; do
+        docker exec -i "$container" psql -v ON_ERROR_STOP=1 -q -U postgres -d "$database" <"$folder/$file" >/dev/null
+    done
+    echo 'done'
+}
+
+describe_postgres() {
+    local image tag package postgis_image port postgis_port database folder connection connections=()
+    image="$(default_image Postgres)"
+
+    start_postgres "$image" postgres_container
+    port="$(postgres_port "$postgres_container")"
 
     # The schemas and seeds are the files that PostgresDatabases of the PostgreSQL project applies, in the same order.
     for database in "${POSTGRES_DATABASES[@]}"; do
-        printf 'Creating the database %s ... ' "$database"
-        docker exec "$postgres_container" psql -v ON_ERROR_STOP=1 -q -U postgres -c "CREATE DATABASE $database" \
-            >/dev/null
         folder="$POSTGRES_END_TO_END/$database"
         if [[ $database == realistic ]]; then
             folder="$POSTGRES_REALISTIC"
         fi
-        for file in schema.sql seed.sql; do
-            docker exec -i "$postgres_container" psql -v ON_ERROR_STOP=1 -q -U postgres -d "$database" \
-                <"$folder/$file" >/dev/null
-        done
-        echo 'done'
+        create_postgres_database "$postgres_container" "$database" "$folder"
         connection="Host=127.0.0.1;Port=$port;Username=postgres;Password=$POSTGRES_PASSWORD;Database=$database"
         connections+=(--connection "$database=$connection")
     done
 
-    find "$POSTGRES_END_TO_END/Queries" "$POSTGRES_END_TO_END/NodaTime/Queries" "$POSTGRES_REALISTIC/Cases" \
-        -name '*.sql.json' -type f -delete
+    # The PostGIS image, built as PostgisContainer builds it, by the same arguments and under the same name, so that a
+    # build of either reuses the other's.
+    tag="${image##*:}"
+    package="$(postgis_package)"
+    postgis_image="sqlsource-postgis:$tag-${package%%+*}"
+    printf 'Building %s ... ' "$postgis_image"
+    docker build --quiet --build-arg "PG=$tag" --build-arg "POSTGIS=$package" -t "$postgis_image" \
+        "$POSTGIS_DOCKERFILE" >/dev/null
+    echo 'done'
+
+    start_postgres "$postgis_image" postgis_container
+    postgis_port="$(postgres_port "$postgis_container")"
+    create_postgres_database "$postgis_container" "$POSTGIS_DATABASE" "$POSTGRES_END_TO_END/$POSTGIS_DATABASE"
+    connection="Host=127.0.0.1;Port=$postgis_port;Username=postgres;Password=$POSTGRES_PASSWORD"
+    connections+=(--connection "$POSTGIS_DATABASE=$connection;Database=$POSTGIS_DATABASE")
+
+    find "$POSTGRES_END_TO_END/Queries" "$POSTGRES_END_TO_END/NodaTime/Queries" \
+        "$POSTGRES_END_TO_END/NetTopologySuite/Queries" "$POSTGRES_REALISTIC/Cases" -name '*.sql.json' -type f -delete
 
     dotnet run --project src/SqlSource.Tool -- \
         describe --force "$POSTGRES_PROJECT/Postgres.csproj" "${connections[@]}"
+
+    docker rm -f "$postgis_container" >/dev/null
+    postgis_container=''
 
     # The examples: their schema on a database of their own, and their project described with that connection, under
     # the logical database that its queries belong to, named after their dialect.

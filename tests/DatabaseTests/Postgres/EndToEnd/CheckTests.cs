@@ -16,12 +16,14 @@ namespace SqlSource.DatabaseTests.Postgres.EndToEnd;
 // The sidecars committed beside the end-to-end queries and the realistic cases are what the server answers today:
 // "describe --check" on the project, with the real MSBuild and a connection to each database, finds every entry the
 // same as its sidecar's.  The counts it prints are those of the entries the committed sidecars hold for each database.
+// It names the databases of this container with --database, since "gis" is on the PostGIS container alone, which
+// NetTopologySuite/GisCheckTests checks.
 [Collection(UsesPostgres.Name)]
 public sealed class CheckTests(PostgresDatabases postgres)
 {
     // The number of entries of the sidecars under EndToEnd/ and Realistic/Cases/, by the database each was described
     // against.
-    private static int ProjectEntries(string database) =>
+    internal static int ProjectEntries(string database) =>
         CommittedEntries.Count(
             new[] { RepositoryPaths.EndToEnd, RealisticCases.Corpus.Cases }.SelectMany(static folder =>
                 Directory.EnumerateFiles(folder, "*.sql.json", SearchOption.AllDirectories)
@@ -47,6 +49,12 @@ public sealed class CheckTests(PostgresDatabases postgres)
         if (checkedHere.Count == withModels.Count)
         {
             var result = await CheckAsync([
+                "--database",
+                PostgresDatabases.AppDatabase,
+                "--database",
+                PostgresDatabases.BillingDatabase,
+                "--database",
+                PostgresDatabases.RealisticDatabase,
                 .. Connection(PostgresDatabases.AppDatabase),
                 .. Connection(PostgresDatabases.BillingDatabase),
                 .. Connection(PostgresDatabases.RealisticDatabase),
@@ -90,7 +98,7 @@ public sealed class CheckTests(PostgresDatabases postgres)
     }
 
     // "describe --check" over the real project, on the real MSBuild and the PostgreSQL describer.
-    private static async Task<CliResult> CheckAsync(IEnumerable<string> args)
+    internal static async Task<CliResult> CheckAsync(IEnumerable<string> args)
     {
         using var run = CliRun.Real(RepositoryRoot.WorkingFolder);
         run.Describers.Add(new PostgresDescriber());
