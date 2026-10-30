@@ -46,6 +46,11 @@
         <PackageReference Include="Microsoft.VisualStudio.SolutionPersistence" />
         <!-- The driver of the PostgreSQL describer, Describing/Postgres/. -->
         <PackageReference Include="Npgsql" />
+        <!--
+            Npgsql's plugin for NetTopologySuite, which the PostgreSQL describer's data source registers so that it
+            binds a parameter of PostGIS's geometry or geography, and its check describes the query.
+        -->
+        <PackageReference Include="Npgsql.NetTopologySuite" />
         <PackageReference Include="System.CommandLine" />
     </ItemGroup>
     <ItemGroup>
