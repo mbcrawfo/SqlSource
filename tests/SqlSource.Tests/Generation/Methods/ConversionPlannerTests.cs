@@ -9,6 +9,7 @@ using SqlSource.Generation.Methods;
 using SqlSource.Generation.Types;
 using SqlSource.Settings;
 using SqlSource.Settings.ClrTypes;
+using SqlSource.Settings.Libraries;
 using SqlSource.Testing.Snapshot;
 using Xunit;
 
@@ -23,7 +24,10 @@ public sealed class ConversionPlannerTests
     private const string When = "global::MyApp.When";
     private const string DateTime = "global::System.DateTime";
     private const string DateTimeOffset = "global::System.DateTimeOffset";
+    private const string Instant = "global::NodaTime.Instant";
+    private const string LocalDate = "global::NodaTime.LocalDate";
     private const string Place = "the typeOverrides of the settings file /app/sqlsource.json";
+    private const string LibraryPlace = "the NodaTime library";
 
     private static readonly LocationInfo At = new(
         "/app/Repo/Users.sql",
@@ -503,6 +507,132 @@ public sealed class ConversionPlannerTests
         blocked.ShouldBeFalse();
     }
 
+    // NodaTime's edges serve SQL Server alone, so an Instant that an override chose on PostgreSQL goes to the driver.
+    [Fact]
+    public void Plan_SqlServerEdgeForAPostgresQuery_IsNotUsed()
+    {
+        var type = Overridden(Instant, true, "timestamptz", DateTime, true);
+        var converters = Of(Edge(DateTime, Instant), Edge(Instant, DateTime));
+
+        foreach (var isRead in new[] { true, false })
+        {
+            var (conversion, problems, blocked) = Plan(type, isRead, converters, engine: DatabaseEngine.PostgreSql);
+
+            conversion.ShouldBeNull();
+            problems.ShouldBeEmpty();
+            blocked.ShouldBeFalse();
+        }
+    }
+
+    [Fact]
+    public void Plan_LibraryEdgeOfTheTarget_IsUsed()
+    {
+        var type = OfTheLibrary(LocalDate, "date", DateTime);
+        var edge = Edge(DateTime, LocalDate);
+
+        var (conversion, problems, blocked) = Plan(
+            type,
+            isRead: true,
+            Of(edge),
+            "column 'day'",
+            DatabaseEngine.SqlServer
+        );
+
+        conversion.ShouldBe(
+            new Conversion(edge.Method, DateTime, true, false, null, false, Library: SqlLibrary.NodaTime)
+        );
+        problems.ShouldBeEmpty();
+        blocked.ShouldBeFalse();
+    }
+
+    // A project's converter between Instant and another type does not make every timestamptz the plugin reads an error.
+    [Fact]
+    public void Plan_LibraryRowWithForeignConverters_GoesToTheDriver()
+    {
+        var type = OfTheLibrary(Instant, "timestamptz", DateTime);
+        var converters = Of(
+            Project("global::MyApp.Moments.ToOffset", Instant, true, DateTimeOffset, true),
+            Project("global::MyApp.Moments.FromOffset", DateTimeOffset, true, Instant, true)
+        );
+
+        foreach (var isRead in new[] { true, false })
+        {
+            var (conversion, problems, blocked) = Plan(type, isRead, converters, "column 'at'");
+
+            conversion.ShouldBeNull();
+            problems.ShouldBeEmpty();
+            blocked.ShouldBeFalse();
+        }
+    }
+
+    [Fact]
+    public void Plan_LibraryRowWithOneDirection_ReadsByItAndWritesByTheDriver()
+    {
+        var type = OfTheLibrary(Instant, "timestamptz", DateTime);
+        var converters = Of(Project("global::MyApp.Moments.ToInstant", DateTime, true, Instant, true));
+
+        var (read, readProblems, readBlocked) = Plan(type, isRead: true, converters, "column 'at'");
+        var (write, writeProblems, writeBlocked) = Plan(type, isRead: false, converters, "parameter 'at'");
+
+        read.ShouldBe(new Conversion("global::MyApp.Moments.ToInstant", DateTime, true, false, null, false));
+        readProblems.ShouldBeEmpty();
+        readBlocked.ShouldBeFalse();
+        write.ShouldBeNull();
+        writeProblems.ShouldBeEmpty();
+        writeBlocked.ShouldBeFalse();
+    }
+
+    // An array of a library's type is converted by its element's edge, and the other direction goes to the driver.
+    [Fact]
+    public void Plan_LibraryRowArrayWithOneDirection_ReadsByElementAndWritesByTheDriver()
+    {
+        var type = OfTheLibrary(Instant + "[]", "timestamptz[]", DateTime + "[]", isValueType: false) with
+        {
+            Database = new DatabaseType(DateTime + "[]", false, true),
+        };
+        var converters = Of(Project("global::MyApp.Moments.ToInstant", DateTime, true, Instant, true));
+
+        var (read, readProblems, _) = Plan(type, isRead: true, converters, "column 'ats'");
+        var (write, writeProblems, writeBlocked) = Plan(type, isRead: false, converters, "parameter 'ats'");
+
+        read.ShouldBe(new Conversion("global::MyApp.Moments.ToInstant", DateTime + "[]", true, true, Instant, true));
+        readProblems.ShouldBeEmpty();
+        write.ShouldBeNull();
+        writeProblems.ShouldBeEmpty();
+        writeBlocked.ShouldBeFalse();
+    }
+
+    // A library row whose database type the base map gives no C# type is the driver's too.
+    [Fact]
+    public void Plan_LibraryRowWithoutABaseType_GoesToTheDriver()
+    {
+        var type = OfTheLibrary(Instant, "timestamptz", null);
+        var converters = Of(Project("global::MyApp.Moments.ToOffset", Instant, true, DateTimeOffset, true));
+
+        var (conversion, problems, blocked) = Plan(type, isRead: true, converters, "column 'at'");
+
+        conversion.ShouldBeNull();
+        problems.ShouldBeEmpty();
+        blocked.ShouldBeFalse();
+    }
+
+    // A type an override chose keeps the rule that a library row is exempt from.
+    [Fact]
+    public void Plan_OverrideWithForeignConverters_StillReports279()
+    {
+        var type = Overridden(Instant, true, "timestamptz", DateTime, true);
+        var converters = Of(
+            Project("global::MyApp.Moments.ToOffset", Instant, true, DateTimeOffset, true),
+            Project("global::MyApp.Moments.FromOffset", DateTimeOffset, true, Instant, true)
+        );
+
+        var (conversion, problems, blocked) = Plan(type, isRead: true, converters, "column 'at'");
+
+        conversion.ShouldBeNull();
+        blocked.ShouldBeTrue();
+        problems.ShouldHaveSingleItem().ShouldStartWith("SQLSRC279: The column 'at' has type 'NodaTime.Instant'");
+    }
+
     private static (Conversion? Conversion, List<string> Problems, bool Blocked) Plan(
         PropertyType type,
         bool isRead,
@@ -516,7 +646,7 @@ public sealed class ConversionPlannerTests
             type,
             isRead,
             subject,
-            new ConversionContext(engine, converters, At, problems),
+            new ConversionContext(engine, ConverterTargetsExtensions.Of(engine, true), converters, At, problems),
             out var blocked
         );
         problems.ShouldAllBe(problem => problem.Location == At);
@@ -549,6 +679,23 @@ public sealed class ConversionPlannerTests
             Place,
             new DatabaseType(databaseText, databaseIsValueType, elementIsValueType)
         );
+
+    // A type that NodaTime's row gave, with the base map's type of its database type.
+    private static PropertyType OfTheLibrary(string text, string key, string? databaseText, bool isValueType = true) =>
+        new(
+            text,
+            isValueType,
+            true,
+            EquatableArray<string>.Empty,
+            key,
+            LibraryPlace,
+            new DatabaseType(databaseText, databaseText is not null, false),
+            Library: SqlLibrary.NodaTime
+        );
+
+    // NodaTime's edge from the one type to the other.
+    private static Converter Edge(string argument, string returns) =>
+        NodaTimeConversions.Edges.Single(edge => edge.ArgumentText == argument && edge.ReturnText == returns);
 
     private static Converter Project(
         string method,

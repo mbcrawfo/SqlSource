@@ -217,15 +217,16 @@ public sealed class CachingMethodTests
         OutputReasons(result).ShouldAllBeCached();
     }
 
-    // Npgsql 9 allows the methods as Npgsql 10 does, so the drivers' value is equal, and no type gathers its input
-    // again.
+    // Npgsql 8 allows the methods as Npgsql 9 does, and both are before 10, the target of a library's converters, so
+    // the drivers' value is equal, and no type gathers its input again.
     [Fact]
     public void Run_DriverVersionEdit_ReEmitsNoMethod()
     {
-        var compilation = MethodsCompilation(UserQueries());
+        var compilation = MethodsCompilation(UserQueries())
+            .ReplaceReference(NpgsqlReferences.Npgsql10, NpgsqlReferences.Npgsql9);
         var driver = _scene.FirstRunOfMethods(compilation);
 
-        var result = Run(driver, compilation.ReplaceReference(NpgsqlReferences.Npgsql10, NpgsqlReferences.Npgsql9));
+        var result = Run(driver, compilation.ReplaceReference(NpgsqlReferences.Npgsql9, NpgsqlReferences.Npgsql8));
 
         result.Diagnostics.ShouldBeEmpty();
         AllReasons(result, TrackingNames.MethodDrivers).ShouldBe([IncrementalStepRunReason.Unchanged]);

@@ -22,8 +22,9 @@ namespace SqlSource.Generation.Types.Maps;
 /// <see cref="TypeMappingKind.CastToText" /> and <see cref="TypeMappingKind.NeedsNpgsql10" />, the type to cast to,
 /// an array of it for an array; for <see cref="TypeMappingKind.DiffersByDriver" />, the entry of the type
 /// override for each driver whose C# type is not of <c>NpgsqlTypes</c>, or null when neither is; for a type that the
-/// type override, the column types or a marker chose, found or not, the place that chose it, and for
-/// <see cref="TypeMappingKind.ArrayNamedByItsOwnKey" />, the place that wrote the entry; for
+/// type override, the column types or a marker chose, found or not, the place that chose it, and for a library's row
+/// the library as a place, <c>the NodaTime library</c>; for <see cref="TypeMappingKind.ArrayNamedByItsOwnKey" />, the
+/// place that wrote the entry; for
 /// <see cref="TypeMappingKind.NeedsSqlServerTypes" />, the package's C# type for the type; and for
 /// <see cref="TypeMappingKind.NeedsNewerSqlClient" />, the version of SqlClient that first has its C# type.
 /// </param>

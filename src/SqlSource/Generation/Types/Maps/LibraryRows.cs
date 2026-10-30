@@ -8,7 +8,9 @@ namespace SqlSource.Generation.Types.Maps;
 /// <summary>
 /// The rows of the libraries that are on, which <see cref="PostgresTypeMap.Map" /> asks after the type override and
 /// before the base map.  A row gives a library's own C# type for a type of <c>pg_catalog</c>, and writes it
-/// <c>global::</c>-qualified: the generator names no library type itself.
+/// <c>global::</c>-qualified: the generator names no library type itself.  Its <c>Detail</c> is the library as a place,
+/// <see cref="PlaceOf" />, so that the type has a place and the base map's type beside it, which a converter converts
+/// from and to.
 /// </summary>
 internal sealed class LibraryRows
 {
@@ -41,6 +43,16 @@ internal sealed class LibraryRows
     }
 
     /// <summary>
+    /// The library as the place that chose a type, which <c>SQLSRC250</c> to <c>SQLSRC252</c> word: <c>the NodaTime
+    /// library</c>.
+    /// </summary>
+    public static string PlaceOf(SqlLibrary library) =>
+        library switch
+        {
+            SqlLibrary.NodaTime or _ => "the NodaTime library",
+        };
+
+    /// <summary>
     /// The library's mapping of <paramref name="type" />, or null when it has none: a type of <c>pg_catalog</c> that
     /// a row names, by its <c>InternalName</c> ignoring case, as the base map's rows are.
     /// </summary>
@@ -52,9 +64,17 @@ internal sealed class LibraryRows
         const string Noda = "global::NodaTime.";
         const string Range = "global::NpgsqlTypes.NpgsqlRange<" + Noda;
         var rows = new Dictionary<string, TypeMapping>(StringComparer.OrdinalIgnoreCase);
+        var place = PlaceOf(SqlLibrary.NodaTime);
 
         void Add(string key, string text, bool isValueType) =>
-            rows.Add(key, TypeMapping.Mapped(key, text, isValueType) with { Library = SqlLibrary.NodaTime });
+            rows.Add(
+                key,
+                TypeMapping.Mapped(key, text, isValueType) with
+                {
+                    Detail = place,
+                    Library = SqlLibrary.NodaTime,
+                }
+            );
 
         Add("timestamptz", Noda + "Instant", true);
         Add("timestamp", Noda + "LocalDateTime", true);

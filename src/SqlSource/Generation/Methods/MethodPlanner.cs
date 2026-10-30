@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using SqlSource.Diagnostics;
+using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Models;
 using SqlSource.Generation.Types.Drivers;
@@ -105,6 +106,7 @@ internal static class MethodPlanner
         var written = WrittenNames(queries);
         var planned = new List<Planned>();
         var engines = CodeGenEngines.None;
+        var served = new ServedConverters(input.Converters);
         foreach (var usable in queries)
         {
             if (usable.Settings.Output != OutputKind.CodeGen)
@@ -123,7 +125,8 @@ internal static class MethodPlanner
             engines |= engine.ToCodeGenEngines();
             var context = new QueryContext(input, key, file, engine, usable);
             AddUnavailableLibraries(context, diagnostics, libraryUses);
-            if (Plan(context, written) is { } plan)
+            var target = ConverterTargetsExtensions.Of(engine, input.Drivers.PostgresAtLeast10);
+            if (Plan(context, written, target, served.Of(target)) is { } plan)
             {
                 planned.Add(plan);
             }
@@ -151,8 +154,13 @@ internal static class MethodPlanner
 
     // The plan of one query whose output is CodeGen, or null when it gets nothing and reports nothing here.  Every
     // problem of SQLSRC272, SQLSRC275, SQLSRC274 and its converters that the query has is reported, and any one leaves
-    // it no method.
-    private static Planned? Plan(QueryContext context, HashSet<string> written)
+    // it no method.  Its conversions see the converters of the type's slice that serve its target.
+    private static Planned? Plan(
+        QueryContext context,
+        HashSet<string> written,
+        ConverterTargets target,
+        EquatableArray<Converter> converters
+    )
     {
         var (input, _, file, engine, usable) = context;
         var (_, queryIndex, query, settings) = usable;
@@ -193,7 +201,7 @@ internal static class MethodPlanner
         var isUsable = input.Drivers.Allows(engine);
         var reading = new Reading(
             isUsable,
-            new ConversionContext(engine, input.Converters, query.NameLocation, problems)
+            new ConversionContext(engine, target, converters, query.NameLocation, problems)
         );
         var hasInput = TryReadInput(context, models, reading, out var methodInput);
         var hasOutput = TryReadOutput(context, models, reading, out var methodOutput);
@@ -583,6 +591,63 @@ internal static class MethodPlanner
             );
             isBlocked |= blocked;
             return conversion;
+        }
+    }
+
+    // The converters of the type's slice that serve each target, filtered once for the type, and only for a target that
+    // one of its queries is on: at most three lists, never one for each query.  A slice without a library's edge is
+    // every target's as it is, so a type without one allocates nothing.
+    private struct ServedConverters(EquatableArray<Converter> all)
+    {
+        private readonly bool _hasLibraryEdge = HasLibraryEdge(all);
+
+        private EquatableArray<Converter>? _sqlServer;
+
+        private EquatableArray<Converter>? _npgsqlBefore10;
+
+        private EquatableArray<Converter>? _npgsql10;
+
+        // The converters that serve the target, in the order of the slice.
+        public EquatableArray<Converter> Of(ConverterTargets target)
+        {
+            if (!_hasLibraryEdge)
+            {
+                return all;
+            }
+
+            if (target == ConverterTargets.SqlServer)
+            {
+                return _sqlServer ??= Serving(all, target);
+            }
+
+            return target == ConverterTargets.NpgsqlBefore10
+                ? _npgsqlBefore10 ??= Serving(all, target)
+                : _npgsql10 ??= Serving(all, target);
+        }
+
+        // By index, so that the search boxes no enumerator.
+        private static bool HasLibraryEdge(EquatableArray<Converter> converters)
+        {
+            for (var index = 0; index < converters.Count; index++)
+            {
+                if (converters[index].Library is not null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // The converters that serve the target, or the slice itself when every one does.
+        private static EquatableArray<Converter> Serving(EquatableArray<Converter> converters, ConverterTargets target)
+        {
+            var serving = ImmutableArray.CreateBuilder<Converter>(converters.Count);
+            serving.AddRange(converters.Where(converter => converter.Serves(target)));
+
+            return serving.Count == converters.Count
+                ? converters
+                : new EquatableArray<Converter>(serving.ToImmutable());
         }
     }
 

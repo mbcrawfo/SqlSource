@@ -433,8 +433,9 @@ internal static class QueryTyper
         return null;
     }
 
-    // The property type of a found mapping.  A type of the map or of a library's row has no place, so the driver reads
-    // it as it is; one that a type override chose has the base map's type beside it, for its converters.
+    // The property type of a found mapping.  A type of the map has no place, so the driver reads it as it is; one that a
+    // type override, a column type, a marker or a library's row chose has the base map's type beside it, for its
+    // converters.
     private static PropertyType PropertyOf(TypeMapping mapping, string text, SidecarType type, Typing typing) =>
         new(
             text,

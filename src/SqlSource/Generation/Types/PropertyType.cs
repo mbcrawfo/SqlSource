@@ -16,7 +16,8 @@ namespace SqlSource.Generation.Types;
 /// </param>
 /// <param name="Place">
 /// The place that chose the type, as <c>SQLSRC250</c> to <c>SQLSRC252</c> word it: the one that wrote the type
-/// override's or the column types' entry, or the marker that gave it.  Null for a type of the base map.
+/// override's or the column types' entry, the marker that gave it, or the library whose row gave it, <c>the NodaTime
+/// library</c>.  Null for a type of the base map.
 /// </param>
 /// <param name="Database">
 /// What the base map reads the database type as, which a converter converts from and to, set exactly when
@@ -30,9 +31,10 @@ namespace SqlSource.Generation.Types;
 /// base map gave.  It changes no model's C# either, and is not compared.
 /// </param>
 /// <param name="Library">
-/// The library whose row gave the type, or null for any other type.  A library row has no <paramref name="Place" />,
-/// <paramref name="Database" /> or <paramref name="Mapped" />, so no converter applies: the driver's plugin reads and
-/// writes the type.
+/// The library whose row gave the type, or null for any other type.  A library row has its <paramref name="Place" /> and
+/// <paramref name="Database" />, so that a converter of the query's engine and driver applies, and no
+/// <paramref name="Mapped" />.  Where no converter fits, the driver reads and writes the type, as the plugin does on
+/// PostgreSQL, with no <c>SQLSRC279</c> or <c>SQLSRC280</c>.
 /// </param>
 /// <param name="WithoutLibrary">
 /// The type the parameter or column has without the library, set exactly when <paramref name="Library" /> is: what the

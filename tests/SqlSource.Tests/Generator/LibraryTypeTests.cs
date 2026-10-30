@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Generation;
+using SqlSource.Generation.Converters;
 using SqlSource.Generation.Types;
 using SqlSource.Settings;
 using SqlSource.Settings.Libraries;
@@ -52,14 +53,16 @@ public sealed class LibraryTypeTests
         null
     );
 
-    // What NodaTime's row gives it, with the base map's type beside it.
+    // What NodaTime's row gives it, a place of its own whose database side is the base map's type, with the base map's
+    // type beside it.
     private static readonly PropertyType InstantOfTheLibrary = new(
         Instant,
         true,
         true,
         EquatableArray<string>.Empty,
         "timestamptz",
-        null,
+        "the NodaTime library",
+        new DatabaseType(DateTime, true, false),
         Library: SqlLibrary.NodaTime,
         WithoutLibrary: DateTimeOfTheMap
     );
@@ -455,6 +458,54 @@ public sealed class LibraryTypeTests
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldContain(Instant);
         methods.ShouldContain("global::NpgsqlTypes.NpgsqlRange<global::NodaTime.LocalDate>[]");
+    }
+
+    // A project's converter between Instant and another type leaves the plugin's row to the driver, with no error.
+    [Fact]
+    public void Run_PluginRowWithAProjectConverterOfAnotherType_HasNoError()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class Sample;
+
+                public static class Moments
+                {
+                    [SqlSourceConverter]
+                    public static global::System.DateTimeOffset ToOffset(global::NodaTime.Instant value) =>
+                        value.ToDateTimeOffset();
+
+                    [SqlSourceConverter]
+                    public static global::NodaTime.Instant FromOffset(global::System.DateTimeOffset value) =>
+                        global::NodaTime.Instant.FromDateTimeOffset(value);
+                }
+            }
+            """;
+        var file = new SqlFile(GeneratorHarness.UsersPath, ListEvents);
+
+        var run = MethodRuns.Run(file, [EventsEntry(file)], Source, WithThePlugin);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("reader.GetFieldValue<" + Instant + ">(0)");
+    }
+
+    // NodaTime without its plugin on PostgreSQL: an override to Instant goes to the driver, since NodaTime's edges
+    // serve SQL Server alone, and no class of conversions is written.
+    [Fact]
+    public void Run_InstantOverrideWithoutThePlugin_KeepsTheDriversRead()
+    {
+        var run = RunEvents(
+            ListEvents,
+            [NpgsqlReferences.Npgsql10, LibraryReferences.NodaTime("3.3.7")],
+            Settings("typeOverrides", new JsonObject { ["timestamptz"] = "NodaTime.Instant" })
+        );
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("reader.GetFieldValue<" + Instant + ">(0)");
+        run.Sources.Keys.ShouldNotContain(LibraryConverters.HintNameOf(SqlLibrary.NodaTime));
     }
 
     // ListEvents of the file, or the query of the name, whose one column, at, is a timestamptz read from
