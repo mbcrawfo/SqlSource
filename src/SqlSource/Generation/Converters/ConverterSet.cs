@@ -8,8 +8,8 @@ using SqlSource.Settings.ClrTypes;
 namespace SqlSource.Generation.Converters;
 
 /// <summary>
-/// Every converter of the project, from its own source, from the mapped types and from the libraries, with <c>SQLSRC277</c> and
-/// <c>SQLSRC278</c> at the methods of its source.
+/// Every converter of the project, from its own source, from the mapped types and from the libraries, with
+/// <c>SQLSRC277</c> and <c>SQLSRC278</c> at the methods of its source.
 /// </summary>
 /// <param name="Converters">
 /// The converters, in the order of <see cref="Comparer" />: ordinal by argument, then by return type, then by method,

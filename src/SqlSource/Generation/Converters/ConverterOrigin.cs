@@ -13,8 +13,8 @@ internal enum ConverterOrigin
     MappedType,
 
     /// <summary>
-    /// A conversion that SqlSource itself generates for a library whose setting is on, such as NodaTime's, and so has no
-    /// method or location.
+    /// A conversion that SqlSource itself generates for a library the project references, such as NodaTime's, whether
+    /// the library's setting is on or not.  It has no location.
     /// </summary>
     Library,
 }
