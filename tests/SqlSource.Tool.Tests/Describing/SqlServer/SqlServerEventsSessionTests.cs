@@ -5,6 +5,7 @@ using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Columns;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
 using Xunit;

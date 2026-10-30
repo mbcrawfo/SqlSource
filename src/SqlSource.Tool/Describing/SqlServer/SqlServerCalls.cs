@@ -282,9 +282,9 @@ internal sealed record SqlServerColumnRow(
 
 /// <summary>
 /// The type a row of <c>sp_describe_undeclared_parameters</c> or of <c>sys.dm_exec_describe_first_result_set</c> gives,
-/// under the names of the latter, which <see cref="SqlServerTypes" /> reads.  It adds no member to a record: a row of
-/// <c>sp_describe_undeclared_parameters</c> gives its <c>suggested_</c> columns through an explicit implementation,
-/// which a capture does not write.
+/// under the names of the latter, which <see cref="Types.SqlServerTypes" /> reads.  It adds no member to a record: a
+/// row of <c>sp_describe_undeclared_parameters</c> gives its <c>suggested_</c> columns through an explicit
+/// implementation, which a capture does not write.
 /// </summary>
 internal interface ISqlServerTypeRow
 {

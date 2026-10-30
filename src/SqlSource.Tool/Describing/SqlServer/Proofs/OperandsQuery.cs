@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using SqlSource.Tool.Describing.SqlServer.Types;
 
 namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 

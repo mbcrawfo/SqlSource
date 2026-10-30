@@ -3,6 +3,7 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Columns;
 using SqlSource.Tool.Describing.SqlServer.Proofs;
 using Xunit;
 using static SqlSource.Tool.Tests.SqlServerScript;

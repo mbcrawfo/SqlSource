@@ -29,29 +29,10 @@ internal static class ConnectionErrors
     public const string DatabaseRefused = "the server cannot open the database for the login";
 
     /// <summary>
-    /// The error <c>-2</c> at <c>open</c>, or an error at <c>open</c> with a <see cref="TimeoutException" /> in its
-    /// chain.
-    /// </summary>
-    public const string ConnectTimedOut = "the connection to the server timed out";
-
-    /// <summary>
-    /// An error at <c>open</c> with a <see cref="SocketException" /> in its chain, followed by <c>: </c> and the name
-    /// of its <see cref="SocketError" /> when that names a reason.  SqlClient 7.1.1 on Linux wraps a socket's
-    /// exception whose error is <see cref="SocketError.Success" />, which names none, so the text stands alone there.
+    /// An error at <c>open</c> with a <see cref="SocketException" /> in its chain, as
+    /// <see cref="ConnectionTexts.Unreachable" /> writes it.
     /// </summary>
     public const string UnreachablePrefix = "SqlClient could not reach the server";
-
-    /// <summary>Any other error at <c>open</c>.</summary>
-    public const string SessionRefused = "the server refused to open a session";
-
-    /// <summary>The error <c>-2</c> at a later call: SqlClient's timeout of a command.</summary>
-    public const string NoAnswerInTime = "the server did not answer in time";
-
-    /// <summary>
-    /// An error of class 20 or above at a later call, which ends the connection; and every call after one that found
-    /// the connection so, which is not opened again.
-    /// </summary>
-    public const string LostConnection = "the connection to the server was lost";
 
     /// <summary>
     /// A connection string that SqlClient cannot read.  SqlClient's own text is not passed on: it quotes a keyword,
@@ -119,11 +100,11 @@ internal static class ConnectionErrors
                 {
                     LoginFailed => LoginRefused,
                     CannotOpenDatabase or CannotOpenDefaultDatabase => DatabaseRefused,
-                    Timeout => ConnectTimedOut,
-                    _ when timedOut => ConnectTimedOut,
+                    Timeout => ConnectionTexts.ConnectTimedOut,
+                    _ when timedOut => ConnectionTexts.ConnectTimedOut,
                     _ => other,
                 },
-            SessionRefused
+            ConnectionTexts.SessionRefused
         );
     }
 
@@ -137,11 +118,11 @@ internal static class ConnectionErrors
             static error =>
                 error switch
                 {
-                    { Number: Timeout } => NoAnswerInTime,
-                    { Class: >= FatalClass } => LostConnection,
+                    { Number: Timeout } => ConnectionTexts.NoAnswerInTime,
+                    { Class: >= FatalClass } => ConnectionTexts.LostConnection,
                     _ => error.Message,
                 },
-            LostConnection
+            ConnectionTexts.LostConnection
         );
 
     // The text at open of an error that is no refused login, database or timeout: a TLS handshake that failed, a server
@@ -154,12 +135,9 @@ internal static class ConnectionErrors
             return CertificateRefused;
         }
 
-        return ExceptionChain.Find<SocketException>(exception) switch
-        {
-            null => SessionRefused,
-            { SocketErrorCode: SocketError.Success } => UnreachablePrefix,
-            { } socket => UnreachablePrefix + ": " + socket.SocketErrorCode.ToString(),
-        };
+        return ExceptionChain.Find<SocketException>(exception) is { } socket
+            ? ConnectionTexts.Unreachable(UnreachablePrefix, socket)
+            : ConnectionTexts.SessionRefused;
     }
 
     /// <summary>An error of the describer's own: the text, and 0 for each number.</summary>

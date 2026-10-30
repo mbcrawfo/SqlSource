@@ -1,5 +1,6 @@
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
@@ -52,7 +53,7 @@ public sealed class SqlServerEventsTableTests
 
         var members = log.Events.ShouldHaveSingleItem().Members;
         NamesOf(members).ShouldBe(["query", "schema", "table", "error", "durationMs"]);
-        Member(members, "error").ShouldBe(ErrorsOf((0, 0, 0, ConnectionErrors.LostConnection)));
+        Member(members, "error").ShouldBe(ErrorsOf((0, 0, 0, ConnectionTexts.LostConnection)));
     }
 
     [Fact]

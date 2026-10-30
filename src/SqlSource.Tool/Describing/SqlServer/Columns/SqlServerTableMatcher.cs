@@ -4,7 +4,7 @@ using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 
-namespace SqlSource.Tool.Describing.SqlServer;
+namespace SqlSource.Tool.Describing.SqlServer.Columns;
 
 /// <summary>
 /// Whether a query's result is exactly one table's or view's column list, so that the generator can name the model

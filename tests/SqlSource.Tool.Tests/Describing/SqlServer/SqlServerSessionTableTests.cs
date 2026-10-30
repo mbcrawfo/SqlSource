@@ -220,7 +220,7 @@ public sealed class SqlServerSessionTableTests
 
         lost.Descriptor.Id.ShouldBe("SQLSRC225");
         lost.Step.ShouldBe(DescribeStep.TableMatch);
-        lost.ServerLines.ShouldBe([ConnectionErrors.LostConnection]);
+        lost.ServerLines.ShouldBe([ConnectionTexts.LostConnection]);
         refused.Descriptor.Id.ShouldBe("SQLSRC225");
         refused.Step.ShouldBe(DescribeStep.TableMatch);
         refused.ServerLines.ShouldBe(["Msg 208: Invalid object name 'dbo.users'."]);
