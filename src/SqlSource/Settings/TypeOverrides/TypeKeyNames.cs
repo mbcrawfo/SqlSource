@@ -11,7 +11,7 @@ namespace SqlSource.Settings.TypeOverrides;
 /// </summary>
 internal static class TypeKeyNames
 {
-    internal static readonly Dictionary<string, string> Extensions = NamesOf(
+    private static readonly Dictionary<string, string> Extensions = NamesOf(
         "citext",
         "hstore",
         "ltree",
@@ -21,7 +21,7 @@ internal static class TypeKeyNames
     );
 
     // Every key of the base map, its refused types and the built-in multiranges included, by itself.
-    internal static readonly Dictionary<string, string> PostgresNames = NamesOf(
+    internal static readonly IReadOnlyDictionary<string, string> PostgresNames = NamesOf(
         "bool",
         "int2",
         "int4",
@@ -109,7 +109,7 @@ internal static class TypeKeyNames
     );
 
     // Every key of the SQL Server map.  rowversion is an alias of timestamp, and sysname is nvarchar's alias type.
-    internal static readonly Dictionary<string, string> SqlServerNames = NamesOf(
+    internal static readonly IReadOnlyDictionary<string, string> SqlServerNames = NamesOf(
         "bigint",
         "int",
         "smallint",
@@ -150,7 +150,9 @@ internal static class TypeKeyNames
 
     // The one-word aliases of PostgreSQL's table of data types, by the name each stands for.  "char" is the key of
     // the one-byte type, not an alias of bpchar.
-    internal static readonly Dictionary<string, string> PostgresAliases = new(StringComparer.OrdinalIgnoreCase)
+    internal static readonly IReadOnlyDictionary<string, string> PostgresAliases = new Dictionary<string, string>(
+        StringComparer.OrdinalIgnoreCase
+    )
     {
         ["integer"] = "int4",
         ["int"] = "int4",
@@ -164,7 +166,9 @@ internal static class TypeKeyNames
     };
 
     // SQL Server's one-word synonyms of its types, by the name each stands for.
-    internal static readonly Dictionary<string, string> SqlServerAliases = new(StringComparer.OrdinalIgnoreCase)
+    internal static readonly IReadOnlyDictionary<string, string> SqlServerAliases = new Dictionary<string, string>(
+        StringComparer.OrdinalIgnoreCase
+    )
     {
         ["integer"] = "int",
         ["character"] = "char",
@@ -173,10 +177,10 @@ internal static class TypeKeyNames
     };
 
     /// <summary>The names of the PostgreSQL types the base map knows, in lower case.</summary>
-    public static IReadOnlyCollection<string> KnownPostgresNames => PostgresNames.Keys;
+    public static IEnumerable<string> KnownPostgresNames => PostgresNames.Keys;
 
     /// <summary>The names of the SQL Server types the base map knows, in lower case.</summary>
-    public static IReadOnlyCollection<string> KnownSqlServerNames => SqlServerNames.Keys;
+    public static IEnumerable<string> KnownSqlServerNames => SqlServerNames.Keys;
 
     /// <summary>
     /// Whether <paramref name="internalName" /> is the name of a type of an extension that the base map knows:

@@ -152,8 +152,11 @@ internal static class SidecarReader
                 case SidecarKeys.ToolVersion:
                     toolVersion = cursor.ReadString(key, orNull: false);
                     break;
-                default:
+                case SidecarKeys.Queries:
                     queries = ReadQueries(cursor);
+                    break;
+                default:
+                    cursor.SkipValue();
                     break;
             }
         }
@@ -275,9 +278,12 @@ internal static class SidecarReader
                 case SidecarKeys.Parameters:
                     ReadParametersOrDefer(cursor, ref members);
                     break;
-                default:
+                case SidecarKeys.Columns:
                     members.ColumnsKey = cursor.KeySpan;
                     ReadColumnsOrDefer(cursor, ref members);
+                    break;
+                default:
+                    cursor.SkipValue();
                     break;
             }
         }
@@ -421,13 +427,17 @@ internal static class SidecarReader
         string? table = null;
         for (var key = cursor.NextKey(TableKeys, ref seen); key is not null; key = cursor.NextKey(TableKeys, ref seen))
         {
-            if (key == SidecarKeys.Schema)
+            switch (key)
             {
-                schema = cursor.ReadString(key, orNull: true);
-            }
-            else
-            {
-                table = cursor.ReadString(key, orNull: true);
+                case SidecarKeys.Schema:
+                    schema = cursor.ReadString(key, orNull: true);
+                    break;
+                case SidecarKeys.Table:
+                    table = cursor.ReadString(key, orNull: true);
+                    break;
+                default:
+                    cursor.SkipValue();
+                    break;
             }
         }
 
@@ -486,8 +496,11 @@ internal static class SidecarReader
                 case SidecarKeys.Nullable:
                     nullable = cursor.ReadBoolean(key);
                     break;
-                default:
+                case SidecarKeys.TypeSource:
                     typeSource = cursor.ReadString(key, orNull: true);
+                    break;
+                default:
+                    cursor.SkipValue();
                     break;
             }
         }
@@ -564,8 +577,11 @@ internal static class SidecarReader
                 case SidecarKeys.Identity:
                     identity = cursor.ReadBoolean(key);
                     break;
-                default:
+                case SidecarKeys.Computed:
                     computed = cursor.ReadBoolean(key);
+                    break;
+                default:
+                    cursor.SkipValue();
                     break;
             }
         }
@@ -623,8 +639,11 @@ internal static class SidecarReader
                 case SidecarKeys.Table:
                     table = cursor.ReadString(key, orNull: true);
                     break;
-                default:
+                case SidecarKeys.Column:
                     column = cursor.ReadString(key, orNull: true);
+                    break;
+                default:
+                    cursor.SkipValue();
                     break;
             }
         }

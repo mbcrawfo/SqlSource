@@ -53,6 +53,9 @@ public sealed class SidecarReaderTests
     private const string SqlServerType = /*lang=json*/
         "{'name': 'int', 'maxLength': 4, 'precision': 10, 'scale': 0}";
 
+    private const string OtherType = /*lang=json*/
+        "{'name': 'INTEGER'}";
+
     // Valid with every object's keys in the opposite order: the version comes last, and each entry's engine and hash
     // after its arrays.
     // SidecarReaderRobustnessTests damages it too.
@@ -309,6 +312,39 @@ public sealed class SidecarReaderTests
         var type = SqlServerType.Replace(old, string.Empty, StringComparison.Ordinal);
 
         ShouldBeMalformed(FileOf("mssql", type), SidecarErrorKind.MissingKey, type, 1, key);
+    }
+
+    // A parameter's own type is read by a list of keys with bindName in it, and is checked against that list, so a
+    // key it cannot do without is missing there too, whether bindName is written before its other keys or after them.
+    [Theory]
+    [InlineData("postgres", IntType, "'name': 'integer', ", "name")]
+    [InlineData("postgres", IntType, "'kind': 'base', ", "kind")]
+    [InlineData("postgres", IntType, "'schema': 'pg_catalog', ", "schema")]
+    [InlineData("postgres", IntType, ", 'internalName': 'int4'", "internalName")]
+    [InlineData("mssql", SqlServerType, "'name': 'int', ", "name")]
+    [InlineData("mssql", SqlServerType, "'maxLength': 4, ", "maxLength")]
+    [InlineData("mssql", SqlServerType, "'precision': 10, ", "precision")]
+    [InlineData("mssql", SqlServerType, ", 'scale': 0", "scale")]
+    [InlineData("sqlite", OtherType, "'name': 'INTEGER'", "name")]
+    public void Read_ParameterTypeWithABindNameAndAKeyRemoved_IsMissingKeyAtTheType(
+        string engine,
+        string type,
+        string old,
+        string key
+    )
+    {
+        type.IndexOf(old, StringComparison.Ordinal).ShouldBeGreaterThanOrEqualTo(0, old);
+        var members = type.Replace(old, string.Empty, StringComparison.Ordinal)[1..^1];
+        const string BindName = "'bindName': 'b'";
+        string[] types =
+            members.Length == 0
+                ? ["{" + BindName + "}"]
+                : ["{" + BindName + ", " + members + "}", "{" + members + ", " + BindName + "}"];
+
+        foreach (var withBindName in types)
+        {
+            ShouldBeMalformed(ParameterFileOf(engine, withBindName), SidecarErrorKind.MissingKey, withBindName, 1, key);
+        }
     }
 
     [Fact]

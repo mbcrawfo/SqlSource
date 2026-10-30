@@ -23,9 +23,8 @@ internal static class SidecarTypeReader
         SidecarKeys.Subtype,
     ];
 
-    // The keys of a parameter's own type, here and for each engine below: a type has a bind name only there.  It is
-    // last, so that the keys shared with the engine's own array keep their bits, and so that Require and Has work
-    // with either array.
+    // The keys of a parameter's own type, here and for each engine below: a type has a bind name only there.  Each
+    // reader checks its keys against the array it read them by, so the place of the bind name in it is free.
     private static readonly string[] PostgresParameterKeys = [.. PostgresKeys, SidecarKeys.BindName];
 
     private static readonly string[] SqlServerKeys =
@@ -48,7 +47,7 @@ internal static class SidecarTypeReader
 
     private static readonly string[] OtherKeys = [SidecarKeys.Name];
 
-    private static readonly string[] OtherParameterKeys = [SidecarKeys.Name, SidecarKeys.BindName];
+    private static readonly string[] OtherParameterKeys = [.. OtherKeys, SidecarKeys.BindName];
 
     /// <summary>
     /// Reads the value of a <c>type</c> key under <paramref name="engine" />.  Null for <c>null</c> where
@@ -125,16 +124,19 @@ internal static class SidecarTypeReader
                 case SidecarKeys.Labels:
                     labels = ReadLabels(cursor);
                     break;
-                default:
+                case SidecarKeys.Subtype:
                     subtype = ReadNested(cursor, key);
+                    break;
+                default:
+                    cursor.SkipValue();
                     break;
             }
         }
 
-        cursor.Require(PostgresKeys, seen, brace, SidecarKeys.Name);
-        cursor.Require(PostgresKeys, seen, brace, SidecarKeys.Kind);
-        cursor.Require(PostgresKeys, seen, brace, SidecarKeys.Schema);
-        cursor.Require(PostgresKeys, seen, brace, SidecarKeys.InternalName);
+        cursor.Require(keys, seen, brace, SidecarKeys.Name);
+        cursor.Require(keys, seen, brace, SidecarKeys.Kind);
+        cursor.Require(keys, seen, brace, SidecarKeys.Schema);
+        cursor.Require(keys, seen, brace, SidecarKeys.InternalName);
 
         if (MissingNestedKey(kind, element, baseType, labels, subtype) is { } missing)
         {
@@ -237,16 +239,19 @@ internal static class SidecarTypeReader
                 case SidecarKeys.Scale:
                     scale = cursor.ReadInt32(key, orNull: false);
                     break;
-                default:
+                case SidecarKeys.UserType:
                     userType = ReadUserType(cursor);
+                    break;
+                default:
+                    cursor.SkipValue();
                     break;
             }
         }
 
-        cursor.Require(SqlServerKeys, seen, brace, SidecarKeys.Name);
-        cursor.Require(SqlServerKeys, seen, brace, SidecarKeys.MaxLength);
-        cursor.Require(SqlServerKeys, seen, brace, SidecarKeys.Precision);
-        cursor.Require(SqlServerKeys, seen, brace, SidecarKeys.Scale);
+        cursor.Require(keys, seen, brace, SidecarKeys.Name);
+        cursor.Require(keys, seen, brace, SidecarKeys.MaxLength);
+        cursor.Require(keys, seen, brace, SidecarKeys.Precision);
+        cursor.Require(keys, seen, brace, SidecarKeys.Scale);
         return cursor.Error is null && name is not null
             ? new SqlServerType(
                 name,
@@ -286,8 +291,11 @@ internal static class SidecarTypeReader
                 case SidecarKeys.Name:
                     name = cursor.ReadString(key, orNull: true);
                     break;
-                default:
+                case SidecarKeys.AssemblyQualifiedName:
                     assemblyQualifiedName = cursor.ReadString(key, orNull: true);
+                    break;
+                default:
+                    cursor.SkipValue();
                     break;
             }
         }
@@ -312,7 +320,7 @@ internal static class SidecarTypeReader
                     bindName = cursor.ReadString(key, orNull: false);
                     break;
                 default:
-                    // NextKey gives no key that is not in the array.
+                    cursor.SkipValue();
                     break;
             }
         }
