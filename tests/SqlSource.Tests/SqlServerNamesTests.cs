@@ -22,16 +22,18 @@ public sealed class SqlServerNamesTests
     public void UdtPart_LettersDigitsAndUnderscores_IsAsItIs(string part) =>
         SqlServerNames.UdtPart(part).ShouldBe(part);
 
+    [Fact]
+    public void UdtPart_EmptyPart_IsEmpty() => SqlServerNames.UdtPart("").ShouldBe("");
+
     [Theory]
     [InlineData("my type", "[my type]")]
     [InlineData("a.b", "[a.b]")]
     [InlineData("a]b", "[a]]b]")]
-    [InlineData("", "")]
     public void UdtPart_OtherCharacters_AreInBrackets(string part, string expected) =>
         SqlServerNames.UdtPart(part).ShouldBe(expected);
 
     [Fact]
-    public void ClrSystemTypes_AreTheThreeOfSys() =>
+    public void ClrSystemTypes_OfSys_AreTheThreeInOrder() =>
         SqlServerNames.ClrSystemTypes.ShouldBe(["hierarchyid", "geography", "geometry"]);
 
     [Theory]

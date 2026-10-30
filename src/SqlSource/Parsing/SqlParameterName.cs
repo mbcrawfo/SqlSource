@@ -9,8 +9,9 @@ namespace SqlSource.Parsing;
 /// driver reports, and the one rule for comparing two parameters' names, which the generator and the tool share.
 /// </summary>
 /// <remarks>
-/// Two names that differ only in case are one parameter, as both engines and their drivers take them, so a name is
-/// compared ordinal ignoring case wherever it is compared.
+/// SqlSource reads two names that differ only in case as one parameter, so a name is compared ordinal ignoring case
+/// wherever a parameter is matched by its name.  The drivers bind such names as one, and so does a SQL Server whose
+/// instance collation ignores case; one whose collation is case-sensitive reads them as two variables.
 /// </remarks>
 internal static class SqlParameterName
 {
