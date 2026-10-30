@@ -39,7 +39,7 @@ The calls: `NpgsqlDataSourceBuilder` and `NpgsqlSlimDataSourceBuilder`, the slim
   - **A `(a,b]` `tstzrange` reads as the `Interval` `[a+1ns, b+1ns)`**, since `Interval` is half-open.  Written back, PostgreSQL's microseconds drop the nanosecond and store `[a,b)`, so a read and a write of the same value change the range.
   - Unbounded ranges read as an `Interval` without that start or end, both ways.
   - **`NpgsqlRange<Instant>` for `tstzrange` and `NpgsqlRange<LocalDate>` for `daterange`**, and their arrays for the two multiranges, are read and written by the plugin on Npgsql 8 and 10.  They round-trip an empty range (`IsEmpty`), an unbounded one, `[a,b)` and a `NULL` equal.  `(a,b]` keeps its bounds on `tstzrange`; PostgreSQL itself canonicalizes it to `[a+1,b+1)` on `daterange`.
-  - **A multirange never holds an empty range.**  PostgreSQL drops it whether the driver writes it, a literal holds it or `tstzmultirange(...)` builds it, so `Interval[]` and `DateInterval[]` never meet the empty case.  Finding 2's shift still applies to `Interval[]`.
+  - **A multirange never holds an empty range.**  PostgreSQL drops it whether the driver writes it, a literal holds it or `tstzmultirange(...)` builds it, so `Interval[]` and `DateInterval[]` never meet the empty case.  The 1 ns shift of a `(a,b]` `tstzrange`, above, still applies to `Interval[]`.
 - **Arrays report `System.Array`.**  For an array column, `GetFieldType` and `GetColumnSchema()[i].DataType` give `System.Array`, not `T[]`, while `GetValue` gives `T[]`.  A multirange itself reports `Interval[]`.  This is the driver's, with or without a plugin; the generated code reads by `GetFieldValue<T[]>` and never asks.
 - **Without `UseNodaTime()`**, full or slim, `GetFieldType` of `timestamptz` is `System.DateTime`.  Reading an `Instant` throws `System.InvalidCastException: Reading as 'NodaTime.Instant' is not supported for fields having DataTypeName 'timestamp with time zone'`.  Writing one throws `System.InvalidCastException: Writing values of 'NodaTime.Instant' is not supported for parameters having DataTypeName 'timestamp with time zone'.`  The words are the same on 8 and 10; they are the README FAQ's case.
 - **The plugin that pairs with Npgsql 8** is `Npgsql.NodaTime` 8.0.x, whose every version depends on NodaTime 3.1.9 or later ([question 6](#6-the-probes-markers-and-the-libraries-floors)).
@@ -80,7 +80,7 @@ The calls: each edge of the design's table, by its exact read and write expressi
 
 ## 4. PostGIS
 
-**The image.**  A Dockerfile from the pinned `postgres` image, installing PostGIS by an exact package version from the image's own pgdg source:
+**The image.**  A Dockerfile from the pinned `postgres` image, installing PostGIS by an exact package version from the image's own pgdg source, or from pgdg's archive once that version has left it:
 
 ```dockerfile
 ARG PG=18.6
@@ -88,7 +88,14 @@ FROM postgres:${PG}
 
 ARG POSTGIS=3.6.4+dfsg-2.pgdg13+1
 
+# The archive line is the image's own pgdg line, with its key, pointed at apt-archive.postgresql.org, which keeps every
+# version pgdg has published; it needs https, so ca-certificates comes first.
 RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates; \
+    sed -n 's|^deb \(\[[^]]*\]\) http://apt.postgresql.org/pub/repos/apt \([a-z]*\)-pgdg .*|deb \1 https://apt-archive.postgresql.org/pub/repos/apt \2-pgdg-archive main|p' \
+        /etc/apt/sources.list.d/pgdg.list > /etc/apt/sources.list.d/pgdg-archive.list; \
+    test -s /etc/apt/sources.list.d/pgdg-archive.list; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         "postgresql-${PG_MAJOR}-postgis-3=${POSTGIS}" \
@@ -99,7 +106,8 @@ RUN set -eux; \
 - **It meets root `AGENTS.md` rule 5.**  It built on `postgres:14.24`, `15.19`, `16.15`, `17.11` and `18.6`, natively on arm64 and as `linux/amd64`: 10 of 10, the slowest amd64 build 61 seconds.  The PostgreSQL version is the base tag's and PostGIS's an exact package version.  `SHOW server_version` equals the base tag on all ten, the PostGIS step upgraded or removed no package of the base, and `postgis_full_version()` is 3.6.4 everywhere.
 - **The rest of what PostGIS brings is not pinned.**  It adds 95 packages, the same set and versions on every major and both architectures.  Six come from pgdg and move with it: `libgeos3.14.1` and `libgeos-c1t64` `3.14.1-2.pgdg13+1`, `libproj25` and `proj-data` `9.8.1-1.pgdg13+1`, `gdal-data` and `gdal-plugins` `3.13.2+dfsg-1.pgdg13+1`.  87 come from Debian trixie and trixie-security, as the base image's own packages do.  `postgis_full_version()` reports GEOS 3.14.1 and PROJ 9.8.1 at run time against 3.13.1 and 9.6.0 at compile time, so a later build may bring a newer GEOS or PROJ under the same PostGIS.
 - **A pinned version outlives its removal from `apt.postgresql.org`.**  `apt-archive.postgresql.org`'s `trixie-pgdg-archive` lists `postgresql-1[4-8]-postgis-3` and `-scripts` at 3.6.4 and 3.6.2 on both architectures, with the six pgdg dependencies.  The live `apt.postgresql.org` lists 3.6.2, 3.6.3 and 3.6.4 today.
-  - Installing from the archive needs `ca-certificates` first: the base images have none, and the archive redirects `http` to `https`, so `apt-get update` fails with `certificate verify failed`.  With it, a simulated install of 3.6.2 from the archive alone resolves.
+  - Installing from the archive needs `ca-certificates` first: the base images have none, and the archive redirects `http` to `https`, so `apt-get update` fails with `certificate verify failed`.
+  - The probes ran on a first form of the Dockerfile with no archive line, which installed 3.6.4 from `apt.postgresql.org` alone; that form fails with `Version ... was not found` once its version has left.  The Dockerfile above adds the archive, and built on `postgres:14.24` and `18.6` with 3.6.4 and with 3.6.1, a version the live source no longer lists, leaving each server's version as its base tag's.
 
 **Through the plugin.**  Npgsql and `Npgsql.NetTopologySuite` 8.0.9 and 10.0.3 on the 14.24 and 18.6 PostGIS images, on a data source with `UseNetTopologySuite()`; all four agree but for one message.
 
@@ -192,7 +200,7 @@ The floors of NodaTime and NetTopologySuite are the plugins' minimums, so NuGet 
 
 **Amended in the design**, each a designer's call or a "Verify first" the spike answered:
 
-- **7.1**: each NodaTime row and alternative confirmed on Npgsql 8, 9 and 10; the `ArgumentException` of a write not in UTC; the paths of the end-to-end and floor projects.
+- **7.1**: each NodaTime row, its arrays, its `NULL` and each alternative confirmed on Npgsql 8 and 10, and the boxed types on 9 too; the `ArgumentException` of a write not in UTC; the paths of the end-to-end and floor projects.
 - **7.2**: what the manual says of the SQL Server edges at their limits: an offset with seconds truncated on write, values outside `DateTime`'s range, SqlClient's rounding and refusals of `datetime` and `smalldatetime`, and a `Duration` outside `time`.
 - **7.3**: SQL Server's `json` refuses a top-level scalar, a JSON `null` included, and the method lets the server's error through; a JSON `null` read into a not-null `JsonNode`, `JsonObject` or `JsonArray` throws, as into a not-null class, since a `JsonNode` cannot hold one; `json` and `jsonb` normalize what they store.
 - **7.4**: the PostGIS image and its Dockerfile; a library row matched by `internalName` and `kind`; the tool's plugin, which makes the check pass; the spatial read through `GetStream`, without the cast, if it holds through a wrapping connection; the class of the shared instances given a static constructor, so that they are created at the first spatial query; a `geography` of SRID 0 refused by SQL Server.
@@ -200,7 +208,8 @@ The floors of NodaTime and NetTopologySuite are the plugins' minimums, so NuGet 
 
 **Exact values** the later sub-phases use:
 
-- **Packages.**  Main projects: NodaTime 3.3.7 on SQL Server (the plugin brings its own on PostgreSQL), `Npgsql.NodaTime` and `Npgsql.NetTopologySuite` 10.0.3, NetTopologySuite 2.6.0, `NetTopologySuite.IO.SqlServerBytes` 2.1.0.  Floor projects: `Npgsql.NodaTime` and `Npgsql.NetTopologySuite` 8.0.9, NodaTime 3.1.9, NetTopologySuite 2.5.0, `NetTopologySuite.IO.SqlServerBytes` 2.1.0.
+- **Packages.**  Main projects: NodaTime 3.3.7, `Npgsql.NodaTime` and `Npgsql.NetTopologySuite` 10.0.3, NetTopologySuite 2.6.0, `NetTopologySuite.IO.SqlServerBytes` 2.1.0.  Floor projects: `Npgsql.NodaTime` and `Npgsql.NetTopologySuite` 8.0.9, NodaTime 3.1.9, NetTopologySuite 2.5.0, `NetTopologySuite.IO.SqlServerBytes` 2.1.0.
+- **The repository pins transitive packages centrally** (`CentralPackageTransitivePinningEnabled` in `Directory.Packages.props`).  Once NodaTime and NetTopologySuite have central versions, every project that gets them through a plugin gets the central version, not the plugin's own: the PostgreSQL main project runs `Npgsql.NodaTime` 10.0.3 on NodaTime 3.3.7, which this spike did not run (it ran 3.2.2).  So each floor project, `Postgres.Npgsql8` and `SqlServer.SqlClient61`, references NodaTime 3.1.9 and NetTopologySuite 2.5.0 itself, with `VersionOverride`, or it tests the central versions instead of the floors.
 - **PostGIS**: `3.6.4+dfsg-2.pgdg13+1`, on `postgres:14.24` and `18.6` in CI and `15.19`, `16.15` and `17.11` at night.
 - **The markers** of question 6's table.
 
@@ -212,5 +221,3 @@ The floors of NodaTime and NetTopologySuite are the plugins' minimums, so NuGet 
 - Microsoft.Data.SqlClient 6.1.8 is published; the floor project pins 6.1.7, which this spike ran.
 
 **Found outside phase 7**: a `-- param:` marker cannot name a type whose modifier is not digits, such as `geometry(Point,4326)` (question 4).  It is the marker grammar's, and it has gone to the owner as a question.
-</content>
-</invoke>

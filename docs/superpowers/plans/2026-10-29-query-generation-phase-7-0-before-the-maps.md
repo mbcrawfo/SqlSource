@@ -92,5 +92,3 @@ The document records these in its "What later sub-phases take" section.
 - [ ] **Step 3: The outline.**  Row 7.0 Done; a phase 7 note where a finding changes the outline's text.
 - [ ] **Step 4: The notes.**  `7-0-notes.md`: the versions, images, markers and floors, and any decision the later sub-phases must know.
 - [ ] **Step 5: Validate and commit.**  `./pre-commit-validation.sh`, then commit the document, the amendments and this plan.
-</content>
-</invoke>
