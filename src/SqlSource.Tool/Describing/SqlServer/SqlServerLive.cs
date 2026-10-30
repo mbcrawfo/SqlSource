@@ -254,7 +254,7 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
     /// name the server gave, in brackets with a <c>]</c> written twice.
     /// </summary>
     public static string TableSelect(string schema, string table) =>
-        "SELECT * FROM " + Bracketed(schema) + "." + Bracketed(table);
+        "SELECT * FROM " + SqlServerNames.Bracketed(schema) + "." + SqlServerNames.Bracketed(table);
 
     /// <summary>
     /// The text of <c>declared</c> for one parameter, which the server describes under its declaration:
@@ -326,12 +326,6 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             static error => new SqlServerColumnsAnswer(null, null, error),
             token
         );
-
-    /// <summary>
-    /// A catalog name in brackets, which hold any character but a <c>]</c> that is not written twice: <c>[User]</c>,
-    /// <c>[odd ]]type]</c>.
-    /// </summary>
-    public static string Bracketed(string name) => "[" + name.Replace("]", "]]", StringComparison.Ordinal) + "]";
 
     // A call of sp_describe_undeclared_parameters with the SQL and the declarations as the values of its parameters.
     private async Task<SqlCommand> DescribeUndeclaredAsync(string sql, string? declarations, CancellationToken token)
