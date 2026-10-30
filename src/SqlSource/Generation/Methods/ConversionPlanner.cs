@@ -38,15 +38,12 @@ internal static class ConversionPlanner
 
     /// <summary>
     /// The conversion of one column or parameter, or null for one read or bound as its type is.  Its problems are
-    /// added to <paramref name="problems" />, at <paramref name="at" />.
+    /// added to the problems of <paramref name="context" />, at its place.
     /// </summary>
     /// <param name="type">The property's type.</param>
     /// <param name="isRead">Whether it is a column, read, and not a parameter, bound.</param>
-    /// <param name="engine">The engine of the query's file, whose base map says which types are foreign.</param>
-    /// <param name="converters">The converters of the type's slice, in the order of the set.</param>
     /// <param name="subject">The column or parameter as a message names it: <c>column 'id'</c>.</param>
-    /// <param name="at">The query's name.</param>
-    /// <param name="problems">The query's problems.</param>
+    /// <param name="context">What the query's conversions read, and report to.</param>
     /// <param name="blocked">
     /// Whether the query gets no method, with a problem added or, for a converter of the project's own source that has
     /// its own error at the method, without one.
@@ -54,11 +51,8 @@ internal static class ConversionPlanner
     public static Conversion? Plan(
         PropertyType type,
         bool isRead,
-        DatabaseEngine engine,
-        EquatableArray<Converter> converters,
         string subject,
-        LocationInfo at,
-        List<DiagnosticInfo> problems,
+        ConversionContext context,
         out bool blocked
     )
     {
@@ -68,7 +62,7 @@ internal static class ConversionPlanner
             return null;
         }
 
-        var decision = new Decision(isRead, engine, converters, subject, at, problems);
+        var decision = new Decision(isRead, subject, context);
         // Matched as a converter's types are written, a keyword's type by its keyword and System.Nullable<T> as T?,
         // which the element of a conversion by element keeps, so that a nullable element is seen as one.
         var text = ClrTypeName.KeywordTextOf(type.Text);
@@ -83,10 +77,7 @@ internal static class ConversionPlanner
             }
             else if (element is not null && decision.IsForeignWithConverters(element))
             {
-                new Decision(isRead, engine, converters, ElementSubject + subject, at, problems).ReportNoBase(
-                    element,
-                    ElementKeyOf(type.Key)
-                );
+                decision.OfElement().ReportNoBase(element, ElementKeyOf(type.Key));
                 blocked = true;
             }
 
@@ -112,7 +103,7 @@ internal static class ConversionPlanner
         // Its messages name the element, whose converter is the one to add.
         if (element is not null && ElementOf(databaseText) is { } databaseElement && !decision.Touches(text))
         {
-            var ofElement = new Decision(isRead, engine, converters, ElementSubject + subject, at, problems);
+            var ofElement = decision.OfElement();
             if (ofElement.TryEdge(element, databaseElement, out var byElement, out blocked))
             {
                 if (byElement is null)
@@ -165,15 +156,11 @@ internal static class ConversionPlanner
         key.EndsWith("[]", StringComparison.Ordinal) ? key.Substring(0, key.Length - 2) : key;
 
     // The steps of the decision for one pair of types, the property's or its element's and the base map's.
-    private readonly struct Decision(
-        bool isRead,
-        DatabaseEngine engine,
-        EquatableArray<Converter> converters,
-        string subject,
-        LocationInfo at,
-        List<DiagnosticInfo> problems
-    )
+    private readonly struct Decision(bool isRead, string subject, ConversionContext context)
     {
+        // The decision for the element of the array that the subject is.
+        public Decision OfElement() => new(isRead, ElementSubject + subject, context);
+
         // True when the pair decides the conversion: the edge it needs, used or blocked, or the other direction's,
         // SQLSRC280, blocked.  False when neither edge exists.
         public bool TryEdge(string type, string database, out Converter? used, out bool blocked)
@@ -194,10 +181,10 @@ internal static class ConversionPlanner
             }
 
             var (has, needs) = isRead ? (To, From) : (From, To);
-            problems.Add(
+            context.Problems.Add(
                 DiagnosticInfo.Create(
                     SqlDiagnostics.ConverterDirectionMissing,
-                    at,
+                    context.At,
                     subject,
                     PostgresTypeMap.AsWritten(type),
                     has,
@@ -216,10 +203,10 @@ internal static class ConversionPlanner
         // map gives no C# type.  Its help names no place, since a type override, a column type or a marker may have
         // chosen the type.
         public void ReportNoBase(string type, string key) =>
-            problems.Add(
+            context.Problems.Add(
                 DiagnosticInfo.Create(
                     SqlDiagnostics.ConverterTypeMismatch,
-                    at,
+                    context.At,
                     subject,
                     PostgresTypeMap.AsWritten(type),
                     "which has converters, but the database type '" + key + "' has no C# type to convert from",
@@ -231,7 +218,9 @@ internal static class ConversionPlanner
 
         // Whether any converter takes or returns the type.
         public bool Touches(string type) =>
-            converters.Any(converter => IsText(converter.ArgumentText, type) || IsText(converter.ReturnText, type));
+            context.Converters.Any(converter =>
+                IsText(converter.ArgumentText, type) || IsText(converter.ReturnText, type)
+            );
 
         public bool IsForeignWithConverters(string type) => IsForeign(type) && Touches(type);
 
@@ -244,8 +233,10 @@ internal static class ConversionPlanner
                 return false;
             }
 
-            var others = converters
-                .Where(converter => IsText(converter.ArgumentText, type) || IsText(converter.ReturnText, type))
+            var others = context
+                .Converters.Where(converter =>
+                    IsText(converter.ArgumentText, type) || IsText(converter.ReturnText, type)
+                )
                 .Select(converter =>
                     IsText(converter.ArgumentText, type) ? converter.ReturnText : converter.ArgumentText
                 )
@@ -255,10 +246,10 @@ internal static class ConversionPlanner
                 .ToList();
             var written = PostgresTypeMap.AsWritten(type);
             var databaseWritten = PostgresTypeMap.AsWritten(database);
-            problems.Add(
+            context.Problems.Add(
                 DiagnosticInfo.Create(
                     SqlDiagnostics.ConverterTypeMismatch,
-                    at,
+                    context.At,
                     subject,
                     written,
                     "whose converters convert from and to "
@@ -285,16 +276,18 @@ internal static class ConversionPlanner
             {
                 if (converter.Fault is { } fault)
                 {
-                    problems.Add(DiagnosticInfo.Create(SqlDiagnostics.NotAConverter, at, converter.DisplayName, fault));
+                    context.Problems.Add(
+                        DiagnosticInfo.Create(SqlDiagnostics.NotAConverter, context.At, converter.DisplayName, fault)
+                    );
                 }
             }
 
             if (sound.Count > 1 && sound.TrueForAll(static converter => converter.Origin == ConverterOrigin.MappedType))
             {
-                problems.Add(
+                context.Problems.Add(
                     DiagnosticInfo.Create(
                         SqlDiagnostics.DuplicateConverter,
-                        at,
+                        context.At,
                         sound[0].DisplayName,
                         sound[1].DisplayName,
                         PostgresTypeMap.AsWritten(sound[0].ArgumentText),
@@ -309,13 +302,13 @@ internal static class ConversionPlanner
         // The converters from the one type to the other.
         private List<Converter> EdgeOf(string from, string to) =>
             [
-                .. converters.Where(converter =>
+                .. context.Converters.Where(converter =>
                     IsText(converter.ArgumentText, from) && IsText(converter.ReturnText, to)
                 ),
             ];
 
         private bool IsForeign(string type) =>
-            engine == DatabaseEngine.SqlServer ? !SqlServerTypeMap.Gives(type) : !PostgresTypeMap.Gives(type);
+            context.Engine == DatabaseEngine.SqlServer ? !SqlServerTypeMap.Gives(type) : !PostgresTypeMap.Gives(type);
 
         // 'int', 'int' and 'short', or 'a', 'b' and 'c'.
         private static string ListOf(List<string> types)
