@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using SqlSource.Diagnostics;
-using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Models;
 using SqlSource.Parsing;
@@ -95,24 +94,28 @@ internal static class MethodPlanner
     )
     {
         var typeQueries = input.Type;
-        var type = typeQueries.Type.Type;
-        var usable = TypeEmitter.FindUsableFiles(type, typeQueries.Files, typeQueries.FileSettings, null);
-        var queries = Resolve(input, usable);
+        var queries = UsableQueries.Of(typeQueries, null);
         var written = WrittenNames(queries);
         var planned = new List<Planned>();
         var engines = CodeGenEngines.None;
-        for (var index = 0; index < queries.Count; index++)
+        foreach (var usable in queries)
         {
-            var (fileIndex, queryIndex, query, settings) = queries[index];
-            if (settings.Output != OutputKind.CodeGen)
+            if (usable.Settings.Output != OutputKind.CodeGen)
             {
                 continue;
             }
 
-            var file = typeQueries.Files[fileIndex];
-            var engine = EngineOf(file.Dialect);
-            engines |= engine;
-            if (Plan(input, key, file, fileIndex, queryIndex, query, settings, written, engine) is { } plan)
+            // Only a describable dialect's query has an entry, so only it can have a method or need a driver.
+            var file = typeQueries.Files[usable.FileIndex];
+            if (!SqlDescribableDialects.Contains(file.Dialect))
+            {
+                continue;
+            }
+
+            var engine = SqlDescribableDialects.EngineOf(file.Dialect);
+            engines |= engine.ToCodeGenEngines();
+            var context = new QueryContext(input, key, file, engine, usable);
+            if (Plan(context, written) is { } plan)
             {
                 planned.Add(plan);
             }
@@ -122,46 +125,16 @@ internal static class MethodPlanner
         return engines;
     }
 
-    // Each query of the usable files, in order, with the settings in effect for it here.
-    private static List<(int File, int Query, SqlQuery Value, QuerySettings Settings)> Resolve(
-        MethodsInput input,
-        bool[] usable
-    )
-    {
-        var typeQueries = input.Type;
-        var type = typeQueries.Type.Type;
-        var queries = new List<(int File, int Query, SqlQuery Value, QuerySettings Settings)>();
-        for (var fileIndex = 0; fileIndex < typeQueries.Files.Count; fileIndex++)
-        {
-            if (!usable[fileIndex])
-            {
-                continue;
-            }
-
-            var file = typeQueries.Files[fileIndex];
-            for (var queryIndex = 0; queryIndex < file.Queries.Count; queryIndex++)
-            {
-                var query = file.Queries[queryIndex];
-                var settings = QuerySettings.Resolve(query.Markers, type.Settings, typeQueries.FileSettings[fileIndex]);
-                queries.Add((fileIndex, queryIndex, query, settings));
-            }
-        }
-
-        return queries;
-    }
-
     // The names of the members the type's file writes for the queries whose output is not CodeGen: each one's constant
     // or token method, in the type itself or in its nested class.
-    private static HashSet<string> WrittenNames(
-        List<(int File, int Query, SqlQuery Value, QuerySettings Settings)> queries
-    )
+    private static HashSet<string> WrittenNames(UsableQuerySequence queries)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var (_, _, query, settings) in queries)
+        foreach (var usable in queries)
         {
-            if (settings.Output != OutputKind.CodeGen)
+            if (usable.Settings.Output != OutputKind.CodeGen)
             {
-                _ = names.Add(query.Name);
+                _ = names.Add(usable.Query.Name);
             }
         }
 
@@ -171,20 +144,12 @@ internal static class MethodPlanner
     // The plan of one query whose output is CodeGen, or null when it gets nothing and reports nothing here.  Every
     // problem of SQLSRC272, SQLSRC275, SQLSRC274 and its converters that the query has is reported, and any one leaves
     // it no method.
-    private static Planned? Plan(
-        MethodsInput input,
-        string key,
-        ParsedSqlFile file,
-        int fileIndex,
-        int queryIndex,
-        SqlQuery query,
-        QuerySettings settings,
-        HashSet<string> written,
-        CodeGenEngines engine
-    )
+    private static Planned? Plan(QueryContext context, HashSet<string> written)
     {
+        var (input, _, file, engine, usable) = context;
+        var (_, queryIndex, query, settings) = usable;
         // A query without models has its own error already, reported by its file.
-        if (FindModels(input.Files[fileIndex], queryIndex, query.Name) is not { } models)
+        if (input.Files[usable.FileIndex].Find(queryIndex, query.Name) is not { } models)
         {
             return null;
         }
@@ -217,13 +182,13 @@ internal static class MethodPlanner
         // Its models are read whatever its other problems, so that it gets every problem of its converters too.
         var planned = new Planned(problems, name, query.Name, query.NameLocation, null, false, []);
         // A query whose driver is missing gets no method, which SQLSRC273 says, so its converters are not decided.
-        var databaseEngine = SqlDescribableDialects.EngineOf(file.Dialect);
-        var isUsable =
-            (engine == CodeGenEngines.Postgres && input.Drivers.Postgres)
-            || (engine == CodeGenEngines.SqlServer && input.Drivers.SqlServer);
-        var reading = new Reading(databaseEngine, isUsable, query.NameLocation, problems);
-        var hasInput = TryReadInput(input, key, file, queryIndex, query, models, reading, out var methodInput);
-        var hasOutput = TryReadOutput(input, key, file, queryIndex, settings, models, reading, out var methodOutput);
+        var isUsable = input.Drivers.Allows(engine);
+        var reading = new Reading(
+            isUsable,
+            new ConversionContext(engine, input.Converters, query.NameLocation, problems)
+        );
+        var hasInput = TryReadInput(context, models, reading, out var methodInput);
+        var hasOutput = TryReadOutput(context, models, reading, out var methodOutput);
         if (problems.Count > 0 || !hasInput || !hasOutput)
         {
             return planned;
@@ -235,7 +200,7 @@ internal static class MethodPlanner
             TypeEmitter.GetSummaryXml(query, file.FileName),
             shape,
             settings.CollectionType,
-            databaseEngine,
+            engine,
             settings.KeepComments ? query.KeptSegments ?? query.Segments : query.Segments,
             settings.ValidateTokens,
             settings.UseArrayPool,
@@ -279,22 +244,6 @@ internal static class MethodPlanner
         }
     }
 
-    // The query's models, matched by index and name as TypeModels matches them.  The models of a file are in the order
-    // of its queries, so a search finds them.
-    private static QueryModels? FindModels(FileModels file, int queryIndex, string name)
-    {
-        var at = SortedSearch.IndexOf(file.Queries.Count, new QueryProbe(file.Queries, queryIndex));
-        return at >= 0 && string.Equals(file.Queries[at].Name, name, StringComparison.Ordinal)
-            ? file.Queries[at]
-            : null;
-    }
-
-    // A struct, so that SortedSearch does not box it.
-    private readonly struct QueryProbe(EquatableArray<QueryModels> queries, int queryIndex) : SortedSearch.IProbe
-    {
-        public int CompareAt(int index) => queries[index].Index.CompareTo(queryIndex);
-    }
-
     // SQLSRC275 for each token named as a fixed argument.
     private static List<DiagnosticInfo> FindTokenProblems(SqlQuery query) =>
         [
@@ -313,16 +262,14 @@ internal static class MethodPlanner
     // The input model, or null when the query has no parameters.  False when it needs one and has none, when its
     // properties do not match its parameters, which is never thrown on, or when a parameter's converter blocks it.
     private static bool TryReadInput(
-        MethodsInput input,
-        string key,
-        ParsedSqlFile file,
-        int queryIndex,
-        SqlQuery query,
+        QueryContext context,
         QueryModels models,
         Reading reading,
         out MethodInput? methodInput
     )
     {
+        var (input, key, file, _, usable) = context;
+        var (_, queryIndex, query, _) = usable;
         methodInput = null;
         if (models.Input is not { } properties)
         {
@@ -342,7 +289,7 @@ internal static class MethodPlanner
         for (var index = 0; index < properties.Count; index++)
         {
             var property = properties[index];
-            var write = reading.ConversionOf(property, false, input.Converters, ref isBlocked);
+            var write = reading.ConversionOf(property, false, ref isBlocked);
             parameters.Add(
                 new MethodParameter(
                     query.Parameters[index].Name,
@@ -366,16 +313,14 @@ internal static class MethodPlanner
     // The output model, or null when the query's entry has no rows.  False when it needs one and has none, when its
     // columns' names do not match its properties, or when a column's converter blocks it.
     private static bool TryReadOutput(
-        MethodsInput input,
-        string key,
-        ParsedSqlFile file,
-        int queryIndex,
-        QuerySettings settings,
+        QueryContext context,
         QueryModels models,
         Reading reading,
         out MethodOutput? methodOutput
     )
     {
+        var (input, key, file, _, usable) = context;
+        var (_, queryIndex, _, settings) = usable;
         methodOutput = null;
         if (models.Output is not { } properties)
         {
@@ -397,7 +342,7 @@ internal static class MethodPlanner
         for (var index = 0; index < properties.Count; index++)
         {
             var property = properties[index];
-            var read = reading.ConversionOf(property, true, input.Converters, ref isBlocked);
+            var read = reading.ConversionOf(property, true, ref isBlocked);
             columns.Add(new MethodColumn(names[index], property.Name, property.Type.Text, property.IsNullable, read));
         }
 
@@ -542,17 +487,6 @@ internal static class MethodPlanner
         }
     }
 
-    // The engine of a describable dialect: the methods of no other have an entry.
-    private static CodeGenEngines EngineOf(SqlDialect dialect)
-    {
-        if (dialect == SqlDialect.PostgreSql)
-        {
-            return CodeGenEngines.Postgres;
-        }
-
-        return dialect == SqlDialect.SqlServer ? CodeGenEngines.SqlServer : CodeGenEngines.None;
-    }
-
     // The shape as the name marker writes it.
     private static string ShapeName(ResultShape shape) =>
         shape switch
@@ -564,22 +498,22 @@ internal static class MethodPlanner
             ResultShape.RowCount or _ => "rowcount",
         };
 
-    // What deciding the converters of one query's properties reads: the engine of its file, whether its driver allows
-    // a method, without which nothing is decided, the query's name, where a problem goes, and its problems.
-    private readonly record struct Reading(
+    // The values that planning one query reads from its type and its file: the type's input and key, the query's file
+    // and the engine of its dialect, and the query with its place and settings.
+    private readonly record struct QueryContext(
+        MethodsInput Input,
+        string Key,
+        ParsedSqlFile File,
         DatabaseEngine Engine,
-        bool IsDriverUsable,
-        LocationInfo At,
-        List<DiagnosticInfo> Problems
-    )
+        UsableQuery Query
+    );
+
+    // What deciding the converters of one query's properties reads: whether its driver allows a method, without which
+    // nothing is decided, and the context of its conversions.
+    private readonly record struct Reading(bool IsDriverUsable, ConversionContext Conversions)
     {
         // The property's conversion, null with nothing decided when the driver allows no method.  A block is OR-ed in.
-        public Conversion? ConversionOf(
-            ModelProperty property,
-            bool isRead,
-            EquatableArray<Converter> converters,
-            ref bool isBlocked
-        )
+        public Conversion? ConversionOf(ModelProperty property, bool isRead, ref bool isBlocked)
         {
             if (!IsDriverUsable)
             {
@@ -589,11 +523,8 @@ internal static class MethodPlanner
             var conversion = ConversionPlanner.Plan(
                 property.Type,
                 isRead,
-                Engine,
-                converters,
                 property.Subject,
-                At,
-                Problems,
+                Conversions,
                 out var blocked
             );
             isBlocked |= blocked;

@@ -31,52 +31,48 @@ internal static class TypeModels
             return EquatableArray<ModelRequest>.Empty;
         }
 
-        var usable = TypeEmitter.FindUsableFiles(target, type.Files, type.FileSettings, null);
         var requests = ImmutableArray.CreateBuilder<ModelRequest>();
         (string Key, string Name)? claimingType = null;
-        for (var index = 0; index < type.Files.Count; index++)
+        var fileIndex = -1;
+        FileModels? models = null;
+        foreach (var usable in UsableQueries.Of(type, null))
         {
-            var parsed = type.Files[index];
-            var modelsAt = SqlPath.IndexOf(files, parsed.NormalizedPath, static file => file.NormalizedPath);
-            if (!usable[index] || modelsAt < 0)
+            if (usable.FileIndex != fileIndex)
+            {
+                // The queries come in file order, so a file's models are looked up once.
+                fileIndex = usable.FileIndex;
+                var modelsAt = SqlPath.IndexOf(
+                    files,
+                    type.Files[fileIndex].NormalizedPath,
+                    static file => file.NormalizedPath
+                );
+                models = modelsAt < 0 ? null : files[modelsAt];
+            }
+
+            // The models were read from the same parse, so they match the query; a mismatch is skipped rather than
+            // thrown on.
+            if (models?.Find(usable.QueryIndex, usable.Query.Name) is not { } query)
             {
                 continue;
             }
 
-            var models = files[modelsAt];
-            foreach (var query in models.Queries)
+            var settings = usable.Settings;
+            if (settings.Output is not (OutputKind.Models or OutputKind.CodeGen))
             {
-                // The models were read from the same parse, so the index finds the query; a mismatch is skipped
-                // rather than thrown on.
-                if (
-                    query.Index >= parsed.Queries.Count
-                    || !string.Equals(parsed.Queries[query.Index].Name, query.Name, StringComparison.Ordinal)
-                )
-                {
-                    continue;
-                }
+                continue;
+            }
 
-                var settings = QuerySettings.Resolve(
-                    parsed.Queries[query.Index].Markers,
-                    target.Settings,
-                    type.FileSettings[index]
-                );
-                if (settings.Output is not (OutputKind.Models or OutputKind.CodeGen))
-                {
-                    continue;
-                }
+            var parsed = type.Files[fileIndex];
+            claimingType ??= ClaimingTypeOf(target);
+            var claiming = claimingType.Value;
+            if (query.Input is { } input)
+            {
+                requests.Add(Request(target, settings, parsed, query, claiming, ModelRole.Input, input));
+            }
 
-                claimingType ??= ClaimingTypeOf(target);
-                var claiming = claimingType.Value;
-                if (query.Input is { } input)
-                {
-                    requests.Add(Request(target, settings, parsed, query, claiming, ModelRole.Input, input));
-                }
-
-                if (query.Output is { } output)
-                {
-                    requests.Add(Request(target, settings, parsed, query, claiming, ModelRole.Output, output));
-                }
+            if (query.Output is { } output)
+            {
+                requests.Add(Request(target, settings, parsed, query, claiming, ModelRole.Output, output));
             }
         }
 
