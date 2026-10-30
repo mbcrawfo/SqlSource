@@ -965,14 +965,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(libraryConversionOutputs, AddFile);
 
-        // The libraries that the CodeGen queries use, each once, which almost never change.
+        // The libraries that the CodeGen queries use, each once for each engine, which almost never change.
         var usedLibraries = typeMethods
             .Select(static (methods, _) => methods.UsedLibraries)
             .Collect()
-            .Select(static (each, _) => DistinctLibraries(each))
+            .Select(static (each, _) => DistinctUses(each))
             .WithTrackingName(TrackingNames.UsedLibraries);
 
-        // Not located, and once for the project and library, however many of its queries use the library.
+        // Not located, and once for the project and package, however many of its queries, of either engine, use it.
         context.RegisterSourceOutput(usedLibraries.Combine(libraryProbe), ReportLibrariesBelowTheFloor);
     }
 
@@ -1000,8 +1000,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         }
     }
 
-    // The libraries of every type, conversions' or used ones, each once, in the order of SqlLibrary, so that the value
-    // does not depend on the order of the compilation's types.
+    // The libraries of every type's conversions, each once, in the order of SqlLibrary, so that the value does not
+    // depend on the order of the compilation's types.
     private static EquatableArray<LibraryValue> DistinctLibraries(ImmutableArray<EquatableArray<LibraryValue>> each) =>
         new(
             each.SelectMany(static libraries => libraries)
@@ -1010,23 +1010,29 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 .ToImmutableArray()
         );
 
-    // SQLSRC282 for each library that a CodeGen query uses and that the project references older than its floor.
+    // The libraries that every type's queries use, each once for each engine, in the order of LibraryUse, so that the
+    // value does not depend on the order of the compilation's types.
+    private static EquatableArray<LibraryUse> DistinctUses(ImmutableArray<EquatableArray<LibraryUse>> each) =>
+        new(
+            each.SelectMany(static uses => uses)
+                .Distinct()
+                .OrderBy(static use => use, LibraryUse.Order)
+                .ToImmutableArray()
+        );
+
+    // SQLSRC282 for each package that the libraries a CodeGen query uses need on its engine and that the project
+    // references older than its floor, each once: NetTopologySuite, used on both engines, is one error.
     private static void ReportLibrariesBelowTheFloor(
         SourceProductionContext output,
-        (EquatableArray<LibraryValue> Libraries, LibraryProbe Probe) input
+        (EquatableArray<LibraryUse> Uses, LibraryProbe Probe) input
     )
     {
         var probe = input.Probe;
-        foreach (var library in input.Libraries.Select(static used => used.Library).Where(probe.IsBelowTheFloor))
+        var packages = input.Uses.SelectMany(use => probe.PackagesBelowTheFloor(use.Library, use.Engine)).Distinct();
+        foreach (var (name, version, floor) in packages)
         {
             output.ReportDiagnostic(
-                Diagnostic.Create(
-                    SqlDiagnostics.LibraryBelowTheFloor,
-                    Location.None,
-                    MethodPlanner.LibraryName(library),
-                    probe.VersionTextOf(library),
-                    LibraryProbe.FloorOf(library)
-                )
+                Diagnostic.Create(SqlDiagnostics.LibraryBelowTheFloor, Location.None, name, version, floor)
             );
         }
     }

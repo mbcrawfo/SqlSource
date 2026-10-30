@@ -19,13 +19,41 @@ namespace SqlSource.Tests.Generator;
 // of queries, files and types it reaches.  The queries keep their methods, with the base map's types.  Each run is
 // under postgres on Npgsql 10 unless it says otherwise.
 //
-// SQLSRC282: a library older than its floor that a codegen query uses is reported once for the project, with no
-// position, and the queries that use it get no method, while their models keep the library's types.
+// SQLSRC282: a package of a library older than its floor that a codegen query uses on its engine is reported once for
+// the project, with no position, and the queries that use it get no method, while their models keep the library's
+// types.
 public sealed class LibraryDiagnosticsTests
 {
     private const string BelowTheFloor =
         "SQLSRC282 (1,1)-(1,1): This project references NodaTime 3.1.8, and SqlSource needs NodaTime 3.1.9 or later "
         + "for the query methods that use it, so they are not generated.  Update the package.";
+
+    private const string NetTopologySuiteBelowTheFloor =
+        "SQLSRC282 (1,1)-(1,1): This project references NetTopologySuite 2.4.0, and SqlSource needs NetTopologySuite "
+        + "2.5.0 or later for the query methods that use it, so they are not generated.  Update the package.";
+
+    private const string SqlServerBytesBelowTheFloor =
+        "SQLSRC282 (1,1)-(1,1): This project references NetTopologySuite.IO.SqlServerBytes 2.0.0, and SqlSource needs "
+        + "NetTopologySuite.IO.SqlServerBytes 2.1.0 or later for the query methods that use it, so they are not "
+        + "generated.  Update the package.";
+
+    private const string Geometry = "global::NetTopologySuite.Geometries.Geometry";
+
+    private const string ListShapes = "-- name: ListShapes\nSELECT shape FROM shapes;\n";
+
+    private const string FindPlaces = "-- name: FindPlaces\nSELECT place FROM places WHERE place = @place;\n";
+
+    // SQL Server's geography, a CLR type of sys, as the tool describes it.
+    private static readonly SqlServerType Geography = TestSidecars.SqlServer(
+        "geography",
+        maxLength: -1,
+        precision: 0,
+        userType: new SqlServerUserType("sys", "geography", "Microsoft.SqlServer.Types, Version=11.0.0.0")
+    );
+
+    // The settings that turn NetTopologySuite on.
+    private static string NetTopologySuiteOn =>
+        GeneratorHarness.Json(new JsonObject { ["libraryTypes"] = new JsonObject { ["netTopologySuite"] = "on" } });
 
     private const string FindDates = "-- name: FindDates\nSELECT d FROM dates WHERE d = @d;\n";
 
@@ -461,6 +489,94 @@ public sealed class LibraryDiagnosticsTests
             ]);
     }
 
+    // A PostGIS geometry, which the plugin's row makes NetTopologySuite's Geometry, with a NetTopologySuite older than
+    // 2.5.0: SQLSRC282, no method, and models of Geometry.
+    [Fact]
+    public void Run_NetTopologySuite240OnPostgres_Reports282()
+    {
+        var run = RunShapes([
+            NpgsqlReferences.Npgsql10,
+            LibraryReferences.SyntheticNetTopologySuite("2.4.0", concaveHull: false),
+            LibraryReferences.NpgsqlNetTopologySuite("10.0.3"),
+        ]);
+
+        run.Problems().ShouldBe([NetTopologySuiteBelowTheFloor]);
+        MethodSources(run).ShouldBeEmpty();
+        run.Sources["App.ListShapesDto-Model.g.cs"].ShouldContain("(" + Geometry + " Shape);");
+    }
+
+    // On SQL Server, NetTopologySuite at its floor with a reader of SQL Server's bytes older than 2.1.0, which only
+    // its informational version tells apart: SQLSRC282 for the reader's package, and no method.
+    [Fact]
+    public void Run_SqlServerBytes200OnSqlServer_Reports282()
+    {
+        var run = RunPlaces([
+            SqlClientReferences.SqlClient7,
+            LibraryReferences.NetTopologySuite("2.5.0"),
+            LibraryReferences.SqlServerBytes("2.0.0"),
+        ]);
+
+        run.Problems().ShouldBe([SqlServerBytesBelowTheFloor]);
+        MethodSources(run).ShouldBeEmpty();
+        run.Sources["App.FindPlacesDto-Model.g.cs"].ShouldContain("(" + Geometry + "? Place);");
+    }
+
+    // The reader of SQL Server's bytes is SQL Server's alone, so an old one stops no PostgreSQL query.
+    [Fact]
+    public void Run_PostgresUseWithOldSqlServerBytes_ReportsNothing()
+    {
+        var run = RunShapes([
+            NpgsqlReferences.Npgsql10,
+            LibraryReferences.NetTopologySuite("2.6.0"),
+            LibraryReferences.NpgsqlNetTopologySuite("10.0.3"),
+            LibraryReferences.SqlServerBytes("2.0.0"),
+        ]);
+
+        run.ShouldBeClean();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain(" ListShapes(");
+    }
+
+    // Both packages below their floors on SQL Server: one SQLSRC282 for each.
+    [Fact]
+    public void Run_BothBelowOnSqlServer_ReportsTwo()
+    {
+        var run = RunPlaces([
+            SqlClientReferences.SqlClient7,
+            LibraryReferences.SyntheticNetTopologySuite("2.4.0", concaveHull: false),
+            LibraryReferences.SqlServerBytes("2.0.0"),
+        ]);
+
+        run.Problems().ShouldBe([NetTopologySuiteBelowTheFloor, SqlServerBytesBelowTheFloor], ignoreOrder: true);
+        MethodSources(run).ShouldBeEmpty();
+    }
+
+    // NetTopologySuite below its floor, used by a query of each engine: one SQLSRC282 for the project.
+    [Fact]
+    public void Run_NetTopologySuiteBelowOnBothEngines_ReportsItOnce()
+    {
+        var shapes = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
+        var places = new SqlFile("/app/Repo/Places.sql", "-- dialect: mssql\n" + FindPlaces);
+
+        var run = GeneratorHarness.Run(
+            OutputKind.CodeGen,
+            [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
+            [shapes, Sidecars.Of(shapes, ShapesEntry(shapes)), places, Sidecars.Of(places, PlacesEntry(places))],
+            references:
+            [
+                NpgsqlReferences.Npgsql10,
+                SqlClientReferences.SqlClient7,
+                LibraryReferences.SyntheticNetTopologySuite("2.4.0", concaveHull: false),
+                LibraryReferences.NpgsqlNetTopologySuite("10.0.3"),
+                LibraryReferences.SqlServerBytes("2.1.0"),
+            ],
+            dialect: "postgres",
+            settings: NetTopologySuiteOn
+        );
+
+        run.Problems().ShouldBe([NetTopologySuiteBelowTheFloor]);
+        MethodSources(run).ShouldBeEmpty();
+    }
+
     // The query of the name, whose one column, at, is a timestamptz read from public.events.at.
     private static SidecarEntry EventsEntry(SqlFile file, string name = "ListEvents") =>
         Entry(file, name, [], [Column("at", Timestamptz, origin: new SidecarOrigin("public", "events", "at"))]);
@@ -473,6 +589,38 @@ public sealed class LibraryDiagnosticsTests
             [TestSidecars.Parameter(0, "d", Date, false)],
             [TestSidecars.Column(0, "d", Date)]
         );
+
+    // ListShapes of the file, whose one column, shape, is PostGIS's geometry of public.
+    private static SidecarEntry ShapesEntry(SqlFile file) =>
+        Entry(
+            file,
+            "ListShapes",
+            [],
+            [Column("shape", TestSidecars.Postgres(name: "geometry", schema: "public", internalName: "geometry"))]
+        );
+
+    // FindPlaces of the file under mssql, whose column place is a nullable geography, and which finds by one.
+    private static SidecarEntry PlacesEntry(SqlFile file) =>
+        MethodRuns.SqlServerEntry(
+            file,
+            "FindPlaces",
+            [TestSidecars.Parameter(0, "place", Geography, false)],
+            [TestSidecars.Column(0, "place", Geography, nullable: true)]
+        );
+
+    // ListShapes at CodeGen under postgres, with these references.
+    private static GeneratorRun RunShapes(MetadataReference[] references)
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
+        return MethodRuns.Run(file, [ShapesEntry(file)], references: references);
+    }
+
+    // FindPlaces at CodeGen under mssql, with these references and NetTopologySuite on.
+    private static GeneratorRun RunPlaces(MetadataReference[] references)
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, FindPlaces);
+        return MethodRuns.RunSqlServer(file, [PlacesEntry(file)], references: references, settings: NetTopologySuiteOn);
+    }
 
     // The files of methods that a run generated.
     private static string[] MethodSources(GeneratorRun run) =>

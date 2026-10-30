@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
@@ -60,8 +61,18 @@ internal sealed record LibraryProbe(
 
     private const string SqlServerBytesAssemblyName = "NetTopologySuite.IO.SqlServerBytes";
 
+    // What a diagnostic says of a package whose assembly gives no version.
+    private const string UnknownVersion = "of an unknown version";
+
     // The oldest NodaTime whose types SqlSource's rows and conversions name.
     private static readonly Version NodaTimeFloor = new(3, 1, 9, 0);
+
+    // The oldest NetTopologySuite that Npgsql.NetTopologySuite 8.0 takes.
+    private static readonly Version NetTopologySuiteFloor = new(2, 5, 0);
+
+    // The oldest reader and writer of SQL Server's bytes that write M values and check a geography polygon for
+    // emptiness before its ring orientation.
+    private static readonly Version SqlServerBytesFloor = new(2, 1, 0);
 
     /// <summary>
     /// Whether the project references what <paramref name="library" /> needs on <paramref name="engine" />: on
@@ -100,37 +111,66 @@ internal sealed record LibraryProbe(
         };
 
     /// <summary>
-    /// Whether the project references <paramref name="library" /> older than its floor: for NodaTime, an assembly
-    /// named <c>NodaTime</c> older than 3.1.9 that has its types.  A library whose assembly gives no version, as one
-    /// merged into an assembly of another name, is not below it.
+    /// Whether the project references a package of <paramref name="library" /> that <paramref name="engine" />'s
+    /// queries use older than its floor, as <see cref="PackagesBelowTheFloor" /> names them.
     /// </summary>
-    public bool IsBelowTheFloor(SqlLibrary library) =>
+    public bool IsBelowTheFloor(SqlLibrary library, DatabaseEngine engine) =>
         library switch
         {
-            SqlLibrary.NodaTime => NodaTime && NodaTimeVersion is { } version && version < NodaTimeFloor,
-            SqlLibrary.NetTopologySuite or _ => false,
+            SqlLibrary.NodaTime => IsNodaTimeBelowTheFloor,
+            SqlLibrary.NetTopologySuite => IsNetTopologySuiteBelowTheFloor
+                || (engine == DatabaseEngine.SqlServer && IsSqlServerBytesBelowTheFloor),
+            _ => false,
         };
 
     /// <summary>
-    /// The oldest version of <paramref name="library" /> that SqlSource supports, as a diagnostic gives it.
+    /// The packages of <paramref name="library" /> that <paramref name="engine" />'s queries use and that the project
+    /// references older than their floor, each with the version found and the floor, as <c>SQLSRC282</c> names them:
+    /// NodaTime below 3.1.9 on both engines; NetTopologySuite below 2.5.0 on both, and on SQL Server
+    /// NetTopologySuite.IO.SqlServerBytes below 2.1.0, which only SQL Server's queries use.
     /// </summary>
-    public static string FloorOf(SqlLibrary library) =>
-        library switch
+    public IEnumerable<(string Name, string Version, string Floor)> PackagesBelowTheFloor(
+        SqlLibrary library,
+        DatabaseEngine engine
+    )
+    {
+        if (library == SqlLibrary.NodaTime && IsNodaTimeBelowTheFloor)
         {
-            SqlLibrary.NodaTime => TextOf(NodaTimeFloor),
-            SqlLibrary.NetTopologySuite or _ => "",
-        };
+            yield return (NodaTimeAssemblyName, TextOf(NodaTimeVersion!), TextOf(NodaTimeFloor));
+        }
 
-    /// <summary>
-    /// The version of <paramref name="library" /> that the project references, as a diagnostic gives it: the major,
-    /// the minor and the build, as <c>3.1.8</c>.  Empty when there is none.
-    /// </summary>
-    public string VersionTextOf(SqlLibrary library) =>
-        library switch
+        if (library != SqlLibrary.NetTopologySuite)
         {
-            SqlLibrary.NodaTime => NodaTimeVersion is { } version ? TextOf(version) : "",
-            SqlLibrary.NetTopologySuite or _ => "",
-        };
+            yield break;
+        }
+
+        if (IsNetTopologySuiteBelowTheFloor)
+        {
+            yield return (
+                NetTopologySuiteAssemblyName,
+                NetTopologySuiteVersion ?? UnknownVersion,
+                TextOf(NetTopologySuiteFloor)
+            );
+        }
+
+        if (engine == DatabaseEngine.SqlServer && IsSqlServerBytesBelowTheFloor)
+        {
+            yield return (SqlServerBytesAssemblyName, SqlServerBytesVersion!, TextOf(SqlServerBytesFloor));
+        }
+    }
+
+    // An assembly named NodaTime older than 3.1.9 that has its types.  A library whose assembly gives no version, as
+    // one merged into an assembly of another name, is not below it.
+    private bool IsNodaTimeBelowTheFloor => NodaTime && NodaTimeVersion is { } version && version < NodaTimeFloor;
+
+    // NetTopologySuite's geometries without ConcaveHull, first in 2.5.0, whatever version the package says, since
+    // every 2.x has one identity.
+    private bool IsNetTopologySuiteBelowTheFloor => NetTopologySuite && !NetTopologySuiteAtFloor;
+
+    // A reader of SQL Server's bytes whose package says a version older than 2.1.0.  One that says none, or none that
+    // starts with a number, is not below it.
+    private bool IsSqlServerBytesBelowTheFloor =>
+        SqlServerBytes && NumbersOf(SqlServerBytesVersion) is { } version && version < SqlServerBytesFloor;
 
     /// <summary>
     /// Reads the probe from <paramref name="compilation" />: six type lookups, the identities of its references, and
@@ -169,6 +209,26 @@ internal sealed record LibraryProbe(
     // The version of the package of the newest assembly of the name that defines one of the types, or null.
     private static string? PackageVersionOf(ImmutableArray<INamedTypeSymbol> types, string assemblyName) =>
         DriverProbes.NewestNamed(types, assemblyName) is { } assembly ? DriverProbes.PackageVersionOf(assembly) : null;
+
+    // The leading numbers and dots of a package's version, as 2.1.0 of 2.1.0-beta1, with a build of 0 where it has
+    // none, so that 2.1 is 2.1.0, or null when they make no version.
+    private static Version? NumbersOf(string? text)
+    {
+        if (text is null)
+        {
+            return null;
+        }
+
+        var length = 0;
+        while (length < text.Length && (text[length] is (>= '0' and <= '9') or '.'))
+        {
+            length++;
+        }
+
+        return Version.TryParse(text.Substring(0, length), out var version)
+            ? new Version(version.Major, version.Minor, Math.Max(version.Build, 0))
+            : null;
+    }
 
     // The major, the minor and the build, which a version of an assembly always has, without throwing on one that has
     // fewer.

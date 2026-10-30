@@ -144,9 +144,11 @@ public sealed class LibraryProbeTests
             CompilationOf(LibraryReferences.Synthetic("3.1.8.0", nodaTimeTypes: true, pluginExtensions: false))
         );
 
-        probe.IsBelowTheFloor(SqlLibrary.NodaTime).ShouldBeTrue();
-        probe.VersionTextOf(SqlLibrary.NodaTime).ShouldBe("3.1.8");
-        LibraryProbe.FloorOf(SqlLibrary.NodaTime).ShouldBe("3.1.9");
+        probe.IsBelowTheFloor(SqlLibrary.NodaTime, DatabaseEngine.PostgreSql).ShouldBeTrue();
+        probe.IsBelowTheFloor(SqlLibrary.NodaTime, DatabaseEngine.SqlServer).ShouldBeTrue();
+        probe
+            .PackagesBelowTheFloor(SqlLibrary.NodaTime, DatabaseEngine.SqlServer)
+            .ShouldBe([("NodaTime", "3.1.8", "3.1.9")]);
     }
 
     [Fact]
@@ -156,7 +158,7 @@ public sealed class LibraryProbeTests
             CompilationOf(LibraryReferences.Synthetic("3.1.9.0", nodaTimeTypes: true, pluginExtensions: false))
         );
 
-        probe.IsBelowTheFloor(SqlLibrary.NodaTime).ShouldBeFalse();
+        probe.IsBelowTheFloor(SqlLibrary.NodaTime, DatabaseEngine.SqlServer).ShouldBeFalse();
     }
 
     // No NodaTime, or its types in an assembly of another name, which gives no version: nothing is below the floor.
@@ -175,8 +177,8 @@ public sealed class LibraryProbeTests
             )
         );
 
-        none.IsBelowTheFloor(SqlLibrary.NodaTime).ShouldBeFalse();
-        merged.IsBelowTheFloor(SqlLibrary.NodaTime).ShouldBeFalse();
+        none.IsBelowTheFloor(SqlLibrary.NodaTime, DatabaseEngine.SqlServer).ShouldBeFalse();
+        merged.IsBelowTheFloor(SqlLibrary.NodaTime, DatabaseEngine.SqlServer).ShouldBeFalse();
     }
 
     // An assembly named NodaTime without its types is not NodaTime, whatever its version.
@@ -187,7 +189,7 @@ public sealed class LibraryProbeTests
             CompilationOf(LibraryReferences.Synthetic("2.0.0.0", nodaTimeTypes: false, pluginExtensions: false))
         );
 
-        probe.IsBelowTheFloor(SqlLibrary.NodaTime).ShouldBeFalse();
+        probe.IsBelowTheFloor(SqlLibrary.NodaTime, DatabaseEngine.SqlServer).ShouldBeFalse();
     }
 
     [Fact]
@@ -281,6 +283,112 @@ public sealed class LibraryProbeTests
 
         probe.NetTopologySuiteAtFloor.ShouldBeTrue();
         probe.NetTopologySuiteVersion.ShouldBe("2.5.1");
+    }
+
+    // NetTopologySuite without ConcaveHull is below its floor on both engines, whatever version it says.
+    [Fact]
+    public void IsBelowTheFloor_NetTopologySuite240_IsTrueOnBothEngines()
+    {
+        var probe = LibraryProbe.Read(
+            CompilationOf(LibraryReferences.SyntheticNetTopologySuite("2.4.0", concaveHull: false))
+        );
+
+        probe.IsBelowTheFloor(SqlLibrary.NetTopologySuite, DatabaseEngine.PostgreSql).ShouldBeTrue();
+        probe.IsBelowTheFloor(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer).ShouldBeTrue();
+        probe
+            .PackagesBelowTheFloor(SqlLibrary.NetTopologySuite, DatabaseEngine.PostgreSql)
+            .ShouldBe([("NetTopologySuite", "2.4.0", "2.5.0")]);
+    }
+
+    // An assembly that gives no informational version is named as of an unknown version.
+    [Fact]
+    public void PackagesBelowTheFloor_NetTopologySuiteWithoutAVersion_SaysItIsUnknown()
+    {
+        var probe = new LibraryProbe(
+            NodaTime: false,
+            NpgsqlNodaTime: false,
+            NodaTimeVersion: null,
+            NetTopologySuite: true,
+            NetTopologySuiteAtFloor: false
+        );
+
+        probe
+            .PackagesBelowTheFloor(SqlLibrary.NetTopologySuite, DatabaseEngine.PostgreSql)
+            .ShouldBe([("NetTopologySuite", "of an unknown version", "2.5.0")]);
+    }
+
+    // NetTopologySuite.IO.SqlServerBytes below 2.1.0, told by its informational version, is below the floor only for
+    // SQL Server's queries, which alone use it.
+    [Fact]
+    public void IsBelowTheFloor_SqlServerBytes200_IsTrueOnSqlServerOnly()
+    {
+        var probe = LibraryProbe.Read(
+            CompilationOf(LibraryReferences.NetTopologySuite("2.5.0"), LibraryReferences.SqlServerBytes("2.0.0"))
+        );
+
+        probe.IsBelowTheFloor(SqlLibrary.NetTopologySuite, DatabaseEngine.PostgreSql).ShouldBeFalse();
+        probe.IsBelowTheFloor(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer).ShouldBeTrue();
+        probe.PackagesBelowTheFloor(SqlLibrary.NetTopologySuite, DatabaseEngine.PostgreSql).ShouldBeEmpty();
+        probe
+            .PackagesBelowTheFloor(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer)
+            .ShouldBe([("NetTopologySuite.IO.SqlServerBytes", "2.0.0", "2.1.0")]);
+    }
+
+    // The version's leading numbers decide, with a missing build read as 0, and a version that starts with no number
+    // decides nothing.
+    [Theory]
+    [InlineData("2.0.0", true)]
+    [InlineData("1.15.0", true)]
+    [InlineData("2.0", true)]
+    [InlineData("2.1", false)]
+    [InlineData("2.1.0", false)]
+    [InlineData("2.1.0-beta1", false)]
+    [InlineData("2.2.0", false)]
+    [InlineData("unknown", false)]
+    [InlineData(null, false)]
+    public void IsBelowTheFloor_SqlServerBytesVersion_IsBelow210(string? version, bool expected)
+    {
+        var probe = new LibraryProbe(
+            NodaTime: false,
+            NpgsqlNodaTime: false,
+            NodaTimeVersion: null,
+            NetTopologySuite: true,
+            NetTopologySuiteAtFloor: true,
+            SqlServerBytes: true,
+            SqlServerBytesVersion: version
+        );
+
+        probe.IsBelowTheFloor(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer).ShouldBe(expected);
+    }
+
+    // Both below on SQL Server: each package once, NetTopologySuite first.
+    [Fact]
+    public void PackagesBelowTheFloor_BothBelowOnSqlServer_NamesEach()
+    {
+        var probe = LibraryProbe.Read(
+            CompilationOf(
+                LibraryReferences.SyntheticNetTopologySuite("2.4.0", concaveHull: false),
+                LibraryReferences.SqlServerBytes("2.0.0")
+            )
+        );
+
+        probe
+            .PackagesBelowTheFloor(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer)
+            .ShouldBe([
+                ("NetTopologySuite", "2.4.0", "2.5.0"),
+                ("NetTopologySuite.IO.SqlServerBytes", "2.0.0", "2.1.0"),
+            ]);
+    }
+
+    [Fact]
+    public void IsBelowTheFloor_NetTopologySuiteAtItsFloors_IsFalse()
+    {
+        var probe = LibraryProbe.Read(
+            CompilationOf(LibraryReferences.NetTopologySuite("2.5.0"), LibraryReferences.SqlServerBytes("2.1.0"))
+        );
+
+        probe.IsBelowTheFloor(SqlLibrary.NetTopologySuite, DatabaseEngine.PostgreSql).ShouldBeFalse();
+        probe.IsBelowTheFloor(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer).ShouldBeFalse();
     }
 
     [Theory]
