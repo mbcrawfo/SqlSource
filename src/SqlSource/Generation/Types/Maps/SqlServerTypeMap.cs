@@ -32,8 +32,9 @@ internal static class SqlServerTypeMap
     /// The C# type of <paramref name="type" /> under <paramref name="column" />.  At each level,
     /// <paramref name="overrideOf" /> is asked first, then <paramref name="libraries" />, the rows of the libraries
     /// that are on, or none when it is null, then the map's row.  A type with a user type is asked by the user type's
-    /// key, and an alias type then maps as its base; a CLR type of <c>sys</c> is a row by its name, and any other is
-    /// unreadable, and neither takes a library's row.  Never throws.
+    /// key, and an alias type then maps as its base; a CLR type is asked of <paramref name="libraries" /> after the
+    /// override, which has rows for the spatial types of <c>sys</c> alone, then a CLR type of <c>sys</c> is a row by
+    /// its name, and any other is unreadable.  Never throws.
     /// </summary>
     public static TypeMapping Map(
         SqlServerType type,
@@ -53,6 +54,11 @@ internal static class SqlServerTypeMap
             if (string.IsNullOrEmpty(userType.AssemblyQualifiedName))
             {
                 return Map(type with { UserType = null }, column, overrideOf, libraries);
+            }
+
+            if (libraries?.Find(type) is { } clrFromLibrary)
+            {
+                return clrFromLibrary;
             }
 
             // Only the CLR types are rows by their name: an assembly-qualified sys.int is not int.

@@ -660,6 +660,19 @@ internal static class QueryTyper
                 typeName,
                 "Reference Npgsql"
             ),
+            // A spatial type, which NetTopologySuite's row reads in a CodeGen query, or the package's type.
+            TypeMappingKind.NeedsSqlServerTypes when SqlServerNames.IsSpatial(key) => DiagnosticInfo.Create(
+                SqlDiagnostics.TypeHasNoCSharpType,
+                at,
+                subject,
+                typeName,
+                "Reference NetTopologySuite.IO.SqlServerBytes and turn the netTopologySuite library on, to read it as "
+                    + "NetTopologySuite's Geometry in a codegen query, or reference the package "
+                    + "Microsoft.SqlServer.Types and map it with the type override, as "
+                    + key
+                    + "="
+                    + failure.Detail
+            ),
             // A type of the package, which SqlClient reads only when the application references it.
             TypeMappingKind.NeedsSqlServerTypes => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,

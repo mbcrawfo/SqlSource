@@ -177,8 +177,9 @@ public sealed class QueryTyperTests
             ),
             "column 'c0'",
             "geography",
-            "Reference the package Microsoft.SqlServer.Types and map it with the type override, as "
-                + "geography=Microsoft.SqlServer.Types.SqlGeography"
+            "Reference NetTopologySuite.IO.SqlServerBytes and turn the netTopologySuite library on, to read it as "
+                + "NetTopologySuite's Geometry in a codegen query, or reference the package Microsoft.SqlServer.Types "
+                + "and map it with the type override, as geography=Microsoft.SqlServer.Types.SqlGeography"
         );
 
     [Fact]

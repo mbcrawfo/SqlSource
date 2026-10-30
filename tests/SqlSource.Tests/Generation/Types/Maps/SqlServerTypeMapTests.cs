@@ -338,6 +338,10 @@ public sealed class SqlServerTypeMapTests
 
     private static LibraryRows NodaTimeOn => LibraryRows.Of([SqlLibrary.NodaTime])!;
 
+    private const string Geometry = "global::NetTopologySuite.Geometries.Geometry";
+
+    private static LibraryRows NetTopologySuiteOn => LibraryRows.Of([SqlLibrary.NetTopologySuite])!;
+
     [Theory]
     [MemberData(nameof(NodaTimeRows))]
     public void Map_NodaTimeOn_GivesEachRow(string name, string expected)
@@ -447,6 +451,73 @@ public sealed class SqlServerTypeMapTests
             mapping.Kind.ShouldNotBe(TypeMappingKind.Mapped);
             mapping.Library.ShouldBeNull();
         }
+    }
+
+    // SQL Server's spatial CLR types of sys are NetTopologySuite's Geometry, by their name ignoring case, with the
+    // library as their place.
+    [Theory]
+    [InlineData("geography", "geography")]
+    [InlineData("geometry", "geometry")]
+    [InlineData("Geography", "geography")]
+    public void Map_NetTopologySuiteOn_SpatialClrTypeOfSysIsGeometry(string name, string key)
+    {
+        var type = TestSidecars.SqlServer(name: name, userType: new SqlServerUserType("sys", name, Assembly));
+
+        var mapping = SqlServerTypeMap.Map(type, SqlClientColumn.SqlClient7, libraries: NetTopologySuiteOn);
+
+        ShouldMapTo(mapping, Geometry, false, key);
+        mapping.Detail.ShouldBe("the NetTopologySuite library");
+        mapping.Library.ShouldBe(SqlLibrary.NetTopologySuite);
+    }
+
+    // Only a CLR type of sys named geography or geometry takes the row: not hierarchyid, not a user's CLR type of that
+    // name, and not a type without its user type, which only a sidecar edited by hand has.
+    [Fact]
+    public void Map_NetTopologySuiteOn_OtherTypesTakeNoRow()
+    {
+        var hierarchyId = TestSidecars.SqlServer(
+            name: "hierarchyid",
+            userType: new SqlServerUserType("sys", "hierarchyid", Assembly)
+        );
+        var users = TestSidecars.SqlServer(
+            name: "geography",
+            userType: new SqlServerUserType("dbo", "geography", Assembly)
+        );
+        var bare = TestSidecars.SqlServer(name: "geography");
+
+        foreach (var type in new[] { hierarchyId, users, bare })
+        {
+            var mapping = SqlServerTypeMap.Map(type, SqlClientColumn.SqlClient7, libraries: NetTopologySuiteOn);
+
+            mapping.Kind.ShouldNotBe(TypeMappingKind.Mapped);
+            mapping.Library.ShouldBeNull();
+        }
+
+        NodaTimeOn
+            .Find(
+                TestSidecars.SqlServer(name: "geography", userType: new SqlServerUserType("sys", "geography", Assembly))
+            )
+            .ShouldBeNull();
+    }
+
+    // The type override is asked first, by the CLR type's key, and wins over the row.
+    [Fact]
+    public void Map_OverrideAndNetTopologySuite_OverrideWins()
+    {
+        var geography = TestSidecars.SqlServer(
+            name: "geography",
+            userType: new SqlServerUserType("sys", "geography", Assembly)
+        );
+
+        var mapping = SqlServerTypeMap.Map(
+            geography,
+            SqlClientColumn.SqlClient7,
+            Overrides(("geography", "global::NetTopologySuite.Geometries.Point")),
+            NetTopologySuiteOn
+        );
+
+        mapping.Text.ShouldBe("global::NetTopologySuite.Geometries.Point");
+        mapping.Library.ShouldBeNull();
     }
 
     private static bool IsClr(string name) => name is "hierarchyid" or "geography" or "geometry";

@@ -46,6 +46,16 @@ public sealed class LibraryTypeTests
         + "SqlSource cannot give a C# type.  Reference Npgsql.NetTopologySuite to read it as NetTopologySuite's "
         + "Geometry in a codegen query, or map it with the type override, as public.geometry=<a C# type>.";
 
+    private const string ListPlaces = "-- name: ListPlaces\nSELECT place, shape FROM places;\n";
+
+    // SQLSRC246 of ListPlaces's column place, SQL Server's geography, whose help names NetTopologySuite's package.
+    private const string PlaceHasNoCSharpType =
+        $"SQLSRC246 {GeneratorHarness.UsersPath}(1,10)-(1,20): The column 'place' has the type 'geography', which "
+        + "SqlSource cannot give a C# type.  Reference NetTopologySuite.IO.SqlServerBytes and turn the "
+        + "netTopologySuite library on, to read it as NetTopologySuite's Geometry in a codegen query, or reference the "
+        + "package Microsoft.SqlServer.Types and map it with the type override, as "
+        + "geography=Microsoft.SqlServer.Types.SqlGeography.";
+
     private static readonly PostgresType Timestamptz = Catalog("timestamptz") with
     {
         Name = "timestamp with time zone",
@@ -94,6 +104,15 @@ public sealed class LibraryTypeTests
             NpgsqlReferences.Npgsql10,
             LibraryReferences.NetTopologySuite("2.6.0"),
             LibraryReferences.NpgsqlNetTopologySuite("10.0.3"),
+        ];
+
+    // SqlClient, NetTopologySuite and its reader and writer of SQL Server's bytes, with which the library can be on
+    // under mssql.
+    private static MetadataReference[] WithSqlServerBytes =>
+        [
+            SqlClientReferences.SqlClient7,
+            LibraryReferences.NetTopologySuite("2.6.0"),
+            LibraryReferences.SqlServerBytes("2.1.0"),
         ];
 
     // Npgsql, NodaTime and the plugin, which turn the library on by default.
@@ -759,6 +778,93 @@ public sealed class LibraryTypeTests
         run.Sources[MethodRuns.MethodsFile].ShouldContain("reader.GetFieldValue<" + Point + ">(0)");
     }
 
+    // SQL Server's geography and geometry, CLR types of sys, under NetTopologySuite's row when the library is on, which
+    // it is on SQL Server only when something says so.  Without the library neither has a C# type, so the row stays,
+    // with nothing beside it, and the query keeps the failure of its first column for a claim at Models.
+    [Fact]
+    public void Run_SqlServerSpatialWithLibraryOn_IsGeometry()
+    {
+        var run = RunPlaces(WithSqlServerBytes, NetTopologySuiteIs("on"));
+
+        run.ShouldBeClean();
+        var query = QueryOf(run);
+        query.Columns.ShouldNotBeNull().Select(column => column.Text).ShouldBe([Geometry, Geometry]);
+        query.Columns.Value.Select(column => column.Key).ShouldBe(["geography", "geometry"]);
+        foreach (var column in query.Columns.Value)
+        {
+            column.Library.ShouldBe(SqlLibrary.NetTopologySuite);
+            column.Place.ShouldBe("the NetTopologySuite library");
+            column.WithoutLibrary.ShouldBeNull();
+        }
+
+        var failure = query.WithoutLibraryFailure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC246");
+        failure.Arguments[0].ShouldBe("column 'place'");
+        StepOutputs.Single<FileTypes>(run, TrackingNames.FileTypes).Diagnostics.ShouldBeEmpty();
+    }
+
+    // Off by default on SQL Server, with the packages or without them: the columns have no C# type, and the help names
+    // NetTopologySuite's package and the library as well as Microsoft.SqlServer.Types.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Run_SqlServerSpatialWithLibraryOff_Reports246WithTheNewHelp(bool referenced)
+    {
+        var run = RunPlaces(referenced ? WithSqlServerBytes : [SqlClientReferences.SqlClient7]);
+
+        run.Diagnostics.ShouldBe([PlaceHasNoCSharpType]);
+        StepOutputs.Single<FileTypes>(run, TrackingNames.FileTypes).Queries.ShouldBeEmpty();
+    }
+
+    // hierarchyid has no row of NetTopologySuite, and its help names Microsoft.SqlServer.Types alone.
+    [Fact]
+    public void Run_HierarchyId_KeepsItsHelp()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListNodes\nSELECT node FROM tree;\n");
+        var entry = MethodRuns.SqlServerEntry(
+            file,
+            "ListNodes",
+            [],
+            [TestSidecars.Column(0, "node", SqlServerClr("hierarchyid"), nullable: true)]
+        );
+
+        var run = MethodRuns.RunSqlServer(
+            file,
+            [entry],
+            references: WithSqlServerBytes,
+            settings: NetTopologySuiteIs("on")
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GeneratorHarness.UsersPath}(1,10)-(1,19): The column 'node' has the type 'hierarchyid', "
+                + "which SqlSource cannot give a C# type.  Reference the package Microsoft.SqlServer.Types and map "
+                + "it with the type override, as hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId.",
+        ]);
+    }
+
+    // A claim at Models reads no library's type, and SQL Server's spatial types have no other: the query gets
+    // SQLSRC246 and no models, as without the library.
+    [Fact]
+    public void Run_ModelsClaimOfSqlServerSpatial_Reports246()
+    {
+        const string Models = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                public partial class Rows;
+            }
+            """;
+
+        var run = RunPlaces(WithSqlServerBytes, NetTopologySuiteIs("on"), Models);
+
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Diagnostics.ShouldBe([PlaceHasNoCSharpType]);
+        ModelFiles(run).ShouldBeEmpty();
+        QueryOf(run).Columns.ShouldNotBeNull().Select(column => column.Text).ShouldBe([Geometry, Geometry]);
+    }
+
     // ListEvents of the file, or the query of the name, whose one column, at, is a timestamptz read from
     // public.events.at.
     private static SidecarEntry EventsEntry(SqlFile file, string name = "ListEvents") =>
@@ -771,6 +877,40 @@ public sealed class LibraryTypeTests
     // A base type of PostGIS, in the schema.
     private static PostgresType Postgis(string schema, string internalName) =>
         TestSidecars.Postgres(name: internalName, schema: schema, internalName: internalName);
+
+    // A CLR type of sys, as the tool describes one: its name, and its user type of the same name with its assembly.
+    private static SqlServerType SqlServerClr(string name) =>
+        TestSidecars.SqlServer(
+            name,
+            maxLength: -1,
+            precision: 0,
+            userType: new SqlServerUserType("sys", name, "Microsoft.SqlServer.Types, Version=11.0.0.0")
+        );
+
+    // ListPlaces under mssql, whose columns are place, a nullable geography, and shape, a geometry, with these
+    // references, the project's settings and the source.
+    private static GeneratorRun RunPlaces(
+        MetadataReference[] references,
+        string? settings = null,
+        string source = MethodRuns.Source
+    )
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, ListPlaces);
+        var entry = MethodRuns.SqlServerEntry(
+            file,
+            "ListPlaces",
+            [],
+            [
+                TestSidecars.Column(0, "place", SqlServerClr("geography"), nullable: true),
+                TestSidecars.Column(1, "shape", SqlServerClr("geometry"), nullable: false),
+            ]
+        );
+        return MethodRuns.RunSqlServer(file, [entry], source, references, settings);
+    }
+
+    // The settings of the library types that say this of NetTopologySuite.
+    private static string NetTopologySuiteIs(string state) =>
+        Settings("libraryTypes", new JsonObject { ["netTopologySuite"] = state });
 
     // The one query of the run's one file.
     private static QueryTypes QueryOf(GeneratorRun run) =>
