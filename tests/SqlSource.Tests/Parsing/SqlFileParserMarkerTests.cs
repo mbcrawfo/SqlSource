@@ -6,6 +6,7 @@ using SqlSource.Parsing;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using Xunit;
 using static SqlSource.Tests.Parsing.ParseOf;
@@ -278,6 +279,102 @@ public sealed class SqlFileParserMarkerTests
                         + "exactly"
                 ),
             ]);
+    }
+
+    // The header says off and the query on: the query's entry is its own, and a query with no marker has the header's.
+    [Fact]
+    public void LibraryTypes_InTheHeaderAndAQuery_MergePerLibrary()
+    {
+        var blocks = Blocks(
+            "-- library-types: nodatime=off\n-- name: A\n-- library-types: nodatime=on\nSELECT 1\n"
+                + "-- name: B\nSELECT 2\n"
+        );
+
+        var query = LibraryEntry(blocks[0]);
+        query.State.ShouldBe(LibraryState.On);
+        query.Place.ShouldBe(SettingPlace.Query);
+        var header = LibraryEntry(blocks[1]);
+        header.State.ShouldBe(LibraryState.Off);
+        header.Place.ShouldBe(SettingPlace.FileHeader);
+    }
+
+    [Fact]
+    public void LibraryTypes_OfAFileWithNoName_IsAtTheQuery()
+    {
+        var entry = LibraryEntry(Blocks("-- library-types: nodatime=default\nSELECT 1\n").ShouldHaveSingleItem());
+
+        entry.State.ShouldBe(LibraryState.Default);
+        entry.Place.ShouldBe(SettingPlace.Query);
+    }
+
+    // There is one library today, so the only entries that can share a line are the same one twice, which is no
+    // conflict.
+    [Fact]
+    public void LibraryTypes_SeveralEntriesOnOneLine()
+    {
+        var block = Blocks("-- name: Q\n-- library-types: nodatime=on   nodatime=on\nSELECT 1\n")
+            .ShouldHaveSingleItem();
+
+        block.Markers.LibraryTypes.ShouldNotBeNull().Count.ShouldBe(1);
+        LibraryEntry(block).State.ShouldBe(LibraryState.On);
+    }
+
+    [Theory]
+    [InlineData("nodatime")]
+    [InlineData("nodatime=maybe")]
+    [InlineData("json=on")]
+    [InlineData("=on")]
+    [InlineData("")]
+    public void LibraryTypes_Invalid_IsSQLSRC111(string value)
+    {
+        var text = "-- name: Q\n-- library-types:" + (value.Length == 0 ? "" : " " + value) + "\nSELECT 1\n";
+
+        var error = Errors(text).ShouldHaveSingleItem();
+
+        error.Kind.ShouldBe(SqlParseErrorKind.InvalidMarkerValue);
+        error.Arguments[0].ShouldBe(value.Length == 0 ? "library-types:" : "library-types: " + value);
+        error.Arguments[1].ShouldContain("nodatime");
+        error.Arguments[1].ShouldContain("default");
+        error.Span.ShouldBe(value.Length == 0 ? TextSpans.Of(text, "-- library-types:") : TextSpans.Of(text, value));
+    }
+
+    [Fact]
+    public void LibraryTypes_ConflictInAScope_IsSQLSRC112()
+    {
+        const string Text = "-- name: Q\n-- library-types: nodatime=on\n-- library-types: nodatime=off\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ConflictingSettings,
+                    TextSpans.Of(Text, "nodatime=off"),
+                    "library-types: nodatime=off"
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void LibraryTypes_EntryCarriesTheMarkersLineSpan()
+    {
+        const string Text = "-- library-types: nodatime=off\n\n-- name: Q\n-- library-types:   nodatime=on\nSELECT 1\n";
+
+        var blocks = Blocks(Text);
+        var query = LibraryEntry(blocks[0]);
+
+        query.Span.ShouldBe(TextSpans.Of(Text, "-- library-types:   nodatime=on"));
+        query.LineSpan.ShouldBe(new LinePositionSpan(new LinePosition(3, 0), new LinePosition(3, 31)));
+    }
+
+    [Fact]
+    public void LibraryTypes_EntryOfTheHeader_CarriesTheMarkersLineSpan()
+    {
+        const string Text = "\n-- library-types: nodatime=off\n-- name: Q\nSELECT 1\n";
+
+        var entry = LibraryEntry(Blocks(Text).ShouldHaveSingleItem());
+
+        entry.Span.ShouldBe(TextSpans.Of(Text, "-- library-types: nodatime=off"));
+        entry.LineSpan.ShouldBe(new LinePositionSpan(new LinePosition(1, 0), new LinePosition(1, 30)));
+        entry.Place.ShouldBe(SettingPlace.FileHeader);
     }
 
     [Fact]
@@ -764,6 +861,9 @@ public sealed class SqlFileParserMarkerTests
                 new ColumnType("POSTS.ID", "Other", SettingPlace.FileHeader),
                 new ColumnType("posts.id", "PostId", SettingPlace.FileHeader),
             ]);
+
+    private static LibrarySetting LibraryEntry(SqlBlock block) =>
+        LibrarySettings.Find(block.Markers.LibraryTypes.ShouldNotBeNull(), SqlLibrary.NodaTime).ShouldNotBeNull();
 
     private static string[] Columns(SqlBlock block) =>
         [.. block.ColumnMarkers.Select(static column => column.Name + ":" + Nullability(column.IsNullable))];

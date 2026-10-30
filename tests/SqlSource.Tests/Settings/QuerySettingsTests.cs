@@ -1,6 +1,9 @@
+using System;
+using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Testing.Snapshot;
 using Xunit;
@@ -299,6 +302,53 @@ public sealed class QuerySettingsTests
                 new ColumnType("users.id", null, SettingPlace.FileHeader),
             ]);
     }
+
+    // The levels merge per library: the nearer one's entry for a library it names, whatever its state, and the
+    // farther one's for any it does not.  An entry of default stays, so that it hides the farther level's.
+    [Theory]
+    [InlineData("On", "Off", "On", "Query")]
+    [InlineData("Off", "On", "Off", "Query")]
+    [InlineData("Default", "On", "Default", "Query")]
+    [InlineData("Default", "Off", "Default", "Query")]
+    [InlineData("On", "Default", "On", "Query")]
+    public void Over_LibraryTypes_TakeTheNearerLevelsEntryOfALibrary(
+        string near,
+        string far,
+        string state,
+        string placeName
+    )
+    {
+        var nearer = Libraries(Enum.Parse<LibraryState>(near), SettingPlace.Query);
+        var farther = Libraries(Enum.Parse<LibraryState>(far), SettingPlace.FileHeader);
+
+        var entry = LibrarySettings.Find(nearer.Over(farther).LibraryTypes.ShouldNotBeNull(), SqlLibrary.NodaTime);
+
+        entry.ShouldNotBeNull().State.ShouldBe(Enum.Parse<LibraryState>(state));
+        entry.Place.Kind.ShouldBe(Enum.Parse<SettingPlaceKind>(placeName));
+    }
+
+    [Fact]
+    public void Over_LibraryTypesOfOnlyOneLevel_AreThatLevelsItself()
+    {
+        var entries = Libraries(LibraryState.On, SettingPlace.FileHeader);
+
+        SettingsLevel.None.Over(entries).LibraryTypes.ShouldBe(entries.LibraryTypes);
+        entries.Over(SettingsLevel.None).LibraryTypes.ShouldBe(entries.LibraryTypes);
+    }
+
+    private static SettingsLevel Libraries(LibraryState state, SettingPlace place) =>
+        new()
+        {
+            LibraryTypes = new EquatableArray<LibrarySetting>([
+                new LibrarySetting(
+                    SqlLibrary.NodaTime,
+                    state,
+                    place,
+                    new TextSpan(0, 10),
+                    new LinePositionSpan(new LinePosition(0, 0), new LinePosition(0, 10))
+                ),
+            ]),
+        };
 
     private static SettingsLevel Overrides(params TypeOverride[] entries) =>
         new() { TypeOverrides = TestSidecars.Of(entries) };

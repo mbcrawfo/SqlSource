@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 using SqlSource.Settings.ClrTypes;
 using SqlSource.Settings.ColumnTypes;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 
 namespace SqlSource.Parsing.Markers;
@@ -72,6 +74,9 @@ internal sealed class SqlMarkerScope(
 
     // The column types of the file's header: sorted by key as ColumnTypeMap keeps a map, each key once.
     private List<ColumnType>? _columnTypes;
+
+    // The library types of the scope: sorted by library as LibrarySettings keeps them, each library once.
+    private List<LibrarySetting>? _libraryTypes;
 
     /// <summary>The scope's generator parameters.</summary>
     public SqlGeneratorParameterScope Generator { get; } = new();
@@ -158,6 +163,9 @@ internal sealed class SqlMarkerScope(
             case SqlMarkerKind.TypeOverride:
                 ReadTypeOverride(marker);
                 break;
+            case SqlMarkerKind.LibraryTypes:
+                ReadLibraryTypes(marker);
+                break;
             case SqlMarkerKind.InputModelSuffix:
                 SetText(ref _inputModelSuffix, marker, SettingValue.IsSuffix(Value(marker)));
                 break;
@@ -225,7 +233,8 @@ internal sealed class SqlMarkerScope(
                 or SqlMarkerKind.CollectionType
                 or SqlMarkerKind.InputModel
                 or SqlMarkerKind.OutputModel
-                or SqlMarkerKind.TypeOverride;
+                or SqlMarkerKind.TypeOverride
+                or SqlMarkerKind.LibraryTypes;
 
     internal static bool IsAllowedInPreamble(SqlMarkerKind kind) =>
         kind
@@ -239,7 +248,8 @@ internal sealed class SqlMarkerScope(
                 or SqlMarkerKind.OutputModelType
                 or SqlMarkerKind.CollectionType
                 or SqlMarkerKind.TypeOverride
-                or SqlMarkerKind.Column;
+                or SqlMarkerKind.Column
+                or SqlMarkerKind.LibraryTypes;
 
     private SettingsLevel BuildLevel()
     {
@@ -255,6 +265,7 @@ internal sealed class SqlMarkerScope(
             && _collectionType is null
             && _typeOverrides is null
             && _columnTypes is null
+            && _libraryTypes is null
         )
         {
             return SettingsLevel.None;
@@ -277,6 +288,9 @@ internal sealed class SqlMarkerScope(
             TypeOverrides = isSqlServer ? null : typeOverrides,
             SqlServerTypeOverrides = isSqlServer ? typeOverrides : null,
             ColumnTypes = _columnTypes is null ? null : new EquatableArray<ColumnType>(_columnTypes.ToImmutableArray()),
+            LibraryTypes = _libraryTypes is null
+                ? null
+                : new EquatableArray<LibrarySetting>(_libraryTypes.ToImmutableArray()),
         };
     }
 
@@ -347,6 +361,86 @@ internal sealed class SqlMarkerScope(
             AddConflict(marker);
         }
     }
+
+    // The value is entries separated by white space, each a library, an "=" and a state.  The entries of a scope add
+    // up, one for each library; the same state twice is fine, and another state for a library is a conflict, the first
+    // standing.  An entry that is not valid is reported once for the marker, and the entries after it are not read.  An
+    // entry has the span and the lines of the whole marker, which is what a diagnostic about it points at.  A file's
+    // header is the place of its preamble's entries.
+    private void ReadLibraryTypes(SqlMarker marker)
+    {
+        var place = scopeKind == SqlScopeKind.Preamble ? SettingPlace.FileHeader : SettingPlace.Query;
+        var rest = Value(marker).TrimStart();
+        if (rest.IsEmpty)
+        {
+            AddInvalid(marker, LibraryTypesHelp());
+            return;
+        }
+
+        while (!rest.IsEmpty)
+        {
+            var length = 0;
+            while (length < rest.Length && !char.IsWhiteSpace(rest[length]))
+            {
+                length++;
+            }
+
+            if (!LibrarySettings.TryReadEntry(rest.Slice(0, length), out var library, out var state))
+            {
+                AddInvalid(marker, LibraryTypesHelp());
+                return;
+            }
+
+            rest = rest.Slice(length).TrimStart();
+            if (FindLibraryType(library) is not { } existing)
+            {
+                AddLibraryType(
+                    new LibrarySetting(library, state, place, marker.Span, TextLines.LineSpanOf(text, marker.Span))
+                );
+            }
+            else if (existing.State != state)
+            {
+                AddConflict(marker);
+            }
+        }
+    }
+
+    private LibrarySetting? FindLibraryType(SqlLibrary library)
+    {
+        if (_libraryTypes is null)
+        {
+            return null;
+        }
+
+        foreach (var entry in _libraryTypes)
+        {
+            if (entry.Library == library)
+            {
+                return entry;
+            }
+        }
+
+        return null;
+    }
+
+    private void AddLibraryType(LibrarySetting entry)
+    {
+        var entries = _libraryTypes ??= [];
+        var index = 0;
+        while (index < entries.Count && entries[index].Library < entry.Library)
+        {
+            index++;
+        }
+
+        entries.Insert(index, entry);
+    }
+
+    // The libraries and the states, as the message names them: what the user can write.
+    private static string LibraryTypesHelp() =>
+        ".  Write name=state, such as nodatime=on, separated by spaces: the libraries are "
+        + string.Join(", ", Enum.GetValues(typeof(SqlLibrary)).Cast<SqlLibrary>().Select(SettingValue.NameOf))
+        + " and the states are "
+        + string.Join(", ", Enum.GetValues(typeof(LibraryState)).Cast<LibraryState>().Select(SettingValue.NameOf));
 
     // The value is exactly one token with a default, as the SQL would write it.  The default is lexed alone, as the
     // parameter list reads it later: a quote or a comment that does not close inside it would swallow what follows.
