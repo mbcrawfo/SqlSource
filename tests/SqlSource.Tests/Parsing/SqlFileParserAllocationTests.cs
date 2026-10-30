@@ -21,7 +21,15 @@ public sealed class SqlFileParserAllocationTests
     // each character when this budget was set.  It is a budget of its own, with the same room and the same rule.
     private const double BudgetInBytesPerCharacterWithComments = 24;
 
+    // A query with a marker of its own, other than -- name: and -- summary:, which the parser reads itself, has a scope
+    // of its own, which a parse of this file, whose queries have none, does not make.  A -- param: on each query added
+    // 712 bytes a query to the parse when this budget was set, the same in Debug, in Release and under coverage: its
+    // line, its scope and its declaration.  It is a budget of its own, with the same room and the same rule.
+    private const double BudgetInBytesPerQueryForAParam = 750;
+
     private const int Queries = 50;
+
+    private const int Iterations = 20;
 
     [Theory]
     [InlineData(nameof(SqlDialect.Ansi), false, false)]
@@ -35,10 +43,31 @@ public sealed class SqlFileParserAllocationTests
     [InlineData(nameof(SqlDialect.Ansi), false, true)]
     public void Parse_TypicalFile_AllocatesWithinItsBudget(string dialectName, bool hasDialect, bool keepsComments)
     {
-        const int Iterations = 20;
         var dialect = Enum.Parse<SqlDialect>(dialectName);
-        var text = CreateFile(hasDialect, keepsComments);
-        SqlFileParser.Parse(text, "Queries.sql", dialect).Blocks.Count.ShouldBe(Queries);
+        var text = CreateFile(hasDialect, keepsComments, hasParams: false);
+
+        (AllocatedByAParse(text, dialect) / text.Length).ShouldBeLessThan(
+            keepsComments ? BudgetInBytesPerCharacterWithComments : BudgetInBytesPerCharacter
+        );
+    }
+
+    [Fact]
+    public void Parse_QueriesWithAParamEach_AllocateWithinTheirBudgetForTheParam()
+    {
+        var plain = CreateFile(hasDialect: false, keepsComments: false, hasParams: false);
+        var withParams = CreateFile(hasDialect: false, keepsComments: false, hasParams: true);
+
+        var added = AllocatedByAParse(withParams, SqlDialect.Ansi) - AllocatedByAParse(plain, SqlDialect.Ansi);
+
+        (added / Queries).ShouldBeLessThan(BudgetInBytesPerQueryForAParam);
+    }
+
+    // The bytes that one parse of the file allocates, as an average over a number of parses.
+    private static double AllocatedByAParse(string text, SqlDialect dialect)
+    {
+        var parsed = SqlFileParser.Parse(text, "Queries.sql", dialect);
+        parsed.Blocks.Count.ShouldBe(Queries);
+        parsed.Errors.ShouldBeEmpty();
 
         // The first parses pay for one-off work: JIT compilation, static initialisers and the shared buffer pool.
         for (var iteration = 0; iteration < Iterations; iteration++)
@@ -52,16 +81,12 @@ public sealed class SqlFileParserAllocationTests
             _ = SqlFileParser.Parse(text, "Queries.sql", dialect);
         }
 
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-
-        (allocated / (double)(Iterations * text.Length)).ShouldBeLessThan(
-            keepsComments ? BudgetInBytesPerCharacterWithComments : BudgetInBytesPerCharacter
-        );
+        return (GC.GetAllocatedBytesForCurrentThread() - before) / (double)Iterations;
     }
 
     // A file like the ones the generator is written for: a preamble, and queries that mix line comments, block
-    // comments, string literals, tokens and blank lines.
-    private static string CreateFile(bool hasDialect, bool keepsComments)
+    // comments, string literals, tokens and blank lines.  With params, each query declares its parameter in a marker.
+    private static string CreateFile(bool hasDialect, bool keepsComments, bool hasParams)
     {
         var file = new StringBuilder("-- Copyright (c) Example\n")
             .Append(hasDialect ? "-- dialect: postgres\n" : string.Empty)
@@ -75,6 +100,7 @@ public sealed class SqlFileParserAllocationTests
                 .Append("\n-- summary: Loads the rows for report ")
                 .Append(number)
                 .Append(".\n")
+                .Append(hasParams ? "-- param: @from timestamptz\n" : string.Empty)
                 .Append("SELECT u.id, u.name, u.email, /* inline note */ o.total -- trailing note\n")
                 .Append("FROM {{schema}}.users AS u\n")
                 .Append("    INNER JOIN {{schema}}.orders AS o ON o.user_id = u.id -- join\n")
