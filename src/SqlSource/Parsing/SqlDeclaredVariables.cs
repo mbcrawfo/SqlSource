@@ -147,7 +147,7 @@ internal sealed class SqlDeclaredVariables
     {
         foreach (var variable in _names)
         {
-            if (name.Equals(_text.AsSpan(variable.Start, variable.Length), StringComparison.OrdinalIgnoreCase))
+            if (name.Equals(_text.AsSpan(variable.Start, variable.Length), SqlParameterName.Comparison))
             {
                 return true;
             }

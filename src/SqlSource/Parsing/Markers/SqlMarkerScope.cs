@@ -495,7 +495,7 @@ internal sealed class SqlMarkerScope(
         _declarations ??= [];
         foreach (var existing in _declarations)
         {
-            if (!string.Equals(existing.Name, name, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(existing.Name, name, SqlParameterName.Comparison))
             {
                 continue;
             }

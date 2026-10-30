@@ -59,7 +59,7 @@ internal static class SqlParameterList
             {
                 (inDefaults ??= []).Add(new DefaultParameter(sql.Text, span, -1));
             }
-            else if (IndexOf(parameters, sql.Text.AsSpan(name.Start, name.Length)) < 0)
+            else if (SqlParameterName.IndexOf(parameters, sql.Text.AsSpan(name.Start, name.Length)) < 0)
             {
                 parameters.Add(new SqlQueryParameter(NameOf(sql.Text, span), null, null, false));
             }
@@ -113,7 +113,7 @@ internal static class SqlParameterList
         List<SqlParseError> errors
     )
     {
-        var index = IndexOf(parameters, declaration.Name.AsSpan());
+        var index = SqlParameterName.IndexOf(parameters, declaration.Name.AsSpan());
         if (index >= 0)
         {
             parameters[index] = parameters[index] with
@@ -155,7 +155,7 @@ internal static class SqlParameterList
         {
             var nameSpan = SqlParameterName.Of(parameter.Span);
             var name = parameter.Text.AsSpan(nameSpan.Start, nameSpan.Length);
-            if (IndexOf(parameters, name) >= 0 || variables?.Holds(name) == true)
+            if (SqlParameterName.IndexOf(parameters, name) >= 0 || variables?.Holds(name) == true)
             {
                 continue;
             }
@@ -189,19 +189,6 @@ internal static class SqlParameterList
     {
         var name = SqlParameterName.Of(span);
         return text.Substring(name.Start, name.Length);
-    }
-
-    private static int IndexOf(ImmutableArray<SqlQueryParameter>.Builder parameters, ReadOnlySpan<char> name)
-    {
-        for (var index = 0; index < parameters.Count; index++)
-        {
-            if (name.Equals(parameters[index].Name.AsSpan(), StringComparison.OrdinalIgnoreCase))
-            {
-                return index;
-            }
-        }
-
-        return -1;
     }
 
     // A parameter inside a default: in the SQL (Offset is -1) or in the text of a marker's default, which starts at
