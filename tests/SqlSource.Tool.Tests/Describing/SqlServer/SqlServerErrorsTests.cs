@@ -4,6 +4,7 @@ using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Statements;
 using SqlSource.Tool.Testing;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
@@ -339,7 +340,7 @@ public sealed class SqlServerErrorsTests
     {
         var failure = SqlServerErrors.Failed(
             Of(SqlDialectRules.SqlServer, "SELECT @p AS p"),
-            new SqlServerServerError([new SqlServerErrorRow(0, 0, 0, ConnectionErrors.LostConnection)]),
+            new SqlServerServerError([new SqlServerErrorRow(0, 0, 0, ConnectionTexts.LostConnection)]),
             DescribeStep.DescribeParameters
         );
 
@@ -355,7 +356,7 @@ public sealed class SqlServerErrorsTests
         SqlServerErrors
             .Failed(
                 Of(SqlDialectRules.SqlServer, "SELECT @p AS p"),
-                new SqlServerServerError([new SqlServerErrorRow(-2, 11, 0, ConnectionErrors.NoAnswerInTime)]),
+                new SqlServerServerError([new SqlServerErrorRow(-2, 11, 0, ConnectionTexts.NoAnswerInTime)]),
                 DescribeStep.ResolveType
             )
             .Step.ShouldBe(DescribeStep.ResolveType);

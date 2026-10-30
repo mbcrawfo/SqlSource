@@ -1,11 +1,10 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Security.Authentication;
 using Npgsql;
 using Shouldly;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
 
@@ -19,8 +18,6 @@ public sealed class ConnectionErrorsTests
 {
     private const string Host = "10.0.0.5";
     private const string User = "sqlsrc_wombat";
-
-    public static TheoryData<string> OwnTexts => [.. PostgresConnection.OwnTexts];
 
     [Theory]
     [InlineData("28P01", "the server refused the password")]
@@ -92,6 +89,18 @@ public sealed class ConnectionErrorsTests
             )
             .Message.ShouldBe("Npgsql could not reach the server: HostNotFound");
 
+    // A socket's error that names no reason is left out, as SqlClient's is on Linux.
+    [Fact]
+    public void AtOpen_SocketErrorOfSuccess_IsThePrefixAlone() =>
+        ConnectionErrors
+            .AtOpen(
+                new NpgsqlException(
+                    $"Failed to connect to {Host}:5432",
+                    new IOException(Host, new SocketException((int)SocketError.Success))
+                )
+            )
+            .Message.ShouldBe("Npgsql could not reach the server");
+
     [Fact]
     public void AtOpen_OtherDriverError_NamesTheTypeOfTheInnermostException() =>
         ConnectionErrors
@@ -117,35 +126,12 @@ public sealed class ConnectionErrorsTests
             .AtOpen(new NpgsqlException($"the server {Host} said something"))
             .Message.ShouldBe("Npgsql could not open a connection to the server (NpgsqlException)");
 
-    // A message of the describer's own with an inner exception is the driver's: the describer never gives one.
+    // The driver's error is the driver's, even with a message that is one of the describer's own texts.
     [Fact]
     public void AtOpen_OwnTextWithAnInnerException_IsNotPassedOn() =>
         ConnectionErrors
-            .AtOpen(new NpgsqlException(PostgresConnection.LostConnection, new IOException(Host)))
+            .AtOpen(new NpgsqlException(ConnectionTexts.LostConnection, new IOException(Host)))
             .Message.ShouldBe("Npgsql could not open a connection to the server (IOException)");
-
-    [Theory]
-    [MemberData(nameof(OwnTexts))]
-    public void AtOpen_OwnText_PassesUnchanged(string text) =>
-        ConnectionErrors
-            .AtOpen(new NpgsqlException(text))
-            .ShouldBe(new PostgresServerError(null, text, null, null, null));
-
-    [Theory]
-    [MemberData(nameof(OwnTexts))]
-    public void Of_OwnText_PassesUnchanged(string text) =>
-        ConnectionErrors.Of(new NpgsqlException(text)).ShouldBe(new PostgresServerError(null, text, null, null, null));
-
-    // The set is kept beside the constants: one that it leaves out would be answered as the driver's.
-    [Fact]
-    public void OwnTexts_EveryPublicTextOfTheConnection_IsListed() =>
-        PostgresConnection.OwnTexts.ShouldBe(
-            typeof(PostgresConnection)
-                .GetFields(BindingFlags.Public | BindingFlags.Static)
-                .Where(static field => field.IsLiteral && field.FieldType == typeof(string))
-                .Select(static field => (string)field.GetRawConstantValue()!),
-            ignoreOrder: true
-        );
 
     [Theory]
     [InlineData("08006")]
@@ -175,7 +161,7 @@ public sealed class ConnectionErrorsTests
                     new IOException(Host, new SocketException((int)SocketError.ConnectionReset))
                 )
             )
-            .ShouldBe(new PostgresServerError(null, PostgresConnection.LostConnection, null, null, null));
+            .ShouldBe(new PostgresServerError(null, ConnectionTexts.LostConnection, null, null, null));
 
     [Fact]
     public void Of_OtherServerError_KeepsItsMessageDetailHintAndPosition() =>

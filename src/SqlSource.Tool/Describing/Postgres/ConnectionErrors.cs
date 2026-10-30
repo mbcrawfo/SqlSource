@@ -8,7 +8,7 @@ namespace SqlSource.Tool.Describing.Postgres;
 
 /// <summary>
 /// What the driver threw, as the answer of a call holds it: <see cref="AtOpen" /> for <c>open</c>, and
-/// <see cref="Of" /> for every other call.
+/// <see cref="Of" /> for every other call; and the describer's own errors, <see cref="Own" />.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -18,9 +18,9 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <see cref="SocketError" /> and of an exception's type hold nothing of a connection.
 /// </para>
 /// <para>
-/// The describer's own texts, <see cref="PostgresConnection.OwnTexts" />, pass as they are: an
-/// <see cref="NpgsqlException" /> that is no <see cref="PostgresException" />, has no inner exception, and whose
-/// message is one of them.  Any other error of a later call is the server's, as it said it.
+/// The describer's own texts are thrown as a <see cref="PostgresConnection.UnusableException" />, which
+/// <c>PostgresLive.AnswerAsync</c> answers through <see cref="Own" /> before it reaches either.  Any other error of a
+/// later call is the server's, as it said it.
 /// </para>
 /// </remarks>
 internal static class ConnectionErrors
@@ -46,18 +46,12 @@ internal static class ConnectionErrors
     /// <summary>A server error of class <c>08</c> at <c>open</c>.</summary>
     public const string ConnectionRefused = "the server refused the connection";
 
-    /// <summary>Any other server error at <c>open</c>.</summary>
-    public const string SessionRefused = "the server refused to open a session";
-
     /// <summary>The driver's refusal at <c>open</c> of a server that asks for a password when none is given.</summary>
     public const string NoPassword = "the server asks for a password and the connection string gives none";
 
-    /// <summary>A driver's error at <c>open</c> with a <see cref="TimeoutException" /> in its chain.</summary>
-    public const string ConnectTimedOut = "the connection to the server timed out";
-
     /// <summary>
-    /// A driver's error at <c>open</c> with a <see cref="SocketException" /> in its chain, followed by <c>: </c>
-    /// and the name of its <see cref="SocketError" />.
+    /// A driver's error at <c>open</c> with a <see cref="SocketException" /> in its chain, as
+    /// <see cref="ConnectionTexts.Unreachable" /> writes it.
     /// </summary>
     public const string UnreachablePrefix = "Npgsql could not reach the server";
 
@@ -72,8 +66,53 @@ internal static class ConnectionErrors
     /// </summary>
     public const string SessionEnded = "the server ended the session";
 
-    /// <summary>A driver's error at a later call with a <see cref="TimeoutException" /> in its chain.</summary>
-    public const string NoAnswerInTime = "the server did not answer in time";
+    /// <summary>
+    /// What is said of a connection string the driver cannot read.  The driver's own text is not passed on: its
+    /// inner exception quotes the value.
+    /// </summary>
+    public const string UnreadableConnectionString = "Npgsql cannot read the connection string";
+
+    /// <summary>
+    /// What is said of a connection string that sets <c>Multiplexing=true</c>: the driver then shares physical
+    /// connections between commands, and a prepared statement is session state that a later command may not find.
+    /// </summary>
+    public const string MultiplexingRefused = "Multiplexing=true does not keep one session";
+
+    /// <summary>
+    /// What is said of a file that the connection string or the environment names and that cannot be read: it is
+    /// not there, its folder is not, the tool may not open it, or its path is too long.  The driver's own text is
+    /// not passed on: it quotes the path.
+    /// </summary>
+    public const string UnreadableFile = "a file that the connection string or the environment names cannot be read";
+
+    /// <summary>
+    /// What is said of a file that the connection string or the environment names and that the driver reads but
+    /// cannot use: a certificate or a key that is not in a form it knows or whose password is wrong, a password
+    /// file with a line that is not written as it wants.  The driver's own text is not passed on.
+    /// </summary>
+    public const string UnusableFile =
+        "a file that the connection string or the environment names is not what Npgsql expects: "
+        + "it is not in the right form, or its password is wrong";
+
+    /// <summary>
+    /// What is said of settings of the connection string that the driver cannot honour together, such as a
+    /// <c>Target Session Attributes</c> other than <c>Any</c> for one host.
+    /// </summary>
+    public const string UnsupportedSettings =
+        "Npgsql does not support these settings of the connection string together";
+
+    /// <summary>
+    /// What is said of a server that asks for GSS authentication on a machine where the operating system's GSS
+    /// library cannot be loaded.
+    /// </summary>
+    public const string GssUnavailable = "GSS authentication is not available on this machine";
+
+    /// <summary>
+    /// What is said of a session whose answer to <c>open</c> Npgsql cannot read as text: the driver loaded the
+    /// database's types on open with SQL that the search path changes, and an operator <c>=</c> of a user's on two
+    /// <c>oid</c> or two <c>"char"</c> before <c>pg_catalog</c> leaves it without them.
+    /// </summary>
+    public const string UnreadableTypes = "Npgsql cannot read the database's types";
 
     // How Npgsql 10.0.3 begins its message when the server asks for a password and nothing gave one.  The rest of it
     // names the method of authentication, and it has no SQLSTATE and no inner exception.
@@ -86,11 +125,6 @@ internal static class ConnectionErrors
     /// <summary>What <c>open</c> answers for what the driver threw.</summary>
     public static PostgresServerError AtOpen(NpgsqlException exception)
     {
-        if (IsOwn(exception))
-        {
-            return Fixed(null, exception.Message);
-        }
-
         if (exception is PostgresException server)
         {
             return Fixed(server.SqlState, AtOpenOf(server.SqlState));
@@ -103,29 +137,24 @@ internal static class ConnectionErrors
 
         if (ExceptionChain.Find<TimeoutException>(exception) is not null)
         {
-            return Fixed(null, ConnectTimedOut);
+            return Fixed(null, ConnectionTexts.ConnectTimedOut);
         }
 
         return ExceptionChain.Find<SocketException>(exception) is { } socket
-            ? Fixed(null, UnreachablePrefix + ": " + socket.SocketErrorCode.ToString())
+            ? Fixed(null, ConnectionTexts.Unreachable(UnreachablePrefix, socket))
             : Fixed(null, NotOpenedPrefix + " (" + Innermost(exception).GetType().Name + ")");
     }
 
     /// <summary>What a call after <c>open</c> answers for what the driver threw.</summary>
     public static PostgresServerError Of(NpgsqlException exception)
     {
-        if (IsOwn(exception))
-        {
-            return Fixed(null, exception.Message);
-        }
-
         if (exception is not PostgresException server)
         {
             return Fixed(
                 null,
                 ExceptionChain.Find<TimeoutException>(exception) is not null
-                    ? NoAnswerInTime
-                    : PostgresConnection.LostConnection
+                    ? ConnectionTexts.NoAnswerInTime
+                    : ConnectionTexts.LostConnection
             );
         }
 
@@ -138,6 +167,9 @@ internal static class ConnectionErrors
         return new PostgresServerError(server.SqlState, server.MessageText, server.Detail, server.Hint, position);
     }
 
+    /// <summary>An error of the describer's own: the text, with no SQLSTATE, detail, hint or position.</summary>
+    public static PostgresServerError Own(string text) => Fixed(null, text);
+
     private static string AtOpenOf(string sqlState) =>
         sqlState switch
         {
@@ -148,17 +180,11 @@ internal static class ConnectionErrors
             "53300" => TooManyConnections,
             "57P03" => NotAcceptingConnections,
             _ when sqlState.StartsWith("08", StringComparison.Ordinal) => ConnectionRefused,
-            _ => SessionRefused,
+            _ => ConnectionTexts.SessionRefused,
         };
 
     private static bool EndsTheSession(string sqlState) =>
         sqlState.StartsWith("08", StringComparison.Ordinal) || SessionEnding.Contains(sqlState, StringComparer.Ordinal);
-
-    // A text the describer threw itself: PostgresConnection makes each with no inner exception.
-    private static bool IsOwn(NpgsqlException exception) =>
-        exception is not PostgresException
-        && exception.InnerException is null
-        && PostgresConnection.OwnTexts.Contains(exception.Message, StringComparer.Ordinal);
 
     private static Exception Innermost(Exception exception)
     {

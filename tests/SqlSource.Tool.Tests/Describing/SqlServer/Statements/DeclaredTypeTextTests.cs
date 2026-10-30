@@ -1,9 +1,9 @@
 using Shouldly;
 using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Statements;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.SqlServer;
+namespace SqlSource.Tool.Tests.Describing.SqlServer.Statements;
 
 // The text of a -- param: type is put into a declaration the tool sends, so it is read against T-SQL's grammar of a
 // type name first: one or two parts, then (max) or one or two numbers in parentheses, and nothing else.

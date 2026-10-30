@@ -1,4 +1,5 @@
 using Shouldly;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
@@ -148,7 +149,7 @@ public sealed class SqlServerEventsTests
 
         var members = log.Events.ShouldHaveSingleItem().Members;
         NamesOf(members).ShouldBe(["query", "sql", "params", "error", "durationMs"]);
-        Member(members, "error").ShouldBe(ErrorsOf((0, 0, 0, ConnectionErrors.LostConnection)));
+        Member(members, "error").ShouldBe(ErrorsOf((0, 0, 0, ConnectionTexts.LostConnection)));
     }
 
     [Fact]
@@ -261,7 +262,7 @@ public sealed class SqlServerEventsTests
 
         var members = log.Events.ShouldHaveSingleItem().Members;
         NamesOf(members).ShouldBe(["query", "sql", "params", "error", "durationMs"]);
-        Member(members, "error").ShouldBe(ErrorsOf((0, 0, 0, ConnectionErrors.LostConnection)));
+        Member(members, "error").ShouldBe(ErrorsOf((0, 0, 0, ConnectionTexts.LostConnection)));
     }
 
     [Fact]

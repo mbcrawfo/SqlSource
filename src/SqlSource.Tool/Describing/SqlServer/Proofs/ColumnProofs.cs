@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.SqlServer.Columns;
+using SqlSource.Tool.Describing.SqlServer.Types;
 
 namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 

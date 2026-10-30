@@ -7,6 +7,7 @@ using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Columns;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 

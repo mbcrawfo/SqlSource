@@ -4,6 +4,7 @@ using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Statements;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 using static SqlSource.Tool.Tests.SqlServerScript;

@@ -45,7 +45,7 @@ internal sealed class SqlServerScript
     public static readonly SqlServerType Int = new("int", 4, 10, 0, null);
 
     public static readonly SqlServerServerError Lost = new([
-        new SqlServerErrorRow(0, 0, 0, ConnectionErrors.LostConnection),
+        new SqlServerErrorRow(0, 0, 0, ConnectionTexts.LostConnection),
     ]);
 
     // dbo.users.id as browse mode 2 describes it in the session's database.

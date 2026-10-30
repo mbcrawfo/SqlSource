@@ -187,7 +187,7 @@ public sealed class SqlServerSessionColumnTests
 
         lost.Descriptor.Id.ShouldBe("SQLSRC225");
         lost.Step.ShouldBe(DescribeStep.DescribeColumns);
-        lost.ServerLines.ShouldBe([ConnectionErrors.LostConnection]);
+        lost.ServerLines.ShouldBe([ConnectionTexts.LostConnection]);
         dynamic.Descriptor.Id.ShouldBe("SQLSRC264");
         dynamic.Step.ShouldBe(DescribeStep.DescribeColumns);
     }

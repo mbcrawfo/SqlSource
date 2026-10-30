@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Types;
 using SqlSource.Tool.Testing.Realistic;
 
 namespace SqlSource.DatabaseTests.SqlServer.Realistic;

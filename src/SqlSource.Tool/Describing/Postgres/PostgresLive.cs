@@ -266,7 +266,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
     /// <summary>Asks <c>open</c>.</summary>
     /// <remarks>
     /// Every column of the answer is text, so a column that Npgsql cannot read as a string is a session whose types
-    /// the driver could not load, which is <see cref="PostgresConnection.UnreadableTypes" />.
+    /// the driver could not load, which is <see cref="ConnectionErrors.UnreadableTypes" />.
     /// </remarks>
     public Task<PostgresOpenAnswer> OpenAsync(CancellationToken token) =>
         AnswerAsync(
@@ -294,7 +294,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
                 }
                 catch (InvalidCastException)
                 {
-                    throw new NpgsqlException(PostgresConnection.UnreadableTypes);
+                    throw new PostgresConnection.UnusableException(ConnectionErrors.UnreadableTypes);
                 }
             },
             ConnectionErrors.AtOpen,
@@ -929,9 +929,10 @@ internal sealed class PostgresLive(PostgresConnection connection)
     }
 
     /// <summary>
-    /// Runs a call and gives its answer, or the answer of the error the server, Npgsql or the connection gave.  A
-    /// cancellation passes through, and so does anything but an <see cref="NpgsqlException" />, which is a bug.
-    /// Internal for a test.
+    /// Runs a call and gives its answer, or the answer of the error the server, Npgsql or the connection gave: a
+    /// <see cref="PostgresConnection.UnusableException" /> with its text as it is, and any other
+    /// <see cref="NpgsqlException" /> through <paramref name="errorOf" />.  A cancellation passes through, and so does
+    /// anything but an <see cref="NpgsqlException" />, which is a bug.  Internal for a test.
     /// </summary>
     /// <param name="call">What the call runs.</param>
     /// <param name="errorOf">
@@ -948,6 +949,10 @@ internal sealed class PostgresLive(PostgresConnection connection)
         try
         {
             return await call();
+        }
+        catch (PostgresConnection.UnusableException exception)
+        {
+            return failed(ConnectionErrors.Own(exception.Message));
         }
         catch (NpgsqlException exception)
         {

@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.SqlServer.Types;
 
-namespace SqlSource.Tool.Describing.SqlServer;
+namespace SqlSource.Tool.Describing.SqlServer.Columns;
 
 /// <summary>
 /// The columns of a sidecar from the rows of <c>columns</c>: the server's answer as given, with the hidden rows

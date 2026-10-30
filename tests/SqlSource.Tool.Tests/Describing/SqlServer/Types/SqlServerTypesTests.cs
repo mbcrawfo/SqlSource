@@ -2,9 +2,10 @@ using System;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Types;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.SqlServer;
+namespace SqlSource.Tool.Tests.Describing.SqlServer.Types;
 
 // A SQL Server type from a row of sp_describe_undeclared_parameters or of sys.dm_exec_describe_first_result_set, a
 // parameter's, a declared parameter's or a column's: the system type name and the facets verbatim, and the user type

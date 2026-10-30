@@ -4,11 +4,11 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
-using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Statements;
 using SqlSource.Tool.Testing;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.SqlServer;
+namespace SqlSource.Tool.Tests.Describing.SqlServer.Statements;
 
 // SQL Server refuses a parameter used twice, so each use of a reused parameter is renamed to a copy of its own; the
 // copies' types are unified into the parameter's, and the server's list of parameters is held to the lexer's.
