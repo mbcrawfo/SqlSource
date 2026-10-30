@@ -136,11 +136,11 @@ internal sealed partial class SqlServerSession
                 }
 
                 var copies = copied.Reused.FirstOrDefault(reused =>
-                    string.Equals(reused.Name, parameter.Name, StringComparison.OrdinalIgnoreCase)
+                    string.Equals(reused.Name, parameter.Name, SqlParameterName.Comparison)
                 );
                 foreach (var name in copies?.Copies ?? [parameter.Name])
                 {
-                    if (string.Equals(name, probed, StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(name, probed, SqlParameterName.Comparison))
                     {
                         declared.Add((name, type));
                     }

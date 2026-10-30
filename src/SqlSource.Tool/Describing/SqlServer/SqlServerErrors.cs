@@ -421,7 +421,7 @@ internal static class SqlServerErrors
     // parameter, compared ignoring case.
     private static HashSet<string> NamedIn(SqlServerServerError error, CopiedSql copied)
     {
-        var named = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var named = new HashSet<string>(SqlParameterName.Comparer);
         foreach (var message in error.Errors.Select(static row => row.Message))
         {
             var at = message.IndexOf('@', StringComparison.Ordinal);

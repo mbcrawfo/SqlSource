@@ -227,22 +227,10 @@ internal static class QueryTyper
         };
 
     // The query's parameter of the name, ignoring case, when its marker gives it a C# type, or null.
-    private static SqlQueryParameter? MarkedParameter(EquatableArray<SqlQueryParameter> declared, string name)
-    {
-        for (var index = 0; index < declared.Count; index++)
-        {
-            var parameter = declared[index];
-            if (
-                parameter.ClrType is not null
-                && string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase)
-            )
-            {
-                return parameter;
-            }
-        }
-
-        return null;
-    }
+    private static SqlQueryParameter? MarkedParameter(EquatableArray<SqlQueryParameter> declared, string name) =>
+        SqlParameterName.IndexOf(declared, name.AsSpan()) is >= 0 and var index && declared[index].ClrType is not null
+            ? declared[index]
+            : null;
 
     /// <summary>
     /// The property type of a parameter or column whose C# type a marker or a setting chose, over the type override

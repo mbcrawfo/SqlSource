@@ -157,7 +157,7 @@ internal sealed partial class SqlServerSession : DescriberSession
             declarations.Add((parameter, read.Value));
         }
 
-        var declaredTypes = new Dictionary<string, SqlServerType>(StringComparer.OrdinalIgnoreCase);
+        var declaredTypes = new Dictionary<string, SqlServerType>(SqlParameterName.Comparer);
         foreach (var (parameter, type) in declarations)
         {
             var resolved = await ResolveAsync(request, parameter, type, cancellationToken);
@@ -209,7 +209,7 @@ internal sealed partial class SqlServerSession : DescriberSession
             return Failed(SqlServerErrors.ListsDiffer(request, differences));
         }
 
-        var rowOf = new Dictionary<string, SqlServerParameterRow>(StringComparer.OrdinalIgnoreCase);
+        var rowOf = new Dictionary<string, SqlServerParameterRow>(SqlParameterName.Comparer);
         foreach (var row in rows)
         {
             _ = rowOf.TryAdd(SqlParameterName.WithoutPrefix(row.Name, "@"), row);
@@ -219,10 +219,10 @@ internal sealed partial class SqlServerSession : DescriberSession
         var declarationOf = declarations.ToDictionary(
             static declaration => declaration.Parameter.Name,
             static declaration => declaration.Type,
-            StringComparer.OrdinalIgnoreCase
+            SqlParameterName.Comparer
         );
         var probes = new Probes(request, copied, declarationOf, rowOf);
-        var reusedTypes = new Dictionary<string, SqlServerType>(StringComparer.OrdinalIgnoreCase);
+        var reusedTypes = new Dictionary<string, SqlServerType>(SqlParameterName.Comparer);
         foreach (var reused in copied.Reused)
         {
             var unified = await UnifyAsync(request, reused, probes, rowOf, cancellationToken);

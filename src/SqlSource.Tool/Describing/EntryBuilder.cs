@@ -30,7 +30,9 @@ internal static class EntryBuilder
     )
     {
         var listed = query.Query.Parameters;
-        var unknown = description.Parameters.FirstOrDefault(described => Find(listed, described.Name) < 0);
+        var unknown = description.Parameters.FirstOrDefault(described =>
+            SqlParameterName.IndexOf(listed, described.Name.AsSpan()) < 0
+        );
         if (unknown is not null)
         {
             throw new InvalidOperationException(
@@ -71,23 +73,6 @@ internal static class EntryBuilder
         );
     }
 
-    private static int Find(EquatableArray<SqlQueryParameter> listed, string name)
-    {
-        for (var index = 0; index < listed.Count; index++)
-        {
-            if (string.Equals(listed[index].Name, name, StringComparison.OrdinalIgnoreCase))
-            {
-                return index;
-            }
-        }
-
-        return -1;
-    }
-
-    private static DescribedParameter? Find(EquatableArray<DescribedParameter> described, string name)
-    {
-        return described.FirstOrDefault(parameter =>
-            string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase)
-        );
-    }
+    private static DescribedParameter? Find(EquatableArray<DescribedParameter> described, string name) =>
+        described.FirstOrDefault(parameter => string.Equals(parameter.Name, name, SqlParameterName.Comparison));
 }
