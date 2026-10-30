@@ -19,7 +19,7 @@ The maintainability review of 2026-10-27 found these in `src/`.  Each is small a
 13. **[`QueryMethodWriter`](../../src/SqlSource/Generation/Emitting/QueryMethodWriter.cs) is about 960 lines** that write the signature and its documentation, the SQL, the command, the run, the reading of rows (`AppendVectorChecks` to `AppendGetFieldValue`), the naming of locals (`Locals`), and the split of a streaming method into its checks and a static local iterator (`AppendBody`, `AppendArguments` and `AppendCallArguments`).
 14. **A dead member**: `SelectStatement.CteNames` (`src/SqlSource.Tool/Describing/SqlServer/Proofs/SelectStatement.cs`) is read only by `SelectStatementTests`; the same list goes to `SelectBody.Read` on its own.
 15. **Mutable statics**: five `internal static readonly Dictionary` fields of `Settings/TypeOverrides/TypeKeyNames.cs`, which only `TypeKeys` reads and nothing writes.
-16. **The two describers lay out their folders differently**: PostgreSQL's table matcher, nullability, declared types and placeholders are in `Postgres/Columns/`, `Postgres/Statements/` and `Postgres/Types/`, where SQL Server's equivalents sit at `SqlServer/`'s root.
+16. ~~**The two describers lay out their folders differently**: PostgreSQL's table matcher, nullability, declared types and placeholders are in `Postgres/Columns/`, `Postgres/Statements/` and `Postgres/Types/`, where SQL Server's equivalents sit at `SqlServer/`'s root.~~  Fixed: SQL Server's mirror PostgreSQL's, with `SqlServerColumns` and `SqlServerTableMatcher` in `SqlServer/Columns/`, `DeclaredTypeText` and `ParameterCopies` in `SqlServer/Statements/`, and `SqlServerTypes` in `SqlServer/Types/`.
 
 ## Why it exists
 
@@ -48,7 +48,7 @@ One item at a time, each in its own pull request, with no change to what is gene
 13. Move the reading of rows to a `RowReaderWriter.cs`, and `Locals` to a file of its own.
 14. Drop `SelectStatement.CteNames` and test through `Body`.
 15. Expose the dictionaries as `IReadOnlyDictionary`.
-16. Decide whether the two describers' folders mirror each other, and move the other's files to match.
+16. ~~Decide whether the two describers' folders mirror each other, and move the other's files to match.~~  Done.
 
 ## Trigger
 

@@ -14,15 +14,20 @@ The describer gives a query's parameters, the columns of its first result set wi
 | [`SqlServerSession.Calls.cs`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerSession.Calls.cs) | Each call, asked through the exchange by `DescriberSession.AskAsync`, timed by the run's clock and written to the log |
 | [`SqlServerConnection.cs`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerConnection.cs) | The connection's value, the one `SqlConnection` of the session and every command made on it, and the listener on SqlClient's events, which it owns |
 | [`SqlClientRunListener.cs`](../../src/SqlSource.Tool/Describing/SqlServer/SqlClientRunListener.cs) | The allowlist of SqlClient's events that a run with a log writes as `mssql.driver` |
-| [`SqlServerColumns.cs`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerColumns.cs) | The sidecar's columns from the rows of `columns`, and each column's origin or why it has none |
-| [`SqlServerTableMatcher.cs`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerTableMatcher.cs) | The table every column comes from, and the checks of the table match |
 | [`SqlServerLive.cs`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerLive.cs) | The `live` function of each call and every text the describer sends |
 | [`SqlServerCallNames.cs`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerCallNames.cs), [`SqlServerCalls.cs`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerCalls.cs) | The names of the calls, and their request and answer records |
-| [`DeclaredTypeText.cs`](../../src/SqlSource.Tool/Describing/SqlServer/DeclaredTypeText.cs) | Reads the type of a `-- param:` marker against T-SQL's grammar of a type name |
-| [`ParameterCopies.cs`](../../src/SqlSource.Tool/Describing/SqlServer/ParameterCopies.cs) | The rename of a reused parameter's uses to copies, the rule that unifies the copies' types, and the comparison of the server's parameters with the query's list |
-| [`SqlServerTypes.cs`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerTypes.cs) | The sidecar's `SqlServerType` of a row of either describe procedure |
 | [`SqlServerErrors.cs`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerErrors.cs), [`ConnectionErrors.cs`](../../src/SqlSource.Tool/Describing/SqlServer/ConnectionErrors.cs) | A failure of each cause, and what an answer keeps of an exception of SqlClient |
 | [`SqlServerEvents.cs`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerEvents.cs) | The events of the describer's log |
+
+The folders [`Columns/`](../../src/SqlSource.Tool/Describing/SqlServer/Columns/), [`Statements/`](../../src/SqlSource.Tool/Describing/SqlServer/Statements/) and [`Types/`](../../src/SqlSource.Tool/Describing/SqlServer/Types/) hold what is made of a column, of a query's text and of a type, as PostgreSQL's folders of the same names do.  None of their files asks the server anything.
+
+| File | Holds |
+|----|----|
+| [`SqlServerColumns.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Columns/SqlServerColumns.cs) | The sidecar's columns from the rows of `columns`, and each column's origin or why it has none |
+| [`SqlServerTableMatcher.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Columns/SqlServerTableMatcher.cs) | The table every column comes from, and the checks of the table match |
+| [`DeclaredTypeText.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Statements/DeclaredTypeText.cs) | Reads the type of a `-- param:` marker against T-SQL's grammar of a type name |
+| [`ParameterCopies.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Statements/ParameterCopies.cs) | The rename of a reused parameter's uses to copies, the rule that unifies the copies' types, and the comparison of the server's parameters with the query's list |
+| [`SqlServerTypes.cs`](../../src/SqlSource.Tool/Describing/SqlServer/Types/SqlServerTypes.cs) | The sidecar's `SqlServerType` of a row of either describe procedure |
 
 The folder [`Proofs/`](../../src/SqlSource.Tool/Describing/SqlServer/Proofs/) holds [the proofs of not null](#proofs-of-not-null).  None of its files asks the server anything.
 
@@ -159,7 +164,7 @@ A parameter that the server reports and the list lacks is one that the lexer too
 
 ## Types
 
-[`SqlServerTypes`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerTypes.cs) builds the sidecar's `SqlServerType` from a row of `parameters`, `FromParameter`, of `declared`, `FromDeclared`, or of `columns`, `FromColumn`.  Its `name` is the system type name of the row verbatim, its facets included, `nvarchar(100)` or `decimal(18,2)`, and `maxLength`, `precision` and `scale` are the row's.  A row that names a user type gives its `userType`: the schema, the name and, for a CLR type, the assembly-qualified name.  So `sysname` is a user type of `sys` over `nvarchar(128)`, `hierarchyid` a user type of `sys` with its assembly, and an alias type such as `dbo.Email` a user type over its base, while a `rowversion` is `timestamp`, as the server names it.  SQL Server 2025 names `json` and `vector(n)` so to SqlClient, whose TDS knows them, where an older client is told `varchar(max)`, and the describer records what SqlClient is told; `ColumnTests.ColumnsAsync_JsonAndVector_On2025` holds it.  A row with no type name or without a facet is an `InvalidOperationException`, since the server typed the parameter or the column, or raised an error.
+[`SqlServerTypes`](../../src/SqlSource.Tool/Describing/SqlServer/Types/SqlServerTypes.cs) builds the sidecar's `SqlServerType` from a row of `parameters`, `FromParameter`, of `declared`, `FromDeclared`, or of `columns`, `FromColumn`.  Its `name` is the system type name of the row verbatim, its facets included, `nvarchar(100)` or `decimal(18,2)`, and `maxLength`, `precision` and `scale` are the row's.  A row that names a user type gives its `userType`: the schema, the name and, for a CLR type, the assembly-qualified name.  So `sysname` is a user type of `sys` over `nvarchar(128)`, `hierarchyid` a user type of `sys` with its assembly, and an alias type such as `dbo.Email` a user type over its base, while a `rowversion` is `timestamp`, as the server names it.  SQL Server 2025 names `json` and `vector(n)` so to SqlClient, whose TDS knows them, where an older client is told `varchar(max)`, and the describer records what SqlClient is told; `ColumnTests.ColumnsAsync_JsonAndVector_On2025` holds it.  A row with no type name or without a facet is an `InvalidOperationException`, since the server typed the parameter or the column, or raised an error.
 
 `bindName` is never written for SQL Server; [what is written](sidecar-format.md#what-is-written) says why.
 
@@ -167,7 +172,7 @@ A parameter that the server reports and the list lacks is one that the lexer too
 
 ## Columns and the table match
 
-A query's columns are those of its first result set as `sys.dm_exec_describe_first_result_set` describes it, which is all the procedure describes: a batch of several statements is described by its first result set, and the others are [D-0006](../deferred/D-0006-multiple-result-sets-on-sql-server.md).  What is made of the rows is in [`SqlServerColumns`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerColumns.cs) and [`SqlServerTableMatcher`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerTableMatcher.cs), neither of which asks the server anything.
+A query's columns are those of its first result set as `sys.dm_exec_describe_first_result_set` describes it, which is all the procedure describes: a batch of several statements is described by its first result set, and the others are [D-0006](../deferred/D-0006-multiple-result-sets-on-sql-server.md).  What is made of the rows is in [`SqlServerColumns`](../../src/SqlSource.Tool/Describing/SqlServer/Columns/SqlServerColumns.cs) and [`SqlServerTableMatcher`](../../src/SqlSource.Tool/Describing/SqlServer/Columns/SqlServerTableMatcher.cs), neither of which asks the server anything.
 
 ### Browse mode 2
 

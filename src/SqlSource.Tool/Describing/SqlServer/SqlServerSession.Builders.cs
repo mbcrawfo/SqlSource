@@ -4,6 +4,8 @@ using System.Linq;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Describing.SqlServer.Statements;
+using SqlSource.Tool.Describing.SqlServer.Types;
 
 namespace SqlSource.Tool.Describing.SqlServer;
 

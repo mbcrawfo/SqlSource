@@ -7,7 +7,7 @@ using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 
-namespace SqlSource.Tool.Describing.SqlServer;
+namespace SqlSource.Tool.Describing.SqlServer.Statements;
 
 /// <summary>The SQL with each use of a reused parameter renamed to a copy of its own.</summary>
 /// <param name="Sql">The SQL that is sent: the user's, with only the uses of the reused parameters renamed.</param>

@@ -2,6 +2,7 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Columns;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
 using Xunit;

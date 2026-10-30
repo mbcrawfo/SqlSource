@@ -2,7 +2,7 @@ using System;
 using SqlSource.Parsing.Quoting;
 using SqlSource.Tool.Describing.Describers;
 
-namespace SqlSource.Tool.Describing.SqlServer;
+namespace SqlSource.Tool.Describing.SqlServer.Statements;
 
 /// <summary>
 /// Reads the type of a <c>-- param:</c> marker against T-SQL's grammar of a type name, before it is put into the
