@@ -37,6 +37,11 @@
         -->
         <PackageDownload Include="NodaTime" Version="[3.1.9];[3.3.7]" />
         <PackageDownload Include="Npgsql.NodaTime" Version="[8.0.3];[10.0.3]" />
+        <!--
+            The reference assemblies of .NET 8, which the tests compile generated code against beside the runtime's,
+            of .NET 10, and which Generator/LibraryReferences.cs reads.
+        -->
+        <PackageDownload Include="Microsoft.NETCore.App.Ref" Version="[8.0.31]" />
         <AssemblyMetadata Include="NuGetPackageRoot" Value="$(NuGetPackageRoot)" />
     </ItemGroup>
     <ItemGroup>

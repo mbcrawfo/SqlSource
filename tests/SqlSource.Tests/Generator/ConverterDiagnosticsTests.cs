@@ -51,7 +51,7 @@ public sealed class ConverterDiagnosticsTests
         );
 
         run.ShouldBeClean();
-        var converters = StepOutputs.Single<ConverterSet>(run, TrackingNames.Converters).Converters;
+        var converters = ConvertersOf(run);
         converters.Select(converter => converter.Location?.LineSpan.Start.Line + 1).ShouldBe([11, 22, 19, 8]);
         converters
             .Select(converter => converter with { Location = null })
@@ -135,11 +135,8 @@ public sealed class ConverterDiagnosticsTests
         );
 
         run.ShouldBeClean();
-        StepOutputs
-            .Single<ConverterSet>(run, TrackingNames.Converters)
-            .Converters.Select(converter =>
-                (converter.DisplayName, converter.ArgumentText, converter.ArgumentIsValueType)
-            )
+        ConvertersOf(run)
+            .Select(converter => (converter.DisplayName, converter.ArgumentText, converter.ArgumentIsValueType))
             .ShouldBe([
                 ("App.Conversions.FromEmail(App.Email?)", "global::App.Email", false),
                 ("App.Conversions.FromUserId(App.UserId?)", "global::App.UserId", true),
@@ -391,9 +388,8 @@ public sealed class ConverterDiagnosticsTests
         var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
         diagnostic.ShouldStartWith($"SQLSRC277 /app/Repo/Sample.cs({(faultyFirst ? 9 : 10)},");
         diagnostic.ShouldContain($"The method '{displayName}' is marked [SqlSourceConverter], but {fault}.");
-        StepOutputs
-            .Single<ConverterSet>(run, TrackingNames.Converters)
-            .Converters.Select(converter => (converter.DisplayName, converter.Fault))
+        ConvertersOf(run)
+            .Select(converter => (converter.DisplayName, converter.Fault))
             .ShouldBe([("App.Conversions.From(string)", null), (displayName, fault)], ignoreOrder: true);
     }
 
@@ -449,9 +445,7 @@ public sealed class ConverterDiagnosticsTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        var converter = StepOutputs
-            .Single<ConverterSet>(run, TrackingNames.Converters)
-            .Converters.ShouldHaveSingleItem();
+        var converter = ConvertersOf(run).ShouldHaveSingleItem();
         converter.Fault.ShouldBeNull();
         converter.WarningIds.ShouldBe(["CS0612", "CS0618"]);
     }
@@ -508,9 +502,7 @@ public sealed class ConverterDiagnosticsTests
         );
 
         run.ShouldBeClean();
-        var converter = StepOutputs
-            .Single<ConverterSet>(run, TrackingNames.Converters)
-            .Converters.ShouldHaveSingleItem();
+        var converter = ConvertersOf(run).ShouldHaveSingleItem();
         converter.ArgumentText.ShouldBe("global::System.DateTime");
         converter.ReturnText.ShouldBe("global::System.DateTime");
     }
@@ -563,9 +555,8 @@ public sealed class ConverterDiagnosticsTests
         );
 
         run.ShouldBeClean();
-        StepOutputs
-            .Single<ConverterSet>(run, TrackingNames.Converters)
-            .Converters.Select(converter => (converter.Method, converter.Origin))
+        ConvertersOf(run)
+            .Select(converter => (converter.Method, converter.Origin))
             .ShouldBe([
                 ("global::Lib.Email.To", ConverterOrigin.MappedType),
                 ("global::App.Conversions.ToEmail", ConverterOrigin.Project),
@@ -590,6 +581,14 @@ public sealed class ConverterDiagnosticsTests
                 + "returns the converted value.",
         ]);
     }
+
+    // The converters of the run's set but the libraries', which the runtime's System.Text.Json brings to every run.
+    private static Converter[] ConvertersOf(GeneratorRun run) =>
+        [
+            .. StepOutputs
+                .Single<ConverterSet>(run, TrackingNames.Converters)
+                .Converters.Where(converter => converter.Origin != ConverterOrigin.Library),
+        ];
 
     // A type that holds one member, at FaultyMethodLine, which marks the method it holds as a converter.
     private static string FaultySource(string type, string method) =>
