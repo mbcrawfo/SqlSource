@@ -551,7 +551,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         var converters = projectConverters
             .Combine(mappedTypeConverters)
-            .Select(static (input, _) => ConverterSet.Of(input.Left, input.Right))
+            .Select(static (input, _) => ConverterSet.Of(input.Left, input.Right, EquatableArray<Converter>.Empty))
             .WithTrackingName(TrackingNames.Converters);
 
         // The problems alone, so that an edit that changes none of them reports nothing again.

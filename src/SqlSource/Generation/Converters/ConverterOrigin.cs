@@ -11,4 +11,10 @@ internal enum ConverterOrigin
     /// <c>-- column:</c> marker names.
     /// </summary>
     MappedType,
+
+    /// <summary>
+    /// A conversion that SqlSource itself generates for a library whose setting is on, such as NodaTime's, and so has no
+    /// method or location.
+    /// </summary>
+    Library,
 }

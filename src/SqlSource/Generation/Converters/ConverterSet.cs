@@ -8,14 +8,14 @@ using SqlSource.Settings.ClrTypes;
 namespace SqlSource.Generation.Converters;
 
 /// <summary>
-/// Every converter of the project, from its own source and from the mapped types, with <c>SQLSRC277</c> and
+/// Every converter of the project, from its own source, from the mapped types and from the libraries, with <c>SQLSRC277</c> and
 /// <c>SQLSRC278</c> at the methods of its source.
 /// </summary>
 /// <param name="Converters">
 /// The converters, in the order of <see cref="Comparer" />: ordinal by argument, then by return type, then by method,
 /// then by display name.
-/// A mapped type's converter of an edge that one of the project's source has is left out, so that a project can replace
-/// a library's conversion.
+/// A mapped type's converter of an edge that one of the project's source has is left out, and so is a library's of an
+/// edge that either has, so that a project can replace a library's conversion.
 /// </param>
 /// <param name="Diagnostics">
 /// <c>SQLSRC277</c> at each method of the project's source that is not a converter, and <c>SQLSRC278</c> at each that
@@ -41,13 +41,19 @@ internal sealed record ConverterSet(EquatableArray<Converter> Converters, Equata
         converters.IsEmpty ? EquatableArray<Converter>.Empty : new(converters.Sort(Comparer));
 
     /// <summary>
-    /// The converters of the project's source and of the mapped types together, with the diagnostics of the project's
-    /// source.  A method with a fault is kept, as an edge.  Two declarations of one method, as the two of a partial
-    /// method, are one converter.  A method with a fault is no part of a <c>SQLSRC278</c>.
+    /// The converters of the project's source, of the mapped types and of the libraries together, with the diagnostics
+    /// of the project's source.  A method with a fault is kept, as an edge.  Two declarations of one method, as the two
+    /// of a partial method, are one converter.  A method with a fault is no part of a <c>SQLSRC278</c>.  A library's
+    /// edge has no location, so it is no part of a <c>SQLSRC277</c> or a <c>SQLSRC278</c>, and is left out when the
+    /// project or a mapped type has a converter of its two types, whether that converter has a fault or not.
     /// </summary>
-    public static ConverterSet Of(EquatableArray<Converter> project, EquatableArray<Converter> mappedTypes)
+    public static ConverterSet Of(
+        EquatableArray<Converter> project,
+        EquatableArray<Converter> mappedTypes,
+        EquatableArray<Converter> library
+    )
     {
-        var all = ImmutableArray.CreateBuilder<Converter>(project.Count + mappedTypes.Count);
+        var all = ImmutableArray.CreateBuilder<Converter>(project.Count + mappedTypes.Count + library.Count);
         foreach (var converter in project.OrderBy(static converter => converter, Comparer))
         {
             if (all.Count == 0 || !IsSameMethod(all[all.Count - 1], converter))
@@ -63,6 +69,11 @@ internal sealed record ConverterSet(EquatableArray<Converter> Converters, Equata
         all.AddRange(
             mappedTypes.Where(converter => !projectEdges.Contains((converter.ArgumentText, converter.ReturnText)))
         );
+
+        var takenEdges = new HashSet<(string Argument, string Return)>(
+            all.Select(static converter => (converter.ArgumentText, converter.ReturnText))
+        );
+        all.AddRange(library.Where(converter => !takenEdges.Contains((converter.ArgumentText, converter.ReturnText))));
 
         all.Sort(Comparer);
         return new ConverterSet(new EquatableArray<Converter>(all.ToImmutable()), diagnostics);

@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Converters;
+using SqlSource.Settings.Libraries;
 using SqlSource.Testing.Snapshot;
 using Xunit;
 
@@ -22,7 +23,7 @@ public sealed class ConverterSetTests
             MappedTypeConverter("global::Lib.Email.To", "global::Lib.Email", "string")
         );
 
-        var set = ConverterSet.Of(project, mapped);
+        var set = ConverterSet.Of(project, mapped, EquatableArray<Converter>.Empty);
 
         set.Converters.Select(static converter => converter.Method)
             .ShouldBe(["global::Lib.Email.To", "global::App.Conversions.ToEmail"]);
@@ -40,7 +41,7 @@ public sealed class ConverterSetTests
         );
         var mapped = TestSidecars.Of(MappedTypeConverter("global::Lib.Id.From", "int", "global::Lib.Id"));
 
-        var set = ConverterSet.Of(project, mapped);
+        var set = ConverterSet.Of(project, mapped, EquatableArray<Converter>.Empty);
 
         set.Converters.Select(static converter => (converter.ArgumentText, converter.ReturnText))
             .ShouldBe([
@@ -63,7 +64,8 @@ public sealed class ConverterSetTests
                 ProjectConverter("global::App.C.Trim", "global::App.Email", "global::App.Email", 4),
                 ProjectConverter("global::App.C.FromUserId", "global::App.UserId", "long", 5)
             ),
-            TestSidecars.Of(MappedTypeConverter("global::Lib.Email.Parse", "byte[]", "global::App.Email"))
+            TestSidecars.Of(MappedTypeConverter("global::Lib.Email.Parse", "byte[]", "global::App.Email")),
+            EquatableArray<Converter>.Empty
         );
 
         set.Touching("global::App.Email")
@@ -79,6 +81,123 @@ public sealed class ConverterSetTests
             .ShouldBe(["global::App.C.FromUserId", "global::App.C.ToUserId"]);
         set.Touching("int").ShouldBeEmpty();
     }
+
+    [Fact]
+    public void Of_LibraryEdgeTheProjectHas_KeepsTheProjects()
+    {
+        var project = TestSidecars.Of(
+            ProjectConverter("global::App.C.ToLocalDate", "global::System.DateTime", "global::NodaTime.LocalDate", 1)
+        );
+        var library = TestSidecars.Of(
+            LibraryConverter(
+                "global::SqlSource.Generated.ToLocalDate",
+                "global::System.DateTime",
+                "global::NodaTime.LocalDate"
+            )
+        );
+
+        var set = ConverterSet.Of(project, EquatableArray<Converter>.Empty, library);
+
+        set.Converters.ShouldHaveSingleItem().Origin.ShouldBe(ConverterOrigin.Project);
+    }
+
+    [Fact]
+    public void Of_LibraryEdgeAMappedTypeHas_KeepsTheMappedTypes()
+    {
+        var mapped = TestSidecars.Of(
+            MappedTypeConverter(
+                "global::Lib.Dates.ToLocalDate",
+                "global::System.DateTime",
+                "global::NodaTime.LocalDate"
+            )
+        );
+        var library = TestSidecars.Of(
+            LibraryConverter(
+                "global::SqlSource.Generated.ToLocalDate",
+                "global::System.DateTime",
+                "global::NodaTime.LocalDate"
+            )
+        );
+
+        var set = ConverterSet.Of(EquatableArray<Converter>.Empty, mapped, library);
+
+        set.Converters.ShouldHaveSingleItem().Origin.ShouldBe(ConverterOrigin.MappedType);
+    }
+
+    [Fact]
+    public void Of_ProjectHasOneDirection_KeepsTheLibrarysOther()
+    {
+        var project = TestSidecars.Of(
+            ProjectConverter("global::App.C.ToLocalDate", "global::System.DateTime", "global::NodaTime.LocalDate", 1)
+        );
+        var library = TestSidecars.Of(
+            LibraryConverter(
+                "global::SqlSource.Generated.ToLocalDate",
+                "global::System.DateTime",
+                "global::NodaTime.LocalDate"
+            ),
+            LibraryConverter(
+                "global::SqlSource.Generated.FromLocalDate",
+                "global::NodaTime.LocalDate",
+                "global::System.DateTime"
+            )
+        );
+
+        var set = ConverterSet.Of(project, EquatableArray<Converter>.Empty, library);
+
+        set.Converters.Select(static converter => (converter.Method, converter.Origin))
+            .ShouldBe([
+                ("global::SqlSource.Generated.FromLocalDate", ConverterOrigin.Library),
+                ("global::App.C.ToLocalDate", ConverterOrigin.Project),
+            ]);
+    }
+
+    [Fact]
+    public void Of_LibraryEdges_ReportNothing()
+    {
+        var library = TestSidecars.Of(
+            LibraryConverter("global::SqlSource.Generated.A", "global::System.DateTime", "global::NodaTime.LocalDate"),
+            LibraryConverter("global::SqlSource.Generated.B", "global::System.DateTime", "global::NodaTime.LocalDate")
+        );
+
+        var set = ConverterSet.Of(EquatableArray<Converter>.Empty, EquatableArray<Converter>.Empty, library);
+
+        set.Converters.Count.ShouldBe(2);
+        set.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Touching_LibraryEdge_FindsIt()
+    {
+        var library = TestSidecars.Of(
+            LibraryConverter(
+                "global::SqlSource.Generated.ToLocalDate",
+                "global::System.DateTime",
+                "global::NodaTime.LocalDate"
+            )
+        );
+        var set = ConverterSet.Of(EquatableArray<Converter>.Empty, EquatableArray<Converter>.Empty, library);
+
+        set.Touching("global::NodaTime.LocalDate")
+            .ShouldHaveSingleItem()
+            .Method.ShouldBe("global::SqlSource.Generated.ToLocalDate");
+        _ = set.Touching("global::System.DateTime").ShouldHaveSingleItem();
+    }
+
+    private static Converter LibraryConverter(string method, string argument, string result) =>
+        new(
+            method,
+            method.Replace("global::", string.Empty, StringComparison.Ordinal) + "(" + argument + ")",
+            argument,
+            false,
+            result,
+            false,
+            EquatableArray<string>.Empty,
+            null,
+            ConverterOrigin.Library,
+            null,
+            new LibraryScope(SqlLibrary.NodaTime, ConverterTargets.All)
+        );
 
     private static Converter ProjectConverter(string method, string argument, string result, int line) =>
         new(
