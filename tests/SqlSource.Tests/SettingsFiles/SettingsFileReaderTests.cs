@@ -6,6 +6,7 @@ using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.SettingsFiles;
 using Xunit;
@@ -230,6 +231,7 @@ public sealed class SettingsFileReaderTests
     [InlineData("generatorParameters", "\"keep-comments\"")]
     [InlineData("typeOverrides", "[]")]
     [InlineData("columnTypes", "\"a.b=X\"")]
+    [InlineData("libraryTypes", "[]")]
     [InlineData(
         "nestedClass", /*lang=json,strict*/
         "{ \"a\": \"b\" }"
@@ -371,6 +373,10 @@ public sealed class SettingsFileReaderTests
         "columnTypes", /*lang=json,strict*/
         "{\"users.id\": [], \"posts.id\": null}"
     )]
+    [InlineData(
+        "libraryTypes", /*lang=json,strict*/
+        "{\"nodaTime\": true}"
+    )]
     public void Read_ListOfOnlyWrongTypes_SetsNothing(string key, string value)
     {
         var text = $$"""{"{{key}}": {{value}}}""";
@@ -444,6 +450,88 @@ public sealed class SettingsFileReaderTests
                 "columnTypes",
                 "\"users\".id",
                 "users.id"
+            ),
+        ]);
+    }
+
+    [Fact]
+    public void Read_LibraryTypes_MemberIsKeptApartFromTheEntry()
+    {
+        const string Text = /*lang=json,strict*/
+            "{\n  \"dialect\": \"postgres\",\n  \"libraryTypes\": { \"nodaTime\": \"on\" }\n}";
+
+        var file = SettingsFileReader.Read(Text, Place);
+
+        file.Errors.ShouldBeEmpty();
+        file.Level.LibraryTypes.ShouldNotBeNull()
+            .ShouldBe([new LibrarySetting(SqlLibrary.NodaTime, LibraryState.On, Place)]);
+        var member = file.LibraryMemberOf(SqlLibrary.NodaTime).ShouldNotBeNull();
+        member.Span.ShouldBe(Span(Text, "\"nodaTime\": \"on\""));
+        member.LineSpan.Start.Line.ShouldBe(2);
+        member.LineSpan.ShouldBe(SourceText.From(Text).Lines.GetLinePositionSpan(member.Span));
+    }
+
+    // The member moves and the level stays equal, so that a step that reads the level alone is not run again.
+    [Fact]
+    public void Read_LibraryTypes_MovedMember_LeavesTheLevelEqual()
+    {
+        const string Before = /*lang=json,strict*/
+            "{\"outputModelSuffix\": \"Row\", \"libraryTypes\": {\"nodaTime\": \"on\"}}";
+        const string After = /*lang=json,strict*/
+            "{\"outputModelSuffix\": \"Record\",\n\n \"libraryTypes\": {\"nodaTime\": \"on\"}}";
+
+        var before = SettingsFileReader.Read(Before, Place);
+        var after = SettingsFileReader.Read(After, Place);
+
+        after.Level.LibraryTypes.ShouldBe(before.Level.LibraryTypes);
+        after.LibraryMembers.ShouldNotBe(before.LibraryMembers);
+        after.LibraryMemberOf(SqlLibrary.NodaTime).ShouldNotBeNull().LineSpan.Start.Line.ShouldBe(2);
+    }
+
+    // A repeat gives no entry, so only the first member is kept, and a file without the library types keeps none.
+    [Fact]
+    public void Read_LibraryMembers_AreThoseThatGiveEntries()
+    {
+        const string Repeated = /*lang=json,strict*/
+            """{"libraryTypes": {"nodaTime": "on", "noda-time": "off"}}""";
+
+        SettingsFileReader
+            .Read(Repeated, Place)
+            .LibraryMembers.ShouldHaveSingleItem()
+            .Span.ShouldBe(Span(Repeated, "\"nodaTime\": \"on\""));
+        SettingsFileReader.Read("{}", Place).LibraryMembers.ShouldBeEmpty();
+        SettingsFileReader.Read("{}", Place).LibraryMemberOf(SqlLibrary.NodaTime).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Read_LibraryTypeMembers_AreReportedByTheirSpansAndCarryThePlace()
+    {
+        const string Invalid = /*lang=json,strict*/
+            """{"libraryTypes": {"nodaTime": "maybe"}}""";
+        const string Repeated = /*lang=json,strict*/
+            """{"libraryTypes": {"nodaTime": "on", "noda-time": "off"}}""";
+
+        var invalid = SettingsFileReader.Read(Invalid, Place);
+        var repeated = SettingsFileReader.Read(Repeated, Place);
+
+        invalid.Level.ShouldBeSameAs(SettingsLevel.None);
+        invalid.Errors.ShouldBe([
+            new SettingsFileError(
+                SettingsFileErrorKind.InvalidValue,
+                Span(Invalid, "\"nodaTime\": \"maybe\""),
+                "libraryTypes",
+                "nodaTime",
+                "maybe"
+            ),
+        ]);
+        repeated.Level.LibraryTypes.ShouldNotBeNull().Select(static entry => entry.State).ShouldBe([LibraryState.On]);
+        repeated.Errors.ShouldBe([
+            new SettingsFileError(
+                SettingsFileErrorKind.RepeatedKey,
+                Span(Repeated, "\"noda-time\""),
+                "libraryTypes",
+                "noda-time",
+                "nodaTime"
             ),
         ]);
     }

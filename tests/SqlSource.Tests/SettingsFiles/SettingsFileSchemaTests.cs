@@ -7,6 +7,7 @@ using Json.Schema;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Settings;
+using SqlSource.Settings.Libraries;
 using SqlSource.SettingsFiles;
 using Xunit;
 
@@ -208,6 +209,32 @@ public sealed class SettingsFileSchemaTests
         property.GetProperty("additionalProperties").GetProperty("pattern").GetString().ShouldBe(@"\S");
     }
 
+    // The library types are an object of choices: the names of its members are those of SqlLibrary, and its values
+    // those of LibraryState, each for completion and as a pattern.  Neither may be blank, since the reader finds a
+    // member with a blank name or value not valid.
+    [Fact]
+    public void Schema_LibraryTypes_NamesAndValuesAreGeneratedFromTheEnums()
+    {
+        var property = Properties.GetProperty(SettingsFileKeys.LibraryTypes);
+        var names = property.GetProperty("propertyNames");
+        var values = property.GetProperty("additionalProperties");
+
+        Choices(names).ShouldBe(Enum.GetNames<SqlLibrary>().Select(name => char.ToLowerInvariant(name[0]) + name[1..]));
+        Choices(values).ShouldBe(Enum.GetValues<LibraryState>().Select(SettingValue.NameOf));
+        Pattern(names).ShouldBe(RequiredChoicePattern(Enum.GetNames<SqlLibrary>()));
+        Pattern(values).ShouldBe(RequiredChoicePattern(Enum.GetNames<LibraryState>()));
+        values.GetProperty("type").GetString().ShouldBe("string");
+        foreach (var name in Choices(names))
+        {
+            SettingValue.TryReadChoice<SqlLibrary>(name, out _).ShouldBeTrue(name);
+        }
+
+        foreach (var value in Choices(values))
+        {
+            SettingValue.TryReadChoice<LibraryState>(value, out _).ShouldBeTrue(value);
+        }
+    }
+
     [Fact]
     public void Schema_PatternOfDialect_IsGeneratedFromTheNamesAndOptions()
     {
@@ -280,6 +307,19 @@ public sealed class SettingsFileSchemaTests
     [InlineData(SettingsFileKeys.Dialect, "\"mysql , ansi-quotes\"")]
     [InlineData(SettingsFileKeys.GeneratorParameters, "[\"default\", \"\"]")]
     [InlineData(SettingsFileKeys.GeneratorParameters, "[\"default\", \"default\"]")]
+    [InlineData(
+        SettingsFileKeys.LibraryTypes, /*lang=json,strict*/
+        "{\"nodaTime\": \"on\"}"
+    )]
+    [InlineData(
+        SettingsFileKeys.LibraryTypes, /*lang=json,strict*/
+        "{\" Noda-Time \": \" DEFAULT \"}"
+    )]
+    [InlineData(
+        SettingsFileKeys.LibraryTypes, /*lang=json,strict*/
+        "{\"noda time\": \"Off\"}"
+    )]
+    [InlineData(SettingsFileKeys.LibraryTypes, "{}")]
     public void Schema_SpellingTheReaderAccepts_IsValid(string key, string value)
     {
         var text = $$"""{"{{key}}": {{value}}}""";
@@ -346,6 +386,24 @@ public sealed class SettingsFileSchemaTests
     [InlineData( /*lang=json,strict*/
         """{"columnTypes": {"": "UserId"}}"""
     )]
+    [InlineData( /*lang=json,strict*/
+        """{"libraryTypes": {"nodaTime": "maybe"}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"libraryTypes": {"json": "on"}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"libraryTypes": {"nodaTime": ""}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"libraryTypes": {" ": "on"}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"libraryTypes": {"node-time": "on"}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"libraryTypes": ["nodaTime"]}"""
+    )]
     public void Schema_FileTheReaderRejects_IsNotValid(string text)
     {
         Errors(text).ShouldNotBeEmpty();
@@ -379,6 +437,15 @@ public sealed class SettingsFileSchemaTests
             : Regex.Escape(character.ToString());
 
     private static string CaseFree(string name) => string.Concat(name.Select(CaseFree));
+
+    // The pattern of a choice that is required: the choice's pattern without the empty spelling.
+    private static string RequiredChoicePattern(string[] names) =>
+        @"^\s*(?:[- \t]*(?:"
+        + string.Join(
+            "|",
+            names.Select(name => string.Concat(name.Select(character => CaseFree(character) + @"[- \t]*")))
+        )
+        + @"))\s*$";
 
     private static object? ReadChoice(Type choice, string value) =>
         choice switch

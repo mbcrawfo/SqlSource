@@ -73,6 +73,8 @@ internal static class TrackingNames
 
     public const string SqlClientProbe = nameof(SqlClientProbe);
 
+    public const string LibraryProbe = nameof(LibraryProbe);
+
     public const string UsesSqlServerEntries = nameof(UsesSqlServerEntries);
 
     public const string MappedTypeNames = nameof(MappedTypeNames);
@@ -134,6 +136,10 @@ internal static class TrackingNames
     public const string MethodOutput = nameof(MethodOutput);
 
     public const string MethodDiagnostics = nameof(MethodDiagnostics);
+
+    public const string SettingsFileLibraryUses = nameof(SettingsFileLibraryUses);
+
+    public const string SettingsFileLibraryDiagnostics = nameof(SettingsFileLibraryDiagnostics);
 
     public const string CodeGenEngines = nameof(CodeGenEngines);
 }

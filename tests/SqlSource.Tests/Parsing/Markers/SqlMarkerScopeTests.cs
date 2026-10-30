@@ -5,6 +5,7 @@ using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Markers;
 using SqlSource.Settings;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using Xunit;
 
@@ -25,6 +26,7 @@ public sealed class SqlMarkerScopeTests
     [InlineData("-- output-model-suffix: Row", true, false)]
     [InlineData("-- model-namespace: App.Models", true, false)]
     [InlineData("-- type-override: int4 = long", true, true)]
+    [InlineData("-- library-types: nodatime=on", true, true)]
     [InlineData("-- token: x", false, true)]
     [InlineData("-- token-ignore: x", false, true)]
     [InlineData("-- param: @a int", false, true)]
@@ -125,6 +127,22 @@ public sealed class SqlMarkerScopeTests
         scope
             .Level.TypeOverrides.ShouldNotBeNull()
             .ShouldBe([new TypeOverride("int4", "global::System.Int32", SettingPlace.FileHeader)]);
+    }
+
+    // The first marker of a scope stands, so the conflict leaves its entry in the level.
+    [Fact]
+    public void Read_TwoStatesForALibraryInOneScope_ConflictAtTheSecondAndTheFirstStands()
+    {
+        var (scope, errors) = Scope(
+            SqlScopeKind.Preamble,
+            "-- library-types: nodatime=on",
+            "-- library-types: nodatime=off"
+        );
+
+        errors.Select(static error => error.Kind).ShouldBe([SqlParseErrorKind.ConflictingSettings]);
+        var entry = scope.Level.LibraryTypes.ShouldNotBeNull().ShouldHaveSingleItem();
+        entry.State.ShouldBe(LibraryState.On);
+        entry.Place.ShouldBe(SettingPlace.FileHeader);
     }
 
     // Names that differ by case are two types of a catalog that quotes them, so they are two keys.

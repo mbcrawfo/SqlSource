@@ -47,6 +47,7 @@ Each name links to its section, which gives its values and its rules.  **Written
 | [One query's model name](#setting-model-name) | A type's name, or its full name | `-- input-model:`, `-- output-model:` inside a query | Works today |
 | [Type overrides](#setting-type-overrides) | Entries `"key": "type"`, each a database type and the C# type it gets, or `"key": "default"`.  Default: none | `typeOverrides` in a settings file; `-- type-override:` in the file header and inside a query | Works today |
 | [Column types](#setting-column-types) | Entries `"key": "type"`, each a column of a table or view, `table.column` or `schema.table.column`, and the C# type it gets, or `"key": "default"`.  Default: none | `columnTypes` in a settings file; `-- column:` in the file header, and inside a query for a column of the query's result | Works today |
+| [Library types](#setting-library-types) | Entries `"library": "state"`, the library `nodaTime` and the state `on`, `off` or `default`.  Default: on for PostgreSQL where the project references `Npgsql.NodaTime`, and off otherwise | `libraryTypes` in a settings file; `-- library-types:` in the file header and inside a query | Works today, for NodaTime on PostgreSQL |
 | [`SqlLocation`](#setting-sql-location) | `Nested`, `Direct`.  Default `Nested` | `SqlLocation` on the attribute | Works today |
 | [Nested class](#setting-nested-class) | A C# identifier that is not a keyword.  Default `Sql` | `nestedClass` in a settings file; `NestedClass` on the attribute | Works today |
 | [`Path`](#setting-path) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: that folder | `Path` on the attribute | Works today |
@@ -84,7 +85,7 @@ Four exceptions, stated plainly:
 - **A list of generator parameters replaces the one below it whole.**  It never adds to it.  See [generator parameters](#setting-generator-parameters).
 - **A dialect value replaces the one below it whole**, options included.  The dialect has no attribute and no in-query level: a file has one dialect, which is the marker in its file header, else the nearest of its settings files that sets one, else `ansi`.  See [dialect](#setting-dialect).
 - **`SqlLocation`, `MethodLocation` and `Path` exist only on the attribute.**  They have nothing to choose between.  The nested class has two, the attribute over the settings files, which are those of the folder of the type's C# file.
-- **A type override, or a column type, replaces only the keys it names.**  Each place adds its entries to those of the places below it, each settings file a place of its own, so a folder's file adds to the entries of the files above it.  An entry for a key, a database type or a column, replaces the entry below it for that key, and `default` takes the key out.  Neither has an attribute level.  See [type overrides](#setting-type-overrides) and [column types](#setting-column-types).
+- **A type override, a column type, or a library of the library types, replaces only the keys it names.**  Each place adds its entries to those of the places below it, each settings file a place of its own, so a folder's file adds to the entries of the files above it.  An entry for a key, a database type, a column or a library, replaces the entry below it for that key, and `default` takes the key out.  None of them has an attribute level.  See [type overrides](#setting-type-overrides), [column types](#setting-column-types) and [library types](#setting-library-types).
 
 <a id="a-value-that-is-wrong"></a>
 
@@ -93,7 +94,7 @@ Four exceptions, stated plainly:
 | Written as | Reported as | What happens |
 |----|----|----|
 | A marker | [SQLSRC111](diagnostics.md#sqlsrc111), a dialect included.  A generator parameter that does not exist is [SQLSRC109](diagnostics.md#sqlsrc109); a value that contradicts another in the same place is [SQLSRC112](diagnostics.md#sqlsrc112) | The file produces no members until it is fixed |
-| A settings file | [SQLSRC015](diagnostics.md#sqlsrc015) to [SQLSRC020](diagnostics.md#sqlsrc020), at the file, line and column of the mistake: see [settings files](#settings-files) | A value that is wrong is not set by that file, so a farther settings file or the default gives it, for a dialect too.  The rest of the file still applies, and so do the other words of a list, unless one is `default` beside another, and the other entries of `typeOverrides` or `columnTypes`.  Of a key, or an entry, written twice, the first applies.  A file that is not a JSON object gives nothing |
+| A settings file | [SQLSRC015](diagnostics.md#sqlsrc015) to [SQLSRC020](diagnostics.md#sqlsrc020), at the file, line and column of the mistake: see [settings files](#settings-files) | A value that is wrong is not set by that file, so a farther settings file or the default gives it, for a dialect too.  The rest of the file still applies, and so do the other words of a list, unless one is `default` beside another, and the other entries of `typeOverrides`, `columnTypes` or `libraryTypes`.  Of a key, or an entry, written twice, the first applies.  A file that is not a JSON object gives nothing |
 | A property of the attribute | [SQLSRC006](diagnostics.md#sqlsrc006) | The type produces no members until it is fixed |
 
 <a id="setting-output"></a>
@@ -497,7 +498,7 @@ A converter in any other type of a referenced assembly is not found.  When your 
 
 **An array of PostgreSQL whose C# type is an array of a type of yours**, chosen for the element, as `email[]` under `public.email=MyApp.Email`, or for the array, as `public.user_id[]=MyApp.UserId?[]`, is converted element by element by the element's converters: a `MyApp.Email[]` column is read as a `string[]`, and each element given to `FromDatabase`.  A `NULL` element stays null, the converter not called for it, when the element is of a reference type or written with `?`, as `MyApp.UserId?`.  A `NULL` element of a value type written without `?`, as a `MyApp.Email[]` holds, throws `InvalidCastException`, "Column 'emails' holds a null element.".  The array is converted whole instead when a type override or a column type gives the array a type of yours that is not an array, `public.email[]=MyApp.EmailList`, or an array type that has converters of its own: those converters, between that type and `string[]`, are used, and the element's are not.
 
-**Converters apply only where a type override, a column type or a `-- param:` marker chose the type, and only in query methods.**  A column or parameter whose type the type table gives is never converted, so a converter between `System.DateTimeOffset` and a type of yours changes no `timetz` column.  A query whose output is `models` calls no converter, and gets none of their errors at its name; to read it through Dapper, see [the recipe](recipes.md#models-through-dapper).  A type override to a type the driver reads for some database type, such as `string`, `System.DateTimeOffset` or `System.DateOnly`, is read and sent as the driver does when no converter is between it and the type the driver reads.
+**Converters apply only where a type override, a column type or a `-- param:` marker chose the type, and only in query methods.**  A column or parameter whose type the type table, or a library of the [library types](#setting-library-types), gives is never converted, so a converter between `System.DateTimeOffset` and a type of yours changes no `timetz` column, and one between `NodaTime.Instant` and a type of yours no `timestamptz` that NodaTime gives its type.  A query whose output is `models` calls no converter, and gets none of their errors at its name; to read it through Dapper, see [the recipe](recipes.md#models-through-dapper).  A type override to a type the driver reads for some database type, such as `string`, `System.DateTimeOffset` or `System.DateOnly`, is read and sent as the driver does when no converter is between it and the type the driver reads.
 
 **Without a converter**, the query method asks the driver for the type that was chosen.  That is right for a type the driver was taught, a C# enum after Npgsql's `MapEnum<T>()` for one, a composite after `MapComposite<T>()` or a type of a plugin, and for a type it reads already, such as `System.DateTimeOffset` for a `timestamptz`.  A type of yours that the driver does not know, with no converter, throws the driver's `InvalidCastException` when the query runs.
 
@@ -551,6 +552,61 @@ A column type gives one column of a table or view the C# type of your choice, in
 **Inside a query**, a `-- column:` line names a column of the query's result, as the query returns it, and gives it a C# type after `->`: `-- column: total -> PostCount`.  It wins over the column types of the other places and over the type override, and `-> default` takes the column out of the column types, so that the type override, or else the type map, gives its type.  The same marker sets the column's nullability, before the `->` or alone: `-- column: note null -> NoteText`.  Its name is one part, so a name with a `.` outside quotes is [SQLSRC111](diagnostics.md#sqlsrc111): a column's source is mapped in the file header.  The rules of its name, of its nullability and of two markers for one column are on [the generator page](generator.md#column-marker).  In a file with no `-- name:` line, which is one query and takes both kinds, a key of two or three parts is the file header's kind, and a name of one part the query's.
 
 The `sqlsource` tool does not read `columnTypes`, and a `-- column:` marker changes nothing that is described: adding, changing or removing one leaves the query's sidecar current.
+
+<a id="setting-library-types"></a>
+
+## Library types
+
+```jsonc
+// sqlsource.json, in the folder of a project that references Npgsql.NodaTime
+{
+    "root": true,
+    "dialect": "postgres",
+    "libraryTypes": {
+        "nodaTime": "off",
+    },
+}
+```
+
+```jsonc
+// Scheduling/sqlsource.json
+{
+    "libraryTypes": {
+        "nodaTime": "default",
+    },
+}
+```
+
+```sql postgres
+-- name: ListShifts
+-- library-types: nodatime=off
+SELECT id, starts_at FROM shifts;
+```
+
+The library types say whether the query methods read and send a library's types, in place of the types of the type map, for the database types the library covers.  The one library today is NodaTime, named `nodaTime`: on PostgreSQL it gives a `timestamptz` the type `NodaTime.Instant`, a `date` a `NodaTime.LocalDate`, and so on, as [NodaTime on PostgreSQL](postgresql.md#nodatime) lists.  Above, the project references `Npgsql.NodaTime`, so NodaTime would be on for all of it; the project's settings file turns it off, the files under `Scheduling/` give it back to its default, on, and the query `ListShifts` turns it off again, so its `starts_at`, a `timestamptz`, stays a `System.DateTime`.
+
+> **Coming in a later release.**  The library types will also give SQL Server's date and time types NodaTime's types, and know NetTopologySuite and System.Text.Json.  See [what works today](README.md#what-works-today).
+
+**The state** of a library is `on`, `off` or `default`, matched ignoring case, hyphens and spaces, as the library's name is.  `default` takes the library out of the entries of every place below, so that its default applies, as a type override's `default` gives a type back to the type map.
+
+**The default**, where no place names the library or the nearest that does says `default`:
+
+- **PostgreSQL**: `on` when the project references `Npgsql.NodaTime`, the plugin that lets Npgsql read and send NodaTime's types, directly or through another package such as Entity Framework Core's `Npgsql.EntityFrameworkCore.PostgreSQL.NodaTime`, and `off` otherwise.  A project that references `NodaTime` alone has it off.
+- **SQL Server**: `off`.
+
+**Every place, merged by library.**  The library types are `libraryTypes` in the settings files of a `.sql` file's folder and of the folders above it, and the `-- library-types:` marker in the file header and inside a query.  There is no attribute property.  For each query the entries add up from the farthest settings file to the nearest, then the file header, then the query, and an entry for a library replaces the entry of a place below for that library alone, as the [type override](#setting-type-overrides)'s entries do.  One value serves both databases: a file's dialect decides which database's types apply.
+
+**Only for query methods.**  A library's types reach only a query whose [output](#setting-output) is `codegen`, for each type that claims it.  A query whose output is `models` keeps the type map's types in its models, whatever the library types say: there they are read and checked, and do nothing else.  To give such a query a library's types, as for rows read through Dapper, name them with the type override or the column types.  A model that a `codegen` query, with the library on, and a `models` query share, or two `codegen` queries, one with the library on and one with it off, has two sets of types and is [SQLSRC257](diagnostics.md#sqlsrc257): name the models apart with [`-- output-model:`](#setting-model-name), or turn the library on or off alike for both.
+
+**Below your own choices.**  A column's or parameter's C# type is its query's `-- column:` marker's or its `-- param:` marker's, then the [column types](#setting-column-types)', then the [type override](#setting-type-overrides)'s, then the library's, then the type map's: see [property types](generator.md#property-types).  So a project that maps `timestamptz` with the type override keeps its type with NodaTime on, and `"timestamptz": "default"` in a nearer settings file, or `-- type-override: timestamptz=default`, gives `timestamptz` back to the library there.
+
+**What `on` needs.**  The project references what the library needs on the database of the query: on PostgreSQL `Npgsql.NodaTime`, and on SQL Server `NodaTime`.  An entry that says `on` for a `codegen` query of a project without it is [SQLSRC281](diagnostics.md#sqlsrc281), at the entry, and the query keeps the type map's types.  On SQL Server NodaTime has no types yet, so `on` changes no C# type there.  A query method that reads NodaTime's types on PostgreSQL needs `UseNodaTime()` on the application's data source: see [PostgreSQL's query methods](postgresql.md#method-results).
+
+**In a settings file**, `libraryTypes` is a JSON object with a member for each library, `"nodaTime": "on"`.  A member whose library or state is not one is [SQLSRC019](diagnostics.md#sqlsrc019), and the other members still apply.  Two members for one library, `"nodaTime"` and `"NodaTime"`, are [SQLSRC020](diagnostics.md#sqlsrc020), and the first applies.
+
+**In a marker**, a `-- library-types:` line holds one entry or more, each `name=state` with no space around its `=`, separated by white space: `-- library-types: nodatime=on`.  The lines of one place add up, one for each library, and the same state twice is fine.  Two states for one library in the file header, or inside one query, are [SQLSRC112](diagnostics.md#sqlsrc112).  A line with no entry, or an entry that is not valid, is [SQLSRC111](diagnostics.md#sqlsrc111).
+
+The `sqlsource` tool does not read `libraryTypes`, and a `-- library-types:` marker changes nothing that is described: adding, changing or removing one leaves the query's sidecar current.
 
 <a id="setting-sql-location"></a>
 
@@ -732,11 +788,11 @@ A settings file is a file named `sqlsource.json`, in any folder.  It sets the se
 **What it holds** is one JSON object, whose members are the settings.  It may hold `//` and `/* */` comments, and a comma after the last member of an object or the last element of an array.
 
 - **The keys** are those of [the tables](#all-settings), `root` and `$schema`, matched exactly, case included: `Dialect` is not a key.  A key that is not one is [SQLSRC016](diagnostics.md#sqlsrc016), whose section lists them all, and a key written twice is [SQLSRC017](diagnostics.md#sqlsrc017).
-- **Each value is a JSON string**, except `root`, which is `true` or `false`, `generatorParameters`, an array of strings, and `typeOverrides` and `columnTypes`, each an object whose values are strings.  A value of another JSON type, `null` among them, is [SQLSRC018](diagnostics.md#sqlsrc018).
+- **Each value is a JSON string**, except `root`, which is `true` or `false`, `generatorParameters`, an array of strings, and `typeOverrides`, `columnTypes` and `libraryTypes`, each an object whose values are strings.  A value of another JSON type, `null` among them, is [SQLSRC018](diagnostics.md#sqlsrc018).
 - **A string is read as JSON writes it.**  The white space around it is ignored, and every character inside it is kept, a `;` or a `#` among them; there is no escape but JSON's own.  A string that is empty or white space sets nothing, and is no error.  To leave a setting to the files above, or to its default, leave its key out.
 - **`$schema`** is for your editor, which then checks the keys and values as you write them and offers them as you type: `https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/settings-v1.schema.json`.  SqlSource reads nothing of it.
 
-**The settings files of a `.sql` file** are the `sqlsource.json` of its folder and those of each folder above it, to the top of the drive, nearest first.  For each setting the nearest that sets it wins, so a file in a folder sets only what differs from the folders above it; the entries of `typeOverrides` and `columnTypes` add up instead, key by key, as [type overrides](#setting-type-overrides) says.  A file that says `"root": true` is the last: no `sqlsource.json` in a folder above it applies to the files below it.  Put one in the project's folder, or at the top of the repository, so that a settings file above it, elsewhere on the machine, never changes your build.  `"root": false`, or no `root`, lets the search go on.  A file whose text is not JSON ([SQLSRC015](diagnostics.md#sqlsrc015)) gives nothing, its `root` included, so the search goes past it to the folders above.
+**The settings files of a `.sql` file** are the `sqlsource.json` of its folder and those of each folder above it, to the top of the drive, nearest first.  For each setting the nearest that sets it wins, so a file in a folder sets only what differs from the folders above it; the entries of `typeOverrides`, `columnTypes` and `libraryTypes` add up instead, key by key, as [type overrides](#setting-type-overrides) says.  A file that says `"root": true` is the last: no `sqlsource.json` in a folder above it applies to the files below it.  Put one in the project's folder, or at the top of the repository, so that a settings file above it, elsewhere on the machine, never changes your build.  `"root": false`, or no `root`, lets the search go on.  A file whose text is not JSON ([SQLSRC015](diagnostics.md#sqlsrc015)) gives nothing, its `root` included, so the search goes past it to the folders above.
 
 - **A `.sql` file that the project lists from another folder**, outside the project's folder, takes the settings files of its own folder and the folders above it, not those of the project's folder.
 - **A type's [nested class](#setting-nested-class)** is the one setting taken from the settings files of a C# file: those of the folder of the C# file that carries `[SqlSourceGenerate]`.
@@ -746,7 +802,7 @@ A settings file is a file named `sqlsource.json`, in any folder.  It sets the se
 
 **In the build**, SqlSource keeps a settings file out of the output and publish folders where the SDK would copy it, as the Web SDK copies every `.json` file of a web project.  A copy rule of your own still copies it: a rule written for `appsettings.json`, such as `<None Update="**/*.json" CopyToOutputDirectory="PreserveNewest" />`, copies every `sqlsource.json` of the project too.  So name the files such a rule copies, as `Update="appsettings*.json"` does, or follow it with `<None Update="**/sqlsource.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />`.  Adding, deleting, moving or editing one makes the next build compile again, and an IDE that builds the project reads the same files.  The project file holds no setting: an MSBuild property or item metadata named after a setting is not read, and nothing reports it, so move such a value to a settings file.  The one MSBuild property of SqlSource that a project sets is [`SqlSourceIncludeFiles`](#included-files), which says which `.sql` files are included.
 
-See: [SQLSRC015](diagnostics.md#sqlsrc015), a file that is not a JSON object; [SQLSRC016](diagnostics.md#sqlsrc016), a key that is not known; [SQLSRC017](diagnostics.md#sqlsrc017), a key written twice; [SQLSRC018](diagnostics.md#sqlsrc018), a value of the wrong JSON type; [SQLSRC019](diagnostics.md#sqlsrc019), a value that is not valid; [SQLSRC020](diagnostics.md#sqlsrc020), a key repeated in `typeOverrides` or `columnTypes`.
+See: [SQLSRC015](diagnostics.md#sqlsrc015), a file that is not a JSON object; [SQLSRC016](diagnostics.md#sqlsrc016), a key that is not known; [SQLSRC017](diagnostics.md#sqlsrc017), a key written twice; [SQLSRC018](diagnostics.md#sqlsrc018), a value of the wrong JSON type; [SQLSRC019](diagnostics.md#sqlsrc019), a value that is not valid; [SQLSRC020](diagnostics.md#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`.
 
 <a id="known-issues"></a>
 

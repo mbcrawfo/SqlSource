@@ -30,7 +30,7 @@ internal static class SettingsFileReader
 
     /// <summary>
     /// Reads <paramref name="text" />, the text of a settings file without a byte order mark.  The entries of the type
-    /// override and the column types carry <paramref name="place" />.
+    /// override, the column types and the library types carry <paramref name="place" />.
     /// </summary>
     public static SettingsFile Read(string text, SettingPlace place)
     {
@@ -40,6 +40,7 @@ internal static class SettingsFileReader
                 null,
                 null,
                 SettingsLevel.None,
+                EquatableArray<LibraryMember>.Empty,
                 new EquatableArray<SettingsFileError>(ImmutableArray.Create(invalid))
             );
         }
@@ -49,7 +50,8 @@ internal static class SettingsFileReader
         var walk = new Walk(text, errors, values);
         walk.ReadMembers();
 
-        var source = new SettingsFileSource(values, place, errors);
+        var libraryMembers = new List<LibraryMember>();
+        var source = new SettingsFileSource(values, text, place, errors, libraryMembers);
         var level = SettingsLevelReader.Read(ref source);
         var sorted =
             errors.Count == 0
@@ -57,7 +59,8 @@ internal static class SettingsFileReader
                 : new EquatableArray<SettingsFileError>(
                     errors.OrderBy(static error => error.Span.Start).ToImmutableArray()
                 );
-        return new SettingsFile(walk.Root, walk.Dialect, level, sorted);
+        var members = new EquatableArray<LibraryMember>(libraryMembers.ToImmutableArray());
+        return new SettingsFile(walk.Root, walk.Dialect, level, members, sorted);
     }
 
     private static SettingsFileError? CheckGrammar(string text)

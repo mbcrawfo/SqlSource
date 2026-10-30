@@ -15,4 +15,9 @@
     // The C# type that timestamptz is read as, in place of the default of the type map.
     "timestamptz": "System.DateTimeOffset",
   },
+  "libraryTypes": {
+    // Off for every query of the project but those of EndToEnd/NodaTime/, whose own settings file gives the detected
+    // library back: the project references Npgsql.NodaTime, which would otherwise turn NodaTime on here.
+    "nodaTime": "off",
+  },
 }

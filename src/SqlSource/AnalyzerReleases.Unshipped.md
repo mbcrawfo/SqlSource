@@ -124,4 +124,5 @@ SQLSRC277 | SqlSource | Error | Method marked as a converter is not one
 SQLSRC278 | SqlSource | Error | Two converters convert between the same types
 SQLSRC279 | SqlSource | Error | Converters do not convert from the database type
 SQLSRC280 | SqlSource | Error | Converter is missing for one direction
+SQLSRC281 | SqlSource | Error | A library that is on is not referenced
 SQLSRC284 | SqlSource | Warning | Short name finds a type that only a package brings

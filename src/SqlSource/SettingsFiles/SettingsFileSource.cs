@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Settings;
+using SqlSource.Settings.Libraries;
 
 namespace SqlSource.SettingsFiles;
 
@@ -10,12 +11,16 @@ namespace SqlSource.SettingsFiles;
 /// reader finds not valid into errors at the positions of the file.  Used only by <see cref="SettingsFileReader" />.
 /// </summary>
 /// <param name="values">The raw value of each setting the file gives, by <see cref="SettingId" />.</param>
-/// <param name="place">The place the entries of the type override and the column types carry.</param>
+/// <param name="text">The text of the file, which the line and column of a member are found in.</param>
+/// <param name="place">The place the entries of the type override, column types and library types carry.</param>
 /// <param name="errors">The reader's list, which the errors are added to.</param>
+/// <param name="libraryMembers">The reader's list, which the position of each entry's member is added to.</param>
 internal readonly struct SettingsFileSource(
     SettingsFileValue?[] values,
+    string text,
     SettingPlace place,
-    List<SettingsFileError> errors
+    List<SettingsFileError> errors,
+    List<LibraryMember> libraryMembers
 ) : ISettingSource
 {
     public SettingPlace Place => place;
@@ -25,6 +30,14 @@ internal readonly struct SettingsFileSource(
     public IReadOnlyList<string>? Elements(SettingId setting) => values[(int)setting]?.Elements;
 
     public IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting) => values[(int)setting]?.Members;
+
+    // The member from its key to its value, as InvalidPart reports one, kept beside the level and not in it.
+    public void LibraryEntry(SqlLibrary library, int index)
+    {
+        var value = ValueOf(SettingId.LibraryTypes);
+        var span = TextSpan.FromBounds(value.KeySpans![index].Start, value.Spans[index].End);
+        libraryMembers.Add(new LibraryMember(library, span, TextLines.LineSpanOf(text, span)));
+    }
 
     public T? Choice<T>(SettingId setting)
         where T : struct, Enum

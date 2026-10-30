@@ -145,6 +145,31 @@
         "pattern": "\\S"
       }
     },
+    "libraryTypes": {
+      "description": "Libraries whose types SqlSource uses, and `on`, `off` or `default` for each, as `\"nodaTime\": \"on\"`. Matched ignoring case, hyphens and spaces. `default` ignores what the settings files above this one say about the library.",
+      "type": "object",
+      "propertyNames": {
+        "anyOf": [
+          {
+            "enum": ["nodaTime"]
+          },
+          {
+            "pattern": "^\\s*(?:[- \\t]*(?:[nN][- \\t]*[oO][- \\t]*[dD][- \\t]*[aA][- \\t]*[tT][- \\t]*[iI][- \\t]*[mM][- \\t]*[eE][- \\t]*))\\s*$"
+          }
+        ]
+      },
+      "additionalProperties": {
+        "type": "string",
+        "anyOf": [
+          {
+            "enum": ["on", "off", "default"]
+          },
+          {
+            "pattern": "^\\s*(?:[- \\t]*(?:[oO][- \\t]*[nN][- \\t]*|[oO][- \\t]*[fF][- \\t]*[fF][- \\t]*|[dD][- \\t]*[eE][- \\t]*[fF][- \\t]*[aA][- \\t]*[uU][- \\t]*[lL][- \\t]*[tT][- \\t]*))\\s*$"
+          }
+        ]
+      }
+    },
     "nestedClass": {
       "description": "The name of the class that holds a type's queries: a C# identifier that is not a keyword. Default `Sql`.",
       "type": "string"

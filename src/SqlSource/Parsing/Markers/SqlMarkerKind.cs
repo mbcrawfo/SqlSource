@@ -69,4 +69,9 @@ internal enum SqlMarkerKind
     /// header, the C# type of the columns read from one column of a table or view.
     /// </summary>
     Column,
+
+    /// <summary>
+    /// <c>-- library-types:</c> turns the types of a library on or off, for a query or for every query of its file.
+    /// </summary>
+    LibraryTypes,
 }

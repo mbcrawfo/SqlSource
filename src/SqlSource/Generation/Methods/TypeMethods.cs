@@ -23,7 +23,13 @@ namespace SqlSource.Generation.Methods;
 /// </param>
 /// <param name="AttributeLocation">Where the type's attribute is.</param>
 /// <param name="Methods">The methods, in the order of the type's files and of their queries.</param>
-/// <param name="Diagnostics">The problems of the methods, each at its query's name.</param>
+/// <param name="Diagnostics">
+/// The problems of the methods, each at its query's name, or at the marker of a library that the project cannot use.
+/// </param>
+/// <param name="SettingsFileLibraries">
+/// The libraries that a settings file turns on for the methods and that the project cannot use, without the
+/// positions of their members, which <see cref="SettingsFileLibraryUse.Locate" /> finds.
+/// </param>
 /// <param name="CodeGenEngines">The engines of the type's queries whose output is <c>CodeGen</c>.</param>
 /// <param name="WarningIds">
 /// The ids of the compiler's warnings that the methods give, which their file disables: of every converter they call
@@ -41,6 +47,7 @@ internal sealed record TypeMethods(
     LocationInfo AttributeLocation,
     EquatableArray<QueryMethod> Methods,
     EquatableArray<DiagnosticInfo> Diagnostics,
+    EquatableArray<SettingsFileLibraryUse> SettingsFileLibraries,
     CodeGenEngines CodeGenEngines,
     EquatableArray<string> WarningIds
 )

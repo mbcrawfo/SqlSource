@@ -1,0 +1,12 @@
+{
+  "libraryTypes": {
+    // NodaTime takes the engine's default, which the project's reference to Npgsql.NodaTime turns on, over the off of
+    // the project's settings file.
+    "nodaTime": "default",
+  },
+  "typeOverrides": {
+    // The type map's own C# type for timestamptz, which is NodaTime's Instant here: the override of the project's
+    // settings file would otherwise win over the library's row.
+    "timestamptz": "default",
+  },
+}

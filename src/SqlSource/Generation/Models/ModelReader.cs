@@ -156,7 +156,8 @@ internal static class ModelReader
                 output,
                 columnNames,
                 entry.MatchesTable,
-                parameterTypes
+                parameterTypes,
+                types.UnavailableLibraries
             );
     }
 

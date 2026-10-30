@@ -1,4 +1,5 @@
 using SqlSource.Generation.Types.MappedTypes;
+using SqlSource.Settings.Libraries;
 
 namespace SqlSource.Generation.Types.Maps;
 
@@ -35,6 +36,10 @@ namespace SqlSource.Generation.Types.Maps;
 /// The C# type as the type override, the column types or the marker wrote it, which <c>SQLSRC284</c> names, set
 /// exactly when <paramref name="Package" /> is.
 /// </param>
+/// <param name="Library">
+/// The library whose row gave the C# type, or null for the type override's, the column types', a marker's and the
+/// base map's.  An array's or a domain's mapping that is its element's or base's keeps it.
+/// </param>
 internal sealed record TypeMapping(
     TypeMappingKind Kind,
     string Key,
@@ -44,7 +49,8 @@ internal sealed record TypeMapping(
     EquatableArray<string> WarningIds,
     string? Detail,
     PackageBinding? Package = null,
-    string? Written = null
+    string? Written = null,
+    SqlLibrary? Library = null
 )
 {
     /// <summary>A public C# type whose use gives no warning.</summary>

@@ -334,6 +334,30 @@ Each of these is an error at the query's name, and the query has no models until
 - **Two columns, or two parameters, whose properties have one name ignoring case**, as `SELECT u.id, o.id`, or `user_id` beside `userId`: [SQLSRC255](diagnostics.md#sqlsrc255).  Names are compared ignoring case, since Dapper matches a column to a property ignoring case.
 - **A name that a record or `object` already has a member of**, `EqualityContract`, `Equals`, `GetHashCode`, `ToString`, `GetType`, `MemberwiseClone`, `Finalize`, `ReferenceEquals`, `PrintMembers`, `Deconstruct` or `Clone`, or the name of the model itself: [SQLSRC256](diagnostics.md#sqlsrc256).
 
+<a id="property-types"></a>
+
+### Property types
+
+```sql postgres
+-- column: users.id -> UserId
+
+-- name: GetUser
+-- column: nickname -> Nickname
+SELECT id, nickname, created_at, born
+FROM users
+WHERE id = @id;
+```
+
+A property has the C# type of its column or parameter.  Above, in a project that maps `"date": "System.DateOnly"` with the type override and references `Npgsql.NodaTime`, `Id` is a `UserId` by the file header's column type, `Nickname` a `Nickname` by its query's marker, `CreatedAt`, a `timestamptz`, a `NodaTime.Instant` by NodaTime under `codegen` and a `System.DateTime` under `models`, and `Born`, a `date`, a `System.DateOnly` by the type override.  A column's C# type is the first of these that gives one:
+
+1. its query's `-- column: name -> Type` marker: see [the `-- column:` marker](#column-marker);
+2. the [column types](settings.md#setting-column-types), by the column of a table or view it is read from;
+3. the [type override](settings.md#setting-type-overrides), by its database type;
+4. a library of the [library types](settings.md#setting-library-types) that is on for the query, NodaTime on PostgreSQL, for a query whose output is `codegen` alone;
+5. the type map of [PostgreSQL](postgresql.md#type-map) or [SQL Server](sqlserver.md#types).
+
+A parameter's is its [`-- param:` marker](parameters-and-tokens.md#param-marker)'s C# type after `->`, then the type override's, the library's and the type map's.  Each of the first three is a type you chose, which a query method reads and sends through your [converters](settings.md#converters) when it has them; a library's type and the type map's are read and sent by the driver.
+
 <a id="model-nullability"></a>
 
 ### Which properties can be null
@@ -434,6 +458,7 @@ A model is generated once for its full name, however many queries and types ask 
 
 - **Two models of one name that differ** are [SQLSRC257](diagnostics.md#sqlsrc257), which names the first difference.  The queries are taken in the order of their files' paths, then of their order in a file, then of the names of the types that claim them, and the error is at the later query, at its `-- input-model:` or `-- output-model:` marker, or at its name when it has none.  The earlier query's model is generated, and the later query has none of that kind until the two agree.
 - **An input model and an output model are never shared**, so one name for both, which two equal suffixes give a query, is SQLSRC257 too.
+- **A model shared across outputs can differ by a library's types.**  A query whose output is `codegen` gets a library's types where the [library types](settings.md#setting-library-types) turn it on, NodaTime's `Instant` for a `timestamptz` on PostgreSQL, while a query whose output is `models` keeps the type map's `System.DateTime`.  So a table model, or a model named by a marker, that a `codegen` query and a `models` query share, or two `codegen` queries where the library is on for one and off for the other, is SQLSRC257.  Name the models apart with [`-- output-model:`](settings.md#setting-model-name), or turn the library on or off alike for both.
 - **A shared model's documentation is its first query's**: that query's summary, and its columns' or parameters' documentation, though another query's column comes from another table.
 
 <a id="unusable-model-names"></a>
@@ -578,6 +603,7 @@ The [result shape](sql-files.md#result-shapes) after the query's name says what 
 - **A property that can be null** is null when its column is.
 - **A property that cannot be null is read with no check**, so a null in its column throws, as the driver reports it: Npgsql's `InvalidCastException` "Column 'name' is null.", and Microsoft.Data.SqlClient's `SqlNullValueException` "Data is Null.".  Microsoft.Data.SqlClient gives no error for a null `vector`, so the method checks such a column itself, and throws `InvalidCastException` "Column 'embedding' is null." with the column's name.  A `!` at the end of an alias, a `-- column:` marker that says `not null`, or a column that the tool showed is never null, is so checked the first time a null arrives, and never read as a default value.
 - **Each column is read as its property's C# type**, and each parameter sent as one, unless a converter converts it.  A C# type that a [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a `-- param:` marker names, with no converter, is given to the driver as it is, which suits a type the driver knows or was taught, and throws the driver's `InvalidCastException` for one it was never taught: see [converters](settings.md#converters).
+- **A column or parameter whose type a library gives**, NodaTime's on PostgreSQL by the [library types](settings.md#setting-library-types), is read and sent by the library's plugin for the driver, which your application registers on its data source: see [what a method reads and throws](postgresql.md#method-results).  Without it, the driver throws `InvalidCastException`.
 - **A column whose type a type override or a column type chose, and that has a [converter](settings.md#converters)**, is read as the type the driver reads its database type as, and that value given to the converter, whose result is the property's value.  A null never reaches the converter: a property that cannot be null throws as above, before the converter is called.
 
 <a id="method-parameters"></a>

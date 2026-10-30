@@ -1,0 +1,73 @@
+using System;
+using System.Collections.Generic;
+using SqlSource.Settings.Libraries;
+using SqlSource.Snapshot;
+
+namespace SqlSource.Generation.Types.Maps;
+
+/// <summary>
+/// The rows of the libraries that are on, which <see cref="PostgresTypeMap.Map" /> asks after the type override and
+/// before the base map.  A row gives a library's own C# type for a type of <c>pg_catalog</c>, and writes it
+/// <c>global::</c>-qualified: the generator names no library type itself.
+/// </summary>
+internal sealed class LibraryRows
+{
+    // The only library there is: its set is the only one that is not empty.  A second library makes one instance for
+    // each set of libraries, cached the same way.
+    private static readonly LibraryRows NodaTimeOnly = new(NodaTimeRows());
+
+    private readonly Dictionary<string, TypeMapping> _rows;
+
+    private LibraryRows(Dictionary<string, TypeMapping> rows)
+    {
+        _rows = rows;
+    }
+
+    /// <summary>
+    /// The rows of <paramref name="on" />: the same instance each time for the same libraries, and null when there are
+    /// none.
+    /// </summary>
+    public static LibraryRows? Of(IReadOnlyList<SqlLibrary> on)
+    {
+        for (var i = 0; i < on.Count; i++)
+        {
+            if (on[i] == SqlLibrary.NodaTime)
+            {
+                return NodaTimeOnly;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The library's mapping of <paramref name="type" />, or null when it has none: a type of <c>pg_catalog</c> that
+    /// a row names, by its <c>InternalName</c> ignoring case, as the base map's rows are.
+    /// </summary>
+    public TypeMapping? Find(PostgresType type) =>
+        PostgresTypeMap.IsSystemType(type) && _rows.TryGetValue(type.InternalName, out var row) ? row : null;
+
+    private static Dictionary<string, TypeMapping> NodaTimeRows()
+    {
+        const string Noda = "global::NodaTime.";
+        const string Range = "global::NpgsqlTypes.NpgsqlRange<" + Noda;
+        var rows = new Dictionary<string, TypeMapping>(StringComparer.OrdinalIgnoreCase);
+
+        void Add(string key, string text, bool isValueType) =>
+            rows.Add(key, TypeMapping.Mapped(key, text, isValueType) with { Library = SqlLibrary.NodaTime });
+
+        Add("timestamptz", Noda + "Instant", true);
+        Add("timestamp", Noda + "LocalDateTime", true);
+        Add("date", Noda + "LocalDate", true);
+        Add("time", Noda + "LocalTime", true);
+        Add("timetz", Noda + "OffsetTime", true);
+        Add("interval", Noda + "Period", false);
+        Add("tstzrange", Range + "Instant>", true);
+        Add("tsrange", Range + "LocalDateTime>", true);
+        Add("daterange", Range + "LocalDate>", true);
+        Add("tstzmultirange", Range + "Instant>[]", false);
+        Add("tsmultirange", Range + "LocalDateTime>[]", false);
+        Add("datemultirange", Range + "LocalDate>[]", false);
+        return rows;
+    }
+}

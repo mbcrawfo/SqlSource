@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using Xunit;
 
@@ -300,6 +302,75 @@ public sealed class SettingsLevelReaderTests
         source.RepeatedKeys.ShouldBe([(SettingId.ColumnTypes, 2, 1)]);
     }
 
+    [Fact]
+    public void LibraryTypes_AreReadFromMembers()
+    {
+        var source = new FakeSource(
+            [],
+            SettingsFile,
+            members: new Dictionary<SettingId, KeyValuePair<string, string>[]>
+            {
+                [SettingId.LibraryTypes] = [new(" NodaTime ", " Default ")],
+            }
+        );
+
+        var level = SettingsLevelReader.Read(ref source);
+
+        level
+            .LibraryTypes.ShouldNotBeNull()
+            .ShouldBe([new LibrarySetting(SqlLibrary.NodaTime, LibraryState.Default, SettingsFile)]);
+        source.LibraryEntries.ShouldBe([(SqlLibrary.NodaTime, 0)]);
+        source.Invalids.ShouldBeEmpty();
+        source.InvalidParts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void LibraryTypes_InvalidMemberIsReportedByIndex()
+    {
+        var source = new FakeSource(
+            [],
+            members: new Dictionary<SettingId, KeyValuePair<string, string>[]>
+            {
+                [SettingId.LibraryTypes] = [new("nodaTime", "maybe"), new("json", "on")],
+            }
+        );
+
+        SettingsLevelReader.Read(ref source).ShouldBeSameAs(SettingsLevel.None);
+        source.InvalidParts.ShouldBe([(SettingId.LibraryTypes, 0), (SettingId.LibraryTypes, 1)]);
+        source.RepeatedKeys.ShouldBeEmpty();
+        source.LibraryEntries.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void LibraryTypes_RepeatedLibraryIsRepeatedKey()
+    {
+        var source = new FakeSource(
+            [],
+            members: new Dictionary<SettingId, KeyValuePair<string, string>[]>
+            {
+                [SettingId.LibraryTypes] = [new("nodaTime", "on"), new("noda-time", "off")],
+            }
+        );
+
+        var level = SettingsLevelReader.Read(ref source);
+
+        level.LibraryTypes.ShouldNotBeNull().Select(static entry => entry.State).ShouldBe([LibraryState.On]);
+        source.RepeatedKeys.ShouldBe([(SettingId.LibraryTypes, 1, 0)]);
+        source.InvalidParts.ShouldBeEmpty();
+        source.LibraryEntries.ShouldBe([(SqlLibrary.NodaTime, 0)]);
+    }
+
+    [Fact]
+    public void LibraryTypes_ASettingWithAnEmptyObject_IsNotSet()
+    {
+        var source = new FakeSource(
+            [],
+            members: new Dictionary<SettingId, KeyValuePair<string, string>[]> { [SettingId.LibraryTypes] = [] }
+        );
+
+        SettingsLevelReader.Read(ref source).ShouldBeSameAs(SettingsLevel.None);
+    }
+
     // An object with no valid member sets nothing.
     [Theory]
     [InlineData("TypeOverrides")]
@@ -322,8 +393,8 @@ public sealed class SettingsLevelReaderTests
         invalid.InvalidParts.ShouldBe([(id, 0)]);
     }
 
-    // The parameters' array form is asked for before their text.  The type override and the column types are asked for
-    // as members alone.
+    // The parameters' array form is asked for before their text.  The type override, the column types and the library
+    // types are asked for as members alone.
     [Fact]
     public void Read_EverySetting_IsAskedForInTheOrderOfTheEnum()
     {
@@ -344,6 +415,7 @@ public sealed class SettingsLevelReaderTests
             "Choice(CollectionType)",
             "Members(TypeOverrides)",
             "Members(ColumnTypes)",
+            "Members(LibraryTypes)",
             "Text(NestedClass)",
         ]);
     }
@@ -367,6 +439,9 @@ public sealed class SettingsLevelReaderTests
 
         public List<(SettingId Setting, int Index, int First)> RepeatedKeys { get; } = [];
 
+        // Each member that gave an entry of the library types, as its library and its index.
+        public List<(SqlLibrary Library, int Index)> LibraryEntries { get; } = [];
+
         // Each call, as the method and the setting.
         public List<string> Asked { get; } = [];
 
@@ -387,6 +462,8 @@ public sealed class SettingsLevelReaderTests
             Asked.Add($"Members({setting})");
             return members is not null && members.TryGetValue(setting, out var written) ? written : null;
         }
+
+        public readonly void LibraryEntry(SqlLibrary library, int index) => LibraryEntries.Add((library, index));
 
         public readonly T? Choice<T>(SettingId setting)
             where T : struct, Enum

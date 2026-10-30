@@ -54,6 +54,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         RegisterTypeSources(context, typeQueries);
         RegisterMethodSources(
             context,
+            settingsFiles,
             typeQueries,
             models.AllFileModels,
             models.Models,
@@ -449,6 +450,15 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .CompilationProvider.Select(static (compilation, _) => SqlClientProbe.Read(compilation))
             .WithTrackingName(TrackingNames.SqlClientProbe);
 
+        // The libraries the project references, the same way, which the library switch needs to know which can be on.
+        var libraryProbe = context
+            .CompilationProvider.Select(static (compilation, _) => LibraryProbe.Read(compilation))
+            .WithTrackingName(TrackingNames.LibraryProbe);
+
+        // The probe without NodaTime's version, which typing does not read, so that a change of the version alone types
+        // no file again.
+        var typingLibraryProbe = libraryProbe.Select(static (probe, _) => probe with { NodaTimeVersion = null });
+
         // The C# types that the type override names at any level, as a sorted list of their names, which an edit that
         // leaves the names alone gives again, equal.
         var mappedTypeNames = fileLevels
@@ -486,11 +496,11 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // The C# types of each claimed file's usable entries, a node for each file after its check, so that an edit to
         // one file or one sidecar types that file alone.  A file with no usable entry carries nothing to type.  Each
         // file keeps its input beside its types, so that the models read its entries without typing it again.  The
-        // input keeps the type override and the column types of the file's level alone, so that a change to another
-        // setting types no file again.
+        // input keeps the type override, the column types and the library types of the file's level alone, so that a
+        // change to another setting types no file again.
         var typedFiles = sidecarChecks.Then(each =>
             each.Combine(parsedFiles.Combine(fileLevels))
-                .Combine(npgsqlProbe.Combine(sqlClientProbe.Combine(mappedTypes)))
+                .Combine(npgsqlProbe.Combine(sqlClientProbe.Combine(typingLibraryProbe.Combine(mappedTypes))))
                 .Select(
                     static (input, _) =>
                         FileTypesInput.Gather(
@@ -499,7 +509,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                             input.Left.Right.Right,
                             input.Right.Left,
                             input.Right.Right.Left,
-                            input.Right.Right.Right
+                            input.Right.Right.Right.Left,
+                            input.Right.Right.Right.Right
                         )
                 )
                 .WithTrackingName(TrackingNames.FileTypesInput)
@@ -517,7 +528,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (resolved, _) => resolved.Converters)
             .WithTrackingName(TrackingNames.MappedTypeConverters);
 
-        return new TypedFiles(npgsqlProbe, sqlClientProbe, typedFiles, fileTypes, mappedTypeConverters);
+        return new TypedFiles(npgsqlProbe, sqlClientProbe, libraryProbe, typedFiles, fileTypes, mappedTypeConverters);
     }
 
     // The project's converters, from the methods of its source that carry the converter attribute and from the mapped
@@ -744,10 +755,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
-    // The file of each type's methods, and their diagnostics, with the clashes across types and SQLSRC273 for each
-    // engine whose methods have no driver.
+    // The file of each type's methods, and their diagnostics, with the clashes across types, SQLSRC281 at each member
+    // of a settings file that turns on a library the project cannot use, and SQLSRC273 for each engine whose methods
+    // have no driver.
     private static void RegisterMethodSources(
         IncrementalGeneratorInitializationContext context,
+        IncrementalValueProvider<SettingsFileSet> settingsFiles,
         IncrementalValuesProvider<TypeQueries> typeQueries,
         IncrementalValueProvider<EquatableArray<FileModels>> allFileModels,
         IncrementalValueProvider<ModelSet> models,
@@ -842,7 +855,22 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (diagnostics, _) => MethodPlanner.Distinct(diagnostics))
             .WithTrackingName(TrackingNames.MethodDiagnostics);
 
+        // The libraries that a settings file turns on and the project cannot use, each once, without the positions of
+        // their members, which no step before this one carries: an edit of a settings file that only moves a member
+        // types and plans nothing again, and finds the member again here, in the file as it is read now.
+        var settingsFileLibraryUses = typeMethods
+            .Select(static (methods, _) => methods.SettingsFileLibraries)
+            .Collect()
+            .Select(static (uses, _) => SettingsFileLibraryUse.Distinct(uses))
+            .WithTrackingName(TrackingNames.SettingsFileLibraryUses);
+
+        var settingsFileLibraryDiagnostics = settingsFileLibraryUses
+            .Combine(settingsFiles)
+            .Select(static (input, _) => SettingsFileLibraryUse.Locate(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.SettingsFileLibraryDiagnostics);
+
         context.RegisterSourceOutput(methodDiagnostics, ReportAll);
+        context.RegisterSourceOutput(settingsFileLibraryDiagnostics, ReportAll);
         context.RegisterSourceOutput(conflicts, ReportConflicts);
         context.RegisterSourceOutput(methodOutputs, AddMethods);
 
@@ -1075,11 +1103,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         FileNodes<SidecarCheckResult> Checks
     );
 
-    // The drivers the project references, each claimed file typed, its types alone, and the converters of the mapped
-    // types.
+    // The drivers and the libraries the project references, each claimed file typed, its types alone, and the
+    // converters of the mapped types.
     private readonly record struct TypedFiles(
         IncrementalValueProvider<NpgsqlProbe> NpgsqlProbe,
         IncrementalValueProvider<SqlClientProbe> SqlClientProbe,
+        IncrementalValueProvider<LibraryProbe> LibraryProbe,
         FileNodes<TypedFile> Files,
         FileNodes<FileTypes> FileTypes,
         IncrementalValueProvider<EquatableArray<Converter>> MappedTypeConverters

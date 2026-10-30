@@ -201,13 +201,19 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC279](#sqlsrc279) | Converters do not convert from the database type |
 | [SQLSRC280](#sqlsrc280) | Converter is missing for one direction |
 
+**The libraries of a query**
+
+| Id | Title |
+|----|----|
+| [SQLSRC281](#sqlsrc281) | A library that is on is not referenced |
+
 **A short name of your choice**
 
 | Id | Title |
 |----|----|
 | [SQLSRC284](#sqlsrc284) | Short name finds a type that only a package brings |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides` or `columnTypes`, is the build's alone.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
@@ -230,6 +236,8 @@ The ids from `SQLSRC253` to `SQLSRC260` are reported by the build, about the [mo
 The ids from `SQLSRC272` to `SQLSRC276` are reported by the build, about the [method](generator.md#query-methods) of a query whose output is `codegen`.  `SQLSRC272`, `SQLSRC274` and `SQLSRC275` are reported at the query's name, once however many types claim its file, except a `SQLSRC274` whose cause is of one type, which each such type reports, and one for the methods of two types that clash, which each of the two queries gets.  A query of a file that two types of one namespace claim gives each type a method of one signature, so it gets one `SQLSRC274` for each type, each naming the other.  A query gets every one of them that it has, and no method until all are fixed; its models are still generated.  `SQLSRC273` has no file and line, and is reported once for the project and database.  `SQLSRC276` is about the extension class that holds a type's methods, and is reported at the type's `[SqlSourceGenerate]`, once for each type whose methods would go into the class.
 
 The ids from `SQLSRC277` to `SQLSRC280` are reported by the build, about converters, the methods marked `[SqlSourceConverter]`.  `SQLSRC277` and `SQLSRC278` are about the methods of the project's own code: at the method's name, whatever the output of the project, its types and its files, and whether a query uses the method or not.  A converter of a type that a type override, a column type or a `-- param:` marker names, declared in a referenced assembly, has no place in the project, so `SQLSRC277` and `SQLSRC278` are reported for it at the name of each query whose output is `codegen` and whose method would use it.  `SQLSRC279` and `SQLSRC280` are about a column or a parameter of a query whose output is `codegen`, whose C# type a type override, a column type or a `-- param:` marker chose, and whose type has converters that do not serve it.  Each of these at a query is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.  A project whose output is `models` uses no converter, and gets none of them at a query, and neither does a query whose database's driver the project does not reference, which [SQLSRC273](#sqlsrc273) is about.
+
+`SQLSRC281` is reported by the build, about the [library types](settings.md#setting-library-types) of a query whose output is `codegen`: at the entry of a settings file or the marker that turns a library on, once for each database whose queries it reaches, and never for a query whose output is `models` or `sql`.  The query keeps its models and its method.
 
 `SQLSRC284` is reported by the build, as `SQLSRC250` to `SQLSRC252` are, at the name of a query whose output is `models` or `codegen`, once for each column and parameter whose C# type you chose by a short name that it is about.  It is a warning, and the query keeps the type: it gets its models, and under `codegen` its method.
 
@@ -427,7 +435,7 @@ A key of the top-level object of a settings file is not one of its keys.  Keys a
 }
 ```
 
-The keys are `$schema`, `root`, `dialect`, `database`, `output`, `generatorParameters`, `inputModelSuffix`, `outputModelSuffix`, `modelNamespace`, `inputModelType`, `outputModelType`, `collectionType`, `typeOverrides`, `columnTypes` and `nestedClass`.  Correct the key, or remove the member.  While it is wrong its value is not read, and the other members still apply.
+The keys are `$schema`, `root`, `dialect`, `database`, `output`, `generatorParameters`, `inputModelSuffix`, `outputModelSuffix`, `modelNamespace`, `inputModelType`, `outputModelType`, `collectionType`, `typeOverrides`, `columnTypes`, `libraryTypes` and `nestedClass`.  Correct the key, or remove the member.  While it is wrong its value is not read, and the other members still apply.
 
 See: [Settings files](settings.md#settings-files)
 
@@ -453,7 +461,7 @@ See: [Settings files](settings.md#settings-files)
 
 **Settings file value has the wrong type**
 
-A value of a settings file is not of the JSON type its key takes.  `root` takes `true` or `false`, `generatorParameters` an array of strings, `typeOverrides` and `columnTypes` an object whose values are strings, and every other key a string.  `null` is of the wrong type for every key.  The message names the key and what it takes, and the error is at the value.
+A value of a settings file is not of the JSON type its key takes.  `root` takes `true` or `false`, `generatorParameters` an array of strings, `typeOverrides`, `columnTypes` and `libraryTypes` an object whose values are strings, and every other key a string.  `null` is of the wrong type for every key.  The message names the key and what it takes, and the error is at the value.
 
 ```jsonc
 {
@@ -467,7 +475,7 @@ A value of a settings file is not of the JSON type its key takes.  `root` takes 
 }
 ```
 
-Write the value as its key takes it: `"root": true`, `"generatorParameters": ["keep-comments"]`.  While a value is of the wrong type its setting is not set by the file.  An element of `generatorParameters`, or a member of `typeOverrides` or `columnTypes`, of the wrong type is reported on its own and left out, and the others still apply; an array that has elements, none of them a string, sets nothing, while `[]` is the empty list.  To leave a setting unset, remove its member: an empty string, or one of white space, also sets nothing for a key that takes a string, and is not an error.
+Write the value as its key takes it: `"root": true`, `"generatorParameters": ["keep-comments"]`.  While a value is of the wrong type its setting is not set by the file.  An element of `generatorParameters`, or a member of `typeOverrides`, `columnTypes` or `libraryTypes`, of the wrong type is reported on its own and left out, and the others still apply; an array that has elements, none of them a string, sets nothing, while `[]` is the empty list.  To leave a setting unset, remove its member: an empty string, or one of white space, also sets nothing for a key that takes a string, and is not an error.
 
 See: [Settings files](settings.md#settings-files)
 
@@ -475,7 +483,7 @@ See: [Settings files](settings.md#settings-files)
 
 **Settings file value is not valid**
 
-A value of a settings file is of the JSON type its key takes, but its setting does not take it.  The message quotes the value, trimmed, and names the key; for a member of `typeOverrides` or `columnTypes` it quotes the member as `key: type`.  The error is at the string, or for a member from its key to its value.
+A value of a settings file is of the JSON type its key takes, but its setting does not take it.  The message quotes the value, trimmed, and names the key; for a member of `typeOverrides`, `columnTypes` or `libraryTypes` it quotes the member as `key: value`.  The error is at the string, or for a member from its key to its value.
 
 ```jsonc
 {
@@ -489,10 +497,13 @@ A value of a settings file is of the JSON type its key takes, but its setting do
     "columnTypes": {
         "id": "MyApp.UserId",
     },
+    "libraryTypes": {
+        "nodaTime": "yes",
+    },
 }
 ```
 
-Correct the value, or remove it.  While it is wrong the setting is not set by this file, so a farther settings file or the default applies.  In `generatorParameters`, `typeOverrides` and `columnTypes` each element or member that is not valid is reported on its own, and the others still apply, with one exception: `default` beside another generator parameter makes the whole list not set, and each `default` is reported.  For a key that takes a string, a value that is empty or white space sets nothing and is not an error, and such an element of `generatorParameters` is skipped; a member of `typeOverrides` or `columnTypes` whose key or type is empty or white space is reported.
+Correct the value, or remove it.  While it is wrong the setting is not set by this file, so a farther settings file or the default applies.  In `generatorParameters`, `typeOverrides`, `columnTypes` and `libraryTypes` each element or member that is not valid is reported on its own, and the others still apply, with one exception: `default` beside another generator parameter makes the whole list not set, and each `default` is reported.  For a key that takes a string, a value that is empty or white space sets nothing and is not an error, and such an element of `generatorParameters` is skipped; a member of `typeOverrides`, `columnTypes` or `libraryTypes` whose key or value is empty or white space is reported.
 
 `dialect` takes a dialect's name, `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` or `oracle`, in any case.  `sqlserver` and `tsql` also mean `mssql`, `postgresql` also means `postgres`, and `cockroach` also means `cockroachdb`.  After `mysql` or `mariadb` the value may name options, each after a comma, as in `"mysql,ansi-quotes"`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  An option that does not exist, an option after any other dialect, and a comma with nothing before it or after it each make the whole value wrong.
 
@@ -510,13 +521,15 @@ The rules are in [type overrides](settings.md#setting-type-overrides).
 
 `columnTypes` takes members `"key": "type"`, trimmed in the same way.  Its key is the column a value is read from, `table.column` or `schema.table.column`, each part plain or in double quotes, so `id`, of one part, is reported, and so are a key of four parts, a key in brackets and a key with `[]`.  Its C# type is read as a type override's is, or is `default`.  The rules are in [column types](settings.md#setting-column-types).
 
+`libraryTypes` takes members `"library": "state"`, each trimmed and matched ignoring case, hyphens and spaces: the library is `nodaTime`, and the state `on`, `off` or `default`.  The message names them.  The rules are in [library types](settings.md#setting-library-types).
+
 See: [Settings files](settings.md#settings-files)
 
 ## SQLSRC020
 
 **Settings file entry repeats a key**
 
-Two members of `typeOverrides`, or two of `columnTypes`, have one key.  Two keys are one when they are the same once their quotes and escapes are read and their aliases resolved: `integer` and `int4` name one PostgreSQL type, `"users".id` and `users.id` one column, and an unqualified built-in type name is one in any case, so `timestamptz` and `TIMESTAMPTZ` are one key.  Keys that differ only in the case of a plain part of a qualified name are two keys and nothing is reported: `users.id` and `Users.ID`, or `dbo.Email` and `DBO.EMAIL`, both apply, and a type or column whose name matches one of them exactly takes that one.  The first member of two that are one applies, and the second is reported at its key; the message quotes both keys and names the setting.
+Two members of `typeOverrides`, two of `columnTypes`, or two of `libraryTypes`, have one key.  Two keys are one when they are the same once their quotes and escapes are read and their aliases resolved: `integer` and `int4` name one PostgreSQL type, `"users".id` and `users.id` one column, `nodaTime` and `NodaTime` one library, and an unqualified built-in type name is one in any case, so `timestamptz` and `TIMESTAMPTZ` are one key.  Keys that differ only in the case of a plain part of a qualified name are two keys and nothing is reported: `users.id` and `Users.ID`, or `dbo.Email` and `DBO.EMAIL`, both apply, and a type or column whose name matches one of them exactly takes that one.  The first member of two that are one applies, and the second is reported at its key; the message quotes both keys and names the setting.
 
 ```jsonc
 {
@@ -687,7 +700,7 @@ See: [Generator parameters](settings.md#setting-generator-parameters)
 
 **Marker value is not valid**
 
-A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:` or `-- type-override:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
+A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:`, `-- type-override:` or `-- library-types:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
 
 - No generator parameter takes a value: `keep-comments=1` is this error.
 - What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
@@ -706,6 +719,7 @@ A generator parameter has a value it does not take; what follows a name in a `--
 - `-- type-override:` takes one entry, `key = type` or `key = default`.  The key is a type's one-word name, `timestamptz` and not `timestamp with time zone`, and a type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`.  A schema or a name may be in double quotes, with a quote inside it doubled: `public."Status"`, `"my schema"."order-status"`; or in `U&"..."` with escapes, `public.U&"Order\000AItem"`, where an escape that is not `\\`, `\` and four hex digits, or `\+` and six, for a code from 1 to 10FFFF (a character beyond FFFF is one `\+` escape or the escapes of its two surrogates), is not valid.  The type is a keyword, a full name or a short name, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end.  See [type overrides](settings.md#setting-type-overrides).
 - The key of a `-- type-override:` marker is read by its file's dialect.  In an `mssql` file it is a SQL Server type's name, such as `int`, `nvarchar` or `sys.int`, and a name SQL Server does not have, such as `int4` or `pg_catalog.text`, is this error.  In a file of any other dialect a name that SQL Server alone has, such as `nvarchar` or `rowversion`, is this error.  A type of a schema of your own, `dbo.Email`, is read in either.
 - A key is not written in brackets: `-- type-override: [dbo].[Email] = MyApp.Email` is this error, and the message shows the forms that are read, `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
+- `-- library-types:` takes one entry or more, each `name=state` with no space around its `=`, separated by white space, as in `-- library-types: nodatime=off`.  The library is `nodaTime` and the state `on`, `off` or `default`, matched ignoring case, hyphens and spaces.  A line with no entry, an entry without `=`, `nodatime = on` with spaces, and a library or a state that is not one are this error, which the message lists.  See [library types](settings.md#setting-library-types).
 
 A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
 
@@ -746,6 +760,7 @@ Two settings contradict each other.  The error is at the second.
 - Two `-- output:` markers that give different values, or two `-- database:` markers that name different databases (`billing` and `Billing` are different), in the file header or inside one query.
 - Two markers of any other setting of the models and the collection type that give different values in the file header or inside one query: two `-- input-model:` markers that name different types, two `-- model-namespace:` markers, and so on.
 - Two `-- type-override:` markers that give one database type different C# types, in the file header or inside one query.  The key is compared as [type overrides](settings.md#setting-type-overrides) compares it, so `integer` and `int4` are one type, `public.status` and `public."status"` are one type, and `public.Status` and `public.status` are two; and the C# types are compared by how they are named, so `int` and `System.Int32` are two, and so are `UserId` and `MyApp.UserId`.  The same holds for the C# types of `-- column:` and `-- param:` markers.
+- Two entries of `-- library-types:` markers that give one library two states, in the file header or inside one query, on one line or two: `nodatime=on` and `nodatime=off`.
 
 ```sql error
 -- name: ListUsers
@@ -754,7 +769,7 @@ Two settings contradict each other.  The error is at the second.
 SELECT id, name FROM users;
 ```
 
-Remove one of the two.  A query's `-- generator:` list replaces the file header's list, and a query's `-- type-override:` for a type replaces the file header's for that type: neither is a conflict, and nor is a query's `-- column:` for a column whose source the file header maps.  The same dialect given twice with the same options is not a conflict either.
+Remove one of the two.  A query's `-- generator:` list replaces the file header's list, a query's `-- type-override:` for a type replaces the file header's for that type, and a query's `-- library-types:` for a library the file header's for that library: none is a conflict, and nor is a query's `-- column:` for a column whose source the file header maps.  The same dialect given twice with the same options is not a conflict either.
 
 See: [A value that is wrong](settings.md#a-value-that-is-wrong)
 
@@ -849,6 +864,7 @@ Move the marker to where the message says.  A file with no `-- name:` line is on
 | `-- collection-type:` | yes | yes |
 | `-- type-override:` | yes | yes |
 | `-- column:` | yes | yes |
+| `-- library-types:` | yes | yes |
 
 The table is this error's, with two exceptions.  A `-- summary:` in the file header is [SQLSRC107](#sqlsrc107), and a `-- dialect:` inside a query or after SQL is [SQLSRC115](#sqlsrc115).
 
@@ -2707,6 +2723,20 @@ A type override, a column type or a `-- param:` marker gives a column or a param
 Add the converter that the message names, a static method marked `[SqlSourceConverter]` that takes the one type and returns the other, on the type itself or in a class of the project.  A method that takes a type and returns the same type serves both directions.  For an array whose elements are converted one by one, the message names the element of the column or parameter, and the converter to add is of the element's type.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
 
 See: [Converters](settings.md#converters)
+
+## SQLSRC281
+
+**A library that is on is not referenced**
+
+The `libraryTypes` of a settings file, or a `-- library-types:` marker, turns a library on, such as NodaTime, for queries whose output is `codegen`, and the project does not reference what the library needs on the database of those queries: on PostgreSQL the `Npgsql.NodaTime` package, which brings NodaTime and lets Npgsql read and send its types, and on SQL Server the `NodaTime` package.  The message names the library, the database and the package that is missing.
+
+```console
+/work/App/sqlsource.json(5,5): error SQLSRC281: NodaTime is on for the PostgreSQL query methods it reaches here, but the project does not reference Npgsql.NodaTime.  Reference Npgsql.NodaTime, or turn NodaTime off for these queries.
+```
+
+Reference the package the message names from the project.  Or, where the error points, set the library to `off`, or remove the entry, for those queries: a library that nothing turns on is on only where the project references what it needs.  The error is reported at the entry that says `on`, the member of the settings file or the line of the marker, once for each database whose `codegen` queries it reaches, however many queries, files and types those are.  A query whose output is `models` or `sql` is not reported.  The queries keep their methods and their models, with the C# types they have while the library is off.
+
+See: [Library types](settings.md#setting-library-types)
 
 ## SQLSRC284
 

@@ -92,6 +92,12 @@ public sealed class SqlQueryHashTests
         Hash("-- name: Q\n-- param: @id int4 -> UserId\nSELECT @id;")
             .ShouldBe(Hash("-- name: Q\n-- param: @id int4\nSELECT @id;"));
 
+    // A library switch changes the C# types of a query, not the SQL the database describes.
+    [Fact]
+    public void Hash_IgnoresALibraryTypesMarker() =>
+        Hash("-- library-types: nodatime=on\n-- name: Q\n-- library-types: nodatime=off\nSELECT 1;\n")
+            .ShouldBe(Hash(Simple));
+
     [Fact]
     public void Compute_AnyQuery_IsSixtyFourLowerCaseHexCharacters() => Hash(Simple).ShouldMatch("^[0-9a-f]{64}$");
 

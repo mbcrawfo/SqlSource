@@ -37,15 +37,26 @@ internal static class PostgresTypeMap
 
     /// <summary>
     /// The C# type of <paramref name="type" /> under <paramref name="column" />.  At each level,
-    /// <paramref name="overrideOf" /> is asked first; then an array is its element's type with <c>[]</c>, a domain
-    /// its base's, and any other type the map's row or the rule of its kind.  An array's or a domain's failure is its
+    /// <paramref name="overrideOf" /> is asked first, then <paramref name="libraries" />, the rows of the libraries
+    /// that are on, or none when it is null; then an array is its element's type with <c>[]</c>, a domain its
+    /// base's, and any other type the map's row or the rule of its kind.  An array's or a domain's failure is its
     /// element's or base's, with that key.  Never throws.
     /// </summary>
-    public static TypeMapping Map(PostgresType type, NpgsqlColumn column, PostgresOverrideOf? overrideOf = null)
+    public static TypeMapping Map(
+        PostgresType type,
+        NpgsqlColumn column,
+        PostgresOverrideOf? overrideOf = null,
+        LibraryRows? libraries = null
+    )
     {
         if (overrideOf?.Invoke(type) is { } overridden)
         {
             return overridden;
+        }
+
+        if (libraries?.Find(type) is { } fromLibrary)
+        {
+            return fromLibrary;
         }
 
         // Every type of an extension the map knows is a base type: a domain or a composite of the same name is not one.
@@ -76,10 +87,10 @@ internal static class PostgresTypeMap
         return kind switch
         {
             PostgresTypeKind.Array => type.Element is { } element
-                ? ArrayOf(Map(element, column, overrideOf))
+                ? ArrayOf(Map(element, column, overrideOf, libraries))
                 : TypeMapping.Failed(TypeMappingKind.NotWrittenByTheTool, key),
             PostgresTypeKind.Domain => type.Base is { } baseType
-                ? Map(baseType, column, overrideOf)
+                ? Map(baseType, column, overrideOf, libraries)
                 : TypeMapping.Failed(TypeMappingKind.NotWrittenByTheTool, key),
             PostgresTypeKind.Enum => TypeMapping.Mapped(key, StringKeyword, false),
             PostgresTypeKind.Range or PostgresTypeKind.Multirange => TypeMapping.Failed(
@@ -125,7 +136,7 @@ internal static class PostgresTypeMap
         internalName.Equals("bit", StringComparison.OrdinalIgnoreCase)
         || internalName.Equals("varbit", StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsSystemType(PostgresType type) =>
+    internal static bool IsSystemType(PostgresType type) =>
         type.Schema.Equals(SystemSchemas.Postgres, StringComparison.Ordinal);
 
     // An array of a type that a cast reads is read by a cast to an array, of the same rank.

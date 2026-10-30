@@ -25,6 +25,12 @@
           "Microsoft.Testing.Platform": "2.4.0"
         }
       },
+      "NodaTime": {
+        "type": "Direct",
+        "requested": "[3.1.9, )",
+        "resolved": "3.1.9",
+        "contentHash": "EzjwDOtsETlXWBDE6qvTQqc3guP+9xrAOf9j1mHL++UD4VeZay+dbCPNnXyZhoQMkKAOZ/+hIOtz7STl0Rkknw=="
+      },
       "Npgsql": {
         "type": "Direct",
         "requested": "[8.0.9, )",
@@ -32,6 +38,16 @@
         "contentHash": "H7O9NrvSO+BaojUOK59YmSOi7+RabnBoNPw1F7NgtZhw5uBeAA3bCjTH2VjgacUVHe8K1asPyj/a/mnhJ/e1yA==",
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
+        }
+      },
+      "Npgsql.NodaTime": {
+        "type": "Direct",
+        "requested": "[8.0.9, )",
+        "resolved": "8.0.9",
+        "contentHash": "jZeRl8VC4OQEAm4vq7Nt3G5A7pt2oaLfxdRER9kxtEFp2ENZ8kcYAZdVu3FTSdY7UKHfwi9rN4xALDHs1TOaqw==",
+        "dependencies": {
+          "NodaTime": "3.1.9",
+          "Npgsql": "8.0.9"
         }
       },
       "Roslynator.Analyzers": {

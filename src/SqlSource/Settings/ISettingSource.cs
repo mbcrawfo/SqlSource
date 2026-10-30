@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using SqlSource.Settings.Libraries;
 
 namespace SqlSource.Settings;
 
@@ -14,7 +15,8 @@ namespace SqlSource.Settings;
 internal interface ISettingSource
 {
     /// <summary>
-    /// The place the source is, which the entries of the type override and the column types it gives carry.
+    /// The place the source is, which the entries of the type override, the column types and the library types it gives
+    /// carry.
     /// </summary>
     SettingPlace Place { get; }
 
@@ -29,10 +31,17 @@ internal interface ISettingSource
 
     /// <summary>
     /// The key and the value of each member of a setting written as an object of strings, as a settings file writes
-    /// the type override and the column types, as written and in order, or null when the source writes it as text or
-    /// not at all.
+    /// the type override, the column types and the library types, as written and in order, or null when the source
+    /// writes it as text or not at all.
     /// </summary>
     IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting);
+
+    /// <summary>
+    /// Records that the member at <paramref name="index" /> of the library types gives the entry of
+    /// <paramref name="library" />.  A source that knows where its members are keeps that position apart from the
+    /// level, so that a member that only moves changes no level; one that never gives the library types ignores it.
+    /// </summary>
+    void LibraryEntry(SqlLibrary library, int index);
 
     /// <summary>
     /// The choice, or null when it is not set.  A value that is no member is recorded by the source, which alone

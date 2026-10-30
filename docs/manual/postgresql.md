@@ -157,7 +157,7 @@ WHERE id = @id;
 
 Each column and each parameter of a described PostgreSQL query gets a C# type: the type that Npgsql reads a value of its PostgreSQL type as.  If `id` is a `bigint`, `placed_at` a `timestamp with time zone`, `total` a `numeric(12,2)`, `tags` a `text[]` and `born` a `date`, they are `long`, `System.DateTime`, `decimal`, `string[]`, and `System.DateTime` on Npgsql 8 and 9 or `System.DateOnly` on Npgsql 10; `@id` is a `long`.  Whether a column can be null is decided [above](#nullability), not by its type.
 
-The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for a type that Npgsql cannot read.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides), `"timestamptz": "System.DateTimeOffset"` in a settings file's `typeOverrides`.  To give one column another, use a [column type](settings.md#setting-column-types), `"users.id": "MyApp.UserId"` in its `columnTypes`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Npgsql does not read, such as an id or an `Email` over a domain, needs [converters](settings.md#converters) to and from the type of the table below.
+The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for a type that Npgsql cannot read.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides), `"timestamptz": "System.DateTimeOffset"` in a settings file's `typeOverrides`.  To give one column another, use a [column type](settings.md#setting-column-types), `"users.id": "MyApp.UserId"` in its `columnTypes`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Npgsql does not read, such as an id or an `Email` over a domain, needs [converters](settings.md#converters) to and from the type of the table below.  A project that references `Npgsql.NodaTime` gets NodaTime's types for the date and time types of its queries whose output is `codegen`: see [NodaTime](#nodatime).
 
 <a id="which-npgsql"></a>
 
@@ -242,6 +242,49 @@ The names are those of PostgreSQL's catalog, which are the [type override's](set
 - **A multidimensional array** is read as `int[,]` and not `int[]`, and its column's type does not say how many dimensions it has, so a column of `int4[]` that holds a two-dimensional array cannot be read into an `int[]`.  Map it, `int4[]=int[,]`, where every value of the column has two dimensions.
 - **The settings of the application's data source can change what Npgsql reads**, and SqlSource cannot see them.  The table is what a data source made with `NpgsqlDataSourceBuilder`, or a plain `NpgsqlConnection`, reads.  `NpgsqlSlimDataSourceBuilder` reads fewer types until its `Enable...()` methods are called.  The AppContext switch `Npgsql.EnableLegacyTimestampBehavior`, and Npgsql 10's legacy date and time resolver, read some date and time types as other C# types; map those types with the type override to the C# types the application reads.
 
+<a id="nodatime"></a>
+
+### NodaTime
+
+```sql postgres
+-- name: GetShift -> one
+SELECT id, starts_at, day, length, slots
+FROM shifts
+WHERE id = @id;
+```
+
+```csharp
+public sealed record GetShiftDto(
+    long Id,
+    global::NodaTime.Instant StartsAt,
+    global::NodaTime.LocalDate Day,
+    global::NodaTime.Period Length,
+    global::NpgsqlTypes.NpgsqlRange<global::NodaTime.Instant> Slots);
+```
+
+A project that references `Npgsql.NodaTime`, Npgsql's plugin for NodaTime, gets NodaTime's types for the columns and parameters of its queries whose output is `codegen`, read and sent by the plugin.  Above, `starts_at` is a `timestamptz`, `day` a `date`, `length` an `interval` and `slots` a `tstzrange`, each `NOT NULL`.  The [library types](settings.md#setting-library-types) turn NodaTime off for a project, a folder, a file or a query.  The types are the same on Npgsql 8, 9 and 10: reference the `Npgsql.NodaTime` of the same major as your Npgsql.
+
+| PostgreSQL type | C# type with NodaTime |
+|----|----|
+| `timestamptz` (`timestamp with time zone`) | `NodaTime.Instant` |
+| `timestamp` (`timestamp without time zone`) | `NodaTime.LocalDateTime` |
+| `date` | `NodaTime.LocalDate` |
+| `time` (`time without time zone`) | `NodaTime.LocalTime` |
+| `timetz` (`time with time zone`) | `NodaTime.OffsetTime` |
+| `interval` | `NodaTime.Period` |
+| `tstzrange`, `tsrange`, `daterange` | `NpgsqlTypes.NpgsqlRange<NodaTime.Instant>`, `NpgsqlTypes.NpgsqlRange<NodaTime.LocalDateTime>`, `NpgsqlTypes.NpgsqlRange<NodaTime.LocalDate>` |
+| `tstzmultirange`, `tsmultirange`, `datemultirange` | An array of the range's type: `NpgsqlTypes.NpgsqlRange<NodaTime.Instant>[]` and so on |
+
+An array of one of these types is an array of its C# type, `NodaTime.Instant[]` for `timestamptz[]`, and a domain over one has its C# type, as [the kinds](#type-table) say.  Every other type keeps the type of [the types](#type-table).
+
+- **Only query methods get NodaTime's types.**  A query whose output is `models` keeps the types of the table above, and so do its models, whether rows are read through Dapper or your own code.  A model that such a query shares with a `codegen` query is [SQLSRC257](diagnostics.md#sqlsrc257): see [library types](settings.md#setting-library-types).
+- **Your own choices win.**  A [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) and a `-- param:` or `-- column:` marker give their type over NodaTime's, so a project with `"timestamptz": "System.DateTimeOffset"` keeps its `DateTimeOffset` columns.  `"timestamptz": "default"` in a nearer settings file, or `-- type-override: timestamptz=default` in a file, gives `timestamptz` to NodaTime there.
+- **The plugin reads other types too**, which the type override, a column type or a marker can give: a `timestamptz` as a `NodaTime.ZonedDateTime`, read in the zone UTC, a `NodaTime.OffsetDateTime`, read at offset 0, a `System.DateTimeOffset` or a `System.DateTime`; a `timestamp` as a `System.DateTime`; an `interval` as a `NodaTime.Duration`; a `tstzrange` as a `NodaTime.Interval` and a `daterange` as a `NodaTime.DateInterval`, with their multiranges as arrays of them.  A query method reads and sends each through the plugin.
+- **A `ZonedDateTime` or an `OffsetDateTime` is sent in UTC alone.**  One in another zone, or at another offset, throws `ArgumentException`, the query does not run, and the connection is closed: a transaction open on it is lost, and the next command on it throws `InvalidOperationException`, so open a new connection to go on.  Npgsql 8 and 10 do the same.  Convert the value to UTC before the call, with `value.WithZone(DateTimeZone.Utc)` or `value.WithOffset(Offset.Zero)`; a value in UTC leaves the connection open.
+- **An `interval` with months or years** read as a `NodaTime.Duration` throws `InvalidCastException`, which says to read it as a `NodaTime.Period`, the default.
+- **`NodaTime.Interval` and `NodaTime.DateInterval` cannot hold every range**, which is why the defaults are `NpgsqlRange<T>`.  An empty range throws when it is read: `ArgumentOutOfRangeException` for a `tstzrange` as an `Interval`, and `ArgumentException` for a `daterange` as a `DateInterval`.  A `tstzrange` whose start is excluded, `(a,b]`, is read as the `Interval` `[a+1ns, b+1ns)`, since an `Interval` includes its start and excludes its end, and sent back it is stored as `[a,b)`, since PostgreSQL keeps microseconds: a read and a write move the range.  A multirange never holds an empty range, but its ranges move the same way.
+- **Without the plugin**, a project that references `NodaTime` alone gets none of NodaTime's types by default.  A type override, a column type or a marker that names one, `timestamptz=NodaTime.Instant`, gives the property that type, as it would any type, and the query method asks Npgsql for it, which throws `InvalidCastException` when the query runs.  Add `Npgsql.NodaTime`, and call `UseNodaTime()` as [what a method reads and throws](#method-results) says.
+
 <a id="models"></a>
 
 ## Models
@@ -264,7 +307,7 @@ public sealed record FindOrdersDto(long Id, global::System.DateTime PlacedAt, st
 
 A described PostgreSQL query gets the [models](generator.md#models) that every described query gets, by the rules of the generator page; their namespace and documentation are left out above.  What PostgreSQL decides in them:
 
-- **Each property's type** is its column's or parameter's C# type, from [the type table](#type-table) under the version of Npgsql that the project references, or the one you chose, by the [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a marker.  Above, `id` is a `bigint` and `placed_at` a `timestamp with time zone`, both `NOT NULL`.
+- **Each property's type** is its column's or parameter's C# type, from [the type table](#type-table) under the version of Npgsql that the project references, or [NodaTime's](#nodatime) for a query whose output is `codegen` in a project that references `Npgsql.NodaTime`, or the one you chose, by the [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a marker.  Above, `id` is a `bigint` and `placed_at` a `timestamp with time zone`, both `NOT NULL`.
 - **A column's property can be null** by [which columns can be null](#nullability): `customer_name` comes from the optional side of the `LEFT JOIN`, so its property is a `string?`.  A column's alias can say otherwise with `!` or `?`, and so can a [`-- column:` marker](generator.md#column-marker).
 - **A parameter's property can be null** only when its `-- param:` marker says `null`, as `@status` does, since PostgreSQL does not say whether a parameter can be null.
 - **A column with no name**, which PostgreSQL calls `?column?`, as an expression or a literal without an alias, is [SQLSRC253](diagnostics.md#sqlsrc253), and the query gets no models until it is fixed.  Give it an alias.
@@ -296,7 +339,7 @@ Each described query whose output is `codegen` gets a method that runs it throug
 
 Each parameter is sent as the PostgreSQL type it was described with, or the type its [`-- param:` marker](parameters-and-tokens.md#param-marker) declares, and never as a type chosen from the C# type of its value.  A `string` for a `jsonb`, an `xml`, an `ltree` or an enum, a `uint` for an `oid`, a `decimal` for a `money` and a `DateTimeOffset` at any offset for a `timetz` each reach the server as that type.  A null is sent as a `NULL` of that type, so `@p IS NULL` works with no cast once the parameter has a type, from another use or a `-- param:` marker, as [above](#parameters).  How a method names a parameter and sends a null is on [the generator page](generator.md#method-parameters).  For some types:
 
-- **A `timestamptz` parameter takes a `DateTimeOffset` at offset 0, or a `DateTime` whose `Kind` is `Utc`**, and a `timestamp` parameter a `DateTime` of another `Kind`.  Npgsql refuses any other with an `ArgumentException` before anything is sent, a `DateTimeOffset` at another offset, an `Unspecified` `DateTime` for a `timestamptz` and a `Utc` one for a `timestamp` alike, and nothing is converted in the session's time zone.  Send `value.ToUniversalTime()` to a `timestamptz`.
+- **A `timestamptz` parameter takes a `DateTimeOffset` at offset 0, or a `DateTime` whose `Kind` is `Utc`**, and a `timestamp` parameter a `DateTime` of another `Kind`.  Any other throws `ArgumentException`, the query does not run, and nothing is converted in the session's time zone.  A `DateTime` of the wrong `Kind`, an `Unspecified` one for a `timestamptz` or a `Utc` one for a `timestamp`, leaves the connection open and a transaction on it as it was.  A `DateTimeOffset` at another offset also closes the connection: a transaction open on it is lost, and the next command on it throws `InvalidOperationException`, so open a new connection to go on.  Npgsql 8 and 10 do the same, with Npgsql.NodaTime's plugin or without it.  Send `value.ToUniversalTime()` to a `timestamptz`; a value at offset 0 leaves the connection open.
 - **A parameter declared as a domain is sent as the domain's base type**, so the domain's `CHECK` is not applied to it.  Compared with a column of the domain, a value that the domain refuses finds no row, and the server checks it only when it is written to such a column.
 - **A `string` longer than the `varchar(n)` column it is written to is refused by the server**, with `22001`, and never cut to fit.
 - **A parameter that has a [converter](settings.md#converters)** is converted to the type of [the table](#type-table), a domain's base type for a domain, and sent as its database type too.
@@ -307,7 +350,17 @@ Each parameter is sent as the PostgreSQL type it was described with, or the type
 
 - **Give each method the transaction** of a connection that has one.  Npgsql runs a command in its connection's transaction even when the method is not given it, but Microsoft.Data.SqlClient does not, so code that passes it runs on both: see [the connection](generator.md#method-connection).
 - **A column is read as its property's C# type**, the one [the types](#type-map) give it, so a type that Npgsql reads only once it is taught, an enum mapped to a C# enum or a plugin's type, needs the teaching on the data source, as `MapEnum<T>()`.  A type of yours that Npgsql never reads takes [converters](settings.md#converters) instead: the column is read as the type of [the table](#type-table), a domain as its base type, and converted.
-- **Every type that [the table](#type-table) gives a C# type is sent and read on Npgsql 8, 9 and 10**, as the C# type of the version's column, and SqlSource is tested on Npgsql 8 and 10.  `cube`, which Npgsql 8 and 9 do not read, is sent and read on Npgsql 10.
+- **Every type that [the table](#type-table) gives a C# type is sent and read on Npgsql 8, 9 and 10**, as the C# type of the version's column, and SqlSource is tested on Npgsql 8 and 10.  `cube`, which Npgsql 8 and 9 do not read, is sent and read on Npgsql 10.  So is each type of [NodaTime](#nodatime), on each version with its `Npgsql.NodaTime`.
+- **NodaTime's types need `UseNodaTime()` on the data source.**  A method that reads or sends a [NodaTime](#nodatime) type runs only on a connection of a data source whose builder called `UseNodaTime()`, of `Npgsql.NodaTime`.  Without it, Npgsql throws `InvalidCastException`, "Reading as 'NodaTime.Instant' is not supported for fields having DataTypeName 'timestamp with time zone'", or the same for writing, when the query runs:
+
+  ```csharp
+  var builder = new NpgsqlDataSourceBuilder(connectionString);
+  builder.UseNodaTime();
+  await using var dataSource = builder.Build();
+  ```
+
+- **Entity Framework Core's NodaTime package turns NodaTime on.**  `Npgsql.EntityFrameworkCore.PostgreSQL.NodaTime` brings `Npgsql.NodaTime`, so the query methods of a project that references it get NodaTime's types.  `UseNodaTime()` inside EF Core's `UseNpgsql(...)` teaches the data source that EF Core builds for itself, and no other: call `UseNodaTime()` on the builder of the data source whose connections run the query methods, or turn NodaTime off with the [library types](settings.md#setting-library-types), `"nodaTime": "off"`.
+- **`UseNodaTime()` changes what Npgsql gives Dapper too.**  On a data source that calls it, every reader gets NodaTime's types: a `timestamptz` arrives as an `Instant`, so a query whose output is `models`, read through Dapper into its `System.DateTime` property, fails, and a `tstzrange` or a `daterange` arrives as an `Interval` or a `DateInterval`, which throws for an empty range, whatever the property's type.  That is the plugin's doing.  Give such queries NodaTime's types with the [type override](settings.md#setting-type-overrides), `"timestamptz": "NodaTime.Instant"` in a settings file of their folder, or read them on a data source without the plugin.
 - **A column whose property cannot be null** throws Npgsql's `InvalidCastException`, "Column 'name' is null.", when it holds a null, before any converter is called.
 - **`rowcount` is `-1` for a `SELECT`**, and for a `WITH` whose last statement is a `SELECT`, though its `WITH` updates rows: see [what each shape returns](generator.md#method-shapes).
 - **`commandTimeout`** that passes throws Npgsql's `NpgsqlException`, whose inner exception is a `TimeoutException`.

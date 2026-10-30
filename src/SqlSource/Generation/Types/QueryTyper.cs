@@ -12,6 +12,7 @@ using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Settings.ClrTypes;
 using SqlSource.Settings.ColumnTypes;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 
@@ -21,8 +22,8 @@ namespace SqlSource.Generation.Types;
 /// Gives each parameter and column of a file's usable entries its C# type: for a parameter, the one its
 /// <c>-- param:</c> marker gives after <c>-&gt;</c>; for a column, the one its query's <c>-- column:</c> marker gives
 /// after <c>-&gt;</c>, else the column types' for its source, from the most specific level that names it; else the
-/// type override's, from the most specific level that names its key; or else the base map of its engine's, under the
-/// column of the project's driver of that engine.
+/// type override's, from the most specific level that names its key; else the row of a library that is on for the
+/// query; or else the base map of its engine's, under the column of the project's driver of that engine.
 /// </summary>
 /// <remarks>
 /// A query's parameters are typed before its columns, each in order, and its first failure is its one error, at its
@@ -32,7 +33,10 @@ namespace SqlSource.Generation.Types;
 /// type override is the entries of its file's engine, and its column types those of every level, each merged once for
 /// each distinct level of markers, since the queries without markers of their own share their file header's.  An
 /// empty map, as in a project without the override, is not asked at all.  A column's marker of <c>-&gt; default</c>
-/// skips the column types alone.
+/// skips the column types alone.  The libraries that are on are resolved once for each distinct level of markers too:
+/// a library is on when its winning entry says <c>on</c>, or when no entry or <c>default</c> wins and the probe's
+/// default for the engine is on.  One whose assemblies the project lacks gives no rows, and its entry is recorded on
+/// each query of the level.  SQL Server has no library rows yet.
 /// </remarks>
 internal static class QueryTyper
 {
@@ -52,6 +56,9 @@ internal static class QueryTyper
 
     // The place of a column's C# type that a -- column: marker of its query gives, by its name or by its source.
     private const string QueryColumnMarker = "a -- column: marker of the query";
+
+    // Every library, in the order of its enum, which each level of markers asks the switch about.
+    private static readonly SqlLibrary[] AllLibraries = (SqlLibrary[])Enum.GetValues(typeof(SqlLibrary));
 
     /// <summary>The types of the file's queries whose entries are usable, and the errors of the others.</summary>
     public static FileTypes Type(FileTypesInput input)
@@ -90,13 +97,21 @@ internal static class QueryTyper
                 input.SqlClientProbe.VersionText,
                 level.Lookup,
                 level.ColumnTypes,
+                level.Libraries,
                 input.MappedTypes,
                 query.NameLocation,
                 diagnostics
             );
             if (TypeQuery(entry, query, prefix, typing) is { } types)
             {
-                queries.Add(types);
+                queries.Add(
+                    level.UnavailableLibraries.Count == 0
+                        ? types
+                        : types with
+                        {
+                            UnavailableLibraries = level.UnavailableLibraries,
+                        }
+                );
             }
         }
 
@@ -361,15 +376,27 @@ internal static class QueryTyper
 
     // The property type of one parameter or column, by the map of its type's engine, or null after its error is
     // added.  A type of an engine this version does not know, or a parameter's that is null, is only in a sidecar
-    // edited by hand, and describing again mends it.
+    // edited by hand, and describing again mends it.  A type that a library's row gives keeps beside it the type it
+    // has without the library, unless that one fails, when the failure is the type's and the row is not used.
     private static PropertyType? TypeOf(SidecarType? type, string owner, string name, Typing typing)
     {
         TypeMapping mapping;
+        TypeMapping? withoutLibrary = null;
         DatabaseEngine engine;
         switch (type)
         {
             case PostgresType postgres:
-                mapping = PostgresTypeMap.Map(postgres, typing.Column, typing.Lookup?.OfPostgres);
+                var overrideOf = typing.Lookup?.OfPostgres;
+                mapping = PostgresTypeMap.Map(postgres, typing.Column, overrideOf, typing.Libraries);
+                if (mapping.Library is not null)
+                {
+                    withoutLibrary = PostgresTypeMap.Map(postgres, typing.Column, overrideOf);
+                    if (withoutLibrary.Kind != TypeMappingKind.Mapped)
+                    {
+                        (mapping, withoutLibrary) = (withoutLibrary, null);
+                    }
+                }
+
                 engine = DatabaseEngine.PostgreSql;
                 break;
             case SqlServerType sqlServer:
@@ -391,23 +418,33 @@ internal static class QueryTyper
 
         if (mapping is { Kind: TypeMappingKind.Mapped, Text: { } text })
         {
-            // A type of the map has no place; one that a type override, a column type or a marker chose has the base
-            // map's type beside it.
             WarnOfPackage(mapping, MessageSubject.Of(owner, name), typing);
-            return new PropertyType(
-                text,
-                mapping.IsValueType,
-                mapping.IsPublic,
-                mapping.WarningIds,
-                mapping.Key,
-                mapping.Detail,
-                mapping.Detail is null ? null : DatabaseTypeOf(type, typing)
-            );
+            var property = PropertyOf(mapping, text, type, typing);
+            return withoutLibrary is { Text: { } baseText }
+                ? property with
+                {
+                    Library = mapping.Library,
+                    WithoutLibrary = PropertyOf(withoutLibrary, baseText, type, typing),
+                }
+                : property;
         }
 
         typing.Diagnostics.Add(Diagnose(mapping, MessageSubject.Of(owner, name), type.Name, typing, engine));
         return null;
     }
+
+    // The property type of a found mapping.  A type of the map or of a library's row has no place, so the driver reads
+    // it as it is; one that a type override chose has the base map's type beside it, for its converters.
+    private static PropertyType PropertyOf(TypeMapping mapping, string text, SidecarType type, Typing typing) =>
+        new(
+            text,
+            mapping.IsValueType,
+            mapping.IsPublic,
+            mapping.WarningIds,
+            mapping.Key,
+            mapping.Detail,
+            mapping.Detail is null ? null : DatabaseTypeOf(type, typing)
+        );
 
     // What the base map alone reads the type as, with no lookup of the override at any level, and the element's value
     // type for an array or a domain over one.
@@ -646,10 +683,10 @@ internal static class QueryTyper
             [subject, failure.Key, ClrTypeName.AsWritten(failure.Text ?? ""), failure.Detail ?? "", .. more]
         );
 
-    // The lookup of the type override for the markers, of the file's engine's entries, and the merged column types,
-    // made once for each distinct level of markers, by reference: a query without markers of its own holds its file
-    // header's level.  No lookup for an empty map.  A map of defaults alone is asked, since a default of an array's
-    // own key maps nothing and is reported.
+    // The lookup of the type override for the markers, of the file's engine's entries, the merged column types, and
+    // the libraries that are on, made once for each distinct level of markers, by reference: a query without markers
+    // of its own holds its file header's level.  No lookup for an empty map.  A map of defaults alone is asked, since a
+    // default of an array's own key maps nothing and is reported.
     private static LevelTypes LevelTypesOf(
         SettingsLevel markers,
         FileTypesInput input,
@@ -666,28 +703,89 @@ internal static class QueryTyper
         }
 
         var map = QuerySettings.ResolveTypeOverrides(markers, input.Level, engine);
+        var (libraries, unavailable) = LibrariesOf(
+            QuerySettings.ResolveLibraries(markers, input.Level),
+            input.LibraryProbe,
+            engine
+        );
         var made = new LevelTypes(
             map.Count > 0 ? new OverrideLookup(map, input.MappedTypes, engine) : null,
-            QuerySettings.ResolveColumnTypes(markers, input.Level)
+            QuerySettings.ResolveColumnTypes(markers, input.Level),
+            libraries,
+            unavailable
         );
         levels.Add((markers, made));
         return made;
     }
 
-    // What one level of markers gives the typing of its queries: the lookup of the type override, and the column
-    // types, empty when no level has any.
-    private readonly record struct LevelTypes(OverrideLookup? Lookup, EquatableArray<ColumnType> ColumnTypes);
+    // The rows of the libraries that are on and that the project can use, or null when there are none or the engine
+    // has no rows, and the winning entry of each library that is on and that it cannot use.  A library is on when its
+    // winning entry says on, or when none or a default wins and the probe's default for the engine is on, which it is
+    // only for a library the project can use.
+    private static (LibraryRows? Rows, EquatableArray<LibrarySetting> Unavailable) LibrariesOf(
+        EquatableArray<LibrarySetting> entries,
+        LibraryProbe probe,
+        DatabaseEngine engine
+    )
+    {
+        List<SqlLibrary>? on = null;
+        ImmutableArray<LibrarySetting>.Builder? unavailable = null;
+        foreach (var library in AllLibraries)
+        {
+            var entry = LibrarySettings.Find(entries, library);
+            var state = entry?.State ?? LibraryState.Default;
+            if (state == LibraryState.Default)
+            {
+                state = probe.DefaultOf(library, engine);
+            }
+
+            if (state != LibraryState.On)
+            {
+                continue;
+            }
+
+            if (probe.IsAvailable(library, engine))
+            {
+                (on ??= []).Add(library);
+            }
+            else
+            {
+                // A default is on only where the library is available, so an entry of on won.
+                (unavailable ??= ImmutableArray.CreateBuilder<LibrarySetting>()).Add(entry!);
+            }
+        }
+
+        // SQL Server has no library rows yet.
+        var rows = on is not null && engine == DatabaseEngine.PostgreSql ? LibraryRows.Of(on) : null;
+        return (
+            rows,
+            unavailable is null
+                ? EquatableArray<LibrarySetting>.Empty
+                : new EquatableArray<LibrarySetting>(unavailable.ToImmutable())
+        );
+    }
+
+    // What one level of markers gives the typing of its queries: the lookup of the type override, the column types,
+    // empty when no level has any, the rows of the libraries that are on, and the entries of those that are on but
+    // that the project cannot use.
+    private readonly record struct LevelTypes(
+        OverrideLookup? Lookup,
+        EquatableArray<ColumnType> ColumnTypes,
+        LibraryRows? Libraries,
+        EquatableArray<LibrarySetting> UnavailableLibraries
+    );
 
     // What the typing of one query reads, and where its error goes.  SqlClientVersion is the probe's VersionText, for
     // the message of a type that the project's SqlClient is too old for, ColumnTypes the merged column types of the
-    // query's level of markers, and MappedTypes the compilation's answers for every C# type that a level or a marker
-    // chose.
+    // query's level of markers, Libraries the rows of its libraries that are on, and MappedTypes the compilation's
+    // answers for every C# type that a level or a marker chose.
     private readonly record struct Typing(
         NpgsqlColumn Column,
         SqlClientColumn SqlClientColumn,
         string SqlClientVersion,
         OverrideLookup? Lookup,
         EquatableArray<ColumnType> ColumnTypes,
+        LibraryRows? Libraries,
         EquatableArray<MappedType> MappedTypes,
         LocationInfo Location,
         ImmutableArray<DiagnosticInfo>.Builder Diagnostics

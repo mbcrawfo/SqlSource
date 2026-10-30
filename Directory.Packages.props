@@ -40,6 +40,12 @@
         <!-- Reads .sln and .slnx files for the tool, as the dotnet command does with the same library. -->
         <PackageVersion Include="Microsoft.VisualStudio.SolutionPersistence" Version="1.0.52" />
         <!--
+            The library of NodaTime's types, which tests/DatabaseTests/Postgres gets from Npgsql.NodaTime.
+            tests/DatabaseTests/Postgres.Npgsql8 overrides it to 3.1.9, the floor that Npgsql.NodaTime 8 needs: central
+            transitive pinning would otherwise hold it here.
+        -->
+        <PackageVersion Include="NodaTime" Version="3.3.7" />
+        <!--
             The driver of the PostgreSQL describer.  The tool's driver is its own: the floor of the Npgsql that a
             consumer's project may use is decided with the generated code, not here.
             examples/PostgresExamples/README.md lists this version.  The event ids that NpgsqlRunLogger forwards to
@@ -47,6 +53,12 @@
             are read again.
         -->
         <PackageVersion Include="Npgsql" Version="10.0.3" />
+        <!--
+            The plugin of Npgsql for NodaTime, the version that pairs with the Npgsql above, through which
+            tests/DatabaseTests/Postgres runs the queries of EndToEnd/NodaTime/.  tests/DatabaseTests/Postgres.Npgsql8
+            overrides it to the 8.0 release that pairs with its driver.
+        -->
+        <PackageVersion Include="Npgsql.NodaTime" Version="10.0.3" />
         <PackageVersion Include="NSubstitute" Version="6.2.0" />
         <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
         <PackageVersion Include="Roslynator.Analyzers" Version="5.0.0" />

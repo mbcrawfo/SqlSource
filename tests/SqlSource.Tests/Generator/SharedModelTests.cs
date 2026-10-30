@@ -2,6 +2,7 @@
 
 using System;
 using System.Linq;
+using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Models;
@@ -41,6 +42,46 @@ public sealed class SharedModelTests
         GeneratorHarness.UsersPath,
         "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
     );
+
+    private static readonly SqlFile EventsFile = new(
+        GeneratorHarness.UsersPath,
+        "-- name: ListEvents\nSELECT at FROM events;\n"
+    );
+
+    // One file claimed by a type at CodeGen and a type at Models, in one namespace.
+    private const string TwoOutputsSource = """
+        using SqlSource;
+
+        namespace App
+        {
+            [SqlSourceGenerate(Output = GeneratorOutput.CodeGen)]
+            public partial class Repo;
+
+            [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+            public partial class Dtos;
+        }
+        """;
+
+    private const string EventsName = $"{GeneratorHarness.UsersPath}(1,10)-(1,20)";
+
+    // Npgsql, NodaTime and the plugin, which turn the library on by default.
+    private static readonly MetadataReference[] WithThePlugin =
+    [
+        NpgsqlReferences.Npgsql10,
+        LibraryReferences.NodaTime("3.3.7"),
+        LibraryReferences.NpgsqlNodaTime("10.0.3"),
+    ];
+
+    private static readonly PostgresType Timestamptz = Catalog("timestamptz") with
+    {
+        Name = "timestamp with time zone",
+    };
+
+    private static SidecarEntry EventsEntry => EntryOf(EventsFile, "ListEvents");
+
+    // The query of the name, whose one column, at, is a timestamptz read from public.events.at.
+    private static SidecarEntry EntryOf(SqlFile file, string name) =>
+        Entry(file, name, [], [Column("at", Timestamptz, origin: new SidecarOrigin("public", "events", "at"))]);
 
     [Fact]
     public void Run_TwoQueriesOfOneModelName_ShareOneModel()
@@ -530,7 +571,7 @@ public sealed class SharedModelTests
                 + $"compiler warns on a type name of lower-case ASCII letters alone.{Help258}"
             )
         );
-        run.SeverityOf("SQLSRC258").ShouldBe(Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        run.SeverityOf("SQLSRC258").ShouldBe(DiagnosticSeverity.Error);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
         ModelFiles(run).ShouldBeEmpty();
@@ -725,6 +766,78 @@ public sealed class SharedModelTests
         ModelsOf(run).Queries.ShouldHaveSingleItem().ColumnNames.ShouldBeNull();
     }
 
+    // The realistic corpora's pattern: one file claimed by a type at CodeGen and a type at Models, of one namespace.  A
+    // property that a library row types is the library's at CodeGen and the base map's at Models, so the two models of
+    // one name differ.
+    [Fact]
+    public void SharedModel_CodeGenWithLibrary_AndModels_IsSQLSRC257()
+    {
+        var run = Run(TwoOutputsSource, [EventsFile, Sidecars.Of(EventsFile, EventsEntry)], references: WithThePlugin);
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC257 {EventsName}: The output model 'App.ListEventsDto' of the query 'ListEvents' is not the same "
+                + "as the output model of that name of the query 'ListEvents' in Users.sql, for the type App.Dtos: the "
+                + "property 'At' is 'NodaTime.Instant' here and 'System.DateTime' there."
+                + Help257,
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        ModelFiles(run).ShouldBe(["App.ListEventsDto-Model.g.cs"]);
+    }
+
+    // The library off at the project's root gives both types the base map's, so the model is shared.
+    [Fact]
+    public void SharedModel_LibraryOffAtRoot_IsShared()
+    {
+        var run = Run(
+            TwoOutputsSource,
+            [EventsFile, Sidecars.Of(EventsFile, EventsEntry)],
+            settings: /*lang=json,strict*/
+            """{"libraryTypes": {"nodaTime": "off"}}""",
+            references: WithThePlugin
+        );
+
+        run.ShouldBeClean();
+        ModelFiles(run).ShouldBe(["App.ListEventsDto-Model.g.cs"]);
+        run.Sources["App.ListEventsDto-Model.g.cs"].ShouldContain("(global::System.DateTime At);");
+    }
+
+    // Two queries at CodeGen of one type, one of which turns the library off: the properties differ as a CodeGen type's
+    // and a Models type's do.
+    [Fact]
+    public void SharedModel_TwoCodeGenQueries_LibraryOnAndOff_IsSQLSRC257()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Output = GeneratorOutput.CodeGen)]
+                public partial class Repo;
+            }
+            """;
+        var a = new SqlFile(APath, "-- name: GetA\n-- output-model: Event\nSELECT at FROM events;\n");
+        var b = new SqlFile(
+            BPath,
+            "-- name: GetB\n-- output-model: Event\n-- library-types: nodatime=off\nSELECT at FROM events;\n"
+        );
+
+        var run = Run(
+            Source,
+            [a, Sidecars.Of(a, EntryOf(a, "GetA")), b, Sidecars.Of(b, EntryOf(b, "GetB"))],
+            references: WithThePlugin
+        );
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC257 /app/Repo/B.sql(2,1)-(2,23): The output model 'App.Event' of the query 'GetB' is not the same "
+                + "as the output model of that name of the query 'GetA' in A.sql: the property 'At' is "
+                + $"'System.DateTime' here and 'NodaTime.Instant' there.{Help257}",
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        ModelFiles(run).ShouldBe(["App.Event-Model.g.cs"]);
+    }
+
     // GetA in A and GetB in B, each with the -- output-model: marker of the name, then the markers given.
     private static (SqlFile A, SqlFile B) OfOneName(string aMarkers, string bMarkers, string name = "UserRow") =>
         (
@@ -750,7 +863,7 @@ public sealed class SharedModelTests
             "SQLSRC257 /app/Repo/B.sql(2,1)-(2,25): The output model 'App.UserRow' of the query 'GetB' is not the same "
                 + $"as the output model of that name of the query 'GetA' in A.sql: {message}.{Help257}",
         ]);
-        run.SeverityOf("SQLSRC257").ShouldBe(Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        run.SeverityOf("SQLSRC257").ShouldBe(DiagnosticSeverity.Error);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
         ModelFiles(run).ShouldBe(["App.UserRow-Model.g.cs"]);

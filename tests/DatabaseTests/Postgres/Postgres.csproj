@@ -24,6 +24,8 @@
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
         <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
         <PackageReference Include="Npgsql" />
+        <!-- The plugin of the queries of EndToEnd/NodaTime/: the root sqlsource.json turns NodaTime off elsewhere. -->
+        <PackageReference Include="Npgsql.NodaTime" />
         <PackageReference Include="Shouldly" />
         <PackageReference Include="xunit.v3" />
     </ItemGroup>

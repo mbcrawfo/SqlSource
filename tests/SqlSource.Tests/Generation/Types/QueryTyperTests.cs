@@ -398,7 +398,7 @@ public sealed class QueryTyperTests
         );
 
     // The file Users of the dialect with the one query GetUser and its entry, under the file's level, Npgsql 10 and the
-    // SqlClient given, SqlClient 6.1 unless it is.
+    // SqlClient given, SqlClient 6.1 unless it is, and no library.
     private static FileTypesInput InputOf(
         SqlDialect dialect,
         SidecarEntry entry,
@@ -420,6 +420,7 @@ public sealed class QueryTyperTests
             level,
             new NpgsqlProbe(true, true, true, new Version(10, 0)),
             sqlClient ?? SqlClient61,
+            new LibraryProbe(NodaTime: false, NpgsqlNodaTime: false, NodaTimeVersion: null),
             TestSidecars.Of(Found(Email, false), Found(Version, false), Found(Guid, true), Found("long", true))
         );
     }

@@ -17,5 +17,6 @@ internal enum SettingId
     CollectionType,
     TypeOverrides,
     ColumnTypes,
+    LibraryTypes,
     NestedClass,
 }

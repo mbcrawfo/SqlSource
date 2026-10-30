@@ -1,4 +1,5 @@
 using SqlSource.Settings.ColumnTypes;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 
 namespace SqlSource.Settings;
@@ -69,6 +70,13 @@ internal sealed record SettingsLevel
     public EquatableArray<ColumnType>? ColumnTypes { get; init; }
 
     /// <summary>
+    /// What the level says about each library whose types SqlSource can use, sorted by library as
+    /// <see cref="LibrarySettings" /> keeps them, entries of <c>default</c> included.  Merged per library, not taken
+    /// whole.
+    /// </summary>
+    public EquatableArray<LibrarySetting>? LibraryTypes { get; init; }
+
+    /// <summary>
     /// The name of the class that holds a type's members in <see cref="MemberPlacement.Nested" /> placement.  The
     /// attribute and the chain of the folder of the type's C# file give it; no <c>.sql</c> file's level does, since a
     /// type's queries can come from several files.
@@ -80,8 +88,8 @@ internal sealed record SettingsLevel
 
     /// <summary>
     /// This level over <paramref name="other" />: each member from this level when it has one, and from
-    /// <paramref name="other" /> when it has not.  The type override of each engine and the column types are merged per
-    /// key, this level's entry winning.
+    /// <paramref name="other" /> when it has not.  The type override of each engine, the column types and the library
+    /// types are merged per key, this level's entry winning.
     /// </summary>
     public SettingsLevel Over(SettingsLevel other)
     {
@@ -109,6 +117,7 @@ internal sealed record SettingsLevel
             TypeOverrides = TypeOverrideMap.Over(TypeOverrides, other.TypeOverrides),
             SqlServerTypeOverrides = TypeOverrideMap.Over(SqlServerTypeOverrides, other.SqlServerTypeOverrides),
             ColumnTypes = ColumnTypeMap.Over(ColumnTypes, other.ColumnTypes),
+            LibraryTypes = LibrarySettings.Over(LibraryTypes, other.LibraryTypes),
             NestedClass = NestedClass ?? other.NestedClass,
         };
     }

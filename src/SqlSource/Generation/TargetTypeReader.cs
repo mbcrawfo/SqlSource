@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
 using SqlSource.Settings;
+using SqlSource.Settings.Libraries;
 
 namespace SqlSource.Generation;
 
@@ -203,6 +204,9 @@ internal static class TargetTypeReader
 
         public IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting) => null;
 
+        // The attribute has no level for the library types.
+        public void LibraryEntry(SqlLibrary library, int index) { }
+
         public T? Choice<T>(SettingId setting)
             where T : struct, Enum => PropertyOf(setting) is { } property ? Choice<T>(property) : null;
 
@@ -256,9 +260,10 @@ internal static class TargetTypeReader
                 SettingId.InputModelType => AttributeSource.InputModelTypeProperty,
                 SettingId.OutputModelType => AttributeSource.OutputModelTypeProperty,
                 SettingId.CollectionType => AttributeSource.CollectionTypeProperty,
-                // The type override and the column types have no attribute level.
+                // The type override, the column types and the library types have no attribute level.
                 SettingId.TypeOverrides => null,
                 SettingId.ColumnTypes => null,
+                SettingId.LibraryTypes => null,
                 SettingId.NestedClass => AttributeSource.NestedClassProperty,
                 _ => null,
             };
