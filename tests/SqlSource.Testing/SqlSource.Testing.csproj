@@ -31,6 +31,12 @@
             and the newest 7.
         -->
         <PackageDownload Include="Microsoft.Data.SqlClient" Version="[6.0.5];[6.1.7];[7.1.1]" />
+        <!--
+            The same for the probe of the libraries: NodaTime at the oldest version that it supports and the newest, and
+            the plugin of Npgsql for the Npgsql 8 and 10 above, which Generator/LibraryReferences.cs reads.
+        -->
+        <PackageDownload Include="NodaTime" Version="[3.1.9];[3.3.7]" />
+        <PackageDownload Include="Npgsql.NodaTime" Version="[8.0.3];[10.0.3]" />
         <AssemblyMetadata Include="NuGetPackageRoot" Value="$(NuGetPackageRoot)" />
     </ItemGroup>
     <ItemGroup>

@@ -449,6 +449,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .CompilationProvider.Select(static (compilation, _) => SqlClientProbe.Read(compilation))
             .WithTrackingName(TrackingNames.SqlClientProbe);
 
+        // The libraries the project references, the same way, which the library switch needs to know which can be on.
+        // Nothing reads it yet.
+        var libraryProbe = context
+            .CompilationProvider.Select(static (compilation, _) => LibraryProbe.Read(compilation))
+            .WithTrackingName(TrackingNames.LibraryProbe);
+
         // The C# types that the type override names at any level, as a sorted list of their names, which an edit that
         // leaves the names alone gives again, equal.
         var mappedTypeNames = fileLevels
@@ -517,7 +523,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (resolved, _) => resolved.Converters)
             .WithTrackingName(TrackingNames.MappedTypeConverters);
 
-        return new TypedFiles(npgsqlProbe, sqlClientProbe, typedFiles, fileTypes, mappedTypeConverters);
+        return new TypedFiles(npgsqlProbe, sqlClientProbe, libraryProbe, typedFiles, fileTypes, mappedTypeConverters);
     }
 
     // The project's converters, from the methods of its source that carry the converter attribute and from the mapped
@@ -1075,11 +1081,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         FileNodes<SidecarCheckResult> Checks
     );
 
-    // The drivers the project references, each claimed file typed, its types alone, and the converters of the mapped
-    // types.
+    // The drivers and the libraries the project references, each claimed file typed, its types alone, and the
+    // converters of the mapped types.
     private readonly record struct TypedFiles(
         IncrementalValueProvider<NpgsqlProbe> NpgsqlProbe,
         IncrementalValueProvider<SqlClientProbe> SqlClientProbe,
+        IncrementalValueProvider<LibraryProbe> LibraryProbe,
         FileNodes<TypedFile> Files,
         FileNodes<FileTypes> FileTypes,
         IncrementalValueProvider<EquatableArray<Converter>> MappedTypeConverters
