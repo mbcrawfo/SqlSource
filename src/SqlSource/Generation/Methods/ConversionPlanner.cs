@@ -222,7 +222,8 @@ internal static class ConversionPlanner
     }
 
     // Why the JSON opt-in does not apply to the type on the database type, as SQLSRC283's {3} words it, or null when it
-    // does: on a type that holds JSON or is read as string, with a type the serializer takes.
+    // does: on a type that holds JSON or is read as string, with a type the serializer takes.  On an array that holds
+    // JSON, the type's element is checked, as the serializer converts such an array element by element.
     private static string? OptInProblemOf(string type, DatabaseType database, string key, Decision decision)
     {
         if (!database.HoldsJson && !JsonText.Equals(database.Text, StringComparison.Ordinal))
@@ -232,17 +233,23 @@ internal static class ConversionPlanner
                 : "the database type '" + key + "' is not read as a string";
         }
 
-        var bare = WithoutQuestionMark(type);
+        var (bare, named) =
+            database.Text is { } text && ElementOf(text) is not null && EdgeElementOf(type) is { } element
+                ? (element, "its element '")
+                : (WithoutQuestionMark(type), "'");
         if (JsonTypes.IsJsonType(bare))
         {
-            return "'"
+            return named
                 + ClrTypeName.AsWritten(bare)
-                + "' is a type of System.Text.Json, which is read without the serializer";
+                + "' is a type of System.Text.Json, which is read without the "
+                + "serializer";
         }
 
         return decision.IsSerializable(bare)
             ? null
-            : "'" + ClrTypeName.AsWritten(bare) + "' is a type that the driver reads, which the serializer never takes";
+            : named
+                + ClrTypeName.AsWritten(bare)
+                + "' is a type that the driver reads, which the serializer never takes";
     }
 
     // Whether the serializer reads and sends the type, the property's or its element's: a class that no converter

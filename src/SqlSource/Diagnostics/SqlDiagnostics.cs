@@ -996,8 +996,9 @@ internal static class SqlDiagnostics
     // place that chose it, as SQLSRC250's {3}, and {3} why the opt-in does not apply: "the database type '<its key>' is
     // read as '<the base map's type>', not as a string", or "is not read as a string" for one the base map gives no C#
     // type; "'<the type>' is a type of System.Text.Json, which is read without the serializer"; or "'<the type>' is a
-    // type that the driver reads, which the serializer never takes".  Reported at the query's name, by
-    // ConversionPlanner, for codegen queries only, once for each column and parameter whose place says json.
+    // type that the driver reads, which the serializer never takes", each with "its element '<the element>'" in place
+    // of "'<the type>'" for an array on an array that holds JSON.  Reported at the query's name, by ConversionPlanner,
+    // for codegen queries only, once for each column and parameter whose place says json.
     public static readonly DiagnosticDescriptor JsonOptInNotApplicable = new(
         id: "SQLSRC283",
         title: "JSON opt-in does not apply",

@@ -695,6 +695,75 @@ public sealed class JsonSerializerMethodTests
         );
     }
 
+    // On an array that holds JSON the opt-in checks the element, as the serializer converts it by element: an array of
+    // a type of System.Text.Json or of one the base map gives is SQLSRC283 naming the element, on jsonb[] and on a
+    // domain over it.
+    [Theory]
+    [InlineData("System.Text.Json.JsonElement[]", "System.Text.Json.JsonElement", false)]
+    [InlineData("string[]", "string", false)]
+    [InlineData("System.Text.Json.JsonElement[]", "System.Text.Json.JsonElement", true)]
+    public void Run_OptInWithArrayOfANonClassOnJsonbArray_IsSQLSRC283(string type, string element, bool isDomain)
+    {
+        SidecarType database = isDomain
+            ? TestSidecars.Postgres(
+                name: "order_docs",
+                kind: SidecarValues.Kind.Domain,
+                schema: "public",
+                internalName: "order_docs",
+                baseType: JsonbArray,
+                bindName: "order_docs"
+            )
+            : JsonbArray;
+
+        var run = RunOptIn("Npgsql 10", "query marker", database, type: type);
+
+        ShouldBeSQLSRC283(
+            run,
+            ["column", "parameter"],
+            type,
+            "a -- column: marker of the query",
+            "its element '"
+                + element
+                + (
+                    element == "string"
+                        ? "' is a type that the driver reads, which the serializer never takes"
+                        : "' is a type of System.Text.Json, which is read without the serializer"
+                )
+        );
+    }
+
+    // An array of the class on jsonb[] takes the opt-in, and is converted element by element as without it.
+    [Theory]
+    [InlineData("App.OrderMetadata[]")]
+    [InlineData("App.OrderMetadata?[]")]
+    public void Run_OptInWithClassArrayOnJsonbArray_IsConvertedByElement(string type)
+    {
+        var withWord = RunOptIn("Npgsql 10", "query marker", JsonbArray, type: type);
+        var without = RunOptIn("Npgsql 10", "query marker", JsonbArray, json: false, type: type);
+
+        withWord.ShouldBeClean();
+        without.ShouldBeClean();
+        var methods = withWord.Sources[MethodRuns.MethodsFile];
+        methods.ShouldBe(without.Sources[MethodRuns.MethodsFile]);
+        methods.ShouldContain("global::System.Array.ConvertAll<string, global::App.OrderMetadata");
+        methods.ShouldContain(Deserialize + OrderMetadata + ">(item)");
+    }
+
+    // On a plain jsonb an array of a type of System.Text.Json is a collection, serialized whole: the opt-in takes it.
+    [Fact]
+    public void Run_OptInWithJsonElementArrayOnJsonb_IsSerializedWhole()
+    {
+        var run = RunOptIn("Npgsql 10", "query marker", Jsonb, type: "System.Text.Json.JsonElement[]");
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(
+            "(" + Deserialize + "global::System.Text.Json.JsonElement[]>(reader.GetFieldValue<string>(0)) ?? throw "
+        );
+        methods.ShouldContain(Serialize + "global::System.Text.Json.JsonElement[]>(value)");
+        methods.ShouldNotContain("ConvertAll");
+    }
+
     // A type that the base map gives no C# type, as a composite, is not read as a string either.
     [Fact]
     public void Run_OptInOnAComposite_IsSQLSRC283()
