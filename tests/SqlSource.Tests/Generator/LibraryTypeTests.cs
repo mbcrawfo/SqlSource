@@ -1,6 +1,7 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
 using System;
+using System.Linq;
 using System.Text.Json.Nodes;
 using Microsoft.CodeAnalysis;
 using Shouldly;
@@ -321,6 +322,139 @@ public sealed class LibraryTypeTests
         var entry = query.UnavailableLibraries.ShouldHaveSingleItem();
         entry.Library.ShouldBe(SqlLibrary.NodaTime);
         entry.State.ShouldBe(LibraryState.On);
+    }
+
+    // The types of one file's queries are the same for every type that claims it, and the output of the claim picks: a
+    // Models claim's model has the base map's, and a CodeGen claim's model and method have the library's.
+    [Fact]
+    public void ModelsClaim_GetsTheBaseTypes_MethodsGetTheLibrarys()
+    {
+        const string TwoNamespaces = """
+            using SqlSource;
+
+            namespace Methods
+            {
+                [SqlSourceGenerate(Output = GeneratorOutput.CodeGen)]
+                public partial class Repo;
+            }
+
+            namespace Dtos
+            {
+                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                public partial class Rows;
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: ListEvents\nSELECT at FROM events WHERE at > @since;\n"
+        );
+        var entry = Entry(
+            file,
+            "ListEvents",
+            [Parameter("since", Timestamptz with { BindName = "timestamptz" })],
+            [Column("at", Timestamptz, origin: EventsAt)]
+        );
+
+        var run = MethodRuns.Run(file, [entry], TwoNamespaces, WithThePlugin);
+
+        run.ShouldBeClean();
+        ModelFiles(run)
+            .ShouldBe([
+                "Dtos.ListEventsDto-Model.g.cs",
+                "Dtos.ListEventsParams-Model.g.cs",
+                "Methods.ListEventsDto-Model.g.cs",
+                "Methods.ListEventsParams-Model.g.cs",
+            ]);
+        run.Sources["Dtos.ListEventsDto-Model.g.cs"].ShouldContain("(" + DateTime + " At);");
+        run.Sources["Dtos.ListEventsParams-Model.g.cs"].ShouldContain("(" + DateTime + " Since);");
+        run.Sources["Methods.ListEventsDto-Model.g.cs"].ShouldContain("(" + Instant + " At);");
+        run.Sources["Methods.ListEventsParams-Model.g.cs"].ShouldContain("(" + Instant + " Since);");
+        var methods = run.Sources["Methods.Repo-Methods.g.cs"];
+        methods.ShouldContain("reader.GetFieldValue<" + Instant + ">(0)");
+        methods.ShouldContain("new global::Npgsql.NpgsqlParameter<" + Instant + ">();");
+        methods.ShouldContain(" parameter.DataTypeName = \"pg_catalog.timestamptz\";\n");
+    }
+
+    // Every row of NodaTime's, as a parameter and a column that can and cannot be null, and an array of one, compile
+    // with no error and no warning in what is generated, against the newest Npgsql, plugin and NodaTime and
+    // the oldest.
+    [Theory]
+    [InlineData("10.0.3", "3.3.7", true)]
+    [InlineData("8.0.3", "3.1.9", false)]
+    public void CodeGen_NodaTime_CompilesWithoutWarnings(string npgsql, string nodaTime, bool newest)
+    {
+        var tstz = Timestamptz;
+        var tsrange = Catalog("tsrange", SidecarValues.Kind.Range, Catalog("timestamp"));
+        var daterange = Catalog("daterange", SidecarValues.Kind.Range, Catalog("date"));
+        var tstzrange = Catalog("tstzrange", SidecarValues.Kind.Range, tstz);
+        static PostgresType Multi(PostgresType range) =>
+            TestSidecars.Postgres(
+                name: range.Name.Replace("range", "multirange", StringComparison.Ordinal),
+                kind: SidecarValues.Kind.Multirange,
+                internalName: range.InternalName.Replace("range", "multirange", StringComparison.Ordinal),
+                subtype: range
+            );
+
+        PostgresType[] types =
+        [
+            tstz,
+            Catalog("timestamp"),
+            Catalog("date"),
+            Catalog("time"),
+            Catalog("timetz"),
+            Catalog("interval"),
+            tstzrange,
+            tsrange,
+            daterange,
+            Multi(tstzrange),
+            Multi(tsrange),
+            Multi(daterange),
+            ArrayOf(tstz, "_timestamptz"),
+        ];
+        var names = types
+            .Select((_, index) => "v" + index.ToString(System.Globalization.CultureInfo.InvariantCulture))
+            .ToArray();
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: Everything\nSELECT 1 WHERE "
+                + string.Join(
+                    " AND ",
+                    names.Select(name => "@" + name + " IS NOT NULL AND @maybe_" + name + " IS NULL")
+                )
+                + ";\n"
+        );
+        SidecarParameter[] parameters =
+        [
+            .. types.Select(
+                (type, index) =>
+                    Parameter(names[index], type with { BindName = type.InternalName.TrimStart('_') }, false)
+            ),
+            .. types.Select(
+                (type, index) =>
+                    Parameter("maybe_" + names[index], type with { BindName = type.InternalName.TrimStart('_') }, true)
+            ),
+        ];
+        SidecarColumn[] columns =
+        [
+            .. types.Select((type, index) => Column(names[index], type, false)),
+            .. types.Select((type, index) => Column("maybe_" + names[index], type, true)),
+        ];
+
+        var run = MethodRuns.Run(
+            file,
+            [Entry(file, "Everything", parameters, columns)],
+            references:
+            [
+                newest ? NpgsqlReferences.Npgsql10 : NpgsqlReferences.Npgsql8,
+                LibraryReferences.NodaTime(nodaTime),
+                LibraryReferences.NpgsqlNodaTime(npgsql),
+            ]
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(Instant);
+        methods.ShouldContain("global::NpgsqlTypes.NpgsqlRange<global::NodaTime.LocalDate>[]");
     }
 
     // ListEvents of the file, or the query of the name, whose one column, at, is a timestamptz read from
