@@ -1,4 +1,5 @@
 using SqlSource.Settings.ColumnTypes;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 
 namespace SqlSource.Settings;
@@ -51,8 +52,9 @@ internal readonly record struct QuerySettings(
     /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
     /// the attribute, then the file's level, then the default.  The file's level is the chain of its folder, so the
-    /// nearest settings file that has a setting gives it.  The type override and the column types are not among them:
-    /// <see cref="ResolveTypeOverrides" /> and <see cref="ResolveColumnTypes" /> give them.
+    /// nearest settings file that has a setting gives it.  The type override, the column types and the library types
+    /// are not among them: <see cref="ResolveTypeOverrides" />, <see cref="ResolveColumnTypes" /> and
+    /// <see cref="ResolveLibraries" /> give them.
     /// </summary>
     public static QuerySettings Resolve(SettingsLevel markers, SettingsLevel attribute, SettingsLevel file) =>
         new(
@@ -99,6 +101,15 @@ internal readonly record struct QuerySettings(
     /// </summary>
     public static EquatableArray<ColumnType> ResolveColumnTypes(SettingsLevel markers, SettingsLevel file) =>
         ColumnTypeMap.Over(markers.ColumnTypes, file.ColumnTypes) ?? EquatableArray<ColumnType>.Empty;
+
+    /// <summary>
+    /// The library types of a query: the markers' over the file's level's, merged per library, so a level replaces
+    /// only the libraries it names.  The file's level is the chain of its folder.  Sorted by library, and empty when no
+    /// level names one.  It keeps its entries of <c>default</c>, which hide the farther levels' so that the engine's
+    /// default applies, and is kept apart from <see cref="Resolve" /> for the same reason as the type override.
+    /// </summary>
+    public static EquatableArray<LibrarySetting> ResolveLibraries(SettingsLevel markers, SettingsLevel file) =>
+        LibrarySettings.Over(markers.LibraryTypes, file.LibraryTypes) ?? EquatableArray<LibrarySetting>.Empty;
 
     /// <summary>
     /// The database of a query: the markers', then the file's level's, else the name of the dialect, which the caller

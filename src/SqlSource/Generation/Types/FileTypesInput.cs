@@ -8,8 +8,8 @@ namespace SqlSource.Generation.Types;
 
 /// <summary>
 /// One claimed file with everything its types read.  It compares equal until one of them changes, so an edit to
-/// another file, to another sidecar or to a setting other than the type override and the column types types this one
-/// again only when its own value changed.
+/// another file, to another sidecar or to a setting other than the type override, the column types and the library
+/// types types this one again only when its own value changed.
 /// </summary>
 /// <param name="Check">What the checks of the file's sidecar gave, its usable entries among them.</param>
 /// <param name="File">
@@ -17,12 +17,16 @@ namespace SqlSource.Generation.Types;
 /// has nothing to type.
 /// </param>
 /// <param name="Level">
-/// The type override and the column types of the file's level, the chain of its folder, as a level that says nothing
-/// else.
+/// The type override, the column types and the library types of the file's level, the chain of its folder, as a level
+/// that says nothing else.
 /// </param>
 /// <param name="NpgsqlProbe">The Npgsql the project references, which chooses the column of PostgreSQL's map.</param>
 /// <param name="SqlClientProbe">
 /// The Microsoft.Data.SqlClient the project references, which chooses the column of SQL Server's map.
+/// </param>
+/// <param name="LibraryProbe">
+/// The libraries the project references, which decide whether a library that is on can be used, and whether one that
+/// no level names is on.
 /// </param>
 /// <param name="MappedTypes">
 /// The C# types that the type override and the column types name at any level, and that the <c>-- param:</c> and
@@ -34,13 +38,14 @@ internal sealed record FileTypesInput(
     SettingsLevel Level,
     NpgsqlProbe NpgsqlProbe,
     SqlClientProbe SqlClientProbe,
+    LibraryProbe LibraryProbe,
     EquatableArray<MappedType> MappedTypes
 )
 {
     /// <summary>
-    /// Finds the parsed file and the level of <paramref name="check" />'s file, of which it keeps the type override and
-    /// the column types alone, as <see cref="TypeSettingsOf" /> gives them.  Both lists are sorted by
-    /// <see cref="SqlPath.Comparer" />.
+    /// Finds the parsed file and the level of <paramref name="check" />'s file, of which it keeps the type override,
+    /// the column types and the library types alone, as <see cref="TypeSettingsOf" /> gives them.  Both lists are
+    /// sorted by <see cref="SqlPath.Comparer" />.
     /// </summary>
     public static FileTypesInput Gather(
         SidecarCheckResult check,
@@ -48,6 +53,7 @@ internal sealed record FileTypesInput(
         EquatableArray<FileLevel> fileLevels,
         NpgsqlProbe npgsqlProbe,
         SqlClientProbe sqlClientProbe,
+        LibraryProbe libraryProbe,
         EquatableArray<MappedType> mappedTypes
     )
     {
@@ -63,6 +69,7 @@ internal sealed record FileTypesInput(
                 SettingsLevel.None,
                 npgsqlProbe,
                 sqlClientProbe,
+                libraryProbe,
                 EquatableArray<MappedType>.Empty
             );
         }
@@ -74,22 +81,27 @@ internal sealed record FileTypesInput(
             levelIndex < 0 ? SettingsLevel.None : TypeSettingsOf(fileLevels[levelIndex].Level),
             npgsqlProbe,
             sqlClientProbe,
+            libraryProbe,
             mappedTypes
         );
     }
 
     /// <summary>
-    /// The type override of <paramref name="level" />, each engine's entries, and its column types, as a level that
-    /// says nothing else, so that a change to another setting gives an equal level.  <see cref="SettingsLevel.None" />
-    /// when it has none of them.
+    /// The type override of <paramref name="level" />, each engine's entries, its column types and its library types,
+    /// as a level that says nothing else, so that a change to another setting gives an equal level.
+    /// <see cref="SettingsLevel.None" /> when it has none of them.
     /// </summary>
     public static SettingsLevel TypeSettingsOf(SettingsLevel level) =>
-        level.TypeOverrides is null && level.SqlServerTypeOverrides is null && level.ColumnTypes is null
+        level.TypeOverrides is null
+        && level.SqlServerTypeOverrides is null
+        && level.ColumnTypes is null
+        && level.LibraryTypes is null
             ? SettingsLevel.None
             : new SettingsLevel
             {
                 TypeOverrides = level.TypeOverrides,
                 SqlServerTypeOverrides = level.SqlServerTypeOverrides,
                 ColumnTypes = level.ColumnTypes,
+                LibraryTypes = level.LibraryTypes,
             };
 }

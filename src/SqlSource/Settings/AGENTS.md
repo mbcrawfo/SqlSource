@@ -3,7 +3,7 @@
 Plain data and the readers of values.  See [settings](../../../docs/architecture/generator.md#settings).
 
 - **No file access, no symbols, no pipeline types, and nothing from `Parsing/`, `Generation/` or `Diagnostics/`.**  A rule shared with another folder goes in the root namespace, as `SqlIdentifier`, `DatabaseName` and `SystemSchemas` do.
-- **`QuerySettings.Resolve` is the one rule that puts the levels together**, with `ResolveTypeOverrides`, `ResolveColumnTypes` and `ResolveDatabase` for the three settings the attribute has no level for.
+- **`QuerySettings.Resolve` is the one rule that puts the levels together**, with `ResolveTypeOverrides`, `ResolveColumnTypes`, `ResolveLibraries` and `ResolveDatabase` for the four settings the attribute has no level for.
 - **A setting comes whole from the most specific level that has it, except the type override, the column types and the library types, which merge per key.**
 - **A new setting** is a nullable member of `SettingsLevel`, a line in `Over`, a member of `QuerySettings` with its default, and a `case` in `SqlMarkerScope.Read` when a marker gives it.  When another source gives it, it is also a member of `SettingId`, a line in `SettingsLevelReader.Read`, the one reader of the attribute and of the settings files, and a property in the `AttributeSettings` of `TargetTypeReader`.
 - **An `ISettingSource` only finds a raw value**, as text, as the elements of an array (the generator parameters, which the reader asks for before their text) or as the members of an object (the type override, the column types and the library types, which the reader reads from members alone); records one that is not valid, and an element or member that is not valid or repeats a key, by its index; and says its `SettingPlace`.  See [reading a level](../../../docs/architecture/generator.md#reading-a-level).
@@ -34,6 +34,7 @@ See [the type override](../../../docs/architecture/generator.md#the-type-overrid
 ## The library types
 
 - **The library types are `Settings/Libraries/`: one `LibrarySetting` for each `SqlLibrary`, merged by `LibrarySettings.Over`, which keeps an entry of `LibraryState.Default` so that it hides the farther levels.**  Never drop one before `LibrarySettings.Find`.
+- **The library types are not part of `QuerySettings.Resolve`**: `ResolveLibraries` merges them, and its caller does so once for each distinct level of markers, as for the type override.
 - **A new library is a member of `SqlLibrary`, whose lower-cased name is what a user writes**, and with it the names in `schemas/settings-v1.schema.json`, which `SettingsFileSchemaTests` checks against the enum.
 - **An entry carries the span and line span of its member through `ISettingSource.MemberSpans`**, so a diagnostic about it needs no source text; the attribute has no level for it and returns the default.
 

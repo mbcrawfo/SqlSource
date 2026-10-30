@@ -450,7 +450,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .WithTrackingName(TrackingNames.SqlClientProbe);
 
         // The libraries the project references, the same way, which the library switch needs to know which can be on.
-        // Nothing reads it yet.
         var libraryProbe = context
             .CompilationProvider.Select(static (compilation, _) => LibraryProbe.Read(compilation))
             .WithTrackingName(TrackingNames.LibraryProbe);
@@ -492,11 +491,11 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // The C# types of each claimed file's usable entries, a node for each file after its check, so that an edit to
         // one file or one sidecar types that file alone.  A file with no usable entry carries nothing to type.  Each
         // file keeps its input beside its types, so that the models read its entries without typing it again.  The
-        // input keeps the type override and the column types of the file's level alone, so that a change to another
-        // setting types no file again.
+        // input keeps the type override, the column types and the library types of the file's level alone, so that a
+        // change to another setting types no file again.
         var typedFiles = sidecarChecks.Then(each =>
             each.Combine(parsedFiles.Combine(fileLevels))
-                .Combine(npgsqlProbe.Combine(sqlClientProbe.Combine(mappedTypes)))
+                .Combine(npgsqlProbe.Combine(sqlClientProbe.Combine(libraryProbe.Combine(mappedTypes))))
                 .Select(
                     static (input, _) =>
                         FileTypesInput.Gather(
@@ -505,7 +504,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                             input.Left.Right.Right,
                             input.Right.Left,
                             input.Right.Right.Left,
-                            input.Right.Right.Right
+                            input.Right.Right.Right.Left,
+                            input.Right.Right.Right.Right
                         )
                 )
                 .WithTrackingName(TrackingNames.FileTypesInput)

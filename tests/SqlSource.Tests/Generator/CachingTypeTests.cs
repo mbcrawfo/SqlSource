@@ -21,7 +21,13 @@ namespace SqlSource.Tests.Generator;
 // The caching of the typing of the queries: which files an edit makes the generator type again.
 public sealed class CachingTypeTests
 {
+    private const string Instant = "global::NodaTime.Instant";
+
     private readonly CachingScene _scene = new();
+
+    // Npgsql, NodaTime and its plugin, which turn NodaTime on by default.
+    private static MetadataReference[] WithNodaTimesPlugin =>
+        [NpgsqlReferences.Npgsql10, LibraryReferences.NodaTime("3.3.7"), LibraryReferences.NpgsqlNodaTime("10.0.3")];
 
     // The probe and the resolution run on the new compilation and give equal values, so no file is typed again.
     [Fact]
@@ -429,6 +435,131 @@ public sealed class CachingTypeTests
             .ShouldHaveSingleItem()
             .Text.ShouldBe("global::System.DateOnly");
     }
+
+    // The -- library-types: marker is no part of the hash, so its edit leaves Users' entry current, and types Users
+    // again without the library.  Orders gathers an equal input and is not typed again, and the probe of the libraries
+    // runs on the run's compilation and gives an equal value.
+    [Fact]
+    public void LibraryTypesMarker_Edit_RetypesOnlyItsFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: WithNodaTimesPlugin);
+        var users = UsersWithLibraryTypes("on");
+        var driver = CreateDriver(
+                ProjectFileWithTypeOverrides(null),
+                [
+                    users,
+                    _scene.Orders,
+                    TypedSidecar(users, "GetUser", "timestamptz"),
+                    TypedSidecar(_scene.Orders, "GetOrder", "timestamptz"),
+                ]
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        ColumnTextOf(driver.GetRunResult(), "app/Users/Users.sql").ShouldBe(Instant);
+
+        var result = Run(driver.ReplaceAdditionalText(users, UsersWithLibraryTypes("off")), compilation);
+
+        AllReasons(result, TrackingNames.LibraryProbe).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        Reasons<FileTypesInput>(result, TrackingNames.FileTypesInput, input => input.Check.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        Reasons<TypedFile>(result, TrackingNames.TypedFile, file => file.Types.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        result.Diagnostics.ShouldBeEmpty();
+        ColumnTextOf(result, "app/Users/Users.sql").ShouldBe("global::System.DateTime");
+        ColumnTextOf(result, "app/Orders/Orders.sql").ShouldBe(Instant);
+    }
+
+    // The plugin added turns the library on by default: the probe changes, every file is typed again with NodaTime's
+    // type, and the models and the methods that read it are planned again.
+    [Fact]
+    public void LibraryReference_Added_RetypesAndReplansMethods()
+    {
+        var compilation = MethodsCompilation(TypeSource("App", "UserQueries"));
+        var driver = _scene.FirstRunOfMethods(
+            compilation,
+            TypedSidecar(_scene.Users, "GetUser", "timestamptz"),
+            TypedSidecar(_scene.Orders, "GetOrder", "timestamptz")
+        );
+        MethodsOf(driver.GetRunResult(), UserMethods).ShouldContain("GetFieldValue<global::System.DateTime>(");
+
+        var result = Run(
+            driver,
+            compilation.AddReferences(LibraryReferences.NodaTime("3.3.7"), LibraryReferences.NpgsqlNodaTime("10.0.3"))
+        );
+
+        result.Diagnostics.ShouldBeEmpty();
+        AllReasons(result, TrackingNames.LibraryProbe).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.TypedFile).ShouldAllBe(IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.FileModels).ShouldAllBe(IncrementalStepRunReason.Modified);
+        MethodReasons(result, TrackingNames.MethodsInput)
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Modified),
+                ignoreOrder: true
+            );
+        MethodsOf(result, UserMethods).ShouldContain("GetFieldValue<global::NodaTime.Instant>(");
+    }
+
+    // An edit of the library types of the settings file of Users' folder: Orders, which the file does not reach,
+    // gathers an equal input and is not typed again.
+    [Fact]
+    public void SettingsFileLibraryTypes_Edit_RetypesOnlyItsFolder()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: WithNodaTimesPlugin);
+        var folder = LibraryTypesFile("on");
+        var driver = _scene.FirstRunWithTypes(
+            compilation,
+            ProjectFileWithTypeOverrides(null),
+            TypedSidecar(_scene.Users, "GetUser", "timestamptz"),
+            TypedSidecar(_scene.Orders, "GetOrder", "timestamptz"),
+            folder
+        );
+
+        var result = Run(driver.ReplaceAdditionalText(folder, LibraryTypesFile("off")), compilation);
+
+        Reasons<FileTypesInput>(result, TrackingNames.FileTypesInput, input => input.Check.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        result.Diagnostics.ShouldBeEmpty();
+        ColumnTextOf(result, "app/Users/Users.sql").ShouldBe("global::System.DateTime");
+        ColumnTextOf(result, "app/Orders/Orders.sql").ShouldBe(Instant);
+
+        // The settings file of Users' folder, with this state of NodaTime.
+        static InMemoryAdditionalText LibraryTypesFile(string state) =>
+            new("/app/Users/sqlsource.json", "{\"libraryTypes\": {\"nodaTime\": \"" + state + "\"}}");
+    }
+
+    // Users, whose query's -- library-types: marker gives NodaTime this state.
+    private InMemoryAdditionalText UsersWithLibraryTypes(string state) =>
+        new(_scene.Users.Path, "-- name: GetUser\n-- library-types: nodatime=" + state + "\nSELECT 1 AS value;\n");
 
     // Users, whose one parameter a -- param: marker gives the C# type of MyApp.
     private InMemoryAdditionalText UsersWithMarker(string type) =>

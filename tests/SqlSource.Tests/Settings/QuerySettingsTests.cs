@@ -336,6 +336,21 @@ public sealed class QuerySettingsTests
         entries.Over(SettingsLevel.None).LibraryTypes.ShouldBe(entries.LibraryTypes);
     }
 
+    // The markers' entry for a library wins over the file's level's, a default included, which hides the file's.
+    [Fact]
+    public void ResolveLibraries_MarkersOverFile()
+    {
+        var markers = Libraries(LibraryState.Default, SettingPlace.Query);
+        var file = Libraries(LibraryState.On, SettingsFile);
+
+        var entry = QuerySettings.ResolveLibraries(markers, file).ShouldHaveSingleItem();
+
+        entry.State.ShouldBe(LibraryState.Default);
+        entry.Place.ShouldBe(SettingPlace.Query);
+        QuerySettings.ResolveLibraries(SettingsLevel.None, file).ShouldBe(file.LibraryTypes!.Value);
+        QuerySettings.ResolveLibraries(SettingsLevel.None, SettingsLevel.None).ShouldBeEmpty();
+    }
+
     private static SettingsLevel Libraries(LibraryState state, SettingPlace place) =>
         new()
         {
