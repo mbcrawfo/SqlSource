@@ -545,7 +545,7 @@ internal static class PostgresErrors
         var index = 0;
         while (
             index < asked.Parameters.Count
-            && !string.Equals(asked.Parameters[index].Name, unbound.Parameter, StringComparison.Ordinal)
+            && !string.Equals(asked.Parameters[index].Name, unbound.Parameter, SqlParameterName.Comparison)
         )
         {
             index++;

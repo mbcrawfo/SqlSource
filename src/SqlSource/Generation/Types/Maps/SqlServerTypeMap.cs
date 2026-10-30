@@ -180,9 +180,9 @@ internal static class SqlServerTypeMap
             Row.OfSqlClient("global::Microsoft.Data.SqlTypes.SqlVector<float>", true, SqlClientColumn.SqlClient61),
             "vector"
         );
-        Add(Row.NeedsTypes("SqlHierarchyId"), "hierarchyid");
-        Add(Row.NeedsTypes("SqlGeography"), "geography");
-        Add(Row.NeedsTypes("SqlGeometry"), "geometry");
+        Add(Row.NeedsTypes("SqlHierarchyId"), SqlServerNames.HierarchyId);
+        Add(Row.NeedsTypes("SqlGeography"), SqlServerNames.Geography);
+        Add(Row.NeedsTypes("SqlGeometry"), SqlServerNames.Geometry);
         return rows;
     }
 

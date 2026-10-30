@@ -164,12 +164,10 @@ internal static class ParameterPlaceholders
 
     private static string OrdinalOf(ReadOnlySpan<char> name, EquatableArray<SqlQueryParameter> parameters)
     {
-        for (var index = 0; index < parameters.Count; index++)
+        var index = SqlParameterName.IndexOf(parameters, name);
+        if (index >= 0)
         {
-            if (name.Equals(parameters[index].Name, StringComparison.OrdinalIgnoreCase))
-            {
-                return (index + 1).ToString(CultureInfo.InvariantCulture);
-            }
+            return (index + 1).ToString(CultureInfo.InvariantCulture);
         }
 
         throw new InvalidOperationException($"The SQL holds the parameter '{name}', which the query's list does not.");

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using SqlSource.Snapshot;
 
 namespace SqlSource.Tool.Describing.SqlServer.Types;
@@ -16,15 +15,6 @@ namespace SqlSource.Tool.Describing.SqlServer.Types;
 /// </remarks>
 internal static class SqlServerTypes
 {
-    // The CLR types of the system, by their system type name, which a row of them names besides their assembly.
-    private static readonly HashSet<string> ClrSystemTypes =
-    [
-        with(StringComparer.OrdinalIgnoreCase),
-        "geometry",
-        "geography",
-        "hierarchyid",
-    ];
-
     /// <summary>The type the server suggests for an undeclared parameter.</summary>
     /// <exception cref="InvalidOperationException">
     /// The row has no type name or lacks a facet: the server typed the parameter, or it would have raised an error.
@@ -69,20 +59,21 @@ internal static class SqlServerTypes
         }
 
         return user.Schema is null
-            ? SqlServerLive.Bracketed(name)
-            : SqlServerLive.Bracketed(user.Schema) + "." + SqlServerLive.Bracketed(name);
+            ? SqlServerNames.Bracketed(name)
+            : SqlServerNames.Bracketed(user.Schema) + "." + SqlServerNames.Bracketed(name);
     }
 
     /// <summary>
     /// True when the row's type may be a CLR type: it has an assembly-qualified name, as <c>geometry</c>,
-    /// <c>geography</c>, <c>hierarchyid</c> and a user's CLR type have, its system type name is one of those three, or
-    /// it has none.  A CLR type's <c>Parse</c> may answer its Null for a string such as <c>'NULL'</c>, so a conversion
-    /// of a value that is not null to it may be <c>NULL</c>.  The one rule of what is a CLR type for the proofs.
+    /// <c>geography</c>, <c>hierarchyid</c> and a user's CLR type have, its system type name is one of those three
+    /// (<see cref="SqlServerNames.ClrSystemTypes" />), or it has none.  A CLR type's <c>Parse</c> may answer its Null
+    /// for a string such as <c>'NULL'</c>, so a conversion of a value that is not null to it may be <c>NULL</c>.  The
+    /// one rule of what is a CLR type for the proofs.
     /// </summary>
     public static bool MayBeClr(ISqlServerTypeRow row) =>
         row.AssemblyQualifiedTypeName is not null
         || row.SystemTypeName is not { } name
-        || ClrSystemTypes.Contains(name);
+        || SqlServerNames.IsClrSystemType(name);
 
     private static SqlServerType Build(ISqlServerTypeRow row)
     {

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Methods;
@@ -118,16 +117,12 @@ internal sealed class SqlServerParameterBinder : ParameterBinder
             && TryReadFacets(type, row.Facet, out facet);
     }
 
-    // The UdtTypeName of a CLR type: its bare name in sys, where hierarchyid, geography and geometry are, and
-    // schema.name otherwise.  SqlClient splits the name at each dot outside brackets and sends the parts, so a part
-    // that is not all letters, digits and underscores is put in brackets, a ] in it written twice.
+    // The UdtTypeName of a CLR type: its bare name in sys, where SqlServerNames.ClrSystemTypes are, and schema.name
+    // otherwise, each part as SqlServerNames.UdtPart writes it.
     private static string UdtTypeNameOf(string? schema, string name) =>
-        schema is null || SystemSchemas.IsSqlServer(schema) ? Part(name) : Part(schema) + "." + Part(name);
-
-    private static string Part(string part) =>
-        part.All(character => char.IsLetterOrDigit(character) || character == '_')
-            ? part
-            : "[" + part.Replace("]", "]]") + "]";
+        schema is null || SystemSchemas.IsSqlServer(schema)
+            ? SqlServerNames.UdtPart(name)
+            : SqlServerNames.UdtPart(schema) + "." + SqlServerNames.UdtPart(name);
 
     // The number the binding takes from the type: the Size of a length, -1 for max; the precision, of a decimal, whose
     // scale is the type's; or the dimension of a vector.  False for one no SqlParameter can hold, which only a sidecar
@@ -317,7 +312,7 @@ internal sealed class SqlServerParameterBinder : ParameterBinder
         rows.Add("datetimeoffset", new Row("DateTimeOffset", Facet.Scale7));
         rows.Add("json", new Row("NVarChar", Facet.Max));
         rows.Add("vector", new Row(null, Facet.Vector));
-        foreach (var name in new[] { "hierarchyid", "geography", "geometry" })
+        foreach (var name in SqlServerNames.ClrSystemTypes)
         {
             rows.Add(name, new Row("Udt", Facet.None, UdtTypeName: name));
         }

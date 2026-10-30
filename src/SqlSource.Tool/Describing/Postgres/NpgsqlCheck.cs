@@ -144,10 +144,9 @@ internal static class NpgsqlCheck
         {
             // "@" and ":" are the prefixes Npgsql places a parameter by.
             var name = SqlParameterName.WithoutPrefix(placed, "@:");
-            var parameter =
-                parameters.FirstOrDefault(parameter =>
-                    string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase)
-                ) ?? new SqlQueryParameter(name, null, null, false);
+            var parameter = SqlParameterName.IndexOf(parameters, name.AsSpan()) is >= 0 and var index
+                ? parameters[index]
+                : new SqlQueryParameter(name, null, null, false);
             if (!order.Contains(parameter))
             {
                 order.Add(parameter);

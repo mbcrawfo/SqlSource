@@ -94,8 +94,8 @@ internal static class ParameterCopies
     public static CopiedSql Rename(string sql, EquatableArray<SqlQueryParameter> parameters)
     {
         var lexemes = DescriberSql.Lex(sql, SqlDialectRules.SqlServer);
-        var uses = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var uses = new Dictionary<string, int>(SqlParameterName.Comparer);
+        var taken = new HashSet<string>(SqlParameterName.Comparer);
         foreach (var lexeme in lexemes)
         {
             if (lexeme.Kind == SqlLexemeKind.Parameter)
@@ -119,11 +119,11 @@ internal static class ParameterCopies
 
         if (reused.Count == 0)
         {
-            return new CopiedSql(sql, [], new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+            return new CopiedSql(sql, [], new Dictionary<string, string>(SqlParameterName.Comparer));
         }
 
         var separator = SeparatorFor(reused, taken);
-        var made = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var made = new HashSet<string>(SqlParameterName.Comparer);
         var copies = reused
             .Select(parameter => new ReusedParameter(parameter.Name, CopiesOf(parameter, separator, taken, made)))
             .ToList();
@@ -178,7 +178,7 @@ internal static class ParameterCopies
     {
         var listed = undeclared.ToList();
         var fromServer = new List<string>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(SqlParameterName.Comparer);
         foreach (var name in reported)
         {
             var bare = SqlParameterName.WithoutPrefix(name, Prefixes);
@@ -189,7 +189,7 @@ internal static class ParameterCopies
             }
         }
 
-        var inList = new HashSet<string>(listed, StringComparer.OrdinalIgnoreCase);
+        var inList = new HashSet<string>(listed, SqlParameterName.Comparer);
         return
         [
             .. listed.Where(name => !seen.Contains(name)).Select(static name => new ListDifference(name, true)),
@@ -211,7 +211,7 @@ internal static class ParameterCopies
 
     private static bool AreFree(List<(string Name, int Uses)> reused, string separator, HashSet<string> taken)
     {
-        var made = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var made = new HashSet<string>(SqlParameterName.Comparer);
         foreach (var (name, uses) in reused)
         {
             for (var number = 1; number <= uses; number++)
@@ -229,8 +229,8 @@ internal static class ParameterCopies
 
     private static string Renamed(string sql, EquatableArray<SqlLexeme> lexemes, List<ReusedParameter> copies)
     {
-        var byName = copies.ToDictionary(static copy => copy.Name, StringComparer.OrdinalIgnoreCase);
-        var next = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var byName = copies.ToDictionary(static copy => copy.Name, SqlParameterName.Comparer);
+        var next = new Dictionary<string, int>(SqlParameterName.Comparer);
         var renamed = new StringBuilder(sql.Length + (copies.Count * 8));
         foreach (var lexeme in lexemes)
         {
@@ -250,7 +250,7 @@ internal static class ParameterCopies
 
     private static Dictionary<string, string> ParameterOfCopy(List<ReusedParameter> copies)
     {
-        var parameterOfCopy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var parameterOfCopy = new Dictionary<string, string>(SqlParameterName.Comparer);
         foreach (var reused in copies)
         {
             foreach (var copy in reused.Copies)

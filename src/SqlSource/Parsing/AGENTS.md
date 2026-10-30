@@ -2,7 +2,8 @@
 
 See [parsing](../../../docs/architecture/generator.md#parsing).
 
-- **Pure.**  No file access and no pipeline types.  Comparisons are ordinal; marker keywords and the names of generator parameters are ordinal ignoring case.
+- **Pure.**  No file access and no pipeline types.  Comparisons are ordinal; marker keywords, `-- column:` names and the names of generator parameters are ordinal ignoring case.
+- **A query's parameter names compare through `SqlParameterName.Comparer` and `Comparison`, and are found with `SqlParameterName.IndexOf`**, the one rule that the generator and the tool share.
 - **Every span is an offset into the file's text**; `SqlBlockText.ToSourceSpan` maps one of a block's built SQL back.
 - **Quoted regions and hints are copied as written**, apart from line endings.  Trimming and blank-line removal must never reach inside one.
 - **Lexemes cover the text without gaps**, and a quoted region or block comment ends with its closing delimiter: `SqlMarkerReader` and `SqlTextBuilder` depend on both.

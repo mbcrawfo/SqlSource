@@ -39,7 +39,7 @@ internal static class UncastParameters
     private static HashSet<string> Uncast(string sql, EquatableArray<SqlLexeme> lexemes)
     {
         var pieces = Pieces(sql, lexemes);
-        var uncast = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var uncast = new HashSet<string>(SqlParameterName.Comparer);
         for (var index = 0; index < pieces.Count; index++)
         {
             if (pieces[index] is not { Parameter: true } parameter)
