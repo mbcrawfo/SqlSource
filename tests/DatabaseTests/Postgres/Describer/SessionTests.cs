@@ -101,7 +101,7 @@ public sealed class SessionTests(PostgresDatabases postgres)
 
         var failure = await ShouldNotOpenAsync(connection.ConnectionString);
 
-        failure.ServerLines.ShouldBe([PostgresConnection.UnreadableFile]);
+        failure.ServerLines.ShouldBe([ConnectionErrors.UnreadableFile]);
         Failures.TextsOf(failure).ShouldAllBe(text => !text.Contains(path, StringComparison.Ordinal));
     }
 
@@ -170,11 +170,10 @@ public sealed class SessionTests(PostgresDatabases postgres)
         var ended = ShouldBeRejected(found, DescribeStep.DescribeParameters);
         ended
             .ServerLines.ShouldHaveSingleItem()
-            .ShouldBeOneOf("57P01: the server ended the session", PostgresConnection.LostConnection);
+            .ShouldBeOneOf("57P01: the server ended the session", ConnectionTexts.LostConnection);
         var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
         ShouldNotName(ended, connection.Host, connection.Username);
-        ShouldBeRejected(later, DescribeStep.DescribeParameters)
-            .ServerLines.ShouldBe([PostgresConnection.LostConnection]);
+        ShouldBeRejected(later, DescribeStep.DescribeParameters).ServerLines.ShouldBe([ConnectionTexts.LostConnection]);
     }
 
     // The statement is prepared and the session ends before its columns are read.  "columns" answers the error that
@@ -201,7 +200,7 @@ public sealed class SessionTests(PostgresDatabases postgres)
 
         _ = ShouldBeRejected(described, DescribeStep.DescribeColumns);
         capture.Calls.Select(call => call.Method).ShouldBe(["open", "prepare", "columns", "deallocate"]);
-        CaptureJson.TextOf(capture.Calls[3].Answer).ShouldContain(PostgresConnection.LostConnection);
+        CaptureJson.TextOf(capture.Calls[3].Answer).ShouldContain(ConnectionTexts.LostConnection);
         CaptureJson.Write(capture).ShouldNotContain(new NpgsqlConnectionStringBuilder(postgres.ConnectionString).Host!);
     }
 
@@ -350,7 +349,7 @@ public sealed class SessionTests(PostgresDatabases postgres)
 
             var failure = await ShouldNotOpenAsync($"{postgres.ConnectionString};{ScratchSchema.ShadowingEqualsPath}");
 
-            failure.ServerLines.ShouldBe([PostgresConnection.UnreadableTypes]);
+            failure.ServerLines.ShouldBe([ConnectionErrors.UnreadableTypes]);
             failure.Help.ShouldBe(PostgresErrors.UnreadableTypesHelp);
         }
         finally

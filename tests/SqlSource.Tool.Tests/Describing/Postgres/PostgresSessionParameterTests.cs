@@ -245,7 +245,7 @@ public sealed class PostgresSessionParameterTests
     [Fact]
     public async Task DescribeAsync_TypesThatFails_IsSqlsrc225AtResolveType()
     {
-        var dropped = new PostgresServerError(null, PostgresConnection.LostConnection, null, null, null);
+        var dropped = new PostgresServerError(null, ConnectionTexts.LostConnection, null, null, null);
         var script = new PostgresScript().Open();
         _ = script.PreparesWithNoColumns(1, "SELECT $1::int", ["unknown"], new PostgresPrepareAnswer([23], null));
         _ = script.Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer(null, dropped));

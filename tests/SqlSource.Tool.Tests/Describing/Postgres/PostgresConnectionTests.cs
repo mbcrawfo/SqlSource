@@ -1,7 +1,10 @@
 using System;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
+using SqlSource.Testing;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
@@ -22,11 +25,11 @@ public sealed class PostgresConnectionTests
     {
         await using var connection = new PostgresConnection(connectionString, NullRunLog.Instance);
 
-        var thrown = await Should.ThrowAsync<NpgsqlException>(() =>
+        var thrown = await Should.ThrowAsync<PostgresConnection.UnusableException>(() =>
             connection.OpenAsync(TestContext.Current.CancellationToken)
         );
 
-        thrown.Message.ShouldBe(PostgresConnection.MultiplexingRefused);
+        thrown.Message.ShouldBe(ConnectionErrors.MultiplexingRefused);
     }
 
     [Fact]
@@ -41,7 +44,7 @@ public sealed class PostgresConnectionTests
             connection.OpenAsync(TestContext.Current.CancellationToken)
         );
 
-        thrown.Message.ShouldNotBe(PostgresConnection.MultiplexingRefused);
+        thrown.Message.ShouldNotBe(ConnectionErrors.MultiplexingRefused);
     }
 
     // What the driver throws, when a connection string names a file, is no NpgsqlException: it reads the file when it
@@ -58,7 +61,7 @@ public sealed class PostgresConnectionTests
             AgreesToTls,
             $"SslMode=Require;SslCertificate={path}",
             path,
-            PostgresConnection.UnreadableFile
+            ConnectionErrors.UnreadableFile
         );
     }
 
@@ -72,7 +75,7 @@ public sealed class PostgresConnectionTests
             AgreesToTls,
             $"SslMode=Require;SslCertificate={path}",
             path,
-            PostgresConnection.UnreadableFile
+            ConnectionErrors.UnreadableFile
         );
     }
 
@@ -87,7 +90,7 @@ public sealed class PostgresConnectionTests
             AgreesToTls,
             $"SslMode=Require;SslCertificate={certificate};SslKey={key}",
             key,
-            PostgresConnection.UnreadableFile
+            ConnectionErrors.UnreadableFile
         );
     }
 
@@ -104,7 +107,7 @@ public sealed class PostgresConnectionTests
             AsksForPassword,
             $"SslMode=Disable;Passfile={path}",
             path,
-            PostgresConnection.UnreadableFile
+            ConnectionErrors.UnreadableFile
         );
     }
 
@@ -118,7 +121,7 @@ public sealed class PostgresConnectionTests
             AsksForPassword,
             $"SslMode=Disable;Passfile={path}",
             path,
-            PostgresConnection.UnreadableFile
+            ConnectionErrors.UnreadableFile
         );
     }
 
@@ -132,7 +135,7 @@ public sealed class PostgresConnectionTests
             AgreesToTls,
             $"SslMode=Require;SslCertificate={path}",
             Secrets.Marker,
-            PostgresConnection.UnusableFile
+            ConnectionErrors.UnusableFile
         );
     }
 
@@ -147,7 +150,7 @@ public sealed class PostgresConnectionTests
             AsksForPassword,
             $"SslMode=Disable;Passfile={path}",
             Secrets.Marker,
-            PostgresConnection.UnusableFile
+            ConnectionErrors.UnusableFile
         );
     }
 
@@ -158,7 +161,7 @@ public sealed class PostgresConnectionTests
             null,
             "Host=127.0.0.1;Port=1;Target Session Attributes=primary",
             "primary",
-            PostgresConnection.UnsupportedSettings
+            ConnectionErrors.UnsupportedSettings
         );
 
     // The runtime runs the GSS loader from the static constructor of NetSecurityNative: the first call into it throws
@@ -199,18 +202,32 @@ public sealed class PostgresConnectionTests
             )
             .ShouldBeFalse();
 
+    // Every error the describer throws of its own is an UnusableException, which AnswerAsync passes as it is: an
+    // NpgsqlException made here would be answered as the driver's, by a fixed text that is not the one meant.
+    [Fact]
+    public void PostgresDescriber_ThrowsNoNpgsqlExceptionOfItsOwn() =>
+        Directory
+            .EnumerateFiles(
+                RepositoryRoot.Path("src", "SqlSource.Tool", "Describing", "Postgres"),
+                "*.cs",
+                SearchOption.AllDirectories
+            )
+            .Where(static file => File.ReadAllText(file).Contains("new NpgsqlException(", StringComparison.Ordinal))
+            .Select(static file => Path.GetFileName(file))
+            .ShouldBeEmpty();
+
     private const bool AgreesToTls = true;
     private const bool AsksForPassword = false;
 
-    // Opens a connection with the keywords added to a server's own, and checks the NpgsqlException that comes.  The
-    // server is none for a refusal that comes before anything connects.
+    // Opens a connection with the keywords added to a server's own, and checks the describer's own exception that
+    // comes.  The server is none for a refusal that comes before anything connects.
     private static async Task ShouldRefuseAsync(bool? agreesToTls, string keywords, string notQuoted, string message)
     {
         using var server = agreesToTls is { } agrees ? new FakePostgresServer(agrees) : null;
         var connectionString = server is null ? keywords : server.ConnectionString + keywords;
         await using var connection = new PostgresConnection(connectionString, NullRunLog.Instance);
 
-        var thrown = await Should.ThrowAsync<NpgsqlException>(() =>
+        var thrown = await Should.ThrowAsync<PostgresConnection.UnusableException>(() =>
             connection.OpenAsync(TestContext.Current.CancellationToken)
         );
 

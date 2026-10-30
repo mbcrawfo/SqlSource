@@ -2,6 +2,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Describing;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
@@ -254,7 +255,7 @@ public sealed class PostgresEventsColumnTests
     public async Task DescribeAsync_ColumnsThatFails_WritesItsErrorInThePlaceOfTheColumns()
     {
         var log = new RecordingLog();
-        var lost = new PostgresServerError(null, PostgresConnection.LostConnection, null, null, null);
+        var lost = new PostgresServerError(null, ConnectionTexts.LostConnection, null, null, null);
         var script = new PostgresScript()
             .Open()
             .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer([23], null))

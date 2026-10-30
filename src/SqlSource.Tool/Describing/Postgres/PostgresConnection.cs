@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing.Postgres;
@@ -35,77 +36,6 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </param>
 internal sealed class PostgresConnection(string connectionString, IRunLog log) : IAsyncDisposable
 {
-    /// <summary>
-    /// What is said of a connection string the driver cannot read.  The driver's own text is not passed on: its
-    /// inner exception quotes the value.
-    /// </summary>
-    public const string UnreadableConnectionString = "Npgsql cannot read the connection string";
-
-    /// <summary>
-    /// What is said of a call on a connection that the server has ended: a restart, an administrator, an idle
-    /// timeout.  The driver's own word for it is an exception that is none of a server.
-    /// </summary>
-    public const string LostConnection = "the connection to the server was lost";
-
-    /// <summary>
-    /// What is said of a connection string that sets <c>Multiplexing=true</c>: the driver then shares physical
-    /// connections between commands, and a prepared statement is session state that a later command may not find.
-    /// </summary>
-    public const string MultiplexingRefused = "Multiplexing=true does not keep one session";
-
-    /// <summary>
-    /// What is said of a file that the connection string or the environment names and that cannot be read: it is
-    /// not there, its folder is not, the tool may not open it, or its path is too long.  The driver's own text is
-    /// not passed on: it quotes the path.
-    /// </summary>
-    public const string UnreadableFile = "a file that the connection string or the environment names cannot be read";
-
-    /// <summary>
-    /// What is said of a file that the connection string or the environment names and that the driver reads but
-    /// cannot use: a certificate or a key that is not in a form it knows or whose password is wrong, a password
-    /// file with a line that is not written as it wants.  The driver's own text is not passed on.
-    /// </summary>
-    public const string UnusableFile =
-        "a file that the connection string or the environment names is not what Npgsql expects: "
-        + "it is not in the right form, or its password is wrong";
-
-    /// <summary>
-    /// What is said of settings of the connection string that the driver cannot honour together, such as a
-    /// <c>Target Session Attributes</c> other than <c>Any</c> for one host.
-    /// </summary>
-    public const string UnsupportedSettings =
-        "Npgsql does not support these settings of the connection string together";
-
-    /// <summary>
-    /// What is said of a server that asks for GSS authentication on a machine where the operating system's GSS
-    /// library cannot be loaded.
-    /// </summary>
-    public const string GssUnavailable = "GSS authentication is not available on this machine";
-
-    /// <summary>
-    /// What is said of a session whose answer to <c>open</c> Npgsql cannot read as text: the driver loaded the
-    /// database's types on open with SQL that the search path changes, and an operator <c>=</c> of a user's on two
-    /// <c>oid</c> or two <c>"char"</c> before <c>pg_catalog</c> leaves it without them.
-    /// </summary>
-    public const string UnreadableTypes = "Npgsql cannot read the database's types";
-
-    /// <summary>
-    /// Every text that the describer throws as an <see cref="NpgsqlException" /> of its own, with no inner exception:
-    /// the constants above.  <see cref="ConnectionErrors" /> passes each as it is, and answers any other message by
-    /// a text of its own.
-    /// </summary>
-    public static IReadOnlyList<string> OwnTexts { get; } =
-    [
-        UnreadableConnectionString,
-        LostConnection,
-        MultiplexingRefused,
-        UnreadableFile,
-        UnusableFile,
-        UnsupportedSettings,
-        GssUnavailable,
-        UnreadableTypes,
-    ];
-
     // The type of the runtime whose static constructor loads the GSS library: Interop+NetSecurityNative+GssInitializer.
     // It is initialized by the static constructor of Interop+NetSecurityNative, so the exception that comes out is for
     // that type, with this one as its inner exception.
@@ -296,13 +226,14 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     /// the driver's is thrown as it is, whatever it quotes, and no answer keeps its text
     /// (<see cref="ConnectionErrors" />).  A server that misbehaves can also reach the
     /// catch of <see cref="FormatException" />, through Npgsql's decode of a SCRAM salt or its parse of an OID while
-    /// it loads the types, and is then reported with the file's message, <see cref="UnusableFile" />.
+    /// it loads the types, and is then reported with the file's message, <see cref="ConnectionErrors.UnusableFile" />.
     /// </para>
     /// </remarks>
-    /// <exception cref="NpgsqlException">
-    /// The server could not be reached or refused, the driver cannot read the connection string, a file it names
-    /// cannot be read or used, its settings are not supported together, the string sets <c>Multiplexing=true</c>, the
-    /// operating system's GSS library cannot be loaded, or the connection was open and is so no longer.
+    /// <exception cref="NpgsqlException">The server could not be reached or refused.</exception>
+    /// <exception cref="UnusableException">
+    /// The driver cannot read the connection string, a file it names cannot be read or used, its settings are not
+    /// supported together, the string sets <c>Multiplexing=true</c>, the operating system's GSS library cannot be
+    /// loaded, or the connection was open and is so no longer.
     /// </exception>
     public async Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken)
     {
@@ -311,7 +242,9 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
             // The driver closes a connection on which a call found that the server had gone, and for a command on
             // a closed one it throws what is no NpgsqlException.  A server causes it, so it is an answer's error
             // like any other.  The session is not opened again: what it had prepared is gone with its backend.
-            return _connection.State == ConnectionState.Open ? _connection : throw new NpgsqlException(LostConnection);
+            return _connection.State == ConnectionState.Open
+                ? _connection
+                : throw new UnusableException(ConnectionTexts.LostConnection);
         }
 
         try
@@ -324,7 +257,7 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
         {
             // The driver's word for a string it cannot read: a keyword it does not know, a value that is no number,
             // no host.  A user's mistake, and so an answer of "open" like any other.  The exception is not kept.
-            throw new NpgsqlException(UnreadableConnectionString);
+            throw new UnusableException(ConnectionErrors.UnreadableConnectionString);
         }
         catch (Exception exception)
             when (exception
@@ -336,18 +269,18 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
         {
             // A certificate, a key or a password file that the string or the environment names.  The text quotes
             // the path, so the exception is not kept.
-            throw new NpgsqlException(UnreadableFile);
+            throw new UnusableException(ConnectionErrors.UnreadableFile);
         }
         catch (Exception exception) when (exception is CryptographicException or FormatException)
         {
             // The same files, read and not understood: a certificate or key in no form the driver knows, a wrong
             // SslPassword, a line of a password file that is no entry.
-            throw new NpgsqlException(UnusableFile);
+            throw new UnusableException(ConnectionErrors.UnusableFile);
         }
         catch (TypeInitializationException exception) when (IsGssUnavailable(exception))
         {
             // The operating system's GSS library cannot be loaded, and the server asked for it.
-            throw new NpgsqlException(GssUnavailable);
+            throw new UnusableException(ConnectionErrors.GssUnavailable);
         }
     }
 
@@ -382,7 +315,7 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
         var builder = new NpgsqlDataSourceBuilder(connectionString);
         if (builder.ConnectionStringBuilder.Multiplexing)
         {
-            throw new NpgsqlException(MultiplexingRefused);
+            throw new UnusableException(ConnectionErrors.MultiplexingRefused);
         }
 
         // Npgsql logs the values of a command's parameters when the string asks it to, whatever the data source's own
@@ -410,7 +343,7 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
             // Settings that the driver cannot honour together, which it finds when it builds.  The only
             // NotSupportedException of a build that no setting of the string causes is for a provider of passwords
             // or a callback, and the tool sets none.
-            throw new NpgsqlException(UnsupportedSettings);
+            throw new UnusableException(ConnectionErrors.UnsupportedSettings);
         }
 
         _driverLog = driverLog;
@@ -585,4 +518,30 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
 
     /// <summary>The connection without its value.</summary>
     public override string ToString() => nameof(PostgresConnection);
+
+    /// <summary>
+    /// Why the connection cannot be used, in the describer's own words: one of the texts of
+    /// <see cref="ConnectionErrors" /> or <see cref="ConnectionTexts" />, which <c>PostgresLive.AnswerAsync</c> answers
+    /// as it is, through <see cref="ConnectionErrors.Own" />.  Every error the describer throws of its own is this.
+    /// </summary>
+    /// <remarks>
+    /// It derives from <see cref="NpgsqlException" /> so that every catch of the driver's errors, which ends or
+    /// restores the describe's transaction, takes it too.  It has the standard constructors for the reasons
+    /// <c>DescriberFaultException</c> gives: S3871, CA1515 and CA1032.  It holds no inner exception.
+    /// </remarks>
+    internal sealed class UnusableException : NpgsqlException
+    {
+        public UnusableException()
+            : base(ConnectionTexts.LostConnection) { }
+
+        public UnusableException(string message)
+            : base(message) { }
+
+        public UnusableException(string message, Exception innerException)
+            : base(message)
+        {
+            // Dropped, as the class says: the driver's text may quote the value or a path.
+            _ = innerException;
+        }
+    }
 }

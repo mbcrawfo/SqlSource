@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing.SqlServer;
@@ -19,7 +20,7 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// <para>
 /// The session has one <see cref="SqlConnection" />, opened by the first call that needs it.  A call that finds it no
 /// longer open, which SqlClient does after an error that ends the connection, makes that call and every later one
-/// answer <see cref="ConnectionErrors.LostConnection" />: it is not opened again.
+/// answer <see cref="ConnectionTexts.LostConnection" />: it is not opened again.
 /// </para>
 /// <para>
 /// A command's text is not a constant here, which is what <c>CA2100</c> flags: <c>.editorconfig</c> turns the rule
@@ -163,7 +164,7 @@ internal sealed class SqlServerConnection(string connectionString, IRunLog log) 
         {
             return _connection.State == ConnectionState.Open
                 ? _connection
-                : throw new UnusableException(ConnectionErrors.LostConnection);
+                : throw new UnusableException(ConnectionTexts.LostConnection);
         }
 
         var builder =
@@ -286,7 +287,7 @@ internal sealed class SqlServerConnection(string connectionString, IRunLog log) 
     internal sealed class UnusableException : InvalidOperationException
     {
         public UnusableException()
-            : base(ConnectionErrors.LostConnection) { }
+            : base(ConnectionTexts.LostConnection) { }
 
         public UnusableException(string message)
             : base(message) { }

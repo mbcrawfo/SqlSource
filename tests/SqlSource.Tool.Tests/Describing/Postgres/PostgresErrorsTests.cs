@@ -33,7 +33,7 @@ public sealed class PostgresErrorsTests
     [Fact]
     public void Open_ErrorWithoutASqlState_HasTheMessageAlone() =>
         PostgresErrors
-            .Open(new PostgresServerError(null, ConnectionErrors.ConnectTimedOut, null, null, null), "app")
+            .Open(new PostgresServerError(null, ConnectionTexts.ConnectTimedOut, null, null, null), "app")
             .ServerLines.ShouldBe(["the connection to the server timed out"]);
 
     // The refusal is the tool's own message and no server said it: the line is that message alone.
@@ -41,14 +41,14 @@ public sealed class PostgresErrorsTests
     public void Open_MultiplexingRefused_IsSqlsrc236()
     {
         var failure = PostgresErrors.Open(
-            new PostgresServerError(null, PostgresConnection.MultiplexingRefused, null, null, null),
+            new PostgresServerError(null, ConnectionErrors.MultiplexingRefused, null, null, null),
             "app"
         );
 
         failure.Descriptor.Id.ShouldBe("SQLSRC236");
         failure.Arguments.ShouldBe(["app"]);
         failure.Step.ShouldBeNull();
-        failure.ServerLines.ShouldBe([PostgresConnection.MultiplexingRefused]);
+        failure.ServerLines.ShouldBe([ConnectionErrors.MultiplexingRefused]);
         failure.Help.ShouldBe(PostgresErrors.SessionNotKeptHelp);
     }
 
@@ -57,7 +57,7 @@ public sealed class PostgresErrorsTests
     public void Open_UnreadableTypes_IsSqlsrc224WithItsOwnHelp()
     {
         var failure = PostgresErrors.Open(
-            new PostgresServerError(null, PostgresConnection.UnreadableTypes, null, null, null),
+            new PostgresServerError(null, ConnectionErrors.UnreadableTypes, null, null, null),
             "app"
         );
 
@@ -478,14 +478,14 @@ public sealed class PostgresErrorsTests
     public void Prepare_ErrorWithoutASqlState_IsSqlsrc225WithTheMessageAlone()
     {
         var failure = PostgresErrors.Prepare(
-            new PostgresServerError(null, PostgresConnection.LostConnection, null, null, null),
+            new PostgresServerError(null, ConnectionTexts.LostConnection, null, null, null),
             Query(),
             Prepared(1),
             "app"
         );
 
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
-        failure.ServerLines.ShouldBe([PostgresConnection.LostConnection]);
+        failure.ServerLines.ShouldBe([ConnectionTexts.LostConnection]);
     }
 
     // The server counts a character outside the basic plane once, and so does the tool: the fifth character of the
@@ -510,14 +510,14 @@ public sealed class PostgresErrorsTests
     public void Types_Error_IsSqlsrc225AtResolveType()
     {
         var failure = PostgresErrors.Types(
-            new PostgresServerError(null, PostgresConnection.LostConnection, null, null, null),
+            new PostgresServerError(null, ConnectionTexts.LostConnection, null, null, null),
             Query()
         );
 
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
-        failure.Arguments.ShouldBe(["Q", PostgresConnection.LostConnection]);
+        failure.Arguments.ShouldBe(["Q", ConnectionTexts.LostConnection]);
         failure.Step.ShouldBe(DescribeStep.ResolveType);
-        failure.ServerLines.ShouldBe([PostgresConnection.LostConnection]);
+        failure.ServerLines.ShouldBe([ConnectionTexts.LostConnection]);
     }
 
     // Nothing the server said: a table, a column or a type went while the query was described.  So there is no
@@ -685,7 +685,7 @@ public sealed class PostgresErrorsTests
     [Fact]
     public void Check_VerdictErrorOfALostConnection_IsSqlsrc225WithItsText()
     {
-        var error = new PostgresServerError(null, PostgresConnection.LostConnection, null, null, null);
+        var error = new PostgresServerError(null, ConnectionTexts.LostConnection, null, null, null);
 
         var failure = PostgresErrors
             .Check(
@@ -698,9 +698,9 @@ public sealed class PostgresErrorsTests
             .ShouldNotBeNull();
 
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
-        failure.Arguments.ShouldBe(["ListUsers", PostgresConnection.LostConnection]);
+        failure.Arguments.ShouldBe(["ListUsers", ConnectionTexts.LostConnection]);
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
-        failure.ServerLines.ShouldBe([PostgresConnection.LostConnection]);
+        failure.ServerLines.ShouldBe([ConnectionTexts.LostConnection]);
     }
 
     [Fact]
