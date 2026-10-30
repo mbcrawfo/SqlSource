@@ -41,7 +41,12 @@ namespace SqlSource.Generation.Methods;
 /// <param name="MayReturnNull">
 /// Whether the call, on a read, can return null for a value that is not a <c>NULL</c>: the parse of a JSON
 /// <c>null</c> into a <see cref="Converters.JsonTypes.IsNode" /> type.  A not-null element read by element then
-/// throws on it.
+/// throws on it.  Also the serializer's read of a reference type, whose JSON <c>null</c> it gives as null.
+/// </param>
+/// <param name="IsSerializer">
+/// Whether the call is System.Text.Json's serializer, <c>JsonSerializer.Deserialize&lt;T&gt;</c> or
+/// <c>JsonSerializer.Serialize&lt;T&gt;</c> with its default options, for a project's own class in a type that holds
+/// JSON, rather than a converter.  It has no <paramref name="Library" />: no class is emitted for it.
 /// </param>
 internal sealed record Conversion(
     string Method,
@@ -52,7 +57,8 @@ internal sealed record Conversion(
     bool ElementIsValueType,
     EquatableArray<string> WarningIds = default,
     SqlLibrary? Library = null,
-    bool MayReturnNull = false
+    bool MayReturnNull = false,
+    bool IsSerializer = false
 )
 {
     /// <summary>

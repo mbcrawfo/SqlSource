@@ -144,7 +144,12 @@ internal static class PostgresTypeMap
     {
         if (element.Kind == TypeMappingKind.Mapped)
         {
-            return element with { Text = element.Text + "[]", IsValueType = false };
+            return element with
+            {
+                Text = element.Text + "[]",
+                IsValueType = false,
+                ElementIsValueType = element.IsValueType,
+            };
         }
 
         return element.Kind is TypeMappingKind.CastToOid or TypeMappingKind.CastToText or TypeMappingKind.NeedsNpgsql10

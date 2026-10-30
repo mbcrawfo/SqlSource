@@ -66,6 +66,21 @@ public sealed class LibraryConversionTests
         "System.Text.Json.Nodes.JsonArray",
     ];
 
+    // App.Sample, with a class and a value type that the serializer reads and sends.
+    private const string SerializedSource = """
+        using SqlSource;
+
+        namespace App
+        {
+            [SqlSourceGenerate]
+            public partial class Sample;
+
+            public sealed record Metadata(string Note);
+
+            public readonly record struct Spot(int X, int Y);
+        }
+        """;
+
     // SqlClient 7 and NodaTime 3.3.7.
     private static MetadataReference[] WithNodaTime =>
         [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")];
@@ -567,7 +582,8 @@ public sealed class LibraryConversionTests
     // Every edge of System.Text.Json that a query of SQL Server and one of Npgsql 8 use, read and written, nullable and
     // not, whole and, on Npgsql, by element, compiles with no error and no warning in what is generated, against each
     // driver, with the reference assemblies of .NET 8 and with the runtime's, of .NET 10.  Npgsql 10 reads and writes
-    // the same nodes itself.  A not-null node, whose read can give null for a JSON null, throws on one.
+    // the same nodes itself.  A not-null node, whose read can give null for a JSON null, throws on one.  A second query
+    // of the file reads and sends a project's classes through the serializer beside them.
     [Theory]
     [InlineData("SqlClient 6.1", false)]
     [InlineData("SqlClient 6.1", true)]
@@ -598,24 +614,35 @@ public sealed class LibraryConversionTests
             _ = markers.Append("-- param: @maybe_").Append(name).Append(" -> ").Append(used[index]).Append('\n');
         }
 
+        string[] serialized = isSqlServer
+            ? ["App.Metadata", "App.Spot"]
+            : ["App.Metadata", "App.Spot", "App.Metadata[]", "App.Spot?[]"];
+        var serializedMarkers = new System.Text.StringBuilder();
+        for (var index = 0; index < serialized.Length; index++)
+        {
+            var name = "v" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            foreach (var each in new[] { name, "maybe_" + name })
+            {
+                _ = serializedMarkers.Append("-- column: ").Append(each).Append(" -> ").Append(serialized[index]);
+                _ = serializedMarkers.Append("\n-- param: @").Append(each).Append(" -> ").Append(serialized[index]);
+                _ = serializedMarkers.Append('\n');
+            }
+        }
+
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
             EverythingQuery("Everything", used.Length, markers.ToString())
+                + "\n"
+                + EverythingQuery("Serialized", serialized.Length, serializedMarkers.ToString())
         );
+        var jsonb = Catalog("jsonb") with { BindName = "jsonb" };
+        var json = Catalog("json") with { BindName = "json" };
         var entry = isSqlServer
-            ? JsonEntry(file, used, NVarCharMax, SqlServerJson)
-            : JsonEntry(
-                file,
-                used,
-                Catalog("jsonb") with
-                {
-                    BindName = "jsonb",
-                },
-                Catalog("json") with
-                {
-                    BindName = "json",
-                }
-            );
+            ? JsonEntry(file, "Everything", used, NVarCharMax, SqlServerJson)
+            : JsonEntry(file, "Everything", used, jsonb, json);
+        var serializedEntry = isSqlServer
+            ? JsonEntry(file, "Serialized", serialized, SqlServerJson, SqlServerJson)
+            : JsonEntry(file, "Serialized", serialized, jsonb, json);
         var driverReference = driver switch
         {
             "SqlClient 6.1" => SqlClientReferences.SqlClient61,
@@ -626,8 +653,8 @@ public sealed class LibraryConversionTests
 
         var run = GeneratorHarness.Run(
             OutputKind.CodeGen,
-            [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
-            [file, Sidecars.Of(file, entry)],
+            [new SourceFile(GeneratorHarness.SourcePath, SerializedSource)],
+            [file, Sidecars.Of(file, entry, serializedEntry)],
             supportedFramework: !net8,
             references: net8 ? [.. LibraryReferences.Net8Framework, driverReference] : [driverReference],
             dialect: isSqlServer ? "mssql" : "postgres"
@@ -636,6 +663,8 @@ public sealed class LibraryConversionTests
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
         methods.ShouldContain("holds a JSON null.");
+        methods.ShouldContain("global::System.Text.Json.JsonSerializer.Deserialize<global::App.Metadata>(");
+        methods.ShouldContain("global::System.Text.Json.JsonSerializer.Serialize<global::App.Spot>(");
         if (driver == "Npgsql 10")
         {
             methods.ShouldNotContain("JsonConversions");
@@ -653,10 +682,10 @@ public sealed class LibraryConversionTests
         run.Sources[JsonClassFile].ShouldBe(JsonConversions.Source);
     }
 
-    // The entry of the query of Run_JsonGeneratedCode_CompilesWithoutWarnings, over the types the override names: v<i>
+    // The entry of a query of Run_JsonGeneratedCode_CompilesWithoutWarnings, over the types the override names: v<i>
     // and its parameter not null, and maybe_v<i> nullable; the even ones of the first database type and the odd ones
     // of the second, or of its array for an array.
-    private static SidecarEntry JsonEntry(SqlFile file, string[] types, SidecarType even, SidecarType odd)
+    private static SidecarEntry JsonEntry(SqlFile file, string query, string[] types, SidecarType even, SidecarType odd)
     {
         var parameters = new System.Collections.Generic.List<SidecarParameter>();
         var columns = new System.Collections.Generic.List<SidecarColumn>();
@@ -676,8 +705,8 @@ public sealed class LibraryConversionTests
         }
 
         return even is SqlServerType
-            ? MethodRuns.SqlServerEntry(file, "Everything", [.. parameters], [.. columns])
-            : Entry(file, "Everything", [.. parameters], [.. columns]);
+            ? MethodRuns.SqlServerEntry(file, query, [.. parameters], [.. columns])
+            : Entry(file, query, [.. parameters], [.. columns]);
     }
 
     // The type of SQL Server of the name, with the facets the tool writes for it.

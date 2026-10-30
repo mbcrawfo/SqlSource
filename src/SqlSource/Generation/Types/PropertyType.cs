@@ -41,6 +41,13 @@ namespace SqlSource.Generation.Types;
 /// type override and the base map give it, for a type that claims the query at an output the library does not apply
 /// to.
 /// </param>
+/// <param name="ElementIsValueType">
+/// Whether the element of an array's C# type is a value type, without the <c>?</c> of a nullable element: true for
+/// <c>global::App.Point[]</c> and <c>global::App.Point?[]</c>, false for any type that is no array of one rank, and
+/// for a type of the base map, which has no <paramref name="Place" />.  The serializer, which converts such an array
+/// element by element, has no converter to say it.  It changes no model's C#, so <c>ModelCollector.FindDifference</c>
+/// does not compare it.
+/// </param>
 internal sealed record PropertyType(
     string Text,
     bool IsValueType,
@@ -51,5 +58,6 @@ internal sealed record PropertyType(
     DatabaseType? Database = null,
     string? Mapped = null,
     SqlLibrary? Library = null,
-    PropertyType? WithoutLibrary = null
+    PropertyType? WithoutLibrary = null,
+    bool ElementIsValueType = false
 );

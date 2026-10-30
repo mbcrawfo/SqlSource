@@ -14,4 +14,10 @@ namespace SqlSource.Generation.Types;
 /// Whether the C# type of the element is a value type, for an array or a domain over one, its element mapped the same
 /// way; false for any other type.
 /// </param>
-internal sealed record DatabaseType(string? Text, bool IsValueType, bool ElementIsValueType);
+/// <param name="HoldsJson">
+/// Whether the type holds JSON, which a project's own class is read and sent through System.Text.Json's serializer
+/// for: <c>json</c> or <c>jsonb</c> of <c>pg_catalog</c>, a domain over one, or an array whose element is one, through
+/// domains; or SQL Server's <c>json</c>, through an alias type.  It changes no model's C#, so
+/// <c>ModelCollector.FindDifference</c> does not compare it.
+/// </param>
+internal sealed record DatabaseType(string? Text, bool IsValueType, bool ElementIsValueType, bool HoldsJson = false);

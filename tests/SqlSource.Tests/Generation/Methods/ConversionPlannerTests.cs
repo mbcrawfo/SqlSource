@@ -26,6 +26,10 @@ public sealed class ConversionPlannerTests
     private const string DateTimeOffset = "global::System.DateTimeOffset";
     private const string Instant = "global::NodaTime.Instant";
     private const string LocalDate = "global::NodaTime.LocalDate";
+    private const string OrderMetadata = "global::MyApp.OrderMetadata";
+    private const string Point = "global::MyApp.Point";
+    private const string Deserialize = "global::System.Text.Json.JsonSerializer.Deserialize<";
+    private const string Serialize = "global::System.Text.Json.JsonSerializer.Serialize<";
     private const string Place = "the typeOverrides of the settings file /app/sqlsource.json";
     private const string LibraryPlace = "the NodaTime library";
 
@@ -633,6 +637,160 @@ public sealed class ConversionPlannerTests
         problems.ShouldHaveSingleItem().ShouldStartWith("SQLSRC279: The column 'at' has type 'NodaTime.Instant'");
     }
 
+    // A class on a type that holds JSON is read and sent through the serializer, whose read of a reference type can
+    // give null for a JSON null.
+    [Theory]
+    [InlineData(true, Deserialize + OrderMetadata + ">")]
+    [InlineData(false, Serialize + OrderMetadata + ">")]
+    public void Plan_ClassOnJson_GoesThroughTheSerializer(bool isRead, string method)
+    {
+        var type = HoldingJson(OrderMetadata, false, "jsonb", "string");
+
+        var (conversion, problems, blocked) = Plan(type, isRead, Of<Converter>());
+
+        conversion.ShouldBe(
+            new Conversion(method, "string", false, false, null, false, MayReturnNull: isRead, IsSerializer: true)
+        );
+        problems.ShouldBeEmpty();
+        blocked.ShouldBeFalse();
+    }
+
+    // The serializer's read of a value type is never null; a nullable one is written without its question mark.
+    [Theory]
+    [InlineData(Point)]
+    [InlineData(Point + "?")]
+    public void Plan_ValueTypeOnJson_CannotReturnNull(string text)
+    {
+        var type = HoldingJson(text, true, "json", "string");
+
+        var (conversion, _, _) = Plan(type, isRead: true, Of<Converter>(), engine: DatabaseEngine.SqlServer);
+
+        conversion.ShouldBe(
+            new Conversion(Deserialize + Point + ">", "string", false, false, null, false, IsSerializer: true)
+        );
+    }
+
+    // An array of a class over an array of a type that holds JSON is serialized element by element, the element
+    // without its question mark; a reference element's read can give null.
+    [Theory]
+    [InlineData(true, OrderMetadata, false, Deserialize + OrderMetadata + ">")]
+    [InlineData(false, OrderMetadata, false, Serialize + OrderMetadata + ">")]
+    [InlineData(true, OrderMetadata + "?", false, Deserialize + OrderMetadata + ">")]
+    [InlineData(true, Point, true, Deserialize + Point + ">")]
+    [InlineData(false, Point + "?", true, Serialize + Point + ">")]
+    public void Plan_ClassArrayOnJsonArray_GoesThroughTheSerializerByElement(
+        bool isRead,
+        string element,
+        bool elementIsValueType,
+        string method
+    )
+    {
+        var type = HoldingJson(element + "[]", false, "jsonb[]", "string[]") with
+        {
+            ElementIsValueType = elementIsValueType,
+        };
+
+        var (conversion, problems, blocked) = Plan(type, isRead, Of<Converter>());
+
+        conversion.ShouldBe(
+            new Conversion(
+                method,
+                "string[]",
+                false,
+                true,
+                element,
+                elementIsValueType,
+                MayReturnNull: isRead && !elementIsValueType,
+                IsSerializer: true
+            )
+        );
+        problems.ShouldBeEmpty();
+        blocked.ShouldBeFalse();
+    }
+
+    // An array of a class over a type that holds JSON whole is a class itself, serialized whole.
+    [Fact]
+    public void Plan_ClassArrayOnJson_GoesThroughTheSerializerWhole()
+    {
+        var type = HoldingJson(OrderMetadata + "[]", false, "jsonb", "string");
+
+        var (conversion, _, _) = Plan(type, isRead: true, Of<Converter>());
+
+        conversion.ShouldBe(
+            new Conversion(
+                Deserialize + OrderMetadata + "[]>",
+                "string",
+                false,
+                false,
+                null,
+                false,
+                MayReturnNull: true,
+                IsSerializer: true
+            )
+        );
+    }
+
+    // A class on a string that holds no JSON goes to the driver, as 8.2 has it.
+    [Fact]
+    public void Plan_ClassOnAStringThatHoldsNoJson_GoesToTheDriver()
+    {
+        var type = Overridden(OrderMetadata, false, "text", "string", false);
+
+        var (conversion, problems, blocked) = Plan(type, isRead: true, Of<Converter>());
+
+        conversion.ShouldBeNull();
+        problems.ShouldBeEmpty();
+        blocked.ShouldBeFalse();
+    }
+
+    // A type of System.Text.Json, or one the base map gives, is no class.
+    [Theory]
+    [InlineData("string", false)]
+    [InlineData("long", true)]
+    [InlineData("global::System.Text.Json.JsonElement", true)]
+    [InlineData("global::System.Text.Json.Nodes.JsonNode", false)]
+    public void Plan_JsonTypeOrBaseTypeOnJson_IsNotSerialized(string text, bool isValueType)
+    {
+        var type = HoldingJson(text, isValueType, "jsonb", "string");
+
+        var (conversion, problems, blocked) = Plan(type, isRead: true, Of<Converter>());
+
+        conversion.ShouldBeNull();
+        problems.ShouldBeEmpty();
+        blocked.ShouldBeFalse();
+    }
+
+    // A class whose converters are of another type keeps 8.2's rule, SQLSRC279, with no serializer.
+    [Fact]
+    public void Plan_ClassOnJsonWithConvertersOfAnotherType_ReportsSqlsrc279()
+    {
+        var type = HoldingJson(OrderMetadata, false, "jsonb", "string");
+        var converters = Of(
+            Project("global::MyApp.OrderMetadata.FromBytes", "byte[]", false, OrderMetadata, false),
+            Project("global::MyApp.OrderMetadata.ToBytes", OrderMetadata, false, "byte[]", false)
+        );
+
+        var (conversion, problems, blocked) = Plan(type, isRead: true, converters, "column 'meta'");
+
+        conversion.ShouldBeNull();
+        blocked.ShouldBeTrue();
+        problems.ShouldHaveSingleItem().ShouldStartWith("SQLSRC279: The column 'meta' has type 'MyApp.OrderMetadata'");
+    }
+
+    // A converter of the edge replaces the serializer.
+    [Fact]
+    public void Plan_ClassOnJsonWithItsEdge_UsesTheConverter()
+    {
+        var type = HoldingJson(OrderMetadata, false, "jsonb", "string");
+        var converters = Of(Project("global::MyApp.OrderMetadata.FromJson", "string", false, OrderMetadata, false));
+
+        var (conversion, _, _) = Plan(type, isRead: true, converters);
+
+        conversion.ShouldBe(
+            new Conversion("global::MyApp.OrderMetadata.FromJson", "string", false, false, null, false)
+        );
+    }
+
     private static (Conversion? Conversion, List<string> Problems, bool Blocked) Plan(
         PropertyType type,
         bool isRead,
@@ -679,6 +837,13 @@ public sealed class ConversionPlannerTests
             Place,
             new DatabaseType(databaseText, databaseIsValueType, elementIsValueType)
         );
+
+    // A type that a marker chose, over a database type that holds JSON.
+    private static PropertyType HoldingJson(string text, bool isValueType, string key, string databaseText) =>
+        Overridden(text, isValueType, key, databaseText, false) with
+        {
+            Database = new DatabaseType(databaseText, false, false, HoldsJson: true),
+        };
 
     // A type that NodaTime's row gave, with the base map's type of its database type.
     private static PropertyType OfTheLibrary(string text, string key, string? databaseText, bool isValueType = true) =>

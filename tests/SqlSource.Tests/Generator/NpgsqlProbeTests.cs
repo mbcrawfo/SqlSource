@@ -375,7 +375,8 @@ public sealed class NpgsqlProbeTests
                     NoWarnings,
                     key,
                     "the typeOverrides of the settings file " + GeneratorHarness.ProjectSettingsPath,
-                    new DatabaseType(null, false, false)
+                    new DatabaseType(null, false, false),
+                    ElementIsValueType: expected.EndsWith("[]", StringComparison.Ordinal)
                 ),
             ]);
     }

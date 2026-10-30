@@ -26,6 +26,12 @@ namespace SqlSource.Generation.Methods;
 /// driver are seen, so a library's edge for SQL Server never converts a PostgreSQL column.  A type that a library's row
 /// chose is never <c>SQLSRC279</c> or <c>SQLSRC280</c>: where no edge fits, the driver reads and binds it, as the
 /// plugin does on PostgreSQL.
+/// <para>
+/// A project's own class, a type that is no type of System.Text.Json and none the base map gives, on a type that holds
+/// JSON and is read as <c>string</c>, is read and sent through System.Text.Json's serializer when no converter touches
+/// it, whole or, for an array of a type that holds JSON, element by element.  The serializer never reports anything: a
+/// class with converters of other types keeps the rules above.
+/// </para>
 /// </remarks>
 internal static class ConversionPlanner
 {
@@ -39,6 +45,13 @@ internal static class ConversionPlanner
 
     // Before the subject of an array's element: "element of column 'ids'".
     private const string ElementSubject = "element of ";
+
+    // The type the base map reads a type that holds JSON as, which the serializer reads and sends.
+    private const string JsonText = "string";
+
+    private const string Deserialize = "global::System.Text.Json.JsonSerializer.Deserialize<";
+
+    private const string Serialize = "global::System.Text.Json.JsonSerializer.Serialize<";
 
     /// <summary>
     /// The conversion of one column or parameter, or null for one read or bound as its type is.  Its problems are
@@ -131,8 +144,37 @@ internal static class ConversionPlanner
                 );
             }
 
+            if (TakesSerializer(database.HoldsJson, databaseElement, element, ofElement))
+            {
+                return new Conversion(
+                    SerializerOf(element, isRead),
+                    databaseText,
+                    database.ElementIsValueType,
+                    true,
+                    ElementOf(text),
+                    type.ElementIsValueType,
+                    MayReturnNull: isRead && !type.ElementIsValueType,
+                    IsSerializer: true
+                );
+            }
+
             blocked = ofElement.ReportForeign(element, databaseElement, ElementKeyOf(type.Key));
             return null;
+        }
+
+        var holdsJson = database.HoldsJson;
+        if (TakesSerializer(holdsJson, databaseText, text, decision))
+        {
+            return new Conversion(
+                SerializerOf(text, isRead),
+                databaseText,
+                database.IsValueType,
+                false,
+                null,
+                false,
+                MayReturnNull: isRead && !type.IsValueType,
+                IsSerializer: true
+            );
         }
 
         blocked = decision.ReportForeign(text, databaseText, type.Key);
@@ -157,6 +199,26 @@ internal static class ConversionPlanner
             ? element.Substring(0, element.Length - 1)
             : element;
     }
+
+    // Whether the serializer reads and sends the type, the property's or its element's: a class that no converter
+    // touches, on a type that holds JSON, which the base map reads as string.  The type is matched without the ? of a
+    // nullable value type.
+    private static bool TakesSerializer(bool holdsJson, string database, string type, Decision decision)
+    {
+        var bare = WithoutQuestionMark(type);
+        return holdsJson
+            && database.Equals(JsonText, StringComparison.Ordinal)
+            && !decision.Touches(bare)
+            && decision.IsSerializable(bare);
+    }
+
+    // The serializer's call for the type, without the ? of a nullable value type, which the method never passes a
+    // null: JsonSerializer.Deserialize<T> to read, JsonSerializer.Serialize<T> to send, with the default options.
+    private static string SerializerOf(string type, bool isRead) =>
+        (isRead ? Deserialize : Serialize) + WithoutQuestionMark(type) + ">";
+
+    private static string WithoutQuestionMark(string type) =>
+        type.EndsWith("?", StringComparison.Ordinal) ? type.Substring(0, type.Length - 1) : type;
 
     // The key of an array's element: an entry of the array is keyed by its element's key with [], and the override of
     // the element gives the element's key itself.
@@ -327,6 +389,9 @@ internal static class ConversionPlanner
                 ),
             ];
         }
+
+        // Whether the type is a class for the serializer: no type of System.Text.Json, and none the base map gives.
+        public bool IsSerializable(string type) => !JsonTypes.IsJsonType(type) && IsForeign(type);
 
         private bool IsForeign(string type) =>
             context.Engine == DatabaseEngine.SqlServer ? !SqlServerTypeMap.Gives(type) : !PostgresTypeMap.Gives(type);

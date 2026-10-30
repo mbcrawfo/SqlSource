@@ -102,7 +102,8 @@ internal static class MappedTypeResolver
                     found.Status == MappedTypeStatus.Ambiguous && !found.Candidates.IsDefaultOrEmpty
                         ? new EquatableArray<string>(found.Candidates)
                         : EquatableArray<string>.Empty,
-                    found.Package
+                    found.Package,
+                    found.ElementIsValueType
                 )
             );
 
@@ -178,7 +179,8 @@ internal static class MappedTypeResolver
                 name.Ranks.Count == 0 && keyword is not ("string" or "object"),
                 true,
                 use == Use.Whole ? null : AsWritten(compilation, KeywordType(compilation, keyword), name, use),
-                null
+                null,
+                ElementIsValueType: IsOneRank(name) && keyword is not ("string" or "object")
             );
         }
 
@@ -243,12 +245,24 @@ internal static class MappedTypeResolver
         var isValueType = name.Ranks.Count == 0 && type.IsValueType;
         if (use == Use.Whole)
         {
-            return new Resolution(status, isValueType, isPublic, null, constructed, full, Package: package);
+            return new Resolution(
+                status,
+                isValueType,
+                isPublic,
+                null,
+                constructed,
+                full,
+                Package: package,
+                ElementIsValueType: IsOneRank(name) && type.IsValueType
+            );
         }
 
         var symbol = AsWritten(compilation, constructed, name, use);
         return new Resolution(status, isValueType, isPublic, symbol, null, full, Package: package);
     }
+
+    // Whether the name is an array of one rank of one dimension, [] or ?[], whose element is the type the name names.
+    private static bool IsOneRank(ClrTypeName name) => name.Ranks.Count == 1 && name.Ranks[0].Dimensions == 1;
 
     // The named type of the name, the full name's by its metadata name or the short name's one candidate, with its
     // status.  A short name of no type is not found, and one of several is ambiguous, their full names its
@@ -711,7 +725,8 @@ internal static class MappedTypeResolver
         INamedTypeSymbol? Named,
         ClrTypeName? Written = null,
         ImmutableArray<string> Candidates = default,
-        PackageBinding? Package = null
+        PackageBinding? Package = null,
+        bool ElementIsValueType = false
     )
     {
         public static Resolution Failed(MappedTypeStatus status, ImmutableArray<string> candidates = default) =>

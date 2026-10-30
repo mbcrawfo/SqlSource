@@ -512,7 +512,7 @@ internal static class MethodPlanner
                     property.Type.Text,
                     property.IsNullable,
                     read,
-                    ThrowsOnJsonNull(property)
+                    ThrowsOnJsonNull(property, read)
                 )
             );
         }
@@ -527,9 +527,14 @@ internal static class MethodPlanner
     }
 
     // Whether the read of a column into the property can give null for a JSON null, which a not-null property then
-    // refuses: a node of System.Text.Json, whether a generated parse or the driver reads it.
-    private static bool ThrowsOnJsonNull(ModelProperty property) =>
-        !property.IsNullable && JsonTypes.IsNode(ClrTypeName.KeywordTextOf(property.Type.Text));
+    // refuses: a node of System.Text.Json, whether a generated parse or the driver reads it, and the serializer's read
+    // of a reference type whole.  An element read by element is checked by its conversion's MayReturnNull.
+    private static bool ThrowsOnJsonNull(ModelProperty property, Conversion? read) =>
+        !property.IsNullable
+        && (
+            JsonTypes.IsNode(ClrTypeName.KeywordTextOf(property.Type.Text))
+            || read is { IsSerializer: true, IsByElement: false, MayReturnNull: true }
+        );
 
     // The ordinals in the order of the model's properties: by name, ordinally, when the model is sorted, as
     // TypeModels sorts it; the names are distinct ignoring case, so there are no ties.
