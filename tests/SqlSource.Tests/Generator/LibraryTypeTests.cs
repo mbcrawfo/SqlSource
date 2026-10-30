@@ -308,9 +308,7 @@ public sealed class LibraryTypeTests
             [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")]
         );
 
-        // The method calls the library's generated conversion, which a later change emits, so the compilation is not
-        // asked to be clean.
-        run.Diagnostics.ShouldBeEmpty();
+        run.ShouldBeClean();
         var column = QueryOf(run).Columns.ShouldNotBeNull().ShouldHaveSingleItem();
         column.Text.ShouldBe("global::NodaTime.LocalDate");
         column.Library.ShouldBe(SqlLibrary.NodaTime);

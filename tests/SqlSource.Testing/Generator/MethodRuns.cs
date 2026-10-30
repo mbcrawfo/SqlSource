@@ -62,8 +62,18 @@ internal static class MethodRuns
         SidecarEntry[] entries,
         string source = Source,
         MetadataReference[]? references = null,
-        string? settings = null
-    ) => Run(file, entries, source, references ?? [SqlClientReferences.SqlClient7], "mssql", settings: settings);
+        string? settings = null,
+        SqlFile[]? otherFiles = null
+    ) =>
+        Run(
+            file,
+            entries,
+            source,
+            references ?? [SqlClientReferences.SqlClient7],
+            "mssql",
+            settings: settings,
+            otherFiles: otherFiles
+        );
 
     // An entry of an mssql query for its current hash: with rows when it has columns, and without when they are null.
     // The parameters and columns are numbered by their place.

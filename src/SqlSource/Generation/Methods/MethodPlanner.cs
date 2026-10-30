@@ -53,9 +53,10 @@ internal static class MethodPlanner
         var libraryUses = ImmutableArray.CreateBuilder<SettingsFileLibraryUse>();
         var engines = CodeGenEngines.None;
         var warningIds = new SortedSet<string>(StringComparer.Ordinal);
+        var conversionLibraries = new SortedSet<SqlLibrary>();
         if (typeQueries.Type.Diagnostics.Count == 0 && typeQueries.Files.Count > 0)
         {
-            engines = Collect(input, key, methods, diagnostics, libraryUses, warningIds);
+            engines = Collect(input, key, methods, diagnostics, libraryUses, warningIds, conversionLibraries);
         }
 
         return new TypeMethods(
@@ -72,7 +73,12 @@ internal static class MethodPlanner
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable()),
             new EquatableArray<SettingsFileLibraryUse>(libraryUses.ToImmutable()),
             engines,
-            new EquatableArray<string>(warningIds.ToImmutableArray())
+            new EquatableArray<string>(warningIds.ToImmutableArray()),
+            conversionLibraries.Count == 0
+                ? EquatableArray<ConversionLibrary>.Empty
+                : new EquatableArray<ConversionLibrary>(
+                    conversionLibraries.Select(static library => new ConversionLibrary(library)).ToImmutableArray()
+                )
         );
     }
 
@@ -98,7 +104,8 @@ internal static class MethodPlanner
         ImmutableArray<QueryMethod>.Builder methods,
         ImmutableArray<DiagnosticInfo>.Builder diagnostics,
         ImmutableArray<SettingsFileLibraryUse>.Builder libraryUses,
-        SortedSet<string> warningIds
+        SortedSet<string> warningIds,
+        SortedSet<SqlLibrary> conversionLibraries
     )
     {
         var typeQueries = input.Type;
@@ -132,7 +139,7 @@ internal static class MethodPlanner
             }
         }
 
-        AddPlanned(planned, methods, diagnostics, warningIds);
+        AddPlanned(planned, methods, diagnostics, warningIds, conversionLibraries);
         return engines;
     }
 
@@ -505,12 +512,14 @@ internal static class MethodPlanner
             .Any(parameter => string.Equals(parameter.Trim().TrimStart('@'), name, StringComparison.Ordinal));
 
     // The planned queries in order: the problems of each, then SQLSRC274 at each of two or more methods of one name,
-    // and the rest of the methods when their driver allows them, with the ids of their warnings.
+    // and the rest of the methods when their driver allows them, with the ids of their warnings and the libraries
+    // whose conversions they call.
     private static void AddPlanned(
         List<Planned> planned,
         ImmutableArray<QueryMethod>.Builder methods,
         ImmutableArray<DiagnosticInfo>.Builder diagnostics,
-        SortedSet<string> warningIds
+        SortedSet<string> warningIds,
+        SortedSet<SqlLibrary> conversionLibraries
     )
     {
         var byName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
@@ -545,6 +554,28 @@ internal static class MethodPlanner
             {
                 methods.Add(method);
                 warningIds.UnionWith(plan.WarningIds);
+                AddConversionLibraries(method, conversionLibraries);
+            }
+        }
+    }
+
+    // The library of each conversion of the method that is a library's generated one, a column's read or a
+    // parameter's write.
+    private static void AddConversionLibraries(QueryMethod method, SortedSet<SqlLibrary> libraries)
+    {
+        foreach (var parameter in method.Input?.Parameters ?? EquatableArray<MethodParameter>.Empty)
+        {
+            if (parameter.Write?.Library is { } library)
+            {
+                _ = libraries.Add(library);
+            }
+        }
+
+        foreach (var column in method.Output?.Columns ?? EquatableArray<MethodColumn>.Empty)
+        {
+            if (column.Read?.Library is { } library)
+            {
+                _ = libraries.Add(library);
             }
         }
     }

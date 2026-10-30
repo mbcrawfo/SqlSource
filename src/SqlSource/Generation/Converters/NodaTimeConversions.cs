@@ -15,6 +15,9 @@ internal static class NodaTimeConversions
     /// <summary>The class's name, as a converter's method is written.</summary>
     public const string ClassName = "global::SqlSource.NodaTimeConversions";
 
+    /// <summary>The class's metadata name, which <see cref="LibraryConverters.ClassMetadataNames" /> lists.</summary>
+    public const string MetadataName = Namespace + "." + ShortClassName;
+
     private const string Namespace = "SqlSource";
 
     private const string ShortClassName = "NodaTimeConversions";

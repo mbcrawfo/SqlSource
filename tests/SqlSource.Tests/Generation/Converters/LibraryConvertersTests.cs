@@ -175,5 +175,34 @@ public sealed class LibraryConvertersTests
         declared.Length.ShouldBe(14);
     }
 
+    // The suppressor of CS0436 knows a library's class by these names, so each class that a source declares is among
+    // them, and nothing else is.
+    [Fact]
+    public void ClassMetadataNames_ComparedWithTheSources_AreEveryClassTheyDeclare()
+    {
+        var declared = System
+            .Enum.GetValues<SqlLibrary>()
+            .Select(LibraryConverters.SourceOf)
+            .OfType<string>()
+            .SelectMany(source =>
+                CSharpSyntaxTree
+                    .ParseText(source, cancellationToken: TestContext.Current.CancellationToken)
+                    .GetRoot(TestContext.Current.CancellationToken)
+                    .DescendantNodes()
+                    .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax>()
+            )
+            .Select(declaration =>
+                declaration
+                    .Ancestors()
+                    .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.BaseNamespaceDeclarationSyntax>()
+                    .Single()
+                    .Name
+                + "."
+                + declaration.Identifier.ValueText
+            );
+
+        LibraryConverters.ClassMetadataNames.ShouldBe(declared, ignoreOrder: true);
+    }
+
     private static LibraryProbe Probe() => new(NodaTime: true, NpgsqlNodaTime: false, NodaTimeVersion: null);
 }

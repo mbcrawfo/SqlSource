@@ -888,7 +888,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(methodDiagnostics, ReportAll);
         context.RegisterSourceOutput(settingsFileLibraryDiagnostics, ReportAll);
         context.RegisterSourceOutput(conflicts, ReportConflicts);
-        context.RegisterSourceOutput(methodOutputs, AddMethods);
+        context.RegisterSourceOutput(methodOutputs, AddFile);
 
         // The engines of the project's CodeGen queries, which almost never change.
         var codeGenEngines = typeMethods
@@ -899,6 +899,28 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         // Not located, and once for the project and engine, however many of its queries need the driver.
         context.RegisterSourceOutput(codeGenEngines.Combine(npgsqlProbe.Combine(sqlClientProbe)), ReportMissingDrivers);
+
+        // The libraries whose generated conversion a method calls, each once, which almost never change.
+        var conversionLibraries = typeMethods
+            .Select(static (methods, _) => methods.ConversionLibraries)
+            .Collect()
+            .Select(static (each, _) => DistinctLibraries(each))
+            .WithTrackingName(TrackingNames.ConversionLibraries);
+
+        // The class of each of those libraries, in a file of its own, once for the project however many methods call
+        // it.
+        var libraryConversionOutputs = conversionLibraries
+            .SelectMany(static (libraries, _) => libraries)
+            .Select(
+                static (used, _) =>
+                    (
+                        HintName: LibraryConverters.HintNameOf(used.Library),
+                        Source: LibraryConverters.SourceOf(used.Library)
+                    )
+            )
+            .WithTrackingName(TrackingNames.LibraryConversionOutput);
+
+        context.RegisterSourceOutput(libraryConversionOutputs, AddFile);
     }
 
     private static void ReportChecks(SourceProductionContext output, SidecarCheckResult check) =>
@@ -916,13 +938,26 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     private static void ReportConflicts(SourceProductionContext output, MethodConflicts conflicts) =>
         ReportAll(output, conflicts.Diagnostics);
 
-    private static void AddMethods(SourceProductionContext output, (string HintName, string? Source) methods)
+    // A file of a type's methods or of a library's conversions, when it has a source.
+    private static void AddFile(SourceProductionContext output, (string HintName, string? Source) file)
     {
-        if (methods.Source is not null)
+        if (file.Source is not null)
         {
-            output.AddSource(methods.HintName, SourceText.From(methods.Source, Encoding.UTF8));
+            output.AddSource(file.HintName, SourceText.From(file.Source, Encoding.UTF8));
         }
     }
+
+    // The libraries of every type, each once, in the order of SqlLibrary, so that the value does not depend on the order
+    // of the compilation's types.
+    private static EquatableArray<ConversionLibrary> DistinctLibraries(
+        ImmutableArray<EquatableArray<ConversionLibrary>> each
+    ) =>
+        new(
+            each.SelectMany(static libraries => libraries)
+                .Distinct()
+                .OrderBy(static library => library.Library)
+                .ToImmutableArray()
+        );
 
     // SQLSRC273 for each engine that a CodeGen query has and whose driver the project does not reference.
     private static void ReportMissingDrivers(

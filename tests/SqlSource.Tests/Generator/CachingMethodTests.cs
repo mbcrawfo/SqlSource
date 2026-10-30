@@ -25,6 +25,12 @@ public sealed class CachingMethodTests
 {
     private const string AdminMethods = "App.Admin.AdminQueries-Methods.g.cs";
 
+    // The file of the class of NodaTime's conversions.
+    private const string ConversionsFile = "SqlSource-NodaTimeConversions.g.cs";
+
+    // The override that makes a datetime2 an Instant, which NodaTime's conversion of DateTime gives.
+    private const string InstantOverride = "-- type-override: datetime2=NodaTime.Instant\n\n";
+
     private readonly CachingScene _scene = new();
 
     // Orders with its query renamed GetUser, as UserQueries' is, and a model of its own by its marker.
@@ -560,6 +566,58 @@ public sealed class CachingMethodTests
         methods.ShouldNotContain("parameter.Size = 50;\n");
     }
 
+    // Under mssql, Users reads a datetime2 that its override makes an Instant, through NodaTime's conversion, so the
+    // project gets the class of the conversions.  The edit changes the SQL of Users within its line: UserQueries plans
+    // its methods again, which call the same library, so the libraries are equal and the class is not written again.
+    [Fact]
+    public void Run_EditThatKeepsTheLibrariesUsed_LeavesTheConversionOutputCached()
+    {
+        var users = UsersAt(InstantOverride + "-- name: GetUser\nSELECT at FROM events;\n");
+        var usersSidecar = DateTime2Sidecar(users);
+        var (compilation, driver) = FirstRunWithNodaTime(users, usersSidecar);
+        GeneratedFiles(driver.GetRunResult()).ShouldContain(ConversionsFile);
+
+        var edited = UsersAt(InstantOverride + "-- name: GetUser\nSELECT at FROM moments;\n");
+        var result = Run(
+            driver.ReplaceAdditionalText(users, edited).ReplaceAdditionalText(usersSidecar, DateTime2Sidecar(edited)),
+            compilation
+        );
+
+        result.Diagnostics.ShouldBeEmpty();
+        MethodReasons(result, TrackingNames.TypeMethods)
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.ConversionLibraries).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.LibraryConversionOutput).ShouldBe([IncrementalStepRunReason.Cached]);
+        MethodsOf(result, UserMethods).ShouldContain("SELECT at FROM moments;");
+        GeneratedFiles(result).ShouldContain(ConversionsFile);
+    }
+
+    // Users reads a datetime2 as a DateTime, which calls no conversion, so the project has no class.  The edit adds the
+    // override that makes it an Instant: the libraries change, and the class is written.
+    [Fact]
+    public void Run_FirstUseOfAnEdge_EmitsTheClass()
+    {
+        var users = UsersAt("-- name: GetUser\nSELECT at FROM events;\n");
+        var usersSidecar = DateTime2Sidecar(users);
+        var (compilation, driver) = FirstRunWithNodaTime(users, usersSidecar);
+        GeneratedFiles(driver.GetRunResult()).ShouldNotContain(ConversionsFile);
+
+        var edited = UsersAt(InstantOverride + "-- name: GetUser\nSELECT at FROM events;\n");
+        var result = Run(
+            driver.ReplaceAdditionalText(users, edited).ReplaceAdditionalText(usersSidecar, DateTime2Sidecar(edited)),
+            compilation
+        );
+
+        result.Diagnostics.ShouldBeEmpty();
+        AllReasons(result, TrackingNames.ConversionLibraries).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.LibraryConversionOutput).ShouldBe([IncrementalStepRunReason.New]);
+        GeneratedFiles(result).ShouldContain(ConversionsFile);
+        MethodsOf(result, UserMethods).ShouldContain("global::SqlSource.NodaTimeConversions.InstantFromDateTime(");
+    }
+
     // The source of UserQueries, in the namespace App, with these arguments on its attribute and these members.
     private static string UserQueries(string? arguments = null, string members = "") =>
         TypeSource("App", "UserQueries", arguments, members);
@@ -584,6 +642,49 @@ public sealed class CachingMethodTests
         );
         return new InMemoryAdditionalText(sidecar.Path, sidecar.Text);
     }
+
+    // Users with this text.
+    private InMemoryAdditionalText UsersAt(string text) => new(_scene.Users.Path, text);
+
+    // Both types at CodeGen under mssql, on SqlClient 7 with NodaTime 3.3.7, with this Users and its sidecar, and Orders
+    // with a sidecar of one column of int: the compilation, and the driver after a first run that reports nothing.
+    private (CSharpCompilation Compilation, GeneratorDriver Driver) FirstRunWithNodaTime(
+        InMemoryAdditionalText users,
+        InMemoryAdditionalText usersSidecar
+    )
+    {
+        var compilation = GeneratorHarness.CreateCompilation(
+            [new(UsersSourcePath, UserQueries()), new(OrdersSourcePath, TypeSource("App", "OrderQueries"))],
+            references: [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")]
+        );
+        var driver = CreateDriver(
+                ProjectFile(OutputKind.CodeGen, "mssql"),
+                [users, _scene.Orders, usersSidecar, SqlServerSidecar(_scene.Orders, "GetOrder", null)]
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        return (compilation, driver);
+    }
+
+    // A current mssql sidecar of the file whose entry, GetUser, has one column, at, of datetime2.
+    private static InMemoryAdditionalText DateTime2Sidecar(InMemoryAdditionalText sqlFile)
+    {
+        var file = ToSqlFile(sqlFile);
+        var sidecar = Sidecars.Of(
+            file,
+            MethodRuns.SqlServerEntry(
+                file,
+                "GetUser",
+                [],
+                [TestSidecars.Column(0, "at", TestSidecars.SqlServer("datetime2", 8, 27, 7))]
+            )
+        );
+        return new InMemoryAdditionalText(sidecar.Path, sidecar.Text);
+    }
+
+    // The hint names of the files a run generated.
+    private static IEnumerable<string> GeneratedFiles(GeneratorDriverRunResult result) =>
+        result.Results.Single().GeneratedSources.Select(source => source.HintName);
 
     // Users with this line of SQL in place of SELECT 1;, and its sidecar, which the first run had, written for the new
     // hash.

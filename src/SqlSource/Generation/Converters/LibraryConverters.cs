@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SqlSource.Generation.Types.Drivers;
 using SqlSource.Settings.Libraries;
 
@@ -10,6 +11,15 @@ namespace SqlSource.Generation.Converters;
 /// </summary>
 internal static class LibraryConverters
 {
+    /// <summary>
+    /// The metadata name of each library's class of conversions, which a project gets when its methods call one.  A
+    /// project that sees the internals of another one whose methods call it too sees it twice, and
+    /// <c>AttributeConflictSuppressor</c> turns the compiler's warning off for these as for
+    /// <see cref="AttributeSource.GeneratedTypes" />.
+    /// </summary>
+    public static ImmutableArray<string> ClassMetadataNames { get; } =
+        ImmutableArray.Create(NodaTimeConversions.MetadataName);
+
     /// <summary>
     /// The edges of every library <paramref name="probe" /> finds, in the order of <see cref="ConverterSet.Comparer" />:
     /// NodaTime's when the project references it, else none.
