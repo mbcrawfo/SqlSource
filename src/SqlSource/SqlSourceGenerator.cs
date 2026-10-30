@@ -332,9 +332,9 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             parsedFiles,
             static (output, files) =>
             {
-                foreach (var error in files.SelectMany(static file => file.Errors))
+                foreach (var diagnostic in files.SelectMany(static file => file.Errors.Concat(file.Warnings)))
                 {
-                    output.ReportDiagnostic(error.ToDiagnostic());
+                    output.ReportDiagnostic(diagnostic.ToDiagnostic());
                 }
             }
         );

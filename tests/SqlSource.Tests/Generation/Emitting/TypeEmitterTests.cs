@@ -766,6 +766,7 @@ public sealed class TypeEmitterTests
             fileName,
             TestSidecars.Of(queries),
             TestSidecars.Of<DiagnosticInfo>(),
+            TestSidecars.Of<DiagnosticInfo>(),
             SqlDialect.Ansi
         );
 
