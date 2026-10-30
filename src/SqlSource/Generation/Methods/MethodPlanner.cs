@@ -20,7 +20,7 @@ namespace SqlSource.Generation.Methods;
 /// a converter of a referenced assembly.  It also reports <c>SQLSRC281</c> for a library that is on for a query and
 /// that the project cannot use, which leaves the query its method, with the base map's types: at a marker as a
 /// diagnostic, and for a settings file as a <see cref="SettingsFileLibraryUse" />, which is located at the end.  A query
-/// that uses a library older than its floor gets no method and reports nothing here: the project gets
+/// that uses a library older than its floor gets no method and keeps the problems it has: the project gets
 /// <c>SQLSRC282</c> from the libraries that the type's queries use.
 /// </summary>
 internal static class MethodPlanner
@@ -173,7 +173,8 @@ internal static class MethodPlanner
     // The plan of one query whose output is CodeGen, or null when it gets nothing and reports nothing here.  Every
     // problem of SQLSRC272, SQLSRC275, SQLSRC274 and its converters that the query has is reported, and any one leaves
     // it no method.  Its conversions see the converters of the type's slice that serve its target.  The libraries it
-    // uses are added to the type's, and one older than its floor leaves it no method and no problem.
+    // uses are added to the type's, and one older than its floor leaves it no method, beside its problems, which stay
+    // true once the library is updated.
     private static Planned? Plan(
         QueryContext context,
         HashSet<string> written,
@@ -225,13 +226,9 @@ internal static class MethodPlanner
         );
         var hasInput = TryReadInput(context, models, reading, out var methodInput);
         var hasOutput = TryReadOutput(context, models, reading, out var methodOutput);
-        if (AddUsedLibraries(input, models, methodInput, methodOutput, ref usedLibraries))
-        {
-            // SQLSRC282, for the project, says why the query has no method, so its own problems are left unsaid.
-            return planned with { Problems = [] };
-        }
-
-        if (problems.Count > 0 || !hasInput || !hasOutput)
+        // SQLSRC282, for the project, says why a query that uses a library below its floor has no method.
+        var isBelowTheFloor = AddUsedLibraries(input, models, methodInput, methodOutput, ref usedLibraries);
+        if (problems.Count > 0 || !hasInput || !hasOutput || isBelowTheFloor)
         {
             return planned;
         }

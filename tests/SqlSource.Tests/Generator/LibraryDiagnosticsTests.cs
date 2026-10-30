@@ -296,6 +296,33 @@ public sealed class LibraryDiagnosticsTests
         run.Sources["App.FindDatesDto-Model.g.cs"].ShouldContain("(" + LocalDate + " D);");
     }
 
+    // A query that uses NodaTime below its floor and has a problem of its own, the shape one on a statement without
+    // rows, reports both, so that updating NodaTime leaves nothing new to fix, and has no method.
+    [Fact]
+    public void Run_NodaTimeBelowTheFloorAndAShapeProblem_ReportsBoth()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: SetDate -> one\nUPDATE dates SET d = @d;\n");
+
+        var run = MethodRuns.RunSqlServer(
+            file,
+            [MethodRuns.SqlServerEntry(file, "SetDate", [TestSidecars.Parameter(0, "d", Date, false)], null)],
+            references: BelowTheFloorOnSqlServer,
+            settings: NodaTimeIs("on")
+        );
+
+        run.Problems()
+            .ShouldBe(
+                [
+                    BelowTheFloor,
+                    "SQLSRC272 /app/Repo/Users.sql(1,10)-(1,17): The query 'SetDate' has the shape 'one', and its "
+                        + "statement returns no rows.  Remove the shape, or write 'rowcount' or 'none'.",
+                ],
+                ignoreOrder: true
+            );
+        MethodSources(run).ShouldBeEmpty();
+        run.Sources["App.SetDateParams-Model.g.cs"].ShouldContain("(" + LocalDate + " D);");
+    }
+
     // On PostgreSQL, the plugin's row of a timestamptz is NodaTime's Instant, and NodaTime below its floor reports
     // SQLSRC282 there too.
     [Fact]

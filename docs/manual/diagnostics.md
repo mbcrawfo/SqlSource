@@ -2749,7 +2749,7 @@ The project references a version of a library older than SqlSource supports, and
 CSC : error SQLSRC282: This project references NodaTime 3.1.8, and SqlSource needs NodaTime 3.1.9 or later for the query methods that use it, so they are not generated.  Update the package.
 ```
 
-Until the package is updated, a query that uses the library gets no method, and no other error about its method is reported; its models are still generated, with the library's types.  The queries that do not use the library keep their methods.  Update the package to the version the message gives or later.  When another package brings the older version, reference the library's package from the project itself, at the version you want.  The error has no file and line, because it is about the project's references, and it is reported once for the project and library, however many queries use the library, and never for a query whose output is `models` or `sql`.
+Until the package is updated, a query that uses the library gets no method; its models are still generated, with the library's types.  Any other error about its method is reported beside this one: fix it too, or the query still has no method once the package is updated.  The queries that do not use the library keep their methods.  Update the package to the version the message gives or later.  When another package brings the older version, reference the library's package from the project itself, at the version you want.  The error has no file and line, because it is about the project's references, and it is reported once for the project and library, however many queries use the library, and never for a query whose output is `models` or `sql`.
 
 See: [Library types](settings.md#setting-library-types)
 
