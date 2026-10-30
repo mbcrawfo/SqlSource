@@ -186,13 +186,13 @@ internal static class ConversionPlanner
                     SqlDiagnostics.ConverterDirectionMissing,
                     context.At,
                     subject,
-                    PostgresTypeMap.AsWritten(type),
+                    ClrTypeName.AsWritten(type),
                     has,
-                    PostgresTypeMap.AsWritten(database),
+                    ClrTypeName.AsWritten(database),
                     needs,
                     isRead ? Column : Parameter,
-                    PostgresTypeMap.AsWritten(argument),
-                    PostgresTypeMap.AsWritten(returns)
+                    ClrTypeName.AsWritten(argument),
+                    ClrTypeName.AsWritten(returns)
                 )
             );
             blocked = true;
@@ -208,10 +208,10 @@ internal static class ConversionPlanner
                     SqlDiagnostics.ConverterTypeMismatch,
                     context.At,
                     subject,
-                    PostgresTypeMap.AsWritten(type),
+                    ClrTypeName.AsWritten(type),
                     "which has converters, but the database type '" + key + "' has no C# type to convert from",
                     "Choose a C# type without converters for it, or remove the converters of '"
-                        + PostgresTypeMap.AsWritten(type)
+                        + ClrTypeName.AsWritten(type)
                         + "'"
                 )
             );
@@ -240,12 +240,12 @@ internal static class ConversionPlanner
                 .Select(converter =>
                     IsText(converter.ArgumentText, type) ? converter.ReturnText : converter.ArgumentText
                 )
-                .Select(PostgresTypeMap.AsWritten)
+                .Select(ClrTypeName.AsWritten)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(static other => other, StringComparer.Ordinal)
                 .ToList();
-            var written = PostgresTypeMap.AsWritten(type);
-            var databaseWritten = PostgresTypeMap.AsWritten(database);
+            var written = ClrTypeName.AsWritten(type);
+            var databaseWritten = ClrTypeName.AsWritten(database);
             context.Problems.Add(
                 DiagnosticInfo.Create(
                     SqlDiagnostics.ConverterTypeMismatch,
@@ -290,8 +290,8 @@ internal static class ConversionPlanner
                         context.At,
                         sound[0].DisplayName,
                         sound[1].DisplayName,
-                        PostgresTypeMap.AsWritten(sound[0].ArgumentText),
-                        PostgresTypeMap.AsWritten(sound[0].ReturnText)
+                        ClrTypeName.AsWritten(sound[0].ArgumentText),
+                        ClrTypeName.AsWritten(sound[0].ReturnText)
                     )
                 );
             }

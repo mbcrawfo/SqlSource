@@ -11,7 +11,7 @@ using SqlSource.Snapshot;
 namespace SqlSource.Generation.Emitting;
 
 /// <summary>
-/// Writes the binding of a SQL Server parameter as its described type: the <c>SqlParameter</c> the command creates,
+/// Binds a parameter for Microsoft.Data.SqlClient as its described type: the <c>SqlParameter</c> the command creates,
 /// with the <c>SqlDbType</c> of the type's base name and the size, precision or scale the type has, so that SqlClient
 /// infers nothing from the value.  A value longer than a bounded length is bound at <c>max</c> of its variable-length
 /// type, which SqlClient would otherwise cut, so the server sees it whole.  A decimal for a type of scale 0 is rounded
@@ -20,7 +20,7 @@ namespace SqlSource.Generation.Emitting;
 /// which SqlClient needs for every value but a null.  A parameter without a described SQL Server type, or of a type
 /// with no binding here, is bound by value.
 /// </summary>
-internal static class SqlServerBinding
+internal sealed class SqlServerParameterBinder : ParameterBinder
 {
     private const string SqlParameterType = "global::Microsoft.Data.SqlClient.SqlParameter";
     private const string SqlDbTypeText = "global::System.Data.SqlDbType.";
@@ -30,25 +30,16 @@ internal static class SqlServerBinding
     // Each base name's binding, matched ignoring case, as the server matches a type's name.
     private static readonly Dictionary<string, Row> Rows = BuildRows();
 
-    /// <summary>
-    /// Appends the lines that bind <paramref name="bound" />, as <see cref="ParameterBinder.Append" /> takes them.
-    /// </summary>
-    public static void Append(
-        StringBuilder builder,
-        string indent,
-        string command,
-        string parameter,
-        string parameters,
-        MethodParameter bound,
-        ConversionNames names
-    )
+    /// <inheritdoc />
+    public override void Append(in BindingContext context, MethodParameter bound)
     {
         if (bound.Described is not SqlServerType type || !TryFindRow(type, out var row, out var facet))
         {
-            ParameterBinder.AppendByValue(builder, indent, command, parameter, parameters, bound, names);
+            AppendByValue(context, bound);
             return;
         }
 
+        var (builder, indent, command, parameter, _, _) = context;
         _ = builder
             .Append(indent)
             .Append("var ")
@@ -83,11 +74,11 @@ internal static class SqlServerBinding
         if (row.Facet == Facet.Vector)
         {
             var nullText = VectorNullStart + facet.ToString(CultureInfo.InvariantCulture) + ")";
-            ParameterBinder.AppendValueOrNull(builder, parameters, bound, names, nullText);
+            AppendValueOrNull(context, bound, nullText);
         }
         else
         {
-            ParameterBinder.AppendValueOrNull(builder, parameters, bound, names, DbNull);
+            AppendValueOrNull(context, bound, DbNull);
         }
 
         _ = builder.Append(";\n");

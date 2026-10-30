@@ -127,6 +127,37 @@ internal sealed record ClrTypeName(
     }
 
     /// <summary>
+    /// A C# type as a user writes it in the type override, without <c>global::</c> before a name of several parts.  A
+    /// name of one part keeps it, since without it the name is a short one, which may mean another type.
+    /// </summary>
+    public static string AsWritten(string text)
+    {
+        var at = text.IndexOf(GlobalPrefix, StringComparison.Ordinal);
+        if (at < 0)
+        {
+            return text;
+        }
+
+        var builder = new StringBuilder(text.Length);
+        var start = 0;
+        while (at >= 0)
+        {
+            var end = at + GlobalPrefix.Length;
+            while (end < text.Length && SqlIdentifier.IsPartCharacter(text[end]))
+            {
+                end++;
+            }
+
+            var keep = end == text.Length || text[end] != '.';
+            _ = builder.Append(text, start, (keep ? end : at) - start);
+            start = keep ? end : at + GlobalPrefix.Length;
+            at = text.IndexOf(GlobalPrefix, start, StringComparison.Ordinal);
+        }
+
+        return builder.Append(text, start, text.Length - start).ToString();
+    }
+
+    /// <summary>
     /// Reads a whole text as a type.  False, with a null <paramref name="name" />, for a text that is not one, and
     /// never an exception.
     /// </summary>

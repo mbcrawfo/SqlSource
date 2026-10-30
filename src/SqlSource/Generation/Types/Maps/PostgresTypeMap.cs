@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using SqlSource.Generation.Types.Drivers;
+using SqlSource.Settings.ClrTypes;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 
@@ -18,7 +18,6 @@ internal delegate TypeMapping? PostgresOverrideOf(PostgresType type);
 /// </summary>
 internal static class PostgresTypeMap
 {
-    private const string GlobalPrefix = "global::";
     private const string BitArray = "global::System.Collections.BitArray";
     private const string DateTime = "global::System.DateTime";
     private const string DateOnly = "global::System.DateOnly";
@@ -120,37 +119,6 @@ internal static class PostgresTypeMap
     public static bool Gives(string text) =>
         Given.Contains(text)
         || (text.EndsWith("[]", StringComparison.Ordinal) && Gives(text.Substring(0, text.Length - 2)));
-
-    /// <summary>
-    /// A C# type as a user writes it in the type override, without <c>global::</c> before a name of several parts.  A
-    /// name of one part keeps it, since without it the name is a short one, which may mean another type.
-    /// </summary>
-    public static string AsWritten(string text)
-    {
-        var at = text.IndexOf(GlobalPrefix, StringComparison.Ordinal);
-        if (at < 0)
-        {
-            return text;
-        }
-
-        var builder = new StringBuilder(text.Length);
-        var start = 0;
-        while (at >= 0)
-        {
-            var end = at + GlobalPrefix.Length;
-            while (end < text.Length && SqlIdentifier.IsPartCharacter(text[end]))
-            {
-                end++;
-            }
-
-            var keep = end == text.Length || text[end] != '.';
-            _ = builder.Append(text, start, (keep ? end : at) - start);
-            start = keep ? end : at + GlobalPrefix.Length;
-            at = text.IndexOf(GlobalPrefix, start, StringComparison.Ordinal);
-        }
-
-        return builder.Append(text, start, text.Length - start).ToString();
-    }
 
     // bit and varbit are decided by their length, not by a row.
     private static bool IsBit(string internalName) =>
@@ -328,8 +296,10 @@ internal static class PostgresTypeMap
         // out, and null when both are.
         private static string? EntriesFor(string key, string npgsql8, string npgsql10)
         {
-            var eight = IsOfNpgsqlTypes(npgsql8) ? null : key + "=" + AsWritten(npgsql8) + " on Npgsql 8 and 9";
-            var ten = IsOfNpgsqlTypes(npgsql10) ? null : key + "=" + AsWritten(npgsql10) + " on Npgsql 10";
+            var eight = IsOfNpgsqlTypes(npgsql8)
+                ? null
+                : key + "=" + ClrTypeName.AsWritten(npgsql8) + " on Npgsql 8 and 9";
+            var ten = IsOfNpgsqlTypes(npgsql10) ? null : key + "=" + ClrTypeName.AsWritten(npgsql10) + " on Npgsql 10";
             if (eight is null || ten is null)
             {
                 return eight ?? ten;
