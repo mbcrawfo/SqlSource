@@ -178,7 +178,8 @@ public sealed class SessionTests(PostgresDatabases postgres)
 
     // The statement is prepared and the session ends before its columns are read.  "columns" answers the error that
     // is reported, and "deallocate", which is asked whatever became of the describe, answers one too and replaces
-    // nothing.
+    // nothing.  The describe's transaction ends with it, so the next describe answers the lost connection too, and does
+    // not find a transaction still held.
     [Fact]
     public async Task DescribeAsync_ServerEndsTheSessionBetweenPrepareAndColumns_IsSqlsrc225AndNoThrow()
     {
@@ -198,8 +199,12 @@ public sealed class SessionTests(PostgresDatabases postgres)
 
         var described = await session.DescribeAsync(DescribeRequests.Of(Sql), TestContext.Current.CancellationToken);
 
+        ending = null;
+        var again = await session.DescribeAsync(DescribeRequests.Of(Sql), TestContext.Current.CancellationToken);
+
         _ = ShouldBeRejected(described, DescribeStep.DescribeColumns);
-        capture.Calls.Select(call => call.Method).ShouldBe(["open", "prepare", "columns", "deallocate"]);
+        ShouldBeRejected(again, DescribeStep.DescribeParameters).ServerLines.ShouldBe([ConnectionTexts.LostConnection]);
+        capture.Calls.Select(call => call.Method).ShouldBe(["open", "prepare", "columns", "deallocate", "prepare"]);
         CaptureJson.TextOf(capture.Calls[3].Answer).ShouldContain(ConnectionTexts.LostConnection);
         CaptureJson.Write(capture).ShouldNotContain(new NpgsqlConnectionStringBuilder(postgres.ConnectionString).Host!);
     }

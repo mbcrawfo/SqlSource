@@ -151,13 +151,13 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     /// <summary>The session's connection, opened by the first call.</summary>
     /// <remarks>
     /// <para>
-    /// What the driver (Npgsql 10.0.3, the tag <c>v10.0.3</c> of <c>npgsql/npgsql</c>, <c>src/Npgsql/</c>) throws
-    /// for a keyword that names a file or a service, and whether it is an <see cref="NpgsqlException" />.  The
-    /// driver's text quotes the path, so each type that a user can cause and that is none becomes an
-    /// <see cref="NpgsqlException" /> with a fixed message, without the exception.  Each but the GSS case was provoked
-    /// against a server of a test's own words, on <c>net8.0</c> and <c>net10.0</c>.  The environment names the
-    /// same files (<c>PGSSLCERT</c>, <c>PGSSLKEY</c>, <c>PGPASSFILE</c>) and a default one is read when it exists,
-    /// so a message says "the connection string or the environment".
+    /// What the driver (Npgsql 10.0.3, the tag <c>v10.0.3</c> of <c>npgsql/npgsql</c>, <c>src/Npgsql/</c>) throws for a
+    /// keyword that names a file or a service, and whether it is an <see cref="NpgsqlException" />.  The driver's text
+    /// quotes the path, so each type that a user can cause and that is none becomes an <see cref="UnusableException" />
+    /// with a fixed text of <see cref="ConnectionErrors" />, without the exception.  Each but the GSS case was provoked
+    /// against a server of a test's own words, on <c>net8.0</c> and <c>net10.0</c>.  The environment names the same
+    /// files (<c>PGSSLCERT</c>, <c>PGSSLKEY</c>, <c>PGPASSFILE</c>) and a default one is read when it exists, so a
+    /// message says "the connection string or the environment".
     /// </para>
     /// <list type="bullet">
     /// <item>
