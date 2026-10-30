@@ -16,7 +16,7 @@
 
 ## Global Constraints
 
-- Every commit passes `./pre-commit-validation.sh`; run `./format.sh -- file <changed .cs files>` (the repo's formatter, see `CONTRIBUTING.md`) before it.
+- Every commit passes `./pre-commit-validation.sh`; run `./format.sh -- <changed .cs files>` (the repo's formatter, see `CONTRIBUTING.md`) before it.
 - Dialect `SqlDialect.SqlServer` only.  Names still compare by `SqlParameterName.Comparison`; the list keeps the SQL's first spelling.
 - Diagnostic: id `SQLSRC121`, title `Parameter is written in two spellings`, `DiagnosticSeverity.Warning`, no `NotConfigurable` tag, a comment on the descriptor saying why it may be configured, help link `HelpLinkBase + "sqlsrc121"`.
 - Message format: `"The parameter '{1}' is also written '{0}'.  SqlSource binds it as '{1}', and a SQL Server whose collation is case-sensitive reads '{0}' as another variable, which the query does not declare.  Write it '{1}' throughout the query."`  `{0}` is the spelling at the warning's place and `{1}` the list's, both with their `@`.
