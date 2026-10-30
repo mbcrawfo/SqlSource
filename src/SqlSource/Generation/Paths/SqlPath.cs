@@ -284,9 +284,12 @@ internal static class SqlPath
         return files?.ToImmutable() ?? ImmutableArray<string>.Empty;
     }
 
-    // The first index from start of a path that does not sort before the paths under the folder or, when past is
-    // set, that sorts after them.  The folder is the first folderLength characters of folder.
-    private static int Seek(
+    /// <summary>
+    /// The first index from <paramref name="start" /> of a path that does not sort before the paths under the folder
+    /// or, when <paramref name="past" /> is set, that sorts after them.  The folder is the first
+    /// <paramref name="folderLength" /> characters of <paramref name="folder" />.
+    /// </summary>
+    internal static int Seek(
         EquatableArray<string> sortedPaths,
         int start,
         string folder,
