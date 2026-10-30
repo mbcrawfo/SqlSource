@@ -454,6 +454,125 @@ public sealed class SettingsFileReaderTests
         ]);
     }
 
+    // A column type's value may be an object of its type and the JSON opt-in, and its string form stays.
+    [Fact]
+    public void Read_ColumnTypeAsAnObject_IsAnEntryWithItsJsonOptIn()
+    {
+        const string Text = /*lang=json,strict*/
+            """
+            {
+                "columnTypes": {
+                    "orders.metadata": { "type": "OrderMetadata", "json": true },
+                    "orders.note": { "type": "Note" },
+                    "orders.created_by": "UserId",
+                    "orders.tags": { "json": false, "type": "Tags" }
+                }
+            }
+            """;
+
+        var file = SettingsFileReader.Read(Text, Place);
+
+        file.Errors.ShouldBeEmpty();
+        file.Level.ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([
+                new ColumnType("orders.created_by", "UserId", Place),
+                new ColumnType("orders.metadata", "OrderMetadata", Place, IsJson: true),
+                new ColumnType("orders.note", "Note", Place),
+                new ColumnType("orders.tags", "Tags", Place),
+            ]);
+    }
+
+    // An object with no type, a type that is not a string, a json that is not true or false, another member, or a
+    // member twice, is a member that is not valid, reported from its key to the object's end; the others apply.
+    [Theory]
+    [InlineData("{}")]
+    [InlineData( /*lang=json,strict*/
+        "{ \"json\": true }"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"type\": 1, \"json\": true }"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"type\": null }"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"type\": \"X\", \"json\": \"yes\" }"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"type\": \"X\", \"json\": null }"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"type\": \"X\", \"extra\": 1 }"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"type\": \"X\", \"extra\": { \"a\": [1, {}] } }"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"Type\": \"X\" }"
+    )]
+    [InlineData( /*lang=json*/
+        "{ \"type\": \"X\", \"type\": \"Y\" }"
+    )]
+    [InlineData( /*lang=json*/
+        "{ \"type\": \"X\", \"json\": true, \"json\": false }"
+    )]
+    public void Read_ColumnTypeAsAnObjectThatIsNotOne_IsInvalidValueAndTheOthersApply(string member)
+    {
+        var text = "{ \"columnTypes\": { \"orders.metadata\": " + member + ", \"orders.note\": \"Note\" } }";
+
+        var file = SettingsFileReader.Read(text, Place);
+
+        file.Level.ColumnTypes.ShouldNotBeNull().ShouldBe([new ColumnType("orders.note", "Note", Place)]);
+        file.Errors.ShouldBe([
+            new SettingsFileError(
+                SettingsFileErrorKind.InvalidValue,
+                Span(text, "\"orders.metadata\": " + member),
+                "columnTypes",
+                "orders.metadata",
+                ""
+            ),
+        ]);
+    }
+
+    // The opt-in needs a type, as a marker's -> json default is not valid.
+    [Fact]
+    public void Read_ColumnTypeAsAnObjectOfDefaultAndJson_IsInvalidValue()
+    {
+        const string Member = "\"orders.metadata\": { \"type\": \"default\", \"json\": true }";
+        const string Text = "{ \"columnTypes\": { " + Member + " } }";
+
+        var file = SettingsFileReader.Read(Text, Place);
+
+        file.Level.ShouldBeSameAs(SettingsLevel.None);
+        file.Errors.ShouldBe([
+            new SettingsFileError(
+                SettingsFileErrorKind.InvalidValue,
+                Span(Text, Member),
+                "columnTypes",
+                "orders.metadata",
+                "default"
+            ),
+        ]);
+    }
+
+    // The object form is the column types' alone.
+    [Theory]
+    [InlineData("typeOverrides", "int4")]
+    [InlineData("libraryTypes", "json")]
+    public void Read_ObjectMemberOfAnotherSetting_IsWrongType(string key, string member)
+    {
+        const string Value = /*lang=json,strict*/
+            "{ \"type\": \"long\", \"json\": true }";
+        var text = $$"""{ "{{key}}": { "{{member}}": {{Value}} } }""";
+
+        var file = SettingsFileReader.Read(text, Place);
+
+        file.Level.ShouldBeSameAs(SettingsLevel.None);
+        file.Errors.ShouldBe([
+            new SettingsFileError(SettingsFileErrorKind.WrongType, Span(text, Value), key, null, null),
+        ]);
+    }
+
     [Fact]
     public void Read_LibraryTypes_MemberIsKeptApartFromTheEntry()
     {

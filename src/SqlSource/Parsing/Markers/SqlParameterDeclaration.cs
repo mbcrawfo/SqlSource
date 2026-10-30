@@ -10,10 +10,14 @@ namespace SqlSource.Parsing.Markers;
 /// The C# type after <c>-&gt;</c>, as <c>ClrTypeName.Text</c> writes it, or null when the marker gives none.
 /// </param>
 /// <param name="Marker">The marker.</param>
+/// <param name="IsJson">
+/// Whether the marker writes the word <c>json</c> before the C# type, the JSON opt-in.  Never true without a C# type.
+/// </param>
 internal readonly record struct SqlParameterDeclaration(
     string Name,
     string? Type,
     bool? Nullable,
     string? ClrType,
-    SqlMarker Marker
+    SqlMarker Marker,
+    bool IsJson = false
 );

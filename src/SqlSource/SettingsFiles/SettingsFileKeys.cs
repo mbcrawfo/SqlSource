@@ -44,6 +44,17 @@ internal static class SettingsFileKeys
 
     public const string NestedClass = "nestedClass";
 
+    /// <summary>
+    /// The member of a column type written as an object that gives its C# type.  Not a key of the top level.
+    /// </summary>
+    public const string TypeMember = "type";
+
+    /// <summary>
+    /// The member of a column type written as an object that says whether its column holds JSON, the JSON opt-in.  Not
+    /// a key of the top level.
+    /// </summary>
+    public const string JsonMember = "json";
+
     // The keys of the settings of a level, in the order of SettingId, which KeyOf indexes.
     private static readonly string[] Settings =
     [

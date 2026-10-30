@@ -218,32 +218,77 @@ internal static class SettingsFileReader
             return elements.Count == 0 && wrongTypes > 0 ? null : SettingsFileValue.Array(elements, spans);
         }
 
-        // A member whose value is not a string is reported and left out.  Two members with one key are both kept: the
-        // setting's map says whether two keys are one.
+        // A member whose value is not a string is reported and left out, but for a member of the column types written
+        // as an object, which is kept as the text of its type, its span the object's.  Two members with one key are
+        // both kept: the setting's map says whether two keys are one.
         private SettingsFileValue ReadObject(string key)
         {
             var members = new List<KeyValuePair<string, string>>();
             var (keySpans, valueSpans) = (new List<TextSpan>(), new List<TextSpan>());
+            var json = key == SettingsFileKeys.ColumnTypes ? new List<bool>() : null;
             while (NextMember(out var memberKey))
             {
                 var value = _tokens.Next();
-                if (value.Kind != SidecarTokenKind.String)
+                string written;
+                var isJson = false;
+                TextSpan span;
+                if (value.Kind == SidecarTokenKind.String)
+                {
+                    written = SidecarTokenizer.GetString(text, value);
+                    span = value.Span;
+                }
+                else if (json is not null && value.Kind == SidecarTokenKind.ObjectStart)
+                {
+                    written = ReadColumnTypeObject(out isJson);
+                    span = TextSpan.FromBounds(value.Span.Start, _tokens.Position);
+                }
+                else
                 {
                     WrongType(value, key);
                     continue;
                 }
 
-                members.Add(
-                    new KeyValuePair<string, string>(
-                        SidecarTokenizer.GetString(text, memberKey),
-                        SidecarTokenizer.GetString(text, value)
-                    )
-                );
+                members.Add(new KeyValuePair<string, string>(SidecarTokenizer.GetString(text, memberKey), written));
                 keySpans.Add(memberKey.Span);
-                valueSpans.Add(value.Span);
+                valueSpans.Add(span);
+                json?.Add(isJson);
             }
 
-            return SettingsFileValue.Object(members, keySpans, valueSpans);
+            return SettingsFileValue.Object(members, keySpans, valueSpans, json);
+        }
+
+        // The object form of a column type, after its {: the text of its type member, and whether its json member is
+        // true.  An object with no type, a type that is not a string, a json that is not true or false, a member twice
+        // or any other member gives the empty string, which no type is, so that the level reader finds the member not
+        // valid, as the setting's other problems are found.
+        private string ReadColumnTypeObject(out bool isJson)
+        {
+            (string? type, bool? json, var isValid) = (null, null, true);
+            while (NextMember(out var memberKey))
+            {
+                var value = _tokens.Next();
+                var name = SidecarTokenizer.GetString(text, memberKey);
+                if (name == SettingsFileKeys.TypeMember && type is null && value.Kind == SidecarTokenKind.String)
+                {
+                    type = SidecarTokenizer.GetString(text, value);
+                }
+                else if (
+                    name == SettingsFileKeys.JsonMember
+                    && json is null
+                    && value.Kind is SidecarTokenKind.True or SidecarTokenKind.False
+                )
+                {
+                    json = value.Kind == SidecarTokenKind.True;
+                }
+                else
+                {
+                    isValid = false;
+                    _ = Skip(value);
+                }
+            }
+
+            isJson = isValid && json == true;
+            return isValid && type is not null ? type : string.Empty;
         }
 
         private void WrongType(SidecarToken first, string key) =>

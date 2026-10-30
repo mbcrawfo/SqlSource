@@ -238,6 +238,8 @@ public sealed class SqlFileParserParameterTests
     // A -> inside quotes, or that does not stand after white space, is part of the type.
     [InlineData("-- param: @a \"odd -> name\" -> UserId", "\"odd -> name\"", null, "UserId")]
     [InlineData("-- param: @a my->type", "my->type", null, null)]
+    // The word json alone is a type of that name: the opt-in needs a type after it.
+    [InlineData("-- param: @a -> json", null, null, "json")]
     public void Parse_ParamMarkerWithACSharpType_GivesItsParameterThatType(
         string marker,
         string? type,
@@ -250,6 +252,26 @@ public sealed class SqlFileParserParameterTests
             .Parameters.ShouldHaveSingleItem();
 
         parameter.ShouldBe(new SqlQueryParameter("a", type, nullable, true, clrType));
+    }
+
+    // The word json and white space before the C# type is the JSON opt-in.
+    [Theory]
+    [InlineData("-- param: @a -> json OrderMetadata", null, null, "OrderMetadata")]
+    [InlineData("-- param: @a jsonb null -> json OrderMetadata", "jsonb", true, "OrderMetadata")]
+    [InlineData("-- param: @a text not null ->JSON\tApp.OrderMetadata", "text", false, "global::App.OrderMetadata")]
+    [InlineData("-- param: @a -> json json", null, null, "json")]
+    public void Parse_ParamMarkerWithTheJsonOptIn_GivesItsParameterTheTypeAndTheOptIn(
+        string marker,
+        string? type,
+        bool? nullable,
+        string clrType
+    )
+    {
+        var parameter = Blocks("-- name: Q\n" + marker + "\nSELECT @a\n")
+            .ShouldHaveSingleItem()
+            .Parameters.ShouldHaveSingleItem();
+
+        parameter.ShouldBe(new SqlQueryParameter("a", type, nullable, true, clrType, IsJson: true));
     }
 
     // A parameter that only the marker declares keeps its C# type too.
@@ -266,6 +288,9 @@ public sealed class SqlFileParserParameterTests
     [InlineData("-- param: @a ->")]
     [InlineData("-- param: @a int4 -> UserId more")]
     [InlineData("-- param: @a -> -> UserId")]
+    [InlineData("-- param: @a -> json default")]
+    [InlineData("-- param: @a -> json int?")]
+    [InlineData("-- param: @a -> json UserId more")]
     public void Parse_ParamMarkerOfABadCSharpType_IsSqlsrc111(string marker)
     {
         var text = "-- name: Q\n" + marker + "\nSELECT @a\n";
@@ -285,6 +310,7 @@ public sealed class SqlFileParserParameterTests
     [Theory]
     [InlineData("@a -> OtherId")]
     [InlineData("@a -> App.UserId")]
+    [InlineData("@a -> json UserId")]
     [InlineData("@a")]
     public void Parse_TwoParamMarkersOfDifferentCSharpTypes_IsSqlsrc112(string second)
     {
@@ -302,6 +328,12 @@ public sealed class SqlFileParserParameterTests
                 ),
             ]);
     }
+
+    [Fact]
+    public void Parse_TwoParamMarkersOfTheSameJsonOptIn_IsNotAConflict() =>
+        Blocks("-- name: Q\n-- param: @a -> json UserId\n-- param: @A -> JSON UserId\nSELECT @a\n")
+            .ShouldHaveSingleItem()
+            .Parameters.ShouldBe([new SqlQueryParameter("a", null, null, true, "UserId", IsJson: true)]);
 
     [Fact]
     public void Parse_TwoParamMarkersOfTheSameCSharpType_IsNotAConflict() =>

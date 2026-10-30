@@ -15,4 +15,15 @@ namespace SqlSource.Parsing;
 /// Whether the marker says <c>-&gt; default</c>, which takes the column out of the column types of every level.
 /// </param>
 /// <param name="Span">The whole marker comment in the file.</param>
-internal sealed record SqlColumnMarker(string Name, bool? IsNullable, string? ClrType, bool ResetsType, TextSpan Span);
+/// <param name="IsJson">
+/// Whether the marker writes the word <c>json</c> before the C# type, the JSON opt-in, which says that the column holds
+/// JSON.  Never true without a C# type.
+/// </param>
+internal sealed record SqlColumnMarker(
+    string Name,
+    bool? IsNullable,
+    string? ClrType,
+    bool ResetsType,
+    TextSpan Span,
+    bool IsJson = false
+);

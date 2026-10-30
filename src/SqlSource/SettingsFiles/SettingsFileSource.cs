@@ -31,6 +31,8 @@ internal readonly struct SettingsFileSource(
 
     public IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting) => values[(int)setting]?.Members;
 
+    public bool IsJsonMember(SettingId setting, int index) => values[(int)setting]?.Json is { } json && json[index];
+
     // The member from its key to its value, as InvalidPart reports one, kept beside the level and not in it.
     public void LibraryEntry(SqlLibrary library, int index)
     {

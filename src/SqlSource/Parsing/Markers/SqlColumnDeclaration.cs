@@ -13,10 +13,15 @@ namespace SqlSource.Parsing.Markers;
 /// Whether the marker says <c>-&gt; default</c>, which takes the column out of the column types of every level.
 /// </param>
 /// <param name="Marker">The marker.</param>
+/// <param name="IsJson">
+/// Whether the marker writes the word <c>json</c> before the C# type, the JSON opt-in, which says that the column holds
+/// JSON.  Never true without a C# type.
+/// </param>
 internal readonly record struct SqlColumnDeclaration(
     string Name,
     bool? IsNullable,
     string? ClrType,
     bool ResetsType,
-    SqlMarker Marker
+    SqlMarker Marker,
+    bool IsJson = false
 );

@@ -135,11 +135,31 @@
       }
     },
     "columnTypes": {
-      "description": "Columns of a table or view, `table.column` or `schema.table.column`, and the C# type each gets, or `default`, as `\"users.id\": \"UserId\"`.",
+      "description": "Columns of a table or view, `table.column` or `schema.table.column`, and the C# type each gets, or `default`, as `\"users.id\": \"UserId\"`. A column of a string type that holds JSON takes an object of its type and `\"json\": true`, as `\"orders.metadata\": { \"type\": \"OrderMetadata\", \"json\": true }`.",
       "type": "object",
       "additionalProperties": {
-        "type": "string",
-        "pattern": "\\S"
+        "anyOf": [
+          {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "description": "The C# type the column gets, or `default`.",
+                "type": "string",
+                "pattern": "\\S"
+              },
+              "json": {
+                "description": "Whether the column holds JSON, which is read into the C# type and written from it as JSON. `false` is the plain mapping.",
+                "type": "boolean"
+              }
+            },
+            "required": ["type"],
+            "additionalProperties": false
+          }
+        ]
       },
       "propertyNames": {
         "pattern": "\\S"

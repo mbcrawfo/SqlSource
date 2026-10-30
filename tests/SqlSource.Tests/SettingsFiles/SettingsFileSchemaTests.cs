@@ -76,7 +76,7 @@ public sealed class SettingsFileSchemaTests
                 break;
             case SettingsFileValueType.ObjectOfStrings:
                 property.GetProperty("type").GetString().ShouldBe("object");
-                property.GetProperty("additionalProperties").GetProperty("type").GetString().ShouldBe("string");
+                StringMemberOf(key, property).GetProperty("type").GetString().ShouldBe("string");
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(key), key, "A type of value that the test does not know.");
@@ -206,7 +206,32 @@ public sealed class SettingsFileSchemaTests
         var property = Properties.GetProperty(key);
 
         property.GetProperty("propertyNames").GetProperty("pattern").GetString().ShouldBe(@"\S");
-        property.GetProperty("additionalProperties").GetProperty("pattern").GetString().ShouldBe(@"\S");
+        StringMemberOf(key, property).GetProperty("pattern").GetString().ShouldBe(@"\S");
+    }
+
+    // A column type's value is a string or an object of the members the reader reads, its type required and not
+    // blank, and nothing else.
+    [Fact]
+    public void Schema_ColumnTypes_TakeTheObjectFormTheReaderReads()
+    {
+        var forms = Properties.GetProperty(SettingsFileKeys.ColumnTypes).GetProperty("additionalProperties");
+        forms.GetProperty("anyOf").GetArrayLength().ShouldBe(2);
+        var form = forms.GetProperty("anyOf")[1];
+
+        form.GetProperty("type").GetString().ShouldBe("object");
+        form.GetProperty("additionalProperties").GetBoolean().ShouldBeFalse();
+        form.GetProperty("required")
+            .EnumerateArray()
+            .Select(static name => name.GetString())
+            .ShouldBe([SettingsFileKeys.TypeMember]);
+        var members = form.GetProperty("properties");
+        members
+            .EnumerateObject()
+            .Select(static member => member.Name)
+            .ShouldBe([SettingsFileKeys.TypeMember, SettingsFileKeys.JsonMember], ignoreOrder: true);
+        members.GetProperty(SettingsFileKeys.TypeMember).GetProperty("type").GetString().ShouldBe("string");
+        members.GetProperty(SettingsFileKeys.TypeMember).GetProperty("pattern").GetString().ShouldBe(@"\S");
+        members.GetProperty(SettingsFileKeys.JsonMember).GetProperty("type").GetString().ShouldBe("boolean");
     }
 
     // The library types are an object of choices: the names of its members are those of SqlLibrary, and its values
@@ -324,6 +349,14 @@ public sealed class SettingsFileSchemaTests
         "{\"noda time\": \"Off\"}"
     )]
     [InlineData(SettingsFileKeys.LibraryTypes, "{}")]
+    [InlineData(
+        SettingsFileKeys.ColumnTypes, /*lang=json,strict*/
+        """{"o.metadata": {"type": "Metadata", "json": true}, "o.note": {"type": "Note"}, "o.by": "UserId"}"""
+    )]
+    [InlineData(
+        SettingsFileKeys.ColumnTypes, /*lang=json,strict*/
+        "{\"orders.metadata\": {\"json\": false, \"type\": \" default \"}}"
+    )]
     public void Schema_SpellingTheReaderAccepts_IsValid(string key, string value)
     {
         var text = $$"""{"{{key}}": {{value}}}""";
@@ -391,6 +424,27 @@ public sealed class SettingsFileSchemaTests
         """{"columnTypes": {"": "UserId"}}"""
     )]
     [InlineData( /*lang=json,strict*/
+        """{"columnTypes": {"orders.metadata": {"type": "X", "extra": 1}}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"columnTypes": {"orders.metadata": {"json": true}}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"columnTypes": {"orders.metadata": {"type": 1}}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"columnTypes": {"orders.metadata": {"type": " "}}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"columnTypes": {"orders.metadata": {"type": "X", "json": "yes"}}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"columnTypes": {"orders.metadata": []}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"typeOverrides": {"int4": {"type": "long"}}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
         """{"libraryTypes": {"nodaTime": "maybe"}}"""
     )]
     [InlineData( /*lang=json,strict*/
@@ -421,6 +475,14 @@ public sealed class SettingsFileSchemaTests
     {
         using var schema = JsonDocument.Parse(SchemaText);
         return schema.RootElement.GetProperty("properties").Clone();
+    }
+
+    // What a member of a map takes as a string: the whole of its additionalProperties, or for the column types the
+    // first branch of its anyOf, beside the object form.
+    private static JsonElement StringMemberOf(string key, JsonElement property)
+    {
+        var members = property.GetProperty("additionalProperties");
+        return key == SettingsFileKeys.ColumnTypes ? members.GetProperty("anyOf")[0] : members;
     }
 
     // The spellings of a choice for completion, in the first branch of its anyOf.

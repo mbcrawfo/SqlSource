@@ -5,7 +5,6 @@ using System.Linq;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
-using SqlSource.Settings.ClrTypes;
 using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
@@ -30,9 +29,6 @@ internal sealed class SqlMarkerScope(
     private const string InsideAQuery = "inside a query";
 
     private const string BeforeTheFirstQuery = "before the file's first query";
-
-    // The word that takes a key out of the map of the levels below, ignoring case, as the type override reads it.
-    private const string Default = "default";
 
     // The help of a query's -- column: whose name is a column's source.
     private const string SourceInTheHeader = ".  A column's source is mapped in the file header";
@@ -526,9 +522,9 @@ internal sealed class SqlMarkerScope(
         _ = _ignoredTokens.Add(name);
     }
 
-    // "@name [type] [null | not null] [-> CSharpType]", the name ended by white space or by the arrow.  The type is
-    // what stands between the name and those words, as written.  The C# type is a ClrTypeName, and never default,
-    // since no level below a query maps a parameter.
+    // "@name [type] [null | not null] [-> [json] CSharpType]", the name ended by white space or by the arrow.  The
+    // type is what stands between the name and those words, as written.  The C# type is a ClrTypeName, and never
+    // default, since no level below a query maps a parameter; json before it is the JSON opt-in.
     private void ReadParam(SqlMarker marker)
     {
         var start = marker.ValueSpan.Start;
@@ -557,18 +553,15 @@ internal sealed class SqlMarkerScope(
         var name = text.Substring(start + 1, nameEnd - start - 1);
         var rest = text.AsSpan(nameEnd, end - nameEnd);
         string? clrType = null;
+        var isJson = false;
         if (TrySplitArrow(rest, out var before, out var after))
         {
-            if (
-                after.Equals(Default.AsSpan(), StringComparison.OrdinalIgnoreCase)
-                || !ClrTypeName.TryParse(after, out var parsed)
-            )
+            if (!ColumnTypeGrammar.TryReadMarkerType(after, out clrType, out isJson) || clrType is null)
             {
                 AddInvalid(marker);
                 return;
             }
 
-            clrType = parsed!.Text;
             rest = before;
         }
 
@@ -584,7 +577,8 @@ internal sealed class SqlMarkerScope(
             rest.IsEmpty ? null : rest.ToString(),
             nullable,
             clrType,
-            marker
+            marker,
+            isJson
         );
         _declarations ??= [];
         foreach (var existing in _declarations)
@@ -598,6 +592,7 @@ internal sealed class SqlMarkerScope(
                 !string.Equals(existing.Type, declaration.Type, StringComparison.Ordinal)
                 || existing.Nullable != nullable
                 || !string.Equals(existing.ClrType, clrType, StringComparison.Ordinal)
+                || existing.IsJson != isJson
             )
             {
                 AddConflict(marker);
@@ -611,9 +606,9 @@ internal sealed class SqlMarkerScope(
 
     // In a file's header, a column's source and its C# type, "table.column -> Type" or "-> default", which the file's
     // column types hold; in a file of one query, a name of two or three parts is the header's.  In a query, a result's
-    // column, by its name as the database returns it, then "null" or "not null", "-> Type" or "-> default", or both in
-    // that order.  The name is one word, or a double-quoted name, in which "" is one quote, for a name with white
-    // space, an arrow or a dot, or one that is a word of nullability.
+    // column, by its name as the database returns it, then "null" or "not null", "-> Type", "-> json Type" or
+    // "-> default", or both in that order.  The name is one word, or a double-quoted name, in which "" is one quote,
+    // for a name with white space, an arrow or a dot, or one that is a word of nullability.
     private void ReadColumn(SqlMarker marker)
     {
         var value = Value(marker);
@@ -639,36 +634,23 @@ internal sealed class SqlMarkerScope(
         }
 
         string? clrType = null;
-        var resetsType = false;
-        if (hasArrow)
-        {
-            if (after.Equals(Default.AsSpan(), StringComparison.OrdinalIgnoreCase))
-            {
-                resetsType = true;
-            }
-            else if (ClrTypeName.TryParse(after, out var parsed))
-            {
-                clrType = parsed!.Text;
-            }
-            else
-            {
-                AddInvalid(marker);
-                return;
-            }
-        }
-
-        if ((nullable is null && !hasArrow) || ReadColumnName(rest) is not { } name)
+        var isJson = false;
+        if (
+            (hasArrow && !ColumnTypeGrammar.TryReadMarkerType(after, out clrType, out isJson))
+            || (nullable is null && !hasArrow)
+            || ReadColumnName(rest) is not { } name
+        )
         {
             AddInvalid(marker);
             return;
         }
 
-        AddColumn(new SqlColumnDeclaration(name, nullable, clrType, resetsType, marker));
+        AddColumn(new SqlColumnDeclaration(name, nullable, clrType, hasArrow && clrType is null, marker, isJson));
     }
 
     // Two markers of one column, ignoring case, conflict when both set the nullability and differ, or both set a type,
-    // -> default among them, and differ; the first stands.  A marker that sets nothing an earlier one does not is
-    // dropped, so that a column's markers say each thing once.
+    // -> default among them, and differ, the JSON opt-in included; the first stands.  A marker that sets nothing an
+    // earlier one does not is dropped, so that a column's markers say each thing once.
     private void AddColumn(SqlColumnDeclaration column)
     {
         _columns ??= [];
@@ -689,6 +671,7 @@ internal sealed class SqlMarkerScope(
                     && addsType
                     && (
                         existing.ResetsType != column.ResetsType
+                        || existing.IsJson != column.IsJson
                         || !string.Equals(existing.ClrType, column.ClrType, StringComparison.Ordinal)
                     )
                 )
@@ -709,7 +692,8 @@ internal sealed class SqlMarkerScope(
     }
 
     // A header's entry.  The entries of a scope add up, one for each key; the same type twice is fine, and another
-    // type for a key is a conflict, the first standing.  The types are compared as their text.
+    // type for a key, or the same type with or without the JSON opt-in, is a conflict, the first standing.  The types
+    // are compared as their text.
     private void ReadColumnType(SqlMarker marker)
     {
         if (!ColumnTypeGrammar.TryReadHeaderEntry(Value(marker), out var entry))
@@ -720,7 +704,7 @@ internal sealed class SqlMarkerScope(
 
         if (
             ColumnTypeMap.AddOrFind(_columnTypes ??= [], entry!) is { } existing
-            && !string.Equals(existing.Type, entry!.Type, StringComparison.Ordinal)
+            && (!string.Equals(existing.Type, entry!.Type, StringComparison.Ordinal) || existing.IsJson != entry.IsJson)
         )
         {
             AddConflict(marker);

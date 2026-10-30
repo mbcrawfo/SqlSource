@@ -204,6 +204,8 @@ internal static class TargetTypeReader
 
         public IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting) => null;
 
+        public bool IsJsonMember(SettingId setting, int index) => false;
+
         // The attribute has no level for the library types.
         public void LibraryEntry(SqlLibrary library, int index) { }
 

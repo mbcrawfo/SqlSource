@@ -282,6 +282,30 @@ public sealed class SettingsLevelReaderTests
         source.RepeatedKeys.ShouldBe([(SettingId.TypeOverrides, 2, 0)]);
     }
 
+    // The source says which member is written with the JSON opt-in, and the entry it gives carries it.
+    [Fact]
+    public void Read_ColumnTypeTheSourceSaysIsJson_IsAnEntryThatSaysSo()
+    {
+        var source = new FakeSource(
+            [],
+            SettingsFile,
+            members: new Dictionary<SettingId, KeyValuePair<string, string>[]>
+            {
+                [SettingId.ColumnTypes] = [new("orders.note", "Note"), new("orders.metadata", "OrderMetadata")],
+            },
+            jsonMembers: [(SettingId.ColumnTypes, 1)]
+        );
+
+        SettingsLevelReader
+            .Read(ref source)
+            .ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([
+                new ColumnType("orders.metadata", "OrderMetadata", SettingsFile, IsJson: true),
+                new ColumnType("orders.note", "Note", SettingsFile),
+            ]);
+        source.InvalidParts.ShouldBeEmpty();
+    }
+
     [Fact]
     public void Read_ColumnTypesAsMembers_AreSetAndEachProblemIsNamedByItsIndex()
     {
@@ -428,7 +452,8 @@ public sealed class SettingsLevelReaderTests
         Dictionary<SettingId, string> texts,
         SettingPlace? place = null,
         Dictionary<SettingId, string[]>? elements = null,
-        Dictionary<SettingId, KeyValuePair<string, string>[]>? members = null
+        Dictionary<SettingId, KeyValuePair<string, string>[]>? members = null,
+        HashSet<(SettingId Setting, int Index)>? jsonMembers = null
     ) : ISettingSource
     {
         public readonly SettingPlace Place => place ?? SettingsFile;
@@ -462,6 +487,9 @@ public sealed class SettingsLevelReaderTests
             Asked.Add($"Members({setting})");
             return members is not null && members.TryGetValue(setting, out var written) ? written : null;
         }
+
+        public readonly bool IsJsonMember(SettingId setting, int index) =>
+            jsonMembers is not null && jsonMembers.Contains((setting, index));
 
         public readonly void LibraryEntry(SqlLibrary library, int index) => LibraryEntries.Add((library, index));
 
