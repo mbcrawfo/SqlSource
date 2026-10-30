@@ -7,8 +7,8 @@ using SqlSource.Diagnostics;
 using SqlSource.Generation.Converters;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Types;
-using SqlSource.Generation.Types.Maps;
 using SqlSource.Settings;
+using SqlSource.Settings.ClrTypes;
 using SqlSource.Testing.Snapshot;
 using Xunit;
 
@@ -578,7 +578,7 @@ public sealed class ConversionPlannerTests
 
     // MyApp.Email.From(string), as a message names a method.
     private static string DisplayOf(string method, string argument) =>
-        PostgresTypeMap.AsWritten(method) + "(" + PostgresTypeMap.AsWritten(argument) + ")";
+        ClrTypeName.AsWritten(method) + "(" + ClrTypeName.AsWritten(argument) + ")";
 
     // The converters in the order of the set.
     private static EquatableArray<Converter> Of(params Converter[] converters) =>

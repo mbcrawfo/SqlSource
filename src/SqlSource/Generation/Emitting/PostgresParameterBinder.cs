@@ -27,43 +27,40 @@ namespace SqlSource.Generation.Emitting;
 internal sealed class PostgresParameterBinder : ParameterBinder
 {
     /// <inheritdoc />
-    public override void Append(
-        StringBuilder builder,
-        string indent,
-        string command,
-        string parameter,
-        string parameters,
-        MethodParameter bound,
-        ConversionNames names
-    )
+    public override void Append(in BindingContext context, MethodParameter bound)
     {
-        _ = builder.Append(indent).Append("var ").Append(parameter).Append(" = new global::Npgsql.NpgsqlParameter<");
+        var builder = context.Builder;
+        _ = builder
+            .Append(context.Indent)
+            .Append("var ")
+            .Append(context.Parameter)
+            .Append(" = new global::Npgsql.NpgsqlParameter<");
         AppendBoundType(builder, bound);
         _ = builder
             .Append(">();\n")
-            .Append(indent)
-            .Append(parameter)
+            .Append(context.Indent)
+            .Append(context.Parameter)
             .Append(".ParameterName = ")
             .Append(SymbolDisplay.FormatLiteral(bound.Name, quote: true))
             .Append(";\n");
         if (DataTypeNameOf(bound.Described) is { } dataTypeName)
         {
             _ = builder
-                .Append(indent)
-                .Append(parameter)
+                .Append(context.Indent)
+                .Append(context.Parameter)
                 .Append(".DataTypeName = ")
                 .Append(SymbolDisplay.FormatLiteral(dataTypeName, quote: true))
                 .Append(";\n");
         }
 
-        _ = builder.Append(indent).Append(parameter).Append(".TypedValue = ");
-        AppendValue(builder, parameters, bound, names);
+        _ = builder.Append(context.Indent).Append(context.Parameter).Append(".TypedValue = ");
+        AppendValue(context, bound);
         _ = builder
             .Append(";\n")
-            .Append(indent)
-            .Append(command)
+            .Append(context.Indent)
+            .Append(context.Command)
             .Append(".Parameters.Add(")
-            .Append(parameter)
+            .Append(context.Parameter)
             .Append(");\n");
     }
 
@@ -133,49 +130,17 @@ internal sealed class PostgresParameterBinder : ParameterBinder
         }
     }
 
-    // The property's value, or its converter's result; a value that can be null is matched first, so that the
-    // converter never sees a null, and a null is bound as the null of T, by a conditional typed by TypedValue.
-    private static void AppendValue(
-        StringBuilder builder,
-        string parameters,
-        MethodParameter bound,
-        ConversionNames names
-    )
+    // The property's value, or its converter's result, by a conditional typed by TypedValue, whose null is the null
+    // of T.
+    private static void AppendValue(in BindingContext context, MethodParameter bound)
     {
-        if (bound.Write is not { } write)
+        if (bound.Write is { } write)
         {
-            _ = builder.Append(parameters).Append('.').Append(bound.Property);
-            return;
-        }
-
-        if (!bound.IsNullable && bound.IsValueType)
-        {
-            _ = builder
-                .Append(write.Method)
-                .Append('(')
-                .Append(parameters)
-                .Append('.')
-                .Append(bound.Property)
-                .Append(')');
-            return;
-        }
-
-        _ = builder
-            .Append(parameters)
-            .Append('.')
-            .Append(bound.Property)
-            .Append(" is { } ")
-            .Append(names.Value)
-            .Append(" ? ");
-        if (write.IsByElement)
-        {
-            AppendByElement(builder, write, names);
+            AppendConverted(context, bound, write, "", "null");
         }
         else
         {
-            _ = builder.Append(write.Method).Append('(').Append(names.Value).Append(')');
+            _ = context.Builder.Append(context.Parameters).Append('.').Append(bound.Property);
         }
-
-        _ = builder.Append(" : null");
     }
 }

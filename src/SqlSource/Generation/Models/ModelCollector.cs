@@ -7,7 +7,7 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
-using SqlSource.Generation.Types.Maps;
+using SqlSource.Settings.ClrTypes;
 
 namespace SqlSource.Generation.Models;
 
@@ -273,9 +273,9 @@ internal static class ModelCollector
                 return "the property '"
                     + mine.Name
                     + "' is '"
-                    + PostgresTypeMap.AsWritten(mine.Type.Text)
+                    + ClrTypeName.AsWritten(mine.Type.Text)
                     + "' here and '"
-                    + PostgresTypeMap.AsWritten(theirs.Type.Text)
+                    + ClrTypeName.AsWritten(theirs.Type.Text)
                     + "' there";
             }
 
@@ -346,7 +346,7 @@ internal static class ModelCollector
                 at,
                 property.Subject,
                 property.Type.Mapped ?? property.Type.Key,
-                PostgresTypeMap.AsWritten(property.Type.Text),
+                ClrTypeName.AsWritten(property.Type.Text),
                 property.Type.Place ?? "",
                 NotPublicBefore + fullName + NotPublicAfter,
                 MakeItPublic

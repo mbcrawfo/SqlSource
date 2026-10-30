@@ -14,7 +14,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
 
-public sealed class SqlServerBindingTests
+public sealed class SqlServerParameterBinderTests
 {
     // The binding by value alone of a parameter called name, nullable, that has no described type the binding can use.
     private const string ByValue = """
@@ -100,12 +100,12 @@ public sealed class SqlServerBindingTests
     {
         foreach (var key in SqlServerTypeMap.Keys.Where(key => key != "vector"))
         {
-            var sqlDbType = SqlServerBinding.SqlDbTypeOf(key);
+            var sqlDbType = SqlServerParameterBinder.SqlDbTypeOf(key);
             _ = sqlDbType.ShouldNotBeNull(key);
             Enum.TryParse<SqlDbType>(sqlDbType, out _).ShouldBeTrue(key);
         }
 
-        SqlServerBinding.SqlDbTypeOf("vector").ShouldBeNull();
+        SqlServerParameterBinder.SqlDbTypeOf("vector").ShouldBeNull();
     }
 
     // SqlClient refuses a value of a CLR type without its UdtTypeName, so the type is a Udt of its name, with no
@@ -548,7 +548,17 @@ public sealed class SqlServerBindingTests
         var builder = new StringBuilder();
         ParameterBinder
             .For(DatabaseEngine.SqlServer)
-            .Append(builder, "    ", "command", "p0", "parameters", bound, new ConversionNames("value", "e1", "i1"));
+            .Append(
+                new BindingContext(
+                    builder,
+                    "    ",
+                    "command",
+                    "p0",
+                    "parameters",
+                    new ConversionNames("value", "e1", "i1")
+                ),
+                bound
+            );
         return builder.ToString();
     }
 }

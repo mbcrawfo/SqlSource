@@ -268,7 +268,17 @@ public sealed class PostgresParameterBinderTests
         var builder = new StringBuilder();
         ParameterBinder
             .For(DatabaseEngine.PostgreSql)
-            .Append(builder, "    ", "command", "p0", "parameters", bound, new ConversionNames(value, "e1", "i1"));
+            .Append(
+                new BindingContext(
+                    builder,
+                    "    ",
+                    "command",
+                    "p0",
+                    "parameters",
+                    new ConversionNames(value, "e1", "i1")
+                ),
+                bound
+            );
         return builder.ToString();
     }
 }

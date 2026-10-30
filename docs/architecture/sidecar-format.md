@@ -49,7 +49,7 @@ The tool never writes a sidecar with no entry.  A run over the whole run unit th
 7. **Strings are compared ordinally**, a query's name included, except where the generator or the tool matches one with a name a user writes, or with a table of its own, which ignores case:
    - a parameter's `name` against the query's parameter (`QueryTyper`), and `database` against the query's (`DatabaseName.Comparer`), since two names that differ only in case read one connection variable;
    - a column's `name` against a `-- column:` marker (`ModelReader`), its `origin` against the keys of `columnTypes` (`ColumnTypeMap`), and a type's `schema` and `internalName` against the keys of `typeOverrides` (`TypeOverrideMap`), a plain part of a key ignoring case and a part in quotes exactly, as the manual's [type overrides](../manual/settings.md#type-overrides) and [column types](../manual/settings.md#column-types) say;
-   - a PostgreSQL `internalName` of `pg_catalog` or of an extension the type map knows (`PostgresTypeMap`, `TypeKeyNames`), and a SQL Server type's base name in the type map and the binder's table (`SqlServerTypeMap`, `SqlServerBinding`).
+   - a PostgreSQL `internalName` of `pg_catalog` or of an extension the type map knows (`PostgresTypeMap`, `TypeKeyNames`), and a SQL Server type's base name in the type map and the binder's table (`SqlServerTypeMap`, `SqlServerParameterBinder`).
 8. **Everything about a query is in its entry**; only `formatVersion` and `toolVersion` come from the top.
 
 ## Compatibility

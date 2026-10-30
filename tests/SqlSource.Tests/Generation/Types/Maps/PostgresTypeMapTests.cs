@@ -457,24 +457,6 @@ public sealed class PostgresTypeMapTests
     [InlineData("byte")]
     public void Gives_ForeignTypes_AreNot(string text) => PostgresTypeMap.Gives(text).ShouldBeFalse();
 
-    // global:: goes before a name of several parts, and stays before one of one part, which would be a short name
-    // without it.
-    [Theory]
-    [InlineData("int", "int")]
-    [InlineData("global::System.Guid", "System.Guid")]
-    [InlineData("global::UserId", "global::UserId")]
-    [InlineData("UserId", "UserId")]
-    [InlineData(
-        "global::System.Collections.Generic.Dictionary<global::UserId, global::App.UserId>[]",
-        "System.Collections.Generic.Dictionary<global::UserId, App.UserId>[]"
-    )]
-    [InlineData(
-        "global::System.Collections.Generic.List<global::UserId>",
-        "System.Collections.Generic.List<global::UserId>"
-    )]
-    public void AsWritten_Text_LeavesOutGlobalBeforeANameOfSeveralParts(string text, string written) =>
-        PostgresTypeMap.AsWritten(text).ShouldBe(written);
-
     // A cell is the C# type the mapping gives, or "!" and the kind of its failure.
     private static void ShouldMapTo(TypeMapping mapping, string expected, bool isValueType, string key)
     {
