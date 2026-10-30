@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using SqlSource.Diagnostics;
-using SqlSource.Generation.Types.Maps;
+using SqlSource.Settings.ClrTypes;
 
 namespace SqlSource.Generation.Converters;
 
@@ -141,8 +141,8 @@ internal sealed record ConverterSet(EquatableArray<Converter> Converters, Equata
                         location,
                         converter.DisplayName,
                         other.DisplayName,
-                        PostgresTypeMap.AsWritten(converter.ArgumentText),
-                        PostgresTypeMap.AsWritten(converter.ReturnText)
+                        ClrTypeName.AsWritten(converter.ArgumentText),
+                        ClrTypeName.AsWritten(converter.ReturnText)
                     )
                 );
             }

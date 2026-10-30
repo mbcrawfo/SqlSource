@@ -897,7 +897,7 @@ internal static class SqlDiagnostics
     );
 
     // {0} and {1} are the two methods as "App.Email.FromDatabase(string)", {2} the type of their argument and {3} their
-    // return type, as PostgresTypeMap.AsWritten writes them.  Reported at the name of each method of the project's
+    // return type, as ClrTypeName.AsWritten writes them.  Reported at the name of each method of the project's
     // source, and at the query's name for two of a referenced assembly that the query's method would use.
     public static readonly DiagnosticDescriptor DuplicateConverter = new(
         id: "SQLSRC278",
@@ -912,7 +912,7 @@ internal static class SqlDiagnostics
 
     // It has two forms, which ConversionPlanner builds.  {0} is the column or parameter, as "column 'id'", or "element
     // of column 'ids'" when the foreign type is an array's element, and {1} its type, or the element's, as
-    // PostgresTypeMap.AsWritten writes it.  For a foreign type whose converters are of other types, {2} is "whose
+    // ClrTypeName.AsWritten writes it.  For a foreign type whose converters are of other types, {2} is "whose
     // converters convert from and to <the other types, as 'int' or 'int' and 'short'>, and not from and to '<the
     // base map's type>', the type the database type '<its key>' is read as", and {3} "Add a converter between '<the
     // type>' and '<the base map's type>'".  For a database type the base map gives no C# type, {2} is "which has
@@ -933,7 +933,7 @@ internal static class SqlDiagnostics
     // element by element, {1} its type or the element's, {2} "to" or "from", the direction of the converter it has,
     // {3} the type the base map reads its database type as, {4} the other of "to" and "from", {5} "column" or
     // "parameter", and {6} and {7} the argument and return types of the converter it needs.  The types are as
-    // PostgresTypeMap.AsWritten writes them.  Reported at the query's name.
+    // ClrTypeName.AsWritten writes them.  Reported at the query's name.
     public static readonly DiagnosticDescriptor ConverterDirectionMissing = new(
         id: "SQLSRC280",
         title: "Converter is missing for one direction",

@@ -182,18 +182,18 @@ internal static class QueryMethodWriter
         if (method.Input is { } input)
         {
             var binder = ParameterBinder.For(method.Engine);
+            var context = new BindingContext(
+                builder,
+                blockIndent + GeneratedText.Indent,
+                locals.Command,
+                locals.Parameter,
+                Parameters,
+                locals.ConversionNames
+            );
             foreach (var parameter in input.Parameters)
             {
                 _ = builder.Append(blockIndent).Append("{\n");
-                binder.Append(
-                    builder,
-                    blockIndent + GeneratedText.Indent,
-                    locals.Command,
-                    locals.Parameter,
-                    Parameters,
-                    parameter,
-                    locals.ConversionNames
-                );
+                binder.Append(context, parameter);
                 AppendEnd(builder, blockIndent);
                 _ = builder.Append('\n');
             }

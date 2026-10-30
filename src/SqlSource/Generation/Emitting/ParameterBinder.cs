@@ -25,24 +25,9 @@ internal abstract class ParameterBinder
     /// <summary>
     /// Appends the lines that bind the parameter.
     /// </summary>
-    /// <param name="builder">The source being built.</param>
-    /// <param name="indent">The whitespace that starts each line.</param>
-    /// <param name="command">The name of the command's local.</param>
-    /// <param name="parameter">The name of the parameter's local.</param>
-    /// <param name="parameters">The name of the argument that holds the input model.</param>
+    /// <param name="context">What every parameter of the method is bound with.</param>
     /// <param name="bound">The parameter, and the property that gives its value.</param>
-    /// <param name="names">
-    /// The names of what a converted parameter's binding declares, which no argument and no local of the method has.
-    /// </param>
-    public abstract void Append(
-        StringBuilder builder,
-        string indent,
-        string command,
-        string parameter,
-        string parameters,
-        MethodParameter bound,
-        ConversionNames names
-    );
+    public abstract void Append(in BindingContext context, MethodParameter bound);
 
     /// <summary>
     /// Appends the binding by value alone: the name, without the <c>@</c>, and the value, with nothing else set.  A
@@ -50,38 +35,31 @@ internal abstract class ParameterBinder
     /// <c>DBNull.Value</c> for null.  A property with a converter sends the converter's result, and the converter
     /// never sees a null; an array converted by element sends the array of each element's result.
     /// </summary>
-    internal static void AppendByValue(
-        StringBuilder builder,
-        string indent,
-        string command,
-        string parameter,
-        string parameters,
-        MethodParameter bound,
-        ConversionNames names
-    )
+    protected static void AppendByValue(in BindingContext context, MethodParameter bound)
     {
+        var builder = context.Builder;
         _ = builder
-            .Append(indent)
+            .Append(context.Indent)
             .Append("var ")
-            .Append(parameter)
+            .Append(context.Parameter)
             .Append(" = ")
-            .Append(command)
+            .Append(context.Command)
             .Append(".CreateParameter();\n")
-            .Append(indent)
-            .Append(parameter)
+            .Append(context.Indent)
+            .Append(context.Parameter)
             .Append(".ParameterName = ")
             .Append(SymbolDisplay.FormatLiteral(bound.Name, quote: true))
             .Append(";\n")
-            .Append(indent)
-            .Append(parameter)
+            .Append(context.Indent)
+            .Append(context.Parameter)
             .Append(".Value = ");
-        AppendValueOrNull(builder, parameters, bound, names, "global::System.DBNull.Value");
+        AppendValueOrNull(context, bound, "global::System.DBNull.Value");
         _ = builder
             .Append(";\n")
-            .Append(indent)
-            .Append(command)
+            .Append(context.Indent)
+            .Append(context.Command)
             .Append(".Parameters.Add(")
-            .Append(parameter)
+            .Append(context.Parameter)
             .Append(");\n");
     }
 
@@ -89,23 +67,18 @@ internal abstract class ParameterBinder
     /// Appends the value that the parameter sends, the expression after <c>Value = </c>: the property's value, or the
     /// converter's result, with <paramref name="nullText" /> for a null of a property that can be one.
     /// </summary>
-    internal static void AppendValueOrNull(
-        StringBuilder builder,
-        string parameters,
-        MethodParameter bound,
-        ConversionNames names,
-        string nullText
-    )
+    protected static void AppendValueOrNull(in BindingContext context, MethodParameter bound, string nullText)
     {
+        var builder = context.Builder;
         if (bound.Write is { } write)
         {
-            AppendConverted(builder, parameters, bound, write, names, nullText);
+            AppendConverted(context, bound, write, "(object)", nullText);
         }
         else if (bound.IsNullable || !bound.IsValueType)
         {
             _ = builder
                 .Append("(object?)")
-                .Append(parameters)
+                .Append(context.Parameters)
                 .Append('.')
                 .Append(bound.Property)
                 .Append(" ?? ")
@@ -113,27 +86,36 @@ internal abstract class ParameterBinder
         }
         else
         {
-            _ = builder.Append(parameters).Append('.').Append(bound.Property);
+            _ = builder.Append(context.Parameters).Append('.').Append(bound.Property);
         }
     }
 
-    // The converter of the property's value; a value that can be null is matched first, and null sends the null text.
-    // An array converted by element, which is of a reference type and so matched too, sends the database's array.
-    private static void AppendConverted(
-        StringBuilder builder,
-        string parameters,
+    /// <summary>
+    /// Appends the converter's result for the property's value.  A value that can be null is matched first, so that
+    /// the converter never sees a null, and the result, after <paramref name="cast" />, is then the arm of a
+    /// conditional whose other arm is <paramref name="nullText" />.  An array converted by element, which is of a
+    /// reference type and so matched too, sends the database's array.
+    /// </summary>
+    /// <param name="context">What every parameter of the method is bound with.</param>
+    /// <param name="bound">The parameter, and the property that gives its value.</param>
+    /// <param name="write">The parameter's conversion.</param>
+    /// <param name="cast">What comes before the converted value: <c>(object)</c>, or nothing.</param>
+    /// <param name="nullText">The text a null sends.</param>
+    protected static void AppendConverted(
+        in BindingContext context,
         MethodParameter bound,
         Conversion write,
-        ConversionNames names,
+        string cast,
         string nullText
     )
     {
+        var builder = context.Builder;
         if (!bound.IsNullable && bound.IsValueType)
         {
             _ = builder
                 .Append(write.Method)
                 .Append('(')
-                .Append(parameters)
+                .Append(context.Parameters)
                 .Append('.')
                 .Append(bound.Property)
                 .Append(')');
@@ -141,19 +123,20 @@ internal abstract class ParameterBinder
         }
 
         _ = builder
-            .Append(parameters)
+            .Append(context.Parameters)
             .Append('.')
             .Append(bound.Property)
             .Append(" is { } ")
-            .Append(names.Value)
-            .Append(" ? (object)");
+            .Append(context.Names.Value)
+            .Append(" ? ")
+            .Append(cast);
         if (write.IsByElement)
         {
-            AppendByElement(builder, write, names);
+            AppendByElement(builder, write, context.Names);
         }
         else
         {
-            _ = builder.Append(write.Method).Append('(').Append(names.Value).Append(')');
+            _ = builder.Append(write.Method).Append('(').Append(context.Names.Value).Append(')');
         }
 
         _ = builder.Append(" : ").Append(nullText);
@@ -208,21 +191,4 @@ internal abstract class ParameterBinder
         CanElementBeNull(write) ? write.DatabaseElementText + "?" : write.DatabaseElementText!;
 
     private static bool CanElementBeNull(Conversion write) => write.ElementIsNullable || !write.ElementIsValueType;
-}
-
-/// <summary>
-/// Binds a parameter for Microsoft.Data.SqlClient.
-/// </summary>
-internal sealed class SqlServerParameterBinder : ParameterBinder
-{
-    /// <inheritdoc />
-    public override void Append(
-        StringBuilder builder,
-        string indent,
-        string command,
-        string parameter,
-        string parameters,
-        MethodParameter bound,
-        ConversionNames names
-    ) => SqlServerBinding.Append(builder, indent, command, parameter, parameters, bound, names);
 }

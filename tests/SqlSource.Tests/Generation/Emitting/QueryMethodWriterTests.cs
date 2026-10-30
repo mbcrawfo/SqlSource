@@ -61,7 +61,7 @@ public sealed class QueryMethodWriterTests
         TestModels.NameLocation("Users.sql")
     );
 
-    // GetUser on SQL Server, without parameters, whose binding is SqlServerBindingTests'.
+    // GetUser on SQL Server, without parameters, whose binding is SqlServerParameterBinderTests'.
     private static readonly QueryMethod SqlServerGetUser = GetUser with
     {
         Engine = DatabaseEngine.SqlServer,
