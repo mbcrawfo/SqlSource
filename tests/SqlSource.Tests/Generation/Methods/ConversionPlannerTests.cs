@@ -515,11 +515,8 @@ public sealed class ConversionPlannerTests
         var conversion = ConversionPlanner.Plan(
             type,
             isRead,
-            engine,
-            converters,
             subject,
-            At,
-            problems,
+            new ConversionContext(engine, converters, At, problems),
             out var blocked
         );
         problems.ShouldAllBe(problem => problem.Location == At);

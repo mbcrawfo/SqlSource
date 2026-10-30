@@ -1,3 +1,4 @@
+using System;
 using SqlSource.Diagnostics;
 
 namespace SqlSource.Generation.Models;
@@ -19,4 +20,45 @@ internal sealed record FileModels(
     string FileName,
     EquatableArray<QueryModels> Queries,
     EquatableArray<DiagnosticInfo> Diagnostics
-);
+)
+{
+    /// <summary>
+    /// The models of the query at an index in the file, matched by index and name: the models are read from the same
+    /// parse, so the two agree, and a mismatch is passed over rather than thrown on.  The models are in the order of
+    /// the file's queries, so a search finds them.
+    /// </summary>
+    /// <param name="queryIndex">The query's index among the queries of the file.</param>
+    /// <param name="name">The query's name.</param>
+    /// <returns>The models, or null when the query has none or the model at the index has another name.</returns>
+    public QueryModels? Find(int queryIndex, string name)
+    {
+        // A query has models at most once and the indices rise, so its models are at or before its own index, and
+        // at it when every query before it has models, as is usual.
+        var (low, high) = (0, Math.Min(Queries.Count, queryIndex + 1) - 1);
+        if (high >= 0 && Queries[high].Index == queryIndex)
+        {
+            return string.Equals(Queries[high].Name, name, StringComparison.Ordinal) ? Queries[high] : null;
+        }
+
+        while (low <= high)
+        {
+            var middle = low + ((high - low) / 2);
+            var models = Queries[middle];
+            if (models.Index == queryIndex)
+            {
+                return string.Equals(models.Name, name, StringComparison.Ordinal) ? models : null;
+            }
+
+            if (models.Index < queryIndex)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle - 1;
+            }
+        }
+
+        return null;
+    }
+}
