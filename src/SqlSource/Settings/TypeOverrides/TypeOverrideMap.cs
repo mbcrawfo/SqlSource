@@ -19,7 +19,8 @@ namespace SqlSource.Settings.TypeOverrides;
 internal static class TypeOverrideMap
 {
     // The order of the map and the key of an entry, for SortedKeyedList.  Static, so that no call allocates them.
-    private static readonly Comparison<string> KeyOrder = static (a, b) => Order(new KeyParts(a), new KeyParts(b));
+    private static readonly Comparison<string> KeyOrder = static (a, b) =>
+        SortedKeyedList.Order(a, b, default(KeyComparison));
 
     private static readonly Func<TypeOverride, string> KeyOf = static entry => entry.Key;
 
@@ -99,13 +100,6 @@ internal static class TypeOverrideMap
     private static bool PartMatches(ReadOnlySpan<char> entryPart, ReadOnlySpan<char> part) =>
         !TypeKeyText.IsQuoted(entryPart) || TypeKeyText.TextOf(entryPart).SequenceEqual(TypeKeyText.TextOf(part));
 
-    // The order of the map: ignoring case, then exactly to break a tie.
-    private static int Order(in KeyParts a, in KeyParts b)
-    {
-        var order = Compare(a, b, StringComparison.OrdinalIgnoreCase);
-        return order != 0 ? order : Compare(a, b, StringComparison.Ordinal);
-    }
-
     // Compares the keys as lists of their parts, [name] or [schema, name], lexicographically by the text of each part,
     // a shorter list first, and then a key that is not an array before one that is.  A key that is not well formed
     // does not reach the map, and would be compared as a whole.
@@ -116,21 +110,18 @@ internal static class TypeOverrideMap
             return string.Compare(a.Text, b.Text, comparison);
         }
 
-        var order = ComparePart(a.First, b.First, comparison);
+        var order = TypeKeyText.ComparePart(a.First, b.First, comparison);
         if (order == 0 && (a.Schema.IsEmpty || b.Schema.IsEmpty))
         {
             order = b.Schema.IsEmpty.CompareTo(a.Schema.IsEmpty);
         }
         else if (order == 0)
         {
-            order = ComparePart(a.Name, b.Name, comparison);
+            order = TypeKeyText.ComparePart(a.Name, b.Name, comparison);
         }
 
         return order != 0 ? order : a.IsArray.CompareTo(b.IsArray);
     }
-
-    private static int ComparePart(ReadOnlySpan<char> a, ReadOnlySpan<char> b, StringComparison comparison) =>
-        TypeKeyText.TextOf(a).CompareTo(TypeKeyText.TextOf(b), comparison);
 
     // The index of the first entry that is not less than key ignoring case.  Generic over the list, so that a map,
     // which is a struct, is searched without being boxed.  It is a search of its own because it is a lower bound over
@@ -169,6 +160,13 @@ internal static class TypeOverrideMap
         // stays, so the first in the order of the map wins.
         public bool IsBetterThan(Match other) =>
             other.Entry is null || Rank > other.Rank || (Rank == other.Rank && IsExact && !other.IsExact);
+    }
+
+    // The map's comparison of two keys, for SortedKeyedList.Order.  A struct, so that it is called directly.
+    private readonly struct KeyComparison : SortedKeyedList.IKeyComparison
+    {
+        public int CompareKeys(string first, string second, StringComparison comparison) =>
+            Compare(new KeyParts(first), new KeyParts(second), comparison);
     }
 
     // A key split once into its parts, as TypeKeyText.TrySplit gives them, so that a search splits the key it looks for

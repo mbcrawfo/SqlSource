@@ -124,6 +124,12 @@ internal static class TypeKeyText
     }
 
     /// <summary>
+    /// Compares the text of two parts, as <see cref="TextOf" /> gives it, under <paramref name="comparison" />.
+    /// </summary>
+    public static int ComparePart(ReadOnlySpan<char> a, ReadOnlySpan<char> b, StringComparison comparison) =>
+        TextOf(a).CompareTo(TextOf(b), comparison);
+
+    /// <summary>
     /// Writes <paramref name="text" /> as a part of a key: as it is when it is not empty and holds only letters,
     /// digits, <c>_</c> and <c>$</c>, none of them upper case, since a plain part is read in lower case; otherwise in
     /// double quotes with each <c>"</c> doubled, or in the escaped form when the quotes would not keep it.  A marker is

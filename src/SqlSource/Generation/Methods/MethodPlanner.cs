@@ -382,28 +382,8 @@ internal static class MethodPlanner
         ModelRole role
     )
     {
-        var probe = new ModelAssignment(key, path, queryIndex, role, string.Empty, default);
-        var (low, high) = (0, assignments.Count - 1);
-        while (low <= high)
-        {
-            var middle = low + ((high - low) / 2);
-            var order = ModelAssignment.Order.Compare(assignments[middle], probe);
-            if (order == 0)
-            {
-                return assignments[middle];
-            }
-
-            if (order < 0)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-
-        return null;
+        var at = ModelAssignment.IndexOf(assignments, key, path, queryIndex, role);
+        return at >= 0 ? assignments[at] : null;
     }
 
     // What takes the name of a method of the type, as SQLSRC274 says it, or null when nothing does.  Another method of

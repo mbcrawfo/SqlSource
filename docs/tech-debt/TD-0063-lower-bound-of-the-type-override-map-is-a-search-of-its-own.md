@@ -2,7 +2,7 @@
 
 ## Problem
 
-[`SortedSearch`](../../src/SqlSource/SortedSearch.cs) is the one exact binary search of the generator's sorted lists: `SqlPath.IndexOf` and `MappedTypeResolver.Find` search through it.  [`TypeOverrideMap`](../../src/SqlSource/Settings/TypeOverrides/TypeOverrideMap.cs) is the third search that was written out beside them, and it stays apart: its `LowerBound` finds the first entry that is not less than a key, which `SortedSearch` does not offer, over a `KeyParts`, a `ref struct` that holds spans of the key's text.  On netstandard2.0 a generic helper cannot take a `ref struct` as its key, for that needs `allows ref struct`.  So a change to how the map's entries are searched is made in `LowerBound` and not in `SortedSearch`.  The maintainability review of 2026-10-27 found that `SortedSearch` is not the one other search: seven more are written out by hand, which TD-0079 records with the rest of `src/`'s duplicated logic.
+[`SortedSearch`](../../src/SqlSource/SortedSearch.cs) is the one binary search of the generator's sorted lists, exact or a lower bound, and every other search goes through it, each giving it a probe of its own order.  [`TypeOverrideMap`](../../src/SqlSource/Settings/TypeOverrides/TypeOverrideMap.cs) is the one search written out beside it: its `LowerBound` finds the first entry that is not less than a key, as `SortedSearch.LowerBound` does, but its probe would hold a `KeyParts`, a `ref struct` that holds spans of the key's text.  On netstandard2.0 a struct cannot hold a `ref struct`, and a generic helper cannot take one, for that needs `allows ref struct`.  So a change to how the map's entries are searched is made in `LowerBound` and not in `SortedSearch`.
 
 ## Why it exists
 
@@ -14,7 +14,7 @@ Low.  `TypeOverrideMapTests` pins the map's order and matches.  The cost is one 
 
 ## Proposed fix
 
-Give `SortedSearch` a lower-bound entry, and search the map through it, once either of these holds: the generator can use `allows ref struct` (a newer target), or `KeyParts` holds offsets into the key's text instead of spans, so that it is an ordinary struct a generic helper can take.
+Search the map through `SortedSearch.LowerBound`, with a probe of its own, once either of these holds: the generator can use `allows ref struct` (a newer target), or `KeyParts` holds offsets into the key's text instead of spans, so that it is an ordinary struct a probe can hold.
 
 ## Trigger
 

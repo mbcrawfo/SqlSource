@@ -73,6 +73,33 @@ public sealed class ColumnTypeMapTests
         ColumnTypeMap.Find(map, "public", "users", "id")!.Type.ShouldBe("UserId");
     }
 
+    // Ignoring case, Z (0x5A) sorts before _ (0x5F), and ordinally z (0x7A) after it: the search for _t must start
+    // at zz.x, in the order of the map.
+    [Fact]
+    public void Find_TableThatSortsAfterALetterOnlyIgnoringCase_IsFound()
+    {
+        var map = ColumnTypeMap
+            .Over(TestSidecars.Of(Entry("zz.x", "Z", Far)), TestSidecars.Of(Entry("_t.x", "T", Far)))!
+            .Value;
+
+        ColumnTypeMap.Find(map, null, "_t", "x")!.Type.ShouldBe("T");
+    }
+
+    // The header's key in capitals sorts before the settings file's, so the search must start at the first of the
+    // keys equal ignoring case.
+    [Fact]
+    public void Find_HigherPlaceKeyInAnotherCase_Wins()
+    {
+        var map = ColumnTypeMap
+            .Over(
+                TestSidecars.Of(Entry("Users.id", "Header", SettingPlace.FileHeader)),
+                TestSidecars.Of(Entry("users.id", "File", Far))
+            )!
+            .Value;
+
+        ColumnTypeMap.Find(map, null, "users", "id")!.Type.ShouldBe("Header");
+    }
+
     [Fact]
     public void Find_QuotedPart_ComparesExactly()
     {
