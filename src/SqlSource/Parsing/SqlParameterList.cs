@@ -15,9 +15,11 @@ namespace SqlSource.Parsing;
 /// <c>-- param:</c> marker declares and the static SQL does not hold, in marker order.  Static means outside every
 /// token: a parameter inside <c>{{name:default}}</c> is part of a sample.  Names compare ignoring case.  A name that
 /// the SQL declares as a local variable is not a parameter at any place: <see cref="SqlDeclaredVariables" />.  The
-/// list keeps the spelling of a name that the SQL writes first.  In SQL Server, where an instance may compare names
-/// by case, each further spelling of a name that the SQL or a token's default writes is a warning, once for each
-/// spelling in a query, at its first place in the file; a marker's spelling is not.
+/// list keeps the spelling of a name that the SQL writes first outside tokens; a parameter that only a marker brings
+/// keeps the marker's spelling, and the spellings in token defaults are compared against it.  In SQL Server, where a
+/// server may compare names by case, each further spelling of a name that the SQL or a token's default writes is a
+/// warning, once for each spelling in a query, at its first place in the file; a marker's spelling is never itself
+/// warned of.
 /// </remarks>
 internal static class SqlParameterList
 {

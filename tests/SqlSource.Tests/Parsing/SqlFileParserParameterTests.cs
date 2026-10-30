@@ -479,6 +479,26 @@ public sealed class SqlFileParserParameterTests
             ]);
     }
 
+    // A parameter that only the marker brings keeps the marker's spelling, and the defaults' spellings are compared
+    // against it.
+    [Theory]
+    [InlineData("-- name: Q\n-- param: @Id int\nSELECT 1 {{f:AND b = @id}}\n")]
+    [InlineData("-- name: Q\n-- param: @Id int\n-- token: {{f:AND b = @id}}\nSELECT 1 {{f}}\n")]
+    public void Parse_ParameterOnlyAMarkerBrings_KeepsTheMarkersSpelling(string text)
+    {
+        Warnings(text, SqlDialect.SqlServer)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ParameterInTwoSpellings,
+                    TextSpans.Of(text, "@id"),
+                    "@id",
+                    "@Id"
+                ),
+            ]);
+        Parameters(Blocks(text, dialect: SqlDialect.SqlServer).ShouldHaveSingleItem())
+            .ShouldBe(["Id:int:<unsaid>:declared"]);
+    }
+
     // The marker names the parameter by its own spelling, and the list keeps the SQL's.
     [Fact]
     public void Parse_ParamMarkerInAnotherSpelling_IsNotWarned()
@@ -493,6 +513,10 @@ public sealed class SqlFileParserParameterTests
     [Theory]
     [InlineData("-- name: Q\nSELECT @Id, @id\n", "postgres")]
     [InlineData("-- name: Q\nSELECT @Id, @id\n", "ansi")]
+    [InlineData("-- name: Q\nSELECT @Id {{f:@id}}\n", "postgres")]
+    [InlineData("-- name: Q\nSELECT @Id {{f:@id}}\n", "ansi")]
+    [InlineData("-- name: Q\n-- token: {{f:@id}}\nSELECT @Id {{f}}\n", "postgres")]
+    [InlineData("-- name: Q\n-- token: {{f:@id}}\nSELECT @Id {{f}}\n", "ansi")]
     [InlineData("-- name: Q\nDECLARE @n int = 1; SELECT @N\n", "mssql")]
     [InlineData("-- name: Q\nSELECT @Id, '@id' -- @id\n", "mssql")]
     [InlineData("-- name: Q\n-- generator: keep-comments\nSELECT @Id, '@id' -- @id\n", "mssql")]
@@ -526,14 +550,39 @@ public sealed class SqlFileParserParameterTests
             ]);
     }
 
-    [Fact]
-    public void Parse_FileWithAnErrorAndASecondSpelling_HasNoWarnings()
+    // The first row is an error of the lexer, which stops the parse before the parser runs; the second is the
+    // parser's own, found after the query holding the spelling has been read.
+    [Theory]
+    [InlineData("-- name: Q\nSELECT @Id, @id\n-- name: R\nSELECT 'open\n")]
+    [InlineData("-- name: Q\nSELECT @Id, @id\n-- name: Q\nSELECT 1\n")]
+    public void Parse_FileWithAnErrorAndASecondSpelling_HasNoWarnings(string text)
     {
-        const string Text = "-- name: Q\nSELECT @Id, @id\n-- name: R\nSELECT 'open\n";
-
-        var result = SqlFileParser.Parse(Text, "Query.sql", SqlDialect.SqlServer);
+        var result = SqlFileParser.Parse(text, "Query.sql", SqlDialect.SqlServer);
 
         result.Errors.ShouldNotBeEmpty();
         result.Warnings.ShouldBeEmpty();
+    }
+
+    // The two are found in the order of the places in the SQL and the defaults, which is not the file's.
+    [Fact]
+    public void Parse_ExtraSpellingsFoundOutOfOrder_AreWarnedInFileOrder()
+    {
+        const string Text = "-- name: Q\nSELECT @Id {{f:@ID}}, @id\n";
+
+        Warnings(Text, SqlDialect.SqlServer)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ParameterInTwoSpellings,
+                    TextSpans.Of(Text, "@ID"),
+                    "@ID",
+                    "@Id"
+                ),
+                SqlParseError.Create(
+                    SqlParseErrorKind.ParameterInTwoSpellings,
+                    TextSpans.Of(Text, "@id"),
+                    "@id",
+                    "@Id"
+                ),
+            ]);
     }
 }

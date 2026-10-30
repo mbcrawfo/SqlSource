@@ -207,7 +207,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 |----|----|
 | [SQLSRC284](#sqlsrc284) | Short name finds a type that only a package brings |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 120 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides` or `columnTypes`, is the build's alone.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides` or `columnTypes`, is the build's alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
@@ -951,7 +951,7 @@ See: [Defaults](parameters-and-tokens.md#token-defaults)
 
 **Parameter is written in two spellings**
 
-A query in the `mssql` dialect writes one parameter in two spellings that differ only in case: `@Id`, and then `@id`.  SqlSource reads the two as one parameter, and binds it under the spelling it is first written in.  A SQL Server whose collation is case-sensitive reads the other spelling as another variable, which the query does not declare, and fails the query when it runs.  A server whose collation ignores case, which is the usual one, runs the query as written.  The warning is at the place of the other spelling, and names both.  Each further spelling of a parameter is warned of once in a query, at its first place.
+A query in the `mssql` dialect writes one parameter in two spellings that differ only in case: `@Id`, and then `@id`.  SqlSource reads the two as one parameter, and binds it under the spelling it is first written in.  A SQL Server whose server collation is case-sensitive reads the other spelling as another variable, which the query does not declare, and fails the query when it runs.  A server whose collation ignores case, which is the usual one, runs the query as written.  The collation that counts is the server's, which `SELECT SERVERPROPERTY('Collation')` shows; the collation of the database does not change how the query's variables are read.  The warning is at the place of the other spelling, and names both.  Each further spelling of a parameter is warned of once in a query, at its first place.  A parameter that only a token's default writes, and that a `-- param:` marker declares, is bound as the marker spells it, and the spellings in the defaults are compared against that.
 
 ```sql error
 -- name: GetUser
@@ -959,12 +959,12 @@ SELECT name FROM dbo.users WHERE id = @Id OR parent_id = @id;
 ```
 
 ```console
-/work/App/Queries/Users.sql(2,58): warning SQLSRC121: The parameter '@Id' is also written '@id'.  SqlSource binds it as '@Id', and a SQL Server whose collation is case-sensitive reads '@id' as another variable, which the query does not declare.  Write it '@Id' throughout the query.
+/work/App/Queries/Users.sql(2,58): warning SQLSRC121: The parameter '@Id' is also written '@id'.  SqlSource binds it as '@Id', and a SQL Server whose server collation is case-sensitive reads '@id' as another variable, which the query does not declare.  Write it '@Id' throughout the query.
 ```
 
 Write the parameter in one spelling throughout the query.  A parameter written in the default of a token is checked as the rest of the query is.
 
-This is a warning, since a query runs as written on a server whose collation ignores case, and a project that uses only such servers may want no warning.  A project can list it in `NoWarn` to turn it off, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`:
+This is a warning, since a query runs as written when the server collation ignores case, and a project that uses only such servers may want no warning.  A project can list it in `NoWarn` to turn it off, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`:
 
 ```xml
 <PropertyGroup>

@@ -109,8 +109,8 @@ public sealed class SqlDiagnosticsTests
         Format(SqlDiagnostics.ParameterInTwoSpellings, "@id", "@Id")
             .ShouldBe(
                 "The parameter '@Id' is also written '@id'.  SqlSource binds it as '@Id', and a SQL Server whose "
-                    + "collation is case-sensitive reads '@id' as another variable, which the query does not declare.  "
-                    + "Write it '@Id' throughout the query."
+                    + "server collation is case-sensitive reads '@id' as another variable, which the query does not "
+                    + "declare.  Write it '@Id' throughout the query."
             );
 
     [Fact]

@@ -129,8 +129,8 @@ public sealed class FileDiagnosticsTests
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC121 {GeneratorHarness.UsersPath}(3,36)-(3,39): The parameter '@Id' is also written '@id'.  "
-                + "SqlSource binds it as '@Id', and a SQL Server whose collation is case-sensitive reads '@id' as "
-                + "another variable, which the query does not declare.  Write it '@Id' throughout the query.",
+                + "SqlSource binds it as '@Id', and a SQL Server whose server collation is case-sensitive reads '@id' "
+                + "as another variable, which the query does not declare.  Write it '@Id' throughout the query.",
         ]);
         run.SeverityOf("SQLSRC121").ShouldBe(DiagnosticSeverity.Warning);
         run.Sources[GeneratorHarness.SampleFile]
