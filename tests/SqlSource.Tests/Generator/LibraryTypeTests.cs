@@ -671,6 +671,35 @@ public sealed class LibraryTypeTests
         QueryOf(run).Columns.ShouldNotBeNull().ShouldHaveSingleItem().Text.ShouldBe(Geometry);
     }
 
+    // Two types that claim one query at Models each defer the same failure, which is reported once, as typing reported
+    // it once.
+    [Fact]
+    public void Run_TwoModelsClaimsOfALibraryOnlyColumn_Report246Once()
+    {
+        const string TwoModels = """
+            using SqlSource;
+
+            namespace First
+            {
+                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                public partial class Rows;
+            }
+
+            namespace Second
+            {
+                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                public partial class Rows;
+            }
+            """;
+        var file = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
+
+        var run = MethodRuns.Run(file, [ShapesEntry(file)], TwoModels, WithNetTopologySuite);
+
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Diagnostics.ShouldBe([ShapeHasNoCSharpType]);
+        ModelFiles(run).ShouldBeEmpty();
+    }
+
     // One query claimed by a type at CodeGen and by another at Models: the first's model and method have Geometry,
     // and the second gets SQLSRC246, once, and no models.
     [Fact]

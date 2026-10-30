@@ -620,11 +620,15 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .WithTrackingName(TrackingNames.TypeModels);
 
         // The failure without its libraries of each query that a type claims at Models, which gets no models instead.
-        // Apart from the requests, so that the requests stay equal when a failure's text changes.
+        // Apart from the requests, so that the requests stay equal when a failure's text changes.  Every type's
+        // together, each once, as typing reported it: two types that claim one query at Models give the same failure.
         var libraryFailures = typeQueries
             .Combine(allFileModels)
             .Select(static (input, _) => TypeModels.LibraryFailuresOf(input.Left, input.Right))
-            .WithTrackingName(TrackingNames.LibraryFailures);
+            .WithTrackingName(TrackingNames.LibraryFailures)
+            .Collect()
+            .Select(static (failures, _) => MethodPlanner.Distinct(failures))
+            .WithTrackingName(TrackingNames.AllLibraryFailures);
 
         // Every type's requests together, by full name, since two types or two queries can ask for one model.
         var modelGroups = typeModels
@@ -710,7 +714,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalGeneratorInitializationContext context,
         FileNodes<SidecarCheckResult> sidecarChecks,
         FileNodes<FileTypes> fileTypes,
-        IncrementalValuesProvider<EquatableArray<DiagnosticInfo>> libraryFailures,
+        IncrementalValueProvider<EquatableArray<DiagnosticInfo>> libraryFailures,
         FileNodes<FileModels> fileModels,
         IncrementalValueProvider<ModelSet> models
     )
@@ -722,7 +726,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(fileTypes.EachFile, ReportTypes);
         context.RegisterSourceOutput(fileTypes.OfRepeatedPaths, ReportTypes);
 
-        // The failures of the types that the claims at Models defer, for each type that claims such a query.
+        // The failures of the types that the claims at Models defer, each once for the project.
         context.RegisterSourceOutput(libraryFailures, ReportAll);
 
         // Beside the types' output, so that a change to the models alone reports the types of no file again.
@@ -1235,7 +1239,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     private readonly record struct CollectedModels(
         FileNodes<FileModels> FileModels,
         IncrementalValueProvider<EquatableArray<FileModels>> AllFileModels,
-        IncrementalValuesProvider<EquatableArray<DiagnosticInfo>> LibraryFailures,
+        IncrementalValueProvider<EquatableArray<DiagnosticInfo>> LibraryFailures,
         IncrementalValueProvider<EquatableArray<string>> ModelNames,
         IncrementalValueProvider<ModelSet> Models
     );
