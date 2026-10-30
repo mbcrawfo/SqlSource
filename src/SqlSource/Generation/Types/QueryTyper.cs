@@ -10,6 +10,7 @@ using SqlSource.Generation.Types.MappedTypes;
 using SqlSource.Generation.Types.Maps;
 using SqlSource.Parsing;
 using SqlSource.Settings;
+using SqlSource.Settings.ClrTypes;
 using SqlSource.Settings.ColumnTypes;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
@@ -343,7 +344,7 @@ internal static class QueryTyper
                 typing.Location,
                 subject,
                 mapping.Key,
-                PostgresTypeMap.AsWritten(mapping.Written ?? ""),
+                ClrTypeName.AsWritten(mapping.Written ?? ""),
                 mapping.Detail ?? "",
                 package.ShortName,
                 package.FullName,
@@ -642,7 +643,7 @@ internal static class QueryTyper
         DiagnosticInfo.Create(
             descriptor,
             at,
-            [subject, failure.Key, PostgresTypeMap.AsWritten(failure.Text ?? ""), failure.Detail ?? "", .. more]
+            [subject, failure.Key, ClrTypeName.AsWritten(failure.Text ?? ""), failure.Detail ?? "", .. more]
         );
 
     // The lookup of the type override for the markers, of the file's engine's entries, and the merged column types,

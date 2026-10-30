@@ -190,4 +190,22 @@ public sealed class ClrTypeNameTests
     [InlineData("not a type System.")]
     public void KeywordTextOf_TextWithNothingToChange_IsTheSameString(string text) =>
         ReferenceEquals(ClrTypeName.KeywordTextOf(text), text).ShouldBeTrue();
+
+    // global:: goes before a name of several parts, and stays before one of one part, which would be a short name
+    // without it.
+    [Theory]
+    [InlineData("int", "int")]
+    [InlineData("global::System.Guid", "System.Guid")]
+    [InlineData("global::UserId", "global::UserId")]
+    [InlineData("UserId", "UserId")]
+    [InlineData(
+        "global::System.Collections.Generic.Dictionary<global::UserId, global::App.UserId>[]",
+        "System.Collections.Generic.Dictionary<global::UserId, App.UserId>[]"
+    )]
+    [InlineData(
+        "global::System.Collections.Generic.List<global::UserId>",
+        "System.Collections.Generic.List<global::UserId>"
+    )]
+    public void AsWritten_Text_LeavesOutGlobalBeforeANameOfSeveralParts(string text, string written) =>
+        ClrTypeName.AsWritten(text).ShouldBe(written);
 }
