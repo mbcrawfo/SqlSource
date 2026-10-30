@@ -27,7 +27,7 @@ Each grew where the feature that needed it was written, one phase at a time, and
 
 ## Impact
 
-Low each, Medium together: a change to a rule that is written twice is made once and passes its tests, and the copies drift.
+Low.  A key added to the sidecar without a `case` of its own is read as the last key of its array, and nothing catches it (item 6); two long files are harder to change safely (items 12 and 13); and a dead member and dictionaries that nothing stops a later change from writing invite mistakes (items 14 and 15).
 
 ## Proposed fix
 
@@ -52,4 +52,4 @@ One item at a time, each in its own pull request, with no change to what is gene
 
 ## Trigger
 
-A change to any of the rules above: make it once, in the shared place, instead of in each copy.  Otherwise the next maintainability review.
+A new key of the sidecar, a change to `MappedTypeResolver`, `QueryMethodWriter`, `SelectStatement` or `TypeKeyNames`, or the next maintainability review.
