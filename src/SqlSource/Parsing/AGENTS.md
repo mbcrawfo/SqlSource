@@ -21,6 +21,6 @@ See [parsing](../../../docs/architecture/generator.md#parsing).
 - **The hash has one definition, `SqlQueryHash`, and is not computed during a parse.**  A change to it, to what `SqlTextBuilder` gives for stripped SQL, to how `Parsing/Tokens/TokenScanner.cs` splits segments, to the defaults `Parsing/Tokens/SqlTokenList.cs` gives or to the order of `SqlParameterList`, makes every stored hash stale.
 - **Never build the kept form of a query's SQL for every query**: it doubles what a parse allocates.  The tokens, the parameters and the hash come from `Segments`, the SQL without comments.  See [the two forms](../../../docs/architecture/generator.md#a-block-has-two-forms-of-its-sql).
 - **The dialect is not a generator parameter.**  `SqlGeneratorParameterScope` holds what `-- generator:` lines give.  A setting with a value of its own is a marker, and a key of a settings file beside it.
-- **A result with errors has no blocks.**  The generator must never emit from a partly valid file.
+- **A result with errors has no blocks.**  The generator must never emit from a partly valid file.  A warning, in `SqlFileParseResult.Warnings`, never stops a block, and the list is empty when there are errors.
 
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.

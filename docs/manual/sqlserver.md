@@ -325,8 +325,6 @@ Each parameter is sent as the SQL Server type it was described with, with that t
   }
   ```
 
-- **A query that writes one parameter in two spellings, `@Id` and `@id`, fails on a server whose collation is case-sensitive.**  SqlSource reads the two as [one parameter](parameters-and-tokens.md#query-parameters) and sends the first spelling, but such a server reads them as two variables, so the method throws `SqlException` 137, "Must declare the scalar variable", when it runs, and the describe reports nothing first unless the second spelling is in the select list.  Write each parameter in one spelling throughout a query.
-
 - **A `rowcount` method returns `-1` once `SET NOCOUNT ON` has run on the connection's session.**  See [the generator's known issues](generator.md#known-issues).
 
 - **A query method fails on a connection that wraps a `SqlConnection` and creates parameters of its own.**  Give the method the `SqlConnection` inside: see [the generator's known issues](generator.md#known-issues).

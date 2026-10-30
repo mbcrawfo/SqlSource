@@ -116,7 +116,7 @@ internal static class GeneratorHarness
         var parseOptions = ParseOptions.WithLanguageVersion(languageVersion);
         var compilation = CreateCompilation(sources, supportedFramework, parseOptions, references);
 
-        // What a project sets for a diagnostic, as "dotnet_diagnostic.{id}.severity" in an .editorconfig does.  The
+        // What a project sets for a diagnostic, as `NoWarn` or a `.globalconfig` does.  The
         // driver filters the generator's diagnostics by it, as the compiler does.
         if (diagnosticOptions is not null)
         {
