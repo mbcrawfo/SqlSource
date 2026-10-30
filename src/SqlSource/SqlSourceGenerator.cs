@@ -70,6 +70,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             typing.NpgsqlProbe,
             typing.SqlClientProbe,
             typing.LibraryProbe,
+            typing.TypingLibraryProbe,
             converters
         );
     }
@@ -816,13 +817,16 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<NpgsqlProbe> npgsqlProbe,
         IncrementalValueProvider<SqlClientProbe> sqlClientProbe,
         IncrementalValueProvider<LibraryProbe> libraryProbe,
+        IncrementalValueProvider<LibraryProbe> typingLibraryProbe,
         IncrementalValueProvider<ConverterSet> converters
     )
     {
-        // Whether each engine's driver allows its methods, which is the same value until a reference changes.
+        // Whether each engine's driver allows its methods, and whether SQL Server's spatial read path can be taken,
+        // from the probe of the libraries without their versions: the same value until a reference changes.
         var drivers = npgsqlProbe
             .Combine(sqlClientProbe)
-            .Select(static (input, _) => MethodDrivers.Of(input.Left, input.Right))
+            .Combine(typingLibraryProbe)
+            .Select(static (input, _) => MethodDrivers.Of(input.Left.Left, input.Left.Right, input.Right))
             .WithTrackingName(TrackingNames.MethodDrivers);
 
         var assignments = models.Select(static (set, _) => set.Assignments);

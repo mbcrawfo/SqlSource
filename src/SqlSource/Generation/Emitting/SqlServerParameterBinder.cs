@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
+using SqlSource.Generation.Converters;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Types.Maps;
 using SqlSource.Snapshot;
@@ -24,6 +25,7 @@ internal sealed class SqlServerParameterBinder : ParameterBinder
     private const string SqlParameterType = "global::Microsoft.Data.SqlClient.SqlParameter";
     private const string SqlDbTypeText = "global::System.Data.SqlDbType.";
     private const string DbNull = "global::System.DBNull.Value";
+    private const string SqlBytesNull = NetTopologySuiteConversions.SqlBytes + ".Null";
     private const string VectorNullStart = QueryMethodWriter.VectorType + ".CreateNull(";
 
     // Each base name's binding, matched ignoring case, as the server matches a type's name.
@@ -77,7 +79,8 @@ internal sealed class SqlServerParameterBinder : ParameterBinder
         }
         else
         {
-            AppendValueOrNull(context, bound, DbNull);
+            // The spatial read path binds SqlBytes, whose null is SqlBytes.Null.
+            AppendValueOrNull(context, bound, bound.Write is { IsSpatial: true } ? SqlBytesNull : DbNull);
         }
 
         _ = builder.Append(";\n");

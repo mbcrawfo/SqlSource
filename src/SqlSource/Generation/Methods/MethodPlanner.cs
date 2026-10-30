@@ -222,7 +222,14 @@ internal static class MethodPlanner
         var isUsable = input.Drivers.Allows(engine);
         var reading = new Reading(
             isUsable,
-            new ConversionContext(engine, target, converters, query.NameLocation, problems)
+            new ConversionContext(
+                engine,
+                target,
+                converters,
+                query.NameLocation,
+                problems,
+                input.Drivers.SqlServerSpatial
+            )
         );
         var hasInput = TryReadInput(context, models, reading, out var methodInput);
         var hasOutput = TryReadOutput(context, models, reading, out var methodOutput);

@@ -13,14 +13,28 @@ namespace SqlSource.Generation.Methods;
 /// Whether the project references Npgsql 10 or later, which decides the target of a PostgreSQL query's converters,
 /// <see cref="Converters.ConverterTargets.Npgsql10" /> or <see cref="Converters.ConverterTargets.NpgsqlBefore10" />.
 /// </param>
-internal readonly record struct MethodDrivers(bool Postgres, bool SqlServer, bool PostgresAtLeast10)
+/// <param name="SqlServerSpatial">
+/// Whether the project references NetTopologySuite and NetTopologySuite.IO.SqlServerBytes, so that a SQL Server
+/// query's <c>geography</c> or <c>geometry</c> read as one of NetTopologySuite's geometries takes the spatial read
+/// path.
+/// </param>
+internal readonly record struct MethodDrivers(
+    bool Postgres,
+    bool SqlServer,
+    bool PostgresAtLeast10,
+    bool SqlServerSpatial = false
+)
 {
-    /// <summary>What the two probes say of the drivers.</summary>
-    public static MethodDrivers Of(NpgsqlProbe npgsql, SqlClientProbe sqlClient) =>
+    /// <summary>
+    /// What the two probes say of the drivers, and the probe of the libraries, read without its versions, of
+    /// NetTopologySuite's packages.
+    /// </summary>
+    public static MethodDrivers Of(NpgsqlProbe npgsql, SqlClientProbe sqlClient, LibraryProbe libraries) =>
         new(
             npgsql.Referenced && !npgsql.IsBelowTheFloor,
             sqlClient.Referenced && !sqlClient.IsBelowTheFloor,
-            npgsql.AtLeast10
+            npgsql.AtLeast10,
+            libraries.NetTopologySuite && libraries.SqlServerBytes
         );
 
     /// <summary>Whether the methods of the engine's queries can be generated.</summary>

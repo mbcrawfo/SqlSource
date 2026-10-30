@@ -26,6 +26,28 @@ public sealed class MethodDriversTests
     [InlineData(false, false)]
     public void Of_Npgsql10_SetsPostgresAtLeast10(bool atLeast10, bool expected) =>
         MethodDrivers
-            .Of(new NpgsqlProbe(true, true, atLeast10, null), new SqlClientProbe(false, false, false, null))
+            .Of(
+                new NpgsqlProbe(true, true, atLeast10, null),
+                new SqlClientProbe(false, false, false, null),
+                new LibraryProbe(false, false, null)
+            )
             .PostgresAtLeast10.ShouldBe(expected);
+
+    // SQL Server's spatial read path needs NetTopologySuite and its reader and writer of SQL Server's bytes.
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    public void Of_NetTopologySuiteAndSqlServerBytes_SetsSqlServerSpatial(
+        bool netTopologySuite,
+        bool sqlServerBytes,
+        bool expected
+    ) =>
+        MethodDrivers
+            .Of(
+                new NpgsqlProbe(false, false, false, null),
+                new SqlClientProbe(true, true, false, null),
+                new LibraryProbe(false, false, null, NetTopologySuite: netTopologySuite, SqlServerBytes: sqlServerBytes)
+            )
+            .SqlServerSpatial.ShouldBe(expected);
 }

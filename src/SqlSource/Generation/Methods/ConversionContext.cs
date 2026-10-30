@@ -18,10 +18,15 @@ namespace SqlSource.Generation.Methods;
 /// </param>
 /// <param name="At">The query's name.</param>
 /// <param name="Problems">The query's problems, which conversions add theirs to, at <paramref name="At" />.</param>
+/// <param name="SqlServerSpatial">
+/// Whether the project references NetTopologySuite and NetTopologySuite.IO.SqlServerBytes, which SQL Server's spatial
+/// read path needs.
+/// </param>
 internal readonly record struct ConversionContext(
     DatabaseEngine Engine,
     ConverterTargets Target,
     EquatableArray<Converter> Converters,
     LocationInfo At,
-    List<DiagnosticInfo> Problems
+    List<DiagnosticInfo> Problems,
+    bool SqlServerSpatial = false
 );
