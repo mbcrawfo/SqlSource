@@ -110,8 +110,8 @@ internal static class PostgresErrors
     public static DescribeFailure Open(PostgresServerError error, string database) =>
         (error.SqlState, error.Message) switch
         {
-            (null, PostgresConnection.MultiplexingRefused) => SessionNotKept(database, null, ServerLines(error, 0)),
-            (null, PostgresConnection.UnreadableTypes) => DescribeFailures.Open(
+            (null, ConnectionErrors.MultiplexingRefused) => SessionNotKept(database, null, ServerLines(error, 0)),
+            (null, ConnectionErrors.UnreadableTypes) => DescribeFailures.Open(
                 database,
                 ServerLines(error, 0),
                 UnreadableTypesHelp

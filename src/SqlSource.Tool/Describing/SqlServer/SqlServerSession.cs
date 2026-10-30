@@ -6,7 +6,10 @@ using System.Threading.Tasks;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Describing.SqlServer.Columns;
 using SqlSource.Tool.Describing.SqlServer.Proofs;
+using SqlSource.Tool.Describing.SqlServer.Statements;
+using SqlSource.Tool.Describing.SqlServer.Types;
 using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing.SqlServer;

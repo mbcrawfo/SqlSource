@@ -4,9 +4,10 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Columns;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.SqlServer;
+namespace SqlSource.Tool.Tests.Describing.SqlServer.Columns;
 
 // The six checks of the table match, in the format's order: the first that fails is the answer.  A table is the rows
 // the server gives for SELECT * from it, as the test writes them.

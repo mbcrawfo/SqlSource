@@ -1,4 +1,5 @@
 using Shouldly;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
 using Xunit;
 
@@ -32,6 +33,6 @@ public sealed class ConnectionErrorsTests
     [Fact]
     public void ServerLines_OwnError_IsTheTextAlone() =>
         SqlServerErrors
-            .ServerLines(ConnectionErrors.Own(ConnectionErrors.LostConnection))
+            .ServerLines(ConnectionErrors.Own(ConnectionTexts.LostConnection))
             .ShouldBe(["the connection to the server was lost"]);
 }

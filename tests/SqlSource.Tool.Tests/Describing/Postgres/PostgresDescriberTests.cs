@@ -239,7 +239,7 @@ public sealed class PostgresDescriberTests
 
         var failure = opened.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC224");
-        failure.ServerLines.ShouldBe([PostgresConnection.UnreadableConnectionString]);
+        failure.ServerLines.ShouldBe([ConnectionErrors.UnreadableConnectionString]);
         failure
             .Arguments.Concat(failure.ServerLines)
             .ShouldAllBe(text => !text.Contains(Secrets.Marker, StringComparison.Ordinal));

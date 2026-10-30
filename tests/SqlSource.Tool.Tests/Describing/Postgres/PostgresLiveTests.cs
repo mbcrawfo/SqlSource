@@ -1,7 +1,9 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
 
@@ -89,7 +91,9 @@ public sealed class PostgresLiveTests
 
     [Fact]
     public void RefusedTransaction_LostConnection_IsNull() =>
-        PostgresLive.RefusedTransaction(new NpgsqlException(PostgresConnection.LostConnection)).ShouldBeNull();
+        PostgresLive
+            .RefusedTransaction(new PostgresConnection.UnusableException(ConnectionTexts.LostConnection))
+            .ShouldBeNull();
 
     // An NpgsqlException the call throws, whatever its cause, is the answer's error, made by errorOf.  AnswerAsync has
     // no cancellation filter: it catches by the exception's type alone, and a cancellation that is no NpgsqlException
@@ -115,6 +119,65 @@ public sealed class PostgresLiveTests
             new PostgresDeallocateAnswer(new PostgresServerError("08006", "made by errorOf", null, null, null))
         );
     }
+
+    public static TheoryData<string> OwnTexts =>
+        [
+            ConnectionErrors.UnreadableConnectionString,
+            ConnectionTexts.LostConnection,
+            ConnectionErrors.MultiplexingRefused,
+            ConnectionErrors.UnreadableFile,
+            ConnectionErrors.UnusableFile,
+            ConnectionErrors.UnsupportedSettings,
+            ConnectionErrors.GssUnavailable,
+            ConnectionErrors.UnreadableTypes,
+        ];
+
+    // The describer's own error passes as it is, whatever errorOf would make of it: at "open" and at a later call.
+    [Theory]
+    [MemberData(nameof(OwnTexts))]
+    public async Task AnswerAsync_UnusableException_PassesItsTextUnchanged(string text)
+    {
+        var atOpen = await PostgresLive.AnswerAsync(
+            () => throw new PostgresConnection.UnusableException(text),
+            ConnectionErrors.AtOpen,
+            static error => new PostgresDeallocateAnswer(error)
+        );
+        var later = await PostgresLive.AnswerAsync(
+            () => throw new PostgresConnection.UnusableException(text),
+            ConnectionErrors.Of,
+            static error => new PostgresDeallocateAnswer(error)
+        );
+
+        atOpen.ShouldBe(new PostgresDeallocateAnswer(new PostgresServerError(null, text, null, null, null)));
+        later.ShouldBe(new PostgresDeallocateAnswer(new PostgresServerError(null, text, null, null, null)));
+    }
+
+    // The driver's error is the driver's even when its message is one of the describer's own texts.
+    [Fact]
+    public async Task AnswerAsync_DriverErrorWithAnOwnText_IsAnsweredAsTheDrivers()
+    {
+        var atOpen = await PostgresLive.AnswerAsync(
+            () => throw new NpgsqlException(ConnectionErrors.MultiplexingRefused),
+            ConnectionErrors.AtOpen,
+            static error => new PostgresDeallocateAnswer(error)
+        );
+        var later = await PostgresLive.AnswerAsync(
+            () => throw new NpgsqlException(ConnectionErrors.MultiplexingRefused),
+            ConnectionErrors.Of,
+            static error => new PostgresDeallocateAnswer(error)
+        );
+
+        atOpen.Error!.Message.ShouldBe("Npgsql could not open a connection to the server (NpgsqlException)");
+        later.Error!.Message.ShouldBe(ConnectionTexts.LostConnection);
+    }
+
+    // The exception keeps no inner exception, whose text may quote the value or a path.
+    [Fact]
+    public void UnusableException_InnerException_IsDropped() =>
+        new PostgresConnection.UnusableException(
+            ConnectionErrors.UnreadableFile,
+            new IOException("/secret/path")
+        ).InnerException.ShouldBeNull();
 
     [Fact]
     public async Task AnswerAsync_CallThatIsCancelled_Throws() =>

@@ -3,9 +3,10 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Describing.SqlServer.Columns;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.SqlServer;
+namespace SqlSource.Tool.Tests.Describing.SqlServer.Columns;
 
 // The columns of a query from the rows of sys.dm_exec_describe_first_result_set in browse mode 2, as the test writes
 // them: the server's answer as given, with the hidden rows dropped and an origin only in the session's database.

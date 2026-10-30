@@ -1,7 +1,7 @@
 using System;
 using SqlSource.Snapshot;
 
-namespace SqlSource.Tool.Describing.SqlServer;
+namespace SqlSource.Tool.Describing.SqlServer.Types;
 
 /// <summary>
 /// The sidecar's record of a type, from a row of <c>sp_describe_undeclared_parameters</c> or of
