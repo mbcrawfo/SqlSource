@@ -139,3 +139,31 @@ CREATE TABLE all_types (
     email_value email,
     status_value account_status
 );
+
+-- One nullable column for each type that NodaTime's rows map, and an array of each of those that is not a multirange,
+-- named for its type.  The queries of NodaTime/Queries/NodaTime.sql write and read every column through
+-- Npgsql.NodaTime, with NodaTime's types; all_types keeps the base map's.
+CREATE TABLE noda_values (
+    id integer PRIMARY KEY,
+    timestamptz_value timestamptz,
+    timestamp_value timestamp,
+    date_value date,
+    time_value time,
+    timetz_value timetz,
+    interval_value interval,
+    tstzrange_value tstzrange,
+    tsrange_value tsrange,
+    daterange_value daterange,
+    tstzmultirange_value tstzmultirange,
+    tsmultirange_value tsmultirange,
+    datemultirange_value datemultirange,
+    timestamptz_array_value timestamptz[],
+    timestamp_array_value timestamp[],
+    date_array_value date[],
+    time_array_value time[],
+    timetz_array_value timetz[],
+    interval_array_value interval[],
+    tstzrange_array_value tstzrange[],
+    tsrange_array_value tsrange[],
+    daterange_array_value daterange[]
+);

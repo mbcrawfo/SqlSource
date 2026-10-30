@@ -26,6 +26,16 @@ internal static class EndToEndSources
         return builder.Build();
     }
 
+    // "app" as App sets it up, with Npgsql.NodaTime's plugin, which reads and writes the NodaTime types of the queries
+    // of NodaTime/, whose folder leaves the library on: a data source the application builds for those methods.
+    public static NpgsqlDataSource AppWithNodaTime(PostgresDatabases postgres)
+    {
+        var builder = new NpgsqlDataSourceBuilder(postgres.ConnectionStringOf(PostgresDatabases.AppDatabase));
+        _ = builder.MapEnum<NoteKind>();
+        _ = builder.UseNodaTime();
+        return builder.Build();
+    }
+
     public static NpgsqlDataSource Billing(PostgresDatabases postgres) =>
         NpgsqlDataSource.Create(postgres.ConnectionStringOf(PostgresDatabases.BillingDatabase));
 

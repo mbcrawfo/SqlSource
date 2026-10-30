@@ -7,8 +7,9 @@ using Xunit;
 namespace SqlSource.Tests.TestHarness;
 
 // What the tests of the end-to-end projects read of a model by reflection: its properties in the order they are
-// declared, with their types and whether each can hold null, its shape and the column of a property.  The models here
-// are types of this class, so no generator or server is needed.
+// declared, with their types and whether each can hold null, its shape, the column of a property, and whether a row
+// holds the values of the input model that wrote it.  The models here are types of this class, so no generator or
+// server is needed.
 public sealed class ModelReflectionTests
 {
     [Fact]
@@ -101,6 +102,31 @@ public sealed class ModelReflectionTests
                 ("Note", typeof(string), false)
             )
         );
+
+    [Fact]
+    public void ShouldHoldTheValuesOf_SameValuesAndEqualArrays_Passes() =>
+        ModelReflection.ShouldHoldTheValuesOf(new Written(1, [1, 2], null), new Written(1, [1, 2], null));
+
+    [Fact]
+    public void ShouldHoldTheValuesOf_OtherValue_Fails() =>
+        _ = Should.Throw<ShouldAssertException>(() =>
+            ModelReflection.ShouldHoldTheValuesOf(new Written(1, [1, 2], "a"), new Written(1, [1, 2], null))
+        );
+
+    [Fact]
+    public void ShouldHoldTheValuesOf_OtherArrayElement_Fails() =>
+        _ = Should.Throw<ShouldAssertException>(() =>
+            ModelReflection.ShouldHoldTheValuesOf(new Written(1, [1, 3], null), new Written(1, [1, 2], null))
+        );
+
+    [Fact]
+    public void ShouldHoldTheValuesOf_OtherProperties_Fails() =>
+        _ = Should.Throw<ShouldAssertException>(() =>
+            ModelReflection.ShouldHoldTheValuesOf(new Shapes.SealedRecordModel(1, null), new Written(1, null, null))
+        );
+
+    // A model of a row and of the input model that wrote it alike: a value, an array and a reference that can be null.
+    private sealed record Written(int Id, int[]? Values, string? Note);
 
     // The types below are read by reflection alone.
     [SuppressMessage(

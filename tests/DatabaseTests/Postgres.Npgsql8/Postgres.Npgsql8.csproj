@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
         The end-to-end write and read of all_types on Npgsql 8.0.9, the latest 8.0 release; 8.0 is the oldest version
-        that is supported: through the generated methods, and the read through Dapper; and the streaming method.  A
-        project of its own, since the end-to-end project gets Npgsql 10 through the tool it references.
+        that is supported: through the generated methods, and the read through Dapper; the streaming method; and the
+        write and read of noda_values through the methods and Npgsql.NodaTime 8.  A project of its own, since the
+        end-to-end project gets Npgsql 10 through the tool it references.
         The generator comes from a project reference, which does not bring the package's MSBuild files, so the real
         ones are imported here and at the end of this file.
     -->
@@ -30,6 +31,14 @@
             Include="../Postgres/EndToEnd/Queries/Streaming.sql.json"
             Link="Queries/%(Filename)%(Extension)"
         />
+        <AdditionalFiles
+            Include="../Postgres/EndToEnd/NodaTime/Queries/NodaTime.sql"
+            Link="NodaTime/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../Postgres/EndToEnd/NodaTime/Queries/NodaTime.sql.json"
+            Link="NodaTime/Queries/%(Filename)%(Extension)"
+        />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Dapper" />
@@ -37,6 +46,12 @@
         <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
         <!-- The latest 8.0 release, the floor's driver: the end-to-end project gets 10 from the tool it references. -->
         <PackageReference Include="Npgsql" VersionOverride="8.0.9" />
+        <!--
+            The plugin that pairs with the driver, and NodaTime at 3.1.9, the floor that it needs: central transitive
+            pinning would otherwise raise NodaTime to the end-to-end project's version.
+        -->
+        <PackageReference Include="NodaTime" VersionOverride="3.1.9" />
+        <PackageReference Include="Npgsql.NodaTime" VersionOverride="8.0.9" />
         <PackageReference Include="Shouldly" />
         <PackageReference Include="xunit.v3" />
     </ItemGroup>

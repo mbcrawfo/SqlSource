@@ -72,6 +72,28 @@ internal static class ModelReflection
         TypedPropertiesOf(model).ShouldBe(properties);
     }
 
+    // Fails unless the row and the input model that wrote it have the same properties, and each property of the row the
+    // value of the input model's of the same name: an array element by element, any other value by its Equals.
+    public static void ShouldHoldTheValuesOf(object row, object arguments)
+    {
+        var written = PropertiesOf(arguments.GetType()).ToDictionary(static property => property.Name);
+        var read = PropertiesOf(row.GetType());
+        read.Select(static property => property.Name).ShouldBe(written.Keys, ignoreOrder: true);
+        foreach (var property in read)
+        {
+            var value = property.GetValue(row);
+            var expected = written[property.Name].GetValue(arguments);
+            if (value is Array array && expected is Array expectedArray)
+            {
+                array.Cast<object?>().ShouldBe(expectedArray.Cast<object?>(), property.Name);
+            }
+            else
+            {
+                value.ShouldBe(expected, property.Name);
+            }
+        }
+    }
+
     // The column of a property of a model of a table: Int4ArrayValue is int4_array_value.
     public static string ColumnOf(string property) =>
         string.Concat(
