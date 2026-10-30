@@ -220,4 +220,4 @@ The floors of NodaTime and NetTopologySuite are the plugins' minimums, so NuGet 
 - The probes are in `src/SqlSource/Generation/Types/Drivers/`, and the converters in `src/SqlSource/Generation/Converters/`.
 - Microsoft.Data.SqlClient 6.1.8 is published; the floor project pins 6.1.7, which this spike ran.
 
-**Found outside phase 7**: a `-- param:` marker cannot name a type whose modifier is not digits, such as `geometry(Point,4326)` (question 4).  It is the marker grammar's, and it has gone to the owner as a question.
+**Found outside phase 7**: a `-- param:` marker cannot name a type whose modifier is not digits, such as `geometry(Point,4326)` (question 4).  It is the marker grammar's.  The owner chose to record it as tech debt, [TD-0093](../../tech-debt/TD-0093-a-param-marker-takes-a-modifier-of-numbers-alone.md), with a known issue in the manual, and to leave the grammar as it is.

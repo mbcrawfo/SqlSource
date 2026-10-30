@@ -1579,7 +1579,7 @@ See: [Parameters](postgresql.md#parameters)
 
 A `-- param:` marker gives a parameter a type, and the tool asks the server to resolve that type and to check it against every use of the parameter.  This type cannot be used, for the reason the message ends with:
 
-- `it is not written as a type name`: the text is not a type name as a column definition writes one, with at most one modifier in parentheses and `[]`.  The server can give the same reason for a type it cannot use, such as `numeric(2,-3)` on PostgreSQL 14, which has no negative scale; the `server:` line then says what the server made of the type.
+- `it is not written as a type name`: the text is not a type name as a column definition writes one, with at most one modifier in parentheses and `[]`.  On PostgreSQL the modifier holds numbers alone, so a modifier of words, as in PostGIS's `geometry(Point,4326)`, is refused: write the type without it, which gives a parameter the same type.  The server can give the same reason for a type it cannot use, such as `numeric(2,-3)` on PostgreSQL 14, which has no negative scale; the `server:` line then says what the server made of the type.
 - `the database has no such type`: the server knows no type of that name on the session's search path.
 - `it is a pseudo-type`: the server knows the name, and no value has that type, `record` and `anyelement` for two, or it is an array of such a type, `cstring[]`.
 

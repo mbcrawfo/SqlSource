@@ -197,4 +197,5 @@ With validation off the method checks nothing.  An empty argument leaves nothing
 ## Known issues
 
 - **Under `mssql`, a parameter can be taken for a declared variable.**  After a `DECLARE` with no `;`, a statement that starts with a word SqlSource does not know to start a statement, such as `SEND` or a label, does not end the list.  A parameter after a comma in it, outside parentheses, is then taken for a variable and left out of the parameter list.  End the `DECLARE` with a `;`, or declare the parameter with its type: `-- param: @id int`.
+- **On PostgreSQL, a `-- param:` type whose modifier holds words is refused.**  A type written as a column definition writes PostGIS's, `geometry(Point,4326)`, is [SQLSRC228](diagnostics.md#sqlsrc228), `it is not written as a type name`.  Write the type without its modifier, `-- param: @shape geometry`: PostgreSQL gives a parameter no modifier, so its type is the same.
 - **A user variable of MySQL or MariaDB, and a parameter of a procedure that the SQL creates, are listed as parameters.**  See [names that are read as parameters](#names-read-as-parameters).
