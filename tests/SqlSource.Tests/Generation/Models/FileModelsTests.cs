@@ -3,6 +3,7 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Models;
+using SqlSource.Settings.Libraries;
 using SqlSource.Testing.Snapshot;
 using Xunit;
 
@@ -60,5 +61,18 @@ public sealed class FileModelsTests
     }
 
     private static QueryModels Models(string name, int index) =>
-        new(name, index, TestModels.NameLocation("Users.sql"), null, null, null, null, null, null, null, null);
+        new(
+            name,
+            index,
+            TestModels.NameLocation("Users.sql"),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            EquatableArray<LibrarySetting>.Empty
+        );
 }

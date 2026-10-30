@@ -962,6 +962,21 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the library, as "NodaTime", {1} the database of the queries it reaches, PostgreSQL or SQL Server, and {2}
+    // the assemblies the project does not reference, which that database needs for it.  Reported at the place that
+    // says on, a settings file's member or a marker, once for each place and database.
+    public static readonly DiagnosticDescriptor LibraryNotReferenced = new(
+        id: "SQLSRC281",
+        title: "A library that is on is not referenced",
+        messageFormat: "{0} is on for the {1} query methods it reaches here, but the project does not reference {2}.  "
+            + "Reference {2}, or turn {0} off for these queries.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc281",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     // {0} to {3} as SQLSRC250's, {4} the short name as written, without its type arguments, {5} the full name of the
     // type it finds, as a user writes it, and {6} the name of the type's assembly, which only a package that the
     // project does not reference itself brings.  Reported at the query's name, for each column and parameter.
@@ -1062,6 +1077,7 @@ internal static class SqlDiagnostics
             DuplicateConverter,
             ConverterTypeMismatch,
             ConverterDirectionMissing,
+            LibraryNotReferenced,
             ShortNameFindsAPackagesType
         );
 

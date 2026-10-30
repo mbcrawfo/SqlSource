@@ -1,4 +1,5 @@
 using SqlSource.Diagnostics;
+using SqlSource.Settings.Libraries;
 using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Models;
@@ -28,6 +29,11 @@ namespace SqlSource.Generation.Models;
 /// <param name="ParameterTypes">
 /// The type the entry describes for each of its parameters, in order, or null when <paramref name="Input" /> is.
 /// </param>
+/// <param name="UnavailableLibraries">
+/// The entry that turns each library on for the query, of each library whose assemblies the project does not reference
+/// for the query's engine, as its types have them: a method of the query reports each.  Empty when every library that
+/// is on can be used.
+/// </param>
 internal sealed record QueryModels(
     string Name,
     int Index,
@@ -39,5 +45,6 @@ internal sealed record QueryModels(
     EquatableArray<ModelProperty>? Output,
     EquatableArray<string>? ColumnNames,
     SidecarTable? Table,
-    EquatableArray<SidecarType>? ParameterTypes
+    EquatableArray<SidecarType>? ParameterTypes,
+    EquatableArray<LibrarySetting> UnavailableLibraries
 );

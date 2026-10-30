@@ -201,6 +201,12 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC279](#sqlsrc279) | Converters do not convert from the database type |
 | [SQLSRC280](#sqlsrc280) | Converter is missing for one direction |
 
+**The libraries of a query**
+
+| Id | Title |
+|----|----|
+| [SQLSRC281](#sqlsrc281) | A library that is on is not referenced |
+
 **A short name of your choice**
 
 | Id | Title |
@@ -2707,6 +2713,18 @@ A type override, a column type or a `-- param:` marker gives a column or a param
 Add the converter that the message names, a static method marked `[SqlSourceConverter]` that takes the one type and returns the other, on the type itself or in a class of the project.  A method that takes a type and returns the same type serves both directions.  For an array whose elements are converted one by one, the message names the element of the column or parameter, and the converter to add is of the element's type.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
 
 See: [Converters](settings.md#converters)
+
+## SQLSRC281
+
+**A library that is on is not referenced**
+
+The `libraryTypes` of a settings file, or a `-- library-types:` marker, turns a library on, such as NodaTime, for queries whose output is `codegen`, and the project does not reference what the library needs on the database of those queries: on PostgreSQL the `Npgsql.NodaTime` package, which brings NodaTime and lets Npgsql read and send its types, and on SQL Server the `NodaTime` package.  The message names the library, the database and the package that is missing.
+
+```console
+/work/App/sqlsource.json(5,5): error SQLSRC281: NodaTime is on for the PostgreSQL query methods it reaches here, but the project does not reference Npgsql.NodaTime.  Reference Npgsql.NodaTime, or turn NodaTime off for these queries.
+```
+
+Reference the package the message names from the project.  Or, where the error points, set the library to `off`, or remove the entry, for those queries: a library that nothing turns on is on only where the project references what it needs.  The error is reported at the entry that says `on`, the member of the settings file or the line of the marker, once for each database whose `codegen` queries it reaches, however many queries, files and types those are.  A query whose output is `models` or `sql` is not reported.  The queries keep their methods and their models, with the C# types they have while the library is off.
 
 ## SQLSRC284
 

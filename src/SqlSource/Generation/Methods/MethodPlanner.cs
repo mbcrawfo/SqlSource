@@ -5,8 +5,10 @@ using System.Linq;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Models;
+using SqlSource.Generation.Types.Drivers;
 using SqlSource.Parsing;
 using SqlSource.Settings;
+using SqlSource.Settings.Libraries;
 
 namespace SqlSource.Generation.Methods;
 
@@ -14,7 +16,8 @@ namespace SqlSource.Generation.Methods;
 /// Decides which queries of one type get a method, and what each method is written from, with the problems of those
 /// that cannot have one: <c>SQLSRC272</c>, <c>SQLSRC274</c> and <c>SQLSRC275</c>, and, from
 /// <see cref="ConversionPlanner" />, <c>SQLSRC279</c>, <c>SQLSRC280</c>, and <c>SQLSRC277</c> and <c>SQLSRC278</c> for
-/// a converter of a referenced assembly.
+/// a converter of a referenced assembly.  It also reports <c>SQLSRC281</c> for a library that is on for a query and
+/// that the project cannot use, which leaves the query its method, with the base map's types.
 /// </summary>
 internal static class MethodPlanner
 {
@@ -115,6 +118,7 @@ internal static class MethodPlanner
             var engine = SqlDescribableDialects.EngineOf(file.Dialect);
             engines |= engine.ToCodeGenEngines();
             var context = new QueryContext(input, key, file, engine, usable);
+            AddUnavailableLibraries(context, diagnostics);
             if (Plan(context, written) is { } plan)
             {
                 planned.Add(plan);
@@ -215,6 +219,45 @@ internal static class MethodPlanner
             WarningIds = WarningIdsOf(models, methodInput, methodOutput),
         };
     }
+
+    // SQLSRC281 at each entry that turns a library on for the query whose assemblies the project does not reference for
+    // its engine: at a settings file's member, or at a marker of the query's file.  Distinct makes it one for each
+    // place and engine, whatever the number of queries and types it reaches.  A query without models has its own error.
+    private static void AddUnavailableLibraries(
+        QueryContext context,
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics
+    )
+    {
+        var (input, _, _, engine, usable) = context;
+        if (input.Files[usable.FileIndex].Find(usable.QueryIndex, usable.Query.Name) is not { } models)
+        {
+            return;
+        }
+
+        foreach (var entry in models.UnavailableLibraries)
+        {
+            var path =
+                entry.Place.Kind == SettingPlaceKind.SettingsFile && entry.Place.Path is { } file
+                    ? file
+                    : models.NameLocation.Path;
+            diagnostics.Add(
+                DiagnosticInfo.Create(
+                    SqlDiagnostics.LibraryNotReferenced,
+                    new LocationInfo(path, entry.Span, entry.LineSpan),
+                    LibraryName(entry.Library),
+                    engine.DatabaseName(),
+                    LibraryProbe.MissingAssembliesOf(entry.Library, engine)
+                )
+            );
+        }
+    }
+
+    // The library's name as a diagnostic gives it.
+    private static string LibraryName(SqlLibrary library) =>
+        library switch
+        {
+            SqlLibrary.NodaTime or _ => "NodaTime",
+        };
 
     // The ids of the warnings that a method gives: of each property type it reads or binds, which it names as its
     // model does, and of each converter it calls.
