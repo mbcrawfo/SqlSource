@@ -456,9 +456,17 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .CompilationProvider.Select(static (compilation, _) => LibraryProbe.Read(compilation))
             .WithTrackingName(TrackingNames.LibraryProbe);
 
-        // The probe without NodaTime's version, which typing does not read, so that a change of the version alone types
-        // no file again.
-        var typingLibraryProbe = libraryProbe.Select(static (probe, _) => probe with { NodaTimeVersion = null });
+        // The probe without the libraries' versions, which typing does not read, so that a change of a version alone
+        // types no file again.
+        var typingLibraryProbe = libraryProbe.Select(
+            static (probe, _) =>
+                probe with
+                {
+                    NodaTimeVersion = null,
+                    NetTopologySuiteVersion = null,
+                    SqlServerBytesVersion = null,
+                }
+        );
 
         // The C# types that the type override names at any level, as a sorted list of their names, which an edit that
         // leaves the names alone gives again, equal.

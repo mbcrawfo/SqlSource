@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using SqlSource.Settings;
@@ -8,8 +9,9 @@ namespace SqlSource.Generation.Types.Drivers;
 
 /// <summary>
 /// Which libraries a project references, which the library switch needs to know whether a library can be on: whether
-/// it references NodaTime, and the plugin that lets Npgsql read and write its types.  Each flag is the presence of a
-/// type that the library has.  The value is equal from one edit to the next, so nothing after the probe runs again.
+/// it references NodaTime and NetTopologySuite, the plugins that let Npgsql read and write their types, and
+/// NetTopologySuite's reader and writer of SQL Server's bytes.  Each flag is the presence of a type that the library
+/// has.  The value is equal from one edit to the next, so nothing after the probe runs again.
 /// It is not an <see cref="IDriverProbe" />, since it reports nothing by itself.
 /// </summary>
 /// <param name="NodaTime">Whether <c>NodaTime.Instant</c> is found.</param>
@@ -20,21 +22,58 @@ namespace SqlSource.Generation.Types.Drivers;
 /// The version of the newest referenced assembly named <c>NodaTime</c>, or null when there is none.  It is for the
 /// floor on NodaTime's version: the flags decide what is available.
 /// </param>
-internal sealed record LibraryProbe(bool NodaTime, bool NpgsqlNodaTime, Version? NodaTimeVersion)
+/// <param name="NetTopologySuite">Whether <c>NetTopologySuite.Geometries.Geometry</c> is found.</param>
+/// <param name="NetTopologySuiteAtFloor">
+/// Whether <c>NetTopologySuite.Algorithm.Hull.ConcaveHull</c>, first in 2.5.0, is found, since the identity of every
+/// 2.x is 2.0.0.0.
+/// </param>
+/// <param name="NetTopologySuiteVersion">
+/// The version of the package of the newest assembly named <c>NetTopologySuite</c> that defines <c>Geometry</c>, from
+/// its informational version, or null when there is none or it gives none.  For the diagnostics alone.
+/// </param>
+/// <param name="NpgsqlNetTopologySuite">
+/// Whether <c>Npgsql.NpgsqlNetTopologySuiteExtensions</c>, of the Npgsql.NetTopologySuite plugin, is found.
+/// </param>
+/// <param name="SqlServerBytes">
+/// Whether <c>NetTopologySuite.IO.SqlServerBytesReader</c>, of NetTopologySuite.IO.SqlServerBytes, is found.
+/// </param>
+/// <param name="SqlServerBytesVersion">
+/// The version of the package of the newest assembly named <c>NetTopologySuite.IO.SqlServerBytes</c> that defines
+/// <c>SqlServerBytesReader</c>, as <paramref name="NetTopologySuiteVersion" /> is read, since 2.0.0 and 2.1.0 have one
+/// identity.  For the diagnostics alone.
+/// </param>
+internal sealed record LibraryProbe(
+    bool NodaTime,
+    bool NpgsqlNodaTime,
+    Version? NodaTimeVersion,
+    bool NetTopologySuite = false,
+    bool NetTopologySuiteAtFloor = false,
+    string? NetTopologySuiteVersion = null,
+    bool NpgsqlNetTopologySuite = false,
+    bool SqlServerBytes = false,
+    string? SqlServerBytesVersion = null
+)
 {
     private const string NodaTimeAssemblyName = "NodaTime";
+
+    private const string NetTopologySuiteAssemblyName = "NetTopologySuite";
+
+    private const string SqlServerBytesAssemblyName = "NetTopologySuite.IO.SqlServerBytes";
 
     // The oldest NodaTime whose types SqlSource's rows and conversions name.
     private static readonly Version NodaTimeFloor = new(3, 1, 9, 0);
 
     /// <summary>
     /// Whether the project references what <paramref name="library" /> needs on <paramref name="engine" />: on
-    /// PostgreSQL both NodaTime and the Npgsql plugin, on SQL Server NodaTime alone.
+    /// PostgreSQL the library and its Npgsql plugin; on SQL Server NodaTime alone, and NetTopologySuite with its reader
+    /// and writer of SQL Server's bytes.
     /// </summary>
     public bool IsAvailable(SqlLibrary library, DatabaseEngine engine) =>
         library switch
         {
             SqlLibrary.NodaTime => engine == DatabaseEngine.PostgreSql ? NodaTime && NpgsqlNodaTime : NodaTime,
+            SqlLibrary.NetTopologySuite => NetTopologySuite
+                && (engine == DatabaseEngine.PostgreSql ? NpgsqlNetTopologySuite : SqlServerBytes),
             _ => false,
         };
 
@@ -47,13 +86,16 @@ internal sealed record LibraryProbe(bool NodaTime, bool NpgsqlNodaTime, Version?
 
     /// <summary>
     /// The assemblies that a project has to reference to use <paramref name="library" /> on
-    /// <paramref name="engine" />, as a diagnostic names them: the plugin on PostgreSQL, which brings NodaTime, and
-    /// NodaTime on SQL Server.
+    /// <paramref name="engine" />, as a diagnostic names them: the plugin on PostgreSQL, which brings its library;
+    /// NodaTime on SQL Server, and NetTopologySuite.IO.SqlServerBytes, which brings NetTopologySuite.
     /// </summary>
     public static string MissingAssembliesOf(SqlLibrary library, DatabaseEngine engine) =>
         library switch
         {
             SqlLibrary.NodaTime => engine == DatabaseEngine.PostgreSql ? "Npgsql.NodaTime" : "NodaTime",
+            SqlLibrary.NetTopologySuite => engine == DatabaseEngine.PostgreSql
+                ? "Npgsql.NetTopologySuite"
+                : "NetTopologySuite.IO.SqlServerBytes",
             _ => "",
         };
 
@@ -66,7 +108,7 @@ internal sealed record LibraryProbe(bool NodaTime, bool NpgsqlNodaTime, Version?
         library switch
         {
             SqlLibrary.NodaTime => NodaTime && NodaTimeVersion is { } version && version < NodaTimeFloor,
-            _ => false,
+            SqlLibrary.NetTopologySuite or _ => false,
         };
 
     /// <summary>
@@ -75,7 +117,8 @@ internal sealed record LibraryProbe(bool NodaTime, bool NpgsqlNodaTime, Version?
     public static string FloorOf(SqlLibrary library) =>
         library switch
         {
-            SqlLibrary.NodaTime or _ => TextOf(NodaTimeFloor),
+            SqlLibrary.NodaTime => TextOf(NodaTimeFloor),
+            SqlLibrary.NetTopologySuite or _ => "",
         };
 
     /// <summary>
@@ -85,12 +128,14 @@ internal sealed record LibraryProbe(bool NodaTime, bool NpgsqlNodaTime, Version?
     public string VersionTextOf(SqlLibrary library) =>
         library switch
         {
-            SqlLibrary.NodaTime or _ => NodaTimeVersion is { } version ? TextOf(version) : "",
+            SqlLibrary.NodaTime => NodaTimeVersion is { } version ? TextOf(version) : "",
+            SqlLibrary.NetTopologySuite or _ => "",
         };
 
     /// <summary>
-    /// Reads the probe from <paramref name="compilation" />: two type lookups and the identities of its references.
-    /// Of two references named <c>NodaTime</c>, the newer gives the version.  Never throws.
+    /// Reads the probe from <paramref name="compilation" />: six type lookups, the identities of its references, and
+    /// the informational versions of the assemblies of two types.  Of two references named <c>NodaTime</c>, the newer
+    /// gives the version.  Never throws.
     /// </summary>
     public static LibraryProbe Read(Compilation compilation)
     {
@@ -106,12 +151,24 @@ internal sealed record LibraryProbe(bool NodaTime, bool NpgsqlNodaTime, Version?
             }
         }
 
+        var geometries = compilation.GetTypesByMetadataName("NetTopologySuite.Geometries.Geometry");
+        var readers = compilation.GetTypesByMetadataName("NetTopologySuite.IO.SqlServerBytesReader");
         return new LibraryProbe(
             DriverProbes.Has(compilation, "NodaTime.Instant"),
             DriverProbes.Has(compilation, "Npgsql.NpgsqlNodaTimeExtensions"),
-            version
+            version,
+            !geometries.IsEmpty,
+            DriverProbes.Has(compilation, "NetTopologySuite.Algorithm.Hull.ConcaveHull"),
+            PackageVersionOf(geometries, NetTopologySuiteAssemblyName),
+            DriverProbes.Has(compilation, "Npgsql.NpgsqlNetTopologySuiteExtensions"),
+            !readers.IsEmpty,
+            PackageVersionOf(readers, SqlServerBytesAssemblyName)
         );
     }
+
+    // The version of the package of the newest assembly of the name that defines one of the types, or null.
+    private static string? PackageVersionOf(ImmutableArray<INamedTypeSymbol> types, string assemblyName) =>
+        DriverProbes.NewestNamed(types, assemblyName) is { } assembly ? DriverProbes.PackageVersionOf(assembly) : null;
 
     // The major, the minor and the build, which a version of an assembly always has, without throwing on one that has
     // fewer.

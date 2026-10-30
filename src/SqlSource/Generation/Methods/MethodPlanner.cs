@@ -298,6 +298,7 @@ internal static class MethodPlanner
     public static string LibraryName(SqlLibrary library) =>
         library switch
         {
+            SqlLibrary.NetTopologySuite => "NetTopologySuite",
             SqlLibrary.NodaTime or _ => "NodaTime",
         };
 

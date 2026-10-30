@@ -47,11 +47,12 @@ internal sealed class LibraryRows
 
     /// <summary>
     /// The library as the place that chose a type, which <c>SQLSRC250</c> to <c>SQLSRC252</c> word: <c>the NodaTime
-    /// library</c>.
+    /// library</c> or <c>the NetTopologySuite library</c>.
     /// </summary>
     public static string PlaceOf(SqlLibrary library) =>
         library switch
         {
+            SqlLibrary.NetTopologySuite => "the NetTopologySuite library",
             SqlLibrary.NodaTime or _ => "the NodaTime library",
         };
 

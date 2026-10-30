@@ -197,6 +197,168 @@ public sealed class LibraryProbeTests
         LibraryProbe.MissingAssembliesOf(SqlLibrary.NodaTime, DatabaseEngine.SqlServer).ShouldBe("NodaTime");
     }
 
+    [Fact]
+    public void Read_NetTopologySuite260WithPlugin_SetsEveryFlag()
+    {
+        var probe = LibraryProbe.Read(
+            CompilationOf(
+                NpgsqlReferences.Npgsql10,
+                LibraryReferences.NetTopologySuite("2.6.0"),
+                LibraryReferences.NpgsqlNetTopologySuite("10.0.3")
+            )
+        );
+
+        probe.NetTopologySuite.ShouldBeTrue();
+        probe.NetTopologySuiteAtFloor.ShouldBeTrue();
+        probe.NpgsqlNetTopologySuite.ShouldBeTrue();
+        probe.NetTopologySuiteVersion.ShouldBe("2.6.0");
+        probe.SqlServerBytes.ShouldBeFalse();
+        probe.SqlServerBytesVersion.ShouldBeNull();
+    }
+
+    // The floor's package: Npgsql.NetTopologySuite 8.0.9 brings no NetTopologySuite older than it.
+    [Fact]
+    public void Read_NetTopologySuite250WithPlugin8_IsAtTheFloor()
+    {
+        var probe = LibraryProbe.Read(
+            CompilationOf(
+                NpgsqlReferences.Npgsql8,
+                LibraryReferences.NetTopologySuite("2.5.0"),
+                LibraryReferences.NpgsqlNetTopologySuite("8.0.9")
+            )
+        );
+
+        probe.NetTopologySuiteAtFloor.ShouldBeTrue();
+        probe.NpgsqlNetTopologySuite.ShouldBeTrue();
+        probe.NetTopologySuiteVersion.ShouldBe("2.5.0");
+    }
+
+    // 2.0.0 and 2.1.0 have the same identity, so the informational version alone tells them apart.
+    [Fact]
+    public void Read_SqlServerBytes210_SetsItsVersion()
+    {
+        var probe = LibraryProbe.Read(
+            CompilationOf(LibraryReferences.NetTopologySuite("2.6.0"), LibraryReferences.SqlServerBytes("2.1.0"))
+        );
+
+        probe.SqlServerBytes.ShouldBeTrue();
+        probe.SqlServerBytesVersion.ShouldBe("2.1.0");
+        probe.NpgsqlNetTopologySuite.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Read_SqlServerBytes200_SetsItsVersion()
+    {
+        var probe = LibraryProbe.Read(
+            CompilationOf(LibraryReferences.NetTopologySuite("2.6.0"), LibraryReferences.SqlServerBytes("2.0.0"))
+        );
+
+        probe.SqlServerBytesVersion.ShouldBe("2.0.0");
+    }
+
+    // Every 2.x is 2.0.0.0, so a NetTopologySuite without ConcaveHull, first in 2.5.0, is older than the floor.
+    [Fact]
+    public void Read_NetTopologySuiteSynthetic240_IsNotAtTheFloor()
+    {
+        var probe = LibraryProbe.Read(
+            CompilationOf(LibraryReferences.SyntheticNetTopologySuite("2.4.0+0123abcd", concaveHull: false))
+        );
+
+        probe.NetTopologySuite.ShouldBeTrue();
+        probe.NetTopologySuiteAtFloor.ShouldBeFalse();
+        probe.NetTopologySuiteVersion.ShouldBe("2.4.0");
+    }
+
+    // A version followed by a description, as NetTopologySuite's own are, gives the version alone.
+    [Fact]
+    public void Read_NetTopologySuiteVersionWithADescription_GivesTheVersionAlone()
+    {
+        var probe = LibraryProbe.Read(
+            CompilationOf(
+                LibraryReferences.SyntheticNetTopologySuite("2.5.1 (compatible with JTS 1.19)+0123", concaveHull: true)
+            )
+        );
+
+        probe.NetTopologySuiteAtFloor.ShouldBeTrue();
+        probe.NetTopologySuiteVersion.ShouldBe("2.5.1");
+    }
+
+    [Theory]
+    [InlineData(true, false, true, false)]
+    [InlineData(false, true, false, true)]
+    [InlineData(true, true, true, true)]
+    [InlineData(false, false, false, false)]
+    public void IsAvailable_NetTopologySuite_ByEngine(
+        bool plugin,
+        bool sqlServerBytes,
+        bool onPostgres,
+        bool onSqlServer
+    )
+    {
+        var probe = new LibraryProbe(
+            NodaTime: false,
+            NpgsqlNodaTime: false,
+            NodaTimeVersion: null,
+            NetTopologySuite: true,
+            NetTopologySuiteAtFloor: true,
+            NetTopologySuiteVersion: "2.6.0",
+            NpgsqlNetTopologySuite: plugin,
+            SqlServerBytes: sqlServerBytes,
+            SqlServerBytesVersion: sqlServerBytes ? "2.1.0" : null
+        );
+
+        probe.IsAvailable(SqlLibrary.NetTopologySuite, DatabaseEngine.PostgreSql).ShouldBe(onPostgres);
+        probe.IsAvailable(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer).ShouldBe(onSqlServer);
+    }
+
+    // The plugins without NetTopologySuite itself are not enough: its types are the ones a column's value needs.
+    [Fact]
+    public void IsAvailable_NetTopologySuitePluginsWithoutTheLibrary_IsFalse()
+    {
+        var probe = new LibraryProbe(
+            NodaTime: false,
+            NpgsqlNodaTime: false,
+            NodaTimeVersion: null,
+            NpgsqlNetTopologySuite: true,
+            SqlServerBytes: true
+        );
+
+        probe.IsAvailable(SqlLibrary.NetTopologySuite, DatabaseEngine.PostgreSql).ShouldBeFalse();
+        probe.IsAvailable(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void DefaultOf_NetTopologySuite_OnOnlyOnPostgresWithThePlugin()
+    {
+        var withPlugin = LibraryProbe.Read(
+            CompilationOf(
+                NpgsqlReferences.Npgsql10,
+                LibraryReferences.NetTopologySuite("2.6.0"),
+                LibraryReferences.NpgsqlNetTopologySuite("10.0.3"),
+                LibraryReferences.SqlServerBytes("2.1.0")
+            )
+        );
+        var withoutPlugin = LibraryProbe.Read(
+            CompilationOf(LibraryReferences.NetTopologySuite("2.6.0"), LibraryReferences.SqlServerBytes("2.1.0"))
+        );
+
+        withPlugin.DefaultOf(SqlLibrary.NetTopologySuite, DatabaseEngine.PostgreSql).ShouldBe(LibraryState.On);
+        withPlugin.DefaultOf(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer).ShouldBe(LibraryState.Off);
+        withoutPlugin.DefaultOf(SqlLibrary.NetTopologySuite, DatabaseEngine.PostgreSql).ShouldBe(LibraryState.Off);
+        withoutPlugin.DefaultOf(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer).ShouldBe(LibraryState.Off);
+    }
+
+    [Fact]
+    public void MissingAssembliesOf_NetTopologySuite_NamesTheEnginesPackage()
+    {
+        LibraryProbe
+            .MissingAssembliesOf(SqlLibrary.NetTopologySuite, DatabaseEngine.PostgreSql)
+            .ShouldBe("Npgsql.NetTopologySuite");
+        LibraryProbe
+            .MissingAssembliesOf(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer)
+            .ShouldBe("NetTopologySuite.IO.SqlServerBytes");
+    }
+
     private static CSharpCompilation CompilationOf(params MetadataReference[] references) =>
         GeneratorHarness.CreateCompilation([new SourceFile("/app/Sample.cs", Source)], references: references);
 }

@@ -133,7 +133,7 @@ public sealed class SettingsFileDiagnosticsTests
         Message(SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text)))
             .ShouldBe(
                 "'nodaTime: maybe' is not a valid value of libraryTypes.  'libraryTypes' takes the name of a library "
-                    + "(nodaTime) and on, off or default."
+                    + "(nodaTime or netTopologySuite) and on, off or default."
             );
     }
 

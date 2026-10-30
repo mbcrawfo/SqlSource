@@ -438,6 +438,29 @@ public sealed class LibraryDiagnosticsTests
         run.Sources[MethodRuns.MethodsFile].ShouldContain(" FindDates(");
     }
 
+    // NetTopologySuite on SQL Server needs its reader and writer of SQL Server's bytes beside the library itself.
+    [Fact]
+    public void Run_NetTopologySuiteOnWithoutSqlServerBytes_Reports281()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, FindDates);
+
+        var run = MethodRuns.RunSqlServer(
+            file,
+            [DatesEntry(file, "FindDates")],
+            references: [SqlClientReferences.SqlClient7, LibraryReferences.NetTopologySuite("2.6.0")],
+            settings: GeneratorHarness.Json(
+                new JsonObject { ["libraryTypes"] = new JsonObject { ["netTopologySuite"] = "on" } }
+            )
+        );
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC281 /sqlsource.json(5,5)-(5,29): NetTopologySuite is on for the SQL Server query methods it "
+                    + "reaches here, but the project does not reference NetTopologySuite.IO.SqlServerBytes.  Reference "
+                    + "NetTopologySuite.IO.SqlServerBytes, or turn NetTopologySuite off for these queries.",
+            ]);
+    }
+
     // The query of the name, whose one column, at, is a timestamptz read from public.events.at.
     private static SidecarEntry EventsEntry(SqlFile file, string name = "ListEvents") =>
         Entry(file, name, [], [Column("at", Timestamptz, origin: new SidecarOrigin("public", "events", "at"))]);

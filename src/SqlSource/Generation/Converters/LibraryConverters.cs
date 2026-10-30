@@ -34,7 +34,7 @@ internal static class LibraryConverters
         library switch
         {
             SqlLibrary.NodaTime => NodaTimeConversions.Source,
-            _ => null,
+            SqlLibrary.NetTopologySuite or _ => null,
         };
 
     /// <summary>
