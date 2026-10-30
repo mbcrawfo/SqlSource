@@ -6,7 +6,7 @@ Phase 7 of the [query generation epic](2026-10-07-query-generation-epic-design.m
 
 Written against `main` at `0b1a85ab`, after phase 8, sub-phase 8.7 included, and after [the settings-files design](2026-10-25-settings-files-design.md), whose integration branch `integration/settings-files` holds no layer yet.
 
-Amended on 2026-10-30 by sub-phase 7.0, whose [spike](2026-10-26-query-generation-phase-7-spike.md) answered every "Verify first" item against the containers and drivers.  An amended detail cites the spike's question; a finding that bears on a Decided item is an owner question in the spike, and this document keeps its decided text until the owner answers.
+Amended on 2026-10-30 by sub-phase 7.0, whose [spike](2026-10-26-query-generation-phase-7-spike.md) answered every "Verify first" item against the containers and drivers.  An amended detail cites the spike's question; a finding that bears on a Decided item went to the owner, and the owner's answer is written here with its date: the NodaTime range defaults, changed on 2026-10-30.
 
 ## How to read this document
 
@@ -29,7 +29,7 @@ Decided, the owner's answers that shaped the design:
 - **JSON's own classes use System.Text.Json's default options.**  A project that needs options of its own writes a `[SqlSourceConverter]` from `string` to its type that calls the serializer with them.
 - **A string column that holds JSON is covered by an explicit opt-in** on its mapping, so that SQL Server before 2025, which stores JSON in `nvarchar(max)`, can use its classes too.  A class mapped to a string column without the opt-in is never serialized.
 - **NetTopologySuite on SQL Server is in**, with the generated reader and writer shared as static instances, and no setup needed from the user beyond NetTopologySuite's own global default.
-- **The default types** in [the libraries](#the-libraries), approved as proposed.
+- **The default types** in [the libraries](#the-libraries), approved as proposed, but for PostgreSQL's NodaTime ranges, which the owner changed on 2026-10-30 after 7.0's spike: `NpgsqlRange<Instant>` and `NpgsqlRange<LocalDate>` ("B: NpgsqlRange").
 - **Approach A**, below: the generator's conversions go through phase 8's converter pipeline.
 
 ## Goals
@@ -178,10 +178,10 @@ Decided, the default types:
 | `time` | `LocalTime` | `LocalTime` |
 | `timetz` | `OffsetTime` | |
 | `interval` | `Period` | |
-| `tstzrange`, `tsrange`, `daterange` | `Interval`, `NpgsqlRange<LocalDateTime>`, `DateInterval` | |
-| `tstzmultirange`, `tsmultirange`, `datemultirange` | `Interval[]`, `NpgsqlRange<LocalDateTime>[]`, `DateInterval[]` | |
+| `tstzrange`, `tsrange`, `daterange` | `NpgsqlRange<Instant>`, `NpgsqlRange<LocalDateTime>`, `NpgsqlRange<LocalDate>` | |
+| `tstzmultirange`, `tsmultirange`, `datemultirange` | `NpgsqlRange<Instant>[]`, `NpgsqlRange<LocalDateTime>[]`, `NpgsqlRange<LocalDate>[]` | |
 
-**PostgreSQL.**  These are the types the plugin boxes, on Npgsql 8, 9 and 10 alike.  An array of each is `T[]`.  A type override still chooses any type the plugin reads, `timestamptz=NodaTime.ZonedDateTime` or `interval=NodaTime.Duration`, and the method reads it through the plugin; the manual names the plugin's accepted alternatives and that `ZonedDateTime` and `OffsetDateTime` are read and must be written in UTC.  7.0 confirmed each row, its arrays and its `NULL`, and each alternative, on Npgsql 8 and 10 and on a full and a slim data source, and the types the plugin boxes on Npgsql 9 too.  A value not in UTC fails before the query is sent with `ArgumentException`, not `InvalidCastException`.  An `interval` with months read as `Duration` throws `InvalidCastException` naming `Period` ([spike, question 1](2026-10-26-query-generation-phase-7-spike.md#1-nodatime-on-postgresql)).  No generated conversion is used on PostgreSQL: a project that references NodaTime but not `Npgsql.NodaTime` and maps `timestamptz=NodaTime.Instant` keeps today's behaviour, the type trusted to the driver, which fails at run time until the plugin is registered; the manual says to add the plugin.
+**PostgreSQL.**  These are the types the plugin boxes, on Npgsql 8, 9 and 10 alike, but for `tstzrange` and `daterange` and their multiranges, which it boxes as `Interval` and `DateInterval`.  The owner chose `NpgsqlRange<Instant>` and `NpgsqlRange<LocalDate>` for those on 2026-10-30, since 7.0 found that `Interval` and `DateInterval` cannot read an empty range (`ArgumentOutOfRangeException`, `ArgumentException`) and that `Interval` reads a `(a,b]` `tstzrange` as `[a+1ns, b+1ns)`, which a write stores as `[a,b)`.  The plugin reads and writes `NpgsqlRange<Instant>` and `NpgsqlRange<LocalDate>`, their arrays included, with neither fault.  `Interval` and `DateInterval` stay reachable by a type override, and the manual names both faults there.  It also says that a reader of the boxed value, Dapper's, still gets `Interval` and `DateInterval` for these columns, and so fails on an empty range once the plugin is on.  An array of each is `T[]`.  A type override still chooses any type the plugin reads, `timestamptz=NodaTime.ZonedDateTime` or `interval=NodaTime.Duration`, and the method reads it through the plugin; the manual names the plugin's accepted alternatives and that `ZonedDateTime` and `OffsetDateTime` are read and must be written in UTC.  7.0 confirmed each row, its arrays and its `NULL`, and each alternative, on Npgsql 8 and 10 and on a full and a slim data source, and the types the plugin boxes on Npgsql 9 too.  A value not in UTC fails before the query is sent with `ArgumentException`, not `InvalidCastException`.  An `interval` with months read as `Duration` throws `InvalidCastException` naming `Period` ([spike, question 1](2026-10-26-query-generation-phase-7-spike.md#1-nodatime-on-postgresql)).  No generated conversion is used on PostgreSQL: a project that references NodaTime but not `Npgsql.NodaTime` and maps `timestamptz=NodaTime.Instant` keeps today's behaviour, the type trusted to the driver, which fails at run time until the plugin is registered; the manual says to add the plugin.
 
 **SQL Server.**  The generated conversions, each one line, on the type SqlClient boxes:
 

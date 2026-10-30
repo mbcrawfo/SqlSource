@@ -34,7 +34,7 @@ The calls: `NpgsqlDataSourceBuilder` and `NpgsqlSlimDataSourceBuilder`, the slim
 - **The override alternatives round-trip equal**: `timestamptz` as `ZonedDateTime` (read with zone UTC), `OffsetDateTime` (offset 0), `DateTimeOffset` and `DateTime` (`Kind` `Utc`); `interval` as `Duration`; `timestamp` as `DateTime` (`Kind` `Unspecified`).
   - An `interval` with months read as `Duration` throws `InvalidCastException: Cannot read PostgreSQL interval with non-zero months to NodaTime Duration. Try reading as a NodaTime Period instead.`
   - A `ZonedDateTime` or `OffsetDateTime` that is not UTC fails before the query is sent.  The exception is **`ArgumentException`**, not `InvalidCastException`: `Cannot write ZonedDateTime with Zone=Europe/Berlin to PostgreSQL type 'timestamp with time zone', only UTC is supported.` and `Cannot write OffsetDateTime with Offset=+05:30 ... only offset 0 (UTC) is supported.`
-- **The ranges.**  These are owner question 1 of [What the later sub-phases take from this](#what-the-later-sub-phases-take-from-this).
+- **The ranges.**  These led to owner decision 1 of [What the later sub-phases take from this](#what-the-later-sub-phases-take-from-this): the defaults became `NpgsqlRange<Instant>` and `NpgsqlRange<LocalDate>`.
   - **An empty range cannot be read as `Interval` or `DateInterval`.**  An empty `tstzrange` throws `ArgumentOutOfRangeException: The end parameter must be equal to or later than the start parameter (Parameter 'end')`.  An empty `daterange` throws `ArgumentException: End date must not be earlier than the start date (Parameter 'end')`.  Both come from `GetFieldValue<T>`, `GetFieldValue<T?>` and the boxed `GetValue` alike, so a Dapper reader on a data source with the plugin fails the same way.
   - **A `(a,b]` `tstzrange` reads as the `Interval` `[a+1ns, b+1ns)`**, since `Interval` is half-open.  Written back, PostgreSQL's microseconds drop the nanosecond and store `[a,b)`, so a read and a write of the same value change the range.
   - Unbounded ranges read as an `Interval` without that start or end, both ways.
@@ -194,13 +194,14 @@ The floors of NodaTime and NetTopologySuite are the plugins' minimums, so NuGet 
 
 ## What the later sub-phases take from this
 
-**Owner questions.**  None of these is in the design until the owner answers; the design keeps its decided text.
+**Owner decisions.**
 
-1. **The NodaTime range defaults** (question 1): keep `Interval` and `DateInterval`, with the manual naming the empty-range throw and the 1 ns shift; or make the defaults `NpgsqlRange<Instant>` and `NpgsqlRange<LocalDate>`, which the plugin reads without either, for the ranges and their multiranges' arrays.  Asked of the owner while this spike was written.
+1. **The NodaTime range defaults** (question 1).  The owner chose on 2026-10-30, "B: NpgsqlRange": `tstzrange` is `NpgsqlRange<Instant>`, `tsrange` stays `NpgsqlRange<LocalDateTime>`, `daterange` is `NpgsqlRange<LocalDate>`, and the multiranges are their arrays.  `Interval` and `DateInterval` stay reachable by a type override, with the empty-range throw and the 1 ns shift in the manual.  The design's NodaTime table and the epic's Decided item say so.
+2. **The `-- param:` modifier limit** (question 4), found by this branch's review.  The owner chose "Record as TD": [TD-0093](../../tech-debt/TD-0093-a-param-marker-takes-a-modifier-of-numbers-alone.md), with a known issue in the manual.
 
 **Amended in the design**, each a designer's call or a "Verify first" the spike answered:
 
-- **7.1**: each NodaTime row, its arrays, its `NULL` and each alternative confirmed on Npgsql 8 and 10, and the boxed types on 9 too; the `ArgumentException` of a write not in UTC; the paths of the end-to-end and floor projects.
+- **7.1**: the range defaults of owner decision 1; each NodaTime row, its arrays, its `NULL` and each alternative confirmed on Npgsql 8 and 10, and the boxed types on 9 too; the `ArgumentException` of a write not in UTC; the paths of the end-to-end and floor projects.
 - **7.2**: what the manual says of the SQL Server edges at their limits: an offset with seconds truncated on write, values outside `DateTime`'s range, SqlClient's rounding and refusals of `datetime` and `smalldatetime`, and a `Duration` outside `time`.
 - **7.3**: SQL Server's `json` refuses a top-level scalar, a JSON `null` included, and the method lets the server's error through; a JSON `null` read into a not-null `JsonNode`, `JsonObject` or `JsonArray` throws, as into a not-null class, since a `JsonNode` cannot hold one; `json` and `jsonb` normalize what they store.
 - **7.4**: the PostGIS image and its Dockerfile; a library row matched by `internalName` and `kind`; the tool's plugin, which makes the check pass; the spatial read through `GetStream`, without the cast, if it holds through a wrapping connection; the class of the shared instances given a static constructor, so that they are created at the first spatial query; a `geography` of SRID 0 refused by SQL Server.

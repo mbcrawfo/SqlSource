@@ -915,7 +915,7 @@ By the owner on 2026-10-26, with the rest in the design:
 - **The driver where it can, the generator where it cannot**, so long as the conversion is simple: NodaTime and NetTopologySuite through Npgsql's plugins; on SQL Server, NodaTime by one-line conversions and NetTopologySuite by static shared readers and writers of `NetTopologySuite.IO.SqlServerBytes`.
 - **JSON is a `string` until the project asks.**  A project's own class in a JSON column uses System.Text.Json's default options; a project that needs its own writes a converter from `string`.  A column of a string type that holds JSON, SQL Server's `nvarchar(max)` before 2025, takes the same serialization by an explicit opt-in on its mapping.
 - **The generator's conversions go through the converter pipeline of 8.2**, as a third origin that a project's converter replaces.
-- **The default types** of the design's tables.
+- **The default types** of the design's tables, with PostgreSQL's NodaTime ranges as `NpgsqlRange<Instant>`, `NpgsqlRange<LocalDateTime>` and `NpgsqlRange<LocalDate>`, which the owner chose on 2026-10-30 after [7.0's spike](2026-10-26-query-generation-phase-7-spike.md) found that `Interval` and `DateInterval` cannot read every range.
 
 ### Testing
 
