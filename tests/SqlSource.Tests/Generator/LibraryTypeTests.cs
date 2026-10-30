@@ -299,19 +299,68 @@ public sealed class LibraryTypeTests
         entry.Place.Path.ShouldBe(GeneratorHarness.ProjectSettingsPath);
     }
 
-    // SQL Server has no rows of NodaTime yet, so the library being on changes no type.
+    // SQL Server has NodaTime's rows, and the library is on only when something says so.
     [Fact]
-    public void SqlServer_NodaTimeOn_KeepsTheBaseTypes()
+    public void Run_SqlServerNodaTimeOn_GivesCodeGenModelsNodaTimeTypes()
     {
-        var run = RunOrders([SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")]);
+        var run = RunDates(
+            "-- library-types: nodatime=on\n\n-- name: ListDates\nSELECT d FROM dates;\n",
+            [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")]
+        );
+
+        // The method calls the library's generated conversion, which a later change emits, so the compilation is not
+        // asked to be clean.
+        run.Diagnostics.ShouldBeEmpty();
+        var column = QueryOf(run).Columns.ShouldNotBeNull().ShouldHaveSingleItem();
+        column.Text.ShouldBe("global::NodaTime.LocalDate");
+        column.Library.ShouldBe(SqlLibrary.NodaTime);
+        run.Sources[ModelFiles(run).ShouldHaveSingleItem()].ShouldContain("(global::NodaTime.LocalDate? D);");
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("global::NodaTime.LocalDate");
+    }
+
+    [Fact]
+    public void Run_SqlServerNodaTimeOn_ModelsClaimKeepsDateTime()
+    {
+        const string Models = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                public partial class Rows;
+            }
+            """;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- library-types: nodatime=on\n\n-- name: ListDates\nSELECT d FROM dates;\n"
+        );
+
+        var run = MethodRuns.RunSqlServer(
+            file,
+            [DatesEntry(file)],
+            Models,
+            [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")]
+        );
 
         run.ShouldBeClean();
-        var query = QueryOf(run);
-        var column = query.Columns.ShouldNotBeNull().ShouldHaveSingleItem();
+        var model = ModelFiles(run).ShouldHaveSingleItem();
+        run.Sources[model].ShouldContain("(" + DateTime + "? D);");
+        run.Sources[model].ShouldNotContain("NodaTime");
+    }
+
+    [Fact]
+    public void Run_SqlServerNodaTimeDefault_IsOff()
+    {
+        var run = RunDates(
+            "-- name: ListDates\nSELECT d FROM dates;\n",
+            [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")]
+        );
+
+        run.ShouldBeClean();
+        var column = QueryOf(run).Columns.ShouldNotBeNull().ShouldHaveSingleItem();
         column.Text.ShouldBe(DateTime);
         column.Library.ShouldBeNull();
-        column.WithoutLibrary.ShouldBeNull();
-        query.UnavailableLibraries.ShouldBeEmpty();
+        run.Sources[ModelFiles(run).ShouldHaveSingleItem()].ShouldContain("(" + DateTime + "? D);");
     }
 
     [Fact]
@@ -541,6 +590,22 @@ public sealed class LibraryTypeTests
             settings: settings,
             otherFiles: folderFile is null ? null : [GeneratorHarness.SettingsFile(FolderSettingsPath, folderFile)]
         );
+    }
+
+    // ListDates of the file, whose one column, d, is a nullable date.
+    private static SidecarEntry DatesEntry(SqlFile file) =>
+        MethodRuns.SqlServerEntry(
+            file,
+            "ListDates",
+            [],
+            [TestSidecars.Column(0, "d", TestSidecars.SqlServer("date", 3), nullable: true)]
+        );
+
+    // ListDates of this text at CodeGen under mssql.
+    private static GeneratorRun RunDates(string text, MetadataReference[] references)
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, text);
+        return MethodRuns.RunSqlServer(file, [DatesEntry(file)], references: references);
     }
 
     // ListOrders under mssql, whose one column, placed_at, is a datetime2, with NodaTime on in the project's settings

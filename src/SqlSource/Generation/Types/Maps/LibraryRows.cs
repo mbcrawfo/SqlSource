@@ -6,9 +6,10 @@ using SqlSource.Snapshot;
 namespace SqlSource.Generation.Types.Maps;
 
 /// <summary>
-/// The rows of the libraries that are on, which <see cref="PostgresTypeMap.Map" /> asks after the type override and
-/// before the base map.  A row gives a library's own C# type for a type of <c>pg_catalog</c>, and writes it
-/// <c>global::</c>-qualified: the generator names no library type itself.  Its <c>Detail</c> is the library as a place,
+/// The rows of the libraries that are on, which <see cref="PostgresTypeMap.Map" /> and
+/// <see cref="SqlServerTypeMap.Map" /> ask after the type override and before the base map.  A row gives a library's
+/// own C# type for a type of <c>pg_catalog</c> or a system type of SQL Server, and writes it <c>global::</c>-qualified:
+/// the generator names no library type itself.  Its <c>Detail</c> is the library as a place,
 /// <see cref="PlaceOf" />, so that the type has a place and the base map's type beside it, which a converter converts
 /// from and to.
 /// </summary>
@@ -16,13 +17,15 @@ internal sealed class LibraryRows
 {
     // The only library there is: its set is the only one that is not empty.  A second library makes one instance for
     // each set of libraries, cached the same way.
-    private static readonly LibraryRows NodaTimeOnly = new(NodaTimeRows());
+    private static readonly LibraryRows NodaTimeOnly = new(NodaTimeRows(), NodaTimeSqlServerRows());
 
     private readonly Dictionary<string, TypeMapping> _rows;
+    private readonly Dictionary<string, TypeMapping> _sqlServerRows;
 
-    private LibraryRows(Dictionary<string, TypeMapping> rows)
+    private LibraryRows(Dictionary<string, TypeMapping> rows, Dictionary<string, TypeMapping> sqlServerRows)
     {
         _rows = rows;
+        _sqlServerRows = sqlServerRows;
     }
 
     /// <summary>
@@ -58,6 +61,45 @@ internal sealed class LibraryRows
     /// </summary>
     public TypeMapping? Find(PostgresType type) =>
         PostgresTypeMap.IsSystemType(type) && _rows.TryGetValue(type.InternalName, out var row) ? row : null;
+
+    /// <summary>
+    /// The library's mapping of <paramref name="type" />, or null when it has none: a system type that a row names, by
+    /// its <see cref="SqlServerTypeMap.BaseName" /> ignoring case, which drops its facets.  The caller asks only for a
+    /// type that is not a CLR user type.
+    /// </summary>
+    public TypeMapping? Find(SqlServerType type) =>
+        !string.IsNullOrEmpty(type.Name)
+        && _sqlServerRows.TryGetValue(SqlServerTypeMap.BaseName(type.Name), out var row)
+            ? row
+            : null;
+
+    private static Dictionary<string, TypeMapping> NodaTimeSqlServerRows()
+    {
+        const string Noda = "global::NodaTime.";
+        var rows = new Dictionary<string, TypeMapping>(StringComparer.OrdinalIgnoreCase);
+        var place = PlaceOf(SqlLibrary.NodaTime);
+
+        void Add(string text, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                rows.Add(
+                    key,
+                    TypeMapping.Mapped(key, Noda + text, true) with
+                    {
+                        Detail = place,
+                        Library = SqlLibrary.NodaTime,
+                    }
+                );
+            }
+        }
+
+        Add("LocalDate", "date");
+        Add("LocalTime", "time");
+        Add("LocalDateTime", "datetime2", "datetime", "smalldatetime");
+        Add("OffsetDateTime", "datetimeoffset");
+        return rows;
+    }
 
     private static Dictionary<string, TypeMapping> NodaTimeRows()
     {
