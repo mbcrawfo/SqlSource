@@ -55,6 +55,13 @@ internal sealed class SidecarCursor(string text)
     }
 
     /// <summary>
+    /// Moves past the value of the key <see cref="NextKey" /> returned, as it moves past an unknown key's.  The
+    /// <c>default</c> of each switch over a list of keys calls it: every key of the list has its own <c>case</c>, and a
+    /// key added without one is then skipped, never read as another key.
+    /// </summary>
+    public void SkipValue() => _ = Skip(Next());
+
+    /// <summary>
     /// Reads the next key of the object being read, and its colon.  False at the object's end.
     /// </summary>
     public bool NextMember(out SidecarToken key)
