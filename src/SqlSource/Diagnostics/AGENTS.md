@@ -9,7 +9,7 @@ The generator's are in `Diagnostics/SqlDiagnostics.cs`, and the errors of the `s
 - **Write each `new DiagnosticDescriptor(...)` out in full, with a literal id.**  The release-tracking analyzer reads the arguments, and a helper that builds descriptors hides them from it.
 - **`Diagnostics/SettingsFileDiagnostics.cs` is the one place a `SettingsFileError` becomes a diagnostic**, `SQLSRC015` to `SQLSRC020`, at the line and column of its span, for the build and the tool alike.
 - **An id below 100 is about the type or the project, one from 101 about a `.sql` file, and one from 200 about the snapshot or the tool** (`tests/SqlSource.Tests/Diagnostics/ToolDiagnosticsTests.cs` holds the tool's).
-- **`SQLSRC200` to `SQLSRC282` and `SQLSRC284` are taken**, and phase 7 takes `SQLSRC283`, which its spec, `docs/superpowers/specs/2026-10-26-query-generation-phase-7-library-maps-design.md`, assigns.
+- **`SQLSRC200` to `SQLSRC284` are taken.**
 - **Add a new `SqlParseErrorKind` at the end**: the parser ids follow its order.
 
 ## Diagnostics with no position

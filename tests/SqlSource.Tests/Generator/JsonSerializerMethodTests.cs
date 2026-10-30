@@ -27,6 +27,9 @@ public sealed class JsonSerializerMethodTests
     // System.Text.Json's class of generated conversions, which the serializer never needs.
     private const string JsonClassFile = "SqlSource-JsonConversions.g.cs";
 
+    // The place a parameter's opt-in is written, as SQLSRC283 names it.
+    private const string ParamPlace = "the -- param: marker of the parameter";
+
     // App.Sample, which claims the queries, with the classes the tests map: a class, a record and a value type.
     private const string Source = """
         using SqlSource;
@@ -61,6 +64,15 @@ public sealed class JsonSerializerMethodTests
     private static readonly PostgresType JsonbArray = ArrayOf(Jsonb, "_jsonb") with { BindName = "jsonb[]" };
 
     private static readonly SqlServerType SqlServerJson = TestSidecars.SqlServer("json", -1, 0);
+
+    private static readonly SqlServerType NVarCharMax = TestSidecars.SqlServer("nvarchar(max)", -1, 0);
+
+    private static readonly PostgresType Text = Catalog("text") with { BindName = "text" };
+
+    private static readonly PostgresType TextArray = ArrayOf(Text, "_text") with { BindName = "text[]" };
+
+    // The columns and parameters of SaveMeta.
+    private static readonly string[] MetaNames = ["meta", "maybe_meta"];
 
     // The serializer reads and sends the class, whichever place chose it, and the method throws on a JSON null for the
     // column that is not null; no class of conversions is emitted.
@@ -524,6 +536,383 @@ public sealed class JsonSerializerMethodTests
         methods.ShouldContain(Deserialize);
         methods.ShouldContain(Serialize);
         run.Sources.Keys.ShouldNotContain(JsonClassFile);
+    }
+
+    // The JSON opt-in on nvarchar(max) reads and sends the class through the serializer, whichever of the four places
+    // says it, and the parameter is bound as the column's type, NVarChar at -1.  The -- param: marker gives the
+    // parameters; the place gives the columns, or for the -- param: marker alone none, and they stay strings.
+    [Theory]
+    [InlineData("param marker")]
+    [InlineData("query marker")]
+    [InlineData("header")]
+    [InlineData("settings file")]
+    public void Run_OptInOnNvarcharMax_ReadsAndWritesThroughTheSerializer(string place)
+    {
+        var run = RunOptIn("SqlClient 7", place, NVarCharMax);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        ShouldReadThroughTheSerializer(methods, place);
+        methods.ShouldContain("parameter.SqlDbType = global::System.Data.SqlDbType.NVarChar;\n");
+        methods.ShouldContain("parameter.Size = -1;\n");
+        methods.ShouldContain(
+            "parameter.Value = parameters.Meta is { } value ? (object)"
+                + Serialize
+                + OrderMetadata
+                + ">(value) : global::System.DBNull.Value;\n"
+        );
+        methods.ShouldNotContain("SqlDbType.Json");
+    }
+
+    // The same on text, bound as text.
+    [Theory]
+    [InlineData("param marker")]
+    [InlineData("query marker")]
+    [InlineData("header")]
+    [InlineData("settings file")]
+    public void Run_OptInOnText_ReadsAndWritesThroughTheSerializer(string place)
+    {
+        var run = RunOptIn("Npgsql 10", place, Text);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        ShouldReadThroughTheSerializer(methods, place);
+        methods.ShouldContain("var parameter = new global::Npgsql.NpgsqlParameter<string>();\n");
+        methods.ShouldContain("parameter.DataTypeName = \"pg_catalog.text\";\n");
+        methods.ShouldContain(
+            "parameter.TypedValue = parameters.Meta is { } value ? " + Serialize + OrderMetadata + ">(value) : null;\n"
+        );
+        methods.ShouldNotContain("jsonb");
+    }
+
+    // On a type that holds JSON the opt-in is allowed and changes nothing: the generated text is the same with and
+    // without the word, on each of the four places.
+    [Theory]
+    [InlineData("Npgsql 10", "param marker")]
+    [InlineData("Npgsql 10", "query marker")]
+    [InlineData("Npgsql 10", "header")]
+    [InlineData("Npgsql 10", "settings file")]
+    [InlineData("SqlClient 7", "query marker")]
+    [InlineData("SqlClient 7", "settings file")]
+    public void Run_OptInOnJsonb_ChangesNothing(string driver, string place)
+    {
+        SidecarType database = IsSqlServer(driver) ? SqlServerJson : Jsonb;
+
+        var withWord = RunOptIn(driver, place, database);
+        var without = RunOptIn(driver, place, database, json: false);
+
+        withWord.ShouldBeClean();
+        without.ShouldBeClean();
+        withWord.Sources.Keys.ShouldBe(without.Sources.Keys, ignoreOrder: true);
+        foreach (var (name, text) in without.Sources)
+        {
+            withWord.Sources[name].ShouldBe(text);
+        }
+
+        withWord.Sources[MethodRuns.MethodsFile].ShouldContain(Serialize + OrderMetadata + ">(");
+    }
+
+    // The opt-in on a type that the base map does not read as a string, and that holds no JSON, is SQLSRC283 at the
+    // query, once for each column and parameter that says it, and the query gets no method.
+    [Theory]
+    [InlineData("Npgsql 10", "param marker", ParamPlace)]
+    [InlineData("Npgsql 10", "query marker", "a -- column: marker of the query")]
+    [InlineData("Npgsql 10", "header", "a -- column: marker in the file header")]
+    [InlineData("Npgsql 10", "settings file", "the columnTypes of the settings file /sqlsource.json")]
+    [InlineData("SqlClient 7", "query marker", "a -- column: marker of the query")]
+    public void Run_OptInOnInt_IsSQLSRC283(string driver, string place, string written)
+    {
+        var isSqlServer = IsSqlServer(driver);
+        var database = isSqlServer
+            ? TestSidecars.SqlServer()
+            : (SidecarType)(Catalog("int4") with { BindName = "int4" });
+
+        var run = RunOptIn(driver, place, database);
+
+        string[] subjects = place == "param marker" ? ["parameter"] : ["column", "parameter"];
+        ShouldBeSQLSRC283(
+            run,
+            subjects,
+            "App.OrderMetadata",
+            written,
+            "the database type '" + (isSqlServer ? "int" : "int4") + "' is read as 'int', not as a string",
+            line: place == "header" ? 4 : 1
+        );
+    }
+
+    // A type of System.Text.Json is read without the serializer, so the opt-in with it is SQLSRC283, on a string type
+    // and on one that holds JSON.
+    [Theory]
+    [InlineData("SqlClient 7", "System.Text.Json.JsonElement")]
+    [InlineData("Npgsql 10", "System.Text.Json.Nodes.JsonNode")]
+    public void Run_OptInWithJsonElement_IsSQLSRC283(string driver, string type)
+    {
+        var isSqlServer = IsSqlServer(driver);
+
+        var run = RunOptIn(driver, "query marker", isSqlServer ? NVarCharMax : Jsonb, type: type);
+
+        ShouldBeSQLSRC283(
+            run,
+            ["column", "parameter"],
+            type,
+            "a -- column: marker of the query",
+            "'" + type + "' is a type of System.Text.Json, which is read without the serializer"
+        );
+    }
+
+    // A type the base map gives, as string, is never serialized, so the opt-in with it is SQLSRC283.
+    [Theory]
+    [InlineData("SqlClient 7", "string")]
+    [InlineData("Npgsql 10", "string")]
+    [InlineData("Npgsql 10", "long")]
+    public void Run_OptInWithString_IsSQLSRC283(string driver, string type)
+    {
+        var run = RunOptIn(driver, "query marker", IsSqlServer(driver) ? NVarCharMax : Text, type: type);
+
+        ShouldBeSQLSRC283(
+            run,
+            ["column", "parameter"],
+            type,
+            "a -- column: marker of the query",
+            "'" + type + "' is a type that the driver reads, which the serializer never takes"
+        );
+    }
+
+    // An array of text is read as string[], not as a string, so the opt-in on it is SQLSRC283, whole or by element.
+    [Theory]
+    [InlineData("App.OrderMetadata[]")]
+    [InlineData("App.OrderMetadata")]
+    public void Run_OptInOnTextArray_IsSQLSRC283(string type)
+    {
+        var run = RunOptIn("Npgsql 10", "query marker", TextArray, type: type);
+
+        ShouldBeSQLSRC283(
+            run,
+            ["column", "parameter"],
+            type,
+            "a -- column: marker of the query",
+            "the database type 'text[]' is read as 'string[]', not as a string"
+        );
+    }
+
+    // A type that the base map gives no C# type, as a composite, is not read as a string either.
+    [Fact]
+    public void Run_OptInOnAComposite_IsSQLSRC283()
+    {
+        var composite = TestSidecars.Postgres(
+            name: "address",
+            kind: SidecarValues.Kind.Composite,
+            schema: "public",
+            internalName: "address",
+            bindName: "address"
+        );
+
+        var run = RunOptIn("Npgsql 10", "query marker", composite);
+
+        ShouldBeSQLSRC283(
+            run,
+            ["column", "parameter"],
+            "App.OrderMetadata",
+            "a -- column: marker of the query",
+            "the database type 'public.address' is not read as a string"
+        );
+    }
+
+    // A query whose output is models uses no conversion: the opt-in that does not apply reports nothing, and the
+    // model has the class.
+    [Theory]
+    [InlineData("Npgsql 10")]
+    [InlineData("SqlClient 7")]
+    public void Run_OptInInAModelsQuery_ReportsNothing(string driver)
+    {
+        var isSqlServer = IsSqlServer(driver);
+        var database = isSqlServer
+            ? TestSidecars.SqlServer()
+            : (SidecarType)(Catalog("int4") with { BindName = "int4" });
+
+        var run = RunMeta(
+            driver,
+            "-- name: SaveMeta\n-- output: models\n" + Markers("json App.OrderMetadata") + SaveMeta,
+            type: database
+        );
+
+        run.ShouldBeClean();
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+        run.Sources["App.SaveMetaDto-Model.g.cs"].ShouldContain(OrderMetadata + " Meta");
+        run.Sources["App.SaveMetaParams-Model.g.cs"].ShouldContain(OrderMetadata + " Meta");
+    }
+
+    // A type override of jsonb to the class reaches a models query and a codegen query of one file: the models
+    // query's model keeps the class, with nothing reported, and the codegen query's method serializes it.
+    [Theory]
+    [InlineData("Npgsql 10", "jsonb")]
+    [InlineData("SqlClient 7", "json")]
+    public void Run_OverrideToAClassSharedByModelsAndCodeGen(string driver, string key)
+    {
+        var isSqlServer = IsSqlServer(driver);
+        SidecarType database = isSqlServer ? SqlServerJson : Jsonb;
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: "
+                + key
+                + "=App.OrderMetadata\n\n-- name: SaveMeta\n"
+                + SaveMeta
+                + "\n-- name: ReadMeta\n-- output: models\nSELECT meta FROM orders WHERE meta = @meta;\n"
+        );
+        SidecarParameter[] parameters =
+        [
+            TestSidecars.Parameter(0, "meta", database, false),
+            TestSidecars.Parameter(0, "maybe_meta", database, true),
+        ];
+        SidecarColumn[] columns =
+        [
+            TestSidecars.Column(0, "meta", database, nullable: false),
+            TestSidecars.Column(0, "maybe_meta", database, nullable: true),
+        ];
+        SidecarEntry[] entries = isSqlServer
+            ?
+            [
+                MethodRuns.SqlServerEntry(file, "SaveMeta", parameters, columns),
+                MethodRuns.SqlServerEntry(file, "ReadMeta", parameters[..1], columns[..1]),
+            ]
+            : [Entry(file, "SaveMeta", parameters, columns), Entry(file, "ReadMeta", parameters[..1], columns[..1])];
+
+        var run = isSqlServer ? MethodRuns.RunSqlServer(file, entries, Source) : MethodRuns.Run(file, entries, Source);
+
+        run.ShouldBeClean();
+        run.Sources["App.ReadMetaDto-Model.g.cs"].ShouldContain(OrderMetadata + " Meta");
+        run.Sources["App.ReadMetaParams-Model.g.cs"].ShouldContain(OrderMetadata + " Meta");
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(Deserialize + OrderMetadata + ">(reader.GetFieldValue<string>(0))");
+        methods.ShouldContain(Serialize + OrderMetadata + ">(value)");
+        methods.ShouldNotContain("ReadMeta");
+    }
+
+    // A converter of the project between string and the class replaces the serializer on an opt-in column too.
+    [Theory]
+    [InlineData("Npgsql 10")]
+    [InlineData("SqlClient 7")]
+    public void Run_ProjectConverterOfTheClass_ReplacesTheSerializerOnAnOptIn(string driver)
+    {
+        var run = RunMeta(
+            driver,
+            "-- name: SaveMeta\n" + Markers("json App.OrderMetadata") + SaveMeta,
+            ConvertersSource(
+                "[SqlSourceConverter] public static OrderMetadata FromJson(string value) => new() { Note = value };\n"
+                    + "[SqlSourceConverter] public static string ToJson(OrderMetadata value) => value.Note ?? \"\";"
+            ),
+            type: IsSqlServer(driver) ? NVarCharMax : Text
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("(global::App.OrderMetadata.FromJson(reader.GetFieldValue<string>(0)), ");
+        methods.ShouldContain("global::App.OrderMetadata.ToJson(value)");
+        methods.ShouldNotContain("JsonSerializer");
+        methods.ShouldNotContain("holds a JSON null");
+    }
+
+    // SaveMeta with the opt-in, or with the plain mapping when json is false, to the type at the place: the -- param:
+    // markers give the parameters, and the place the columns, but for the -- param: marker alone.
+    private static GeneratorRun RunOptIn(
+        string driver,
+        string place,
+        SidecarType database,
+        bool json = true,
+        string type = "App.OrderMetadata"
+    )
+    {
+        var marked = (json ? "json " : "") + type;
+        var flag = json ? "true" : "false";
+        var settings =
+            place == "settings file"
+                ? "{\"columnTypes\": {\"orders.meta\": {\"type\": \""
+                    + type
+                    + "\", \"json\": "
+                    + flag
+                    + "}, \"orders.maybe_meta\": {\"type\": \""
+                    + type
+                    + "\", \"json\": "
+                    + flag
+                    + "}}}"
+                : null;
+        var text = place switch
+        {
+            "param marker" => "-- name: SaveMeta\n" + ParamMarkers(marked) + SaveMeta,
+            "query marker" => "-- name: SaveMeta\n" + Markers(marked) + SaveMeta,
+            "header" => "-- column: orders.meta -> "
+                + marked
+                + "\n-- column: orders.maybe_meta -> "
+                + marked
+                + "\n\n-- name: SaveMeta\n"
+                + ParamMarkers(marked)
+                + SaveMeta,
+            _ => "-- name: SaveMeta\n" + ParamMarkers(marked) + SaveMeta,
+        };
+        return RunMeta(driver, text, settings: settings, type: database);
+    }
+
+    // The serializer's read of both columns, when the place gave them the class, and the driver's of a string when it
+    // did not.
+    private static void ShouldReadThroughTheSerializer(string methods, string place)
+    {
+        if (place == "param marker")
+        {
+            methods.ShouldContain("reader.GetFieldValue<string>(0), ");
+            methods.ShouldNotContain(Deserialize);
+            return;
+        }
+
+        methods.ShouldContain(
+            "("
+                + Deserialize
+                + OrderMetadata
+                + ">(reader.GetFieldValue<string>(0)) ?? throw new global::System.InvalidCastException("
+                + "\"Column 'meta' holds a JSON null.\"), "
+        );
+        methods.ShouldContain(
+            "reader.IsDBNull(1) ? default("
+                + OrderMetadata
+                + "?) : "
+                + Deserialize
+                + OrderMetadata
+                + ">(reader.GetFieldValue<string>(1)))"
+        );
+    }
+
+    // SQLSRC283 for meta and maybe_meta as each subject, at SaveMeta's name on the line given, and no method: a column
+    // names the place given, and a parameter its -- param: marker.
+    private static void ShouldBeSQLSRC283(
+        GeneratorRun run,
+        string[] subjects,
+        string type,
+        string place,
+        string reason,
+        int line = 1
+    )
+    {
+        var at = "SQLSRC283 " + GeneratorHarness.UsersPath + "(" + line + ",10)-(" + line + ",18): ";
+        var expected = subjects
+            .SelectMany(subject =>
+                MetaNames.Select(name =>
+                    (Subject: subject + " '" + name + "'", Place: subject == "parameter" ? ParamPlace : place)
+                )
+            )
+            .Select(named =>
+                at
+                + "The "
+                + named.Subject
+                + " is mapped to json '"
+                + type
+                + "' in "
+                + named.Place
+                + ", but "
+                + reason
+                + ".  Remove json, or use it only to map a column or parameter of a string or JSON type to a class "
+                + "of this project."
+            );
+        run.Problems().ShouldBe(expected, ignoreOrder: true);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
     }
 
     private static bool IsSqlServer(string driver) => driver.StartsWith("SqlClient", System.StringComparison.Ordinal);

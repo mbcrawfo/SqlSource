@@ -992,6 +992,24 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the column or parameter, as "column 'meta'", {1} its C# type, as ClrTypeName.AsWritten writes it, {2} the
+    // place that chose it, as SQLSRC250's {3}, and {3} why the opt-in does not apply: "the database type '<its key>' is
+    // read as '<the base map's type>', not as a string", or "is not read as a string" for one the base map gives no C#
+    // type; "'<the type>' is a type of System.Text.Json, which is read without the serializer"; or "'<the type>' is a
+    // type that the driver reads, which the serializer never takes".  Reported at the query's name, by
+    // ConversionPlanner, for codegen queries only, once for each column and parameter whose place says json.
+    public static readonly DiagnosticDescriptor JsonOptInNotApplicable = new(
+        id: "SQLSRC283",
+        title: "JSON opt-in does not apply",
+        messageFormat: "The {0} is mapped to json '{1}' in {2}, but {3}.  Remove json, or use it only to map a column "
+            + "or parameter of a string or JSON type to a class of this project.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc283",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     // {0} to {3} as SQLSRC250's, {4} the short name as written, without its type arguments, {5} the full name of the
     // type it finds, as a user writes it, and {6} the name of the type's assembly, which only a package that the
     // project does not reference itself brings.  Reported at the query's name, for each column and parameter.
@@ -1094,6 +1112,7 @@ internal static class SqlDiagnostics
             ConverterDirectionMissing,
             LibraryNotReferenced,
             LibraryBelowTheFloor,
+            JsonOptInNotApplicable,
             ShortNameFindsAPackagesType
         );
 

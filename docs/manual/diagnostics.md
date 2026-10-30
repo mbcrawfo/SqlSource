@@ -208,6 +208,12 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC281](#sqlsrc281) | A library that is on is not referenced |
 | [SQLSRC282](#sqlsrc282) | A library is older than SqlSource supports |
 
+**The JSON opt-in**
+
+| Id | Title |
+|----|----|
+| [SQLSRC283](#sqlsrc283) | JSON opt-in does not apply |
+
 **A short name of your choice**
 
 | Id | Title |
@@ -239,6 +245,8 @@ The ids from `SQLSRC272` to `SQLSRC276` are reported by the build, about the [me
 The ids from `SQLSRC277` to `SQLSRC280` are reported by the build, about converters, the methods marked `[SqlSourceConverter]`.  `SQLSRC277` and `SQLSRC278` are about the methods of the project's own code: at the method's name, whatever the output of the project, its types and its files, and whether a query uses the method or not.  A converter of a type that a type override, a column type or a `-- param:` marker names, declared in a referenced assembly, has no place in the project, so `SQLSRC277` and `SQLSRC278` are reported for it at the name of each query whose output is `codegen` and whose method would use it.  `SQLSRC279` and `SQLSRC280` are about a column or a parameter of a query whose output is `codegen`, whose C# type a type override, a column type or a `-- param:` marker chose, and whose type has converters that do not serve it.  Each of these at a query is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.  A project whose output is `models` uses no converter, and gets none of them at a query, and neither does a query whose database's driver the project does not reference, which [SQLSRC273](#sqlsrc273) is about.
 
 `SQLSRC281` is reported by the build, about the [library types](settings.md#setting-library-types) of a query whose output is `codegen`: at the entry of a settings file or the marker that turns a library on, once for each database whose queries it reaches, and never for a query whose output is `models` or `sql`.  The query keeps its models and its method.  `SQLSRC282` is reported by the build, about the version of a library that a query whose output is `codegen` uses: with no file and line, once for the project and library, however many queries use it.  Those queries get no method until it is fixed; their models are still generated.
+
+`SQLSRC283` is reported by the build, as `SQLSRC279` and `SQLSRC280` are, at the name of a query whose output is `codegen`, once for each column and parameter whose C# type you chose with the word `json` before it.  The query gets no method until it is fixed; its models are still generated.  A query whose output is `models` reads the word and gets none of it.
 
 `SQLSRC284` is reported by the build, as `SQLSRC250` to `SQLSRC252` are, at the name of a query whose output is `models` or `codegen`, once for each column and parameter whose C# type you chose by a short name that it is about.  It is a warning, and the query keeps the type: it gets its models, and under `codegen` its method.
 
@@ -2755,6 +2763,20 @@ CSC : error SQLSRC282: This project references NodaTime 3.1.8, and SqlSource nee
 Until the package is updated, a query that uses the library gets no method; its models are still generated, with the library's types.  Any other error about its method is reported beside this one: fix it too, or the query still has no method once the package is updated.  The queries that do not use the library keep their methods.  Update the package to the version the message gives or later.  When another package brings the older version, reference the library's package from the project itself, at the version you want.  The error has no file and line, because it is about the project's references, and it is reported once for the project and library, however many queries use the library, and never for a query whose output is `models` or `sql`.
 
 See: [Library types](settings.md#setting-library-types)
+
+## SQLSRC283
+
+**JSON opt-in does not apply**
+
+A column type, a `-- column:` marker or a `-- param:` marker gives a column or a parameter of a query whose output is `codegen` a C# type with the word `json` before it, `"json": true` in a settings file or `-> json OrderMetadata` in a marker, and the opt-in cannot read and send that column or parameter as JSON.  The opt-in says that a column of a string type, such as `text` or `nvarchar(max)`, holds JSON, so that your own class is read and sent through System.Text.Json's serializer, as a `json` or `jsonb` column of it is.  It does not apply to a column or parameter of any other database type, such as `int` or `text[]`, or with a C# type that is not a class of your own: a type of System.Text.Json, such as `JsonElement`, or a type that the database's driver reads, such as `string` or `long`.  The message names the column or parameter, its C# type, the place that chose it, as [SQLSRC250](#sqlsrc250) does, and the reason.
+
+```console
+/work/App/Queries/Orders.sql(1,10): error SQLSRC283: The column 'id' is mapped to json 'App.OrderMetadata' in a -- column: marker of the query, but the database type 'int4' is read as 'int', not as a string.  Remove json, or use it only to map a column or parameter of a string or JSON type to a class of this project.
+```
+
+Remove the word `json` from the place the message names, or `"json": true` from the column type, to map the column or parameter as any other type is mapped.  Or move the opt-in to the column or parameter that holds JSON, and give it your class: a `string` column of a database that has no JSON type, or a `json` or `jsonb` column, on which the opt-in is allowed and changes nothing.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.  A query whose output is `models` is not reported.
+
+See: [Column types](settings.md#setting-column-types), [`-- param:`](parameters-and-tokens.md#param-marker)
 
 ## SQLSRC284
 

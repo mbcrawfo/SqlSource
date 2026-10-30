@@ -32,6 +32,11 @@ namespace SqlSource.Generation.Methods;
 /// it, whole or, for an array of a type that holds JSON, element by element.  The serializer never reports anything: a
 /// class with converters of other types keeps the rules above.
 /// </para>
+/// <para>
+/// The JSON opt-in, a place that wrote <c>json</c> before the type, makes a type read as <c>string</c> hold JSON for
+/// the serializer.  It is checked before any edge: on a type that neither holds JSON nor is read as <c>string</c>, or
+/// with a type the serializer never takes, it is <c>SQLSRC283</c>, which blocks the query.
+/// </para>
 /// </remarks>
 internal static class ConversionPlanner
 {
@@ -84,6 +89,22 @@ internal static class ConversionPlanner
         // which the element of a conversion by element keeps, so that a nullable element is seen as one.
         var text = ClrTypeName.KeywordTextOf(type.Text);
         var element = EdgeElementOf(text);
+        if (type.IsJson && OptInProblemOf(text, database, type.Key, decision) is { } reason)
+        {
+            context.Problems.Add(
+                DiagnosticInfo.Create(
+                    SqlDiagnostics.JsonOptInNotApplicable,
+                    context.At,
+                    subject,
+                    ClrTypeName.AsWritten(text),
+                    type.Place,
+                    reason
+                )
+            );
+            blocked = true;
+            return null;
+        }
+
         if (database.Text is not { } databaseText)
         {
             // A foreign type with converters, else a foreign element with them, which the message names.
@@ -162,7 +183,7 @@ internal static class ConversionPlanner
             return null;
         }
 
-        var holdsJson = database.HoldsJson;
+        var holdsJson = database.HoldsJson || (type.IsJson && databaseText.Equals(JsonText, StringComparison.Ordinal));
         if (TakesSerializer(holdsJson, databaseText, text, decision))
         {
             return new Conversion(
@@ -198,6 +219,30 @@ internal static class ConversionPlanner
         return element is not null && element.EndsWith("?", StringComparison.Ordinal)
             ? element.Substring(0, element.Length - 1)
             : element;
+    }
+
+    // Why the JSON opt-in does not apply to the type on the database type, as SQLSRC283's {3} words it, or null when it
+    // does: on a type that holds JSON or is read as string, with a type the serializer takes.
+    private static string? OptInProblemOf(string type, DatabaseType database, string key, Decision decision)
+    {
+        if (!database.HoldsJson && !JsonText.Equals(database.Text, StringComparison.Ordinal))
+        {
+            return database.Text is { } read
+                ? "the database type '" + key + "' is read as '" + ClrTypeName.AsWritten(read) + "', not as a string"
+                : "the database type '" + key + "' is not read as a string";
+        }
+
+        var bare = WithoutQuestionMark(type);
+        if (JsonTypes.IsJsonType(bare))
+        {
+            return "'"
+                + ClrTypeName.AsWritten(bare)
+                + "' is a type of System.Text.Json, which is read without the serializer";
+        }
+
+        return decision.IsSerializable(bare)
+            ? null
+            : "'" + ClrTypeName.AsWritten(bare) + "' is a type that the driver reads, which the serializer never takes";
     }
 
     // Whether the serializer reads and sends the type, the property's or its element's: a class that no converter

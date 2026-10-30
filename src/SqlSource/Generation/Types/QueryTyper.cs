@@ -134,6 +134,7 @@ internal static class QueryTyper
                 parameter.Type is { } sidecarType && MarkedParameter(declared, parameter.Name) is { } marked
                     ? Chosen(
                         marked.ClrType!,
+                        marked.IsJson,
                         ParamMarker,
                         prefix + marked.Name,
                         sidecarType,
@@ -183,6 +184,7 @@ internal static class QueryTyper
         {
             return Chosen(
                 marked,
+                marker.IsJson,
                 QueryColumnMarker,
                 marker.Name,
                 column.Type,
@@ -196,6 +198,7 @@ internal static class QueryTyper
         {
             return Chosen(
                 type,
+                source.IsJson,
                 ColumnTypePlaceOf(source.Place),
                 source.Key,
                 column.Type,
@@ -254,6 +257,7 @@ internal static class QueryTyper
     /// converter's message names, and <paramref name="key" /> as its <c>Mapped</c>, which the model's message names.
     /// </summary>
     /// <param name="clrType">The C# type, as <c>ClrTypeName.Text</c> writes it.</param>
+    /// <param name="isJson">Whether the place wrote the word <c>json</c> before the C# type, the JSON opt-in.</param>
     /// <param name="place">Where it was chosen, as <c>SQLSRC250</c> to <c>SQLSRC252</c> name it.</param>
     /// <param name="key">What their messages name as mapped: <c>@author</c>, or the key of a column.</param>
     /// <param name="type">The database type.</param>
@@ -262,6 +266,7 @@ internal static class QueryTyper
     /// <param name="typing">What the typing of the query reads, and where its error goes.</param>
     private static PropertyType? Chosen(
         string clrType,
+        bool isJson,
         string place,
         string key,
         SidecarType type,
@@ -289,7 +294,8 @@ internal static class QueryTyper
                 place,
                 DatabaseTypeOf(type, typing),
                 key,
-                ElementIsValueType: mapping.ElementIsValueType
+                ElementIsValueType: mapping.ElementIsValueType,
+                IsJson: isJson
             );
         }
 

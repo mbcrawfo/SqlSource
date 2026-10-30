@@ -48,6 +48,12 @@ namespace SqlSource.Generation.Types;
 /// element by element, has no converter to say it.  It changes no model's C#, so <c>ModelCollector.FindDifference</c>
 /// does not compare it.
 /// </param>
+/// <param name="IsJson">
+/// Whether the place that chose the type wrote the word <c>json</c> before it, the JSON opt-in, which a column type, a
+/// <c>-- column:</c> marker or a <c>-- param:</c> marker can say: the column or parameter holds JSON, read and sent
+/// through System.Text.Json's serializer on a type read as <c>string</c>, and <paramref name="Place" /> is set.  It
+/// changes no model's C#, so <c>ModelCollector.FindDifference</c> does not compare it.
+/// </param>
 internal sealed record PropertyType(
     string Text,
     bool IsValueType,
@@ -59,5 +65,6 @@ internal sealed record PropertyType(
     string? Mapped = null,
     SqlLibrary? Library = null,
     PropertyType? WithoutLibrary = null,
-    bool ElementIsValueType = false
+    bool ElementIsValueType = false,
+    bool IsJson = false
 );
