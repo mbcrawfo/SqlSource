@@ -17,6 +17,7 @@ public sealed class SqlDiagnosticsTests
     // that says why.  Every other diagnostic is an error that a project cannot turn off.
     private static readonly Dictionary<string, DiagnosticSeverity> Configurable = new(StringComparer.Ordinal)
     {
+        ["SQLSRC121"] = DiagnosticSeverity.Warning,
         ["SQLSRC240"] = DiagnosticSeverity.Warning,
         ["SQLSRC245"] = DiagnosticSeverity.Warning,
         ["SQLSRC248"] = DiagnosticSeverity.Info,
@@ -97,6 +98,19 @@ public sealed class SqlDiagnosticsTests
             .ShouldBe(
                 "Token 'filter' and a comment overlap, so the token is read differently where comments are kept.  Keep "
                     + "a comment wholly inside the token's default, or outside the token."
+            );
+
+    [Fact]
+    public void ForParseError_ParameterInTwoSpellings_IsSqlsrc121() =>
+        SqlDiagnostics.ForParseError(SqlParseErrorKind.ParameterInTwoSpellings).Id.ShouldBe("SQLSRC121");
+
+    [Fact]
+    public void ParameterInTwoSpellings_Message_HoldsBothSpellings() =>
+        Format(SqlDiagnostics.ParameterInTwoSpellings, "@id", "@Id")
+            .ShouldBe(
+                "The parameter '@Id' is also written '@id'.  SqlSource binds it as '@Id', and a SQL Server whose "
+                    + "collation is case-sensitive reads '@id' as another variable, which the query does not declare.  "
+                    + "Write it '@Id' throughout the query."
             );
 
     [Fact]

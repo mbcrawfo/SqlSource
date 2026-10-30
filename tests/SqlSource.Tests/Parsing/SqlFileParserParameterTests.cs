@@ -412,4 +412,111 @@ public sealed class SqlFileParserParameterTests
             .ShouldHaveSingleItem()
             .Parameters.Select(static parameter => parameter.Name)
             .ShouldBe(["b"]);
+
+    [Fact]
+    public void Parse_SqlServerParameterInASecondSpelling_IsAWarningAtThatSpelling()
+    {
+        const string Text = "-- name: Q\nUPDATE dbo.t SET a = @Id WHERE b = @id\n";
+
+        Warnings(Text, SqlDialect.SqlServer)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ParameterInTwoSpellings,
+                    TextSpans.Of(Text, "@id"),
+                    "@id",
+                    "@Id"
+                ),
+            ]);
+        Parameters(Blocks(Text, dialect: SqlDialect.SqlServer).ShouldHaveSingleItem()).ShouldBe(["Id:<none>:<unsaid>"]);
+    }
+
+    [Fact]
+    public void Parse_EachExtraSpelling_IsWarnedOnceAtItsFirstPlace()
+    {
+        const string Text = "-- name: Q\nSELECT @Id, @id, @ID, @id\n";
+
+        Warnings(Text, SqlDialect.SqlServer)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ParameterInTwoSpellings,
+                    TextSpans.Of(Text, "@id"),
+                    "@id",
+                    "@Id"
+                ),
+                SqlParseError.Create(
+                    SqlParseErrorKind.ParameterInTwoSpellings,
+                    TextSpans.Of(Text, "@ID"),
+                    "@ID",
+                    "@Id"
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_SpellingInATokenDefault_IsWarned()
+    {
+        const string InSql = "-- name: Q\nSELECT a FROM t WHERE a = @Id {{f:AND b = @id}}\n";
+        const string InMarker =
+            "-- name: Q\n-- param: @Id int\n-- token: {{f:AND b = @id}}\nSELECT a FROM t WHERE 1 = 1 {{f}}\n";
+
+        Warnings(InSql, SqlDialect.SqlServer)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ParameterInTwoSpellings,
+                    TextSpans.Of(InSql, "@id"),
+                    "@id",
+                    "@Id"
+                ),
+            ]);
+        Warnings(InMarker, SqlDialect.SqlServer)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ParameterInTwoSpellings,
+                    TextSpans.Of(InMarker, "@id"),
+                    "@id",
+                    "@Id"
+                ),
+            ]);
+    }
+
+    // The marker names the parameter by its own spelling, and the list keeps the SQL's.
+    [Fact]
+    public void Parse_ParamMarkerInAnotherSpelling_IsNotWarned()
+    {
+        const string Text = "-- name: Q\n-- param: @Id int\nSELECT @id\n";
+
+        Warnings(Text, SqlDialect.SqlServer).ShouldBeEmpty();
+        Parameters(Blocks(Text, dialect: SqlDialect.SqlServer).ShouldHaveSingleItem())
+            .ShouldBe(["id:int:<unsaid>:declared"]);
+    }
+
+    [Theory]
+    [InlineData("-- name: Q\nSELECT @Id, @id\n", "postgres")]
+    [InlineData("-- name: Q\nSELECT @Id, @id\n", "ansi")]
+    [InlineData("-- name: Q\nDECLARE @n int = 1; SELECT @N\n", "mssql")]
+    [InlineData("-- name: Q\nSELECT @Id, '@id' -- @id\n", "mssql")]
+    [InlineData("-- name: Q\n-- generator: keep-comments\nSELECT @Id, '@id' -- @id\n", "mssql")]
+    [InlineData("-- name: A\nSELECT @Id\n-- name: B\nSELECT @id\n", "mssql")]
+    public void Parse_NoSecondSpellingOfAParameter_IsNotWarned(string text, string dialect)
+    {
+        var choice = dialect switch
+        {
+            "postgres" => SqlDialect.PostgreSql,
+            "mssql" => SqlDialect.SqlServer,
+            _ => SqlDialect.Ansi,
+        };
+
+        Warnings(text, choice).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Parse_FileWithAnErrorAndASecondSpelling_HasNoWarnings()
+    {
+        const string Text = "-- name: Q\nSELECT @Id, @id\n-- name: R\nSELECT 'open\n";
+
+        var result = SqlFileParser.Parse(Text, "Query.sql", SqlDialect.SqlServer);
+
+        result.Errors.ShouldNotBeEmpty();
+        result.Warnings.ShouldBeEmpty();
+    }
 }

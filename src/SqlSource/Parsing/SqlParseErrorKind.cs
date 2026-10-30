@@ -103,4 +103,10 @@ internal enum SqlParseErrorKind
     /// head, between its braces and its colon or closing braces.  Argument: the token's name.
     /// </summary>
     TokenCrossesComment,
+
+    /// <summary>
+    /// A parameter of a SQL Server query is written in a spelling other than its first, a warning.  Arguments: this
+    /// spelling and the first, each with its prefix.
+    /// </summary>
+    ParameterInTwoSpellings,
 }
