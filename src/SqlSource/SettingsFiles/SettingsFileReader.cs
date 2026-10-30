@@ -165,7 +165,8 @@ internal static class SettingsFileReader
                 SettingsFileValueType.String => kind == SidecarTokenKind.String,
                 SettingsFileValueType.Boolean => kind is SidecarTokenKind.True or SidecarTokenKind.False,
                 SettingsFileValueType.ArrayOfStrings => kind == SidecarTokenKind.ArrayStart,
-                SettingsFileValueType.ObjectOfStrings => kind == SidecarTokenKind.ObjectStart,
+                SettingsFileValueType.ObjectOfStrings or SettingsFileValueType.ObjectOfColumnTypes => kind
+                    == SidecarTokenKind.ObjectStart,
                 _ => false,
             };
 
@@ -225,7 +226,8 @@ internal static class SettingsFileReader
         {
             var members = new List<KeyValuePair<string, string>>();
             var (keySpans, valueSpans) = (new List<TextSpan>(), new List<TextSpan>());
-            var json = key == SettingsFileKeys.ColumnTypes ? new List<bool>() : null;
+            var json =
+                SettingsFileKeys.TypeOf(key) == SettingsFileValueType.ObjectOfColumnTypes ? new List<bool>() : null;
             while (NextMember(out var memberKey))
             {
                 var value = _tokens.Next();

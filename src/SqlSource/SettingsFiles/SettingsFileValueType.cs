@@ -14,4 +14,10 @@ internal enum SettingsFileValueType
 
     /// <summary>An object whose members' values are strings.</summary>
     ObjectOfStrings,
+
+    /// <summary>
+    /// An object whose members' values are strings, or objects of a <c>type</c> string and an optional <c>json</c>
+    /// boolean: the column types.
+    /// </summary>
+    ObjectOfColumnTypes,
 }

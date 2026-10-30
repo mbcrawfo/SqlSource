@@ -62,18 +62,23 @@ internal readonly struct SettingsFileSource(
     public void Invalid(SettingId setting, string value) =>
         Add(SettingsFileErrorKind.InvalidValue, ValueOf(setting).Spans[0], setting, value, null);
 
-    // An element is reported at its string; a member from its key to its value, with both.
+    // An element is reported at its string; a member from its key to its value, with both.  A member of the column
+    // types written as an object, whose span starts at its brace where a string's starts at its quote, quotes its type,
+    // or its key alone when the reader found no type in it.
     public void InvalidPart(SettingId setting, int index)
     {
         var value = ValueOf(setting);
         if (value.Members is { } members)
         {
+            var isObjectForm = value.Json is not null && text[value.Spans[index].Start] == '{';
+            var type = members[index].Value.Trim();
             Add(
                 SettingsFileErrorKind.InvalidValue,
                 TextSpan.FromBounds(value.KeySpans![index].Start, value.Spans[index].End),
                 setting,
                 members[index].Key.Trim(),
-                members[index].Value.Trim()
+                isObjectForm && type.Length == 0 ? null : type,
+                isObjectForm
             );
             return;
         }
@@ -97,6 +102,12 @@ internal readonly struct SettingsFileSource(
     // The level reader reports only a setting the source gave it.
     private SettingsFileValue ValueOf(SettingId setting) => values[(int)setting]!;
 
-    private void Add(SettingsFileErrorKind kind, TextSpan span, SettingId setting, string argument, string? other) =>
-        errors.Add(new SettingsFileError(kind, span, SettingsFileKeys.KeyOf(setting), argument, other));
+    private void Add(
+        SettingsFileErrorKind kind,
+        TextSpan span,
+        SettingId setting,
+        string argument,
+        string? other,
+        bool isObjectForm = false
+    ) => errors.Add(new SettingsFileError(kind, span, SettingsFileKeys.KeyOf(setting), argument, other, isObjectForm));
 }

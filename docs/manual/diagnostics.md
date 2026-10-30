@@ -462,7 +462,7 @@ See: [Settings files](settings.md#settings-files)
 
 **Settings file value has the wrong type**
 
-A value of a settings file is not of the JSON type its key takes.  `root` takes `true` or `false`, `generatorParameters` an array of strings, `typeOverrides`, `columnTypes` and `libraryTypes` an object whose values are strings, and every other key a string.  `null` is of the wrong type for every key.  The message names the key and what it takes, and the error is at the value.
+A value of a settings file is not of the JSON type its key takes.  `root` takes `true` or `false`, `generatorParameters` an array of strings, `typeOverrides` and `libraryTypes` an object whose values are strings, `columnTypes` an object whose values are strings or objects of a `"type"` string and an optional `"json"` boolean, and every other key a string.  `null` is of the wrong type for every key.  The message names the key and what it takes, and the error is at the value.
 
 ```jsonc
 {
@@ -486,6 +486,8 @@ See: [Settings files](settings.md#settings-files)
 
 A value of a settings file is of the JSON type its key takes, but its setting does not take it.  The message quotes the value, trimmed, and names the key; for a member of `typeOverrides`, `columnTypes` or `libraryTypes` it quotes the member as `key: value`.  The error is at the string, or for a member from its key to its value.
 
+A member of `columnTypes` written as an object takes a `"type"` string, its C# type, and may take `"json"`, `true` or `false`, and no other member; with `"json": true` its type cannot be `default`.  An object that has no `"type"` string, a `"json"` that is not `true` or `false`, a member twice or any other member is quoted by its key alone, and one whose type is not valid as `key: type`, and the message says what the object takes.
+
 ```jsonc
 {
     "dialect": "pgsql",
@@ -497,6 +499,7 @@ A value of a settings file is of the JSON type its key takes, but its setting do
     },
     "columnTypes": {
         "id": "MyApp.UserId",
+        "orders.metadata": { "type": "OrderMetadata", "json": "yes" },
     },
     "libraryTypes": {
         "nodaTime": "yes",

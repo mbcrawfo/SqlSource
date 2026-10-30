@@ -135,7 +135,7 @@
       }
     },
     "columnTypes": {
-      "description": "Columns of a table or view, `table.column` or `schema.table.column`, and the C# type each gets, or `default`, as `\"users.id\": \"UserId\"`. A column of a string type that holds JSON takes an object of its type and `\"json\": true`, as `\"orders.metadata\": { \"type\": \"OrderMetadata\", \"json\": true }`.",
+      "description": "Columns of a table or view, `table.column` or `schema.table.column`, and the C# type each gets, or `default`, as `\"users.id\": \"UserId\"`. A column of a string type that holds JSON takes an object of its type and `\"json\": true`, as `\"orders.metadata\": { \"type\": \"OrderMetadata\", \"json\": true }`, whose type cannot be `default`; `default` is written as a string, or as an object's type without `\"json\": true`.",
       "type": "object",
       "additionalProperties": {
         "anyOf": [
@@ -147,7 +147,7 @@
             "type": "object",
             "properties": {
               "type": {
-                "description": "The C# type the column gets, or `default`.",
+                "description": "The C# type the column gets, or `default` when `json` is not `true`.",
                 "type": "string",
                 "pattern": "\\S"
               },
@@ -157,7 +157,24 @@
               }
             },
             "required": ["type"],
-            "additionalProperties": false
+            "additionalProperties": false,
+            "if": {
+              "properties": {
+                "json": {
+                  "const": true
+                }
+              },
+              "required": ["json"]
+            },
+            "then": {
+              "properties": {
+                "type": {
+                  "not": {
+                    "pattern": "^\\s*[dD][eE][fF][aA][uU][lL][tT]\\s*$"
+                  }
+                }
+              }
+            }
           }
         ]
       },

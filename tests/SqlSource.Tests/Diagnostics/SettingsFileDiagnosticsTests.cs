@@ -148,11 +148,58 @@ public sealed class SettingsFileDiagnosticsTests
             .ShouldBe("'int4: int?' is not a valid value of typeOverrides");
     }
 
+    // A column type written as an object that is not one is quoted by its key, or by its key and type when it has a
+    // type string, and the message says what the form takes; a string member that is not valid keeps its message.
+    [Theory]
+    [InlineData( /*lang=json,strict*/
+        """{ "columnTypes": { "orders.metadata": { "type": "X", "extra": 1 } } }""",
+        "'orders.metadata'"
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{ "columnTypes": { "orders.metadata": { "json": true } } }""",
+        "'orders.metadata'"
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{ "columnTypes": { "orders.metadata": { "type": " Default ", "json": true } } }""",
+        "'orders.metadata: Default'"
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{ "columnTypes": { "orders.metadata": { "type": "int?" } } }""",
+        "'orders.metadata: int?'"
+    )]
+    public void Create_ColumnTypeObjectThatIsNotOne_SaysWhatTheObjectFormTakes(string text, string quoted)
+    {
+        var error = SettingsFileReader.Read(text, SettingsFile).Errors.ShouldHaveSingleItem();
+
+        Message(SettingsFileDiagnostics.Create(error, Path, SourceText.From(text)))
+            .ShouldBe(
+                quoted
+                    + " is not a valid value of columnTypes.  A column type written as an object takes \"type\", its "
+                    + "C# type, and may take \"json\", true or false, and no other member; with \"json\": true its "
+                    + "type cannot be default."
+            );
+    }
+
+    [Fact]
+    public void Create_ColumnTypeStringThatIsNotOne_HasNoHelp()
+    {
+        const string Text = /*lang=json,strict*/
+            """{ "columnTypes": { "orders.metadata": "int?" } }""";
+        var error = SettingsFileReader.Read(Text, SettingsFile).Errors.ShouldHaveSingleItem();
+
+        Message(SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text)))
+            .ShouldBe("'orders.metadata: int?' is not a valid value of columnTypes");
+    }
+
     [Theory]
     [InlineData(SettingsFileKeys.Output, "a string")]
     [InlineData(SettingsFileKeys.Root, "true or false")]
     [InlineData(SettingsFileKeys.GeneratorParameters, "an array of strings")]
-    [InlineData(SettingsFileKeys.ColumnTypes, "an object whose values are strings")]
+    [InlineData(SettingsFileKeys.TypeOverrides, "an object whose values are strings")]
+    [InlineData(
+        SettingsFileKeys.ColumnTypes,
+        "an object whose values are strings, or objects of a \"type\" string and an optional \"json\" boolean"
+    )]
     public void Create_WrongType_NamesTheTypeTheKeyTakes(string key, string type) =>
         Message(Error(SettingsFileErrorKind.WrongType, key, null)).ShouldBe($"'{key}' takes {type}");
 

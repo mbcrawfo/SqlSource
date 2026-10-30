@@ -103,7 +103,8 @@ internal static class SettingsFileKeys
         {
             Root => SettingsFileValueType.Boolean,
             GeneratorParameters => SettingsFileValueType.ArrayOfStrings,
-            TypeOverrides or ColumnTypes or LibraryTypes => SettingsFileValueType.ObjectOfStrings,
+            TypeOverrides or LibraryTypes => SettingsFileValueType.ObjectOfStrings,
+            ColumnTypes => SettingsFileValueType.ObjectOfColumnTypes,
             _ when All.Contains(key) => SettingsFileValueType.String,
             _ => throw new ArgumentOutOfRangeException(nameof(key)),
         };

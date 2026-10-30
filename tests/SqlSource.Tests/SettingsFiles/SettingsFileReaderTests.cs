@@ -529,7 +529,8 @@ public sealed class SettingsFileReaderTests
                 Span(text, "\"orders.metadata\": " + member),
                 "columnTypes",
                 "orders.metadata",
-                ""
+                null,
+                IsObjectForm: true
             ),
         ]);
     }
@@ -550,7 +551,8 @@ public sealed class SettingsFileReaderTests
                 Span(Text, Member),
                 "columnTypes",
                 "orders.metadata",
-                "default"
+                "default",
+                IsObjectForm: true
             ),
         ]);
     }
