@@ -212,6 +212,8 @@ A type that the table does not name gets its C# type by what it is:
 - **`json`**, SQL Server 2025's type, is a `string`.
 - **`vector`** is a `Microsoft.Data.SqlTypes.SqlVector<float>`, a type of Microsoft.Data.SqlClient, which the project references to name it.
 
+> **Coming in a later release.**  The query methods will read and send SQL Server's date and time types as NodaTime's types when the [library types](settings.md#setting-library-types) turn NodaTime on.  See [what works today](README.md#what-works-today).
+
 <a id="models"></a>
 
 ## Models

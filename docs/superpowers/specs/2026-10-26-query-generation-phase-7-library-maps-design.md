@@ -8,6 +8,8 @@ Written against `main` at `0b1a85ab`, after phase 8, sub-phase 8.7 included, and
 
 Amended on 2026-10-30 by sub-phase 7.0, whose [spike](2026-10-26-query-generation-phase-7-spike.md) answered every "Verify first" item against the containers and drivers.  An amended detail cites the spike's question; a finding that bears on a Decided item went to the owner, and the owner's answer is written here with its date: the NodaTime range defaults, changed on 2026-10-30.
 
+Amended again on 2026-10-30 by sub-phase 7.1, with three decisions the owner made that day on questions its build raised: `default` in the switch hides the farther levels and gives the engine's default, as a type override's `default` does; the switch knows `nodaTime` alone in 7.1, and 7.3 adds `json` and 7.4 `netTopologySuite`, each with its probe's markers; and `SQLSRC282` is delivered by 7.2 for NodaTime and by 7.4 for NetTopologySuite and `NetTopologySuite.IO.SqlServerBytes`.  Each amended statement says so with the date.
+
 ## How to read this document
 
 Each statement is one of three kinds, as in the settings-files design:
@@ -108,7 +110,7 @@ How each library's types are read, by engine.  "Plugin" is the driver reading th
 | NetTopologySuite | `netTopologySuite` | Plugin, `Npgsql.NetTopologySuite`; on by default when it is referenced | Generated, with a read path of its own; off by default; needs `NetTopologySuite` and `NetTopologySuite.IO.SqlServerBytes` |
 | System.Text.Json | `json` | `JsonElement` and `JsonDocument` by the driver; `JsonNode` by the driver on Npgsql 10 and generated on 8 and 9; a project's class generated; off by default | Generated; off by default |
 
-Designer's call: the names in the switch, `nodaTime`, `netTopologySuite` and `json`, matched as a choice is, ignoring case, hyphens and spaces.
+Designer's call: the names in the switch, `nodaTime`, `netTopologySuite` and `json`, matched as a choice is, ignoring case, hyphens and spaces.  Decided by the owner on 2026-10-30: the switch knows `nodaTime` alone in 7.1; 7.3 adds `json`, and 7.4 `netTopologySuite`, each with the probe's markers of its library.
 
 ### The library switch
 
@@ -128,7 +130,7 @@ Decided: one setting, at the standard levels, with each library's default by eng
 -- library-types: nodatime=on json=on
 ```
 
-- **The value** of a library is `on`, `off` or `default`.  `default` takes the library out at that level, so a farther level or the engine's default applies, as `default` does for a type override.
+- **The value** of a library is `on`, `off` or `default`.  `default` hides the library's entries of the farther levels, so the engine's default applies, as `default` does for a type override, which hides the type's farther entries and gives the type to the base map.  Amended on 2026-10-30 by the owner, where this said that a farther level or the engine's default applies.
 - **The levels**, most specific first: a `-- library-types:` marker inside the query; one in the file header; the `.sql` file's chain of settings files, nearest first.  No attribute level, since the owner named the three; and no MSBuild level, since none exists after the settings-files work.  Merged per library, as the type override is per key: a level replaces only the libraries it names.
 - **The default** when no level names a library: on PostgreSQL, `on` when the plugin assembly is referenced and `off` otherwise; on SQL Server, `off`; for `json` on both, `off`.
 - **One value for both engines.**  A setting names a library, not an engine; a file's dialect decides which engine's rules apply to its queries.
@@ -323,11 +325,11 @@ Designer's call: each library has a floor, one for both engines, found by 7.0 in
 | NetTopologySuite | 2.5.0 | `Npgsql.NetTopologySuite` 8.0.x needs it | `NetTopologySuite.Algorithm.Hull.ConcaveHull`, first in 2.5.0; every 2.x is `2.0.0.0` |
 | `NetTopologySuite.IO.SqlServerBytes` | 2.1.0 | It writes M values from the coordinates, and checks a `geography` polygon for emptiness before its ring orientation | The informational version, read as `SqlClientProbe` reads SqlClient's: 2.0.0 and 2.1.0 have the same public API and identity version |
 
-A library below its floor that a `codegen` query uses is `SQLSRC282`, an error once per project naming the library, the version found and the floor; its queries keep their types and get no method, as below a driver's floor.  Each end-to-end floor project references each library at its floor; the main projects reference the newest.
+A library below its floor that a `codegen` query uses is `SQLSRC282`, an error once per project naming the library, the version found and the floor; its queries keep their types and get no method, as below a driver's floor.  Decided by the owner on 2026-10-30: 7.2 delivers it for NodaTime, and 7.4 for NetTopologySuite and `NetTopologySuite.IO.SqlServerBytes`.  Each end-to-end floor project references each library at its floor; the main projects reference the newest.
 
 ### The probe
 
-Designer's call: one new probe, `LibraryProbe`, a value-equal record of flags beside `NpgsqlProbe` and `SqlClientProbe`, read by marker symbols with `DriverProbes.Has` and combined into `FileTypesInput` and `MethodsInput`.  The markers, which 7.0 found public and present in every version of each package from its floor to its newest: for `NodaTime`, `NodaTime.Instant`; for `Npgsql.NodaTime`, `Npgsql.NpgsqlNodaTimeExtensions`; for `NetTopologySuite`, `NetTopologySuite.Geometries.Geometry`; for `Npgsql.NetTopologySuite`, `Npgsql.NpgsqlNetTopologySuiteExtensions`; for `NetTopologySuite.IO.SqlServerBytes`, `NetTopologySuite.IO.SqlServerBytesReader`; and for Npgsql 10's `JsonNode` support, the `NpgsqlProbe`'s existing Npgsql 10 flag, `AtLeast10`, whose `NpgsqlTypes.NpgsqlCube` is absent from 8.0.9 and 9.0.5.  `Geometry` and `SqlServerBytesReader` are also in the 1.x packages, over GeoAPI's types; the floors' versions above tell those apart.  System.Text.Json is always present on .NET 8.
+Designer's call: one new probe, `LibraryProbe`, a value-equal record of flags beside `NpgsqlProbe` and `SqlClientProbe`, built by 7.1 with NodaTime's markers and grown by 7.3 and 7.4 with their libraries', as the owner decided on 2026-10-30, read by marker symbols with `DriverProbes.Has` and combined into `FileTypesInput` and `MethodsInput`.  The markers, which 7.0 found public and present in every version of each package from its floor to its newest: for `NodaTime`, `NodaTime.Instant`; for `Npgsql.NodaTime`, `Npgsql.NpgsqlNodaTimeExtensions`; for `NetTopologySuite`, `NetTopologySuite.Geometries.Geometry`; for `Npgsql.NetTopologySuite`, `Npgsql.NpgsqlNetTopologySuiteExtensions`; for `NetTopologySuite.IO.SqlServerBytes`, `NetTopologySuite.IO.SqlServerBytesReader`; and for Npgsql 10's `JsonNode` support, the `NpgsqlProbe`'s existing Npgsql 10 flag, `AtLeast10`, whose `NpgsqlTypes.NpgsqlCube` is absent from 8.0.9 and 9.0.5.  `Geometry` and `SqlServerBytesReader` are also in the 1.x packages, over GeoAPI's types; the floors' versions above tell those apart.  System.Text.Json is always present on .NET 8.
 
 ## Diagnostics
 
@@ -347,9 +349,9 @@ Changed: `SQLSRC246`'s help, for PostGIS and SQL Server's spatial types, names t
 |----|----|----|
 | 7.0 Before the maps | Nothing | The spike: each Verify first of this document answered against the containers and drivers, as a document beside the outline; this design amended where a finding changes a detail |
 | 7.1 The switch, and NodaTime on PostgreSQL | 7.0, and the settings files on `main` | `libraryTypes` and `-- library-types:`, the probe, the library map's place in typing, `SQLSRC281`, and NodaTime on PostgreSQL through the plugin, end to end |
-| 7.2 Generated conversions, and NodaTime on SQL Server | 7.1 | The `Library` origin, emission, the place of a library row in the planner, and NodaTime on SQL Server, end to end |
-| 7.3 JSON | 7.2 | The `json` library, the JSON types on both engines, and a project's own class through the serializer, end to end |
-| 7.4 NetTopologySuite | 7.2 | PostGIS through the plugin, the tool's check, a pinned PostGIS image, and SQL Server's spatial read path, end to end |
+| 7.2 Generated conversions, and NodaTime on SQL Server | 7.1 | The `Library` origin, emission, the place of a library row in the planner, NodaTime on SQL Server, end to end, and `SQLSRC282` for NodaTime |
+| 7.3 JSON | 7.2 | The `json` library and its name in the switch, the JSON types on both engines, and a project's own class through the serializer, end to end |
+| 7.4 NetTopologySuite | 7.2 | `netTopologySuite` in the switch, PostGIS through the plugin, the tool's check, a pinned PostGIS image, SQL Server's spatial read path, end to end, and `SQLSRC282` for NetTopologySuite and `NetTopologySuite.IO.SqlServerBytes` |
 | 7.5 The examples and close | 7.3 and 7.4 | Each library in each example project, the user documentation of the phase read whole, and the close |
 
 7.3 and 7.4 can be built beside each other on 7.2.  Both touch `ConversionPlanner`, `QueryMethodWriter` and the binders, each adding a kind of conversion; each keeps its change to its own kind, and the later to merge reconciles.
@@ -378,19 +380,22 @@ A spike, as [8.0's](2026-10-24-query-generation-phase-8-0-before-the-methods-des
 
 - The `Library` origin in `ConverterSet`, the emitted class, the place of a library row in `ConversionPlanner` and `MethodsInput.ConvertersOf`, and replacement by a project's and a mapped type's converter.
 - NodaTime's SQL Server rows, its conversions of the table both defaults and by-override, and their emission only when a `codegen` query uses them.
+- `SQLSRC282` for NodaTime below 3.1.9, read from `LibraryProbe`'s version of NodaTime, as the owner decided on 2026-10-30.
 - **End to end**: a folder of its own in the SQL Server end-to-end project with NodaTime on, every row written and read through the methods on 2017 and 2025, a column as an `Instant` and a `Duration` by override, and the same in `SqlServer.SqlClient61`.  The allocation test covers one converted read and one write.
 - Generator tests: the emitted class and its absence without a `codegen` use or without the assembly; a project's converter replacing a library's; the conversions offered with the switch off for an override; the generated code compiled against both drivers' metadata with no warning.
 
 ### 7.3 JSON
 
-- The `json` library and `JsonElement` as its default; the JSON types of the table on both engines; a project's own class through the serializer; the null rules; arrays.
+- The `json` library and `JsonElement` as its default, with `json` added to the switch's names, as the owner decided on 2026-10-30; the JSON types of the table on both engines; a project's own class through the serializer; the null rules; arrays.
 - The JSON opt-in for string columns, in the settings file's `columnTypes`, the header's and a query's `-- column:` and `-- param:`, with `SQLSRC283`.
 - **End to end**, on both engines and their floors: each JSON type read and written; a class and an array of a class; a JSON `null` into a nullable and a not-null property; a converter with its own options replacing the serializer for one class.  On PostgreSQL, the class with no `EnableDynamicJson()` on the data source.  On SQL Server 2017 and 2025, a class in an `nvarchar(max)` column by the opt-in, and a class in an `nvarchar` column without it left to 8.2's rules.
 - Generator tests for each of those, and for a class that is not on a JSON type, which keeps 8.2's rules.
 
 ### 7.4 NetTopologySuite
 
+- `netTopologySuite` added to the switch's names, with the probe's markers of NetTopologySuite, `Npgsql.NetTopologySuite` and `NetTopologySuite.IO.SqlServerBytes`, as the owner decided on 2026-10-30.
 - The PostgreSQL rows through the plugin; the tool's check, as 7.0 found it must be.
+- `SQLSRC282` for NetTopologySuite below 2.5.0 and `NetTopologySuite.IO.SqlServerBytes` below 2.1.0, as the owner decided on 2026-10-30.
 - **The PostGIS image.**  Designer's call: a container of its own, started only by the NetTopologySuite tests, beside the end-to-end project's existing one, on the same PostgreSQL version as each run, CI's and the nightly's.  `DefaultImages.Postgres` does not change, so no fixture or sidecar is recorded again; the sidecars of the PostGIS queries are written against the PostGIS container by `tools/describe-end-to-end.sh`, which gains it.  The image and its versions are named in the places rule 5 lists, and rule 5 gains the PostGIS image's sentence.  7.0 built it from each pinned `postgres` image with PostGIS `3.6.4+dfsg-2.pgdg13+1` from the image's own pgdg source, on arm64 and amd64, by the Dockerfile in [the spike](2026-10-26-query-generation-phase-7-spike.md#4-postgis).  GEOS, PROJ and GDAL come with it unpinned, from pgdg and Debian, as the base image's own packages do.  7.4 takes that Dockerfile, which also reads pgdg's archive, `apt-archive.postgresql.org`, after installing `ca-certificates`, so the pinned version still builds once it leaves `apt.postgresql.org`.
 - SQL Server's spatial read path and its write, the four static instances, the subtype cast.
 - **End to end**, on both engines and their floors: `geometry` and `geography` written and read through the methods, a `Point` and a `Polygon` by override, SRIDs kept, nulls, an array on PostgreSQL; on SQL Server a clockwise `geography` shell's `ArgumentException`.

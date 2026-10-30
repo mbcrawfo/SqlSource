@@ -39,6 +39,7 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | `-- collection-type:` | The type that a query's method returns many rows in | yes | yes | [Collection type](settings.md#setting-collection-type) |
 | `-- type-override:` | Gives a database type the C# type of your choice, one entry for each line | yes | yes | [Type overrides](settings.md#setting-type-overrides) |
 | `-- column:` | Inside a query, says whether one column of the query's result can be null, `-- column: total not null`, or gives it a C# type after `->`, `-- column: total -> PostCount`, for its property in the output model, and leaves the column's name alone.  In the file header, gives a column of a table or view a C# type in every query of the file, `-- column: users.id -> UserId`, one entry for each line | yes | yes | [Setting a column's nullability or type with a marker](generator.md#column-marker), [column types](settings.md#setting-column-types) |
+| `-- library-types:` | Turns a library's types, such as NodaTime's, on or off for the query methods, `-- library-types: nodatime=off`, one entry or more for each line | yes | yes | [Library types](settings.md#setting-library-types) |
 
 A marker that is a setting links to its section of [the settings page](settings.md), which also says where else the setting can be given and which place wins.  A marker where its column says "no" is an error: see [markers in the wrong place](#markers-in-the-wrong-place).
 
