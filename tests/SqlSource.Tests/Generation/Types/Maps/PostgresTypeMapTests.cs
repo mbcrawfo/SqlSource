@@ -4,6 +4,7 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Generation.Types.Drivers;
 using SqlSource.Generation.Types.Maps;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
@@ -18,6 +19,8 @@ public sealed class PostgresTypeMapTests
     private const string DateOnly = "global::System.DateOnly";
     private const string BitArray = "global::System.Collections.BitArray";
     private const string Range = "global::NpgsqlTypes.NpgsqlRange";
+    private const string Noda = "global::NodaTime.";
+    private const string NodaRange = "global::NpgsqlTypes.NpgsqlRange<global::NodaTime.";
 
     // Each type built for a case of the rule of its kind, by the name of the case.
     private static readonly Dictionary<string, KindCase> Kinds = new()
@@ -456,6 +459,173 @@ public sealed class PostgresTypeMapTests
     [InlineData("int?")]
     [InlineData("byte")]
     public void Gives_ForeignTypes_AreNot(string text) => PostgresTypeMap.Gives(text).ShouldBeFalse();
+
+    // NodaTime's rows: the type each gives with the library on, and whether it is a value type.  A multirange is an
+    // array of its range's type, and Period is a class.
+    public static TheoryData<string, string, bool> NodaTimeRows =>
+        new()
+        {
+            { "timestamptz", Noda + "Instant", true },
+            { "timestamp", Noda + "LocalDateTime", true },
+            { "date", Noda + "LocalDate", true },
+            { "time", Noda + "LocalTime", true },
+            { "timetz", Noda + "OffsetTime", true },
+            { "interval", Noda + "Period", false },
+            { "tstzrange", NodaRange + "Instant>", true },
+            { "tsrange", NodaRange + "LocalDateTime>", true },
+            { "daterange", NodaRange + "LocalDate>", true },
+            { "tstzmultirange", NodaRange + "Instant>[]", false },
+            { "tsmultirange", NodaRange + "LocalDateTime>[]", false },
+            { "datemultirange", NodaRange + "LocalDate>[]", false },
+        };
+
+    private static LibraryRows NodaTimeOn => LibraryRows.Of([SqlLibrary.NodaTime])!;
+
+    [Theory]
+    [MemberData(nameof(NodaTimeRows))]
+    public void Map_NodaTimeOn_GivesEachRow(string internalName, string expected, bool isValueType)
+    {
+        foreach (var column in Enum.GetValues<NpgsqlColumn>())
+        {
+            var mapping = PostgresTypeMap.Map(ModelRuns.Catalog(internalName), column, libraries: NodaTimeOn);
+
+            ShouldMapTo(mapping, expected, isValueType, internalName);
+            mapping.Library.ShouldBe(SqlLibrary.NodaTime);
+        }
+    }
+
+    [Fact]
+    public void Map_NodaTimeOn_ArrayIsTheElementsArray()
+    {
+        var mapping = PostgresTypeMap.Map(
+            ArrayOf(ModelRuns.Catalog("timestamptz")),
+            NpgsqlColumn.Npgsql10,
+            libraries: NodaTimeOn
+        );
+
+        ShouldMapTo(mapping, Noda + "Instant[]", false, "timestamptz");
+        mapping.Library.ShouldBe(SqlLibrary.NodaTime);
+    }
+
+    [Fact]
+    public void Map_NodaTimeOn_DomainIsItsBases()
+    {
+        var mapping = PostgresTypeMap.Map(
+            DomainOf("mydomain", ModelRuns.Catalog("timestamptz")),
+            NpgsqlColumn.Npgsql10,
+            libraries: NodaTimeOn
+        );
+
+        ShouldMapTo(mapping, Noda + "Instant", true, "timestamptz");
+        mapping.Library.ShouldBe(SqlLibrary.NodaTime);
+    }
+
+    [Fact]
+    public void Map_NodaTimeOn_AnArrayOfADomainIsTheBasesArray()
+    {
+        var mapping = PostgresTypeMap.Map(
+            ArrayOf(DomainOf("mydomain", ModelRuns.Catalog("date"))),
+            NpgsqlColumn.None,
+            libraries: NodaTimeOn
+        );
+
+        ShouldMapTo(mapping, Noda + "LocalDate[]", false, "date");
+        mapping.Library.ShouldBe(SqlLibrary.NodaTime);
+    }
+
+    [Fact]
+    public void Map_Override_WinsAtEachLevel()
+    {
+        var timestamptz = ModelRuns.Catalog("timestamptz");
+        var ofElement = Overrides(("timestamptz", "global::System.DateTimeOffset", true));
+        var ofArray = Overrides(("_timestamptz", "global::MyApp.Stamps", false));
+        var ofDomain = Overrides(("public.mydomain", "global::MyApp.Y", true));
+
+        var element = PostgresTypeMap.Map(timestamptz, NpgsqlColumn.Npgsql10, ofElement, NodaTimeOn);
+        var array = PostgresTypeMap.Map(ArrayOf(timestamptz), NpgsqlColumn.Npgsql10, ofElement, NodaTimeOn);
+        var whole = PostgresTypeMap.Map(ArrayOf(timestamptz), NpgsqlColumn.Npgsql10, ofArray, NodaTimeOn);
+        var domain = PostgresTypeMap.Map(
+            DomainOf("mydomain", timestamptz),
+            NpgsqlColumn.Npgsql10,
+            ofDomain,
+            NodaTimeOn
+        );
+
+        ShouldMapTo(element, "global::System.DateTimeOffset", true, "timestamptz");
+        ShouldMapTo(array, "global::System.DateTimeOffset[]", false, "timestamptz");
+        ShouldMapTo(whole, "global::MyApp.Stamps", false, "_timestamptz");
+        ShouldMapTo(domain, "global::MyApp.Y", true, "public.mydomain");
+        new[] { element, array, whole, domain }.ShouldAllBe(mapping => mapping.Library == null);
+    }
+
+    [Theory]
+    [MemberData(nameof(NodaTimeRows))]
+    public void Map_NodaTimeOff_IsTheBaseMap(string internalName, string notExpected, bool isValueType)
+    {
+        _ = isValueType;
+        var type = ModelRuns.Catalog(internalName);
+
+        foreach (var column in Enum.GetValues<NpgsqlColumn>())
+        {
+            var mapping = PostgresTypeMap.Map(type, column, libraries: null);
+
+            mapping.ShouldBe(PostgresTypeMap.Map(type, column));
+            mapping.Library.ShouldBeNull();
+            mapping.Text.ShouldNotBe(notExpected);
+        }
+    }
+
+    [Fact]
+    public void Map_NodaTimeOn_OtherTypesUnchanged()
+    {
+        PostgresType[] types =
+        [
+            TestSidecars.Postgres(),
+            Text(),
+            ModelRuns.Catalog("int4range", SidecarValues.Kind.Range, subtype: TestSidecars.Postgres()),
+            ArrayOf(TestSidecars.Postgres()),
+            DomainOf("user_id", TestSidecars.Postgres()),
+            UserStatus(),
+            TestSidecars.Postgres(
+                name: "timestamptz",
+                schema: "ext",
+                internalName: "timestamptz",
+                kind: SidecarValues.Kind.Domain,
+                baseType: Text()
+            ),
+            User("timestamptz", SidecarValues.Kind.Base),
+        ];
+
+        foreach (var type in types)
+        {
+            var on = PostgresTypeMap.Map(type, NpgsqlColumn.Npgsql10, libraries: NodaTimeOn);
+
+            on.ShouldBe(PostgresTypeMap.Map(type, NpgsqlColumn.Npgsql10));
+            on.Library.ShouldBeNull();
+        }
+    }
+
+    [Fact]
+    public void Map_NodaTimeOn_MatchesTheNameIgnoringCase() =>
+        ShouldMapTo(
+            PostgresTypeMap.Map(ModelRuns.Catalog("TimestampTZ"), NpgsqlColumn.Npgsql10, libraries: NodaTimeOn),
+            Noda + "Instant",
+            true,
+            "timestamptz"
+        );
+
+    [Fact]
+    public void Of_NoLibraries_IsNull() => LibraryRows.Of([]).ShouldBeNull();
+
+    [Fact]
+    public void Of_ALibrary_IsTheSameInstanceEachTime() =>
+        LibraryRows.Of([SqlLibrary.NodaTime]).ShouldBeSameAs(LibraryRows.Of([SqlLibrary.NodaTime]));
+
+    [Theory]
+    [InlineData(Noda + "Instant")]
+    [InlineData(Noda + "Instant[]")]
+    [InlineData(NodaRange + "Instant>")]
+    public void Gives_LibraryTypeIsForeign(string text) => PostgresTypeMap.Gives(text).ShouldBeFalse();
 
     // A cell is the C# type the mapping gives, or "!" and the kind of its failure.
     private static void ShouldMapTo(TypeMapping mapping, string expected, bool isValueType, string key)
