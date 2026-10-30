@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
@@ -319,15 +318,8 @@ public sealed class SettingsLevelReaderTests
 
         level
             .LibraryTypes.ShouldNotBeNull()
-            .ShouldBe([
-                new LibrarySetting(
-                    SqlLibrary.NodaTime,
-                    LibraryState.Default,
-                    SettingsFile,
-                    new TextSpan(0, 5),
-                    new LinePositionSpan(new LinePosition(0, 0), new LinePosition(0, 5))
-                ),
-            ]);
+            .ShouldBe([new LibrarySetting(SqlLibrary.NodaTime, LibraryState.Default, SettingsFile)]);
+        source.LibraryEntries.ShouldBe([(SqlLibrary.NodaTime, 0)]);
         source.Invalids.ShouldBeEmpty();
         source.InvalidParts.ShouldBeEmpty();
     }
@@ -346,6 +338,7 @@ public sealed class SettingsLevelReaderTests
         SettingsLevelReader.Read(ref source).ShouldBeSameAs(SettingsLevel.None);
         source.InvalidParts.ShouldBe([(SettingId.LibraryTypes, 0), (SettingId.LibraryTypes, 1)]);
         source.RepeatedKeys.ShouldBeEmpty();
+        source.LibraryEntries.ShouldBeEmpty();
     }
 
     [Fact]
@@ -364,6 +357,7 @@ public sealed class SettingsLevelReaderTests
         level.LibraryTypes.ShouldNotBeNull().Select(static entry => entry.State).ShouldBe([LibraryState.On]);
         source.RepeatedKeys.ShouldBe([(SettingId.LibraryTypes, 1, 0)]);
         source.InvalidParts.ShouldBeEmpty();
+        source.LibraryEntries.ShouldBe([(SqlLibrary.NodaTime, 0)]);
     }
 
     [Fact]
@@ -445,6 +439,9 @@ public sealed class SettingsLevelReaderTests
 
         public List<(SettingId Setting, int Index, int First)> RepeatedKeys { get; } = [];
 
+        // Each member that gave an entry of the library types, as its library and its index.
+        public List<(SqlLibrary Library, int Index)> LibraryEntries { get; } = [];
+
         // Each call, as the method and the setting.
         public List<string> Asked { get; } = [];
 
@@ -466,9 +463,7 @@ public sealed class SettingsLevelReaderTests
             return members is not null && members.TryGetValue(setting, out var written) ? written : null;
         }
 
-        // The spans of the member at an index, which a test can tell from the spans of another.
-        public readonly (TextSpan Span, LinePositionSpan LineSpan) MemberSpans(SettingId setting, int index) =>
-            (new TextSpan(index * 10, 5), new LinePositionSpan(new LinePosition(index, 0), new LinePosition(index, 5)));
+        public readonly void LibraryEntry(SqlLibrary library, int index) => LibraryEntries.Add((library, index));
 
         public readonly T? Choice<T>(SettingId setting)
             where T : struct, Enum

@@ -6,15 +6,14 @@ namespace SqlSource.Settings.Libraries;
 /// <param name="Library">The library.</param>
 /// <param name="State">What the level says.</param>
 /// <param name="Place">Where the entry was written.</param>
-/// <param name="Span">
-/// Where the entry's member is in the text of its source, from its key to its value, which a diagnostic about the entry
-/// reports.
+/// <param name="Marker">
+/// Where the marker that gave the entry is in its file's text, with the line and column of that span, which a
+/// diagnostic about the entry reports.  Null for an entry of a settings file, whose reader keeps the position of each
+/// member apart from the level, so that an edit that only moves the member changes no level.
 /// </param>
-/// <param name="LineSpan">The line and column of <paramref name="Span" />.</param>
 internal sealed record LibrarySetting(
     SqlLibrary Library,
     LibraryState State,
     SettingPlace Place,
-    TextSpan Span,
-    LinePositionSpan LineSpan
+    (TextSpan Span, LinePositionSpan LineSpan)? Marker = null
 );

@@ -7,10 +7,10 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
 using SqlSource.Settings;
+using SqlSource.Settings.Libraries;
 
 namespace SqlSource.Generation;
 
@@ -204,7 +204,8 @@ internal static class TargetTypeReader
 
         public IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting) => null;
 
-        public (TextSpan Span, LinePositionSpan LineSpan) MemberSpans(SettingId setting, int index) => default;
+        // The attribute has no level for the library types.
+        public void LibraryEntry(SqlLibrary library, int index) { }
 
         public T? Choice<T>(SettingId setting)
             where T : struct, Enum => PropertyOf(setting) is { } property ? Choice<T>(property) : null;

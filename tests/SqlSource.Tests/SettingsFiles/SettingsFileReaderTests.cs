@@ -455,7 +455,7 @@ public sealed class SettingsFileReaderTests
     }
 
     [Fact]
-    public void Read_LibraryTypes_EntryCarriesTheMembersLineSpan()
+    public void Read_LibraryTypes_MemberIsKeptApartFromTheEntry()
     {
         const string Text = /*lang=json,strict*/
             "{\n  \"dialect\": \"postgres\",\n  \"libraryTypes\": { \"nodaTime\": \"on\" }\n}";
@@ -463,13 +463,44 @@ public sealed class SettingsFileReaderTests
         var file = SettingsFileReader.Read(Text, Place);
 
         file.Errors.ShouldBeEmpty();
-        var entry = file.Level.LibraryTypes.ShouldNotBeNull().ShouldHaveSingleItem();
-        entry.Library.ShouldBe(SqlLibrary.NodaTime);
-        entry.State.ShouldBe(LibraryState.On);
-        entry.Place.ShouldBe(Place);
-        entry.Span.ShouldBe(Span(Text, "\"nodaTime\": \"on\""));
-        entry.LineSpan.Start.Line.ShouldBe(2);
-        entry.LineSpan.ShouldBe(SourceText.From(Text).Lines.GetLinePositionSpan(entry.Span));
+        file.Level.LibraryTypes.ShouldNotBeNull()
+            .ShouldBe([new LibrarySetting(SqlLibrary.NodaTime, LibraryState.On, Place)]);
+        var member = file.LibraryMemberOf(SqlLibrary.NodaTime).ShouldNotBeNull();
+        member.Span.ShouldBe(Span(Text, "\"nodaTime\": \"on\""));
+        member.LineSpan.Start.Line.ShouldBe(2);
+        member.LineSpan.ShouldBe(SourceText.From(Text).Lines.GetLinePositionSpan(member.Span));
+    }
+
+    // The member moves and the level stays equal, so that a step that reads the level alone is not run again.
+    [Fact]
+    public void Read_LibraryTypes_MovedMember_LeavesTheLevelEqual()
+    {
+        const string Before = /*lang=json,strict*/
+            "{\"outputModelSuffix\": \"Row\", \"libraryTypes\": {\"nodaTime\": \"on\"}}";
+        const string After = /*lang=json,strict*/
+            "{\"outputModelSuffix\": \"Record\",\n\n \"libraryTypes\": {\"nodaTime\": \"on\"}}";
+
+        var before = SettingsFileReader.Read(Before, Place);
+        var after = SettingsFileReader.Read(After, Place);
+
+        after.Level.LibraryTypes.ShouldBe(before.Level.LibraryTypes);
+        after.LibraryMembers.ShouldNotBe(before.LibraryMembers);
+        after.LibraryMemberOf(SqlLibrary.NodaTime).ShouldNotBeNull().LineSpan.Start.Line.ShouldBe(2);
+    }
+
+    // A repeat gives no entry, so only the first member is kept, and a file without the library types keeps none.
+    [Fact]
+    public void Read_LibraryMembers_AreThoseThatGiveEntries()
+    {
+        const string Repeated = /*lang=json,strict*/
+            """{"libraryTypes": {"nodaTime": "on", "noda-time": "off"}}""";
+
+        SettingsFileReader
+            .Read(Repeated, Place)
+            .LibraryMembers.ShouldHaveSingleItem()
+            .Span.ShouldBe(Span(Repeated, "\"nodaTime\": \"on\""));
+        SettingsFileReader.Read("{}", Place).LibraryMembers.ShouldBeEmpty();
+        SettingsFileReader.Read("{}", Place).LibraryMemberOf(SqlLibrary.NodaTime).ShouldBeNull();
     }
 
     [Fact]

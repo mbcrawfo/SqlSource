@@ -361,8 +361,12 @@ public sealed class SqlFileParserMarkerTests
         var blocks = Blocks(Text);
         var query = LibraryEntry(blocks[0]);
 
-        query.Span.ShouldBe(TextSpans.Of(Text, "-- library-types:   nodatime=on"));
-        query.LineSpan.ShouldBe(new LinePositionSpan(new LinePosition(3, 0), new LinePosition(3, 31)));
+        query.Marker.ShouldBe(
+            (
+                TextSpans.Of(Text, "-- library-types:   nodatime=on"),
+                new LinePositionSpan(new LinePosition(3, 0), new LinePosition(3, 31))
+            )
+        );
     }
 
     [Fact]
@@ -372,8 +376,12 @@ public sealed class SqlFileParserMarkerTests
 
         var entry = LibraryEntry(Blocks(Text).ShouldHaveSingleItem());
 
-        entry.Span.ShouldBe(TextSpans.Of(Text, "-- library-types: nodatime=off"));
-        entry.LineSpan.ShouldBe(new LinePositionSpan(new LinePosition(1, 0), new LinePosition(1, 30)));
+        entry.Marker.ShouldBe(
+            (
+                TextSpans.Of(Text, "-- library-types: nodatime=off"),
+                new LinePositionSpan(new LinePosition(1, 0), new LinePosition(1, 30))
+            )
+        );
         entry.Place.ShouldBe(SettingPlace.FileHeader);
     }
 

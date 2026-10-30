@@ -1,5 +1,4 @@
 using System;
-using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
@@ -354,15 +353,7 @@ public sealed class QuerySettingsTests
     private static SettingsLevel Libraries(LibraryState state, SettingPlace place) =>
         new()
         {
-            LibraryTypes = new EquatableArray<LibrarySetting>([
-                new LibrarySetting(
-                    SqlLibrary.NodaTime,
-                    state,
-                    place,
-                    new TextSpan(0, 10),
-                    new LinePositionSpan(new LinePosition(0, 0), new LinePosition(0, 10))
-                ),
-            ]),
+            LibraryTypes = new EquatableArray<LibrarySetting>([new LibrarySetting(SqlLibrary.NodaTime, state, place)]),
         };
 
     private static SettingsLevel Overrides(params TypeOverride[] entries) =>

@@ -175,6 +175,7 @@ public sealed class RowBufferTests
             TestModels.AttributeLocation,
             TestSidecars.Of(ListUsers),
             EquatableArray<DiagnosticInfo>.Empty,
+            EquatableArray<SettingsFileLibraryUse>.Empty,
             CodeGenEngines.Postgres,
             EquatableArray<string>.Empty
         );

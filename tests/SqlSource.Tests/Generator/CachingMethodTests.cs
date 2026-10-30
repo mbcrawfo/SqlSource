@@ -356,7 +356,65 @@ public sealed class CachingMethodTests
         AllReasons(result, TrackingNames.TakenExtensionClasses).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.MethodConflicts).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.MethodDiagnostics).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.SettingsFileLibraryUses).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.SettingsFileLibraryDiagnostics).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.CodeGenEngines).ShouldBe([IncrementalStepRunReason.Cached]);
+    }
+
+    // The project's settings file turns NodaTime on, which the project does not reference, so SQLSRC281 is at its
+    // member, on the fifth line.  The edit puts two blank lines above the member: the file is read again, its level is
+    // equal, so no file is typed and no type's methods are planned again, and only the step that finds the member in
+    // the file as it is now runs again, which reports it on the seventh line.
+    [Fact]
+    public void Run_LibraryMemberOfTheProjectsFileMoved_ReportsItAtItsNewLineAndPlansNothing()
+    {
+        var compilation = MethodsCompilation(UserQueries());
+        var project = ProjectFile(
+            OutputKind.CodeGen,
+            "postgres", /*lang=json,strict*/
+            "{\"libraryTypes\": {\"nodaTime\": \"on\"}}"
+        );
+        var driver = CreateDriver(
+                project,
+                [
+                    _scene.Users,
+                    _scene.Orders,
+                    TypedSidecar(_scene.Users, "GetUser", "int4"),
+                    TypedSidecar(_scene.Orders, "GetOrder", "int4"),
+                ]
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        LinesOf(driver.GetRunResult()).ShouldBe(["SQLSRC281 /sqlsource.json(5,5)-(5,21)"]);
+
+        var text = project.GetText(TestContext.Current.CancellationToken)!.ToString();
+        var moved = new InMemoryAdditionalText(
+            project.Path,
+            text.Replace("  \"libraryTypes\"", "\n\n  \"libraryTypes\"", StringComparison.Ordinal)
+        );
+        var result = Run(driver.ReplaceAdditionalText(project, moved), compilation);
+
+        LinesOf(result).ShouldBe(["SQLSRC281 /sqlsource.json(7,5)-(7,21)"]);
+        AllReasons(result, TrackingNames.SettingsFiles).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.FileLevels).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.FileTypesInput).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.FileTypes).ShouldAllBeCached();
+        MethodReasons(result, TrackingNames.TypeMethods)
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached),
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.SettingsFileLibraryUses).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.SettingsFileLibraryDiagnostics).ShouldBe([IncrementalStepRunReason.Modified]);
+
+        // Each diagnostic as its id, its path and its lines and columns, counted from one.
+        static IEnumerable<string> LinesOf(GeneratorDriverRunResult result) =>
+            result.Diagnostics.Select(diagnostic =>
+            {
+                var span = diagnostic.Location.GetLineSpan();
+                return $"{diagnostic.Id} {span.Path}({span.StartLinePosition.Line + 1},"
+                    + $"{span.StartLinePosition.Character + 1})-({span.EndLinePosition.Line + 1},"
+                    + $"{span.EndLinePosition.Character + 1})";
+            });
     }
 
     // AdminQueries, in a namespace of its own so that its method and model clash with none, claims Users too.  The edit

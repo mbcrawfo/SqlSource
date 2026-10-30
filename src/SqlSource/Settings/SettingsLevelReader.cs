@@ -118,7 +118,8 @@ internal static class SettingsLevelReader
 
     // A member whose name is no library or whose value is no state is recorded by its index, and the other members
     // apply.  A member for a library the entries already have is recorded as a repeat of the member that put it, and
-    // the first wins.  A list with no valid member is not set.
+    // the first wins.  A list with no valid member is not set.  The source is told which member gives each entry, and
+    // keeps where it is apart from the level.
     private static EquatableArray<LibrarySetting>? ReadLibraryTypes<TSource>(ref TSource source)
         where TSource : struct, ISettingSource
     {
@@ -148,9 +149,9 @@ internal static class SettingsLevelReader
                 continue;
             }
 
-            var (span, lineSpan) = source.MemberSpans(SettingId.LibraryTypes, index);
-            entries.Add(new LibrarySetting(library, state, source.Place, span, lineSpan));
+            entries.Add(new LibrarySetting(library, state, source.Place));
             entryMembers.Add(index);
+            source.LibraryEntry(library, index);
         }
 
         ReportParts(ref source, SettingId.LibraryTypes, invalid, repeated);

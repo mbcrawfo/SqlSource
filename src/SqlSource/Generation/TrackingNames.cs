@@ -137,5 +137,9 @@ internal static class TrackingNames
 
     public const string MethodDiagnostics = nameof(MethodDiagnostics);
 
+    public const string SettingsFileLibraryUses = nameof(SettingsFileLibraryUses);
+
+    public const string SettingsFileLibraryDiagnostics = nameof(SettingsFileLibraryDiagnostics);
+
     public const string CodeGenEngines = nameof(CodeGenEngines);
 }

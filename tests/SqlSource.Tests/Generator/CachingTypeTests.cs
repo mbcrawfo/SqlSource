@@ -15,6 +15,7 @@ using SqlSource.Testing.Snapshot;
 using Xunit;
 using static SqlSource.Testing.Generator.CachingScene;
 using static SqlSource.Testing.Generator.StepReasons;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -555,6 +556,29 @@ public sealed class CachingTypeTests
         // The settings file of Users' folder, with this state of NodaTime.
         static InMemoryAdditionalText LibraryTypesFile(string state) =>
             new("/app/Users/sqlsource.json", "{\"libraryTypes\": {\"nodaTime\": \"" + state + "\"}}");
+    }
+
+    // An edit of the project's settings file's model suffix, which moves its library types written after it: a level
+    // carries no position of a settings file's member, so each file gathers an equal input and none is typed again.
+    [Fact]
+    public void Run_ModelSuffixAboveTheProjectsLibraryTypesChanged_TypesNothing()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: WithNodaTimesPlugin);
+        var project = ProjectFileWithSuffix("Row");
+        var driver = _scene.FirstRunWithTypes(compilation, project);
+
+        var result = Run(driver.ReplaceAdditionalText(project, ProjectFileWithSuffix("Record")), compilation);
+
+        AllReasons(result, TrackingNames.FileTypesInput).ShouldAllBe(IncrementalStepRunReason.Unchanged);
+        AllReasons(result, TrackingNames.FileTypes).ShouldAllBeCached();
+
+        // The project's settings file with this model suffix, and NodaTime on after it.
+        static InMemoryAdditionalText ProjectFileWithSuffix(string suffix) =>
+            ProjectFile(
+                OutputKind.Models,
+                "postgres",
+                "{\"outputModelSuffix\": \"" + suffix + "\", \"libraryTypes\": {\"nodaTime\": \"on\"}}"
+            );
     }
 
     // Users, whose query's -- library-types: marker gives NodaTime this state.

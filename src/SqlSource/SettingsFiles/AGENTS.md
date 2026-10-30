@@ -5,6 +5,7 @@ The reader of a settings file, `sqlsource.json`.  See [settings files](../../../
 - **The reader never throws, and bounds nesting by `SidecarTokenizer.MaxDepth`.**  A user writes the file, and an exception in the generator costs every type its generated code.
 - **Never hand the walk of `SettingsFileReader` a text the grammar pass has not passed.**  The walk trusts the grammar, as `SidecarCursor` does; `SettingsFileReaderRobustnessTests` holds the two together.
 - **It may use `Settings/`, the tokenizer of `Snapshot/Reading/` and `Parsing/SqlDialectName.cs` with the `SqlDialectChoice` it gives, and nothing of `Generation/` or `Diagnostics/`.**  Its errors are data with a `TextSpan`, so that the build and the tool can each report them.
+- **A position goes beside the level, never in it**: an error in `SettingsFile.Errors`, a member of the library types in `SettingsFile.LibraryMembers`.  A span in the level would type every file under the settings file again on an edit that only moves a member.
 - **Whether a value is valid is `SettingsLevelReader`'s, never the reader's own**, and the dialect's is `SqlDialectName`'s.  `SettingsFileSource` only turns what is rejected into errors at their spans.
 - **A new key is a constant of `SettingsFileKeys`, a row of its `All` and of `TypeOf`, a property of `schemas/settings-v1.schema.json`, and, for a new kind of error, a case of `SettingsFileDiagnostics`.**  The schema accepts what the reader accepts and no more.
 

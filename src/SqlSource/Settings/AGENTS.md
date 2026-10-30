@@ -36,7 +36,7 @@ See [the type override](../../../docs/architecture/generator.md#the-type-overrid
 - **The library types are `Settings/Libraries/`: one `LibrarySetting` for each `SqlLibrary`, merged by `LibrarySettings.Over`, which keeps an entry of `LibraryState.Default` so that it hides the farther levels.**  Never drop one before `LibrarySettings.Find`.
 - **The library types are not part of `QuerySettings.Resolve`**: `ResolveLibraries` merges them, and its caller does so once for each distinct level of markers, as for the type override.
 - **A new library is a member of `SqlLibrary`, whose lower-cased name is what a user writes**, and with it the names in `schemas/settings-v1.schema.json`, which `SettingsFileSchemaTests` checks against the enum.
-- **An entry carries the span and line span of its member through `ISettingSource.MemberSpans`**, so a diagnostic about it needs no source text; the attribute has no level for it and returns the default.
+- **A level holds no position in a settings file.**  The reader tells the source which member gives each entry through `ISettingSource.LibraryEntry`, and a settings file keeps it apart, so an edit that only moves a member changes no level and types nothing again.  Only a marker's entry carries its `Marker` span, since an edit of the marker parses its file again.  See [the library types](../../../docs/architecture/generator.md#the-library-types).
 
 ## The column types
 

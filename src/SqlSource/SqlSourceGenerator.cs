@@ -54,6 +54,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         RegisterTypeSources(context, typeQueries);
         RegisterMethodSources(
             context,
+            settingsFiles,
             typeQueries,
             models.AllFileModels,
             models.Models,
@@ -754,10 +755,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
-    // The file of each type's methods, and their diagnostics, with the clashes across types and SQLSRC273 for each
-    // engine whose methods have no driver.
+    // The file of each type's methods, and their diagnostics, with the clashes across types, SQLSRC281 at each member
+    // of a settings file that turns on a library the project cannot use, and SQLSRC273 for each engine whose methods
+    // have no driver.
     private static void RegisterMethodSources(
         IncrementalGeneratorInitializationContext context,
+        IncrementalValueProvider<SettingsFileSet> settingsFiles,
         IncrementalValuesProvider<TypeQueries> typeQueries,
         IncrementalValueProvider<EquatableArray<FileModels>> allFileModels,
         IncrementalValueProvider<ModelSet> models,
@@ -852,7 +855,22 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (diagnostics, _) => MethodPlanner.Distinct(diagnostics))
             .WithTrackingName(TrackingNames.MethodDiagnostics);
 
+        // The libraries that a settings file turns on and the project cannot use, each once, without the positions of
+        // their members, which no step before this one carries: an edit of a settings file that only moves a member
+        // types and plans nothing again, and finds the member again here, in the file as it is read now.
+        var settingsFileLibraryUses = typeMethods
+            .Select(static (methods, _) => methods.SettingsFileLibraries)
+            .Collect()
+            .Select(static (uses, _) => SettingsFileLibraryUse.Distinct(uses))
+            .WithTrackingName(TrackingNames.SettingsFileLibraryUses);
+
+        var settingsFileLibraryDiagnostics = settingsFileLibraryUses
+            .Combine(settingsFiles)
+            .Select(static (input, _) => SettingsFileLibraryUse.Locate(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.SettingsFileLibraryDiagnostics);
+
         context.RegisterSourceOutput(methodDiagnostics, ReportAll);
+        context.RegisterSourceOutput(settingsFileLibraryDiagnostics, ReportAll);
         context.RegisterSourceOutput(conflicts, ReportConflicts);
         context.RegisterSourceOutput(methodOutputs, AddMethods);
 

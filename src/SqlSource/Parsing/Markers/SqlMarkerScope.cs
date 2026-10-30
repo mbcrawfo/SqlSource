@@ -395,7 +395,7 @@ internal sealed class SqlMarkerScope(
             if (FindLibraryType(library) is not { } existing)
             {
                 AddLibraryType(
-                    new LibrarySetting(library, state, place, marker.Span, TextLines.LineSpanOf(text, marker.Span))
+                    new LibrarySetting(library, state, place, (marker.Span, TextLines.LineSpanOf(text, marker.Span)))
                 );
             }
             else if (existing.State != state)

@@ -1,5 +1,4 @@
 using System;
-using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Settings.Libraries;
@@ -74,11 +73,5 @@ public sealed class LibrarySettingsTests
     }
 
     private static LibrarySetting Entry(LibraryState state, SettingPlace place) =>
-        new(
-            SqlLibrary.NodaTime,
-            state,
-            place,
-            new TextSpan(3, 9),
-            new LinePositionSpan(new LinePosition(1, 3), new LinePosition(1, 12))
-        );
+        new(SqlLibrary.NodaTime, state, place);
 }

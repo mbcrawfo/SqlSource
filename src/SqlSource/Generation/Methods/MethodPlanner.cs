@@ -17,7 +17,8 @@ namespace SqlSource.Generation.Methods;
 /// that cannot have one: <c>SQLSRC272</c>, <c>SQLSRC274</c> and <c>SQLSRC275</c>, and, from
 /// <see cref="ConversionPlanner" />, <c>SQLSRC279</c>, <c>SQLSRC280</c>, and <c>SQLSRC277</c> and <c>SQLSRC278</c> for
 /// a converter of a referenced assembly.  It also reports <c>SQLSRC281</c> for a library that is on for a query and
-/// that the project cannot use, which leaves the query its method, with the base map's types.
+/// that the project cannot use, which leaves the query its method, with the base map's types: at a marker as a
+/// diagnostic, and for a settings file as a <see cref="SettingsFileLibraryUse" />, which is located at the end.
 /// </summary>
 internal static class MethodPlanner
 {
@@ -48,11 +49,12 @@ internal static class MethodPlanner
         var key = HintName.NameOf(type);
         var methods = ImmutableArray.CreateBuilder<QueryMethod>();
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
+        var libraryUses = ImmutableArray.CreateBuilder<SettingsFileLibraryUse>();
         var engines = CodeGenEngines.None;
         var warningIds = new SortedSet<string>(StringComparer.Ordinal);
         if (typeQueries.Type.Diagnostics.Count == 0 && typeQueries.Files.Count > 0)
         {
-            engines = Collect(input, key, methods, diagnostics, warningIds);
+            engines = Collect(input, key, methods, diagnostics, libraryUses, warningIds);
         }
 
         return new TypeMethods(
@@ -67,6 +69,7 @@ internal static class MethodPlanner
             type.AttributeLocation,
             new EquatableArray<QueryMethod>(methods.ToImmutable()),
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable()),
+            new EquatableArray<SettingsFileLibraryUse>(libraryUses.ToImmutable()),
             engines,
             new EquatableArray<string>(warningIds.ToImmutableArray())
         );
@@ -93,6 +96,7 @@ internal static class MethodPlanner
         string key,
         ImmutableArray<QueryMethod>.Builder methods,
         ImmutableArray<DiagnosticInfo>.Builder diagnostics,
+        ImmutableArray<SettingsFileLibraryUse>.Builder libraryUses,
         SortedSet<string> warningIds
     )
     {
@@ -118,7 +122,7 @@ internal static class MethodPlanner
             var engine = SqlDescribableDialects.EngineOf(file.Dialect);
             engines |= engine.ToCodeGenEngines();
             var context = new QueryContext(input, key, file, engine, usable);
-            AddUnavailableLibraries(context, diagnostics);
+            AddUnavailableLibraries(context, diagnostics, libraryUses);
             if (Plan(context, written) is { } plan)
             {
                 planned.Add(plan);
@@ -220,12 +224,15 @@ internal static class MethodPlanner
         };
     }
 
-    // SQLSRC281 at each entry that turns a library on for the query whose assemblies the project does not reference for
-    // its engine: at a settings file's member, or at a marker of the query's file.  Distinct makes it one for each
-    // place and engine, whatever the number of queries and types it reaches.  A query without models has its own error.
+    // SQLSRC281 for each entry that turns a library on for the query whose assemblies the project does not reference
+    // for its engine: at a marker of the query's file, whose text any edit of the marker parses again, or, for a
+    // settings file's member, as a use without its position, which SettingsFileLibraryUse.Locate finds in the file as
+    // it is now.  Distinct makes each one for each place and engine, whatever the number of queries and types it
+    // reaches.  A query without models has its own error.
     private static void AddUnavailableLibraries(
         QueryContext context,
-        ImmutableArray<DiagnosticInfo>.Builder diagnostics
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics,
+        ImmutableArray<SettingsFileLibraryUse>.Builder libraryUses
     )
     {
         var (input, _, _, engine, usable) = context;
@@ -236,24 +243,28 @@ internal static class MethodPlanner
 
         foreach (var entry in models.UnavailableLibraries)
         {
-            var path =
-                entry.Place.Kind == SettingPlaceKind.SettingsFile && entry.Place.Path is { } file
-                    ? file
-                    : models.NameLocation.Path;
+            var missing = LibraryProbe.MissingAssembliesOf(entry.Library, engine);
+            if (entry.Marker is not { } marker)
+            {
+                // An entry without a position is a settings file's, whose place has its path.
+                libraryUses.Add(new SettingsFileLibraryUse(entry.Place.Path!, entry.Library, engine, missing));
+                continue;
+            }
+
             diagnostics.Add(
                 DiagnosticInfo.Create(
                     SqlDiagnostics.LibraryNotReferenced,
-                    new LocationInfo(path, entry.Span, entry.LineSpan),
+                    new LocationInfo(models.NameLocation.Path, marker.Span, marker.LineSpan),
                     LibraryName(entry.Library),
                     engine.DatabaseName(),
-                    LibraryProbe.MissingAssembliesOf(entry.Library, engine)
+                    missing
                 )
             );
         }
     }
 
-    // The library's name as a diagnostic gives it.
-    private static string LibraryName(SqlLibrary library) =>
+    /// <summary>The library's name as a diagnostic gives it.</summary>
+    public static string LibraryName(SqlLibrary library) =>
         library switch
         {
             SqlLibrary.NodaTime or _ => "NodaTime",

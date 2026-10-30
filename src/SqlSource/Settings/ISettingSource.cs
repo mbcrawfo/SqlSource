@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.CodeAnalysis.Text;
+using SqlSource.Settings.Libraries;
 
 namespace SqlSource.Settings;
 
@@ -37,10 +37,11 @@ internal interface ISettingSource
     IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting);
 
     /// <summary>
-    /// Where the member at <paramref name="index" /> of a setting written as an object is, from its key to its value,
-    /// with the line and column of that span.  A source that never gives members for the setting returns the default.
+    /// Records that the member at <paramref name="index" /> of the library types gives the entry of
+    /// <paramref name="library" />.  A source that knows where its members are keeps that position apart from the
+    /// level, so that a member that only moves changes no level; one that never gives the library types ignores it.
     /// </summary>
-    (TextSpan Span, LinePositionSpan LineSpan) MemberSpans(SettingId setting, int index);
+    void LibraryEntry(SqlLibrary library, int index);
 
     /// <summary>
     /// The choice, or null when it is not set.  A value that is no member is recorded by the source, which alone
