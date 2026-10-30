@@ -8,42 +8,68 @@ namespace SqlSource.Generation.Types.Maps;
 /// <summary>
 /// The rows of the libraries that are on, which <see cref="PostgresTypeMap.Map" /> and
 /// <see cref="SqlServerTypeMap.Map" /> ask after the type override and before the base map.  A row gives a library's
-/// own C# type for a type of <c>pg_catalog</c> or a system type of SQL Server, and writes it <c>global::</c>-qualified:
-/// the generator names no library type itself.  Its <c>Detail</c> is the library as a place,
-/// <see cref="PlaceOf" />, so that the type has a place and the base map's type beside it, which a converter converts
-/// from and to.
+/// own C# type for a type of <c>pg_catalog</c>, a base type of PostGIS in any schema or a system type of SQL Server,
+/// and writes it <c>global::</c>-qualified: the generator names no library type itself.  Its <c>Detail</c> is the
+/// library as a place, <see cref="PlaceOf" />, so that the type has a place and the base map's type beside it, which a
+/// converter converts from and to.
 /// </summary>
 internal sealed class LibraryRows
 {
-    // The only library there is: its set is the only one that is not empty.  A second library makes one instance for
-    // each set of libraries, cached the same way.
-    private static readonly LibraryRows NodaTimeOnly = new(NodaTimeRows(), NodaTimeSqlServerRows());
+    // PostGIS's types, by their InternalName.
+    private const string Geometry = "geometry";
+
+    private const string Geography = "geography";
+
+    // PostGIS's rows, by InternalName, which every set of libraries with NetTopologySuite shares.  Declared before
+    // Sets, which reads it when the type is initialized.
+    private static readonly Dictionary<string, TypeMapping> PostgisRows = BuildPostgisRows();
+
+    // One instance for each set of libraries, found by the bit of each library, which is 1 << its number: built once,
+    // when the type is initialized, so that a set found twice is the same instance.  Slot 0 is the empty set, which
+    // has no instance.
+    private static readonly LibraryRows?[] Sets = BuildSets();
 
     private readonly Dictionary<string, TypeMapping> _rows;
+    private readonly Dictionary<string, TypeMapping>? _postgisRows;
     private readonly Dictionary<string, TypeMapping> _sqlServerRows;
 
-    private LibraryRows(Dictionary<string, TypeMapping> rows, Dictionary<string, TypeMapping> sqlServerRows)
+    private LibraryRows(
+        Dictionary<string, TypeMapping> rows,
+        Dictionary<string, TypeMapping>? postgisRows,
+        Dictionary<string, TypeMapping> sqlServerRows
+    )
     {
         _rows = rows;
+        _postgisRows = postgisRows;
         _sqlServerRows = sqlServerRows;
     }
 
     /// <summary>
-    /// The rows of <paramref name="on" />: the same instance each time for the same libraries, and null when there are
-    /// none.
+    /// The rows of <paramref name="on" />: the same instance each time for the same libraries, whatever their order and
+    /// however often one repeats, and null when there are none.
     /// </summary>
     public static LibraryRows? Of(IReadOnlyList<SqlLibrary> on)
     {
+        var mask = 0;
         for (var i = 0; i < on.Count; i++)
         {
-            if (on[i] == SqlLibrary.NodaTime)
-            {
-                return NodaTimeOnly;
-            }
+            mask |= 1 << (int)on[i];
         }
 
-        return null;
+        return Sets[mask];
     }
+
+    /// <summary>
+    /// Whether <paramref name="type" /> is a type of PostGIS, <c>geometry</c> or <c>geography</c>: a base type of that
+    /// name, ignoring case, in any schema, since the extension is installed in a schema of the user's choice.  A domain
+    /// or a composite of the same name is not one.
+    /// </summary>
+    public static bool IsPostgis(PostgresType type) =>
+        type.Kind.Equals(SidecarValues.Kind.Base, StringComparison.Ordinal)
+        && (
+            type.InternalName.Equals(Geometry, StringComparison.OrdinalIgnoreCase)
+            || type.InternalName.Equals(Geography, StringComparison.OrdinalIgnoreCase)
+        );
 
     /// <summary>
     /// The library as the place that chose a type, which <c>SQLSRC250</c> to <c>SQLSRC252</c> word: <c>the NodaTime
@@ -58,10 +84,21 @@ internal sealed class LibraryRows
 
     /// <summary>
     /// The library's mapping of <paramref name="type" />, or null when it has none: a type of <c>pg_catalog</c> that
-    /// a row names, by its <c>InternalName</c> ignoring case, as the base map's rows are.
+    /// a row names, by its <c>InternalName</c> ignoring case, as the base map's rows are, or a type of PostGIS,
+    /// <see cref="IsPostgis" />, in any schema.
     /// </summary>
-    public TypeMapping? Find(PostgresType type) =>
-        PostgresTypeMap.IsSystemType(type) && _rows.TryGetValue(type.InternalName, out var row) ? row : null;
+    public TypeMapping? Find(PostgresType type)
+    {
+        if (PostgresTypeMap.IsSystemType(type) && _rows.TryGetValue(type.InternalName, out var row))
+        {
+            return row;
+        }
+
+        return
+            _postgisRows is not null && IsPostgis(type) && _postgisRows.TryGetValue(type.InternalName, out var postgis)
+            ? postgis
+            : null;
+    }
 
     /// <summary>
     /// The library's mapping of <paramref name="type" />, or null when it has none: a system type that a row names, by
@@ -73,6 +110,78 @@ internal sealed class LibraryRows
         && _sqlServerRows.TryGetValue(SqlServerTypeMap.BaseName(type.Name), out var row)
             ? row
             : null;
+
+    // Every set of libraries, indexed by its mask: the rows of a set are those of its libraries, side by side.  A type
+    // that two libraries give is the later library's, which no pair of libraries does today.
+    private static LibraryRows?[] BuildSets()
+    {
+        var libraries = (SqlLibrary[])Enum.GetValues(typeof(SqlLibrary));
+        var sets = new LibraryRows?[1 << libraries.Length];
+        for (var mask = 1; mask < sets.Length; mask++)
+        {
+            var rows = new Dictionary<string, TypeMapping>(StringComparer.OrdinalIgnoreCase);
+            var sqlServerRows = new Dictionary<string, TypeMapping>(StringComparer.OrdinalIgnoreCase);
+            foreach (var library in libraries)
+            {
+                if ((mask & (1 << (int)library)) == 0)
+                {
+                    continue;
+                }
+
+                var (postgres, sqlServer) = RowsOf(library);
+                foreach (var row in postgres)
+                {
+                    rows[row.Key] = row.Value;
+                }
+
+                foreach (var row in sqlServer)
+                {
+                    sqlServerRows[row.Key] = row.Value;
+                }
+            }
+
+            var postgisRows = (mask & (1 << (int)SqlLibrary.NetTopologySuite)) != 0 ? PostgisRows : null;
+            sets[mask] = new LibraryRows(rows, postgisRows, sqlServerRows);
+        }
+
+        return sets;
+    }
+
+    // The rows of one library, for PostgreSQL's pg_catalog and for SQL Server.  PostGIS's rows match in any schema, so
+    // they are apart, in PostgisRows.
+    private static (Dictionary<string, TypeMapping> Postgres, Dictionary<string, TypeMapping> SqlServer) RowsOf(
+        SqlLibrary library
+    ) =>
+        library switch
+        {
+            SqlLibrary.NetTopologySuite => (Empty(), Empty()),
+            SqlLibrary.NodaTime or _ => (NodaTimeRows(), NodaTimeSqlServerRows()),
+        };
+
+    // No rows, which a set only reads to copy, so it needs no comparer: NetTopologySuite has none in pg_catalog.
+    private static Dictionary<string, TypeMapping> Empty() => [];
+
+    // PostGIS's geometry and geography are both NetTopologySuite's Geometry, a reference type, which the plugin reads
+    // and writes.  The base map has no C# type for either.
+    private static Dictionary<string, TypeMapping> BuildPostgisRows()
+    {
+        var rows = new Dictionary<string, TypeMapping>(StringComparer.OrdinalIgnoreCase);
+        var place = PlaceOf(SqlLibrary.NetTopologySuite);
+
+        void Add(string key) =>
+            rows.Add(
+                key,
+                TypeMapping.Mapped(key, "global::NetTopologySuite.Geometries.Geometry", false) with
+                {
+                    Detail = place,
+                    Library = SqlLibrary.NetTopologySuite,
+                }
+            );
+
+        Add(Geometry);
+        Add(Geography);
+        return rows;
+    }
 
     private static Dictionary<string, TypeMapping> NodaTimeSqlServerRows()
     {

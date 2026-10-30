@@ -49,7 +49,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var converters = FindConverters(context, typing.MappedTypeConverters, typing.TypingLibraryProbe);
         var models = CollectModels(context, typing.Files, typeQueries);
         ReportDrivers(context, typing.NpgsqlProbe, typing.SqlClientProbe, sidecars.Needs, parsedFiles.Sorted);
-        ReportProblems(context, sidecars.Checks, typing.FileTypes, models.FileModels, models.Models);
+        ReportProblems(
+            context,
+            sidecars.Checks,
+            typing.FileTypes,
+            models.LibraryFailures,
+            models.FileModels,
+            models.Models
+        );
         RegisterModelSources(context, models.Models, parsedFiles.EachFile, claims.RepeatedPaths);
         RegisterTypeSources(context, typeQueries);
         RegisterMethodSources(
@@ -612,6 +619,13 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => TypeModels.Of(input.Left, input.Right))
             .WithTrackingName(TrackingNames.TypeModels);
 
+        // The failure without its libraries of each query that a type claims at Models, which gets no models instead.
+        // Apart from the requests, so that the requests stay equal when a failure's text changes.
+        var libraryFailures = typeQueries
+            .Combine(allFileModels)
+            .Select(static (input, _) => TypeModels.LibraryFailuresOf(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.LibraryFailures);
+
         // Every type's requests together, by full name, since two types or two queries can ask for one model.
         var modelGroups = typeModels
             .SelectMany(static (requests, _) => requests)
@@ -643,7 +657,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => ModelCollector.Resolve(input.Left, input.Right))
             .WithTrackingName(TrackingNames.Models);
 
-        return new CollectedModels(fileModels, allFileModels, modelNames, models);
+        return new CollectedModels(fileModels, allFileModels, libraryFailures, modelNames, models);
     }
 
     // Whether the Npgsql and the Microsoft.Data.SqlClient the project references are too old or newer than known, each
@@ -696,6 +710,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalGeneratorInitializationContext context,
         FileNodes<SidecarCheckResult> sidecarChecks,
         FileNodes<FileTypes> fileTypes,
+        IncrementalValuesProvider<EquatableArray<DiagnosticInfo>> libraryFailures,
         FileNodes<FileModels> fileModels,
         IncrementalValueProvider<ModelSet> models
     )
@@ -706,6 +721,9 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // Beside the checks' output, so that a change to the types alone reports the checks of no file again.
         context.RegisterSourceOutput(fileTypes.EachFile, ReportTypes);
         context.RegisterSourceOutput(fileTypes.OfRepeatedPaths, ReportTypes);
+
+        // The failures of the types that the claims at Models defer, for each type that claims such a query.
+        context.RegisterSourceOutput(libraryFailures, ReportAll);
 
         // Beside the types' output, so that a change to the models alone reports the types of no file again.
         context.RegisterSourceOutput(fileModels.EachFile, ReportModels);
@@ -1212,11 +1230,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<EquatableArray<Converter>> MappedTypeConverters
     );
 
-    // Each file's models, every file's together, the models' full names, and the models to emit with the problems of
-    // the requests.
+    // Each file's models, every file's together, the failures without their libraries of each type's queries at Models,
+    // the models' full names, and the models to emit with the problems of the requests.
     private readonly record struct CollectedModels(
         FileNodes<FileModels> FileModels,
         IncrementalValueProvider<EquatableArray<FileModels>> AllFileModels,
+        IncrementalValuesProvider<EquatableArray<DiagnosticInfo>> LibraryFailures,
         IncrementalValueProvider<EquatableArray<string>> ModelNames,
         IncrementalValueProvider<ModelSet> Models
     );

@@ -18,6 +18,7 @@ public sealed class PostgresTypeMapTests
     private const string DateTime = "global::System.DateTime";
     private const string DateOnly = "global::System.DateOnly";
     private const string BitArray = "global::System.Collections.BitArray";
+    private const string Geometry = "global::NetTopologySuite.Geometries.Geometry";
     private const string Range = "global::NpgsqlTypes.NpgsqlRange";
     private const string Noda = "global::NodaTime.";
     private const string NodaRange = "global::NpgsqlTypes.NpgsqlRange<global::NodaTime.";
@@ -621,6 +622,84 @@ public sealed class PostgresTypeMapTests
     public void Of_ALibrary_IsTheSameInstanceEachTime() =>
         LibraryRows.Of([SqlLibrary.NodaTime]).ShouldBeSameAs(LibraryRows.Of([SqlLibrary.NodaTime]));
 
+    // One instance for each set, whatever the order of its libraries and however often one repeats, and another for
+    // each other set.
+    [Fact]
+    public void Of_EachSetOfLibraries_IsTheSameInstance()
+    {
+        var noda = LibraryRows.Of([SqlLibrary.NodaTime]);
+        var nts = LibraryRows.Of([SqlLibrary.NetTopologySuite]);
+        var both = LibraryRows.Of([SqlLibrary.NodaTime, SqlLibrary.NetTopologySuite]);
+
+        nts.ShouldBeSameAs(LibraryRows.Of([SqlLibrary.NetTopologySuite, SqlLibrary.NetTopologySuite]));
+        both.ShouldBeSameAs(LibraryRows.Of([SqlLibrary.NetTopologySuite, SqlLibrary.NodaTime, SqlLibrary.NodaTime]));
+        nts.ShouldNotBeSameAs(noda);
+        both.ShouldNotBeSameAs(noda);
+        both.ShouldNotBeSameAs(nts);
+    }
+
+    // Each set has the rows of its libraries alone: NetTopologySuite's finds no NodaTime row, NodaTime's no PostGIS
+    // row, and the set of both finds the rows of each.
+    [Fact]
+    public void Of_EachSet_HasTheRowsOfItsLibrariesAlone()
+    {
+        var timestamptz = ModelRuns.Catalog("timestamptz");
+        var geometry = Postgis("public", "geometry");
+
+        LibraryRows.Of([SqlLibrary.NetTopologySuite])!.Find(timestamptz).ShouldBeNull();
+        NodaTimeOn.Find(geometry).ShouldBeNull();
+        var both = LibraryRows.Of([SqlLibrary.NodaTime, SqlLibrary.NetTopologySuite])!;
+        both.Find(timestamptz).ShouldNotBeNull().Library.ShouldBe(SqlLibrary.NodaTime);
+        both.Find(geometry).ShouldNotBeNull().Library.ShouldBe(SqlLibrary.NetTopologySuite);
+    }
+
+    // PostGIS is installed in a schema of the user's choice, so its types match by name in any schema, ignoring case.
+    [Theory]
+    [InlineData("public", "geometry", "geometry")]
+    [InlineData("gis", "geography", "geography")]
+    [InlineData("public", "Geometry", "geometry")]
+    public void Find_PostgisTypeInAnySchema_IsGeometry(string schema, string internalName, string key)
+    {
+        var row = LibraryRows.Of([SqlLibrary.NetTopologySuite])!.Find(Postgis(schema, internalName)).ShouldNotBeNull();
+
+        ShouldMapTo(row, Geometry, false, key);
+        row.Detail.ShouldBe("the NetTopologySuite library");
+        row.Library.ShouldBe(SqlLibrary.NetTopologySuite);
+    }
+
+    // A domain or a composite of PostGIS's names is not PostGIS's type.
+    [Theory]
+    [InlineData(SidecarValues.Kind.Domain)]
+    [InlineData(SidecarValues.Kind.Composite)]
+    public void Find_PostgisNameOfAnotherKind_IsNull(string kind) =>
+        LibraryRows
+            .Of([SqlLibrary.NetTopologySuite])!
+            .Find(TestSidecars.Postgres(name: "geometry", kind: kind, schema: "public", internalName: "geometry"))
+            .ShouldBeNull();
+
+    // An array of PostGIS's type is an array of Geometry, and a domain over it is Geometry, by the walk of the map.
+    [Fact]
+    public void Map_NetTopologySuiteOn_ArrayAndDomainFollowTheWalk()
+    {
+        var geometry = Postgis("public", "geometry");
+        var on = LibraryRows.Of([SqlLibrary.NetTopologySuite]);
+        var domain = TestSidecars.Postgres(
+            name: "area",
+            kind: SidecarValues.Kind.Domain,
+            schema: "public",
+            internalName: "area",
+            baseType: geometry
+        );
+
+        var array = PostgresTypeMap.Map(ModelRuns.ArrayOf(geometry, "_geometry"), NpgsqlColumn.Npgsql10, libraries: on);
+        var overDomain = PostgresTypeMap.Map(domain, NpgsqlColumn.Npgsql10, libraries: on);
+
+        ShouldMapTo(array, Geometry + "[]", false, "geometry");
+        array.Library.ShouldBe(SqlLibrary.NetTopologySuite);
+        ShouldMapTo(overDomain, Geometry, false, "geometry");
+        overDomain.Library.ShouldBe(SqlLibrary.NetTopologySuite);
+    }
+
     [Theory]
     [InlineData(Noda + "Instant")]
     [InlineData(Noda + "Instant[]")]
@@ -644,6 +723,10 @@ public sealed class PostgresTypeMapTests
         mapping.IsPublic.ShouldBeTrue();
         mapping.WarningIds.ShouldBeEmpty();
     }
+
+    // A base type of PostGIS, in the schema.
+    private static PostgresType Postgis(string schema, string internalName) =>
+        TestSidecars.Postgres(name: internalName, schema: schema, internalName: internalName);
 
     private static PostgresOverrideOf Overrides(params (string Key, string Text, bool IsValueType)[] entries) =>
         type =>

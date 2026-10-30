@@ -36,12 +36,33 @@ public sealed class LibraryTypeTests
 
     private const string ListEvents = "-- name: ListEvents\nSELECT at FROM events;\n";
 
+    private const string Geometry = "global::NetTopologySuite.Geometries.Geometry";
+
+    private const string ListShapes = "-- name: ListShapes\nSELECT shape FROM maps;\n";
+
+    // SQLSRC246 of ListShapes's column shape, PostGIS's geometry of public, whose help names the plugin.
+    private const string ShapeHasNoCSharpType =
+        $"SQLSRC246 {GeneratorHarness.UsersPath}(1,10)-(1,20): The column 'shape' has the type 'geometry', which "
+        + "SqlSource cannot give a C# type.  Reference Npgsql.NetTopologySuite to read it as NetTopologySuite's "
+        + "Geometry in a codegen query, or map it with the type override, as public.geometry=<a C# type>.";
+
     private static readonly PostgresType Timestamptz = Catalog("timestamptz") with
     {
         Name = "timestamp with time zone",
     };
 
     private static readonly SidecarOrigin EventsAt = new("public", "events", "at");
+
+    // PostGIS's geometry, in public, and a domain over it.
+    private static readonly PostgresType PostgisGeometry = Postgis("public", "geometry");
+
+    private static readonly PostgresType AreaDomain = TestSidecars.Postgres(
+        name: "area",
+        kind: SidecarValues.Kind.Domain,
+        schema: "public",
+        internalName: "area",
+        baseType: PostgisGeometry
+    );
 
     // What the base map gives timestamptz, with no place.
     private static readonly PropertyType DateTimeOfTheMap = new(
@@ -66,6 +87,14 @@ public sealed class LibraryTypeTests
         Library: SqlLibrary.NodaTime,
         WithoutLibrary: DateTimeOfTheMap
     );
+
+    // Npgsql, NetTopologySuite and its plugin, which turn the library on by default.
+    private static MetadataReference[] WithNetTopologySuite =>
+        [
+            NpgsqlReferences.Npgsql10,
+            LibraryReferences.NetTopologySuite("2.6.0"),
+            LibraryReferences.NpgsqlNetTopologySuite("10.0.3"),
+        ];
 
     // Npgsql, NodaTime and the plugin, which turn the library on by default.
     private static MetadataReference[] WithThePlugin =>
@@ -555,10 +584,164 @@ public sealed class LibraryTypeTests
         run.Sources.Keys.ShouldNotContain(LibraryConverters.HintNameOf(SqlLibrary.NodaTime));
     }
 
+    // PostGIS's types under NetTopologySuite's row, read by the plugin: a column of geometry, of geography in another
+    // schema, of an array of geometry and of a domain over it.  Without the library none has a C# type, so the row
+    // stays, with nothing beside it, and the query keeps the failure of its first column for a claim at Models.
+    [Fact]
+    public void Run_PostgisColumnsInCodegen_AreGeometry()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
+        var entry = Entry(
+            file,
+            "ListShapes",
+            [],
+            [
+                Column("shape", PostgisGeometry),
+                Column("place", Postgis("gis", "geography")),
+                Column("shapes", ArrayOf(PostgisGeometry, "_geometry")),
+                Column("area", AreaDomain),
+            ]
+        );
+
+        var run = MethodRuns.Run(file, [entry], references: WithNetTopologySuite);
+
+        run.ShouldBeClean();
+        var query = QueryOf(run);
+        query
+            .Columns.ShouldNotBeNull()
+            .Select(column => column.Text)
+            .ShouldBe([Geometry, Geometry, Geometry + "[]", Geometry]);
+        foreach (var column in query.Columns.Value)
+        {
+            column.Library.ShouldBe(SqlLibrary.NetTopologySuite);
+            column.Place.ShouldBe("the NetTopologySuite library");
+            column.WithoutLibrary.ShouldBeNull();
+        }
+
+        // The first column's failure, which the file's own diagnostics do not hold.
+        var failure = query.WithoutLibraryFailure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC246");
+        failure.Arguments[0].ShouldBe("column 'shape'");
+        StepOutputs.Single<FileTypes>(run, TrackingNames.FileTypes).Diagnostics.ShouldBeEmpty();
+        run.Sources[ModelFiles(run).ShouldHaveSingleItem()].ShouldContain(Geometry + " Shape");
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("reader.GetFieldValue<" + Geometry + ">(0)");
+    }
+
+    // Off by the settings file, or not referenced: the column has no C# type, and the help names the plugin.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Run_PostgisWithLibraryOff_Reports246WithTheNewHelp(bool referenced)
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
+
+        var run = MethodRuns.Run(
+            file,
+            [ShapesEntry(file)],
+            references: referenced ? WithNetTopologySuite : [NpgsqlReferences.Npgsql10],
+            settings: referenced ? Settings("libraryTypes", new JsonObject { ["netTopologySuite"] = "off" }) : null
+        );
+
+        run.Diagnostics.ShouldBe([ShapeHasNoCSharpType]);
+        StepOutputs.Single<FileTypes>(run, TrackingNames.FileTypes).Queries.ShouldBeEmpty();
+    }
+
+    // A claim at Models reads no library's type, and the column has no other: the query gets SQLSRC246 and no models,
+    // as without the library.
+    [Fact]
+    public void Run_ModelsClaimOfALibraryOnlyColumn_Reports246AndNoModels()
+    {
+        const string Models = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                public partial class Rows;
+            }
+            """;
+        var file = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
+
+        var run = MethodRuns.Run(file, [ShapesEntry(file)], Models, WithNetTopologySuite);
+
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Diagnostics.ShouldBe([ShapeHasNoCSharpType]);
+        ModelFiles(run).ShouldBeEmpty();
+        // Typing does not know the output: the column has the library's type, and the failure is kept beside it.
+        QueryOf(run).Columns.ShouldNotBeNull().ShouldHaveSingleItem().Text.ShouldBe(Geometry);
+    }
+
+    // One query claimed by a type at CodeGen and by another at Models: the first's model and method have Geometry,
+    // and the second gets SQLSRC246, once, and no models.
+    [Fact]
+    public void Run_CodegenAndModelsClaims_EachGetsItsOwn()
+    {
+        const string TwoNamespaces = """
+            using SqlSource;
+
+            namespace Methods
+            {
+                [SqlSourceGenerate(Output = GeneratorOutput.CodeGen)]
+                public partial class Repo;
+            }
+
+            namespace Dtos
+            {
+                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                public partial class Rows;
+            }
+            """;
+        var file = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
+
+        var run = MethodRuns.Run(file, [ShapesEntry(file)], TwoNamespaces, WithNetTopologySuite);
+
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Diagnostics.ShouldBe([ShapeHasNoCSharpType]);
+        ModelFiles(run).ShouldBe(["Methods.ListShapesDto-Model.g.cs"]);
+        run.Sources["Methods.ListShapesDto-Model.g.cs"].ShouldContain("(" + Geometry + " Shape);");
+        run.Sources["Methods.Repo-Methods.g.cs"].ShouldContain("reader.GetFieldValue<" + Geometry + ">(0)");
+    }
+
+    // The type override names PostGIS's type by its schema, and wins over the library's row: the column is a Point,
+    // which the plugin reads, with no library and no failure kept.
+    [Fact]
+    public void Run_OverrideOfPublicGeometryToPoint_WinsOverTheRow()
+    {
+        const string Point = "global::NetTopologySuite.Geometries.Point";
+        var file = new SqlFile(GeneratorHarness.UsersPath, ListShapes);
+
+        var run = MethodRuns.Run(
+            file,
+            [ShapesEntry(file)],
+            references: WithNetTopologySuite,
+            settings: Settings(
+                "typeOverrides",
+                new JsonObject { ["public.geometry"] = "NetTopologySuite.Geometries.Point" }
+            )
+        );
+
+        run.ShouldBeClean();
+        var query = QueryOf(run);
+        var column = query.Columns.ShouldNotBeNull().ShouldHaveSingleItem();
+        column.Text.ShouldBe(Point);
+        column.Library.ShouldBeNull();
+        column.WithoutLibrary.ShouldBeNull();
+        query.WithoutLibraryFailure.ShouldBeNull();
+        run.Sources[MethodRuns.MethodsFile].ShouldContain("reader.GetFieldValue<" + Point + ">(0)");
+    }
+
     // ListEvents of the file, or the query of the name, whose one column, at, is a timestamptz read from
     // public.events.at.
     private static SidecarEntry EventsEntry(SqlFile file, string name = "ListEvents") =>
         Entry(file, name, [], [Column("at", Timestamptz, origin: EventsAt)]);
+
+    // ListShapes of the file, whose one column, shape, is PostGIS's geometry.
+    private static SidecarEntry ShapesEntry(SqlFile file) =>
+        Entry(file, "ListShapes", [], [Column("shape", PostgisGeometry)]);
+
+    // A base type of PostGIS, in the schema.
+    private static PostgresType Postgis(string schema, string internalName) =>
+        TestSidecars.Postgres(name: internalName, schema: schema, internalName: internalName);
 
     // The one query of the run's one file.
     private static QueryTypes QueryOf(GeneratorRun run) =>

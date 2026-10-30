@@ -107,6 +107,8 @@ internal static class TrackingNames
 
     public const string TypeModels = nameof(TypeModels);
 
+    public const string LibraryFailures = nameof(LibraryFailures);
+
     public const string ModelGroups = nameof(ModelGroups);
 
     public const string ModelNames = nameof(ModelNames);
