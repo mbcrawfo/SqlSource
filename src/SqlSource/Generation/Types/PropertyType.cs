@@ -31,8 +31,8 @@ namespace SqlSource.Generation.Types;
 /// base map gave.  It changes no model's C# either, and is not compared.
 /// </param>
 /// <param name="Library">
-/// The library whose row gave the type, or null for any other type.  A library row has its <paramref name="Place" /> and
-/// <paramref name="Database" />, so that a converter of the query's engine and driver applies, and no
+/// The library whose row gave the type, or null for any other type.  A library row has its <paramref name="Place" />
+/// and <paramref name="Database" />, so that a converter of the query's engine and driver applies, and no
 /// <paramref name="Mapped" />.  Where no converter fits, the driver reads and writes the type, as the plugin does on
 /// PostgreSQL, with no <c>SQLSRC279</c> or <c>SQLSRC280</c>.
 /// </param>

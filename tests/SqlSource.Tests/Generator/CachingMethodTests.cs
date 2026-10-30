@@ -618,9 +618,9 @@ public sealed class CachingMethodTests
         MethodsOf(result, UserMethods).ShouldContain("global::SqlSource.NodaTimeConversions.InstantFromDateTime(");
     }
 
-    // Under postgres, Users reads a timestamptz, which the plugin's row makes NodaTime's Instant.  A reference that moves
-    // NodaTime's version and keeps it above the floor changes the probe and leaves the libraries below the floor as
-    // they were, so no type plans its methods again.
+    // Under postgres, Users reads a timestamptz, which the plugin's row makes NodaTime's Instant.  A reference that
+    // moves NodaTime's version and keeps it above the floor changes the probe and leaves the libraries below the floor
+    // as they were, so no type plans its methods again.
     [Fact]
     public void Run_NodaTimeVersionChangeAboveTheFloor_PlansNothingAgain()
     {
@@ -710,8 +710,9 @@ public sealed class CachingMethodTests
     // Users with this text.
     private InMemoryAdditionalText UsersAt(string text) => new(_scene.Users.Path, text);
 
-    // Both types at CodeGen under mssql, on SqlClient 7 with NodaTime 3.3.7, with this Users and its sidecar, and Orders
-    // with a sidecar of one column of int: the compilation, and the driver after a first run that reports nothing.
+    // Both types at CodeGen under mssql, on SqlClient 7 with NodaTime 3.3.7, with this Users and its sidecar, and
+    // Orders with a sidecar of one column of int: the compilation, and the driver after a first run that reports
+    // nothing.
     private (CSharpCompilation Compilation, GeneratorDriver Driver) FirstRunWithNodaTime(
         InMemoryAdditionalText users,
         InMemoryAdditionalText usersSidecar

@@ -30,9 +30,9 @@ internal static class SqlServerTypeMap
 
     /// <summary>
     /// The C# type of <paramref name="type" /> under <paramref name="column" />.  At each level,
-    /// <paramref name="overrideOf" /> is asked first, then <paramref name="libraries" />, the rows of the libraries that
-    /// are on, or none when it is null, then the map's row.  A type with a user type is asked by the user type's key,
-    /// and an alias type then maps as its base; a CLR type of <c>sys</c> is a row by its name, and any other is
+    /// <paramref name="overrideOf" /> is asked first, then <paramref name="libraries" />, the rows of the libraries
+    /// that are on, or none when it is null, then the map's row.  A type with a user type is asked by the user type's
+    /// key, and an alias type then maps as its base; a CLR type of <c>sys</c> is a row by its name, and any other is
     /// unreadable, and neither takes a library's row.  Never throws.
     /// </summary>
     public static TypeMapping Map(

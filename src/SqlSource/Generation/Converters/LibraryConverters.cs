@@ -21,8 +21,8 @@ internal static class LibraryConverters
         ImmutableArray.Create(NodaTimeConversions.MetadataName);
 
     /// <summary>
-    /// The edges of every library <paramref name="probe" /> finds, in the order of <see cref="ConverterSet.Comparer" />:
-    /// NodaTime's when the project references it, else none.
+    /// The edges of every library <paramref name="probe" /> finds, in the order of <see cref="ConverterSet.Comparer"
+    /// />: NodaTime's when the project references it, else none.
     /// </summary>
     public static EquatableArray<Converter> Of(LibraryProbe probe) =>
         probe.NodaTime ? NodaTimeConversions.Edges : EquatableArray<Converter>.Empty;

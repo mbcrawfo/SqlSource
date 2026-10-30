@@ -41,8 +41,9 @@ namespace SqlSource.Generation.Methods;
 /// </param>
 /// <param name="UsedLibraries">
 /// The libraries that a query of the type whose output is <c>CodeGen</c> uses, in the order of
-/// <see cref="Settings.Libraries.SqlLibrary" />, each once: of a property that a library's row typed, or of a conversion
-/// that is a library's generated one.  The project gets <c>SQLSRC282</c> for each of them that is older than its floor.
+/// <see cref="Settings.Libraries.SqlLibrary" />, each once: of a property that a library's row typed, or of a
+/// conversion that is a library's generated one.  The project gets <c>SQLSRC282</c> for each of them that is older
+/// than its floor.
 /// </param>
 internal sealed record TypeMethods(
     string TypeKey,

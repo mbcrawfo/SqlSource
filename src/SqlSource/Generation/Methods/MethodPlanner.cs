@@ -19,8 +19,8 @@ namespace SqlSource.Generation.Methods;
 /// <see cref="ConversionPlanner" />, <c>SQLSRC279</c>, <c>SQLSRC280</c>, and <c>SQLSRC277</c> and <c>SQLSRC278</c> for
 /// a converter of a referenced assembly.  It also reports <c>SQLSRC281</c> for a library that is on for a query and
 /// that the project cannot use, which leaves the query its method, with the base map's types: at a marker as a
-/// diagnostic, and for a settings file as a <see cref="SettingsFileLibraryUse" />, which is located at the end.  A query
-/// that uses a library older than its floor gets no method and keeps the problems it has: the project gets
+/// diagnostic, and for a settings file as a <see cref="SettingsFileLibraryUse" />, which is located at the end.  A
+/// query that uses a library older than its floor gets no method and keeps the problems it has: the project gets
 /// <c>SQLSRC282</c> from the libraries that the type's queries use.
 /// </summary>
 internal static class MethodPlanner
