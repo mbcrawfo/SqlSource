@@ -565,9 +565,9 @@ public sealed class LibraryConversionTests
     }
 
     // Every edge of System.Text.Json that a query of SQL Server and one of Npgsql 8 use, read and written, nullable and
-    // not, compiles with no error and no warning in what is generated, against each driver, with the reference
-    // assemblies of .NET 8 and with the runtime's, of .NET 10.  A not-null column of a node is left out: its read can
-    // give null for a JSON null.
+    // not, whole and, on Npgsql, by element, compiles with no error and no warning in what is generated, against each
+    // driver, with the reference assemblies of .NET 8 and with the runtime's, of .NET 10.  Npgsql 10 reads and writes
+    // the same nodes itself.  A not-null node, whose read can give null for a JSON null, throws on one.
     [Theory]
     [InlineData("SqlClient 6.1", false)]
     [InlineData("SqlClient 6.1", true)]
@@ -575,11 +575,19 @@ public sealed class LibraryConversionTests
     [InlineData("SqlClient 7", true)]
     [InlineData("Npgsql 8", false)]
     [InlineData("Npgsql 8", true)]
+    [InlineData("Npgsql 10", false)]
+    [InlineData("Npgsql 10", true)]
     public void Run_JsonGeneratedCode_CompilesWithoutWarnings(string driver, bool net8)
     {
         string[] types = ["System.Text.Json.JsonElement", "System.Text.Json.JsonDocument", .. NodeTypes];
-        var isSqlServer = driver != "Npgsql 8";
-        var used = isSqlServer ? types : NodeTypes;
+        var isSqlServer = driver.StartsWith("SqlClient", System.StringComparison.Ordinal);
+        string[] postgres =
+        [
+            .. NodeTypes,
+            .. NodeTypes.Select(node => node + "[]"),
+            .. NodeTypes.Select(node => node + "?[]"),
+        ];
+        var used = isSqlServer ? types : postgres;
         var markers = new System.Text.StringBuilder();
         for (var index = 0; index < used.Length; index++)
         {
@@ -612,7 +620,8 @@ public sealed class LibraryConversionTests
         {
             "SqlClient 6.1" => SqlClientReferences.SqlClient61,
             "SqlClient 7" => SqlClientReferences.SqlClient7,
-            _ => NpgsqlReferences.Npgsql8,
+            "Npgsql 8" => NpgsqlReferences.Npgsql8,
+            _ => NpgsqlReferences.Npgsql10,
         };
 
         var run = GeneratorHarness.Run(
@@ -626,7 +635,15 @@ public sealed class LibraryConversionTests
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        foreach (var each in used)
+        methods.ShouldContain("holds a JSON null.");
+        if (driver == "Npgsql 10")
+        {
+            methods.ShouldNotContain("JsonConversions");
+            run.Sources.Keys.ShouldNotContain(JsonClassFile);
+            return;
+        }
+
+        foreach (var each in used.Where(each => !each.EndsWith("[]", System.StringComparison.Ordinal)))
         {
             var shortName = each[(each.LastIndexOf('.') + 1)..];
             methods.ShouldContain(Json + shortName + "FromString(");
@@ -636,9 +653,9 @@ public sealed class LibraryConversionTests
         run.Sources[JsonClassFile].ShouldBe(JsonConversions.Source);
     }
 
-    // The entry of the query of Run_JsonGeneratedCode_CompilesWithoutWarnings, over the types the override names:
-    // v<i> and its parameter not null, but a node's column v<i>, which can be null, and maybe_v<i> nullable; the even
-    // ones of the first database type and the odd ones of the second.
+    // The entry of the query of Run_JsonGeneratedCode_CompilesWithoutWarnings, over the types the override names: v<i>
+    // and its parameter not null, and maybe_v<i> nullable; the even ones of the first database type and the odd ones
+    // of the second, or of its array for an array.
     private static SidecarEntry JsonEntry(SqlFile file, string[] types, SidecarType even, SidecarType odd)
     {
         var parameters = new System.Collections.Generic.List<SidecarParameter>();
@@ -646,11 +663,15 @@ public sealed class LibraryConversionTests
         for (var index = 0; index < types.Length; index++)
         {
             var type = index % 2 == 0 ? even : odd;
+            if (types[index].EndsWith("[]", System.StringComparison.Ordinal) && type is PostgresType element)
+            {
+                type = ArrayOf(element, "_" + element.InternalName) with { BindName = element.BindName + "[]" };
+            }
+
             var name = "v" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            var isNode = System.Array.IndexOf(NodeTypes, types[index]) >= 0;
             parameters.Add(TestSidecars.Parameter(0, name, type, false));
             parameters.Add(TestSidecars.Parameter(0, "maybe_" + name, type, true));
-            columns.Add(TestSidecars.Column(0, name, type, nullable: isNode));
+            columns.Add(TestSidecars.Column(0, name, type, nullable: false));
             columns.Add(TestSidecars.Column(0, "maybe_" + name, type, nullable: true));
         }
 

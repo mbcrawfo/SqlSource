@@ -38,6 +38,11 @@ namespace SqlSource.Generation.Methods;
 /// The library whose generated conversion the converter is, for an edge of origin
 /// <see cref="Converters.ConverterOrigin.Library" />; null for any other.
 /// </param>
+/// <param name="MayReturnNull">
+/// Whether the call, on a read, can return null for a value that is not a <c>NULL</c>: the parse of a JSON
+/// <c>null</c> into a <see cref="Converters.JsonTypes.IsNode" /> type.  A not-null element read by element then
+/// throws on it.
+/// </param>
 internal sealed record Conversion(
     string Method,
     string DatabaseText,
@@ -46,7 +51,8 @@ internal sealed record Conversion(
     string? ElementText,
     bool ElementIsValueType,
     EquatableArray<string> WarningIds = default,
-    SqlLibrary? Library = null
+    SqlLibrary? Library = null,
+    bool MayReturnNull = false
 )
 {
     /// <summary>

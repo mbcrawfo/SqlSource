@@ -9,6 +9,7 @@ using SqlSource.Generation.Models;
 using SqlSource.Generation.Types.Drivers;
 using SqlSource.Parsing;
 using SqlSource.Settings;
+using SqlSource.Settings.ClrTypes;
 using SqlSource.Settings.Libraries;
 
 namespace SqlSource.Generation.Methods;
@@ -504,7 +505,16 @@ internal static class MethodPlanner
         {
             var property = properties[index];
             var read = reading.ConversionOf(property, true, ref isBlocked);
-            columns.Add(new MethodColumn(names[index], property.Name, property.Type.Text, property.IsNullable, read));
+            columns.Add(
+                new MethodColumn(
+                    names[index],
+                    property.Name,
+                    property.Type.Text,
+                    property.IsNullable,
+                    read,
+                    ThrowsOnJsonNull(property)
+                )
+            );
         }
 
         methodOutput = new MethodOutput(
@@ -515,6 +525,11 @@ internal static class MethodPlanner
         );
         return !isBlocked;
     }
+
+    // Whether the read of a column into the property can give null for a JSON null, which a not-null property then
+    // refuses: a node of System.Text.Json, whether a generated parse or the driver reads it.
+    private static bool ThrowsOnJsonNull(ModelProperty property) =>
+        !property.IsNullable && JsonTypes.IsNode(ClrTypeName.KeywordTextOf(property.Type.Text));
 
     // The ordinals in the order of the model's properties: by name, ordinally, when the model is sorted, as
     // TypeModels sorts it; the names are distinct ignoring case, so there are no ties.

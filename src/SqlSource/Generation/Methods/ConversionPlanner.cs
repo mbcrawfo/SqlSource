@@ -100,7 +100,8 @@ internal static class ConversionPlanner
                     null,
                     false,
                     whole.WarningIds,
-                    whole.Library?.Library
+                    whole.Library?.Library,
+                    isRead && JsonTypes.IsNode(whole.ReturnText)
                 );
         }
 
@@ -125,7 +126,8 @@ internal static class ConversionPlanner
                     ElementOf(text),
                     elementIsValueType,
                     byElement.WarningIds,
-                    byElement.Library?.Library
+                    byElement.Library?.Library,
+                    isRead && JsonTypes.IsNode(byElement.ReturnText)
                 );
             }
 
