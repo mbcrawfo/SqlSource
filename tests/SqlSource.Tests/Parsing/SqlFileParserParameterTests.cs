@@ -509,6 +509,23 @@ public sealed class SqlFileParserParameterTests
         Warnings(text, choice).ShouldBeEmpty();
     }
 
+    // The places are found in the order of the SQL, then the inline defaults, then the markers' defaults.
+    [Theory]
+    [InlineData("-- name: Q\nSELECT a FROM t WHERE 1 = 1 {{f:AND b = @id}} AND c = @Id AND d = @id\n")]
+    [InlineData("-- name: Q\n-- token: {{f:AND b = @id}}\nSELECT a FROM t WHERE c = @Id {{f}} {{g:AND d = @id}}\n")]
+    public void Parse_ExtraSpellingAtSeveralPlaces_IsWarnedAtItsFirstInTheFile(string text)
+    {
+        Warnings(text, SqlDialect.SqlServer)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ParameterInTwoSpellings,
+                    TextSpans.Of(text, "@id"),
+                    "@id",
+                    "@Id"
+                ),
+            ]);
+    }
+
     [Fact]
     public void Parse_FileWithAnErrorAndASecondSpelling_HasNoWarnings()
     {

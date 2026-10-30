@@ -17,7 +17,7 @@ namespace SqlSource.Parsing;
 /// the SQL declares as a local variable is not a parameter at any place: <see cref="SqlDeclaredVariables" />.  The
 /// list keeps the spelling of a name that the SQL writes first.  In SQL Server, where an instance may compare names
 /// by case, each further spelling of a name that the SQL or a token's default writes is a warning, once for each
-/// spelling in a query, at its first place; a marker's spelling is not.
+/// spelling in a query, at its first place in the file; a marker's spelling is not.
 /// </remarks>
 internal static class SqlParameterList
 {
@@ -46,8 +46,8 @@ internal static class SqlParameterList
         // The parameters of the defaults.  A name is a string only where it is reported.
         List<DefaultParameter>? inDefaults = null;
 
-        // The spellings that a warning has named, made on the first.
-        List<string>? warned = null;
+        // The spellings that a warning has named, each with its warning's place in warnings; made on the first.
+        List<(string Spelling, int Warning)>? warned = null;
         var warnsOfSpellings = rules.Dialect == SqlDialect.SqlServer;
         var token = 0;
         foreach (var span in sql.Parameters)
@@ -168,7 +168,7 @@ internal static class SqlParameterList
         SqlDialectRules rules,
         List<SqlParseError> errors,
         List<SqlParseError> warnings,
-        ref List<string>? warned
+        ref List<(string Spelling, int Warning)>? warned
     )
     {
         foreach (var parameter in inDefaults)
@@ -203,10 +203,11 @@ internal static class SqlParameterList
         }
     }
 
-    // A warning when the parameter is written in a spelling other than the list's, and has not been warned of in that
-    // spelling before.  Nothing is allocated for a parameter that is written as the list has it.
+    // A warning when the parameter is written in a spelling other than the list's.  A spelling is warned of once in a
+    // query, at its first place in the file, which is not the order the places are found in.  Nothing is allocated for
+    // a parameter that is written as the list has it.
     private static void WarnOfSpelling(
-        ref List<string>? warned,
+        ref List<(string Spelling, int Warning)>? warned,
         List<SqlParseError> warnings,
         SqlDialectRules rules,
         ReadOnlySpan<char> written,
@@ -221,17 +222,22 @@ internal static class SqlParameterList
 
         if (warned is not null)
         {
-            foreach (var spelling in warned)
+            foreach (var (spelling, warning) in warned)
             {
                 if (written.Equals(spelling.AsSpan(), StringComparison.Ordinal))
                 {
+                    if (span.Start < warnings[warning].Span.Start)
+                    {
+                        warnings[warning] = warnings[warning] with { Span = span };
+                    }
+
                     return;
                 }
             }
         }
 
         var text = written.ToString();
-        (warned ??= []).Add(text);
+        (warned ??= []).Add((text, warnings.Count));
         warnings.Add(
             SqlParseError.Create(
                 SqlParseErrorKind.ParameterInTwoSpellings,

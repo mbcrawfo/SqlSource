@@ -951,7 +951,7 @@ See: [Defaults](parameters-and-tokens.md#token-defaults)
 
 **Parameter is written in two spellings**
 
-A parameter of a query in the `mssql` dialect is written with letters in another case in one place than in the first place it is written: `@Id` and then `@id`.  SqlSource reads the two as one parameter, and binds it under the spelling it is first written in.  A SQL Server whose collation is case-sensitive reads the other spelling as another variable, which the query does not declare, and fails the query when it runs.  A server whose collation ignores case, which is the usual one, runs the query as written.  The warning is at the place of the other spelling, and names both.  Each further spelling of a parameter is warned of once in a query, at its first place.
+A query in the `mssql` dialect writes one parameter in two spellings that differ only in case: `@Id`, and then `@id`.  SqlSource reads the two as one parameter, and binds it under the spelling it is first written in.  A SQL Server whose collation is case-sensitive reads the other spelling as another variable, which the query does not declare, and fails the query when it runs.  A server whose collation ignores case, which is the usual one, runs the query as written.  The warning is at the place of the other spelling, and names both.  Each further spelling of a parameter is warned of once in a query, at its first place.
 
 ```sql error
 -- name: GetUser
@@ -962,7 +962,7 @@ SELECT name FROM dbo.users WHERE id = @Id OR parent_id = @id;
 /work/App/Queries/Users.sql(2,58): warning SQLSRC121: The parameter '@Id' is also written '@id'.  SqlSource binds it as '@Id', and a SQL Server whose collation is case-sensitive reads '@id' as another variable, which the query does not declare.  Write it '@Id' throughout the query.
 ```
 
-Write the parameter in one spelling throughout the query.  A parameter written in the default of a token is checked as the rest of the query is. 
+Write the parameter in one spelling throughout the query.  A parameter written in the default of a token is checked as the rest of the query is.
 
 This is a warning, since a query runs as written on a server whose collation ignores case, and a project that uses only such servers may want no warning.  A project can list it in `NoWarn` to turn it off, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`:
 
@@ -972,10 +972,10 @@ This is a warning, since a query runs as written on a server whose collation ign
 </PropertyGroup>
 ```
 
-An `.editorconfig` file turns it off too, for the files of its folder:
+A `.globalconfig` file in the project's folder turns it off too:
 
 ```ini
-[*.sql]
+is_global = true
 dotnet_diagnostic.SQLSRC121.severity = none
 ```
 
