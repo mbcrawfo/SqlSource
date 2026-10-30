@@ -1,11 +1,8 @@
 using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
-using Conversion = SqlSource.Generation.Methods.Conversion;
 
 namespace SqlSource.Generation.Emitting;
 
@@ -17,21 +14,22 @@ namespace SqlSource.Generation.Emitting;
 /// </summary>
 /// <remarks>
 /// A token's argument can have any name that is not a fixed argument's, so every local, and the parameters of the
-/// lambda that builds the SQL, take a name no argument has from one <see cref="LocalNames" />.  Every framework type
-/// is written from <c>global::</c>, an extension method is called as a static method, and <c>string</c>, <c>int</c>
-/// and <c>bool</c> are written as keywords.
+/// lambda that builds the SQL, take a name no argument has from one <see cref="LocalNames" />, which
+/// <see cref="QueryMethodLocals" /> holds.  <see cref="RowReaderWriter" /> writes the reading of each row.  Every
+/// framework type is written from <c>global::</c>, an extension method is called as a static method, and
+/// <c>string</c>, <c>int</c> and <c>bool</c> are written as keywords.
 /// </remarks>
 internal static class QueryMethodWriter
 {
-    private const string Connection = "connection";
+    internal const string Connection = "connection";
 
-    private const string Parameters = "parameters";
+    internal const string Parameters = "parameters";
 
-    private const string Transaction = "transaction";
+    internal const string Transaction = "transaction";
 
-    private const string CommandTimeout = "commandTimeout";
+    internal const string CommandTimeout = "commandTimeout";
 
-    private const string CancellationToken = "cancellationToken";
+    internal const string CancellationToken = "cancellationToken";
 
     // The token of a call that nothing cancels.
     private const string NoCancellation = "global::System.Threading.CancellationToken.None";
@@ -86,7 +84,7 @@ internal static class QueryMethodWriter
         var tokens = MethodWriter.GetTokens(method.Segments);
         var arguments = GetArguments(tokens);
         var streams = Streams(method);
-        var locals = new Locals(
+        var locals = new QueryMethodLocals(
             tokens,
             method.Input,
             method.Shape is ResultShape.None or ResultShape.RowCount ? null : method.Output,
@@ -151,7 +149,7 @@ internal static class QueryMethodWriter
         QueryMethod method,
         List<string> tokens,
         List<string> arguments,
-        Locals locals,
+        QueryMethodLocals locals,
         string rowBufferType,
         bool streams
     )
@@ -567,7 +565,7 @@ internal static class QueryMethodWriter
         QueryMethod method,
         List<string> tokens,
         List<string> arguments,
-        Locals locals
+        QueryMethodLocals locals
     )
     {
         if (tokens.Count == 0)
@@ -598,7 +596,12 @@ internal static class QueryMethodWriter
 
     // A command whose SQL is built at run time, from the text of its tokens, is what CA2100 flags, and its tokens are
     // text that the caller chooses, so the assignment turns the rule off around itself and nothing else.
-    private static void AppendCommand(StringBuilder builder, string indent, Locals locals, bool builtAtRunTime)
+    private static void AppendCommand(
+        StringBuilder builder,
+        string indent,
+        QueryMethodLocals locals,
+        bool builtAtRunTime
+    )
     {
         _ = builder
             .Append(indent)
@@ -637,7 +640,7 @@ internal static class QueryMethodWriter
         StringBuilder builder,
         string indent,
         QueryMethod method,
-        Locals locals,
+        QueryMethodLocals locals,
         string rowBufferType,
         bool streams
     )
@@ -693,7 +696,7 @@ internal static class QueryMethodWriter
         string indent,
         QueryMethod method,
         MethodOutput output,
-        Locals locals,
+        QueryMethodLocals locals,
         string rowBufferType
     )
     {
@@ -705,9 +708,9 @@ internal static class QueryMethodWriter
             _ = builder.Append(indent).Append("while (");
             AppendRead(builder, locals);
             _ = builder.Append(")\n").Append(indent).Append("{\n");
-            AppendVectorChecks(builder, innerIndent, output, locals);
+            RowReaderWriter.AppendVectorChecks(builder, innerIndent, output, locals);
             _ = builder.Append(innerIndent).Append(locals.Rows).Append(".Add(");
-            AppendRow(builder, output, locals);
+            RowReaderWriter.AppendRow(builder, output, locals);
             _ = builder.Append(");\n");
             AppendEnd(builder, indent);
             _ = builder.Append('\n');
@@ -731,9 +734,9 @@ internal static class QueryMethodWriter
 
         AppendEnd(builder, indent);
         _ = builder.Append('\n');
-        AppendVectorChecks(builder, indent, output, locals);
+        RowReaderWriter.AppendVectorChecks(builder, indent, output, locals);
         _ = builder.Append(indent).Append("var ").Append(locals.Row).Append(" = ");
-        AppendRow(builder, output, locals);
+        RowReaderWriter.AppendRow(builder, output, locals);
         _ = builder.Append(";\n").Append(indent).Append("if (");
         AppendRead(builder, locals);
         _ = builder.Append(")\n").Append(indent).Append("{\n");
@@ -758,7 +761,7 @@ internal static class QueryMethodWriter
         string indent,
         QueryMethod method,
         MethodOutput output,
-        Locals locals
+        QueryMethodLocals locals
     )
     {
         var tracksRow = DrainsWhenLeftAtARow(method);
@@ -782,9 +785,9 @@ internal static class QueryMethodWriter
         _ = builder.Append(")\n").Append(loopIndent).Append("{\n");
         if (!tracksRow)
         {
-            AppendVectorChecks(builder, innerIndent, output, locals);
+            RowReaderWriter.AppendVectorChecks(builder, innerIndent, output, locals);
             _ = builder.Append(innerIndent).Append("yield return ");
-            AppendRow(builder, output, locals);
+            RowReaderWriter.AppendRow(builder, output, locals);
             _ = builder.Append(";\n");
             AppendEnd(builder, loopIndent);
             return;
@@ -801,9 +804,9 @@ internal static class QueryMethodWriter
             .Append("try\n")
             .Append(innerIndent)
             .Append("{\n");
-        AppendVectorChecks(builder, tryIndent, output, locals);
+        RowReaderWriter.AppendVectorChecks(builder, tryIndent, output, locals);
         _ = builder.Append(tryIndent).Append(locals.Row).Append(" = ");
-        AppendRow(builder, output, locals);
+        RowReaderWriter.AppendRow(builder, output, locals);
         _ = builder.Append(";\n");
         AppendEnd(builder, innerIndent);
         AppendTransactionCheck(builder, innerIndent, method, locals);
@@ -835,7 +838,7 @@ internal static class QueryMethodWriter
     // catch of AppendTransactionCheck reports the one such an error can leave, a rolled-back transaction.  A
     // PostgreSQL query is one statement, so its reader has no later result.  The loop is followed by a blank line, as
     // a return follows it.
-    private static void AppendDrain(StringBuilder builder, string indent, QueryMethod method, Locals locals)
+    private static void AppendDrain(StringBuilder builder, string indent, QueryMethod method, QueryMethodLocals locals)
     {
         if (method.Engine != DatabaseEngine.SqlServer)
         {
@@ -855,7 +858,12 @@ internal static class QueryMethodWriter
     // the method's own as it is.  A database error at a row is thrown as it is too, so a later error of the batch that
     // rolls the transaction back goes unreported (TD-0090).  A call that does not throw runs none of it, though the
     // await in the catch makes the method's state machine keep room for the exception.
-    private static void AppendTransactionCheck(StringBuilder builder, string indent, QueryMethod method, Locals locals)
+    private static void AppendTransactionCheck(
+        StringBuilder builder,
+        string indent,
+        QueryMethod method,
+        QueryMethodLocals locals
+    )
     {
         var blockIndent = indent + GeneratedText.Indent;
         _ = builder
@@ -890,7 +898,7 @@ internal static class QueryMethodWriter
     }
 
     // The loop that reads the results after the rows and does nothing with them, with the token given.
-    private static void AppendDrainLoop(StringBuilder builder, string indent, Locals locals, string token)
+    private static void AppendDrainLoop(StringBuilder builder, string indent, QueryMethodLocals locals, string token)
     {
         _ = builder
             .Append(indent)
@@ -914,7 +922,7 @@ internal static class QueryMethodWriter
             .Append(disposable)
             .Append(", false);\n");
 
-    private static void AppendRead(StringBuilder builder, Locals locals) =>
+    private static void AppendRead(StringBuilder builder, QueryMethodLocals locals) =>
         _ = builder
             .Append("await ")
             .Append(locals.Reader)
@@ -931,299 +939,8 @@ internal static class QueryMethodWriter
             .Append(SymbolDisplay.FormatLiteral(queryName, quote: true))
             .Append(moreThanOne ? ", true);\n" : ", false);\n");
 
-    // A not-null column read as SqlVector<float> is read into a local first, and its Null is refused as a NULL of
-    // any other not-null column is.
-    private static void AppendVectorChecks(StringBuilder builder, string indent, MethodOutput output, Locals locals)
-    {
-        for (var index = 0; index < output.Columns.Count; index++)
-        {
-            if (locals.Values[index] is not { } value)
-            {
-                continue;
-            }
-
-            var column = output.Columns[index];
-            _ = builder
-                .Append(indent)
-                .Append("var ")
-                .Append(value)
-                .Append(" = ")
-                .Append(locals.Reader)
-                .Append(".GetFieldValue<")
-                .Append(column.ReadText)
-                .Append(">(")
-                .Append(index.ToString(CultureInfo.InvariantCulture))
-                .Append(");\n");
-            AppendIf(builder, indent, value + ".IsNull");
-            _ = builder
-                .Append(indent)
-                .Append(GeneratedText.Indent)
-                .Append("throw new global::System.InvalidCastException(")
-                .Append(SymbolDisplay.FormatLiteral("Column '" + column.Name + "' is null.", quote: true))
-                .Append(");\n");
-            AppendEnd(builder, indent);
-            _ = builder.Append('\n');
-        }
-    }
-
-    // A record by its positional constructor, its arguments in the order of its properties; a class by an object
-    // initializer, in column order.
-    private static void AppendRow(StringBuilder builder, MethodOutput output, Locals locals)
-    {
-        _ = builder.Append("new ").Append(output.TypeText);
-        if (output.IsRecord)
-        {
-            _ = builder.Append('(');
-            for (var index = 0; index < output.ConstructorOrder.Count; index++)
-            {
-                _ = builder.Append(index > 0 ? ", " : string.Empty);
-                AppendColumn(builder, output, output.ConstructorOrder[index], locals);
-            }
-
-            _ = builder.Append(')');
-            return;
-        }
-
-        _ = builder.Append(" { ");
-        for (var index = 0; index < output.Columns.Count; index++)
-        {
-            _ = builder.Append(index > 0 ? ", " : string.Empty).Append(output.Columns[index].Property).Append(" = ");
-            AppendColumn(builder, output, index, locals);
-        }
-
-        _ = builder.Append(" }");
-    }
-
-    // A not-null column by GetFieldValue<T> alone; a nullable one by IsDBNull first, and never by GetFieldValue<T?>,
-    // which SqlClient refuses on a NULL.  A column with a converter is read as the converter's database side and
-    // passed to it, so that the converter never sees a NULL; an array converted by element is read as the database's
-    // array and each of its elements passed to it.
-    private static void AppendColumn(StringBuilder builder, MethodOutput output, int ordinal, Locals locals)
-    {
-        var column = output.Columns[ordinal];
-        var read = column.Read;
-        if (locals.Values[ordinal] is { } value)
-        {
-            _ = read is null
-                ? builder.Append(value)
-                : builder.Append(read.Method).Append('(').Append(value).Append(')');
-            return;
-        }
-
-        var ordinalText = ordinal.ToString(CultureInfo.InvariantCulture);
-        if (column.IsNullable)
-        {
-            _ = builder
-                .Append(locals.Reader)
-                .Append(".IsDBNull(")
-                .Append(ordinalText)
-                .Append(") ? default(")
-                .Append(column.TypeText)
-                .Append("?) : ");
-        }
-
-        if (read is { IsByElement: true })
-        {
-            AppendByElement(builder, column, read, ordinalText, locals);
-            return;
-        }
-
-        if (read is not null)
-        {
-            _ = builder.Append(read.Method).Append('(');
-        }
-
-        AppendGetFieldValue(builder, column, ordinalText, locals);
-        if (read is not null)
-        {
-            _ = builder.Append(')');
-        }
-    }
-
-    // Array.ConvertAll of the database's array, by a static lambda that converts each element that is not null.  A
-    // NULL element of a value type throws, naming the column, which Npgsql's throw does not; one of a reference type,
-    // or of an element the property writes nullable, stays null.
-    private static void AppendByElement(
-        StringBuilder builder,
-        MethodColumn column,
-        Conversion read,
-        string ordinalText,
-        Locals locals
-    )
-    {
-        var names = locals.ConversionNames;
-        _ = builder
-            .Append("global::System.Array.ConvertAll<")
-            .Append(read.ReadElementText)
-            .Append(", ")
-            .Append(read.ElementText)
-            .Append(">(");
-        AppendGetFieldValue(builder, column, ordinalText, locals);
-        _ = builder
-            .Append(", static ")
-            .Append(names.Element)
-            .Append(" => ")
-            .Append(names.Element)
-            .Append(" is { } ")
-            .Append(names.Item)
-            .Append(" ? ")
-            .Append(read.Method)
-            .Append('(')
-            .Append(names.Item)
-            .Append(") : ");
-        if (read.ElementIsNullable)
-        {
-            _ = builder.Append("null");
-        }
-        else if (!read.ElementIsValueType)
-        {
-            _ = builder.Append("null!");
-        }
-        else
-        {
-            _ = builder
-                .Append("throw new global::System.InvalidCastException(")
-                .Append(SymbolDisplay.FormatLiteral("Column '" + column.Name + "' holds a null element.", quote: true))
-                .Append(')');
-        }
-
-        _ = builder.Append(')');
-    }
-
-    private static void AppendGetFieldValue(
-        StringBuilder builder,
-        MethodColumn column,
-        string ordinalText,
-        Locals locals
-    ) =>
-        _ = builder
-            .Append(locals.Reader)
-            .Append(".GetFieldValue<")
-            .Append(column.ReadText)
-            .Append(">(")
-            .Append(ordinalText)
-            .Append(')');
-
-    private static void AppendIf(StringBuilder builder, string indent, string condition) =>
+    internal static void AppendIf(StringBuilder builder, string indent, string condition) =>
         _ = builder.Append(indent).Append("if (").Append(condition).Append(")\n").Append(indent).Append("{\n");
 
-    private static void AppendEnd(StringBuilder builder, string indent) => _ = builder.Append(indent).Append("}\n");
-
-    // The names of the method's locals and of the lambdas' parameters, none of which an argument has.  The locals
-    // that read rows are named only for a method that reads them, whose output is given, the value of a converted
-    // parameter only for a method that has one, the element of an array and its value only for a method that
-    // converts one by element, the iterator only for a method that streams, the flag of a row being yielded only
-    // for one that drains when its loop is left at a row, and the exception its catch takes only for one that checks
-    // the transaction.
-    private sealed class Locals
-    {
-        public Locals(
-            List<string> tokens,
-            MethodInput? input,
-            MethodOutput? output,
-            bool streams,
-            bool tracksRow,
-            bool checksTransaction
-        )
-        {
-            var names = new LocalNames(Seed(tokens));
-            Sql = names.Take("sql");
-            WasClosed = names.Take("wasClosed");
-            Command = names.Take("command");
-            CommandScope = names.Take("commandScope");
-            Parameter = names.Take("parameter");
-            var byElement = HasByElement(input, output);
-            ConversionNames = new ConversionNames(
-                HasWrite(input) ? names.Take("value") : string.Empty,
-                byElement ? names.Take("element") : string.Empty,
-                byElement ? names.Take("item") : string.Empty
-            );
-            if (output is null)
-            {
-                Reader = ReaderScope = Rows = Row = string.Empty;
-                Values = [];
-            }
-            else
-            {
-                Reader = names.Take("reader");
-                ReaderScope = names.Take("readerScope");
-                Rows = names.Take("rows");
-                Row = names.Take("row");
-                Values = new string?[output.Columns.Count];
-                for (var index = 0; index < output.Columns.Count; index++)
-                {
-                    var column = output.Columns[index];
-                    if (!column.IsNullable && column.ReadText == VectorType)
-                    {
-                        Values[index] = names.Take("value" + index.ToString(CultureInfo.InvariantCulture));
-                    }
-                }
-            }
-
-            Span = names.Take("span");
-            State = names.Take("state");
-            Iterator = streams ? names.Take("ReadRows") : string.Empty;
-            AtRow = tracksRow ? names.Take("atRow") : string.Empty;
-            Exception = checksTransaction ? names.Take("exception") : string.Empty;
-        }
-
-        public string Sql { get; }
-
-        public string WasClosed { get; }
-
-        public string Command { get; }
-
-        public string CommandScope { get; }
-
-        public string Parameter { get; }
-
-        // The pattern variable that holds the value of a converted parameter in its binding, which is a block of its
-        // own, so that one name serves every parameter; and the parameter of the static lambda that converts an
-        // array's element, and the element that is not null, which no other lambda's parameter has.
-        public ConversionNames ConversionNames { get; }
-
-        public string Reader { get; }
-
-        public string ReaderScope { get; }
-
-        public string Rows { get; }
-
-        public string Row { get; }
-
-        // For each column, the local its value is read into before the row, or null when the row reads it.
-        public string?[] Values { get; }
-
-        public string Span { get; }
-
-        public string State { get; }
-
-        // The local function a streaming method returns, which reads its rows.
-        public string Iterator { get; }
-
-        // The flag that is true while the iterator is suspended at the yield of a row.
-        public string AtRow { get; }
-
-        // The exception that the catch of a method that checks the transaction takes.
-        public string Exception { get; }
-
-        private static bool HasWrite(MethodInput? input) =>
-            input is not null && input.Parameters.Any(static parameter => parameter.Write is not null);
-
-        private static bool HasByElement(MethodInput? input, MethodOutput? output) =>
-            (input is not null && input.Parameters.Any(static parameter => parameter.Write is { IsByElement: true }))
-            || (output is not null && output.Columns.Any(static column => column.Read is { IsByElement: true }));
-
-        private static IEnumerable<string> Seed(List<string> tokens)
-        {
-            yield return Connection;
-            yield return Parameters;
-            yield return Transaction;
-            yield return CommandTimeout;
-            yield return CancellationToken;
-            foreach (var token in tokens)
-            {
-                yield return token;
-            }
-        }
-    }
+    internal static void AppendEnd(StringBuilder builder, string indent) => _ = builder.Append(indent).Append("}\n");
 }
