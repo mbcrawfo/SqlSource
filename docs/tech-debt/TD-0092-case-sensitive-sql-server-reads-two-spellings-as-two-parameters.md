@@ -4,7 +4,7 @@
 
 SqlSource reads two names that differ only in case as one parameter, by [`SqlParameterName`](../../src/SqlSource/Parsing/SqlParameterName.cs)'s `Comparer`, `Comparison` and `IndexOf`, and the manual says so: `@Id` and `@id` are one parameter.  A query's list then holds the name once, as the SQL first writes it, and the generated method binds that spelling alone.  A SQL Server whose instance collation is case-sensitive reads a variable's name by that collation, so there `@id` is another variable, which nothing declares.
 
-A query such as `UPDATE dbo.t SET a = @Id WHERE b = @id` lists one parameter, `Id`.  The describe passes: [`ParameterCopies.Rename`](../../src/SqlSource.Tool/Describing/SqlServer/ParameterCopies.cs) counts `Id` twice ignoring case and sends copies, `CompareLists` maps both back to `Id`, and `columns` sends the SQL as written with only the list's spelling declared, which the server answers with no error unless the other spelling decides a column's type.  The generated method then throws `Msg 137`, "Must declare the scalar variable "@id"", at run time.  The same holds for `SELECT a FROM dbo.t WHERE a = @Id OR b = @id`: only a query whose second spelling decides a column's type, as in its select list, `SELECT @Id + 1 AS x, @id + 1 AS y`, fails its `columns` describe, with `11521`.
+A query such as `UPDATE dbo.t SET a = @Id WHERE b = @id` lists one parameter, `Id`.  The describe passes: [`ParameterCopies.Rename`](../../src/SqlSource.Tool/Describing/SqlServer/Statements/ParameterCopies.cs) counts `Id` twice ignoring case and sends copies, `CompareLists` maps both back to `Id`, and `columns` sends the SQL as written with only the list's spelling declared, which the server answers with no error unless the other spelling decides a column's type.  The generated method then throws `Msg 137`, "Must declare the scalar variable "@id"", at run time.  The same holds for `SELECT a FROM dbo.t WHERE a = @Id OR b = @id`: only a query whose second spelling decides a column's type, as in its select list, `SELECT @Id + 1 AS x, @id + 1 AS y`, fails its `columns` describe, with `11521`.
 
 Observed by a probe on `mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04` started with `MSSQL_COLLATION=Latin1_General_CS_AS`:
 
@@ -19,7 +19,7 @@ No test pins it: no fixture runs a case-sensitive instance collation.
 
 ## Why it exists
 
-The rule of one parameter ignoring case was written for the drivers, which bind such names as one, and for the default instance collations, which ignore case.  It was found by the review of TD-0079's item 5, which put the comparison of parameter names in one place without changing it.
+The rule of one parameter ignoring case was written for the drivers, which bind such names as one, and for the default instance collations, which ignore case.  It was found by the review of the change that put the comparison of parameter names in one place without changing it.
 
 ## Impact
 
