@@ -1,4 +1,3 @@
-using System;
 using SqlSource.Generation.Types.Drivers;
 using SqlSource.Settings.Libraries;
 
@@ -29,15 +28,9 @@ internal static class LibraryConverters
         };
 
     /// <summary>
-    /// The name of the file of <paramref name="library" />'s class.  No type's file can have it, since a <c>-</c> in a
-    /// type's name is followed only by its arity's digits, and no model's or type's methods' can, since those end in
-    /// <c>-Model.g.cs</c> and <c>-Methods.g.cs</c>; and it is not the attribute's.
+    /// The name of the file of <paramref name="library" />'s class, made from the library's name.  No type's file can
+    /// have it, since a <c>-</c> in a type's name is followed only by its arity's digits, and no model's or type's
+    /// methods' can, since those end in <c>-Model.g.cs</c> and <c>-Methods.g.cs</c>; and it is not the attribute's.
     /// </summary>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="library" /> is no member.</exception>
-    public static string HintNameOf(SqlLibrary library) =>
-        library switch
-        {
-            SqlLibrary.NodaTime => "SqlSource-NodaTimeConversions.g.cs",
-            _ => throw new ArgumentOutOfRangeException(nameof(library)),
-        };
+    public static string HintNameOf(SqlLibrary library) => "SqlSource-" + library + "Conversions.g.cs";
 }
