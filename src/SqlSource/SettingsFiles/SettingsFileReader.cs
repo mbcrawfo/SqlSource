@@ -30,7 +30,7 @@ internal static class SettingsFileReader
 
     /// <summary>
     /// Reads <paramref name="text" />, the text of a settings file without a byte order mark.  The entries of the type
-    /// override and the column types carry <paramref name="place" />.
+    /// override, the column types and the library types carry <paramref name="place" />.
     /// </summary>
     public static SettingsFile Read(string text, SettingPlace place)
     {
@@ -49,7 +49,7 @@ internal static class SettingsFileReader
         var walk = new Walk(text, errors, values);
         walk.ReadMembers();
 
-        var source = new SettingsFileSource(values, place, errors);
+        var source = new SettingsFileSource(values, text, place, errors);
         var level = SettingsLevelReader.Read(ref source);
         var sorted =
             errors.Count == 0

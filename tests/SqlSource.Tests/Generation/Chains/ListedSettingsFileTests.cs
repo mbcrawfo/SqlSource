@@ -132,6 +132,12 @@ public sealed class ListedSettingsFileTests
                 true,
                 false
             },
+            {
+                SettingsFileKeys.LibraryTypes, /*lang=json,strict*/
+                """{"nodaTime": "maybe"}""",
+                true,
+                false
+            },
             { SettingsFileKeys.NestedClass, "\"class\"", true, false },
         };
 

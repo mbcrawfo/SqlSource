@@ -1,8 +1,10 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Parsing;
 using SqlSource.Settings;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.SettingsFiles;
 using SqlSource.Snapshot.Reading;
@@ -17,6 +19,15 @@ internal static class SettingsFileDiagnostics
 {
     private const string GeneratorParametersDefaultHelp =
         ".  'default' is the empty list and stands alone: write [] for it.";
+
+    // The end of SQLSRC019's message for a member of libraryTypes: the names of the libraries, as the manual spells
+    // them, and the states.
+    private static readonly string LibraryTypesHelp =
+        ".  'libraryTypes' takes the name of a library ("
+        + JoinOr([.. Enum.GetNames(typeof(SqlLibrary)).Select(LowerFirst)])
+        + ") and "
+        + JoinOr([.. Enum.GetValues(typeof(LibraryState)).Cast<LibraryState>().Select(SettingValue.NameOf)])
+        + ".";
 
     // What SQLSRC018 says a key takes when the error names no key of the table, which the reader never gives.
     private const string OtherType = "another JSON type";
@@ -100,17 +111,28 @@ internal static class SettingsFileDiagnostics
             _ => OtherType,
         };
 
-    // The end of SQLSRC019's message, after the setting: the names of the dialects, why default stands alone, or the
-    // forms of a type override's key that is written in brackets.  Empty for every other value.
+    // The end of SQLSRC019's message, after the setting: the names of the dialects, why default stands alone, the
+    // forms of a type override's key that is written in brackets, or what libraryTypes takes.  Empty for every other
+    // value.
     private static string HelpOf(SettingsFileError error, string argument) =>
         error.Setting switch
         {
             SettingsFileKeys.Dialect => ".  'dialect' takes " + SqlDialectName.Accepted + ".",
             SettingsFileKeys.GeneratorParameters when GeneratorParameterList.IsDefault(argument.AsSpan()) =>
                 GeneratorParametersDefaultHelp,
+            SettingsFileKeys.LibraryTypes => LibraryTypesHelp,
             SettingsFileKeys.TypeOverrides when error.Other is not null => TypeOverrideGrammar.BracketHelp(
                 argument.AsSpan()
             ),
             _ => string.Empty,
         };
+
+    private static string LowerFirst(string name) =>
+        char.ToLowerInvariant(name[0]).ToString(CultureInfo.InvariantCulture) + name.Substring(1);
+
+    // "a", "a or b", "a, b or c".
+    private static string JoinOr(string[] words) =>
+        words.Length < 2
+            ? string.Concat(words)
+            : string.Join(", ", words.Take(words.Length - 1)) + " or " + words[words.Length - 1];
 }

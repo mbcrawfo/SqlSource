@@ -124,6 +124,20 @@ public sealed class SettingsFileDiagnosticsTests
             .ShouldBe("'[users].[id]: UserId' is not a valid value of columnTypes");
 
     [Fact]
+    public void Create_InvalidLibraryTypesMember_NamesTheLibrariesAndTheValues()
+    {
+        const string Text = /*lang=json,strict*/
+            """{ "libraryTypes": { "nodaTime": "maybe" } }""";
+        var error = SettingsFileReader.Read(Text, SettingsFile).Errors.ShouldHaveSingleItem();
+
+        Message(SettingsFileDiagnostics.Create(error, Path, SourceText.From(Text)))
+            .ShouldBe(
+                "'nodaTime: maybe' is not a valid value of libraryTypes.  'libraryTypes' takes the name of a library "
+                    + "(nodaTime) and on, off or default."
+            );
+    }
+
+    [Fact]
     public void Create_InvalidMember_QuotesKeyAndType()
     {
         const string Text = /*lang=json,strict*/

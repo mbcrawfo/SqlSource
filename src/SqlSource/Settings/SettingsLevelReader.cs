@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using SqlSource.Settings.ColumnTypes;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 
 namespace SqlSource.Settings;
@@ -38,6 +40,7 @@ internal static class SettingsLevelReader
             TypeOverrides = ReadTypeOverrides(ref source, out var sqlServerTypeOverrides),
             SqlServerTypeOverrides = sqlServerTypeOverrides,
             ColumnTypes = ReadColumnTypes(ref source),
+            LibraryTypes = ReadLibraryTypes(ref source),
             NestedClass = ReadText(ref source, SettingId.NestedClass, SettingValue.IsTypeName),
         };
 
@@ -111,6 +114,62 @@ internal static class SettingsLevelReader
         ReportParts(ref source, SettingId.ColumnTypes, indexes, repeated);
 
         return columnTypes.Count == 0 ? null : columnTypes;
+    }
+
+    // A member whose name is no library or whose value is no state is recorded by its index, and the other members
+    // apply.  A member for a library the entries already have is recorded as a repeat of the member that put it, and
+    // the first wins.  A list with no valid member is not set.
+    private static EquatableArray<LibrarySetting>? ReadLibraryTypes<TSource>(ref TSource source)
+        where TSource : struct, ISettingSource
+    {
+        if (source.Members(SettingId.LibraryTypes) is not { } members)
+        {
+            return null;
+        }
+
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+        // Beside the entries, the index of the member that put each of them.
+        var (entries, entryMembers) = (new List<LibrarySetting>(), new List<int>());
+        for (var index = 0; index < members.Count; index++)
+        {
+            if (
+                !SettingValue.TryReadChoice(members[index].Key.AsSpan().Trim(), out SqlLibrary library)
+                || !SettingValue.TryReadChoice(members[index].Value.AsSpan().Trim(), out LibraryState state)
+            )
+            {
+                invalid.Add(index);
+                continue;
+            }
+
+            var first = IndexOfLibrary(entries, library);
+            if (first >= 0)
+            {
+                repeated.Add((index, entryMembers[first]));
+                continue;
+            }
+
+            var (span, lineSpan) = source.MemberSpans(SettingId.LibraryTypes, index);
+            entries.Add(new LibrarySetting(library, state, source.Place, span, lineSpan));
+            entryMembers.Add(index);
+        }
+
+        ReportParts(ref source, SettingId.LibraryTypes, invalid, repeated);
+
+        entries.Sort(static (a, b) => a.Library.CompareTo(b.Library));
+        return entries.Count == 0 ? null : new EquatableArray<LibrarySetting>(entries.ToImmutableArray());
+    }
+
+    private static int IndexOfLibrary(List<LibrarySetting> entries, SqlLibrary library)
+    {
+        for (var index = 0; index < entries.Count; index++)
+        {
+            if (entries[index].Library == library)
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     // Gives the source the elements or members that are not valid, then those whose key is repeated.

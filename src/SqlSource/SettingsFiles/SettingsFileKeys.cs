@@ -40,6 +40,8 @@ internal static class SettingsFileKeys
 
     public const string ColumnTypes = "columnTypes";
 
+    public const string LibraryTypes = "libraryTypes";
+
     public const string NestedClass = "nestedClass";
 
     // The keys of the settings of a level, in the order of SettingId, which KeyOf indexes.
@@ -56,6 +58,7 @@ internal static class SettingsFileKeys
         CollectionType,
         TypeOverrides,
         ColumnTypes,
+        LibraryTypes,
         NestedClass,
     ];
 
@@ -76,6 +79,7 @@ internal static class SettingsFileKeys
             CollectionType,
             TypeOverrides,
             ColumnTypes,
+            LibraryTypes,
             NestedClass
         );
 
@@ -88,7 +92,7 @@ internal static class SettingsFileKeys
         {
             Root => SettingsFileValueType.Boolean,
             GeneratorParameters => SettingsFileValueType.ArrayOfStrings,
-            TypeOverrides or ColumnTypes => SettingsFileValueType.ObjectOfStrings,
+            TypeOverrides or ColumnTypes or LibraryTypes => SettingsFileValueType.ObjectOfStrings,
             _ when All.Contains(key) => SettingsFileValueType.String,
             _ => throw new ArgumentOutOfRangeException(nameof(key)),
         };

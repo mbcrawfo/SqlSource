@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.CodeAnalysis.Text;
 
 namespace SqlSource.Settings;
 
@@ -14,7 +15,8 @@ namespace SqlSource.Settings;
 internal interface ISettingSource
 {
     /// <summary>
-    /// The place the source is, which the entries of the type override and the column types it gives carry.
+    /// The place the source is, which the entries of the type override, the column types and the library types it gives
+    /// carry.
     /// </summary>
     SettingPlace Place { get; }
 
@@ -29,10 +31,16 @@ internal interface ISettingSource
 
     /// <summary>
     /// The key and the value of each member of a setting written as an object of strings, as a settings file writes
-    /// the type override and the column types, as written and in order, or null when the source writes it as text or
-    /// not at all.
+    /// the type override, the column types and the library types, as written and in order, or null when the source
+    /// writes it as text or not at all.
     /// </summary>
     IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting);
+
+    /// <summary>
+    /// Where the member at <paramref name="index" /> of a setting written as an object is, from its key to its value,
+    /// with the line and column of that span.  A source that never gives members for the setting returns the default.
+    /// </summary>
+    (TextSpan Span, LinePositionSpan LineSpan) MemberSpans(SettingId setting, int index);
 
     /// <summary>
     /// The choice, or null when it is not set.  A value that is no member is recorded by the source, which alone

@@ -6,6 +6,7 @@ using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using SqlSource.SettingsFiles;
 using Xunit;
@@ -230,6 +231,7 @@ public sealed class SettingsFileReaderTests
     [InlineData("generatorParameters", "\"keep-comments\"")]
     [InlineData("typeOverrides", "[]")]
     [InlineData("columnTypes", "\"a.b=X\"")]
+    [InlineData("libraryTypes", "[]")]
     [InlineData(
         "nestedClass", /*lang=json,strict*/
         "{ \"a\": \"b\" }"
@@ -371,6 +373,10 @@ public sealed class SettingsFileReaderTests
         "columnTypes", /*lang=json,strict*/
         "{\"users.id\": [], \"posts.id\": null}"
     )]
+    [InlineData(
+        "libraryTypes", /*lang=json,strict*/
+        "{\"nodaTime\": true}"
+    )]
     public void Read_ListOfOnlyWrongTypes_SetsNothing(string key, string value)
     {
         var text = $$"""{"{{key}}": {{value}}}""";
@@ -444,6 +450,57 @@ public sealed class SettingsFileReaderTests
                 "columnTypes",
                 "\"users\".id",
                 "users.id"
+            ),
+        ]);
+    }
+
+    [Fact]
+    public void Read_LibraryTypes_EntryCarriesTheMembersLineSpan()
+    {
+        const string Text = /*lang=json,strict*/
+            "{\n  \"dialect\": \"postgres\",\n  \"libraryTypes\": { \"nodaTime\": \"on\" }\n}";
+
+        var file = SettingsFileReader.Read(Text, Place);
+
+        file.Errors.ShouldBeEmpty();
+        var entry = file.Level.LibraryTypes.ShouldNotBeNull().ShouldHaveSingleItem();
+        entry.Library.ShouldBe(SqlLibrary.NodaTime);
+        entry.State.ShouldBe(LibraryState.On);
+        entry.Place.ShouldBe(Place);
+        entry.Span.ShouldBe(Span(Text, "\"nodaTime\": \"on\""));
+        entry.LineSpan.Start.Line.ShouldBe(2);
+        entry.LineSpan.ShouldBe(SourceText.From(Text).Lines.GetLinePositionSpan(entry.Span));
+    }
+
+    [Fact]
+    public void Read_LibraryTypeMembers_AreReportedByTheirSpansAndCarryThePlace()
+    {
+        const string Invalid = /*lang=json,strict*/
+            """{"libraryTypes": {"nodaTime": "maybe"}}""";
+        const string Repeated = /*lang=json,strict*/
+            """{"libraryTypes": {"nodaTime": "on", "noda-time": "off"}}""";
+
+        var invalid = SettingsFileReader.Read(Invalid, Place);
+        var repeated = SettingsFileReader.Read(Repeated, Place);
+
+        invalid.Level.ShouldBeSameAs(SettingsLevel.None);
+        invalid.Errors.ShouldBe([
+            new SettingsFileError(
+                SettingsFileErrorKind.InvalidValue,
+                Span(Invalid, "\"nodaTime\": \"maybe\""),
+                "libraryTypes",
+                "nodaTime",
+                "maybe"
+            ),
+        ]);
+        repeated.Level.LibraryTypes.ShouldNotBeNull().Select(static entry => entry.State).ShouldBe([LibraryState.On]);
+        repeated.Errors.ShouldBe([
+            new SettingsFileError(
+                SettingsFileErrorKind.RepeatedKey,
+                Span(Repeated, "\"noda-time\""),
+                "libraryTypes",
+                "noda-time",
+                "nodaTime"
             ),
         ]);
     }

@@ -4,9 +4,9 @@ Plain data and the readers of values.  See [settings](../../../docs/architecture
 
 - **No file access, no symbols, no pipeline types, and nothing from `Parsing/`, `Generation/` or `Diagnostics/`.**  A rule shared with another folder goes in the root namespace, as `SqlIdentifier`, `DatabaseName` and `SystemSchemas` do.
 - **`QuerySettings.Resolve` is the one rule that puts the levels together**, with `ResolveTypeOverrides`, `ResolveColumnTypes` and `ResolveDatabase` for the three settings the attribute has no level for.
-- **A setting comes whole from the most specific level that has it, except the type override and the column types, which merge per key.**
+- **A setting comes whole from the most specific level that has it, except the type override, the column types and the library types, which merge per key.**
 - **A new setting** is a nullable member of `SettingsLevel`, a line in `Over`, a member of `QuerySettings` with its default, and a `case` in `SqlMarkerScope.Read` when a marker gives it.  When another source gives it, it is also a member of `SettingId`, a line in `SettingsLevelReader.Read`, the one reader of the attribute and of the settings files, and a property in the `AttributeSettings` of `TargetTypeReader`.
-- **An `ISettingSource` only finds a raw value**, as text, as the elements of an array (the generator parameters, which the reader asks for before their text) or as the members of an object (the type override and the column types, which the reader reads from members alone); records one that is not valid, and an element or member that is not valid or repeats a key, by its index; and says its `SettingPlace`.  See [reading a level](../../../docs/architecture/generator.md#reading-a-level).
+- **An `ISettingSource` only finds a raw value**, as text, as the elements of an array (the generator parameters, which the reader asks for before their text) or as the members of an object (the type override, the column types and the library types, which the reader reads from members alone); records one that is not valid, and an element or member that is not valid or repeats a key, by its index; and says its `SettingPlace`.  See [reading a level](../../../docs/architecture/generator.md#reading-a-level).
 - **A reader that finds nothing returns `SettingsLevel.None`**, never a new empty level.
 - **A value from a fixed list is read by `SettingValue.TryReadChoice`**, from the names of an enum's members, so renaming a member changes what a user may write, and with it the list and the pattern of that choice in `schemas/settings-v1.schema.json`, which `SettingsFileSchemaTests` checks against the enum.
 - **`OutputKind`, `MemberPlacement`, `ModelKind`, `CollectionKind` and `MethodPlacement` keep the numbers of the attribute's enums.**  `tests/SqlSource.Tests/Generation/AttributeSourceTests.cs` compares each pair.
@@ -30,6 +30,12 @@ See [the type override](../../../docs/architecture/generator.md#the-type-overrid
 - **A level holds two arrays, one for each `DatabaseEngine`**: `TypeOverrides`, keyed by `TypeKeys.TryNormalizePostgres`, and `SqlServerTypeOverrides`, keyed by `TypeKeys.TryNormalizeSqlServer`.  An entry is absent from the array of an engine that does not read its key.
 - **An object of a settings file fills both arrays; a marker fills only its file's engine's**, by `SqlDescribableDialects.EngineOf`, and a key that engine does not read is `SQLSRC111`.
 - **Code that carries a level's entries carries both arrays**, as `SettingsLevel.Over`, `MappedTypeNames` and `FileTypesInput.TypeSettingsOf` do.
+
+## The library types
+
+- **The library types are `Settings/Libraries/`: one `LibrarySetting` for each `SqlLibrary`, merged by `LibrarySettings.Over`, which keeps an entry of `LibraryState.Default` so that it hides the farther levels.**  Never drop one before `LibrarySettings.Find`.
+- **A new library is a member of `SqlLibrary`, whose lower-cased name is what a user writes**, and with it the names in `schemas/settings-v1.schema.json`, which `SettingsFileSchemaTests` checks against the enum.
+- **An entry carries the span and line span of its member through `ISettingSource.MemberSpans`**, so a diagnostic about it needs no source text; the attribute has no level for it and returns the default.
 
 ## The column types
 

@@ -13,7 +13,7 @@ Each page is in this folder.
 | `src/SqlSource/Generation/Chains` | `generator.md` | `#### The chains` and `#### Which files are checked`, under `### Settings files` |
 | `src/SqlSource/Generation/Emitting` | `generator.md` | `## Emitting` |
 | `src/SqlSource/Generation/Methods` | `generator.md` | `### Query methods`, under `## Emitting` |
-| `src/SqlSource/Settings`, with `ClrTypes/`, `ColumnTypes/` and `TypeOverrides/` | `generator.md` | `## Settings` |
+| `src/SqlSource/Settings`, with `ClrTypes/`, `ColumnTypes/`, `Libraries/` and `TypeOverrides/` | `generator.md` | `## Settings` |
 | `src/SqlSource/SettingsFiles` | `generator.md` | `### Settings files`, under `## Settings` |
 | `src/SqlSource/Parsing`, with `Markers/`, `Quoting/` and `Tokens/` | `generator.md` | `## Parsing` |
 | `src/SqlSource/Diagnostics` | `generator.md` | `## Diagnostics` |

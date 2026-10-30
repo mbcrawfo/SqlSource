@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Settings;
 using SqlSource.Settings.ColumnTypes;
+using SqlSource.Settings.Libraries;
 using SqlSource.Settings.TypeOverrides;
 using Xunit;
 
@@ -300,6 +303,80 @@ public sealed class SettingsLevelReaderTests
         source.RepeatedKeys.ShouldBe([(SettingId.ColumnTypes, 2, 1)]);
     }
 
+    [Fact]
+    public void LibraryTypes_AreReadFromMembers()
+    {
+        var source = new FakeSource(
+            [],
+            SettingsFile,
+            members: new Dictionary<SettingId, KeyValuePair<string, string>[]>
+            {
+                [SettingId.LibraryTypes] = [new(" NodaTime ", " Default ")],
+            }
+        );
+
+        var level = SettingsLevelReader.Read(ref source);
+
+        level
+            .LibraryTypes.ShouldNotBeNull()
+            .ShouldBe([
+                new LibrarySetting(
+                    SqlLibrary.NodaTime,
+                    LibraryState.Default,
+                    SettingsFile,
+                    new TextSpan(0, 5),
+                    new LinePositionSpan(new LinePosition(0, 0), new LinePosition(0, 5))
+                ),
+            ]);
+        source.Invalids.ShouldBeEmpty();
+        source.InvalidParts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void LibraryTypes_InvalidMemberIsReportedByIndex()
+    {
+        var source = new FakeSource(
+            [],
+            members: new Dictionary<SettingId, KeyValuePair<string, string>[]>
+            {
+                [SettingId.LibraryTypes] = [new("nodaTime", "maybe"), new("json", "on")],
+            }
+        );
+
+        SettingsLevelReader.Read(ref source).ShouldBeSameAs(SettingsLevel.None);
+        source.InvalidParts.ShouldBe([(SettingId.LibraryTypes, 0), (SettingId.LibraryTypes, 1)]);
+        source.RepeatedKeys.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void LibraryTypes_RepeatedLibraryIsRepeatedKey()
+    {
+        var source = new FakeSource(
+            [],
+            members: new Dictionary<SettingId, KeyValuePair<string, string>[]>
+            {
+                [SettingId.LibraryTypes] = [new("nodaTime", "on"), new("noda-time", "off")],
+            }
+        );
+
+        var level = SettingsLevelReader.Read(ref source);
+
+        level.LibraryTypes.ShouldNotBeNull().Select(static entry => entry.State).ShouldBe([LibraryState.On]);
+        source.RepeatedKeys.ShouldBe([(SettingId.LibraryTypes, 1, 0)]);
+        source.InvalidParts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void LibraryTypes_ASettingWithAnEmptyObject_IsNotSet()
+    {
+        var source = new FakeSource(
+            [],
+            members: new Dictionary<SettingId, KeyValuePair<string, string>[]> { [SettingId.LibraryTypes] = [] }
+        );
+
+        SettingsLevelReader.Read(ref source).ShouldBeSameAs(SettingsLevel.None);
+    }
+
     // An object with no valid member sets nothing.
     [Theory]
     [InlineData("TypeOverrides")]
@@ -322,8 +399,8 @@ public sealed class SettingsLevelReaderTests
         invalid.InvalidParts.ShouldBe([(id, 0)]);
     }
 
-    // The parameters' array form is asked for before their text.  The type override and the column types are asked for
-    // as members alone.
+    // The parameters' array form is asked for before their text.  The type override, the column types and the library
+    // types are asked for as members alone.
     [Fact]
     public void Read_EverySetting_IsAskedForInTheOrderOfTheEnum()
     {
@@ -344,6 +421,7 @@ public sealed class SettingsLevelReaderTests
             "Choice(CollectionType)",
             "Members(TypeOverrides)",
             "Members(ColumnTypes)",
+            "Members(LibraryTypes)",
             "Text(NestedClass)",
         ]);
     }
@@ -387,6 +465,10 @@ public sealed class SettingsLevelReaderTests
             Asked.Add($"Members({setting})");
             return members is not null && members.TryGetValue(setting, out var written) ? written : null;
         }
+
+        // The spans of the member at an index, which a test can tell from the spans of another.
+        public readonly (TextSpan Span, LinePositionSpan LineSpan) MemberSpans(SettingId setting, int index) =>
+            (new TextSpan(index * 10, 5), new LinePositionSpan(new LinePosition(index, 0), new LinePosition(index, 5)));
 
         public readonly T? Choice<T>(SettingId setting)
             where T : struct, Enum
