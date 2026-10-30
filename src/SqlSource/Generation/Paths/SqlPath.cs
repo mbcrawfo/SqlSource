@@ -284,27 +284,29 @@ internal static class SqlPath
         return files?.ToImmutable() ?? ImmutableArray<string>.Empty;
     }
 
-    // The first index from start of a path that does not sort before the paths under the folder or, when past is
-    // set, that sorts after them.  The folder is the first folderLength characters of folder.
-    private static int Seek(EquatableArray<string> sortedPaths, int start, string folder, int folderLength, bool past)
-    {
-        var low = start;
-        var high = sortedPaths.Count;
-        while (low < high)
-        {
-            var middle = low + ((high - low) / 2);
-            var order = CompareToFolder(sortedPaths[middle], folder, folderLength);
-            if (order < 0 || (past && order == 0))
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle;
-            }
-        }
+    /// <summary>
+    /// The first index from <paramref name="start" /> of a path that does not sort before the paths under the folder
+    /// or, when <paramref name="past" /> is set, that sorts after them.  The folder is the first
+    /// <paramref name="folderLength" /> characters of <paramref name="folder" />.
+    /// </summary>
+    internal static int Seek(
+        EquatableArray<string> sortedPaths,
+        int start,
+        string folder,
+        int folderLength,
+        bool past
+    ) => SortedSearch.LowerBound(start, sortedPaths.Count, new FolderProbe(sortedPaths, folder, folderLength, past));
 
-        return low;
+    // A struct, so that SortedSearch does not box it.  A path under the folder, which compares to it as zero, sorts
+    // before what is looked for when it is past the folder.
+    private readonly struct FolderProbe(EquatableArray<string> sortedPaths, string folder, int folderLength, bool past)
+        : SortedSearch.IProbe
+    {
+        public int CompareAt(int index)
+        {
+            var order = CompareToFolder(sortedPaths[index], folder, folderLength);
+            return order == 0 && past ? -1 : order;
+        }
     }
 
     // Zero when the path is under the folder, at any depth.  Otherwise negative or positive as the path sorts before

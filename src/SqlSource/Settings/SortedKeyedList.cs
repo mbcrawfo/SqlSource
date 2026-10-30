@@ -1,14 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 
 namespace SqlSource.Settings;
 
 /// <summary>
 /// The rules that the type override and the column types share for their entries: a list kept sorted by key, each key
-/// once, in the order a map gives as <c>order</c>, the key of an entry being <c>keyOf</c>.  The maps keep their own
-/// keys, order and lookup, <see cref="TypeOverrides.TypeOverrideMap" /> and <see cref="ColumnTypes.ColumnTypeMap" />,
-/// and pass their order and key here as static delegates, so a call allocates nothing for them.
+/// once, in the order a map gives as <c>order</c>, the key of an entry being <c>keyOf</c>, and the rule of that order,
+/// <see cref="Order" />.  The maps keep their own keys, comparison of keys and lookup,
+/// <see cref="TypeOverrides.TypeOverrideMap" /> and <see cref="ColumnTypes.ColumnTypeMap" />, and pass their order
+/// and key here as static delegates, so a call allocates nothing for them.
 /// </summary>
 internal static class SortedKeyedList
 {
@@ -63,21 +65,28 @@ internal static class SortedKeyedList
     /// </summary>
     public static int IndexOf<T>(List<T> entries, string key, Comparison<string> order, Func<T, string> keyOf)
     {
-        var (low, high) = (0, entries.Count);
-        while (low < high)
+        var probe = new KeyProbe<T>(entries, key, order, keyOf);
+        var at = SortedSearch.LowerBound(entries.Count, probe);
+        return at < entries.Count && probe.CompareAt(at) == 0 ? at : ~at;
+    }
+
+    /// <summary>
+    /// The order of a map whose keys compare by their parts, as <paramref name="comparison" /> compares them: ignoring
+    /// case, then exactly to break a tie, so that keys that differ only by case are two keys.  Keys of the same text
+    /// are equal without being split twice.  Generic over a struct, so that the map's comparison is called directly.
+    /// </summary>
+    // Inlined into each map's order, where a call of its own cost a map's sort and search about a sixth more.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int Order<TComparison>(string a, string b, TComparison comparison)
+        where TComparison : struct, IKeyComparison
+    {
+        var order = comparison.CompareKeys(a, b, StringComparison.OrdinalIgnoreCase);
+        if (order != 0 || string.Equals(a, b, StringComparison.Ordinal))
         {
-            var middle = low + ((high - low) / 2);
-            if (order(keyOf(entries[middle]), key) < 0)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle;
-            }
+            return order;
         }
 
-        return low < entries.Count && order(keyOf(entries[low]), key) == 0 ? low : ~low;
+        return comparison.CompareKeys(a, b, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -96,5 +105,20 @@ internal static class SortedKeyedList
 
         entries.Insert(~at, entry);
         return null;
+    }
+
+    /// <summary>
+    /// How a map compares two keys by their parts under a <see cref="StringComparison" />, for <see cref="Order" />.
+    /// </summary>
+    public interface IKeyComparison
+    {
+        int CompareKeys(string first, string second, StringComparison comparison);
+    }
+
+    // A struct, so that SortedSearch does not box it.
+    private readonly struct KeyProbe<T>(List<T> entries, string key, Comparison<string> order, Func<T, string> keyOf)
+        : SortedSearch.IProbe
+    {
+        public int CompareAt(int index) => order(keyOf(entries[index]), key);
     }
 }

@@ -3,14 +3,21 @@ using System;
 namespace SqlSource;
 
 /// <summary>
-/// The one exact binary search of a sorted list, by a key that each item gives.
+/// The one binary search of the generator's sorted lists, exact or a lower bound.  A caller with its own order gives a
+/// probe.
 /// </summary>
 internal static class SortedSearch
 {
-    // How the item at an index sorts against the key: negative before it, zero equal, positive after.  A struct, so
-    // that a search allocates nothing.
-    private interface IProbe
+    /// <summary>
+    /// How the item at an index sorts against what is looked for.  An implementation is a <c>readonly struct</c>, so
+    /// that a search allocates nothing.
+    /// </summary>
+    public interface IProbe
     {
+        /// <summary>
+        /// Negative when the item at <paramref name="index" /> sorts before what is looked for, zero when it is equal
+        /// to it, positive when it sorts after.
+        /// </summary>
         int CompareAt(int index);
     }
 
@@ -20,7 +27,7 @@ internal static class SortedSearch
     /// <paramref name="comparer" />.  Negative when there is none.
     /// </summary>
     public static int IndexOf<T>(EquatableArray<T> sorted, string key, Func<T, string> keyOf, StringComparer comparer)
-        where T : IEquatable<T> => Search(sorted.Count, new ComparerProbe<T>(sorted, key, keyOf, comparer));
+        where T : IEquatable<T> => IndexOf(sorted.Count, new ComparerProbe<T>(sorted, key, keyOf, comparer));
 
     /// <summary>
     /// The index in <paramref name="sorted" />, which is ordered by <paramref name="comparison" /> on the key that
@@ -35,9 +42,14 @@ internal static class SortedSearch
         Func<T, string> keyOf,
         StringComparison comparison
     )
-        where T : IEquatable<T> => Search(sorted.Count, new PrefixProbe<T>(sorted, text, keyLength, keyOf, comparison));
+        where T : IEquatable<T> =>
+        IndexOf(sorted.Count, new PrefixProbe<T>(sorted, text, keyLength, keyOf, comparison));
 
-    private static int Search<TProbe>(int count, TProbe probe)
+    /// <summary>
+    /// An index in <c>[0, <paramref name="count" />)</c> whose <see cref="IProbe.CompareAt" /> is zero, or -1 when
+    /// there is none.
+    /// </summary>
+    public static int IndexOf<TProbe>(int count, TProbe probe)
         where TProbe : struct, IProbe
     {
         var low = 0;
@@ -62,6 +74,39 @@ internal static class SortedSearch
         }
 
         return -1;
+    }
+
+    /// <summary>
+    /// The first index in <c>[0, <paramref name="count" />)</c> whose <see cref="IProbe.CompareAt" /> is not
+    /// negative, or <paramref name="count" /> when there is none.
+    /// </summary>
+    public static int LowerBound<TProbe>(int count, TProbe probe)
+        where TProbe : struct, IProbe => LowerBound(0, count, probe);
+
+    /// <summary>
+    /// The first index in <c>[<paramref name="start" />, <paramref name="count" />)</c> whose
+    /// <see cref="IProbe.CompareAt" /> is not negative, or <paramref name="count" /> when there is none, which is
+    /// <paramref name="start" /> when it equals <paramref name="count" />.
+    /// </summary>
+    public static int LowerBound<TProbe>(int start, int count, TProbe probe)
+        where TProbe : struct, IProbe
+    {
+        var low = start;
+        var high = count;
+        while (low < high)
+        {
+            var middle = low + ((high - low) / 2);
+            if (probe.CompareAt(middle) < 0)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        return low;
     }
 
     private readonly struct ComparerProbe<T>(

@@ -75,13 +75,13 @@ internal sealed record ConverterSet(EquatableArray<Converter> Converters, Equata
     public EquatableArray<Converter> Touching(string typeText)
     {
         var places = new List<int>();
-        var start = LowerBound(Converters.Count, place => Converters[place].ArgumentText, typeText);
+        var start = SortedSearch.LowerBound(Converters.Count, new ArgumentProbe(Converters, typeText));
         for (var place = start; place < Converters.Count && IsText(Converters[place].ArgumentText, typeText); place++)
         {
             places.Add(place);
         }
 
-        var returnStart = LowerBound(_byReturn.Length, index => Converters[_byReturn[index]].ReturnText, typeText);
+        var returnStart = SortedSearch.LowerBound(_byReturn.Length, new ReturnProbe(Converters, _byReturn, typeText));
         for (
             var index = returnStart;
             index < _byReturn.Length && IsText(Converters[_byReturn[index]].ReturnText, typeText);
@@ -171,25 +171,20 @@ internal sealed record ConverterSet(EquatableArray<Converter> Converters, Equata
             .ThenBy(static place => place)
             .ToImmutableArray();
 
-    // The first place whose text is not ordinally less than the text, in a list ordered by it.
-    private static int LowerBound(int count, Func<int, string> textAt, string text)
+    // Structs, so that SortedSearch does not box them.  Each compares the text of a place in a list ordered by it,
+    // ordinally.
+    private readonly struct ArgumentProbe(EquatableArray<Converter> converters, string typeText) : SortedSearch.IProbe
     {
-        var low = 0;
-        var high = count;
-        while (low < high)
-        {
-            var middle = low + ((high - low) / 2);
-            if (string.CompareOrdinal(textAt(middle), text) < 0)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle;
-            }
-        }
+        public int CompareAt(int index) => string.CompareOrdinal(converters[index].ArgumentText, typeText);
+    }
 
-        return low;
+    private readonly struct ReturnProbe(
+        EquatableArray<Converter> converters,
+        ImmutableArray<int> byReturn,
+        string typeText
+    ) : SortedSearch.IProbe
+    {
+        public int CompareAt(int index) => string.CompareOrdinal(converters[byReturn[index]].ReturnText, typeText);
     }
 
     // Ordinal by argument, return type, method and display name, then the project's before the mapped types', then by

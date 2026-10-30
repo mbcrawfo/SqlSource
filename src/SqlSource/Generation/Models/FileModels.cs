@@ -34,31 +34,17 @@ internal sealed record FileModels(
     {
         // A query has models at most once and the indices rise, so its models are at or before its own index, and
         // at it when every query before it has models, as is usual.
-        var (low, high) = (0, Math.Min(Queries.Count, queryIndex + 1) - 1);
-        if (high >= 0 && Queries[high].Index == queryIndex)
-        {
-            return string.Equals(Queries[high].Name, name, StringComparison.Ordinal) ? Queries[high] : null;
-        }
+        var count = Math.Min(Queries.Count, queryIndex + 1);
+        var at =
+            count > 0 && Queries[count - 1].Index == queryIndex
+                ? count - 1
+                : SortedSearch.IndexOf(count, new QueryProbe(Queries, queryIndex));
+        return at >= 0 && string.Equals(Queries[at].Name, name, StringComparison.Ordinal) ? Queries[at] : null;
+    }
 
-        while (low <= high)
-        {
-            var middle = low + ((high - low) / 2);
-            var models = Queries[middle];
-            if (models.Index == queryIndex)
-            {
-                return string.Equals(models.Name, name, StringComparison.Ordinal) ? models : null;
-            }
-
-            if (models.Index < queryIndex)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-
-        return null;
+    // A struct, so that SortedSearch does not box it.
+    private readonly struct QueryProbe(EquatableArray<QueryModels> queries, int queryIndex) : SortedSearch.IProbe
+    {
+        public int CompareAt(int index) => queries[index].Index.CompareTo(queryIndex);
     }
 }
