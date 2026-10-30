@@ -46,7 +46,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var typeQueries = SelectTypeQueries(claims.ClaimingTypes, parsedFiles.Sorted, fileLevels);
         var sidecars = CheckSidecars(context, claims.ClaimedPaths, typeQueries, parsedFiles, claims.RepeatedPaths);
         var typing = TypeFiles(context, sidecars.Checks, parsedFiles.Sorted, fileLevels);
-        var converters = FindConverters(context, typing.MappedTypeConverters);
+        var converters = FindConverters(context, typing.MappedTypeConverters, typing.TypingLibraryProbe);
         var models = CollectModels(context, typing.Files, typeQueries);
         ReportDrivers(context, typing.NpgsqlProbe, typing.SqlClientProbe, sidecars.Needs, parsedFiles.Sorted);
         ReportProblems(context, sidecars.Checks, typing.FileTypes, models.FileModels, models.Models);
@@ -528,14 +528,23 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (resolved, _) => resolved.Converters)
             .WithTrackingName(TrackingNames.MappedTypeConverters);
 
-        return new TypedFiles(npgsqlProbe, sqlClientProbe, libraryProbe, typedFiles, fileTypes, mappedTypeConverters);
+        return new TypedFiles(
+            npgsqlProbe,
+            sqlClientProbe,
+            libraryProbe,
+            typingLibraryProbe,
+            typedFiles,
+            fileTypes,
+            mappedTypeConverters
+        );
     }
 
-    // The project's converters, from the methods of its source that carry the converter attribute and from the mapped
-    // types, with the problems of its methods reported, whatever the output.
+    // The project's converters, from the methods of its source that carry the converter attribute, from the mapped
+    // types and from the libraries it references, with the problems of its methods reported, whatever the output.
     private static IncrementalValueProvider<ConverterSet> FindConverters(
         IncrementalGeneratorInitializationContext context,
-        IncrementalValueProvider<EquatableArray<Converter>> mappedTypeConverters
+        IncrementalValueProvider<EquatableArray<Converter>> mappedTypeConverters,
+        IncrementalValueProvider<LibraryProbe> typingLibraryProbe
     )
     {
         // An edit to a method's declaration reads that method again, and goes no further unless the converter changes.
@@ -549,9 +558,16 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Collect()
             .Select(static (converters, _) => ConverterSet.Sort(converters));
 
+        // The edges of the libraries the project references, from the probe without NodaTime's version, which they do
+        // not read, so that a change of the version alone finds none again.
+        var libraryConverters = typingLibraryProbe
+            .Select(static (probe, _) => LibraryConverters.Of(probe))
+            .WithTrackingName(TrackingNames.LibraryConverters);
+
         var converters = projectConverters
             .Combine(mappedTypeConverters)
-            .Select(static (input, _) => ConverterSet.Of(input.Left, input.Right, EquatableArray<Converter>.Empty))
+            .Combine(libraryConverters)
+            .Select(static (input, _) => ConverterSet.Of(input.Left.Left, input.Left.Right, input.Right))
             .WithTrackingName(TrackingNames.Converters);
 
         // The problems alone, so that an edit that changes none of them reports nothing again.
@@ -1109,6 +1125,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<NpgsqlProbe> NpgsqlProbe,
         IncrementalValueProvider<SqlClientProbe> SqlClientProbe,
         IncrementalValueProvider<LibraryProbe> LibraryProbe,
+        IncrementalValueProvider<LibraryProbe> TypingLibraryProbe,
         FileNodes<TypedFile> Files,
         FileNodes<FileTypes> FileTypes,
         IncrementalValueProvider<EquatableArray<Converter>> MappedTypeConverters

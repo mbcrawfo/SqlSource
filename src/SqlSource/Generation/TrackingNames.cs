@@ -89,6 +89,8 @@ internal static class TrackingNames
 
     public const string ProjectConverters = nameof(ProjectConverters);
 
+    public const string LibraryConverters = nameof(LibraryConverters);
+
     public const string Converters = nameof(Converters);
 
     public const string FileTypesInput = nameof(FileTypesInput);

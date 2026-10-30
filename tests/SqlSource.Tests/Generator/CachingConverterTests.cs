@@ -273,6 +273,48 @@ public sealed class CachingConverterTests
             );
     }
 
+    // NodaTime is referenced after the first run: the probe changes, and the library's edges are found and joined into
+    // the set, while the project's converters and the files' types, which read the probe without its version, are not.
+    [Fact]
+    public void Run_NodaTimeReferenceAdded_RunsLibraryConvertersAndConverters()
+    {
+        var compilation = Compilation(ConversionsSource);
+        var driver = FirstRun(compilation);
+        AllReasons(driver.GetRunResult(), TrackingNames.LibraryConverters).ShouldBe([IncrementalStepRunReason.New]);
+        LibraryEdgesOf(driver.GetRunResult()).ShouldBeEmpty();
+
+        var result = Run(driver, compilation.AddReferences(LibraryReferences.NodaTime("3.3.7")));
+
+        result.Diagnostics.ShouldBeEmpty();
+        AllReasons(result, TrackingNames.LibraryConverters).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.Converters).ShouldBe([IncrementalStepRunReason.Modified]);
+        LibraryEdgesOf(result).Count().ShouldBe(14);
+        AllReasons(result, TrackingNames.ProjectConverters)
+            .ShouldBe([IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Unchanged]);
+    }
+
+    // An edit of the project's code that touches neither the probe nor a converter: the library's edges are cached.
+    [Fact]
+    public void Run_UnrelatedEdit_LeavesLibraryConvertersCached()
+    {
+        var compilation = Compilation(ConversionsSource).AddReferences(LibraryReferences.NodaTime("3.3.7"));
+        var driver = FirstRun(compilation);
+
+        var result = Run(
+            driver,
+            WithConversions(compilation, ConversionsSource.Replace("=> id.Value;", "=> id.Value + 0;", Ordinal))
+        );
+
+        result.Diagnostics.ShouldBeEmpty();
+        AllReasons(result, TrackingNames.LibraryConverters).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.Converters).ShouldBe([IncrementalStepRunReason.Cached]);
+        LibraryEdgesOf(result).Count().ShouldBe(14);
+    }
+
+    // The edges of the libraries that the set holds.
+    private static IEnumerable<Converter> LibraryEdgesOf(GeneratorDriverRunResult result) =>
+        ConvertersOf(result).Where(converter => converter.Origin == ConverterOrigin.Library);
+
     // Both types' sources, and Conversions with this source.
     private static CSharpCompilation Compilation(string conversions) =>
         MethodsCompilation(TypeSource("App", "UserQueries"))

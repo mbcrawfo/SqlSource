@@ -1,0 +1,43 @@
+using System;
+using SqlSource.Generation.Types.Drivers;
+using SqlSource.Settings.Libraries;
+
+namespace SqlSource.Generation.Converters;
+
+/// <summary>
+/// The edges that SqlSource generates for the libraries a project references, and the text of the class that holds
+/// their methods.  An edge is offered whenever the project references the library, whether the library's setting is
+/// on or not: the setting decides only what an unmapped column becomes.
+/// </summary>
+internal static class LibraryConverters
+{
+    /// <summary>
+    /// The edges of every library <paramref name="probe" /> finds, in the order of <see cref="ConverterSet.Comparer" />:
+    /// NodaTime's when the project references it, else none.
+    /// </summary>
+    public static EquatableArray<Converter> Of(LibraryProbe probe) =>
+        probe.NodaTime ? NodaTimeConversions.Edges : EquatableArray<Converter>.Empty;
+
+    /// <summary>
+    /// The text of the file of <paramref name="library" />'s class, or null for a library with no edges.
+    /// </summary>
+    public static string? SourceOf(SqlLibrary library) =>
+        library switch
+        {
+            SqlLibrary.NodaTime => NodaTimeConversions.Source,
+            _ => null,
+        };
+
+    /// <summary>
+    /// The name of the file of <paramref name="library" />'s class.  No type's file can have it, since a <c>-</c> in a
+    /// type's name is followed only by its arity's digits, and no model's or type's methods' can, since those end in
+    /// <c>-Model.g.cs</c> and <c>-Methods.g.cs</c>; and it is not the attribute's.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="library" /> is no member.</exception>
+    public static string HintNameOf(SqlLibrary library) =>
+        library switch
+        {
+            SqlLibrary.NodaTime => "SqlSource-NodaTimeConversions.g.cs",
+            _ => throw new ArgumentOutOfRangeException(nameof(library)),
+        };
+}
