@@ -154,7 +154,7 @@ WHERE id = @id;
 
 Each column and each parameter of a described SQL Server query gets a C# type: the type that Microsoft.Data.SqlClient reads a value of its SQL Server type as.  If `id` is a `bigint`, `placed_at` a `datetime2(7)`, `total` a `decimal(12,2)`, `notes` an `nvarchar(max)` and `row_version` a `rowversion`, they are `long`, `System.DateTime`, `decimal`, `string` and `byte[]`; `@id` is a `long`.  A column that can be null gets its type with `?`: a `bigint` column that can be null is a `long?`, and an `nvarchar` one a `string?`.
 
-The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for `geography`.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides), `"date": "System.DateOnly"` in a settings file's `typeOverrides`.  To give one column another, use a [column type](settings.md#setting-column-types), `"users.id": "MyApp.UserId"` in its `columnTypes`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Microsoft.Data.SqlClient does not read, such as an id or an `Email` over an alias type, needs [converters](settings.md#converters) to and from the type of the table below.  Rows read through Dapper with a type of your choice need a type handler: see [the recipe](recipes.md#dapper-with-sql-server).
+The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for `geography`.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides), `"date": "System.DateOnly"` in a settings file's `typeOverrides`.  To give one column another, use a [column type](settings.md#setting-column-types), `"users.id": "MyApp.UserId"` in its `columnTypes`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Microsoft.Data.SqlClient does not read, such as an id or an `Email` over an alias type, needs [converters](settings.md#converters) to and from the type of the table below.  Rows read through Dapper with a type of your choice need a type handler: see [the recipe](recipes.md#dapper-with-sql-server).  A project that references NodaTime can give the date and time types of its queries whose output is `codegen` NodaTime's types: see [NodaTime](#nodatime).
 
 <a id="which-sqlclient"></a>
 
@@ -212,7 +212,61 @@ A type that the table does not name gets its C# type by what it is:
 - **`json`**, SQL Server 2025's type, is a `string`.
 - **`vector`** is a `Microsoft.Data.SqlTypes.SqlVector<float>`, a type of Microsoft.Data.SqlClient, which the project references to name it.
 
-> **Coming in a later release.**  The query methods will read and send SQL Server's date and time types as NodaTime's types when the [library types](settings.md#setting-library-types) turn NodaTime on.  See [what works today](README.md#what-works-today).
+<a id="nodatime"></a>
+
+### NodaTime
+
+```jsonc
+// sqlsource.json, in the folder of a project that references NodaTime
+{
+    "root": true,
+    "dialect": "mssql",
+    "libraryTypes": {
+        "nodaTime": "on",
+    },
+}
+```
+
+```sql mssql
+-- name: GetShift -> one
+SELECT id, day, opens_at, starts_at, booked_at
+FROM dbo.shifts
+WHERE id = @id;
+```
+
+```csharp
+public sealed record GetShiftDto(
+    long Id,
+    global::NodaTime.LocalDate Day,
+    global::NodaTime.LocalTime OpensAt,
+    global::NodaTime.LocalDateTime StartsAt,
+    global::NodaTime.OffsetDateTime BookedAt);
+```
+
+A project that references NodaTime, and turns it on with the [library types](settings.md#setting-library-types), gets NodaTime's types for the columns and parameters of its queries whose output is `codegen`.  Above, `day` is a `date`, `opens_at` a `time`, `starts_at` a `datetime2` and `booked_at` a `datetimeoffset`, each `NOT NULL`.  On SQL Server NodaTime is off until a settings file or a marker turns it on, for a project, a folder, a file or a query, whether the project references NodaTime or not.  Microsoft.Data.SqlClient reads and sends no NodaTime type, so the query methods convert each value from the C# type of [the types](#type-table) as they read it, and to that type before they send it: nothing is registered in your application.  The query methods that use NodaTime need NodaTime 3.1.9 or later, and an older one is [SQLSRC282](diagnostics.md#sqlsrc282).
+
+| SQL Server type | C# type with NodaTime |
+|----|----|
+| `date` | `NodaTime.LocalDate` |
+| `time` | `NodaTime.LocalTime` |
+| `datetime2`, `datetime`, `smalldatetime` | `NodaTime.LocalDateTime` |
+| `datetimeoffset` | `NodaTime.OffsetDateTime` |
+
+An alias type over one of these types has its C# type, as [the kinds](#type-table) say, and a CLR type of your own never has one of them.  Every other type keeps the type of [the types](#type-table).  Reading a column as one of these types changes no value, and `datetime2(7)`, `time(7)` and `datetimeoffset(7)` hold NodaTime's values to the 100 nanoseconds; what sending a value can change or refuse is below.
+
+- **Only query methods get NodaTime's types.**  A query whose output is `models` keeps the types of the table above, and so do its models, whether rows are read through Dapper or your own code.  A model that such a query shares with a `codegen` query is [SQLSRC257](diagnostics.md#sqlsrc257): see [library types](settings.md#setting-library-types).
+- **Your own choices win.**  A [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) and a `-- param:` or `-- column:` marker give their type over NodaTime's, so a project with `"date": "System.DateOnly"` keeps its `DateOnly` columns.  `"date": "default"` in a nearer settings file, or `-- type-override: date=default` in a file, gives `date` to NodaTime there.
+- **`NodaTime.Instant` and `NodaTime.Duration` are yours to choose**, with the type override, a column type or a marker, whether NodaTime is on or not, and the query methods convert them as they convert the types above.  `datetime2=NodaTime.Instant` reads a `datetime2` as an `Instant`, taking the value stored as UTC, and sends an `Instant` as its date and time in UTC.  `datetimeoffset=NodaTime.Instant` reads the instant of a `datetimeoffset` and drops its offset, and sends an `Instant` at offset zero.  `time=NodaTime.Duration` reads a `time` as the `Duration` since midnight.
+- **Each NodaTime type is converted from the C# type that some database types are read as**, whichever of them you give it to: a `LocalDate`, a `LocalDateTime` or an `Instant` from the `System.DateTime` of a `date`, a `datetime2`, a `datetime` or a `smalldatetime`; a `LocalTime` or a `Duration` from the `System.TimeSpan` of a `time`; an `OffsetDateTime` or an `Instant` from the `System.DateTimeOffset` of a `datetimeoffset`.  So `datetime2=NodaTime.LocalDate` reads the date of a `datetime2` and drops its time.  One of these types given to another database type, `datetimeoffset=NodaTime.LocalDateTime`, is [SQLSRC279](diagnostics.md#sqlsrc279), which names the type it can be converted from.  A NodaTime type that none of these is, such as a `ZonedDateTime`, needs [converters](settings.md#converters) of your own, without which Microsoft.Data.SqlClient throws `InvalidCastException` when the query runs.
+- **Your converters replace the query methods' own.**  A [converter](settings.md#converters) of your project between a NodaTime type and the C# type it is read as, such as one from `System.DateTime` to `NodaTime.Instant`, is used in its direction in place of SqlSource's conversion, with no error, and SqlSource's is kept for the other direction.
+
+What sending a value of NodaTime can change or refuse:
+
+- **Nanoseconds below 100 are dropped**, never rounded: a `LocalTime` of `12:00:00.999999999` is sent as `12:00:00.9999999`, the most that `time(7)` holds, and so for the other types.
+- **An `OffsetDateTime` whose offset has seconds is sent with the offset cut to the minute**, with no error, as `DateTimeOffset` holds no seconds of an offset.  `+05:30:15` is sent as `+05:30` with the same local date and time, so the instant stored moves by 15 seconds.  An offset beyond 14 hours, which NodaTime allows and `DateTimeOffset` does not, throws `InvalidOperationException`, and a local date and time whose instant is before year 1 or after year 9999 throws `ArgumentOutOfRangeException`.
+- **A value outside `System.DateTime`'s range**, before year 1 or after year 9999, which NodaTime allows, throws before the query is sent: `ArgumentOutOfRangeException` for a `LocalDate`, and `InvalidOperationException` for a `LocalDateTime` or an `Instant`.
+- **`datetime` and `smalldatetime` are rounded**, as for a `System.DateTime`, before they are sent: a `datetime` to its three-hundredths of a second, `.1234567` to `.123`, and a `smalldatetime` to the minute, `12:34:56` to `12:35`.  `23:59:59.999` sent to a `datetime` is the next day's `00:00:00`.  A value outside their ranges, or rounded past them, throws before the query is sent: `SqlTypeException` for a `datetime` before 1753, and `OverflowException` for a `smalldatetime` before 1900 or that rounds past `2079-06-06 23:59`, and for a `datetime` of `9999-12-31 23:59:59.999`.  `9999-12-31 23:59:59.9999999`, the last value before year 10000, is stored in a `datetime` as `23:59:59.997`.
+- **A `Duration` of 24 hours or more, or below zero**, throws `OverflowException`, "SqlDbType.Time overflow", before the query is sent: a `time` holds less than a day.
 
 <a id="models"></a>
 
@@ -235,7 +289,7 @@ public sealed record FindOrdersDto(long Id, global::System.DateTime PlacedAt, st
 
 A described SQL Server query gets the [models](generator.md#models) that every described query gets, by the rules of the generator page; their namespace and documentation are left out above.  What SQL Server decides in them:
 
-- **Each property's type** is its column's or parameter's C# type, from [the type table](#type-table) under the version of Microsoft.Data.SqlClient that the project references, or the one you chose, by the [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a marker.  Above, `id` is a `bigint`, `placed_at` a `datetime2` and `status` an `nvarchar(20)`, all `NOT NULL`: `@since` takes the type of `placed_at`, and `@status` that of `status`.
+- **Each property's type** is its column's or parameter's C# type, from [the type table](#type-table) under the version of Microsoft.Data.SqlClient that the project references, or [NodaTime's](#nodatime) for a query whose output is `codegen` where the library types turn NodaTime on, or the one you chose, by the [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a marker.  Above, `id` is a `bigint`, `placed_at` a `datetime2` and `status` an `nvarchar(20)`, all `NOT NULL`: `@since` takes the type of `placed_at`, and `@status` that of `status`.
 - **A column's property can be null** by [which columns can be null](#nullability): `customer_name` comes from the optional side of the `LEFT JOIN`, so its property is a `string?`.  A [`-- column:` marker](generator.md#column-marker) can say otherwise, and so can a column's alias with `!` or `?`.
 - **A parameter's property can be null** only when its `-- param:` marker says `null`, as `@status` does, since SQL Server does not say whether a parameter can be null.  A marker with `null` and no type leaves the type to SQL Server.
 - **A column with no name**, as an expression or a literal without an alias, is [SQLSRC266](diagnostics.md#sqlsrc266) when the tool describes the query.  Give it an alias.
@@ -276,6 +330,7 @@ Each parameter is sent as the SQL Server type it was described with, with that t
 - **`vector`** is sent as its `SqlVector<float>`, whose length is its dimension, and a null as the null `vector` of the parameter's dimension.
 - **An alias type** is sent as its base type: a parameter of `dbo.Email`, made `FROM nvarchar(320)`, as an `nvarchar(320)`.
 - **A parameter that has a [converter](settings.md#converters)** is sent as its database type too: an `Email` whose converter returns a `string` is sent as that `nvarchar(320)`, and a converted string longer than that whole, as above.
+- **A parameter of a [NodaTime](#nodatime) type** is converted to the C# type of [the table](#type-table) and sent as its database type, as a parameter with a converter is: a `NodaTime.LocalDateTime` for a `datetime` is sent as a `datetime`, and a `NodaTime.LocalTime` as a `time`.  What the conversion does to a value that its column cannot hold is under [NodaTime](#nodatime).
 - **`hierarchyid`, `geography`, `geometry` and a CLR type of your own assembly**, which only a [type override](settings.md#setting-type-overrides) gives a C# type, such as `Microsoft.SqlServer.Types.SqlGeography`, are sent as their SQL Server type, and a null as a `NULL` of it.  A CLR type is named by its schema: `Money` of the schema `dbo` is sent as `dbo.Money`.
 - **A type of a newer SQL Server**, which only a type override gives a C# type too, is sent by its value, and Microsoft.Data.SqlClient chooses its type from it.
 
@@ -286,6 +341,7 @@ Each parameter is sent as the SQL Server type it was described with, with that t
 - **Give each method the transaction** of a connection that has one: Microsoft.Data.SqlClient refuses a command without it, with `InvalidOperationException`, before anything is sent, as [the connection](generator.md#method-connection) says.
 - **A method refuses a transaction that has completed.**  Given a transaction that was committed or rolled back before the call, every method throws `InvalidOperationException`, "The transaction given to the query 'ListOrders' has completed; it is no longer usable.", with the query's name, and nothing runs: the connection is not opened and no command is sent.  Microsoft.Data.SqlClient would otherwise run the command outside any transaction and commit it on its own.  A loop over [streamed rows](settings.md#streaming-rows) checks when the loop starts, so it throws when the loop asks for its first row, and a transaction that completes between the call and the loop is refused too.  A method knows that a transaction has completed by its `Connection`, which Microsoft.Data.SqlClient's `SqlTransaction` sets to null.  A transaction of a library that wraps Microsoft.Data.SqlClient's and keeps its `Connection` set after it completes is not refused, and its command runs outside any transaction as before: give the method the `SqlTransaction` inside.
 - **A column is read as its property's C# type**, the one [the types](#types) give it.  A type of yours that Microsoft.Data.SqlClient never reads, such as an id of your own, takes [converters](settings.md#converters): the column is read as the type of [the table](#type-table), an alias type as its base type, and converted.
+- **A column of a [NodaTime](#nodatime) type** is read as the type of [the table](#type-table) and converted, with nothing registered on the connection or in the application.
 - **A C# enum is read only from a column of its own underlying type**: an enum over `int`, the default, from an `int`, and an enum over `byte` from a `tinyint`.  An enum over `int` throws `InvalidCastException` for a `tinyint`, a `smallint` or a `bigint`, since Microsoft.Data.SqlClient never widens or narrows a value.  Declare the enum over its column's type, `enum Level : byte` for a `tinyint`.
 - **A column whose property cannot be null** throws Microsoft.Data.SqlClient's `SqlNullValueException` when it holds a null, and a `vector` column the method's own `InvalidCastException`, "Column 'name' is null.", before any converter is called.
 - **A query of several statements returns the rows of its first result set**, as its model has them, and its other statements still run.  An error that a statement after that result set raises, such as a `THROW`, is thrown as the error's `SqlException` by every method: one that reads rows, `one`, `one-optional` or `many`, reads the rest of the batch before it returns, so it throws the error in place of its rows, and a loop over [streamed rows](settings.md#streaming-rows) throws it after the last row.  The statements before the error have run, and in a transaction the error may have rolled the transaction back, depending on the error and on `XACT_ABORT`: under `SET XACT_ABORT ON` nearly every error does, and with it off `CAST('x' AS int)` does where a `THROW`, a divide by zero or `CAST(300 AS tinyint)` leaves it open.  Its `rowcount` adds up the rows its statements insert, update or delete, and a `SELECT` among them adds nothing.
