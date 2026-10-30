@@ -40,6 +40,7 @@ internal static class SqlFileParser
             : new SqlFileParseResult(
                 EquatableArray<SqlBlock>.Empty,
                 new EquatableArray<SqlParseError>(ImmutableArray.Create(lexed.Error)),
+                EquatableArray<SqlParseError>.Empty,
                 lexer.Rules.Dialect
             );
     }
@@ -57,6 +58,7 @@ internal static class SqlFileParser
 
         private readonly List<SqlBlock> _blocks = [];
         private readonly List<SqlParseError> _errors = [];
+        private readonly List<SqlParseError> _warnings = [];
         private readonly HashSet<string> _names = [];
 
         // The dialect that a marker of the file has named so far.  It is already in effect by the time the markers
@@ -75,19 +77,33 @@ internal static class SqlFileParser
                 ReadNamedBlocks(nameMarkers);
             }
 
-            return _errors.Count > 0
-                ? new SqlFileParseResult(
+            if (_errors.Count > 0)
+            {
+                return new SqlFileParseResult(
                     EquatableArray<SqlBlock>.Empty,
                     new EquatableArray<SqlParseError>(
                         _errors.OrderBy(static error => error.Span.Start).ToImmutableArray()
                     ),
-                    rules.Dialect
-                )
-                : new SqlFileParseResult(
-                    new EquatableArray<SqlBlock>(_blocks.ToImmutableArray()),
                     EquatableArray<SqlParseError>.Empty,
                     rules.Dialect
                 );
+            }
+
+            // The warnings of the queries are in the order of the queries, and a query's own are not by position.
+            var warnings = EquatableArray<SqlParseError>.Empty;
+            if (_warnings.Count > 0)
+            {
+                warnings = new EquatableArray<SqlParseError>(
+                    _warnings.OrderBy(static warning => warning.Span.Start).ToImmutableArray()
+                );
+            }
+
+            return new SqlFileParseResult(
+                new EquatableArray<SqlBlock>(_blocks.ToImmutableArray()),
+                EquatableArray<SqlParseError>.Empty,
+                warnings,
+                rules.Dialect
+            );
         }
 
         private List<(int Index, SqlMarker Marker)> FindNameMarkers()
@@ -332,7 +348,8 @@ internal static class SqlFileParser
                 new SqlScannedQuery(sql, scanned.Occurrences, tokens, variables),
                 tokenDefaults,
                 scope?.Declarations ?? [],
-                _errors
+                _errors,
+                _warnings
             );
 
             return new BuiltQuery(sql, scanned.Segments, scanned.Occurrences, tokens, parameters);

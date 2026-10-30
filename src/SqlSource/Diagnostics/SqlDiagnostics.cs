@@ -432,6 +432,22 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // A warning a project may configure: SqlSource binds the parameter by its first spelling, and every driver and
+    // every SQL Server whose server collation ignores case read the others as the same variable, so such a query
+    // runs.  An error would break the build of a project whose servers all ignore case.  {0} is the spelling at the
+    // warning's place and {1} the list's, each with its prefix.
+    public static readonly DiagnosticDescriptor ParameterInTwoSpellings = new(
+        id: "SQLSRC121",
+        title: "Parameter is written in two spellings",
+        messageFormat: "The parameter '{1}' is also written '{0}'.  SqlSource binds it as '{1}', and a SQL Server "
+            + "whose server collation is case-sensitive reads '{0}' as another variable, which the query does not "
+            + "declare.  Write it '{1}' throughout the query.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc121"
+    );
+
     public static readonly DiagnosticDescriptor SidecarMalformed = new(
         id: "SQLSRC237",
         title: "Sidecar cannot be read",
@@ -1007,6 +1023,7 @@ internal static class SqlDiagnostics
             UndeclaredParameter,
             InputModelWithoutParameters,
             TokenCrossesComment,
+            ParameterInTwoSpellings,
             SidecarMalformed,
             SidecarFormatTooNew,
             SidecarFormatTooOld,
@@ -1074,6 +1091,7 @@ internal static class SqlDiagnostics
             SqlParseErrorKind.UndeclaredParameter => UndeclaredParameter,
             SqlParseErrorKind.InputModelWithoutParameters => InputModelWithoutParameters,
             SqlParseErrorKind.TokenCrossesComment => TokenCrossesComment,
+            SqlParseErrorKind.ParameterInTwoSpellings => ParameterInTwoSpellings,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "No descriptor is defined for this kind."),
         };
 }

@@ -1,10 +1,12 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
+using System.Collections.Generic;
+using Microsoft.CodeAnalysis;
 using Shouldly;
-using SqlSource.Settings;
 using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using Xunit;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -114,6 +116,40 @@ public sealed class FileDiagnosticsTests
             $"SQLSRC112 {GeneratorHarness.UsersPath}(3,13)-(3,19): 'dialect: oracle' conflicts with a setting given "
                 + "earlier in the same scope",
         ]);
+    }
+
+    private const string TwoSpellings = "-- dialect: mssql\n-- name: SetId\nUPDATE dbo.t SET a = @Id WHERE b = @id;\n";
+
+    // A warning and not an error: the file keeps its query, as a project that sees no problem in the other spelling
+    // needs.
+    [Fact]
+    public void Run_SqlServerParameterInTwoSpellings_WarnsAndStillGeneratesTheQuery()
+    {
+        var run = GeneratorHarness.Run(OutputKind.Sql, Source, new SqlFile(GeneratorHarness.UsersPath, TwoSpellings));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC121 {GeneratorHarness.UsersPath}(3,36)-(3,39): The parameter '@Id' is also written '@id'.  "
+                + "SqlSource binds it as '@Id', and a SQL Server whose server collation is case-sensitive reads '@id' "
+                + "as another variable, which the query does not declare.  Write it '@Id' throughout the query.",
+        ]);
+        run.SeverityOf("SQLSRC121").ShouldBe(DiagnosticSeverity.Warning);
+        run.Sources[GeneratorHarness.SampleFile]
+            .ShouldContain("public const string SetId = \"UPDATE dbo.t SET a = @Id WHERE b = @id;\";");
+        run.CompilationErrors.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_SqlServerParameterInTwoSpellings_IsHiddenBySuppressingTheId()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [new SqlFile(GeneratorHarness.UsersPath, TwoSpellings)],
+            diagnosticOptions: new Dictionary<string, ReportDiagnostic> { ["SQLSRC121"] = ReportDiagnostic.Suppress }
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("public const string SetId");
     }
 
     [Fact]

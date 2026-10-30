@@ -29,7 +29,7 @@ SELECT id, name FROM users WHERE id = @id;
 SqlSource finds the parameters of a query: `@` and a name of letters, digits and `_`, outside strings, quoted identifiers, comments and hints.  The list holds each parameter once, in the order it first appears.  The tool uses the list to ask a database what each parameter is, and the query's input [model](generator.md#models) has a property for each parameter in its order.  The [method](generator.md#query-methods) of a query whose output is `codegen` takes the input model as its argument `parameters`, and sends each parameter of the list by its name, with the value of its property: see [how a parameter is sent](generator.md#method-parameters).
 
 - **A parameter stays in the SQL exactly as written.**  The constant for `GetUser`, and the SQL its method sends, hold `@id`.
-- **Names are compared ignoring case.**  `@Id` and `@id` are one parameter.
+- **Names are compared ignoring case.**  `@Id` and `@id` are one parameter.  Under `mssql`, a second spelling is a warning, [SQLSRC121](diagnostics.md#sqlsrc121), since a SQL Server whose server collation is case-sensitive reads it as another variable.  The parameter keeps the spelling that the SQL first writes outside a token's default, so a spelling in a default or in a `-- param:` marker does not choose it.
 - **Only `@` starts a parameter.**  `:name`, `$1` and `?` are not found, and stay in the SQL as written.
 - **Some uses of `@` are not parameters.**  `@>`, `@@`, `@?` and `@@ROWCOUNT` are not, and neither is the `@` inside a word, such as `user@host`, or an `@` that no name follows, such as the one in `a <@ b`.  The `@` of `<@b` is a parameter, `b`.
 - **A parameter inside a hint is not found.**  A hint, `/*+ ... */` or `/*! ... */`, is copied whole.
@@ -197,5 +197,4 @@ With validation off the method checks nothing.  An empty argument leaves nothing
 ## Known issues
 
 - **Under `mssql`, a parameter can be taken for a declared variable.**  After a `DECLARE` with no `;`, a statement that starts with a word SqlSource does not know to start a statement, such as `SEND` or a label, does not end the list.  A parameter after a comma in it, outside parentheses, is then taken for a variable and left out of the parameter list.  End the `DECLARE` with a `;`, or declare the parameter with its type: `-- param: @id int`.
-- **Under `mssql`, two spellings of one parameter fail on a server whose collation is case-sensitive.**  SqlSource reads `@Id` and `@id` as one parameter, but such a server reads them as two variables, so the query fails when it runs: see [SQL Server's known issues](sqlserver.md#known-issues).  Write each parameter in one spelling throughout a query.
 - **A user variable of MySQL or MariaDB, and a parameter of a procedure that the SQL creates, are listed as parameters.**  See [names that are read as parameters](#names-read-as-parameters).

@@ -11,11 +11,15 @@ namespace SqlSource.Generation;
 /// <param name="FileName">The file's name with its extension.</param>
 /// <param name="Queries">The file's queries, in file order.  Empty when <paramref name="Errors" /> is not.</param>
 /// <param name="Errors">The file's problems, located in the file.</param>
+/// <param name="Warnings">
+/// What the file does that the parser warns of, located in the file.  Empty when <paramref name="Errors" /> is not.
+/// </param>
 /// <param name="Dialect">The dialect the file was read by.</param>
 internal sealed record ParsedSqlFile(
     string NormalizedPath,
     string FileName,
     EquatableArray<SqlQuery> Queries,
     EquatableArray<DiagnosticInfo> Errors,
+    EquatableArray<DiagnosticInfo> Warnings,
     SqlDialect Dialect
 );

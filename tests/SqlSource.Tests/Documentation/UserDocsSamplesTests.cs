@@ -52,11 +52,9 @@ public sealed class UserDocsSamplesTests
                 continue;
             }
 
-            problems.AddRange(
-                SqlFileParser
-                    .Parse(text, "Example.sql", dialect)
-                    .Errors.Select(error => Describe(file, line, text, error))
-            );
+            // A warning is a problem too: a sample that a user copies must not warn.  A warning's own is `error`.
+            var result = SqlFileParser.Parse(text, "Example.sql", dialect);
+            problems.AddRange(result.Errors.Concat(result.Warnings).Select(error => Describe(file, line, text, error)));
         }
 
         problems.ShouldBeEmpty();

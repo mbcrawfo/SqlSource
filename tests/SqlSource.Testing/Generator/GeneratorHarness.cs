@@ -109,11 +109,19 @@ internal static class GeneratorHarness
         string? generatorParameters = null,
         string? dialect = null,
         IReadOnlyDictionary<string, string?>? properties = null,
-        string? settings = null
+        string? settings = null,
+        IReadOnlyDictionary<string, ReportDiagnostic>? diagnosticOptions = null
     )
     {
         var parseOptions = ParseOptions.WithLanguageVersion(languageVersion);
         var compilation = CreateCompilation(sources, supportedFramework, parseOptions, references);
+
+        // What a project sets for a diagnostic, as `NoWarn` or a `.globalconfig` does.  The
+        // driver filters the generator's diagnostics by it, as the compiler does.
+        if (diagnosticOptions is not null)
+        {
+            compilation = compilation.WithOptions(compilation.Options.WithSpecificDiagnosticOptions(diagnosticOptions));
+        }
 
         // The properties are what MSBuild tells the generator, for the tests of SqlSourceBuildFolders and
         // SqlSourceTransitivePackageAssemblies.
