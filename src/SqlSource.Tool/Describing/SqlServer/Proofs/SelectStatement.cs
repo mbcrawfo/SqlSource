@@ -7,9 +7,8 @@ namespace SqlSource.Tool.Describing.SqlServer.Proofs;
 /// The <c>WITH</c> clause, from the word <c>WITH</c> to the <c>)</c> of its last CTE, or an empty range before the
 /// <c>SELECT</c> when there is none.
 /// </param>
-/// <param name="CteNames">The names the <c>WITH</c> clause defines, unquoted, in order.</param>
 /// <param name="Body">The <c>SELECT</c>.</param>
-internal sealed record SelectStatement(TokenRange With, IReadOnlyList<string> CteNames, SelectBody Body)
+internal sealed record SelectStatement(TokenRange With, SelectBody Body)
 {
     /// <summary>
     /// The query, or null when its text is not an optional <c>;</c>, an optional <c>WITH</c> clause and one
@@ -37,7 +36,7 @@ internal sealed record SelectStatement(TokenRange With, IReadOnlyList<string> Ct
         }
 
         var body = SelectBody.Read(tokens, new TokenRange(at, end), names);
-        return body is null ? null : new SelectStatement(new TokenRange(withStart, at), names, body);
+        return body is null ? null : new SelectStatement(new TokenRange(withStart, at), body);
     }
 
     // The end of the CTEs after WITH, "name [(columns)] AS (query)" separated by commas, or -1.

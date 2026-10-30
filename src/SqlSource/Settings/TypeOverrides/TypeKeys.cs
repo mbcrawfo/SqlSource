@@ -331,7 +331,7 @@ internal static class TypeKeys
             : AsWritten(name);
 
     // Whether text is a name of names exactly, in its case: a quoted name has no other spelling.
-    private static bool TryGetExactName(Dictionary<string, string> names, string text, out string known) =>
+    private static bool TryGetExactName(IReadOnlyDictionary<string, string> names, string text, out string known) =>
         names.TryGetValue(text, out known) && string.Equals(known, text, StringComparison.Ordinal);
 
     // Whether a schema as a user wrote it in a key is the engine's system schema, pg_catalog or sys: an identifier is

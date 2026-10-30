@@ -27,7 +27,6 @@ public sealed class SelectStatementTests
         tokens[from.End - 1].Text.ShouldBe("0");
         tokens[from.End].Text.ShouldBe("ORDER");
         statement.With.IsEmpty.ShouldBeTrue();
-        statement.CteNames.ShouldBeEmpty();
     }
 
     // An item's expression leaves its alias out.
@@ -43,22 +42,30 @@ public sealed class SelectStatementTests
     }
 
     [Fact]
-    public void Read_WithClause_KeepsItAndItsNames()
+    public void Read_WithClause_KeepsIt()
     {
         var (tokens, statement) = Read(";WITH a AS (SELECT 1 AS x), b (y) AS (SELECT 2) SELECT a.x FROM a");
 
-        statement.ShouldNotBeNull().CteNames.ShouldBe(["a", "b"]);
-        tokens[statement.With.Start].Text.ShouldBe("WITH");
-        tokens[statement.With.End - 1].Text.ShouldBe(")");
-        tokens[statement.With.End].Text.ShouldBe("SELECT");
+        var with = statement.ShouldNotBeNull().With;
+        tokens[with.Start].Text.ShouldBe("WITH");
+        tokens[with.End - 1].Text.ShouldBe(")");
+        tokens[with.End].Text.ShouldBe("SELECT");
         statement.Body.Items.ShouldHaveSingleItem().Name.ShouldBe("x");
     }
 
+    // Each name the WITH clause defines, unquoted, is a CTE and no table.
+    [Theory]
+    [InlineData(";WITH a AS (SELECT 1 AS x), b (y) AS (SELECT 2) SELECT x FROM a")]
+    [InlineData(";WITH a AS (SELECT 1 AS x), b (y) AS (SELECT 2) SELECT y FROM b")]
+    [InlineData("WITH [a b] AS (SELECT 1 AS x) SELECT x FROM [a b]")]
+    public void Read_FromACteOfTheWithClause_IsNotOneTable(string sql) =>
+        Read(sql).Statement.ShouldNotBeNull().Body.IsOneTable.ShouldBeFalse();
+
     [Fact]
-    public void Read_WithClause_QuotedNamesAreUnquoted() =>
-        Read("WITH [a b] AS (SELECT 1 AS x) SELECT x FROM [a b]")
+    public void Read_FromATableNamedLikeNoCte_IsOneTable() =>
+        Read("WITH [a b] AS (SELECT 1 AS x) SELECT x FROM [a c]")
             .Statement.ShouldNotBeNull()
-            .CteNames.ShouldBe(["a b"]);
+            .Body.IsOneTable.ShouldBeTrue();
 
     [Theory]
     [InlineData("SELECT DISTINCT TOP (@n) PERCENT WITH TIES a FROM t")]
