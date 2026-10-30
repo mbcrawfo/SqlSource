@@ -66,11 +66,13 @@ internal static class SqlFileReader
             fileName,
             new EquatableArray<SqlQuery>(queries.ToImmutable()),
             DiagnosticsOf(file.Path, text, result.Errors),
+            DiagnosticsOf(file.Path, text, result.Warnings),
             result.Dialect
         );
     }
 
-    // The array is made only for errors: a query's kept form has none but in a rare file.
+    // The array is made only for problems: a query's kept form has none but in a rare file, and a file has no warning
+    // but in a rare one.
     private static EquatableArray<DiagnosticInfo> DiagnosticsOf(
         string path,
         SourceText text,

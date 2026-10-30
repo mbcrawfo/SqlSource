@@ -22,6 +22,13 @@ internal static class ParseOf
         return [.. result.Errors];
     }
 
+    public static SqlParseError[] Warnings(string text, SqlDialectChoice dialect = default)
+    {
+        var result = SqlFileParser.Parse(text, "Query.sql", dialect);
+        result.Errors.ShouldBeEmpty();
+        return [.. result.Warnings];
+    }
+
     public static string? Kept(SqlBlock block) =>
         block.KeptSegments is { } segments
             ? string.Concat(
