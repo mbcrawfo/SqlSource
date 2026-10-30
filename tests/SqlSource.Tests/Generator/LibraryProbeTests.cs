@@ -27,7 +27,8 @@ public sealed class LibraryProbeTests
     {
         var probe = LibraryProbe.Read(CompilationOf());
 
-        probe.ShouldBe(new LibraryProbe(NodaTime: false, NpgsqlNodaTime: false, NodaTimeVersion: null));
+        // The runtime's references carry System.Text.Json.
+        probe.ShouldBe(new LibraryProbe(NodaTime: false, NpgsqlNodaTime: false, NodaTimeVersion: null, Json: true));
         probe.IsAvailable(SqlLibrary.NodaTime, DatabaseEngine.PostgreSql).ShouldBeFalse();
         probe.IsAvailable(SqlLibrary.NodaTime, DatabaseEngine.SqlServer).ShouldBeFalse();
         probe.DefaultOf(SqlLibrary.NodaTime, DatabaseEngine.PostgreSql).ShouldBe(LibraryState.Off);
@@ -125,7 +126,7 @@ public sealed class LibraryProbeTests
             )
         );
 
-        probe.ShouldBe(new LibraryProbe(NodaTime: true, NpgsqlNodaTime: true, NodaTimeVersion: null));
+        probe.ShouldBe(new LibraryProbe(NodaTime: true, NpgsqlNodaTime: true, NodaTimeVersion: null, Json: true));
     }
 
     [Fact]
@@ -195,6 +196,46 @@ public sealed class LibraryProbeTests
     {
         LibraryProbe.MissingAssembliesOf(SqlLibrary.NodaTime, DatabaseEngine.PostgreSql).ShouldBe("Npgsql.NodaTime");
         LibraryProbe.MissingAssembliesOf(SqlLibrary.NodaTime, DatabaseEngine.SqlServer).ShouldBe("NodaTime");
+    }
+
+    // System.Text.Json is part of the runtime; a compilation that does not reference it has no JsonElement.
+    [Fact]
+    public void Read_SystemTextJson_FindsJson()
+    {
+        LibraryProbe.Read(CompilationOf()).Json.ShouldBeTrue();
+        LibraryProbe
+            .Read(
+                GeneratorHarness.CreateCompilation(
+                    [new SourceFile("/app/Sample.cs", Source)],
+                    supportedFramework: false
+                )
+            )
+            .Json.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void DefaultOf_Json_IsOffOnBothEngines()
+    {
+        var probe = LibraryProbe.Read(CompilationOf());
+        var without = new LibraryProbe(NodaTime: false, NpgsqlNodaTime: false, NodaTimeVersion: null);
+
+        probe.Json.ShouldBeTrue();
+        foreach (var engine in new[] { DatabaseEngine.PostgreSql, DatabaseEngine.SqlServer })
+        {
+            probe.DefaultOf(SqlLibrary.Json, engine).ShouldBe(LibraryState.Off);
+            probe.IsAvailable(SqlLibrary.Json, engine).ShouldBeTrue();
+            without.IsAvailable(SqlLibrary.Json, engine).ShouldBeFalse();
+            without.DefaultOf(SqlLibrary.Json, engine).ShouldBe(LibraryState.Off);
+        }
+
+        probe.IsBelowTheFloor(SqlLibrary.Json).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void MissingAssembliesOf_NamesSystemTextJson()
+    {
+        LibraryProbe.MissingAssembliesOf(SqlLibrary.Json, DatabaseEngine.PostgreSql).ShouldBe("System.Text.Json");
+        LibraryProbe.MissingAssembliesOf(SqlLibrary.Json, DatabaseEngine.SqlServer).ShouldBe("System.Text.Json");
     }
 
     private static CSharpCompilation CompilationOf(params MetadataReference[] references) =>

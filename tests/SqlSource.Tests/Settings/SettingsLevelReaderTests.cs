@@ -331,7 +331,7 @@ public sealed class SettingsLevelReaderTests
             [],
             members: new Dictionary<SettingId, KeyValuePair<string, string>[]>
             {
-                [SettingId.LibraryTypes] = [new("nodaTime", "maybe"), new("json", "on")],
+                [SettingId.LibraryTypes] = [new("nodaTime", "maybe"), new("jsn", "on")],
             }
         );
 

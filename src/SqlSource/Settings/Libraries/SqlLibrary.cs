@@ -8,4 +8,7 @@ internal enum SqlLibrary
 {
     /// <summary>NodaTime's date and time types.</summary>
     NodaTime,
+
+    /// <summary>System.Text.Json's <c>JsonElement</c> for the JSON types of the databases.</summary>
+    Json,
 }

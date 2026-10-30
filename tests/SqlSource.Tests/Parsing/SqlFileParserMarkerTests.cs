@@ -307,11 +307,17 @@ public sealed class SqlFileParserMarkerTests
         entry.Place.ShouldBe(SettingPlace.Query);
     }
 
-    // There is one library today, so the only entries that can share a line are the same one twice, which is no
-    // conflict.
+    // The same entry twice on a line is no conflict.
     [Fact]
     public void LibraryTypes_SeveralEntriesOnOneLine()
     {
+        var libraries = Blocks("-- name: Q\n-- library-types: json=on nodatime=off\nSELECT 1\n")
+            .ShouldHaveSingleItem()
+            .Markers.LibraryTypes.ShouldNotBeNull();
+        libraries.Count.ShouldBe(2);
+        libraries[0].Library.ShouldBe(SqlLibrary.NodaTime);
+        libraries[1].Library.ShouldBe(SqlLibrary.Json);
+
         var block = Blocks("-- name: Q\n-- library-types: nodatime=on   nodatime=on\nSELECT 1\n")
             .ShouldHaveSingleItem();
 
@@ -322,7 +328,7 @@ public sealed class SqlFileParserMarkerTests
     [Theory]
     [InlineData("nodatime")]
     [InlineData("nodatime=maybe")]
-    [InlineData("json=on")]
+    [InlineData("json=maybe")]
     [InlineData("=on")]
     [InlineData("")]
     public void LibraryTypes_Invalid_IsSQLSRC111(string value)
@@ -334,6 +340,7 @@ public sealed class SqlFileParserMarkerTests
         error.Kind.ShouldBe(SqlParseErrorKind.InvalidMarkerValue);
         error.Arguments[0].ShouldBe(value.Length == 0 ? "library-types:" : "library-types: " + value);
         error.Arguments[1].ShouldContain("nodatime");
+        error.Arguments[1].ShouldContain("json");
         error.Arguments[1].ShouldContain("default");
         error.Span.ShouldBe(value.Length == 0 ? TextSpans.Of(text, "-- library-types:") : TextSpans.Of(text, value));
     }

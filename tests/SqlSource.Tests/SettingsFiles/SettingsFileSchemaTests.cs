@@ -313,6 +313,10 @@ public sealed class SettingsFileSchemaTests
     )]
     [InlineData(
         SettingsFileKeys.LibraryTypes, /*lang=json,strict*/
+        "{\"json\": \"on\", \"nodaTime\": \"Off\"}"
+    )]
+    [InlineData(
+        SettingsFileKeys.LibraryTypes, /*lang=json,strict*/
         "{\" Noda-Time \": \" DEFAULT \"}"
     )]
     [InlineData(
@@ -390,7 +394,10 @@ public sealed class SettingsFileSchemaTests
         """{"libraryTypes": {"nodaTime": "maybe"}}"""
     )]
     [InlineData( /*lang=json,strict*/
-        """{"libraryTypes": {"json": "on"}}"""
+        """{"libraryTypes": {"json": "maybe"}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"libraryTypes": {"jsn": "on"}}"""
     )]
     [InlineData( /*lang=json,strict*/
         """{"libraryTypes": {"nodaTime": ""}}"""
