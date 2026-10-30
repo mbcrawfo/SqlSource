@@ -36,6 +36,11 @@ public sealed class LibraryDiagnosticsTests
 
     private static readonly SqlServerType Date = TestSidecars.SqlServer("date", 3, 10);
 
+    private static readonly SqlServerType DateTime2 = TestSidecars.SqlServer("datetime2", 8, 27, 7);
+
+    // The override that gives a datetime2 NodaTime's Instant, the only use of NodaTime in the three runs of it.
+    private const string InstantOverride = "-- type-override: datetime2=NodaTime.Instant\n\n";
+
     // SqlClient 7 and an assembly of NodaTime 3.1.8, below its floor, with the types its rows name.
     private static MetadataReference[] BelowTheFloorOnSqlServer =>
         [
@@ -339,6 +344,81 @@ public sealed class LibraryDiagnosticsTests
         run.Problems().ShouldBe([BelowTheFloor]);
         MethodSources(run).ShouldBeEmpty();
         run.Sources["App.ListEventsDto-Model.g.cs"].ShouldContain("(global::NodaTime.Instant At);");
+    }
+
+    // With the switch off, a query that reads and finds by a datetime2 that an override makes an Instant uses NodaTime
+    // only through the conversions it is given, not through a property that a library's row typed: SQLSRC282 all the
+    // same, and no conversions class.
+    [Fact]
+    public void Run_NodaTimeBelowTheFloorAndAnOverrideOnly_Reports282()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            InstantOverride + "-- name: FindAt\nSELECT at FROM events WHERE at = @at;\n"
+        );
+
+        var run = MethodRuns.RunSqlServer(
+            file,
+            [
+                MethodRuns.SqlServerEntry(
+                    file,
+                    "FindAt",
+                    [TestSidecars.Parameter(0, "at", DateTime2, false)],
+                    [TestSidecars.Column(0, "at", DateTime2)]
+                ),
+            ],
+            references: BelowTheFloorOnSqlServer
+        );
+
+        run.Problems().ShouldBe([BelowTheFloor]);
+        MethodSources(run).ShouldBeEmpty();
+        run.Sources.Keys.ShouldNotContain(ConversionsFile);
+        run.Sources["App.FindAtParams-Model.g.cs"].ShouldContain("(global::NodaTime.Instant At);");
+        run.Sources["App.FindAtDto-Model.g.cs"].ShouldContain("(global::NodaTime.Instant At);");
+    }
+
+    // The same with a parameter alone: the statement returns no rows, so only the conversion that writes the
+    // parameter uses NodaTime.
+    [Fact]
+    public void Run_NodaTimeBelowTheFloorAndAnOverrideOnAParameterOnly_Reports282()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            InstantOverride + "-- name: Touch -> none\nUPDATE events SET seen = 1 WHERE at = @at;\n"
+        );
+
+        var run = MethodRuns.RunSqlServer(
+            file,
+            [MethodRuns.SqlServerEntry(file, "Touch", [TestSidecars.Parameter(0, "at", DateTime2, false)], null)],
+            references: BelowTheFloorOnSqlServer
+        );
+
+        run.Problems().ShouldBe([BelowTheFloor]);
+        MethodSources(run).ShouldBeEmpty();
+        run.Sources.Keys.ShouldNotContain(ConversionsFile);
+        run.Sources["App.TouchParams-Model.g.cs"].ShouldContain("(global::NodaTime.Instant At);");
+    }
+
+    // The same with a column alone: the query has no parameter, so only the conversion that reads the column uses
+    // NodaTime.
+    [Fact]
+    public void Run_NodaTimeBelowTheFloorAndAnOverrideOnAColumnOnly_Reports282()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            InstantOverride + "-- name: ListAts\nSELECT at FROM events;\n"
+        );
+
+        var run = MethodRuns.RunSqlServer(
+            file,
+            [MethodRuns.SqlServerEntry(file, "ListAts", [], [TestSidecars.Column(0, "at", DateTime2)])],
+            references: BelowTheFloorOnSqlServer
+        );
+
+        run.Problems().ShouldBe([BelowTheFloor]);
+        MethodSources(run).ShouldBeEmpty();
+        run.Sources.Keys.ShouldNotContain(ConversionsFile);
+        run.Sources["App.ListAtsDto-Model.g.cs"].ShouldContain("(global::NodaTime.Instant At);");
     }
 
     // The same project on NodaTime 3.1.9, the floor, reports nothing and has its methods.

@@ -242,7 +242,7 @@ The ids from `SQLSRC277` to `SQLSRC280` are reported by the build, about convert
 
 `SQLSRC284` is reported by the build, as `SQLSRC250` to `SQLSRC252` are, at the name of a query whose output is `models` or `codegen`, once for each column and parameter whose C# type you chose by a short name that it is about.  It is a warning, and the query keeps the type: it gets its models, and under `codegen` its method.
 
-`SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
+`SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to a project, the attribute's to every one and NodaTime's conversions to one whose query methods use them, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
 ## SQLSRC001
 

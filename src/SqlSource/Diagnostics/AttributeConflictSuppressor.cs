@@ -18,7 +18,7 @@ public sealed class AttributeConflictSuppressor : DiagnosticSuppressor
     private static readonly SuppressionDescriptor Descriptor = new(
         id: "SQLSRC901",
         suppressedDiagnosticId: "CS0436",
-        justification: "SqlSource adds this type to every project that uses it, and each project uses its own copy"
+        justification: "SqlSource adds this type to the project, and each project uses its own copy"
     );
 
     /// <inheritdoc />
