@@ -1,5 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
+using System;
 using System.Text.Json.Nodes;
 using Microsoft.CodeAnalysis;
 using Shouldly;
@@ -255,6 +256,27 @@ public sealed class LibraryTypeTests
         column.Text.ShouldBe(Instant + "[]");
         column.Library.ShouldBe(SqlLibrary.NodaTime);
         column.WithoutLibrary.ShouldNotBeNull().Text.ShouldBe(DateTime + "[]");
+    }
+
+    // An assembly with NodaTime's and the plugin's types and no Npgsql: tstzrange has the library's row, while the base
+    // map, with no driver, has no C# type for it.  The base map's failure is the query's, and the row is not used.
+    [Fact]
+    public void Detected_BaseMapFails_TheBaseMapsErrorIsTheQuerys()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, ListEvents);
+        var range = Catalog("tstzrange", SidecarValues.Kind.Range, Timestamptz);
+        var entry = Entry(file, "ListEvents", [], [Column("during", range)]);
+
+        var run = Run(
+            Source,
+            [file, Sidecars.Of(file, entry)],
+            references: [LibraryReferences.Synthetic("3.3.0.0", instant: true, pluginExtensions: true)]
+        );
+
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Diagnostics.ShouldContain(diagnostic => diagnostic.StartsWith("SQLSRC249 ", StringComparison.Ordinal));
+        run.Diagnostics.ShouldNotContain(diagnostic => diagnostic.Contains("NodaTime", StringComparison.Ordinal));
+        StepOutputs.Single<FileTypes>(run, TrackingNames.FileTypes).Queries.ShouldBeEmpty();
     }
 
     // On, though the plugin is missing: the query keeps the base map's types, and the entry that says on is recorded.

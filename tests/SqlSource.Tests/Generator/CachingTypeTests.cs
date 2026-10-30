@@ -561,6 +561,34 @@ public sealed class CachingTypeTests
     private InMemoryAdditionalText UsersWithLibraryTypes(string state) =>
         new(_scene.Users.Path, "-- name: GetUser\n-- library-types: nodatime=" + state + "\nSELECT 1 AS value;\n");
 
+    // NodaTime's version is for its floor, which typing does not read: a reference that changes the version alone
+    // changes the probe, and the probe that typing reads is equal, so no file gathers its input or is typed again.
+    [Fact]
+    public void NodaTimeVersion_Changed_TypesNoFileAgain()
+    {
+        var older = LibraryReferences.Synthetic("3.2.0.0", instant: true, pluginExtensions: true);
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10, older]);
+        var driver = _scene.FirstRunWithTypes(
+            compilation,
+            ProjectFileWithTypeOverrides(null),
+            TypedSidecar(_scene.Users, "GetUser", "timestamptz"),
+            TypedSidecar(_scene.Orders, "GetOrder", "timestamptz")
+        );
+        ColumnTextOf(driver.GetRunResult(), "app/Users/Users.sql").ShouldBe(Instant);
+
+        var result = Run(
+            driver,
+            compilation.ReplaceReference(
+                older,
+                LibraryReferences.Synthetic("3.3.0.0", instant: true, pluginExtensions: true)
+            )
+        );
+
+        AllReasons(result, TrackingNames.LibraryProbe).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.FileTypesInput).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.TypedFile).ShouldAllBeCached();
+    }
+
     // Users, whose one parameter a -- param: marker gives the C# type of MyApp.
     private InMemoryAdditionalText UsersWithMarker(string type) =>
         new(_scene.Users.Path, "-- name: GetUser\n-- param: @id -> MyApp." + type + "\nSELECT 1 WHERE @id = 1;\n");

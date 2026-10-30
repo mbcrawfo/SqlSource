@@ -26,7 +26,8 @@ namespace SqlSource.Generation.Types;
 /// </param>
 /// <param name="LibraryProbe">
 /// The libraries the project references, which decide whether a library that is on can be used, and whether one that
-/// no level names is on.
+/// no level names is on.  It has no <c>NodaTimeVersion</c>, which typing does not read, so that a change of the version
+/// alone types no file again.
 /// </param>
 /// <param name="MappedTypes">
 /// The C# types that the type override and the column types name at any level, and that the <c>-- param:</c> and
