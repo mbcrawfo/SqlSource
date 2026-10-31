@@ -101,3 +101,14 @@ CREATE TABLE dbo.noda_values (
     instant_offset_value datetimeoffset(7) NULL,
     duration_value time(7) NULL
 );
+
+-- A nullable column of each spatial type, read and written by the queries of EndToEnd/NetTopologySuite/, whose folder
+-- turns NetTopologySuite on, and one more of each that their file header's type overrides make a Point, of geography,
+-- and a Polygon, of geometry.  It has no seed: each test writes its rows in a transaction that is rolled back.
+CREATE TABLE dbo.spatial_values (
+    id int PRIMARY KEY,
+    geography_value geography NULL,
+    geometry_value geometry NULL,
+    point_value geography NULL,
+    polygon_value geometry NULL
+);

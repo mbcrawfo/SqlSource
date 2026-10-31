@@ -40,8 +40,11 @@
         <!-- Reads .sln and .slnx files for the tool, as the dotnet command does with the same library. -->
         <PackageVersion Include="Microsoft.VisualStudio.SolutionPersistence" Version="1.0.52" />
         <!--
-            The library of NetTopologySuite's geometries, which the tool gets from Npgsql.NetTopologySuite, pinned
-            here so that every project that brings it has this version.
+            The library of NetTopologySuite's geometries, which the tool gets from Npgsql.NetTopologySuite and
+            tests/DatabaseTests/SqlServer references, pinned here so that every project that brings it has this
+            version.  tests/DatabaseTests/Postgres.Npgsql8 and tests/DatabaseTests/SqlServer.SqlClient61 override it
+            to 2.5.0, the floor of Npgsql.NetTopologySuite 8 and of SqlSource, which central transitive pinning would
+            otherwise hold here.
         -->
         <PackageVersion Include="NetTopologySuite" Version="2.6.0" />
         <!--
