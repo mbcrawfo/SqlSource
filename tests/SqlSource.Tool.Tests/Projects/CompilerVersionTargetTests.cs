@@ -28,7 +28,7 @@ public sealed class CompilerVersionTargetTests : IDisposable
 
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("error SQLSRC021");
-        output.ShouldContain(value[6..]);
+        output.ShouldContain($"Roslyn {value[6..]}.");
         output.ShouldContain("9.0.300");
         output.ShouldContain("17.14");
     }
@@ -44,6 +44,7 @@ public sealed class CompilerVersionTargetTests : IDisposable
     [InlineData("roslyn")]
     [InlineData("csc4.8")]
     [InlineData("roslyn4.x")]
+    [InlineData("roslyn4.99999")]
     public async Task Run_CompilerAtLeast414OrUnknown_Passes(string value)
     {
         var (exitCode, output) = await RunAsync(value);

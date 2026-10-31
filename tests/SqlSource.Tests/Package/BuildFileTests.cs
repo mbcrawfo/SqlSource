@@ -115,10 +115,9 @@ public sealed partial class BuildFileTests
 
     // GenerateMSBuildEditorConfigFileCore is the target of the SDK that writes the file the compiler reads.  The
     // targets of the build's folders, of the package-brought assemblies and of the check of the compiler's version run
-    // before it, when every property of the
-    // SDK and of the artifacts layout is set and the references are resolved, and in every build that writes the
-    // file, a design-time build too.  The search for settings files and the
-    // hash hook it through a property, which SqlSource.AfterSdk.targets empties to run them later: see
+    // before it, when every property of the SDK and of the artifacts layout is set and the references are resolved,
+    // and in every build that writes the file, a design-time build too.  The search for settings files and the hash
+    // hook it through a property, which SqlSource.AfterSdk.targets empties to run them later: see
     // Targets_SettingsSearch_RunsBeforeTheCompilerWhereverItIsHooked.  The target that writes the manifest is the one
     // that is not of a build, Targets_ManifestTarget_HooksNothing, and the hook for a target that adds .sql files
     // hooks nothing either, Targets_HookForFilesThatTargetsAdd_RunsBeforeTheSearchAndTheManifest.

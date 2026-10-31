@@ -105,7 +105,6 @@
             <SqlSourceTransitivePackageAssemblies>$(SqlSourcePackageAssemblyNames.Replace('%', '%2525').Replace('|', '%257C').Replace('#', '%2523').Replace(';', '%253B').Replace('/', '|'))</SqlSourceTransitivePackageAssemblies>
         </PropertyGroup>
     </Target>
-    <!-- editorconfig-checker-enable -->
     <!--
         Stops the build on a compiler older than Roslyn 4.14, in which the generator cannot load: the compiler would
         only warn that it cannot, and the project would then fail on the missing members of the generated code.  The
@@ -113,11 +112,10 @@
         Visual Studio 2022 17.14 and later; a value of any other form is not a version this target knows, and passes.
         The text is that of SqlDiagnostics.CompilerTooOld, with {0} where it writes the version: they change together.
     -->
-    <!-- editorconfig-checker-disable -->
     <Target Name="SqlSourceCheckCompilerVersion" BeforeTargets="GenerateMSBuildEditorConfigFileCore">
         <PropertyGroup>
             <SqlSourceCompilerApiVersion
-                Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(CompilerApiVersion)', '^roslyn\d+\.\d+$'))"
+                Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(CompilerApiVersion)', '^roslyn\d{1,4}\.\d{1,4}$'))"
                 >$(CompilerApiVersion.Substring(6))</SqlSourceCompilerApiVersion>
         </PropertyGroup>
         <Error
