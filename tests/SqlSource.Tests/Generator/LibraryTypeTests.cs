@@ -51,9 +51,9 @@ public sealed class LibraryTypeTests
     // SQLSRC246 of ListPlaces's column place, SQL Server's geography, whose help names NetTopologySuite's package.
     private const string PlaceHasNoCSharpType =
         $"SQLSRC246 {GeneratorHarness.UsersPath}(1,10)-(1,20): The column 'place' has the type 'geography', which "
-        + "SqlSource cannot give a C# type.  Reference NetTopologySuite.IO.SqlServerBytes and turn the "
-        + "netTopologySuite library on, to read it as NetTopologySuite's Geometry in a codegen query, or reference the "
-        + "package Microsoft.SqlServer.Types and map it with the type override, as "
+        + "SqlSource cannot give a C# type.  Reference NetTopologySuite.IO.SqlServerBytes, with NetTopologySuite "
+        + "2.5.0 or later, and turn the netTopologySuite library on, to read it as NetTopologySuite's Geometry in a "
+        + "codegen query, or reference the package Microsoft.SqlServer.Types and map it with the type override, as "
         + "geography=Microsoft.SqlServer.Types.SqlGeography.";
 
     private static readonly PostgresType Timestamptz = Catalog("timestamptz") with

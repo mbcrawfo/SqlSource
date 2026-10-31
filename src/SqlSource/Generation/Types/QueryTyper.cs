@@ -706,7 +706,9 @@ internal static class QueryTyper
                 at,
                 subject,
                 typeName,
-                "Reference NetTopologySuite.IO.SqlServerBytes and turn the netTopologySuite library on, to read it as "
+                "Reference "
+                    + LibraryProbe.SqlServerSpatialPackages
+                    + ", and turn the netTopologySuite library on, to read it as "
                     + "NetTopologySuite's Geometry in a codegen query, or reference the package "
                     + "Microsoft.SqlServer.Types and map it with the type override, as "
                     + key

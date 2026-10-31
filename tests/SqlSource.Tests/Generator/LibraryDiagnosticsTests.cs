@@ -484,8 +484,9 @@ public sealed class LibraryDiagnosticsTests
         run.Problems()
             .ShouldBe([
                 "SQLSRC281 /sqlsource.json(5,5)-(5,29): NetTopologySuite is on for the SQL Server query methods it "
-                    + "reaches here, but the project does not reference NetTopologySuite.IO.SqlServerBytes.  Reference "
-                    + "NetTopologySuite.IO.SqlServerBytes, or turn NetTopologySuite off for these queries.",
+                    + "reaches here, but the project does not reference NetTopologySuite.IO.SqlServerBytes, with "
+                    + "NetTopologySuite 2.5.0 or later.  Reference NetTopologySuite.IO.SqlServerBytes, with "
+                    + "NetTopologySuite 2.5.0 or later, or turn NetTopologySuite off for these queries.",
             ]);
     }
 

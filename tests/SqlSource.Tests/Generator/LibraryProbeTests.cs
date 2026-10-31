@@ -506,7 +506,7 @@ public sealed class LibraryProbeTests
             .ShouldBe("Npgsql.NetTopologySuite");
         LibraryProbe
             .MissingAssembliesOf(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer)
-            .ShouldBe("NetTopologySuite.IO.SqlServerBytes");
+            .ShouldBe("NetTopologySuite.IO.SqlServerBytes, with NetTopologySuite 2.5.0 or later");
     }
 
     private static CSharpCompilation CompilationOf(params MetadataReference[] references) =>
