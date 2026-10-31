@@ -31,7 +31,7 @@
 - **NetTopologySuite is on in `EndToEnd/NetTopologySuite/` alone**, by its `sqlsource.json`.  A query that needs its geometries goes in that folder, whose files `CheckTests` names below 2025 with those of `EndToEnd/Queries/`.
 - **A column of `spatial_values` changes `EndToEnd/app/schema.sql`, the queries of `NetTopologySuite/Queries/` and `NetTopologySuite/NetTopologySuiteQueryTests.cs` and its copy in `tests/DatabaseTests/SqlServer.SqlClient61` together.**
 - **A subtype by a type override goes in a column of its own type, `point_value geography` or `polygon_value geometry`**, since an override is keyed by the database type, and a file header's override of `geography` or `geometry` makes every column of it that subtype.
-- **`NetTopologySuite/WrappingConnection.cs` keeps its reader to the members `DbDataReader` requires and its disposal**, so that the read through it takes `DbDataReader`'s `GetStream`; a query run through it has no parameter, and it has a copy in `tests/DatabaseTests/SqlServer.SqlClient61`.
+- **`tests/DatabaseTests/TestHarness/EndToEnd/WrappingConnection.cs` keeps its reader to the members `DbDataReader` requires and its disposal**, so that the read through it takes `DbDataReader`'s `GetStream`; a query run through it has no parameter.
 
 ## `all_types` and the recipe
 

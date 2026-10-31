@@ -6,15 +6,13 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace SqlSource.DatabaseTests.SqlServer.SqlClient61;
+namespace SqlSource.DatabaseTests.TestHarness.EndToEnd;
 
 // A connection that wraps another, as a profiler or a resilience library wraps SqlClient's, so that a generated method
 // is given a connection, a command, a transaction and a reader that are not SqlClient's.  The connection, the command
 // and the transaction forward every member to the one they wrap, an asynchronous disposal through Dispose.  The reader
 // overrides only what DbDataReader requires, and its disposal, so that every other read, GetStream among them, takes
-// the base class's route.
-// A copy of the end-to-end project's EndToEnd/NetTopologySuite/WrappingConnection.cs, since a test project compiles no
-// .cs file of another: a change to one changes the other.
+// the base class's route.  The NetTopologySuite tests of both SQL Server projects read a geography through it.
 internal sealed class WrappingConnection(DbConnection inner) : DbConnection
 {
     public DbConnection Inner { get; } = inner;
