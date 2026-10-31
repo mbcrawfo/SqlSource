@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Shouldly;
+using SqlSource.Diagnostics;
 using Xunit;
 
 namespace SqlSource.Tests.Package;
@@ -37,10 +39,14 @@ public sealed partial class BuildFileTests
         "CompilerGeneratedFilesOutputPath",
         "NuGetPackageRoot",
         "NuGetPackageFolders",
+        "CompilerApiVersion",
     ];
 
     // The target that writes the project manifest for the sqlsource tool.  It is the one target no build runs.
     private const string ManifestTarget = "SqlSourceWriteManifest";
+
+    // The target that stops the build on a compiler older than the generator loads in.
+    private const string CompilerCheckTarget = "SqlSourceCheckCompilerVersion";
 
     // The target that finds the settings files and gives them to the compiler.
     private const string SearchTarget = "SqlSourceFindSettingsFiles";
@@ -108,7 +114,8 @@ public sealed partial class BuildFileTests
     }
 
     // GenerateMSBuildEditorConfigFileCore is the target of the SDK that writes the file the compiler reads.  The
-    // targets of the build's folders and of the package-brought assemblies run before it, when every property of the
+    // targets of the build's folders, of the package-brought assemblies and of the check of the compiler's version run
+    // before it, when every property of the
     // SDK and of the artifacts layout is set and the references are resolved, and in every build that writes the
     // file, a design-time build too.  The search for settings files and the
     // hash hook it through a property, which SqlSource.AfterSdk.targets empties to run them later: see
@@ -124,14 +131,36 @@ public sealed partial class BuildFileTests
             .Where(target => target.Attribute("Name")!.Value is not (ManifestTarget or ListTarget))
             .ToList();
 
-        targets.Count.ShouldBe(4);
+        targets.Count.ShouldBe(5);
         targets
             .Select(target => target.Attribute("BeforeTargets")?.Value)
             .ShouldBe(
-                ["GenerateMSBuildEditorConfigFileCore", "GenerateMSBuildEditorConfigFileCore", SearchHook, SearchHook],
+                [
+                    "GenerateMSBuildEditorConfigFileCore",
+                    "GenerateMSBuildEditorConfigFileCore",
+                    "GenerateMSBuildEditorConfigFileCore",
+                    SearchHook,
+                    SearchHook,
+                ],
                 ignoreOrder: true
             );
         targets.SelectMany(ConditionsAround).ShouldBeEmpty();
+    }
+
+    // The build stops on a compiler before Roslyn 4.14, in which the generator cannot load, with SQLSRC021.  The
+    // generator cannot report it, so the target does, and its text is the descriptor's message: a change to one is
+    // made to both.
+    [Fact]
+    public void Targets_CompilerCheck_ErrorIsTheDescriptorsCodeAndMessage()
+    {
+        var error = Target(CompilerCheckTarget).Elements("Error").ShouldHaveSingleItem();
+
+        error.Attribute("Code").ShouldNotBeNull().Value.ShouldBe(SqlDiagnostics.CompilerTooOld.Id);
+        error
+            .Attribute("Text")
+            .ShouldNotBeNull()
+            .Value.Replace("$(SqlSourceCompilerApiVersion)", "{0}", StringComparison.Ordinal)
+            .ShouldBe(SqlDiagnostics.CompilerTooOld.MessageFormat.ToString(CultureInfo.InvariantCulture));
     }
 
     // A target of a project that adds a .sql file while the build runs hooks this one with BeforeTargets, wherever it

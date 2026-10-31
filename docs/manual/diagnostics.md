@@ -29,6 +29,12 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC019](#sqlsrc019) | Settings file value is not valid |
 | [SQLSRC020](#sqlsrc020) | Settings file entry repeats a key |
 
+**The compiler**
+
+| Id | Title |
+|----|----|
+| [SQLSRC021](#sqlsrc021) | Compiler is too old |
+
 **`.sql` files**
 
 | Id | Title |
@@ -220,7 +226,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 |----|----|
 | [SQLSRC284](#sqlsrc284) | Short name finds a type that only a package brings |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  The build alone reports [SQLSRC021](#sqlsrc021), before it compiles anything.  Ids from 101 to 121 are about the contents of a `.sql` file.  Ids from 200 to 236, 262 to 266, and 271 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports the errors of a `.sql` file, the ids from 101 to 120, under the generator's ids: what is wrong is the same, and so is the fix.  The build alone reports the warning [SQLSRC121](#sqlsrc121).  It reports the errors of a settings file, [SQLSRC015](#sqlsrc015) to [SQLSRC019](#sqlsrc019), at the same line and column as the build, for a settings file that applies to a `.sql` file or a C# file of the project, and once in a run however many of its projects it applies to.  It reports `SQLSRC019` for `dialect`, `output` and `database` alone, and the build for every key but `database`.  [SQLSRC020](#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`, is the build's alone.
 
 The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` and `mssql` dialects.
 
@@ -559,6 +565,14 @@ Two members of `typeOverrides`, two of `columnTypes`, or two of `libraryTypes`, 
 Remove one of the two members, and keep the C# type you want.
 
 See: [Settings files](settings.md#settings-files)
+
+## SQLSRC021
+
+**Compiler is too old**
+
+The build's C# compiler is older than the one SqlSource needs, which is the compiler of the .NET SDK 9.0.300 and later, and of Visual Studio 2022 17.14 and later.  The message names the version of the compiler the build found.  The build stops, and no query gets a method: a compiler that old cannot run SqlSource at all.
+
+Update the .NET SDK to 9.0.300 or later, or Visual Studio to 2022 17.14 or later.  A project can still target .NET 8: the SDK builds it, and what it runs on is the framework it targets.  A `global.json` that pins an older SDK keeps the build on the old compiler, so change the version it pins.
 
 ## SQLSRC101
 

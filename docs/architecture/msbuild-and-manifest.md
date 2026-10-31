@@ -15,12 +15,13 @@ The props do four things.
 
 No setting is a property or item metadata of the build.  The settings are in settings files, which the targets give the compiler as `AdditionalFiles` items and the generator reads as JSON, so no value of a setting passes through the file the compiler reads its properties from.  Nothing is trimmed, and no value is cut at a `;` or a `#`.
 
-The targets file holds six targets.  `SqlSourceFindBuildFolders` and `SqlSourceFindTransitivePackageAssemblies` hook `GenerateMSBuildEditorConfigFileCore`, the target of the SDK that writes the file the compiler reads its properties from.  The search for settings files and the tracking of additional files run just before `CoreCompile`, from `SqlSourceSettingsFilesBeforeCompile` of `SqlSource.AfterSdk.targets`, or hook `GenerateMSBuildEditorConfigFileCore` where that file is not imported.  `SqlSourceListFiles` and `SqlSourceWriteManifest` hook nothing: the first is the hook for a target of a project that adds a `.sql` file, and the tool runs the second by name.  The file also holds the `PropertyGroup` that sets what the search hooks and what the manifest's target depends on, an `ItemGroup` that nests each sidecar under its `.sql` file and keeps it out of the output and publish folders, and an `ItemGroup` that keeps the settings files that the Web SDK lists as `Content` out of them too.  An arrow means "runs before":
+The targets file holds seven targets.  `SqlSourceFindBuildFolders`, `SqlSourceFindTransitivePackageAssemblies` and `SqlSourceCheckCompilerVersion` hook `GenerateMSBuildEditorConfigFileCore`, the target of the SDK that writes the file the compiler reads its properties from.  The search for settings files and the tracking of additional files run just before `CoreCompile`, from `SqlSourceSettingsFilesBeforeCompile` of `SqlSource.AfterSdk.targets`, or hook `GenerateMSBuildEditorConfigFileCore` where that file is not imported.  `SqlSourceListFiles` and `SqlSourceWriteManifest` hook nothing: the first is the hook for a target of a project that adds a `.sql` file, and the tool runs the second by name.  The file also holds the `PropertyGroup` that sets what the search hooks and what the manifest's target depends on, an `ItemGroup` that nests each sidecar under its `.sql` file and keeps it out of the output and publish folders, and an `ItemGroup` that keeps the settings files that the Web SDK lists as `Content` out of them too.  An arrow means "runs before":
 
 ```mermaid
 flowchart LR
     folders["SqlSourceFindBuildFolders"] --> sdk["GenerateMSBuildEditorConfigFileCore (SDK)"]
     packages["SqlSourceFindTransitivePackageAssemblies"] --> sdk
+    compiler["SqlSourceCheckCompilerVersion"] --> sdk
     list["SqlSourceListFiles"] --> find["SqlSourceFindSettingsFiles"]
     find --> track["SqlSourceTrackAdditionalFiles"]
     track --> late["SqlSourceSettingsFilesBeforeCompile (SqlSource.AfterSdk.targets)"]
@@ -32,7 +33,7 @@ flowchart LR
     defines["AddImplicitDefineConstants (SDK)"] -.->|"with a TargetFramework"| manifest
 ```
 
-The hook and the search are described under [finding the settings files](#finding-the-settings-files), the folders under [the build's folders](#the-builds-folders), the assemblies under [the package-brought assemblies](#the-package-brought-assemblies), the tracking under [tracking additional files](#tracking-additional-files), and the manifest target under [the manifest](#the-manifest).
+The hook and the search are described under [finding the settings files](#finding-the-settings-files), the folders under [the build's folders](#the-builds-folders), the assemblies under [the package-brought assemblies](#the-package-brought-assemblies), the check of the compiler under [the compiler's version](#the-compilers-version), the tracking under [tracking additional files](#tracking-additional-files), and the manifest target under [the manifest](#the-manifest).
 
 ### Nesting a sidecar
 
@@ -73,6 +74,12 @@ It reads the `ReferencePath` items, the references as the build resolved them.  
 The names are escaped as [the build's folders](#the-builds-folders) are, `%`, `|`, `#` and `;`, and joined by `|`, and `TransitivePackageAssemblies.Of` decodes them with `BuildFolders.Unescape`, then sorts them and makes them distinct ignoring case, so that two builds of one list give equal values.  An item's metadata is never the argument of a property function, so the target joins the names with `/`, which no file name holds, escapes the joined list, and then makes each `/` a `|`.
 
 It has no `DependsOnTargets`: a build resolves its references before `GenerateMSBuildEditorConfigFileCore`, a design-time build too, and run by name with nothing resolved, the target sets the property empty, so that no name is warned of, which is the safe side.  The manifest does not carry the property, and its target does not depend on this one: the tool does not resolve types.  [`TransitivePackageAssembliesTargetTests`](../../tests/SqlSource.Tool.Tests/Projects/TransitivePackageAssembliesTargetTests.cs) runs the target on the fixture `PackageAssemblies`, whose project writes its `ReferencePath` items out.
+
+### The compiler's version
+
+The generator is built against Roslyn 4.14 and cannot load in an older compiler.  The compiler then reports only a warning that it could not load the generator, and the project fails on the members of the generated code that are missing, so the generator cannot say why.  `SqlSourceCheckCompilerVersion` says it before that: it reads `CompilerApiVersion`, which each .NET SDK sets to `roslyn<major>.<minor>` for the compiler it carries (`roslyn4.11` in the SDK 8.0, `roslyn4.14` in 9.0.300 and later), sets `SqlSourceCompilerApiVersion` to the part after `roslyn` when the value has that form, and reports `SQLSRC021` with the `Error` task when that version is less than 4.14.  Any other value, including none, leaves `SqlSourceCompilerApiVersion` empty and passes, since a version the target cannot read is not known to be too old.
+
+The target hooks `GenerateMSBuildEditorConfigFileCore`, as the two targets above do, so it runs in every build that writes the file the compiler reads, a design-time build too, before the compiler runs.  Its text is the message of `SqlDiagnostics.CompilerTooOld`, with `{0}` where the target writes `$(SqlSourceCompilerApiVersion)`, and a test in `BuildFileTests` holds the two equal.  Only the target reports this diagnostic: the descriptor is in `SqlDiagnostics` for the list of diagnostics and the analyzer release notes.  [`CompilerVersionTargetTests`](../../tests/SqlSource.Tool.Tests/Projects/CompilerVersionTargetTests.cs) runs the target on the fixture `Single` with `CompilerApiVersion` given as a global property.
 
 ### Tracking additional files
 
