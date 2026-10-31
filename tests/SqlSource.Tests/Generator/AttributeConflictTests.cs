@@ -333,7 +333,10 @@ public sealed class AttributeConflictTests
     private static MetadataReference Other(OutputKind? output) =>
         GeneratorHarness.CreateReference(output, "Other", InternalsVisible + "public class InOther { }\n");
 
-    // Each diagnostic without its message, which for CS0436 names files and assemblies.
+    // Each diagnostic without its message, which for CS0436 names files and assemblies, and with
+    // '/' between folders, since on Windows the compiler names a generated file's folder with '\'.
     private static IEnumerable<string> Places(IEnumerable<string> diagnostics) =>
-        diagnostics.Select(diagnostic => diagnostic[..diagnostic.IndexOf(": ", System.StringComparison.Ordinal)]);
+        diagnostics.Select(diagnostic =>
+            diagnostic[..diagnostic.IndexOf(": ", System.StringComparison.Ordinal)].Replace('\\', '/')
+        );
 }
