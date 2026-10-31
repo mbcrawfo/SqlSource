@@ -482,6 +482,35 @@ public sealed class SettingsFileReaderTests
             ]);
     }
 
+    // A member of the wrong type is left out before the members after it, whose opt-ins stay on their own entries.
+    [Fact]
+    public void Read_ColumnTypesWithAWrongTypeMemberFirst_KeepsEachOptInOnItsMember()
+    {
+        const string Text = /*lang=json,strict*/
+            """
+            {
+                "columnTypes": {
+                    "a.x": 5,
+                    "orders.created_by": "UserId",
+                    "orders.metadata": { "type": "OrderMetadata", "json": true },
+                    "orders.note": "Note"
+                }
+            }
+            """;
+
+        var file = SettingsFileReader.Read(Text, Place);
+
+        file.Errors.ShouldBe([
+            new SettingsFileError(SettingsFileErrorKind.WrongType, Span(Text, "5"), "columnTypes", null, null),
+        ]);
+        file.Level.ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([
+                new ColumnType("orders.created_by", "UserId", Place),
+                new ColumnType("orders.metadata", "OrderMetadata", Place, IsJson: true),
+                new ColumnType("orders.note", "Note", Place),
+            ]);
+    }
+
     // An object with no type, a type that is not a string, a json that is not true or false, another member, or a
     // member twice, is a member that is not valid, reported from its key to the object's end; the others apply.
     [Theory]
