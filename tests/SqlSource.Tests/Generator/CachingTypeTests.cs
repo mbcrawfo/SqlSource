@@ -25,6 +25,10 @@ public sealed class CachingTypeTests
     private const string Instant = "global::NodaTime.Instant";
     private const string Geometry = "global::NetTopologySuite.Geometries.Geometry";
 
+    // The project's settings that turn NetTopologySuite on, which SQL Server leaves off until they do.
+    private const string NetTopologySuiteOn = /*lang=json,strict*/
+        "{\"libraryTypes\": {\"netTopologySuite\": \"on\"}}";
+
     private readonly CachingScene _scene = new();
 
     // Npgsql, NodaTime and its plugin, which turn NodaTime on by default.
@@ -656,7 +660,7 @@ public sealed class CachingTypeTests
         );
         var driver = _scene.FirstRunWithTypes(
             compilation,
-            ProjectFile(OutputKind.CodeGen, "mssql", "{\"libraryTypes\": {\"netTopologySuite\": \"on\"}}"),
+            ProjectFile(OutputKind.CodeGen, "mssql", NetTopologySuiteOn),
             GeographySidecar(_scene.Users, "GetUser"),
             GeographySidecar(_scene.Orders, "GetOrder")
         );
