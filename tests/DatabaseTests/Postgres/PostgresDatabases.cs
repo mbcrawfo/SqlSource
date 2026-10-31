@@ -5,8 +5,9 @@ using SqlSource.DatabaseTests.TestHarness;
 
 namespace SqlSource.DatabaseTests.Postgres;
 
-// The PostgreSQL of the collection UsesPostgres: the database "fixtures" with the fixture schema, and the databases
-// "realistic", "app" and "billing" with their schemas and seeds, each made once.
+// The PostgreSQL of the collection UsesPostgres, and a second of UsesPostgis for EndToEnd/CheckTests: the database
+// "fixtures" with the fixture schema, and the databases "realistic", "app" and "billing" with their schemas and seeds,
+// each made once.
 public sealed class PostgresDatabases() : PostgresContainer(NpgsqlFactory.Instance, EngineImage.Postgres.Image)
 {
     public const string Database = "fixtures";

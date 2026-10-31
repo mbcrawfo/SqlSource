@@ -6,7 +6,8 @@
 
 - **Every sidecar of `EndToEnd/Queries/`, `EndToEnd/NodaTime/Queries/` and `EndToEnd/NetTopologySuite/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
 - **`CheckTests` runs `--check` over the real project, never a copy, through `CliRun.Real`**, which reads the test process's environment and runs the real MSBuild, as `ErrorPathTests` does.
-- **`CheckTests` names each database of `PostgresDatabases` with `--database`, and `NetTopologySuite/GisCheckTests` checks `gis` on the PostGIS container**, since a check of a database without its connection fails: a database added to either container is named by its own check.
+- **`CheckTests` is in `UsesPostgis` and gives every database of both containers its connection**, since a check of a database without its connection fails: a database added to either container gets its connection and its count line there.
+- **On a server that checks every realistic case, `CheckTests` runs once on the whole, with no `--database` and no file**, since only such a run reports a sidecar beside a file that needs none.
 
 ## Queries and tests
 
