@@ -241,6 +241,15 @@ dotnet_diagnostic.CA2100.severity = none
 # IDE0130 (namespace matches folder): a polyfill must be in the namespace of the type it stands in for.
 dotnet_diagnostic.IDE0130.severity = none
 
+[src/SqlSource/**.cs]
+# IDE0301, IDE0303, IDE0304, IDE0305 (use a collection expression): Roslyn 4.14.0 made a collection expression able to
+# target ImmutableArray<T>, and they now flag the existing Create, Empty, builder and ToImmutableArray calls of the
+# generator, whose allocation budgets are measured with those calls.  A call is converted only with a measurement.
+dotnet_diagnostic.IDE0301.severity = suggestion
+dotnet_diagnostic.IDE0303.severity = suggestion
+dotnet_diagnostic.IDE0304.severity = suggestion
+dotnet_diagnostic.IDE0305.severity = suggestion
+
 [src/SqlSource.Tool/**.cs]
 # CA2007 (ConfigureAwait): a console program has no synchronization context.
 dotnet_diagnostic.CA2007.severity = none

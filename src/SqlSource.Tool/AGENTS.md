@@ -8,7 +8,7 @@ The `sqlsource` command, packed as the .NET tool `SqlSource.Tool`.  Its tests, a
 
 ## The project
 
-- **The tool shares the generator's code and never copies it.**  It references `src/SqlSource/SqlSource.csproj` and sees its internals ([folders](../../docs/architecture/tool.md#folders)).  Code that both need goes in the generator's project, where `netstandard2.0` and Roslyn 4.8.0 bound it.
+- **The tool shares the generator's code and never copies it.**  It references `src/SqlSource/SqlSource.csproj` and sees its internals ([folders](../../docs/architecture/tool.md#folders)).  Code that both need goes in the generator's project, where `netstandard2.0` and Roslyn 4.14.0 bound it.
 - **It targets `net8.0` with `RollForward` `Major`, and references a current Roslyn by `VersionOverride`.**  Do not raise the target: a user with only the .NET 8 SDK must be able to run it.  `tools/check-tool-install.sh` runs the packed tool on the newest runtime the machine has.
 - **The tool writes English**, and `SatelliteResourceLanguages` keeps other languages out of the package.  A test compares no text that System.CommandLine wrote.
 - **`README.md` here is the package's short page on nuget.org**: what the tool is for, how to install it, the commands a user runs most, and links to the manual and the repository's `README.md`, which is not packed into this package.  Keep it that short.

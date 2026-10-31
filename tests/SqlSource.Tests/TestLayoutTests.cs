@@ -18,7 +18,7 @@ public sealed class TestLayoutTests
 
     // The first line of each file of Generator/, so that a reader of one sees that RoslynFloor compiles it too.
     private const string SharedHeader =
-        "// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  "
+        "// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  "
         + "See AGENTS.md beside it.";
 
     // tests/SqlSource.Tests.RoslynFloor compiles every file of Generator/; a helper there would be compiled twice.

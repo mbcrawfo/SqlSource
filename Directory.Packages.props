@@ -20,12 +20,13 @@
         -->
         <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" />
         <!--
-            4.8.0 is the compiler in the .NET 8 SDK and Visual Studio 2022 17.8, the oldest hosts SqlSource supports.
+            4.14.0 is the compiler in the .NET SDK 9.0.300 and Visual Studio 2022 17.14, the oldest hosts SqlSource
+            supports.
             Raising it drops those hosts: do not raise it without changing the support target in README.md.
             src/SqlSource.Tool and the tests override it to run on a current compiler.
             tests/SqlSource.Tests.RoslynFloor does not, and runs the generator tests on this version.
         -->
-        <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+        <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
         <!--
             The driver of the SQL Server describer and of tests/DatabaseTests/SqlServer.
             examples/SqlServerExamples/README.md lists this version.

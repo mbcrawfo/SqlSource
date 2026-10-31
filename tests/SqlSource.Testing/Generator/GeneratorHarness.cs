@@ -23,8 +23,8 @@ namespace SqlSource.Testing.Generator;
 
 // Runs the generator over in-memory C# and .sql files.
 //
-// tests/SqlSource.Tests.RoslynFloor references this library and runs it on Roslyn 4.8.0, the oldest compiler the
-// generator supports.  So the files of this folder use only API that Roslyn 4.8.0 has, and the C# they hand to the
+// tests/SqlSource.Tests.RoslynFloor references this library and runs it on Roslyn 4.14.0, the oldest compiler the
+// generator supports.  So the files of this folder use only API that Roslyn 4.14.0 has, and the C# they hand to the
 // compiler is C# 12 at most.
 internal static class GeneratorHarness
 {
@@ -61,8 +61,9 @@ internal static class GeneratorHarness
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    // The newest language version that Roslyn 4.8.0 parses.  Documentation comments are checked, as they are in a
-    // project that builds a documentation file, so that a malformed or missing one in generated code is reported.
+    // The C# that the generator tests hand the compiler, the language of generated code.  Documentation comments are
+    // checked, as they are in a project that builds a documentation file, so that a malformed or missing one in
+    // generated code is reported.
     public static readonly CSharpParseOptions ParseOptions = new(LanguageVersion.CSharp12, DocumentationMode.Diagnose);
 
     // The assemblies of the runtime the tests run on, which is .NET 8 or later.

@@ -8,7 +8,7 @@ namespace SqlSource.Testing.Generator;
 // What a named step of the pipeline gave in a run, for a test that reads a value no output shows.  The driver tracks
 // the steps because GeneratorHarness turns tracking on.
 //
-// Like the other files of this folder, it stays within Roslyn 4.8.0, since tests/SqlSource.Tests.RoslynFloor
+// Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
 internal static class StepOutputs
 {

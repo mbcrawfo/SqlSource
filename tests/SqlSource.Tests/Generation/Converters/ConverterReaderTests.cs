@@ -8,7 +8,7 @@ using static SqlSource.Testing.Generator.ModelRuns;
 namespace SqlSource.Tests.Generation.Converters;
 
 // The faults of a marked method that only a C# newer than the generator tests' C# 12 can declare, so these tests are
-// outside tests/SqlSource.Tests/Generator/, which RoslynFloor compiles on Roslyn 4.8.0.
+// outside tests/SqlSource.Tests/Generator/, which RoslynFloor compiles on Roslyn 4.14.0.
 public sealed class ConverterReaderTests
 {
     // A C# 14 extension block is a type of its own, which the generated code cannot call a member of by name, so each

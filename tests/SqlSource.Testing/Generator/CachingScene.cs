@@ -23,7 +23,7 @@ namespace SqlSource.Testing.Generator;
 // generator nothing.  So every run has a settings file, which SettingsFile reads, and every .sql file a level of stage
 // two from it, at FileLevel.
 //
-// Like the other files of this folder, it stays within Roslyn 4.8.0, since tests/SqlSource.Tests.RoslynFloor
+// Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
 internal sealed class CachingScene
 {

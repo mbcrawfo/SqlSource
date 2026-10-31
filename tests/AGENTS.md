@@ -4,7 +4,7 @@
 
 ## Projects and libraries
 
-- **A test project compiles no `.cs` file of another project, with one exception.**  Code that two test projects need is in one of the libraries, which they reference.  The exception is `tests/SqlSource.Tests/Generator/`, whose test classes `tests/SqlSource.Tests.RoslynFloor` compiles a second time against Roslyn 4.8.0.  `tests/SqlSource.Tests/TestLayoutTests.cs` checks this.
+- **A test project compiles no `.cs` file of another project, with one exception.**  Code that two test projects need is in one of the libraries, which they reference.  The exception is `tests/SqlSource.Tests/Generator/`, whose test classes `tests/SqlSource.Tests.RoslynFloor` compiles a second time against Roslyn 4.14.0.  `tests/SqlSource.Tests/TestLayoutTests.cs` checks this.
 - **The three libraries, `tests/SqlSource.Testing`, `tests/DatabaseTests/TestHarness` and `tests/SqlSource.Tool.Testing`, hold no tests.**  A helper that one test project alone uses stays in that project; one that a second project comes to need moves into a library.
 - **A library references only what every project that references it can take** ([why](README.md#the-projects)): `SqlSource.Testing` stays on the pinned Roslyn and references nothing of the tool, `TestHarness` brings no database driver and nothing of the tool, and `Tool.Testing` references the tool.
 - **A test reads the repository only through `RepositoryRoot.Path`**, never by building a path from the root, and `RepositoryRoot.WorkingFolder` is only for starting a process in the root, since `Path` is what refuses a read that `tools/test-scopes.txt` would let a change skip ([when it refuses](README.md#reading-the-repository)).

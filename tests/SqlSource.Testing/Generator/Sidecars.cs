@@ -10,7 +10,7 @@ namespace SqlSource.Testing.Generator;
 // Hands the generator a sidecar beside a .sql file, and computes a query's hash as the generator does, so that a test
 // writes a current entry without restating the algorithm.
 //
-// Like the other files of this folder, it stays within Roslyn 4.8.0, since tests/SqlSource.Tests.RoslynFloor
+// Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
 internal static class Sidecars
 {

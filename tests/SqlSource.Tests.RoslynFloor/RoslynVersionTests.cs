@@ -11,5 +11,5 @@ public sealed class RoslynVersionTests
     // Directory.Packages.props is raised, the support floor in README.md moves with it, and this number follows.
     [Fact]
     public void RoslynVersion_UnderTheTests_IsTheOldestSupported() =>
-        typeof(Compilation).Assembly.GetName().Version.ShouldBe(new Version(4, 8, 0, 0));
+        typeof(Compilation).Assembly.GetName().Version.ShouldBe(new Version(4, 14, 0, 0));
 }

@@ -17,7 +17,7 @@ namespace SqlSource.Testing.Generator;
 // tests/SqlSource.Tests/Generator/.  The generator runs again on every edit in the IDE, and each step reports, for each
 // of its outputs, whether it was taken from the previous run.  The steps are read by their names in TrackingNames.
 //
-// Like the other files of this folder, it stays within Roslyn 4.8.0, since tests/SqlSource.Tests.RoslynFloor
+// Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
 internal static class StepReasons
 {

@@ -14,7 +14,7 @@ namespace SqlSource.Testing.Generator;
 // The versions of Downloaded are those of the PackageDownload items of SqlSource.Testing.csproj: a mismatch builds and
 // fails only when a test runs.
 //
-// Like the other files of this folder, it stays within Roslyn 4.8.0, since tests/SqlSource.Tests.RoslynFloor
+// Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
 internal static class NpgsqlReferences
 {
