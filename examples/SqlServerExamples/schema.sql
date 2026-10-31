@@ -1,4 +1,5 @@
--- The schema of the example, with a few rows: users, their orders and the lines of each order.
+-- The schema of the example, with a few rows: users, their orders, the lines of each order and the delivery of each
+-- order that has arrived.
 -- The service "schema" of docker-compose.yml runs it in the database examples when it creates that database, and
 -- tools/describe-end-to-end.sh in a database of its own before it describes the queries.  A change to it is followed
 -- by a run of that script, which writes the sidecars again.
@@ -33,6 +34,17 @@ CREATE TABLE order_lines (
     PRIMARY KEY (order_id, line_number)
 );
 
+-- Where and when an order arrived, the carrier's details, a JSON object, and its events, a JSON array.  json is a type
+-- of SQL Server 2025, the version docker-compose.yml starts.  CodeGen/Deliveries.sql reads location as
+-- NetTopologySuite's Geometry, details as the C# class DeliveryDetails and events as a JsonElement.
+CREATE TABLE deliveries (
+    order_id int PRIMARY KEY REFERENCES orders (id),
+    delivered_at datetimeoffset NOT NULL,
+    location geography NOT NULL,
+    details json NOT NULL,
+    events json NOT NULL
+);
+
 INSERT INTO users (name, email, created_at) VALUES
 (N'Ada', N'ada@example.com', '2026-01-05T09:00:00'),
 (N'Grace', N'grace@example.com', '2026-02-11T14:30:00');
@@ -49,3 +61,13 @@ INSERT INTO order_lines (order_id, line_number, product, quantity, unit_price) V
 (2, 1, N'Desk lamp', 1, 29.99),
 (3, 1, N'Stapler', 1, 12.00),
 (3, 2, N'Staples', 3, 2.25);
+
+-- Order 1, which has shipped, arrived in London.
+INSERT INTO deliveries (order_id, delivered_at, location, details, events) VALUES
+(
+    1,
+    '2026-03-02T16:00:00+00:00',
+    geography::Point(51.5072, -0.1276, 4326),
+    N'{"Carrier": "Parcelforce", "TrackingNumber": "PF1234567"}',
+    N'[{"Status": "Delivered"}]'
+);

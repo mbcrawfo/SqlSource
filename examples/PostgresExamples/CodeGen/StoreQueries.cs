@@ -3,6 +3,9 @@ using System.Data.Common;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using NetTopologySuite.Geometries;
+using NodaTime;
+using Npgsql;
 using SqlSource;
 
 namespace PostgresExamples.CodeGen;
@@ -14,6 +17,19 @@ namespace PostgresExamples.CodeGen;
 [SqlSourceGenerate]
 public sealed partial class StoreQueries(DbConnection connection)
 {
+    // The data source of the connections given to StoreQueries.  The project references Npgsql's plugins for NodaTime
+    // and NetTopologySuite, so the methods read and send their types, which Npgsql reads only on a data source taught
+    // them by UseNodaTime() and UseNetTopologySuite().  DapperSetup's data source calls neither, since after
+    // UseNodaTime() Npgsql gives Dapper an Instant for every timestamptz, which the models' DateTimeOffset cannot take.
+    // See docs/manual/postgresql.md, "What a method reads and throws".
+    public static NpgsqlDataSource CreateDataSource(string connectionString)
+    {
+        var builder = new NpgsqlDataSourceBuilder(connectionString);
+        _ = builder.UseNodaTime();
+        _ = builder.UseNetTopologySuite();
+        return builder.Build();
+    }
+
     // many, the default for a query with rows, returns an array.  The parameter and the column OrderId are OrderIds,
     // by the query's marker and by the project's column types.
     public Task<ListOrderLinesDto[]> ListOrderLinesAsync(
@@ -57,6 +73,24 @@ public sealed partial class StoreQueries(DbConnection connection)
             await writer.WriteLineAsync(user.Name).ConfigureAwait(false);
         }
     }
+
+    // rowcount returns the count of rows inserted.  deliveredAt is NodaTime's Instant, by the file's type override, and
+    // location NetTopologySuite's Geometry, as the project references both plugins; details is sent as JSON.
+    public Task<int> RecordDeliveryAsync(
+        int orderId,
+        Instant deliveredAt,
+        Geometry location,
+        DeliveryDetails details,
+        CancellationToken cancellationToken = default
+    ) =>
+        connection.RecordDelivery(
+            new RecordDeliveryParams(OrderId: orderId, DeliveredAt: deliveredAt, Location: location, Details: details),
+            cancellationToken: cancellationToken
+        );
+
+    // one-optional returns the row, or null.  The column Details is a DeliveryDetails, read from its JSON.
+    public Task<FindDeliveryDto?> FindDeliveryAsync(int orderId, CancellationToken cancellationToken = default) =>
+        connection.FindDelivery(new FindDeliveryParams(OrderId: orderId), cancellationToken: cancellationToken);
 
     // A token is a string argument of the method, after the input model when the query has one.  Pass only text your
     // own code chooses, such as "created_at DESC".

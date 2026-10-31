@@ -17,6 +17,27 @@
           "Microsoft.Extensions.Logging.Abstractions": "10.0.0"
         }
       },
+      "Npgsql.NetTopologySuite": {
+        "type": "Direct",
+        "requested": "[10.0.3, )",
+        "resolved": "10.0.3",
+        "contentHash": "roOLWX0vokdN5cdRAwOfCWqhGFztsj2PYcvmFsPBoaSdwkboSkviaOu6hxjcX/+xAKUWUS4Al6VmwNlRQzun4g==",
+        "dependencies": {
+          "NetTopologySuite": "2.6.0",
+          "NetTopologySuite.IO.PostGIS": "2.1.0",
+          "Npgsql": "10.0.3"
+        }
+      },
+      "Npgsql.NodaTime": {
+        "type": "Direct",
+        "requested": "[10.0.3, )",
+        "resolved": "10.0.3",
+        "contentHash": "6ba1CM/zAoI7bTuBV7cFhTR3qqUsY5FqqqNoOh7dHoFHcyEEpIsMui3mC3Swyc+oyAJG0Zf8DCiXPnAf+sW09A==",
+        "dependencies": {
+          "NodaTime": "3.2.2",
+          "Npgsql": "10.0.3"
+        }
+      },
       "Roslynator.Analyzers": {
         "type": "Direct",
         "requested": "[5.0.0, )",
@@ -41,6 +62,26 @@
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.0"
         }
+      },
+      "NetTopologySuite.IO.PostGis": {
+        "type": "Transitive",
+        "resolved": "2.1.0",
+        "contentHash": "3W8XTFz8iP6GQ5jDXK1/LANHiU+988k1kmmuPWNKcJLpmSg6CvFpbTpz+s4+LBzkAp64wHGOldSlkSuzYfrIKA==",
+        "dependencies": {
+          "NetTopologySuite": "[2.0.0, 3.0.0-A)"
+        }
+      },
+      "NetTopologySuite": {
+        "type": "CentralTransitive",
+        "requested": "[2.6.0, )",
+        "resolved": "2.6.0",
+        "contentHash": "1B1OTacTd4QtFyBeuIOcThwSSLUdRZU3bSFIwM8vk36XiZlBMi3K36u74e4OqwwHRHUuJC1PhbDx4hyI266X1Q=="
+      },
+      "NodaTime": {
+        "type": "CentralTransitive",
+        "requested": "[3.3.7, )",
+        "resolved": "3.3.7",
+        "contentHash": "4Rc3zup1sZqtlcgkWZOsjoVbhm+RkDvxrFDJfIxi7nr32ZgzVW+zCTBr827+KG/4r5owpchUjqx8tO4K2ZtpOw=="
       }
     }
   }

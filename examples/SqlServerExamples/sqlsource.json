@@ -12,4 +12,12 @@
     // order_lines.order_id is an OrderId, by its short name, in every query that reads it.
     "order_lines.order_id": "OrderId",
   },
+  "libraryTypes": {
+    // SQL Server turns a library on only when asked, so the project turns on NodaTime, NetTopologySuite and
+    // System.Text.Json, whose types only the methods of CodeGen/ get.  The type override above still wins over NodaTime
+    // for every date, which stays a DateOnly.
+    "nodaTime": "on",
+    "netTopologySuite": "on",
+    "json": "on",
+  },
 }

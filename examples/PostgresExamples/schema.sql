@@ -1,4 +1,5 @@
--- The schema of the example, with a few rows: users, their orders and the lines of each order.
+-- The schema of the example, with a few rows: users, their orders, the lines of each order and the delivery of each
+-- order that has arrived.
 -- docker-compose.yml runs it on the database's first start, and tools/describe-end-to-end.sh on a database of its
 -- own before it describes the queries.  A change to it is followed by a run of that script, which writes the sidecars
 -- again.
@@ -34,6 +35,18 @@ CREATE TABLE order_lines (
     PRIMARY KEY (order_id, line_number)
 );
 
+-- PostGIS, which Postgis/Dockerfile installs, for the geography of a delivery.
+CREATE EXTENSION postgis;
+
+-- Where and when an order arrived, and the carrier's details, a JSON object.  CodeGen/Deliveries.sql reads location as
+-- NetTopologySuite's Geometry and details as the C# class DeliveryDetails.
+CREATE TABLE deliveries (
+    order_id integer PRIMARY KEY REFERENCES orders (id),
+    delivered_at timestamptz NOT NULL,
+    location geography(Point, 4326) NOT NULL,
+    details jsonb NOT NULL
+);
+
 INSERT INTO users (name, email, created_at) VALUES
 ('Ada', 'ada@example.com', '2026-01-05 09:00:00+00'),
 ('Grace', 'grace@example.com', '2026-02-11 14:30:00+00');
@@ -50,3 +63,12 @@ INSERT INTO order_lines (order_id, line_number, product, quantity, unit_price) V
 (2, 1, 'Desk lamp', 1, 29.99),
 (3, 1, 'Stapler', 1, 12.00),
 (3, 2, 'Staples', 3, 2.25);
+
+-- Order 1, which has shipped, arrived in London.
+INSERT INTO deliveries (order_id, delivered_at, location, details) VALUES
+(
+    1,
+    '2026-03-02 16:00:00+00',
+    'SRID=4326;POINT(-0.1276 51.5072)',
+    '{"Carrier": "Parcelforce", "TrackingNumber": "PF1234567"}'
+);

@@ -72,6 +72,14 @@ internal sealed record LibraryProbe(
     // The oldest NetTopologySuite that Npgsql.NetTopologySuite 8.0 takes.
     private static readonly Version NetTopologySuiteFloor = new(2, 5, 0);
 
+    /// <summary>
+    /// What a SQL Server project references to read NetTopologySuite's types, as a diagnostic names it: the reader and
+    /// writer of SQL Server's bytes, and NetTopologySuite at its floor by name, since the reader and writer 2.1.0
+    /// alone bring NetTopologySuite 2.0.0.
+    /// </summary>
+    internal static readonly string SqlServerSpatialPackages =
+        SqlServerBytesAssemblyName + ", with NetTopologySuite " + TextOf(NetTopologySuiteFloor) + " or later";
+
     // The oldest reader and writer of SQL Server's bytes that write M values and check a geography polygon for
     // emptiness before its ring orientation.
     private static readonly Version SqlServerBytesFloor = new(2, 1, 0);
@@ -109,8 +117,8 @@ internal sealed record LibraryProbe(
     /// <summary>
     /// The assemblies that a project has to reference to use <paramref name="library" /> on
     /// <paramref name="engine" />, as a diagnostic names them: the plugin on PostgreSQL, which brings its library;
-    /// NodaTime on SQL Server, and NetTopologySuite.IO.SqlServerBytes, which brings NetTopologySuite; System.Text.Json
-    /// for JSON, on both.
+    /// NodaTime on SQL Server, and <see cref="SqlServerSpatialPackages" /> for NetTopologySuite; System.Text.Json for
+    /// JSON, on both.
     /// </summary>
     public static string MissingAssembliesOf(SqlLibrary library, DatabaseEngine engine) =>
         library switch
@@ -118,7 +126,7 @@ internal sealed record LibraryProbe(
             SqlLibrary.NodaTime => engine == DatabaseEngine.PostgreSql ? "Npgsql.NodaTime" : "NodaTime",
             SqlLibrary.NetTopologySuite => engine == DatabaseEngine.PostgreSql
                 ? "Npgsql.NetTopologySuite"
-                : "NetTopologySuite.IO.SqlServerBytes",
+                : SqlServerSpatialPackages,
             SqlLibrary.Json => "System.Text.Json",
             _ => "",
         };

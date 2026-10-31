@@ -9,8 +9,8 @@
 
         The repository's Directory.Build.props and Directory.Packages.props also apply here.  The first sets the
         language version, implicit usings off, the repository's analyzers and TreatWarningsAsErrors, which your project
-        does not need, and the second gives Dapper and Npgsql their versions, which your project writes on each
-        PackageReference.
+        does not need, and the second gives Dapper, Npgsql and Npgsql's plugins their versions, which your project
+        writes on each PackageReference.
     -->
     <Import Project="../../src/SqlSource/build/SqlSource.props" />
     <PropertyGroup>
@@ -25,6 +25,12 @@
     <ItemGroup>
         <PackageReference Include="Dapper" />
         <PackageReference Include="Npgsql" />
+        <!--
+            Npgsql's plugins for NodaTime and NetTopologySuite: referencing them gives the query methods NodaTime's
+            and NetTopologySuite's types.
+        -->
+        <PackageReference Include="Npgsql.NetTopologySuite" />
+        <PackageReference Include="Npgsql.NodaTime" />
     </ItemGroup>
     <ItemGroup>
         <!-- Only in this repository: the generator, as the package adds it. -->

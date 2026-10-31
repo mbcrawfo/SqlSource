@@ -44,20 +44,21 @@
             tests/DatabaseTests/SqlServer references, pinned here so that every project that brings it has this
             version.  tests/DatabaseTests/Postgres.Npgsql8 and tests/DatabaseTests/SqlServer.SqlClient61 override it
             to 2.5.0, the floor of Npgsql.NetTopologySuite 8 and of SqlSource, which central transitive pinning would
-            otherwise hold here.
+            otherwise hold here.  examples/SqlServerExamples/README.md lists this version.
         -->
         <PackageVersion Include="NetTopologySuite" Version="2.6.0" />
         <!--
             NetTopologySuite's reader and writer of SQL Server's bytes, for the projects that read and send SQL
             Server's geography and geometry through generated code.  2.1.0 is also SqlSource's floor of it.
+            examples/SqlServerExamples/README.md lists this version.
         -->
         <PackageVersion Include="NetTopologySuite.IO.SqlServerBytes" Version="2.1.0" />
         <!--
             The library of NodaTime's types, which tests/DatabaseTests/Postgres gets from Npgsql.NodaTime and
-            tests/DatabaseTests/SqlServer and tests/DatabaseTests/QueryMethodAllocation reference.
-            tests/DatabaseTests/Postgres.Npgsql8 overrides it to 3.1.9, the floor that Npgsql.NodaTime 8 needs, and
-            tests/DatabaseTests/SqlServer.SqlClient61 to 3.1.9, SqlSource's floor: central transitive pinning would
-            otherwise hold it here.
+            tests/DatabaseTests/SqlServer, tests/DatabaseTests/QueryMethodAllocation and examples/SqlServerExamples
+            reference.  tests/DatabaseTests/Postgres.Npgsql8 overrides it to 3.1.9, the floor that Npgsql.NodaTime 8
+            needs, and tests/DatabaseTests/SqlServer.SqlClient61 to 3.1.9, SqlSource's floor: central transitive pinning
+            would otherwise hold it here.  examples/SqlServerExamples/README.md lists this version.
         -->
         <PackageVersion Include="NodaTime" Version="3.3.7" />
         <!--
@@ -71,12 +72,14 @@
         <!--
             The plugin of Npgsql for NodaTime, the version that pairs with the Npgsql above, through which
             tests/DatabaseTests/Postgres runs the queries of EndToEnd/NodaTime/.  tests/DatabaseTests/Postgres.Npgsql8
-            overrides it to the 8.0 release that pairs with its driver.
+            overrides it to the 8.0 release that pairs with its driver.  examples/PostgresExamples/README.md lists this
+            version.
         -->
         <PackageVersion Include="Npgsql.NodaTime" Version="10.0.3" />
         <!--
             The plugin of Npgsql for NetTopologySuite, the version that pairs with the Npgsql above, through which the
-            tool's PostgreSQL describer binds a PostGIS parameter for its check.
+            tool's PostgreSQL describer binds a PostGIS parameter for its check.  examples/PostgresExamples/README.md
+            lists this version.
         -->
         <PackageVersion Include="Npgsql.NetTopologySuite" Version="10.0.3" />
         <PackageVersion Include="NSubstitute" Version="6.2.0" />

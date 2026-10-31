@@ -46,9 +46,9 @@ A new page gets its rows here and its line in the reading guide of `README.md`, 
 A part of query generation that is not built yet has a placeholder under `## Not built yet` of the page it will extend.  It is exactly this: a heading, one sentence on what will go there, and the phase with a link to the epic.  Nothing else.
 
 ```markdown
-### Library maps
+### Build integration
 
-> **Not built yet.**  How the generator maps a described type to a type of a library such as NodaTime.  Delivered by phase 7 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
+> **Not built yet.**  How a target of the build runs the tool before the compile in the online mode.  Delivered by phase 9 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
 ```
 
 - **A placeholder is never filled with design from a spec.**  It holds no design and no types until the code exists.

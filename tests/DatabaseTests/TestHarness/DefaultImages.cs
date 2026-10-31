@@ -7,8 +7,8 @@ internal static class DefaultImages
     // tools/pull-test-images.sh, tools/record-fixtures.sh, when run for postgres or with no argument, and
     // tools/describe-end-to-end.sh read this line by its shape, with sed, and the AppContainer of
     // tests/DatabaseTests/Postgres.Npgsql8 runs on it through EngineImage.Postgres.Default.
-    // examples/PostgresExamples/docker-compose.yml repeats the tag, which rule 5 of AGENTS.md keeps in step.  It names
-    // a major and a minor, as every image of the tests does: the recorded fixtures carry the version they were
+    // examples/PostgresExamples/Postgis/Dockerfile repeats the tag, which PostgisContainerTests keeps in step.  It
+    // names a major and a minor, as every image of the tests does: the recorded fixtures carry the version they were
     // recorded against, and a moving tag would run another.  See tests/DatabaseTests/Postgres/README.md.
     public const string Postgres = "postgres:18.6";
 
