@@ -71,12 +71,14 @@
         <!--
             The plugin of Npgsql for NodaTime, the version that pairs with the Npgsql above, through which
             tests/DatabaseTests/Postgres runs the queries of EndToEnd/NodaTime/.  tests/DatabaseTests/Postgres.Npgsql8
-            overrides it to the 8.0 release that pairs with its driver.
+            overrides it to the 8.0 release that pairs with its driver.  examples/PostgresExamples/README.md lists this
+            version.
         -->
         <PackageVersion Include="Npgsql.NodaTime" Version="10.0.3" />
         <!--
             The plugin of Npgsql for NetTopologySuite, the version that pairs with the Npgsql above, through which the
-            tool's PostgreSQL describer binds a PostGIS parameter for its check.
+            tool's PostgreSQL describer binds a PostGIS parameter for its check.  examples/PostgresExamples/README.md
+            lists this version.
         -->
         <PackageVersion Include="Npgsql.NetTopologySuite" Version="10.0.3" />
         <PackageVersion Include="NSubstitute" Version="6.2.0" />

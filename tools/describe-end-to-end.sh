@@ -12,7 +12,8 @@
 #   PostgisContainer builds from tests/DatabaseTests/TestHarness/Postgis/Dockerfile on the same postgres image.  That
 #   image is kept, as the tests keep it.
 #   It then writes the sidecars of examples/PostgresExamples the same way, against a database "examples" made from its
-#   schema.sql, and runs after a change to a query or to the schema of the examples too.
+#   schema.sql on the PostGIS container, since the schema creates the extension postgis, and runs after a change to a
+#   query or to the schema of the examples too.
 # - SQL Server: the .sql.json files of the realistic cases under tests/DatabaseTests/SqlServer/Realistic/Cases and of
 #   the end-to-end queries under tests/DatabaseTests/SqlServer/EndToEnd/Queries, EndToEnd/NodaTime/Queries,
 #   EndToEnd/NetTopologySuite/Queries and EndToEnd/Json/Queries, against the databases "realistic", "app" and
@@ -178,26 +179,28 @@ describe_postgres() {
     dotnet run --project src/SqlSource.Tool -- \
         describe --force "$POSTGRES_PROJECT/Postgres.csproj" "${connections[@]}"
 
-    docker rm -f "$postgis_container" >/dev/null
-    postgis_container=''
+    docker rm -f "$postgres_container" >/dev/null
+    postgres_container=''
 
-    # The examples: their schema on a database of their own, and their project described with that connection, under
-    # the logical database that its queries belong to, named after their dialect.
+    # The examples: their schema on a database of their own, on the PostGIS container, since the schema creates the
+    # extension postgis, and their project described with that connection, under the logical database that its queries
+    # belong to, named after their dialect.
     printf 'Creating the database %s ... ' "$EXAMPLES_DATABASE"
-    docker exec "$postgres_container" psql -v ON_ERROR_STOP=1 -q -U postgres -c "CREATE DATABASE $EXAMPLES_DATABASE" \
+    docker exec "$postgis_container" psql -v ON_ERROR_STOP=1 -q -U postgres -c "CREATE DATABASE $EXAMPLES_DATABASE" \
         >/dev/null
-    docker exec -i "$postgres_container" psql -v ON_ERROR_STOP=1 -q -U postgres -d "$EXAMPLES_DATABASE" \
+    docker exec -i "$postgis_container" psql -v ON_ERROR_STOP=1 -q -U postgres -d "$EXAMPLES_DATABASE" \
         <"$POSTGRES_EXAMPLES/schema.sql" >/dev/null
     echo 'done'
 
     find "$POSTGRES_EXAMPLES" -name '*.sql.json' -type f -delete
 
-    connection="Host=127.0.0.1;Port=$port;Username=postgres;Password=$POSTGRES_PASSWORD;Database=$EXAMPLES_DATABASE"
+    connection="Host=127.0.0.1;Port=$postgis_port;Username=postgres;Password=$POSTGRES_PASSWORD"
     dotnet run --project src/SqlSource.Tool -- \
-        describe --force "$POSTGRES_EXAMPLES/PostgresExamples.csproj" --connection "postgres=$connection"
+        describe --force "$POSTGRES_EXAMPLES/PostgresExamples.csproj" \
+        --connection "postgres=$connection;Database=$EXAMPLES_DATABASE"
 
-    docker rm -f "$postgres_container" >/dev/null
-    postgres_container=''
+    docker rm -f "$postgis_container" >/dev/null
+    postgis_container=''
 }
 
 describe_sqlserver() {
