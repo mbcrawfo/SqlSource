@@ -339,6 +339,8 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("nodatime")]
     [InlineData("nodatime=maybe")]
     [InlineData("json=maybe")]
+    [InlineData("netTopologySuites=on")]
+    [InlineData("jsons=on")]
     [InlineData("=on")]
     [InlineData("")]
     public void LibraryTypes_Invalid_IsSQLSRC111(string value)
