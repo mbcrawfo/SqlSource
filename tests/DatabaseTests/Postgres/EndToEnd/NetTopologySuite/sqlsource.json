@@ -1,0 +1,9 @@
+{
+  // The database of PostGIS, which the project's other databases lack: its container is the PostGIS image's.
+  "database": "gis",
+  "libraryTypes": {
+    // NetTopologySuite takes the engine's default, which the project's reference to Npgsql.NetTopologySuite turns on,
+    // over the off of the project's settings file.
+    "netTopologySuite": "default",
+  },
+}

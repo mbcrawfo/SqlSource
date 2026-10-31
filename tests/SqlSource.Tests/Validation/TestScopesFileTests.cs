@@ -46,6 +46,7 @@ public sealed class TestScopesFileTests
     [InlineData("tests/DatabaseTests/Directory.Build.props", nameof(TestScope.Both))]
     [InlineData("tests/DatabaseTests/README.md", nameof(TestScope.None))]
     [InlineData("tests/DatabaseTests/TestHarness/EngineImage.cs", nameof(TestScope.Both))]
+    [InlineData("tests/DatabaseTests/TestHarness/Postgis/Dockerfile", nameof(TestScope.Postgres))]
     public void Of_RealPath_IsDecidedAsIntended(string path, string scope) =>
         TestScopes.Repository.Of(path).ToString().ShouldBe(scope);
 

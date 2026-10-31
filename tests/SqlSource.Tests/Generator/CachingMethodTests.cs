@@ -638,6 +638,7 @@ public sealed class CachingMethodTests
         result.Diagnostics.ShouldBeEmpty();
         AllReasons(result, TrackingNames.LibraryProbe).ShouldBe([IncrementalStepRunReason.Modified]);
         AllReasons(result, TrackingNames.LibrariesBelowTheFloor).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.MethodDrivers).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.MethodsInput).ShouldAllBeCached();
         AllReasons(result, TrackingNames.TypeMethods).ShouldAllBeCached();
         AllReasons(result, TrackingNames.UsedLibraries).ShouldBe([IncrementalStepRunReason.Cached]);

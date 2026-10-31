@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -25,9 +24,9 @@ namespace SqlSource.Generation.Types.Drivers;
 /// </param>
 /// <param name="Version">
 /// The version of the newest referenced assembly named <c>Microsoft.Data.SqlClient</c>: its informational version up to
-/// a <c>+</c>, which is the version of its package, or, without one, the major of its identity alone, since the
-/// identity of a package's assembly keeps its major and no more.  Null when there is none.  For the diagnostics alone:
-/// the flags choose the column.
+/// a <c>+</c> or a space, which is the version of its package, or, without one, the major of its identity alone, since
+/// the identity of a package's assembly keeps its major and no more.  Null when there is none.  For the diagnostics
+/// alone: the flags choose the column.
 /// </param>
 internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLeast7, string? Version) : IDriverProbe
 {
@@ -95,61 +94,11 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
         );
     }
 
-    // The assembly that defines the connection type is the driver's, unless it is another name: a driver merged into
-    // an assembly of its own has no version of its own.  A name is checked before anything of an assembly is read.
-    private static string? ReadVersion(ImmutableArray<INamedTypeSymbol> connections)
-    {
-        IAssemblySymbol? newest = null;
-        for (var i = 0; i < connections.Length; i++)
-        {
-            var assembly = connections[i].ContainingAssembly;
-            if (
-                assembly is not null
-                && string.Equals(assembly.Identity.Name, AssemblyName, StringComparison.OrdinalIgnoreCase)
-                && (newest is null || assembly.Identity.Version > newest.Identity.Version)
-            )
-            {
-                newest = assembly;
-            }
-        }
-
-        return newest is null ? null : PackageVersionOf(newest);
-    }
-
-    // The informational version of a package's assembly is its package version followed by +, and the commit.  An
-    // attribute that is missing, has no argument or has one that is not text gives the identity's major.
-    private static string PackageVersionOf(IAssemblySymbol assembly)
-    {
-        foreach (var attribute in assembly.GetAttributes())
-        {
-            if (
-                IsInformationalVersion(attribute.AttributeClass)
-                && attribute.ConstructorArguments.Length > 0
-                && attribute.ConstructorArguments[0] is { Kind: TypedConstantKind.Primitive, Value: string text }
-            )
-            {
-                var end = text.IndexOf('+');
-                var version = (end < 0 ? text : text.Substring(0, end)).Trim();
-                if (version.Length > 0)
-                {
-                    return version;
-                }
-            }
-        }
-
-        return assembly.Identity.Version.Major.ToString(CultureInfo.InvariantCulture);
-    }
-
-    // System.Reflection.AssemblyInformationalVersionAttribute, compared by its names so that no string is made for the
-    // attribute of every assembly on every edit.
-    private static bool IsInformationalVersion(INamedTypeSymbol? type) =>
-        type
-            is {
-                MetadataName: "AssemblyInformationalVersionAttribute",
-                ContainingNamespace:
-                {
-                    Name: "Reflection",
-                    ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true }
-                },
-            };
+    // The newest assembly named Microsoft.Data.SqlClient that defines the connection type, whose informational
+    // version gives the package's, or without one the identity's major.
+    private static string? ReadVersion(ImmutableArray<INamedTypeSymbol> connections) =>
+        DriverProbes.NewestNamed(connections, AssemblyName) is { } newest
+            ? DriverProbes.PackageVersionOf(newest)
+                ?? newest.Identity.Version.Major.ToString(CultureInfo.InvariantCulture)
+            : null;
 }

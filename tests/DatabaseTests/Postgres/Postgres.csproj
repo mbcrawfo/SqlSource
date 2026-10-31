@@ -26,6 +26,11 @@
         <PackageReference Include="Npgsql" />
         <!-- The plugin of the queries of EndToEnd/NodaTime/: the root sqlsource.json turns NodaTime off elsewhere. -->
         <PackageReference Include="Npgsql.NodaTime" />
+        <!--
+            The plugin of the queries of EndToEnd/NetTopologySuite/, which the tool also brings: the root sqlsource.json
+            turns NetTopologySuite off elsewhere.
+        -->
+        <PackageReference Include="Npgsql.NetTopologySuite" />
         <PackageReference Include="Shouldly" />
         <PackageReference Include="xunit.v3" />
     </ItemGroup>

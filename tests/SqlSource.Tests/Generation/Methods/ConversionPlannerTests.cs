@@ -32,6 +32,8 @@ public sealed class ConversionPlannerTests
     private const string Serialize = "global::System.Text.Json.JsonSerializer.Serialize<";
     private const string Place = "the typeOverrides of the settings file /app/sqlsource.json";
     private const string LibraryPlace = "the NodaTime library";
+    private const string Geometry = "global::NetTopologySuite.Geometries.Geometry";
+    private const string GeometryPoint = "global::NetTopologySuite.Geometries.Point";
 
     private static readonly LocationInfo At = new(
         "/app/Repo/Users.sql",
@@ -802,12 +804,183 @@ public sealed class ConversionPlannerTests
         );
     }
 
+    // SQL Server's geography, read as Geometry by NetTopologySuite's row, takes the spatial read path: the shared
+    // reader of the generated class for a column, its writer for a parameter.
+    [Theory]
+    [InlineData(true, "GeographyReader")]
+    [InlineData(false, "GeographyWriter")]
+    public void Plan_GeographyAsGeometry_IsTheSpatialPath(bool isRead, string instance)
+    {
+        var (conversion, problems, blocked) = PlanSpatial(OfNetTopologySuite(Geometry, "geography"), isRead);
+
+        conversion.ShouldBe(Spatial(instance));
+        problems.ShouldBeEmpty();
+        blocked.ShouldBeFalse();
+    }
+
+    // A subtype that an override chose takes the path too, whatever chose it, and its key picks the instance.
+    [Fact]
+    public void Plan_GeometryAsPointByOverride_IsTheSpatialPath()
+    {
+        var type = Overridden(GeometryPoint, false, "geometry", null, false);
+
+        var (conversion, problems, blocked) = PlanSpatial(type, isRead: true);
+
+        conversion.ShouldBe(Spatial("GeometryReader"));
+        problems.ShouldBeEmpty();
+        blocked.ShouldBeFalse();
+    }
+
+    // Without NetTopologySuite.IO.SqlServerBytes the path is not taken: the type goes to the driver, as before.
+    [Fact]
+    public void Plan_SpatialWithoutSqlServerBytes_IsTheDriver()
+    {
+        foreach (var isRead in new[] { true, false })
+        {
+            var (conversion, problems, blocked) = PlanSpatial(
+                OfNetTopologySuite(Geometry, "geography"),
+                isRead,
+                sqlServerSpatial: false
+            );
+
+            conversion.ShouldBeNull();
+            problems.ShouldBeEmpty();
+            blocked.ShouldBeFalse();
+        }
+    }
+
+    // An override to Microsoft.SqlServer.Types's type is no geometry of NetTopologySuite's, and is read and bound as
+    // the driver does, as before.
+    [Fact]
+    public void Plan_OverrideToSqlGeography_IsUnchanged()
+    {
+        var type = Overridden("global::Microsoft.SqlServer.Types.SqlGeography", false, "geography", null, false);
+
+        foreach (var isRead in new[] { true, false })
+        {
+            var (conversion, problems, blocked) = PlanSpatial(type, isRead);
+
+            conversion.ShouldBeNull();
+            problems.ShouldBeEmpty();
+            blocked.ShouldBeFalse();
+        }
+    }
+
+    // A project's converters of Geometry neither replace the path nor make an error of it, though an override chose
+    // the type, which would otherwise be SQLSRC279 for a foreign type whose database type has no base type.
+    [Fact]
+    public void Plan_ProjectConverterOfGeometry_DoesNotReplaceTheSpatialPath()
+    {
+        var type = Overridden(Geometry, false, "geography", null, false);
+        var converters = Of(
+            Project("global::MyApp.Shapes.FromBytes", "byte[]", false, Geometry, false),
+            Project("global::MyApp.Shapes.ToBytes", Geometry, false, "byte[]", false)
+        );
+
+        var (read, readProblems, readBlocked) = PlanSpatial(type, isRead: true, converters);
+        var (write, writeProblems, writeBlocked) = PlanSpatial(type, isRead: false, converters);
+
+        read.ShouldBe(Spatial("GeographyReader"));
+        write.ShouldBe(Spatial("GeographyWriter"));
+        readProblems.ShouldBeEmpty();
+        writeProblems.ShouldBeEmpty();
+        readBlocked.ShouldBeFalse();
+        writeBlocked.ShouldBeFalse();
+    }
+
+    // The path is only for geography and geometry: a varbinary that an override reads as Geometry is converted by the
+    // project's converters, as any other type of the project's choice is.
+    [Fact]
+    public void Plan_GeometryOverVarbinary_IsTheProjectsConverter()
+    {
+        var type = Overridden(Geometry, false, "varbinary", "byte[]", false);
+        var converters = Of(
+            Project("global::MyApp.Shapes.FromBytes", "byte[]", false, Geometry, false),
+            Project("global::MyApp.Shapes.ToBytes", Geometry, false, "byte[]", false)
+        );
+
+        var (read, readProblems, readBlocked) = PlanSpatial(type, isRead: true, converters);
+        var (write, writeProblems, writeBlocked) = PlanSpatial(type, isRead: false, converters);
+
+        read.ShouldBe(new Conversion("global::MyApp.Shapes.FromBytes", "byte[]", false, false, null, false));
+        write.ShouldBe(new Conversion("global::MyApp.Shapes.ToBytes", "byte[]", false, false, null, false));
+        read!.IsSpatial.ShouldBeFalse();
+        write!.IsSpatial.ShouldBeFalse();
+        readProblems.ShouldBeEmpty();
+        writeProblems.ShouldBeEmpty();
+        readBlocked.ShouldBeFalse();
+        writeBlocked.ShouldBeFalse();
+    }
+
+    // PostGIS's geometry is read by the plugin, on PostgreSQL, whatever the project references.
+    [Fact]
+    public void Plan_PostgresGeometry_IsTheDriver()
+    {
+        var problems = new List<DiagnosticInfo>();
+        var context = new ConversionContext(
+            DatabaseEngine.PostgreSql,
+            ConverterTargetsExtensions.Of(DatabaseEngine.PostgreSql, true),
+            Of<Converter>(),
+            At,
+            problems,
+            SqlServerSpatial: true
+        );
+
+        var conversion = ConversionPlanner.Plan(
+            OfNetTopologySuite(Geometry, "geometry"),
+            true,
+            "column 'shape'",
+            context,
+            out var blocked
+        );
+
+        conversion.ShouldBeNull();
+        problems.ShouldBeEmpty();
+        blocked.ShouldBeFalse();
+    }
+
+    // Planned under mssql, with the converters, none by default, and NetTopologySuite.IO.SqlServerBytes referenced
+    // unless it says otherwise.
+    private static (Conversion? Conversion, List<string> Problems, bool Blocked) PlanSpatial(
+        PropertyType type,
+        bool isRead,
+        EquatableArray<Converter> converters = default,
+        bool sqlServerSpatial = true
+    ) => Plan(type, isRead, converters, "column 'place'", DatabaseEngine.SqlServer, sqlServerSpatial);
+
+    // The spatial path through the instance of the generated class.
+    private static Conversion Spatial(string instance) =>
+        new(
+            "global::SqlSource.NetTopologySuiteConversions." + instance,
+            "global::System.Data.SqlTypes.SqlBytes",
+            false,
+            false,
+            null,
+            false,
+            Library: SqlLibrary.NetTopologySuite,
+            IsSpatial: true
+        );
+
+    // A type that NetTopologySuite's row gave, whose database type the base map gives no C# type.
+    private static PropertyType OfNetTopologySuite(string text, string key) =>
+        new(
+            text,
+            false,
+            true,
+            EquatableArray<string>.Empty,
+            key,
+            "the NetTopologySuite library",
+            new DatabaseType(null, false, false),
+            Library: SqlLibrary.NetTopologySuite
+        );
+
     private static (Conversion? Conversion, List<string> Problems, bool Blocked) Plan(
         PropertyType type,
         bool isRead,
         EquatableArray<Converter> converters,
         string subject = "column 'email'",
-        DatabaseEngine engine = DatabaseEngine.PostgreSql
+        DatabaseEngine engine = DatabaseEngine.PostgreSql,
+        bool sqlServerSpatial = false
     )
     {
         var problems = new List<DiagnosticInfo>();
@@ -815,7 +988,14 @@ public sealed class ConversionPlannerTests
             type,
             isRead,
             subject,
-            new ConversionContext(engine, ConverterTargetsExtensions.Of(engine, true), converters, At, problems),
+            new ConversionContext(
+                engine,
+                ConverterTargetsExtensions.Of(engine, true),
+                converters,
+                At,
+                problems,
+                sqlServerSpatial
+            ),
             out var blocked
         );
         problems.ShouldAllBe(problem => problem.Location == At);

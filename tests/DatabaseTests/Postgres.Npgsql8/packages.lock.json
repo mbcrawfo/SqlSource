@@ -25,6 +25,12 @@
           "Microsoft.Testing.Platform": "2.4.0"
         }
       },
+      "NetTopologySuite": {
+        "type": "Direct",
+        "requested": "[2.5.0, )",
+        "resolved": "2.5.0",
+        "contentHash": "5/+2O2ADomEdUn09mlSigACdqvAf0m/pVPGtIPEPQWnyrVykYY0NlfXLIdkMgi41kvH9kNrPqYaFBTZtHYH7Xw=="
+      },
       "NodaTime": {
         "type": "Direct",
         "requested": "[3.1.9, )",
@@ -38,6 +44,17 @@
         "contentHash": "H7O9NrvSO+BaojUOK59YmSOi7+RabnBoNPw1F7NgtZhw5uBeAA3bCjTH2VjgacUVHe8K1asPyj/a/mnhJ/e1yA==",
         "dependencies": {
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
+        }
+      },
+      "Npgsql.NetTopologySuite": {
+        "type": "Direct",
+        "requested": "[8.0.9, )",
+        "resolved": "8.0.9",
+        "contentHash": "2tQ1xpNq7bmrq9NXhOW9HACEGpbWt246qP7LOuMXnTsgwbXGOuUzMUUvDCoDczAL7CDZvgsbTnC/AQGFZNoqOQ==",
+        "dependencies": {
+          "NetTopologySuite": "2.5.0",
+          "NetTopologySuite.IO.PostGIS": "2.1.0",
+          "Npgsql": "8.0.9"
         }
       },
       "Npgsql.NodaTime": {
@@ -236,6 +253,14 @@
         "type": "Transitive",
         "resolved": "5.0.0",
         "contentHash": "dDoKi0PnDz31yAyETfRntsLArTlVAVzUzCIvvEDsDsucrl33Dl8pIJG06ePTJTI3tGpeyHS9Cq7Foc/s4EeKcg=="
+      },
+      "NetTopologySuite.IO.PostGis": {
+        "type": "Transitive",
+        "resolved": "2.1.0",
+        "contentHash": "3W8XTFz8iP6GQ5jDXK1/LANHiU+988k1kmmuPWNKcJLpmSg6CvFpbTpz+s4+LBzkAp64wHGOldSlkSuzYfrIKA==",
+        "dependencies": {
+          "NetTopologySuite": "[2.0.0, 3.0.0-A)"
+        }
       },
       "SharpZipLib": {
         "type": "Transitive",

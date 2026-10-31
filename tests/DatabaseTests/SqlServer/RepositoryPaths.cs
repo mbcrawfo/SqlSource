@@ -24,6 +24,10 @@ internal static class RepositoryPaths
     // The folder of the end-to-end queries whose folder turns NodaTime on, and their sidecars.
     public static string EndToEndNodaTimeQueries { get; } = Path.Combine(EndToEnd, "NodaTime", "Queries");
 
+    // The folder of the end-to-end queries whose folder turns NetTopologySuite on, and their sidecars.
+    public static string EndToEndNetTopologySuiteQueries { get; } =
+        Path.Combine(EndToEnd, "NetTopologySuite", "Queries");
+
     // The folder of the end-to-end queries whose folder turns System.Text.Json on, and their sidecars.
     public static string EndToEndJsonQueries { get; } = Path.Combine(EndToEnd, "Json", "Queries");
 

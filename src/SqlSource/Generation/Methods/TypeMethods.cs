@@ -40,10 +40,10 @@ namespace SqlSource.Generation.Methods;
 /// <see cref="Settings.Libraries.SqlLibrary" />, each once: the classes of conversions that the project gets.
 /// </param>
 /// <param name="UsedLibraries">
-/// The libraries that a query of the type whose output is <c>CodeGen</c> uses, in the order of
-/// <see cref="Settings.Libraries.SqlLibrary" />, each once: of a property that a library's row typed, or of a
-/// conversion that is a library's generated one.  The project gets <c>SQLSRC282</c> for each of them that is older
-/// than its floor.
+/// The libraries that a query of the type whose output is <c>CodeGen</c> uses, each with the query's engine, in the
+/// order of <see cref="LibraryUse.Order" />, each once: of a property that a library's row typed, or of a conversion
+/// that is a library's generated one.  The project gets <c>SQLSRC282</c> for each package of them that is older than
+/// its floor.
 /// </param>
 internal sealed record TypeMethods(
     string TypeKey,
@@ -61,7 +61,7 @@ internal sealed record TypeMethods(
     CodeGenEngines CodeGenEngines,
     EquatableArray<string> WarningIds,
     EquatableArray<LibraryValue> ConversionLibraries,
-    EquatableArray<LibraryValue> UsedLibraries
+    EquatableArray<LibraryUse> UsedLibraries
 )
 {
     /// <summary>

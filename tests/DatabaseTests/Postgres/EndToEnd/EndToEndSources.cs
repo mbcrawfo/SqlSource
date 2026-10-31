@@ -36,6 +36,15 @@ internal static class EndToEndSources
         return builder.Build();
     }
 
+    // "gis" of the PostGIS container, with Npgsql.NetTopologySuite's plugin, which reads and writes the geometries of
+    // the queries of NetTopologySuite/, whose folder leaves the library on.
+    public static NpgsqlDataSource GisWithNetTopologySuite(PostgisDatabases postgis)
+    {
+        var builder = new NpgsqlDataSourceBuilder(postgis.ConnectionStringOf(PostgisDatabases.GisDatabase));
+        _ = builder.UseNetTopologySuite();
+        return builder.Build();
+    }
+
     public static NpgsqlDataSource Billing(PostgresDatabases postgres) =>
         NpgsqlDataSource.Create(postgres.ConnectionStringOf(PostgresDatabases.BillingDatabase));
 

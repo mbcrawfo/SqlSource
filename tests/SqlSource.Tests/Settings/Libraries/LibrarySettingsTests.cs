@@ -54,6 +54,10 @@ public sealed class LibrarySettingsTests
     [InlineData("nodaTime = OFF", true, "NodaTime", "Off")]
     [InlineData("noda time=default", true, "NodaTime", "Default")]
     [InlineData("  noda-time\t=\tDefault  ", true, "NodaTime", "Default")]
+    [InlineData("netTopologySuite=on", true, "NetTopologySuite", "On")]
+    [InlineData("net topology-suite = off", true, "NetTopologySuite", "Off")]
+    // netTopologySuites is no name: a choice is matched whole.
+    [InlineData("netTopologySuites=on", false, null, null)]
     // node-time is no name: it is node, not noda.
     [InlineData("node-time = OFF", false, null, null)]
     [InlineData("nodatime=", false, null, null)]

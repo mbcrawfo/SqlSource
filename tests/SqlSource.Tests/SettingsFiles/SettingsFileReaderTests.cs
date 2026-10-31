@@ -621,6 +621,34 @@ public sealed class SettingsFileReaderTests
         member.LineSpan.ShouldBe(SourceText.From(Text).Lines.GetLinePositionSpan(member.Span));
     }
 
+    // A name is matched whole, as a choice is: netTopologySuite is a library, and netTopologySuites none.
+    [Fact]
+    public void Read_LibraryTypes_NetTopologySuiteIsReadAndAPluralIsNotValid()
+    {
+        const string Valid = /*lang=json,strict*/
+            """{"libraryTypes": {"netTopologySuite": "on"}}""";
+        const string Invalid = /*lang=json,strict*/
+            """{"libraryTypes": {"netTopologySuites": "on"}}""";
+
+        var valid = SettingsFileReader.Read(Valid, Place);
+        var invalid = SettingsFileReader.Read(Invalid, Place);
+
+        valid.Errors.ShouldBeEmpty();
+        valid
+            .Level.LibraryTypes.ShouldNotBeNull()
+            .ShouldBe([new LibrarySetting(SqlLibrary.NetTopologySuite, LibraryState.On, Place)]);
+        invalid.Level.ShouldBeSameAs(SettingsLevel.None);
+        invalid.Errors.ShouldBe([
+            new SettingsFileError(
+                SettingsFileErrorKind.InvalidValue,
+                Span(Invalid, "\"netTopologySuites\": \"on\""),
+                "libraryTypes",
+                "netTopologySuites",
+                "on"
+            ),
+        ]);
+    }
+
     // The member moves and the level stays equal, so that a step that reads the level alone is not run again.
     [Fact]
     public void Read_LibraryTypes_MovedMember_LeavesTheLevelEqual()

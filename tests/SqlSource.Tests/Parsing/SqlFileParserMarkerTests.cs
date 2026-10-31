@@ -307,22 +307,32 @@ public sealed class SqlFileParserMarkerTests
         entry.Place.ShouldBe(SettingPlace.Query);
     }
 
-    // The same entry twice on a line is no conflict.
+    // The same library twice with one state is no conflict, so it is one entry.
     [Fact]
-    public void LibraryTypes_SeveralEntriesOnOneLine()
+    public void LibraryTypes_SameEntryTwiceOnOneLine()
     {
-        var libraries = Blocks("-- name: Q\n-- library-types: json=on nodatime=off\nSELECT 1\n")
-            .ShouldHaveSingleItem()
-            .Markers.LibraryTypes.ShouldNotBeNull();
-        libraries.Count.ShouldBe(2);
-        libraries[0].Library.ShouldBe(SqlLibrary.NodaTime);
-        libraries[1].Library.ShouldBe(SqlLibrary.Json);
-
         var block = Blocks("-- name: Q\n-- library-types: nodatime=on   nodatime=on\nSELECT 1\n")
             .ShouldHaveSingleItem();
 
         block.Markers.LibraryTypes.ShouldNotBeNull().Count.ShouldBe(1);
         LibraryEntry(block).State.ShouldBe(LibraryState.On);
+    }
+
+    // Two libraries share a line, each with its own state, in the order of the libraries.
+    [Fact]
+    public void LibraryTypes_SeveralEntriesOnOneLine()
+    {
+        var block = Blocks("-- name: Q\n-- library-types: json=on netTopologySuite=on nodatime=off\nSELECT 1\n")
+            .ShouldHaveSingleItem();
+
+        block
+            .Markers.LibraryTypes.ShouldNotBeNull()
+            .Select(static entry => (entry.Library, entry.State))
+            .ShouldBe([
+                (SqlLibrary.NodaTime, LibraryState.Off),
+                (SqlLibrary.NetTopologySuite, LibraryState.On),
+                (SqlLibrary.Json, LibraryState.On),
+            ]);
     }
 
     [Theory]
@@ -341,6 +351,7 @@ public sealed class SqlFileParserMarkerTests
         error.Arguments[0].ShouldBe(value.Length == 0 ? "library-types:" : "library-types: " + value);
         error.Arguments[1].ShouldContain("nodatime");
         error.Arguments[1].ShouldContain("json");
+        error.Arguments[1].ShouldContain("nettopologysuite");
         error.Arguments[1].ShouldContain("default");
         error.Span.ShouldBe(value.Length == 0 ? TextSpans.Of(text, "-- library-types:") : TextSpans.Of(text, value));
     }

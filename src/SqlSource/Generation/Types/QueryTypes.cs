@@ -1,3 +1,4 @@
+using SqlSource.Diagnostics;
 using SqlSource.Settings.Libraries;
 
 namespace SqlSource.Generation.Types;
@@ -11,9 +12,16 @@ namespace SqlSource.Generation.Types;
 /// for the query's engine, in the order of <see cref="SqlLibrary" />: the query uses none of its rows.  Empty when
 /// every library that is on can be used.
 /// </param>
+/// <param name="WithoutLibraryFailure">
+/// The query's first failure without its libraries, or null when it has none: set when a library's row typed a
+/// parameter or column that has no C# type without the library, which then has <c>Library</c> set and
+/// <c>WithoutLibrary</c> null.  A claim whose output is not <c>CodeGen</c> gets no models of the query and this
+/// diagnostic instead; the diagnostics of the file's types do not hold it.
+/// </param>
 internal sealed record QueryTypes(
     string Name,
     EquatableArray<PropertyType> Parameters,
     EquatableArray<PropertyType>? Columns,
-    EquatableArray<LibrarySetting> UnavailableLibraries = default
+    EquatableArray<LibrarySetting> UnavailableLibraries = default,
+    DiagnosticInfo? WithoutLibraryFailure = null
 );

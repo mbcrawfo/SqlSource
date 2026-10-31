@@ -55,6 +55,17 @@
           "System.Diagnostics.DiagnosticSource": "9.0.11"
         }
       },
+      "Npgsql.NetTopologySuite": {
+        "type": "Direct",
+        "requested": "[10.0.3, )",
+        "resolved": "10.0.3",
+        "contentHash": "roOLWX0vokdN5cdRAwOfCWqhGFztsj2PYcvmFsPBoaSdwkboSkviaOu6hxjcX/+xAKUWUS4Al6VmwNlRQzun4g==",
+        "dependencies": {
+          "NetTopologySuite": "2.6.0",
+          "NetTopologySuite.IO.PostGIS": "2.1.0",
+          "Npgsql": "10.0.3"
+        }
+      },
       "Roslynator.Analyzers": {
         "type": "Direct",
         "requested": "[5.0.0, )",
@@ -214,6 +225,14 @@
         "resolved": "1.0.0",
         "contentHash": "N4KeF3cpcm1PUHym1RmakkzfkEv3GRMyofVv40uXsQhCQeglr2OHNcUk2WOG51AKpGO8ynGpo9M/kFXSzghwug=="
       },
+      "NetTopologySuite.IO.PostGis": {
+        "type": "Transitive",
+        "resolved": "2.1.0",
+        "contentHash": "3W8XTFz8iP6GQ5jDXK1/LANHiU+988k1kmmuPWNKcJLpmSg6CvFpbTpz+s4+LBzkAp64wHGOldSlkSuzYfrIKA==",
+        "dependencies": {
+          "NetTopologySuite": "[2.0.0, 3.0.0-A)"
+        }
+      },
       "System.Buffers": {
         "type": "Transitive",
         "resolved": "4.6.1",
@@ -308,6 +327,12 @@
         "requested": "[5.9.0, )",
         "resolved": "5.9.0",
         "contentHash": "jMNOo+uoBGiWbZ6Wx0dqU93r5WD4P5WnIRZdoz67RP5N09OUetHgAbo4L7hihOH1NHdD2TgW5/l+SP4gQukwww=="
+      },
+      "NetTopologySuite": {
+        "type": "CentralTransitive",
+        "requested": "[2.6.0, )",
+        "resolved": "2.6.0",
+        "contentHash": "1B1OTacTd4QtFyBeuIOcThwSSLUdRZU3bSFIwM8vk36XiZlBMi3K36u74e4OqwwHRHUuJC1PhbDx4hyI266X1Q=="
       },
       "System.Security.Cryptography.Pkcs": {
         "type": "CentralTransitive",

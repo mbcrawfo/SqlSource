@@ -379,6 +379,14 @@ public sealed class SettingsFileSchemaTests
         SettingsFileKeys.LibraryTypes, /*lang=json,strict*/
         "{\"noda time\": \"Off\"}"
     )]
+    [InlineData(
+        SettingsFileKeys.LibraryTypes, /*lang=json,strict*/
+        "{\"netTopologySuite\": \"on\", \"nodaTime\": \"off\"}"
+    )]
+    [InlineData(
+        SettingsFileKeys.LibraryTypes, /*lang=json,strict*/
+        "{\"Net-Topology Suite\": \"default\"}"
+    )]
     [InlineData(SettingsFileKeys.LibraryTypes, "{}")]
     [InlineData(
         SettingsFileKeys.ColumnTypes, /*lang=json,strict*/
@@ -506,6 +514,9 @@ public sealed class SettingsFileSchemaTests
     )]
     [InlineData( /*lang=json,strict*/
         """{"libraryTypes": {"node-time": "on"}}"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """{"libraryTypes": {"netTopologySuites": "on"}}"""
     )]
     [InlineData( /*lang=json,strict*/
         """{"libraryTypes": ["nodaTime"]}"""

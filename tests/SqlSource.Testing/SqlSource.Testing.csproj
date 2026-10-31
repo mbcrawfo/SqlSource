@@ -42,6 +42,13 @@
             of .NET 10, and which Generator/LibraryReferences.cs reads.
         -->
         <PackageDownload Include="Microsoft.NETCore.App.Ref" Version="[8.0.31]" />
+        <!--
+            NetTopologySuite at the oldest version that it supports and the newest, its plugin of Npgsql for the
+            Npgsql 8 and 10 above, and the reader and writer of SQL Server's bytes at both of its versions.
+        -->
+        <PackageDownload Include="NetTopologySuite" Version="[2.5.0];[2.6.0]" />
+        <PackageDownload Include="Npgsql.NetTopologySuite" Version="[8.0.9];[10.0.3]" />
+        <PackageDownload Include="NetTopologySuite.IO.SqlServerBytes" Version="[2.0.0];[2.1.0]" />
         <AssemblyMetadata Include="NuGetPackageRoot" Value="$(NuGetPackageRoot)" />
     </ItemGroup>
     <ItemGroup>

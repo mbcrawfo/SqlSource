@@ -6,7 +6,7 @@ namespace SqlSource;
 
 /// <summary>
 /// SQL Server's rules for names, which the generator and the tool share: how a name is put in brackets, and the CLR
-/// types of <c>sys</c>.
+/// types of <c>sys</c>, of which two are spatial.
 /// </summary>
 /// <remarks>
 /// A name has two bracketed forms, for two readers.  T-SQL text, such as a declaration the tool sends, needs a name
@@ -37,6 +37,14 @@ internal static class SqlServerNames
     /// a type's name.
     /// </summary>
     public static bool IsClrSystemType(string name) => ClrSystemTypes.Contains(name, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Whether <paramref name="name" /> is a spatial CLR type of <c>sys</c>, <see cref="Geography" /> or
+    /// <see cref="Geometry" />, ignoring case.
+    /// </summary>
+    public static bool IsSpatial(string name) =>
+        name.Equals(Geography, StringComparison.OrdinalIgnoreCase)
+        || name.Equals(Geometry, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// A name in brackets for T-SQL text, which hold any character but a <c>]</c> that is not written twice:

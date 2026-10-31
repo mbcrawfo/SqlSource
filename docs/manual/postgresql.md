@@ -65,7 +65,7 @@ The tool describes a query that is one statement of these kinds: `SELECT` (witho
 | `CALL`, `CREATE`, `SET`, `SHOW` and other commands, `SELECT ... INTO` | [SQLSRC233](diagnostics.md#sqlsrc233) | Give it `-- output: sql`.  For `SELECT ... INTO`, write `CREATE TABLE ... AS` with `-- output: sql` |
 | Two statements under one `-- name:` | [SQLSRC230](diagnostics.md#sqlsrc230) | Give each statement a `-- name:` of its own |
 | A parameter written `$1` | [SQLSRC234](diagnostics.md#sqlsrc234) | Write it as `@name` |
-| A parameter of a composite type, a table's row type, `regclass`, or an extension's type such as PostGIS's `geometry`, which Npgsql cannot send | [SQLSRC232](diagnostics.md#sqlsrc232) | Declare it `text` and cast it where it is used: `-- param: @pair text` with `@pair::public.pair` |
+| A parameter of a composite type, a table's row type, `regclass`, or an extension's type that Npgsql cannot send, such as `seg` | [SQLSRC232](diagnostics.md#sqlsrc232) | Declare it `text` and cast it where it is used: `-- param: @pair text` with `@pair::public.pair` |
 | A column of type `record`, such as `ROW(a, b)` | [SQLSRC229](diagnostics.md#sqlsrc229) | Select the fields as columns of their own, or cast the row to a composite type |
 | A `@` or a `:` that SqlSource and Npgsql read differently | [SQLSRC231](diagnostics.md#sqlsrc231) | Put a space before the parameter, or do what the error's `help:` line says |
 
@@ -157,7 +157,7 @@ WHERE id = @id;
 
 Each column and each parameter of a described PostgreSQL query gets a C# type: the type that Npgsql reads a value of its PostgreSQL type as.  If `id` is a `bigint`, `placed_at` a `timestamp with time zone`, `total` a `numeric(12,2)`, `tags` a `text[]` and `born` a `date`, they are `long`, `System.DateTime`, `decimal`, `string[]`, and `System.DateTime` on Npgsql 8 and 9 or `System.DateOnly` on Npgsql 10; `@id` is a `long`.  Whether a column can be null is decided [above](#nullability), not by its type.
 
-The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for a type that Npgsql cannot read.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides), `"timestamptz": "System.DateTimeOffset"` in a settings file's `typeOverrides`.  To give one column another, use a [column type](settings.md#setting-column-types), `"users.id": "MyApp.UserId"` in its `columnTypes`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Npgsql does not read, such as an id or an `Email` over a domain, needs [converters](settings.md#converters) to and from the type of the table below.  A project that references `Npgsql.NodaTime` gets NodaTime's types for the date and time types of its queries whose output is `codegen`: see [NodaTime](#nodatime).  A project can read its JSON columns as System.Text.Json's types or as classes of its own: see [JSON](#json).
+The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for a type that Npgsql cannot read.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides), `"timestamptz": "System.DateTimeOffset"` in a settings file's `typeOverrides`.  To give one column another, use a [column type](settings.md#setting-column-types), `"users.id": "MyApp.UserId"` in its `columnTypes`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Npgsql does not read, such as an id or an `Email` over a domain, needs [converters](settings.md#converters) to and from the type of the table below.  A project that references `Npgsql.NodaTime` gets NodaTime's types for the date and time types of its queries whose output is `codegen`: see [NodaTime](#nodatime).  One that references `Npgsql.NetTopologySuite` gets NetTopologySuite's for PostGIS's types: see [NetTopologySuite](#nettopologysuite).  A project can read its JSON columns as System.Text.Json's types or as classes of its own: see [JSON](#json).
 
 <a id="which-npgsql"></a>
 
@@ -215,8 +215,9 @@ The names are those of PostgreSQL's catalog, which are the [type override's](set
 | `int4multirange`, `int8multirange`, `nummultirange`, `tsmultirange`, `tstzmultirange`, `datemultirange` | An array of the range's type: `NpgsqlTypes.NpgsqlRange<int>[]` and so on | As the range: `NpgsqlTypes.NpgsqlRange<System.DateOnly>[]` for `datemultirange` | SQLSRC249 |
 | `regclass`, `regproc`, `regprocedure`, `regoper`, `regoperator`, `regrole`, `regnamespace`, `regcollation`, `regdictionary` | None: SQLSRC246.  Cast the column to `oid` in the query | Same | Same |
 | `pg_snapshot`, `txid_snapshot`, `pg_node_tree` | None: SQLSRC246.  Cast the column to `text` in the query | Same | Same |
+| `geometry`, `geography`, PostGIS's types, with or without a modifier such as `(Point,4326)` | None: SQLSRC246.  In the query methods of a project that references `Npgsql.NetTopologySuite`, `NetTopologySuite.Geometries.Geometry`: see [NetTopologySuite](#nettopologysuite) | Same | Same |
 
-`citext`, `hstore`, `ltree`, `lquery`, `ltxtquery` and `cube` are the types of extensions, and are known by their name in whatever schema the extension was created.  A type that the table does not name gets its C# type by its kind:
+`citext`, `hstore`, `ltree`, `lquery`, `ltxtquery` and `cube` are the types of extensions, and are known by their name in whatever schema the extension was created.  So are PostGIS's `geometry` and `geography`, but a type override names them with that schema, `public.geometry`.  A type that the table does not name gets its C# type by its kind:
 
 | Kind | C# type |
 |----|----|
@@ -284,6 +285,39 @@ An array of one of these types is an array of its C# type, `NodaTime.Instant[]` 
 - **An `interval` with months or years** read as a `NodaTime.Duration` throws `InvalidCastException`, which says to read it as a `NodaTime.Period`, the default.
 - **`NodaTime.Interval` and `NodaTime.DateInterval` cannot hold every range**, which is why the defaults are `NpgsqlRange<T>`.  An empty range throws when it is read: `ArgumentOutOfRangeException` for a `tstzrange` as an `Interval`, and `ArgumentException` for a `daterange` as a `DateInterval`.  A `tstzrange` whose start is excluded, `(a,b]`, is read as the `Interval` `[a+1ns, b+1ns)`, since an `Interval` includes its start and excludes its end, and sent back it is stored as `[a,b)`, since PostgreSQL keeps microseconds: a read and a write move the range.  A multirange never holds an empty range, but its ranges move the same way.
 - **Without the plugin**, a project that references `NodaTime` alone gets none of NodaTime's types by default.  A type override, a column type or a marker that names one, `timestamptz=NodaTime.Instant`, gives the property that type, as it would any type, and the query method asks Npgsql for it, which throws `InvalidCastException` when the query runs.  Add `Npgsql.NodaTime`, and call `UseNodaTime()` as [what a method reads and throws](#method-results) says.
+
+<a id="nettopologysuite"></a>
+
+### NetTopologySuite
+
+```sql postgres
+-- name: GetPlace -> one
+SELECT id, outline, centre, stops
+FROM places
+WHERE id = @id;
+```
+
+```csharp
+public sealed record GetPlaceDto(
+    long Id,
+    global::NetTopologySuite.Geometries.Geometry Outline,
+    global::NetTopologySuite.Geometries.Geometry Centre,
+    global::NetTopologySuite.Geometries.Geometry[] Stops);
+```
+
+A project that references `Npgsql.NetTopologySuite`, Npgsql's plugin for NetTopologySuite, gets NetTopologySuite's `Geometry` for PostGIS's types in the columns and parameters of its queries whose output is `codegen`, read and sent by the plugin.  Above, `outline` is a `geometry(Polygon,4326)`, `centre` a `geography(Point,4326)` and `stops` a `geometry[]`, each `NOT NULL`.  The [library types](settings.md#setting-library-types) turn NetTopologySuite off for a project, a folder, a file or a query.  Reference the `Npgsql.NetTopologySuite` of the same major as your Npgsql, with NetTopologySuite 2.5.0 or later, as [SQLSRC282](diagnostics.md#sqlsrc282) says; the application calls `UseNetTopologySuite()` on its data source, as [what a method reads and throws](#method-results) says.
+
+| PostgreSQL type | C# type with NetTopologySuite |
+|----|----|
+| `geometry`, `geography`, with or without a modifier such as `(Point,4326)` | `NetTopologySuite.Geometries.Geometry` |
+
+They are known by their name in whatever schema PostGIS was created.  An array of one is a `NetTopologySuite.Geometries.Geometry[]`, whose `NULL` element is null, and a domain over one has its C# type, as [the kinds](#type-table) say.  Every other type keeps the type of [the types](#type-table).
+
+- **Only query methods get NetTopologySuite's types.**  A query whose output is `models` has no C# type for a PostGIS type, with the plugin or without it, and is [SQLSRC246](diagnostics.md#sqlsrc246): give the query the output `codegen`, or map the type with the [type override](settings.md#setting-type-overrides) to the C# type your code reads it as.
+- **A shape is yours to choose**, with the type override, a [column type](settings.md#setting-column-types) or a `-- param:` or `-- column:` marker: `NetTopologySuite.Geometries.Point`, `Polygon` or another of `Geometry`'s subtypes, which the plugin reads and sends.  A type override names the type with its schema, `public.geometry`, and never `geometry` alone, which is SQL Server's.  Every column of `geometry` has that one key, whatever its modifier, so give one query a shape with a `-- type-override:` inside it, `-- type-override: public.geometry = NetTopologySuite.Geometries.Point`, or one column with a column type.  A value of another shape throws `InvalidCastException`, "Unable to cast object of type 'NetTopologySuite.Geometries.LineString' to type 'NetTopologySuite.Geometries.Point'.", when it is read.
+- **The SRID is kept**, written and read, and so are Z and M: a point of four dimensions comes back with both.  A `geometry` with no SRID, which PostGIS stores as SRID 0, is read with the SRID -1, whether your code or the server wrote it, so compare SRIDs knowing that.  A `geography` sent with SRID 0 is stored as 4326.
+- **A parameter's type** is described and checked as any other's.  A `-- param:` marker writes it without its modifier, `-- param: @outline geometry`: see [the known issue](parameters-and-tokens.md#known-issues).
+- **Without the plugin**, a project that references NetTopologySuite alone gets none of its types by default.  A type override, a column type or a marker that names one gives the property that type, and the query method asks Npgsql for it, which throws `InvalidCastException` when the query runs.  Add `Npgsql.NetTopologySuite`, and call `UseNetTopologySuite()`.
 
 <a id="json"></a>
 
@@ -359,7 +393,7 @@ public sealed record FindOrdersDto(long Id, global::System.DateTime PlacedAt, st
 
 A described PostgreSQL query gets the [models](generator.md#models) that every described query gets, by the rules of the generator page; their namespace and documentation are left out above.  What PostgreSQL decides in them:
 
-- **Each property's type** is its column's or parameter's C# type, from [the type table](#type-table) under the version of Npgsql that the project references, or [NodaTime's](#nodatime) for a query whose output is `codegen` in a project that references `Npgsql.NodaTime`, or [System.Text.Json's](#json) for one where the library types turn `json` on, or the one you chose, by the [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a marker.  Above, `id` is a `bigint` and `placed_at` a `timestamp with time zone`, both `NOT NULL`.
+- **Each property's type** is its column's or parameter's C# type, from [the type table](#type-table) under the version of Npgsql that the project references, or [NodaTime's](#nodatime) or [NetTopologySuite's](#nettopologysuite) for a query whose output is `codegen` in a project that references `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`, or [System.Text.Json's](#json) for one where the library types turn `json` on, or the one you chose, by the [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a marker.  Above, `id` is a `bigint` and `placed_at` a `timestamp with time zone`, both `NOT NULL`.
 - **A column's property can be null** by [which columns can be null](#nullability): `customer_name` comes from the optional side of the `LEFT JOIN`, so its property is a `string?`.  A column's alias can say otherwise with `!` or `?`, and so can a [`-- column:` marker](generator.md#column-marker).
 - **A parameter's property can be null** only when its `-- param:` marker says `null`, as `@status` does, since PostgreSQL does not say whether a parameter can be null.
 - **A column with no name**, which PostgreSQL calls `?column?`, as an expression or a literal without an alias, is [SQLSRC253](diagnostics.md#sqlsrc253), and the query gets no models until it is fixed.  Give it an alias.
@@ -403,7 +437,7 @@ Each parameter is sent as the PostgreSQL type it was described with, or the type
 
 - **Give each method the transaction** of a connection that has one.  Npgsql runs a command in its connection's transaction even when the method is not given it, but Microsoft.Data.SqlClient does not, so code that passes it runs on both: see [the connection](generator.md#method-connection).
 - **A column is read as its property's C# type**, the one [the types](#type-map) give it, so a type that Npgsql reads only once it is taught, an enum mapped to a C# enum or a plugin's type, needs the teaching on the data source, as `MapEnum<T>()`.  A type of yours that Npgsql never reads takes [converters](settings.md#converters) instead: the column is read as the type of [the table](#type-table), a domain as its base type, and converted.
-- **Every type that [the table](#type-table) gives a C# type is sent and read on Npgsql 8, 9 and 10**, as the C# type of the version's column, and SqlSource is tested on Npgsql 8 and 10.  `cube`, which Npgsql 8 and 9 do not read, is sent and read on Npgsql 10.  So is each type of [NodaTime](#nodatime), on each version with its `Npgsql.NodaTime`.
+- **Every type that [the table](#type-table) gives a C# type is sent and read on Npgsql 8, 9 and 10**, as the C# type of the version's column, and SqlSource is tested on Npgsql 8 and 10.  `cube`, which Npgsql 8 and 9 do not read, is sent and read on Npgsql 10.  So is each type of [NodaTime](#nodatime), on each version with its `Npgsql.NodaTime`, and of [NetTopologySuite](#nettopologysuite), with its `Npgsql.NetTopologySuite`.
 - **NodaTime's types need `UseNodaTime()` on the data source.**  A method that reads or sends a [NodaTime](#nodatime) type runs only on a connection of a data source whose builder called `UseNodaTime()`, of `Npgsql.NodaTime`.  Without it, Npgsql throws `InvalidCastException`, "Reading as 'NodaTime.Instant' is not supported for fields having DataTypeName 'timestamp with time zone'", or the same for writing, when the query runs:
 
   ```csharp
@@ -413,6 +447,8 @@ Each parameter is sent as the PostgreSQL type it was described with, or the type
   ```
 
 - **Entity Framework Core's NodaTime package turns NodaTime on.**  `Npgsql.EntityFrameworkCore.PostgreSQL.NodaTime` brings `Npgsql.NodaTime`, so the query methods of a project that references it get NodaTime's types.  `UseNodaTime()` inside EF Core's `UseNpgsql(...)` teaches the data source that EF Core builds for itself, and no other: call `UseNodaTime()` on the builder of the data source whose connections run the query methods, or turn NodaTime off with the [library types](settings.md#setting-library-types), `"nodaTime": "off"`.
+- **NetTopologySuite's types need `UseNetTopologySuite()` on the data source**, of `Npgsql.NetTopologySuite`, as NodaTime's need `UseNodaTime()`.  Without it, Npgsql throws `InvalidCastException`, "Reading as 'NetTopologySuite.Geometries.Geometry' is not supported for fields having DataTypeName 'public.geometry'", or the same for writing, when the query runs.
+- **Entity Framework Core's NetTopologySuite package turns NetTopologySuite on.**  `Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite` brings `Npgsql.NetTopologySuite`, and `UseNetTopologySuite()` inside EF Core's `UseNpgsql(...)` teaches EF Core's own data source alone, as for NodaTime: call `UseNetTopologySuite()` on the builder of the data source whose connections run the query methods, or turn NetTopologySuite off with the [library types](settings.md#setting-library-types), `"netTopologySuite": "off"`.
 - **`UseNodaTime()` changes what Npgsql gives Dapper too.**  On a data source that calls it, every reader gets NodaTime's types: a `timestamptz` arrives as an `Instant`, so a query whose output is `models`, read through Dapper into its `System.DateTime` property, fails, and a `tstzrange` or a `daterange` arrives as an `Interval` or a `DateInterval`, which throws for an empty range, whatever the property's type.  That is the plugin's doing.  Give such queries NodaTime's types with the [type override](settings.md#setting-type-overrides), `"timestamptz": "NodaTime.Instant"` in a settings file of their folder, or read them on a data source without the plugin.
 - **System.Text.Json's types and a class of yours in a [JSON](#json) column need nothing on the data source**, on Npgsql 8, 9 and 10: no `EnableDynamicJson()`.
 - **A column whose property cannot be null** throws Npgsql's `InvalidCastException`, "Column 'name' is null.", when it holds a null, before any converter is called.  A JSON `null` in such a column is no null, and what it gives is under [JSON](#json).

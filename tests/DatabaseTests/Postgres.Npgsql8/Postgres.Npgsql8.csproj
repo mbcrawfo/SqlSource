@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
         The end-to-end write and read of all_types on Npgsql 8.0.9, the latest 8.0 release; 8.0 is the oldest version
-        that is supported: through the generated methods, and the read through Dapper; the streaming method; the write
-        and read of noda_values through the methods and Npgsql.NodaTime 8; and the write and read of json_values through
-        the methods.  A project of its own, since the end-to-end project gets Npgsql 10 through the tool it references.
+        that is supported: through the generated methods, and the read through Dapper; the streaming method; and the
+        write and read of noda_values through the methods and Npgsql.NodaTime 8, and of spatial_values through the
+        methods and Npgsql.NetTopologySuite 8, on a PostGIS container of its own; and the write and read of json_values
+        through the methods.  A project of its own, since the end-to-end project gets Npgsql 10 through the tool it
+        references.
         The generator comes from a project reference, which does not bring the package's MSBuild files, so the real
         ones are imported here and at the end of this file.
     -->
@@ -40,6 +42,14 @@
             Link="NodaTime/Queries/%(Filename)%(Extension)"
         />
         <AdditionalFiles
+            Include="../Postgres/EndToEnd/NetTopologySuite/Queries/NetTopologySuite.sql"
+            Link="NetTopologySuite/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../Postgres/EndToEnd/NetTopologySuite/Queries/NetTopologySuite.sql.json"
+            Link="NetTopologySuite/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
             Include="../Postgres/EndToEnd/Json/Queries/Json.sql"
             Link="Json/Queries/%(Filename)%(Extension)"
         />
@@ -60,6 +70,12 @@
         -->
         <PackageReference Include="NodaTime" VersionOverride="3.1.9" />
         <PackageReference Include="Npgsql.NodaTime" VersionOverride="8.0.9" />
+        <!--
+            The plugin of the same release for NetTopologySuite, and NetTopologySuite at 2.5.0, the floor that it needs,
+            which central transitive pinning would otherwise raise to the end-to-end project's version.
+        -->
+        <PackageReference Include="NetTopologySuite" VersionOverride="2.5.0" />
+        <PackageReference Include="Npgsql.NetTopologySuite" VersionOverride="8.0.9" />
         <PackageReference Include="Shouldly" />
         <PackageReference Include="xunit.v3" />
     </ItemGroup>

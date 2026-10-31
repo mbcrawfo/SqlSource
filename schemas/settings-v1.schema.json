@@ -188,10 +188,10 @@
       "propertyNames": {
         "anyOf": [
           {
-            "enum": ["nodaTime", "json"]
+            "enum": ["nodaTime", "netTopologySuite", "json"]
           },
           {
-            "pattern": "^\\s*(?:[- \\t]*(?:[nN][- \\t]*[oO][- \\t]*[dD][- \\t]*[aA][- \\t]*[tT][- \\t]*[iI][- \\t]*[mM][- \\t]*[eE][- \\t]*|[jJ][- \\t]*[sS][- \\t]*[oO][- \\t]*[nN][- \\t]*))\\s*$"
+            "pattern": "^\\s*(?:[- \\t]*(?:[nN][- \\t]*[oO][- \\t]*[dD][- \\t]*[aA][- \\t]*[tT][- \\t]*[iI][- \\t]*[mM][- \\t]*[eE][- \\t]*|[nN][- \\t]*[eE][- \\t]*[tT][- \\t]*[tT][- \\t]*[oO][- \\t]*[pP][- \\t]*[oO][- \\t]*[lL][- \\t]*[oO][- \\t]*[gG][- \\t]*[yY][- \\t]*[sS][- \\t]*[uU][- \\t]*[iI][- \\t]*[tT][- \\t]*[eE][- \\t]*|[jJ][- \\t]*[sS][- \\t]*[oO][- \\t]*[nN][- \\t]*))\\s*$"
           }
         ]
       },

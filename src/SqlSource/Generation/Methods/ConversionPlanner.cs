@@ -7,6 +7,7 @@ using SqlSource.Generation.Types;
 using SqlSource.Generation.Types.Maps;
 using SqlSource.Settings;
 using SqlSource.Settings.ClrTypes;
+using SqlSource.Settings.Libraries;
 
 namespace SqlSource.Generation.Methods;
 
@@ -25,7 +26,9 @@ namespace SqlSource.Generation.Methods;
 /// is read and bound as the driver reads and binds the type.  Only the converters that serve the query's engine and
 /// driver are seen, so a library's edge for SQL Server never converts a PostgreSQL column.  A type that a library's row
 /// chose is never <c>SQLSRC279</c> or <c>SQLSRC280</c>: where no edge fits, the driver reads and binds it, as the
-/// plugin does on PostgreSQL.
+/// plugin does on PostgreSQL.  SQL Server's <c>geography</c> or <c>geometry</c> read as one of NetTopologySuite's
+/// geometries, when the project references NetTopologySuite.IO.SqlServerBytes, takes the spatial read path before any
+/// edge is looked for, which no converter replaces and which reports nothing.
 /// <para>
 /// A project's own class, a type that is no type of System.Text.Json and none the base map gives, on a type that holds
 /// JSON and is read as <c>string</c>, is read and sent through System.Text.Json's serializer when no converter touches
@@ -79,6 +82,11 @@ internal static class ConversionPlanner
     )
     {
         blocked = false;
+        if (SpatialOf(type, isRead, context) is { } spatial)
+        {
+            return spatial;
+        }
+
         if (type.Place is null || type.Database is not { } database)
         {
             return null;
@@ -135,7 +143,7 @@ internal static class ConversionPlanner
                     false,
                     whole.WarningIds,
                     whole.Library?.Library,
-                    isRead && JsonTypes.IsNode(whole.ReturnText)
+                    MayReturnNull: isRead && JsonTypes.IsNode(whole.ReturnText)
                 );
         }
 
@@ -161,7 +169,7 @@ internal static class ConversionPlanner
                     elementIsValueType,
                     byElement.WarningIds,
                     byElement.Library?.Library,
-                    isRead && JsonTypes.IsNode(byElement.ReturnText)
+                    MayReturnNull: isRead && JsonTypes.IsNode(byElement.ReturnText)
                 );
             }
 
@@ -281,6 +289,26 @@ internal static class ConversionPlanner
 
     private static string WithoutQuestionMark(string type) =>
         type.EndsWith("?", StringComparison.Ordinal) ? type.Substring(0, type.Length - 1) : type;
+
+    // The spatial read path of a SQL Server geography or geometry that one of NetTopologySuite's geometries is read as,
+    // by an override or the library's row, when the project references NetTopologySuite.IO.SqlServerBytes; null for
+    // any other type, as Microsoft.SqlServer.Types.SqlGeography, which is read and bound as the driver does.
+    private static Conversion? SpatialOf(PropertyType type, bool isRead, ConversionContext context) =>
+        context.Engine == DatabaseEngine.SqlServer
+        && context.SqlServerSpatial
+        && SqlServerNames.IsSpatial(type.Key)
+        && NetTopologySuiteConversions.IsGeometryType(type.Text)
+            ? new Conversion(
+                NetTopologySuiteConversions.InstanceOf(type.Key, isRead),
+                NetTopologySuiteConversions.SqlBytes,
+                false,
+                false,
+                null,
+                false,
+                Library: SqlLibrary.NetTopologySuite,
+                IsSpatial: true
+            )
+            : null;
 
     // The key of an array's element: an entry of the array is keyed by its element's key with [], and the override of
     // the element gives the element's key itself.

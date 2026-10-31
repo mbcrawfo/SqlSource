@@ -588,6 +588,11 @@ public sealed class CachingModelTests
                 },
                 ignoreOrder: true
             );
+        // The failures without their libraries run again beside the requests, for the type that changed alone, and
+        // come out equal, so the project's distinct failures are not made again.
+        AllReasons(result, TrackingNames.LibraryFailures)
+            .ShouldBe([IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Cached], ignoreOrder: true);
+        AllReasons(result, TrackingNames.AllLibraryFailures).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.ModelGroups).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.Models).ShouldBe([IncrementalStepRunReason.Cached]);
         ModelReasons(result).Count.ShouldBe(3);

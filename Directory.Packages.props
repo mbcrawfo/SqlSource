@@ -40,6 +40,19 @@
         <!-- Reads .sln and .slnx files for the tool, as the dotnet command does with the same library. -->
         <PackageVersion Include="Microsoft.VisualStudio.SolutionPersistence" Version="1.0.52" />
         <!--
+            The library of NetTopologySuite's geometries, which the tool gets from Npgsql.NetTopologySuite and
+            tests/DatabaseTests/SqlServer references, pinned here so that every project that brings it has this
+            version.  tests/DatabaseTests/Postgres.Npgsql8 and tests/DatabaseTests/SqlServer.SqlClient61 override it
+            to 2.5.0, the floor of Npgsql.NetTopologySuite 8 and of SqlSource, which central transitive pinning would
+            otherwise hold here.
+        -->
+        <PackageVersion Include="NetTopologySuite" Version="2.6.0" />
+        <!--
+            NetTopologySuite's reader and writer of SQL Server's bytes, for the projects that read and send SQL
+            Server's geography and geometry through generated code.  2.1.0 is also SqlSource's floor of it.
+        -->
+        <PackageVersion Include="NetTopologySuite.IO.SqlServerBytes" Version="2.1.0" />
+        <!--
             The library of NodaTime's types, which tests/DatabaseTests/Postgres gets from Npgsql.NodaTime and
             tests/DatabaseTests/SqlServer and tests/DatabaseTests/QueryMethodAllocation reference.
             tests/DatabaseTests/Postgres.Npgsql8 overrides it to 3.1.9, the floor that Npgsql.NodaTime 8 needs, and
@@ -61,6 +74,11 @@
             overrides it to the 8.0 release that pairs with its driver.
         -->
         <PackageVersion Include="Npgsql.NodaTime" Version="10.0.3" />
+        <!--
+            The plugin of Npgsql for NetTopologySuite, the version that pairs with the Npgsql above, through which the
+            tool's PostgreSQL describer binds a PostGIS parameter for its check.
+        -->
+        <PackageVersion Include="Npgsql.NetTopologySuite" Version="10.0.3" />
         <PackageVersion Include="NSubstitute" Version="6.2.0" />
         <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
         <PackageVersion Include="Roslynator.Analyzers" Version="5.0.0" />

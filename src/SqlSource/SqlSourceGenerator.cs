@@ -49,7 +49,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var converters = FindConverters(context, typing.MappedTypeConverters, typing.TypingLibraryProbe);
         var models = CollectModels(context, typing.Files, typeQueries);
         ReportDrivers(context, typing.NpgsqlProbe, typing.SqlClientProbe, sidecars.Needs, parsedFiles.Sorted);
-        ReportProblems(context, sidecars.Checks, typing.FileTypes, models.FileModels, models.Models);
+        ReportProblems(
+            context,
+            sidecars.Checks,
+            typing.FileTypes,
+            models.LibraryFailures,
+            models.FileModels,
+            models.Models
+        );
         RegisterModelSources(context, models.Models, parsedFiles.EachFile, claims.RepeatedPaths);
         RegisterTypeSources(context, typeQueries);
         RegisterMethodSources(
@@ -63,6 +70,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             typing.NpgsqlProbe,
             typing.SqlClientProbe,
             typing.LibraryProbe,
+            typing.TypingLibraryProbe,
             converters
         );
     }
@@ -456,9 +464,17 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .CompilationProvider.Select(static (compilation, _) => LibraryProbe.Read(compilation))
             .WithTrackingName(TrackingNames.LibraryProbe);
 
-        // The probe without NodaTime's version, which typing does not read, so that a change of the version alone types
-        // no file again.
-        var typingLibraryProbe = libraryProbe.Select(static (probe, _) => probe with { NodaTimeVersion = null });
+        // The probe without the libraries' versions, which typing does not read, so that a change of a version alone
+        // types no file again.
+        var typingLibraryProbe = libraryProbe.Select(
+            static (probe, _) =>
+                probe with
+                {
+                    NodaTimeVersion = null,
+                    NetTopologySuiteVersion = null,
+                    SqlServerBytesVersion = null,
+                }
+        );
 
         // The C# types that the type override names at any level, as a sorted list of their names, which an edit that
         // leaves the names alone gives again, equal.
@@ -604,6 +620,17 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => TypeModels.Of(input.Left, input.Right))
             .WithTrackingName(TrackingNames.TypeModels);
 
+        // The failure without its libraries of each query that a type claims at Models, which gets no models instead.
+        // Apart from the requests, so that the requests stay equal when a failure's text changes.  Every type's
+        // together, each once, as typing reported it: two types that claim one query at Models give the same failure.
+        var libraryFailures = typeQueries
+            .Combine(allFileModels)
+            .Select(static (input, _) => TypeModels.LibraryFailuresOf(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.LibraryFailures)
+            .Collect()
+            .Select(static (failures, _) => MethodPlanner.Distinct(failures))
+            .WithTrackingName(TrackingNames.AllLibraryFailures);
+
         // Every type's requests together, by full name, since two types or two queries can ask for one model.
         var modelGroups = typeModels
             .SelectMany(static (requests, _) => requests)
@@ -635,7 +662,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => ModelCollector.Resolve(input.Left, input.Right))
             .WithTrackingName(TrackingNames.Models);
 
-        return new CollectedModels(fileModels, allFileModels, modelNames, models);
+        return new CollectedModels(fileModels, allFileModels, libraryFailures, modelNames, models);
     }
 
     // Whether the Npgsql and the Microsoft.Data.SqlClient the project references are too old or newer than known, each
@@ -688,6 +715,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalGeneratorInitializationContext context,
         FileNodes<SidecarCheckResult> sidecarChecks,
         FileNodes<FileTypes> fileTypes,
+        IncrementalValueProvider<EquatableArray<DiagnosticInfo>> libraryFailures,
         FileNodes<FileModels> fileModels,
         IncrementalValueProvider<ModelSet> models
     )
@@ -698,6 +726,9 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // Beside the checks' output, so that a change to the types alone reports the checks of no file again.
         context.RegisterSourceOutput(fileTypes.EachFile, ReportTypes);
         context.RegisterSourceOutput(fileTypes.OfRepeatedPaths, ReportTypes);
+
+        // The failures of the types that the claims at Models defer, each once for the project.
+        context.RegisterSourceOutput(libraryFailures, ReportAll);
 
         // Beside the types' output, so that a change to the models alone reports the types of no file again.
         context.RegisterSourceOutput(fileModels.EachFile, ReportModels);
@@ -774,7 +805,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
     // The file of each type's methods, and their diagnostics, with the clashes across types, SQLSRC281 at each member
     // of a settings file that turns on a library the project cannot use, SQLSRC273 for each engine whose methods have
-    // no driver, and SQLSRC282 for each library older than its floor that a query uses.
+    // no driver, and SQLSRC282 for each package older than its floor that a query's library needs.
     private static void RegisterMethodSources(
         IncrementalGeneratorInitializationContext context,
         IncrementalValueProvider<SettingsFileSet> settingsFiles,
@@ -786,13 +817,16 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<NpgsqlProbe> npgsqlProbe,
         IncrementalValueProvider<SqlClientProbe> sqlClientProbe,
         IncrementalValueProvider<LibraryProbe> libraryProbe,
+        IncrementalValueProvider<LibraryProbe> typingLibraryProbe,
         IncrementalValueProvider<ConverterSet> converters
     )
     {
-        // Whether each engine's driver allows its methods, which is the same value until a reference changes.
+        // Whether each engine's driver allows its methods, and whether SQL Server's spatial read path can be taken,
+        // from the probe of the libraries without their versions: the same value until a reference changes.
         var drivers = npgsqlProbe
             .Combine(sqlClientProbe)
-            .Select(static (input, _) => MethodDrivers.Of(input.Left, input.Right))
+            .Combine(typingLibraryProbe)
+            .Select(static (input, _) => MethodDrivers.Of(input.Left.Left, input.Left.Right, input.Right))
             .WithTrackingName(TrackingNames.MethodDrivers);
 
         var assignments = models.Select(static (set, _) => set.Assignments);
@@ -931,14 +965,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(libraryConversionOutputs, AddFile);
 
-        // The libraries that the CodeGen queries use, each once, which almost never change.
+        // The libraries that the CodeGen queries use, each once for each engine, which almost never change.
         var usedLibraries = typeMethods
             .Select(static (methods, _) => methods.UsedLibraries)
             .Collect()
-            .Select(static (each, _) => DistinctLibraries(each))
+            .Select(static (each, _) => DistinctUses(each))
             .WithTrackingName(TrackingNames.UsedLibraries);
 
-        // Not located, and once for the project and library, however many of its queries use the library.
+        // Not located, and once for the project and package, however many of its queries, of either engine, use it.
         context.RegisterSourceOutput(usedLibraries.Combine(libraryProbe), ReportLibrariesBelowTheFloor);
     }
 
@@ -966,8 +1000,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         }
     }
 
-    // The libraries of every type, conversions' or used ones, each once, in the order of SqlLibrary, so that the value
-    // does not depend on the order of the compilation's types.
+    // The libraries of every type's conversions, each once, in the order of SqlLibrary, so that the value does not
+    // depend on the order of the compilation's types.
     private static EquatableArray<LibraryValue> DistinctLibraries(ImmutableArray<EquatableArray<LibraryValue>> each) =>
         new(
             each.SelectMany(static libraries => libraries)
@@ -976,23 +1010,29 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 .ToImmutableArray()
         );
 
-    // SQLSRC282 for each library that a CodeGen query uses and that the project references older than its floor.
+    // The libraries that every type's queries use, each once for each engine, in the order of LibraryUse, so that the
+    // value does not depend on the order of the compilation's types.
+    private static EquatableArray<LibraryUse> DistinctUses(ImmutableArray<EquatableArray<LibraryUse>> each) =>
+        new(
+            each.SelectMany(static uses => uses)
+                .Distinct()
+                .OrderBy(static use => use, LibraryUse.Order)
+                .ToImmutableArray()
+        );
+
+    // SQLSRC282 for each package that the libraries a CodeGen query uses need on its engine and that the project
+    // references older than its floor, each once: NetTopologySuite, used on both engines, is one error.
     private static void ReportLibrariesBelowTheFloor(
         SourceProductionContext output,
-        (EquatableArray<LibraryValue> Libraries, LibraryProbe Probe) input
+        (EquatableArray<LibraryUse> Uses, LibraryProbe Probe) input
     )
     {
         var probe = input.Probe;
-        foreach (var library in input.Libraries.Select(static used => used.Library).Where(probe.IsBelowTheFloor))
+        var packages = input.Uses.SelectMany(use => probe.PackagesBelowTheFloor(use.Library, use.Engine)).Distinct();
+        foreach (var (name, version, floor) in packages)
         {
             output.ReportDiagnostic(
-                Diagnostic.Create(
-                    SqlDiagnostics.LibraryBelowTheFloor,
-                    Location.None,
-                    MethodPlanner.LibraryName(library),
-                    probe.VersionTextOf(library),
-                    LibraryProbe.FloorOf(library)
-                )
+                Diagnostic.Create(SqlDiagnostics.LibraryBelowTheFloor, Location.None, name, version, floor)
             );
         }
     }
@@ -1204,11 +1244,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<EquatableArray<Converter>> MappedTypeConverters
     );
 
-    // Each file's models, every file's together, the models' full names, and the models to emit with the problems of
-    // the requests.
+    // Each file's models, every file's together, the failures without their libraries of each type's queries at Models,
+    // the models' full names, and the models to emit with the problems of the requests.
     private readonly record struct CollectedModels(
         FileNodes<FileModels> FileModels,
         IncrementalValueProvider<EquatableArray<FileModels>> AllFileModels,
+        IncrementalValueProvider<EquatableArray<DiagnosticInfo>> LibraryFailures,
         IncrementalValueProvider<EquatableArray<string>> ModelNames,
         IncrementalValueProvider<ModelSet> Models
     );

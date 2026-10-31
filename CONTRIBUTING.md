@@ -29,9 +29,9 @@ The eight test projects and the three libraries they share, which [`tests/README
 - `tests/SqlSource.Tests.RoslynFloor` compiles the generator driver tests a second time, on the oldest supported Roslyn.
 - `tests/SqlSource.Tool.Tests` runs the tests of the tool.
 - `tests/DatabaseTests/Postgres` runs the PostgreSQL describer against a real server and is the end-to-end project, which builds models and methods from its own queries and runs every described query through its method, and needs Docker.
-- `tests/DatabaseTests/Postgres.Npgsql8` writes and reads every mapped type, every NodaTime type and the JSON types and classes through the generated methods, reads the mapped types through Dapper, and breaks out of a streaming method, on Npgsql 8, the oldest supported driver, and needs Docker.
+- `tests/DatabaseTests/Postgres.Npgsql8` writes and reads every mapped type, every NodaTime type, NetTopologySuite's and the JSON types and classes through the generated methods, reads the mapped types through Dapper, and breaks out of a streaming method, on Npgsql 8, the oldest supported driver, and needs Docker.
 - `tests/DatabaseTests/SqlServer` runs the tests of SQL Server against a real server and is SQL Server's end-to-end project, which builds models and query methods from its own queries, runs each query through its method, writes and reads every mapped type through the methods, and reads rows through Dapper for the manual's recipe, and needs Docker.
-- `tests/DatabaseTests/SqlServer.SqlClient61` reads every mapped type through Dapper, writes and reads it, every NodaTime type and the JSON types and classes through the generated methods, and breaks out of a streaming method, on Microsoft.Data.SqlClient 6.1, the oldest supported driver, and needs Docker.
+- `tests/DatabaseTests/SqlServer.SqlClient61` reads every mapped type through Dapper, writes and reads it, every NodaTime type, NetTopologySuite's and the JSON types and classes through the generated methods, and breaks out of a streaming method, on Microsoft.Data.SqlClient 6.1, the oldest supported driver, and needs Docker.
 - `tests/DatabaseTests/QueryMethodAllocation` runs the allocation tests of the generated methods of both engines against hand-written ADO.NET, needs Docker, and is run by the nightly alone.
 - `tests/SqlSource.Testing`, `tests/DatabaseTests/TestHarness` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 
@@ -44,7 +44,7 @@ dotnet build SqlSource.slnx
 dotnet test --solution SqlSource.slnx
 ```
 
-This runs every test project, the two PostgreSQL projects on the default PostgreSQL image and the two SQL Server projects on the default SQL Server image.  CI also runs `tests/DatabaseTests/Postgres` on PostgreSQL 14, the oldest supported:
+This runs every test project, the two PostgreSQL projects on the default PostgreSQL image and the two SQL Server projects on the default SQL Server image.  The first run of the PostgreSQL projects on a PostgreSQL image also builds [their PostGIS image](tests/DatabaseTests/Postgres/README.md#the-postgis-image) on it, which takes a minute or two and needs to reach PostgreSQL's package sources, `apt.postgresql.org` and `apt-archive.postgresql.org`.  CI also runs `tests/DatabaseTests/Postgres` on PostgreSQL 14, the oldest supported:
 
 ```bash
 SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/DatabaseTests/Postgres

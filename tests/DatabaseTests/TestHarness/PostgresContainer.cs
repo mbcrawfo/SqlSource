@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -50,6 +51,10 @@ public abstract class PostgresContainer(DbProviderFactory factory, string image)
         return await TestDatabases.ScalarAsync(source, sql, TestContext.Current.CancellationToken);
     }
 
+    // Makes the image ready before the container is built: nothing for an image that is pulled, and PostgisContainer
+    // builds its own.  A container whose image this throws for is never started.
+    protected virtual Task PrepareImageAsync(CancellationToken token) => Task.CompletedTask;
+
     // Skips the test on a server before that major, which lacks what the reason names.
     public void SkipBelow(int major, string reason) => EngineImage.SkipBelow(Major, major, reason);
 
@@ -59,6 +64,7 @@ public abstract class PostgresContainer(DbProviderFactory factory, string image)
     public async ValueTask InitializeAsync()
     {
         var token = TestContext.Current.CancellationToken;
+        await PrepareImageAsync(token);
 
         // The container's own database is "postgres", so that every database of the subclass is made by CREATE
         // DATABASE.

@@ -1,0 +1,6 @@
+{
+  "libraryTypes": {
+    // NetTopologySuite on, over SQL Server's default, which is off whether the project references it or not.
+    "netTopologySuite": "on",
+  },
+}

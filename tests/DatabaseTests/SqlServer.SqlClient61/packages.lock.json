@@ -45,6 +45,21 @@
           "Microsoft.Testing.Platform": "2.4.0"
         }
       },
+      "NetTopologySuite": {
+        "type": "Direct",
+        "requested": "[2.5.0, )",
+        "resolved": "2.5.0",
+        "contentHash": "5/+2O2ADomEdUn09mlSigACdqvAf0m/pVPGtIPEPQWnyrVykYY0NlfXLIdkMgi41kvH9kNrPqYaFBTZtHYH7Xw=="
+      },
+      "NetTopologySuite.IO.SqlServerBytes": {
+        "type": "Direct",
+        "requested": "[2.1.0, )",
+        "resolved": "2.1.0",
+        "contentHash": "R4BcV19f2l6EjHSjh/EHwLhYQHrOov9vig1EW5oBm0iqlZOgaIJm5tBnlbFnYlvdYOPuf5p0Qtf8PCVwH77Wbg==",
+        "dependencies": {
+          "NetTopologySuite": "[2.0.0, 3.0.0-A)"
+        }
+      },
       "NodaTime": {
         "type": "Direct",
         "requested": "[3.1.9, )",
