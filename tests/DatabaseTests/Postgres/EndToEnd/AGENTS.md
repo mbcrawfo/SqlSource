@@ -4,7 +4,7 @@
 
 ## Sidecars
 
-- **Every sidecar of `EndToEnd/Queries/` and `EndToEnd/NodaTime/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
+- **Every sidecar of `EndToEnd/Queries/`, `EndToEnd/NodaTime/Queries/` and `EndToEnd/Json/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
 - **`CheckTests` runs `--check` over the real project, never a copy, through `CliRun.Real`**, which reads the test process's environment and runs the real MSBuild, as `ErrorPathTests` does.
 
 ## Queries and tests
@@ -21,6 +21,11 @@
 
 - **NodaTime is on in `EndToEnd/NodaTime/` alone**: the project's `sqlsource.json` turns it off, so that the other queries, the realistic corpus and the Dapper tests keep the base map's types.  A query that needs NodaTime's types goes in that folder, and its methods run on `EndToEndSources.AppWithNodaTime`.
 - **A column of `noda_values` changes `EndToEnd/app/schema.sql`, `NodaTime/Queries/NodaTime.sql` and the rows of `NodaTime/NodaTimeQueryTests.cs` and of its copy in `tests/DatabaseTests/Postgres.Npgsql8` together.**
+
+## JSON
+
+- **System.Text.Json is on in `EndToEnd/Json/` alone**, by its `sqlsource.json`, since the library's default is off: a query that needs its types or a class in a JSON column goes in that folder, and its methods run on `EndToEndSources.App`, which calls no `EnableDynamicJson()`.
+- **A column of `json_values` changes `EndToEnd/app/schema.sql`, `Json/Queries/Json.sql` and `Json/JsonQueryTests.cs`, and its copy in `tests/DatabaseTests/Postgres.Npgsql8`, together**; a class of `Json/Types/` changes that project's copy too.
 
 ## `all_types` and the recipe
 

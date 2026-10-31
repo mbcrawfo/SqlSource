@@ -5,9 +5,9 @@
 # request that raises VersionPrefix, since every sidecar holds the tool's version, and reads the diff of what it wrote
 # before committing it.  It has a part for each engine, which starts its own container and removes it:
 # - PostgreSQL: the .sql.json files of the realistic cases under tests/DatabaseTests/Postgres/Realistic/Cases and of
-#   the end-to-end queries under tests/DatabaseTests/Postgres/EndToEnd/Queries and EndToEnd/NodaTime/Queries, against
-#   the databases "realistic", "app" and "billing", each made from the schema.sql and seed.sql of Realistic/,
-#   EndToEnd/app/ and EndToEnd/billing/.
+#   the end-to-end queries under tests/DatabaseTests/Postgres/EndToEnd/Queries, EndToEnd/NodaTime/Queries and
+#   EndToEnd/Json/Queries, against the databases "realistic", "app" and "billing", each made from the schema.sql and
+#   seed.sql of Realistic/, EndToEnd/app/ and EndToEnd/billing/.
 #   It then writes the sidecars of examples/PostgresExamples the same way, against a database "examples" made from its
 #   schema.sql, and runs after a change to a query or to the schema of the examples too.
 # - SQL Server: the .sql.json files of the realistic cases under tests/DatabaseTests/SqlServer/Realistic/Cases and of
@@ -118,8 +118,8 @@ describe_postgres() {
         connections+=(--connection "$database=$connection")
     done
 
-    find "$POSTGRES_END_TO_END/Queries" "$POSTGRES_END_TO_END/NodaTime/Queries" "$POSTGRES_REALISTIC/Cases" \
-        -name '*.sql.json' -type f -delete
+    find "$POSTGRES_END_TO_END/Queries" "$POSTGRES_END_TO_END/NodaTime/Queries" "$POSTGRES_END_TO_END/Json/Queries" \
+        "$POSTGRES_REALISTIC/Cases" -name '*.sql.json' -type f -delete
 
     dotnet run --project src/SqlSource.Tool -- \
         describe --force "$POSTGRES_PROJECT/Postgres.csproj" "${connections[@]}"

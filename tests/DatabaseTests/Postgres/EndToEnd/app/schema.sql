@@ -167,3 +167,23 @@ CREATE TABLE noda_values (
     tsrange_array_value tsrange[],
     daterange_array_value daterange[]
 );
+
+-- One nullable column for each JSON type and class that the queries of Json/Queries/Json.sql read and send, under the
+-- folder's settings file, which turns System.Text.Json on: element, element_json and elements take the library's
+-- JsonElement, the column types of the file's header give the others, and text_meta, a text, holds a class by the
+-- opt-in.
+CREATE TABLE json_values (
+    id integer PRIMARY KEY,
+    element jsonb,
+    element_json json,
+    elements jsonb[],
+    document jsonb,
+    node jsonb,
+    obj jsonb,
+    arr jsonb,
+    meta jsonb,
+    metas jsonb[],
+    tags jsonb,
+    camel jsonb,
+    text_meta text
+);
