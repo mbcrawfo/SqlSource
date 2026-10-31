@@ -9,8 +9,8 @@
 
         The repository's Directory.Build.props and Directory.Packages.props also apply here.  The first sets the
         language version, implicit usings off, the repository's analyzers and TreatWarningsAsErrors, which your project
-        does not need, and the second gives Dapper and Microsoft.Data.SqlClient their versions, which your project
-        writes on each PackageReference.
+        does not need, and the second gives Dapper, Microsoft.Data.SqlClient, NodaTime and
+        NetTopologySuite.IO.SqlServerBytes their versions, which your project writes on each PackageReference.
     -->
     <Import Project="../../src/SqlSource/build/SqlSource.props" />
     <PropertyGroup>
@@ -25,6 +25,12 @@
     <ItemGroup>
         <PackageReference Include="Dapper" />
         <PackageReference Include="Microsoft.Data.SqlClient" />
+        <!--
+            NodaTime, and NetTopologySuite's reader and writer of SQL Server's bytes, which brings NetTopologySuite:
+            the query methods read and send their types, which sqlsource.json turns on.
+        -->
+        <PackageReference Include="NetTopologySuite.IO.SqlServerBytes" />
+        <PackageReference Include="NodaTime" />
     </ItemGroup>
     <ItemGroup>
         <!-- Only in this repository: the generator, as the package adds it. -->
