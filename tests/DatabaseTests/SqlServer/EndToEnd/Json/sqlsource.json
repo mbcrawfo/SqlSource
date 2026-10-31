@@ -1,0 +1,11 @@
+{
+  "libraryTypes": {
+    // System.Text.Json on for the queries of this folder alone, so that SQL Server 2025's json is JsonElement, where
+    // the project's settings file leaves the library at its default, off.
+    "json": "on",
+  },
+  "columnTypes": {
+    // A class of the project on an nvarchar by the opt-in of a settings file, read and sent through the serializer.
+    "json_values.settings_meta": { "type": "OrderMetadata", "json": true },
+  },
+}
