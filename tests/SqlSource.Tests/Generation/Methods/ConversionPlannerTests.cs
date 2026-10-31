@@ -719,6 +719,30 @@ public sealed class ConversionPlannerTests
         writeBlocked.ShouldBeFalse();
     }
 
+    // The path is only for geography and geometry: a varbinary that an override reads as Geometry is converted by the
+    // project's converters, as any other type of the project's choice is.
+    [Fact]
+    public void Plan_GeometryOverVarbinary_IsTheProjectsConverter()
+    {
+        var type = Overridden(Geometry, false, "varbinary", "byte[]", false);
+        var converters = Of(
+            Project("global::MyApp.Shapes.FromBytes", "byte[]", false, Geometry, false),
+            Project("global::MyApp.Shapes.ToBytes", Geometry, false, "byte[]", false)
+        );
+
+        var (read, readProblems, readBlocked) = PlanSpatial(type, isRead: true, converters);
+        var (write, writeProblems, writeBlocked) = PlanSpatial(type, isRead: false, converters);
+
+        read.ShouldBe(new Conversion("global::MyApp.Shapes.FromBytes", "byte[]", false, false, null, false));
+        write.ShouldBe(new Conversion("global::MyApp.Shapes.ToBytes", "byte[]", false, false, null, false));
+        read!.IsSpatial.ShouldBeFalse();
+        write!.IsSpatial.ShouldBeFalse();
+        readProblems.ShouldBeEmpty();
+        writeProblems.ShouldBeEmpty();
+        readBlocked.ShouldBeFalse();
+        writeBlocked.ShouldBeFalse();
+    }
+
     // PostGIS's geometry is read by the plugin, on PostgreSQL, whatever the project references.
     [Fact]
     public void Plan_PostgresGeometry_IsTheDriver()
