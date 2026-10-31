@@ -157,7 +157,7 @@ WHERE id = @id;
 
 Each column and each parameter of a described PostgreSQL query gets a C# type: the type that Npgsql reads a value of its PostgreSQL type as.  If `id` is a `bigint`, `placed_at` a `timestamp with time zone`, `total` a `numeric(12,2)`, `tags` a `text[]` and `born` a `date`, they are `long`, `System.DateTime`, `decimal`, `string[]`, and `System.DateTime` on Npgsql 8 and 9 or `System.DateOnly` on Npgsql 10; `@id` is a `long`.  Whether a column can be null is decided [above](#nullability), not by its type.
 
-The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for a type that Npgsql cannot read.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides), `"timestamptz": "System.DateTimeOffset"` in a settings file's `typeOverrides`.  To give one column another, use a [column type](settings.md#setting-column-types), `"users.id": "MyApp.UserId"` in its `columnTypes`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Npgsql does not read, such as an id or an `Email` over a domain, needs [converters](settings.md#converters) to and from the type of the table below.  A project that references `Npgsql.NodaTime` gets NodaTime's types for the date and time types of its queries whose output is `codegen`: see [NodaTime](#nodatime).
+The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for a type that Npgsql cannot read.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides), `"timestamptz": "System.DateTimeOffset"` in a settings file's `typeOverrides`.  To give one column another, use a [column type](settings.md#setting-column-types), `"users.id": "MyApp.UserId"` in its `columnTypes`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Npgsql does not read, such as an id or an `Email` over a domain, needs [converters](settings.md#converters) to and from the type of the table below.  A project that references `Npgsql.NodaTime` gets NodaTime's types for the date and time types of its queries whose output is `codegen`: see [NodaTime](#nodatime).  A project can read its JSON columns as System.Text.Json's types or as classes of its own: see [JSON](#json).
 
 <a id="which-npgsql"></a>
 
@@ -285,6 +285,58 @@ An array of one of these types is an array of its C# type, `NodaTime.Instant[]` 
 - **`NodaTime.Interval` and `NodaTime.DateInterval` cannot hold every range**, which is why the defaults are `NpgsqlRange<T>`.  An empty range throws when it is read: `ArgumentOutOfRangeException` for a `tstzrange` as an `Interval`, and `ArgumentException` for a `daterange` as a `DateInterval`.  A `tstzrange` whose start is excluded, `(a,b]`, is read as the `Interval` `[a+1ns, b+1ns)`, since an `Interval` includes its start and excludes its end, and sent back it is stored as `[a,b)`, since PostgreSQL keeps microseconds: a read and a write move the range.  A multirange never holds an empty range, but its ranges move the same way.
 - **Without the plugin**, a project that references `NodaTime` alone gets none of NodaTime's types by default.  A type override, a column type or a marker that names one, `timestamptz=NodaTime.Instant`, gives the property that type, as it would any type, and the query method asks Npgsql for it, which throws `InvalidCastException` when the query runs.  Add `Npgsql.NodaTime`, and call `UseNodaTime()` as [what a method reads and throws](#method-results) says.
 
+<a id="json"></a>
+
+### JSON
+
+```jsonc
+// sqlsource.json, in the project's folder
+{
+    "root": true,
+    "dialect": "postgres",
+    "libraryTypes": {
+        "json": "on",
+    },
+    "columnTypes": {
+        "orders.metadata": "OrderMetadata",
+        "orders.document": "System.Text.Json.JsonDocument",
+    },
+}
+```
+
+```sql postgres
+-- name: GetOrder -> one
+SELECT id, payload, history, metadata, document
+FROM orders
+WHERE id = @id;
+```
+
+```csharp
+public sealed record GetOrderDto(
+    long Id,
+    global::System.Text.Json.JsonElement Payload,
+    global::System.Text.Json.JsonElement[] History,
+    global::MyApp.OrderMetadata Metadata,
+    global::System.Text.Json.JsonDocument Document);
+```
+
+A `json` or `jsonb` column is a `string`, as [the types](#type-table) say, until the [library types](settings.md#setting-library-types) turn System.Text.Json on, named `json`.  Then the `json` and `jsonb` columns and parameters of its queries whose output is `codegen` are `System.Text.Json.JsonElement`, and an array of one, `jsonb[]`, a `JsonElement[]`.  Above, `payload` and `metadata` are `jsonb`, `document` a `json` and `history` a `jsonb[]`, each `NOT NULL`, and the column types give `metadata` a class of the project and `document` a `JsonDocument`.  `json` is off until a settings file or a marker turns it on, for a project, a folder, a file or a query.  Every .NET project has System.Text.Json, so it needs no package, and Npgsql reads and sends `JsonElement` with nothing to register on the data source.  `jsonpath` stays a `string`.
+
+| PostgreSQL type | C# type with `json` on |
+|----|----|
+| `json`, `jsonb` | `System.Text.Json.JsonElement` |
+| An array of one, `jsonb[]` | `System.Text.Json.JsonElement[]` |
+
+A domain over one of these types has its C# type, as [the kinds](#type-table) say.  Every other type keeps the type of [the types](#type-table).
+
+- **Only query methods get `JsonElement`.**  A query whose output is `models` keeps the `string` of the table above, and so do its models.  A model that such a query shares with a `codegen` query is [SQLSRC257](diagnostics.md#sqlsrc257): see [library types](settings.md#setting-library-types).
+- **Your own choices win.**  A [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) and a `-- param:` or `-- column:` marker give their type over `JsonElement`.
+- **System.Text.Json's other types are yours to choose**, with the type override, a column type or a marker, with `json` on or off: `JsonDocument`, and `JsonNode`, `JsonObject` and `JsonArray` of `System.Text.Json.Nodes`, for a `json` or `jsonb` column or parameter.  Npgsql reads and sends `JsonElement` and `JsonDocument` on Npgsql 8, 9 and 10, and `JsonNode`, `JsonObject` and `JsonArray` on Npgsql 10.  Npgsql 8 and 9 read those three only after `EnableDynamicJson()` on the data source, so there the query methods convert them themselves, from and to the JSON's text, and the data source needs nothing.  There a `JsonObject` read from a JSON array, or a `JsonArray` from an object, throws `InvalidCastException`.
+- **A `JsonDocument` is yours to dispose.**  Each one that a method returns, in its row's property, holds memory that is returned only when the document is disposed: dispose it, with `using` or once you have read it.  One that you send stays yours.  A `JsonElement` needs no disposal.
+- **A class of your own** in a `json` or `jsonb` column, such as `OrderMetadata` above, is read and sent through System.Text.Json's serializer, with `json` on or off, and with nothing to register on the data source: no `EnableDynamicJson()`, which Npgsql's own route for a class needs.  An array of a class, `OrderMetadata[]` for a `jsonb[]`, is read and sent element by element.  A `text` or `varchar` column that holds JSON takes a class by [the JSON opt-in](settings.md#json-opt-in).  What a class is, the serializer's options, and the converters that replace it, are in [a class in a JSON column](settings.md#json-class).
+- **A JSON `null` is not a SQL `NULL`.**  A column that holds the JSON `null`, `'null'::jsonb`, is read as a `JsonElement` of the kind `Null`, and as a `JsonDocument` whose root is one, whether its property can be null or not.  A `JsonNode`, a `JsonObject` and a `JsonArray` cannot hold it: into a property that can be null it is null, and into one that cannot it throws `InvalidCastException`, "Column 'node' holds a JSON null.", as a class does.  On Npgsql 8 and 9 a `JsonNode[]` throws the same for an element that is a JSON `null`, and a `JsonNode?[]` gives null.  A `JsonNode[]` that Npgsql 10 reads gives such an element as null, unchecked, as for a `NULL` element: write `JsonNode?[]` where an element can be one.  A SQL `NULL` gives its property null, or throws as any column does.
+- **`jsonb` keeps the structure, not the text.**  It stores JSON in a form of its own: its white space is its own, the keys of an object are in its own order, and of two keys of one name the last alone is kept.  So a value reads back equal in structure, not in text: compare JSON read back by its structure.  `json` keeps the text as it was sent.
+
 <a id="models"></a>
 
 ## Models
@@ -307,7 +359,7 @@ public sealed record FindOrdersDto(long Id, global::System.DateTime PlacedAt, st
 
 A described PostgreSQL query gets the [models](generator.md#models) that every described query gets, by the rules of the generator page; their namespace and documentation are left out above.  What PostgreSQL decides in them:
 
-- **Each property's type** is its column's or parameter's C# type, from [the type table](#type-table) under the version of Npgsql that the project references, or [NodaTime's](#nodatime) for a query whose output is `codegen` in a project that references `Npgsql.NodaTime`, or the one you chose, by the [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a marker.  Above, `id` is a `bigint` and `placed_at` a `timestamp with time zone`, both `NOT NULL`.
+- **Each property's type** is its column's or parameter's C# type, from [the type table](#type-table) under the version of Npgsql that the project references, or [NodaTime's](#nodatime) for a query whose output is `codegen` in a project that references `Npgsql.NodaTime`, or [System.Text.Json's](#json) for one where the library types turn `json` on, or the one you chose, by the [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a marker.  Above, `id` is a `bigint` and `placed_at` a `timestamp with time zone`, both `NOT NULL`.
 - **A column's property can be null** by [which columns can be null](#nullability): `customer_name` comes from the optional side of the `LEFT JOIN`, so its property is a `string?`.  A column's alias can say otherwise with `!` or `?`, and so can a [`-- column:` marker](generator.md#column-marker).
 - **A parameter's property can be null** only when its `-- param:` marker says `null`, as `@status` does, since PostgreSQL does not say whether a parameter can be null.
 - **A column with no name**, which PostgreSQL calls `?column?`, as an expression or a literal without an alias, is [SQLSRC253](diagnostics.md#sqlsrc253), and the query gets no models until it is fixed.  Give it an alias.
@@ -343,6 +395,7 @@ Each parameter is sent as the PostgreSQL type it was described with, or the type
 - **A parameter declared as a domain is sent as the domain's base type**, so the domain's `CHECK` is not applied to it.  Compared with a column of the domain, a value that the domain refuses finds no row, and the server checks it only when it is written to such a column.
 - **A `string` longer than the `varchar(n)` column it is written to is refused by the server**, with `22001`, and never cut to fit.
 - **A parameter that has a [converter](settings.md#converters)** is converted to the type of [the table](#type-table), a domain's base type for a domain, and sent as its database type too.
+- **A parameter of a [JSON](#json) type, or a class of yours in one,** is sent as its `json` or `jsonb`: a `JsonElement`, a `JsonDocument`, and on Npgsql 10 a `JsonNode`, a `JsonObject` or a `JsonArray`, by Npgsql, and on Npgsql 8 and 9 those three, and a class on every version, as their JSON's text.  A class by [the JSON opt-in](settings.md#json-opt-in) is sent as its JSON's text, as the parameter's own type: a `text` parameter as a `text`.
 
 <a id="method-results"></a>
 
@@ -361,7 +414,8 @@ Each parameter is sent as the PostgreSQL type it was described with, or the type
 
 - **Entity Framework Core's NodaTime package turns NodaTime on.**  `Npgsql.EntityFrameworkCore.PostgreSQL.NodaTime` brings `Npgsql.NodaTime`, so the query methods of a project that references it get NodaTime's types.  `UseNodaTime()` inside EF Core's `UseNpgsql(...)` teaches the data source that EF Core builds for itself, and no other: call `UseNodaTime()` on the builder of the data source whose connections run the query methods, or turn NodaTime off with the [library types](settings.md#setting-library-types), `"nodaTime": "off"`.
 - **`UseNodaTime()` changes what Npgsql gives Dapper too.**  On a data source that calls it, every reader gets NodaTime's types: a `timestamptz` arrives as an `Instant`, so a query whose output is `models`, read through Dapper into its `System.DateTime` property, fails, and a `tstzrange` or a `daterange` arrives as an `Interval` or a `DateInterval`, which throws for an empty range, whatever the property's type.  That is the plugin's doing.  Give such queries NodaTime's types with the [type override](settings.md#setting-type-overrides), `"timestamptz": "NodaTime.Instant"` in a settings file of their folder, or read them on a data source without the plugin.
-- **A column whose property cannot be null** throws Npgsql's `InvalidCastException`, "Column 'name' is null.", when it holds a null, before any converter is called.
+- **System.Text.Json's types and a class of yours in a [JSON](#json) column need nothing on the data source**, on Npgsql 8, 9 and 10: no `EnableDynamicJson()`.
+- **A column whose property cannot be null** throws Npgsql's `InvalidCastException`, "Column 'name' is null.", when it holds a null, before any converter is called.  A JSON `null` in such a column is no null, and what it gives is under [JSON](#json).
 - **`rowcount` is `-1` for a `SELECT`**, and for a `WITH` whose last statement is a `SELECT`, though its `WITH` updates rows: see [what each shape returns](generator.md#method-shapes).
 - **`commandTimeout`** that passes throws Npgsql's `NpgsqlException`, whose inner exception is a `TimeoutException`.
 - **A cancelled method throws `OperationCanceledException`**, whether the token was cancelled before the call, while the command runs or while the rows are read.
