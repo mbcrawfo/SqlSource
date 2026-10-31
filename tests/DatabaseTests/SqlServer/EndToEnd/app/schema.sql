@@ -112,3 +112,24 @@ CREATE TABLE dbo.spatial_values (
     point_value geography NULL,
     polygon_value geometry NULL
 );
+
+-- One nullable column for each JSON type and class that the queries of Json/Queries/Json.sql read and send, under the
+-- folder's settings file, which turns System.Text.Json on.  Every column is an nvarchar, which the library leaves a
+-- string, so the queries' markers and the folder's column types give each its type: element, document, node, obj and
+-- arr a type of System.Text.Json, settings_meta, header_meta, tags and marker_meta a class by the opt-in at each of its
+-- places, camel a class with converters of its own, and plain_meta, an nvarchar(200), a class without the opt-in,
+-- which SqlClient cannot read.  It has no seed: each test writes its rows in a transaction that is rolled back.
+CREATE TABLE dbo.json_values (
+    id int PRIMARY KEY,
+    element nvarchar(max) NULL,
+    document nvarchar(max) NULL,
+    node nvarchar(max) NULL,
+    obj nvarchar(max) NULL,
+    arr nvarchar(max) NULL,
+    settings_meta nvarchar(max) NULL,
+    header_meta nvarchar(max) NULL,
+    tags nvarchar(max) NULL,
+    marker_meta nvarchar(max) NULL,
+    camel nvarchar(max) NULL,
+    plain_meta nvarchar(200) NULL
+);

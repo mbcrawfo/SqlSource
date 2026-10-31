@@ -64,7 +64,9 @@ public sealed class LibrarySettingsTests
     [InlineData("nodatime", false, null, null)]
     [InlineData("nodatime=maybe", false, null, null)]
     [InlineData("=on", false, null, null)]
-    [InlineData("json=on", false, null, null)]
+    [InlineData("json=on", true, "Json", "On")]
+    [InlineData("  JSON = off ", true, "Json", "Off")]
+    [InlineData("jsn=on", false, null, null)]
     public void TryReadEntry_ReadsNamesAndValuesAsAChoice(string entry, bool valid, string? library, string? state)
     {
         LibrarySettings.TryReadEntry(entry.AsSpan(), out var readLibrary, out var readState).ShouldBe(valid);

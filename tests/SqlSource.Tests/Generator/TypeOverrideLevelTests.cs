@@ -284,7 +284,18 @@ public sealed class TypeOverrideLevelTests
             ]);
         StepOutputs
             .ColumnsOf(ofTheElement, "GetUser")
-            .ShouldBe([new PropertyType(elementType, false, true, NoWarnings, element, TheProjectFilePlace, database)]);
+            .ShouldBe([
+                new PropertyType(
+                    elementType,
+                    false,
+                    true,
+                    NoWarnings,
+                    element,
+                    TheProjectFilePlace,
+                    database,
+                    ElementIsValueType: element != "citext"
+                ),
+            ]);
     }
 
     // _int4 and int4[] are one key, so the query's entry replaces the project's file's whichever spelling each has, and

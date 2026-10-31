@@ -4,10 +4,10 @@
 
 ## Sidecars and majors
 
-- **Every sidecar of `EndToEnd/Queries/`, `EndToEnd/NodaTime/Queries/` and `EndToEnd/NetTopologySuite/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
+- **Every sidecar of `EndToEnd/Queries/`, `EndToEnd/NodaTime/Queries/`, `EndToEnd/NetTopologySuite/Queries/` and `EndToEnd/Json/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
 - **`CheckTests` runs `--check` over the real project, never a copy, through `CliRun.Real`**, as `ErrorPathTests` does.
 - **No entry differs between the supported majors**, since `CheckTests` runs on each, 2017 and 2025 in CI and 2019 and 2022 every night: a parameter that two majors type differently declares its type with `-- param:`.
-- **A query of a type that 2017 lacks goes into `Queries/NewTypes.sql`**, which `CheckTests` leaves out below 17, and its test skips by `SkipBelow(17, ...)`.
+- **A query of a type that 2017 lacks goes into `Queries/NewTypes.sql`, or `Json/Queries/JsonColumns.sql` for one of System.Text.Json on `json`**, which `CheckTests` leaves out below 17, and its test skips by `SkipBelow(17, ...)`.
 - **Every batch of `EndToEnd/app/schema.sql` and `EndToEnd/billing/schema.sql` runs on SQL Server 2017**; a type that 2017 lacks goes into `EndToEnd/app/new-types.sql`.
 
 ## Queries and tests
@@ -32,6 +32,11 @@
 - **A column of `spatial_values` changes `EndToEnd/app/schema.sql`, the queries of `NetTopologySuite/Queries/` and `NetTopologySuite/NetTopologySuiteQueryTests.cs` and its copy in `tests/DatabaseTests/SqlServer.SqlClient61` together.**
 - **A subtype by a type override goes in a column of its own type, `point_value geography` or `polygon_value geometry`**, since an override is keyed by the database type, and a file header's override of `geography` or `geometry` makes every column of it that subtype.
 - **`tests/DatabaseTests/TestHarness/EndToEnd/WrappingConnection.cs` keeps its reader to the members `DbDataReader` requires and its disposal**, so that the read through it takes `DbDataReader`'s `GetStream`; a query run through it has no parameter.
+
+## JSON
+
+- **System.Text.Json is on in `EndToEnd/Json/` alone**, by its `sqlsource.json`, which also holds the opt-in of `json_values.settings_meta`: a query that needs its types or a class in a JSON column goes in that folder, whose files `CheckTests` names below 2025, `JsonColumns.sql` left out.
+- **A column of `json_values` or `json_columns` changes `EndToEnd/app/schema.sql` or `EndToEnd/app/new-types.sql`, the queries of `Json/Queries/` and `Json/JsonQueryTests.cs`, and its copy in `tests/DatabaseTests/SqlServer.SqlClient61`, together**; a class of `Json/Types/` changes that project's copy too.
 
 ## `all_types` and the recipe
 

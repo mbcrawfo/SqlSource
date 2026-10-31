@@ -208,6 +208,12 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC281](#sqlsrc281) | A library that is on is not referenced |
 | [SQLSRC282](#sqlsrc282) | A library is older than SqlSource supports |
 
+**The JSON opt-in**
+
+| Id | Title |
+|----|----|
+| [SQLSRC283](#sqlsrc283) | JSON opt-in does not apply |
+
 **A short name of your choice**
 
 | Id | Title |
@@ -240,9 +246,11 @@ The ids from `SQLSRC277` to `SQLSRC280` are reported by the build, about convert
 
 `SQLSRC281` is reported by the build, about the [library types](settings.md#setting-library-types) of a query whose output is `codegen`: at the entry of a settings file or the marker that turns a library on, once for each database whose queries it reaches, and never for a query whose output is `models` or `sql`.  The query keeps its models and its method.  `SQLSRC282` is reported by the build, about the version of a library that a query whose output is `codegen` uses: with no file and line, once for the project and package, however many queries and databases use the library.  Those queries get no method until it is fixed; their models are still generated.
 
+`SQLSRC283` is reported by the build, as `SQLSRC279` and `SQLSRC280` are, at the name of a query whose output is `codegen`, once for each column and parameter whose C# type you chose with the word `json` before it where the opt-in does not apply.  The query gets no method until it is fixed; its models are still generated.  A query whose output is `models` reads the word and gets none of it.
+
 `SQLSRC284` is reported by the build, as `SQLSRC250` to `SQLSRC252` are, at the name of a query whose output is `models` or `codegen`, once for each column and parameter whose C# type you chose by a short name that it is about.  It is a warning, and the query keeps the type: it gets its models, and under `codegen` its method.
 
-`SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to a project, the attribute's to every one and NodaTime's and NetTopologySuite's classes to one whose query methods use them on SQL Server, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
+`SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to a project, the attribute's to every one and NodaTime's and NetTopologySuite's classes to one whose query methods use them on SQL Server, and System.Text.Json's to one whose query methods use it, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
 ## SQLSRC001
 
@@ -462,7 +470,7 @@ See: [Settings files](settings.md#settings-files)
 
 **Settings file value has the wrong type**
 
-A value of a settings file is not of the JSON type its key takes.  `root` takes `true` or `false`, `generatorParameters` an array of strings, `typeOverrides`, `columnTypes` and `libraryTypes` an object whose values are strings, and every other key a string.  `null` is of the wrong type for every key.  The message names the key and what it takes, and the error is at the value.
+A value of a settings file is not of the JSON type its key takes.  `root` takes `true` or `false`, `generatorParameters` an array of strings, `typeOverrides` and `libraryTypes` an object whose values are strings, `columnTypes` an object whose values are strings or objects of a `"type"` string and an optional `"json"` boolean, and every other key a string.  `null` is of the wrong type for every key.  The message names the key and what it takes, and the error is at the value.
 
 ```jsonc
 {
@@ -486,6 +494,8 @@ See: [Settings files](settings.md#settings-files)
 
 A value of a settings file is of the JSON type its key takes, but its setting does not take it.  The message quotes the value, trimmed, and names the key; for a member of `typeOverrides`, `columnTypes` or `libraryTypes` it quotes the member as `key: value`.  The error is at the string, or for a member from its key to its value.
 
+A member of `columnTypes` written as an object takes a `"type"` string, its C# type, and may take `"json"`, `true` or `false`, and no other member; with `"json": true` its type cannot be `default`.  An object that has no `"type"` string, a `"json"` that is not `true` or `false`, a member twice or any other member is quoted by its key alone, and one whose type is not valid as `key: type`, and the message says what the object takes.
+
 ```jsonc
 {
     "dialect": "pgsql",
@@ -497,6 +507,7 @@ A value of a settings file is of the JSON type its key takes, but its setting do
     },
     "columnTypes": {
         "id": "MyApp.UserId",
+        "orders.metadata": { "type": "OrderMetadata", "json": "yes" },
     },
     "libraryTypes": {
         "nodaTime": "yes",
@@ -522,7 +533,7 @@ The rules are in [type overrides](settings.md#setting-type-overrides).
 
 `columnTypes` takes members `"key": "type"`, trimmed in the same way.  Its key is the column a value is read from, `table.column` or `schema.table.column`, each part plain or in double quotes, so `id`, of one part, is reported, and so are a key of four parts, a key in brackets and a key with `[]`.  Its C# type is read as a type override's is, or is `default`.  The rules are in [column types](settings.md#setting-column-types).
 
-`libraryTypes` takes members `"library": "state"`, each trimmed and matched ignoring case, hyphens and spaces: the library is `nodaTime` or `netTopologySuite`, and the state `on`, `off` or `default`.  The message names them.  The rules are in [library types](settings.md#setting-library-types).
+`libraryTypes` takes members `"library": "state"`, each trimmed and matched ignoring case, hyphens and spaces: the library is `nodaTime`, `netTopologySuite` or `json`, and the state `on`, `off` or `default`.  The message names them.  The rules are in [library types](settings.md#setting-library-types).
 
 See: [Settings files](settings.md#settings-files)
 
@@ -720,7 +731,7 @@ A generator parameter has a value it does not take; what follows a name in a `--
 - `-- type-override:` takes one entry, `key = type` or `key = default`.  The key is a type's one-word name, `timestamptz` and not `timestamp with time zone`, and a type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`.  A schema or a name may be in double quotes, with a quote inside it doubled: `public."Status"`, `"my schema"."order-status"`; or in `U&"..."` with escapes, `public.U&"Order\000AItem"`, where an escape that is not `\\`, `\` and four hex digits, or `\+` and six, for a code from 1 to 10FFFF (a character beyond FFFF is one `\+` escape or the escapes of its two surrogates), is not valid.  The type is a keyword, a full name or a short name, `System.DateTimeOffset` or `DateTimeOffset`, with no `?` at the end.  See [type overrides](settings.md#setting-type-overrides).
 - The key of a `-- type-override:` marker is read by its file's dialect.  In an `mssql` file it is a SQL Server type's name, such as `int`, `nvarchar` or `sys.int`, and a name SQL Server does not have, such as `int4` or `pg_catalog.text`, is this error.  In a file of any other dialect a name that SQL Server alone has, such as `nvarchar` or `rowversion`, is this error.  A type of a schema of your own, `dbo.Email`, is read in either.
 - A key is not written in brackets: `-- type-override: [dbo].[Email] = MyApp.Email` is this error, and the message shows the forms that are read, `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
-- `-- library-types:` takes one entry or more, each `name=state` with no space around its `=`, separated by white space, as in `-- library-types: nodatime=off`.  The library is `nodaTime` or `netTopologySuite` and the state `on`, `off` or `default`, matched ignoring case, hyphens and spaces.  A line with no entry, an entry without `=`, `nodatime = on` with spaces, and a library or a state that is not one are this error, which the message lists.  See [library types](settings.md#setting-library-types).
+- `-- library-types:` takes one entry or more, each `name=state` with no space around its `=`, separated by white space, as in `-- library-types: nodatime=off`.  The library is `nodaTime`, `netTopologySuite` or `json` and the state `on`, `off` or `default`, matched ignoring case, hyphens and spaces.  A line with no entry, an entry without `=`, `nodatime = on` with spaces, and a library or a state that is not one are this error, which the message lists.  See [library types](settings.md#setting-library-types).
 
 A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
 
@@ -2709,7 +2720,7 @@ The error has a second form, when the column's or parameter's database type has 
 /work/App/Queries/Users.sql(1,10): error SQLSRC279: The column 'address' has type 'App.Address', which has converters, but the database type 'public.address' has no C# type to convert from.  Choose a C# type without converters for it, or remove the converters of 'App.Address'.
 ```
 
-For an array whose element type a type override, a column type or a `-- param:` marker chose, such as `email[]` under `"public.email": "App.Email"` or `posts.tag_ids` under `"posts.tag_ids": "TagId[]"`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  On SQL Server, the query methods of a project that references NodaTime convert NodaTime's types themselves, so a NodaTime type given to a database type that it is not converted from, as `datetimeoffset=NodaTime.LocalDateTime`, is this error too, and the message names the type it is converted from and to: see [NodaTime on SQL Server](sqlserver.md#nodatime).  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
+For an array whose element type a type override, a column type or a `-- param:` marker chose, such as `email[]` under `"public.email": "App.Email"` or `posts.tag_ids` under `"posts.tag_ids": "TagId[]"`, the element's converters are used, element by element, and the message, in either form, names the element of the column or parameter and the element's type.  A type the driver reads for some database type, such as `string`, `DateTimeOffset` or `DateOnly`, is never this error, so that a converter between it and another type does not touch the columns that are read as it.  On SQL Server, the query methods of a project that references NodaTime convert NodaTime's types themselves, so a NodaTime type given to a database type that it is not converted from, as `datetimeoffset=NodaTime.LocalDateTime`, is this error too, and the message names the type it is converted from and to: see [NodaTime on SQL Server](sqlserver.md#nodatime).  So are System.Text.Json's types, on SQL Server and, for `JsonNode`, `JsonObject` and `JsonArray`, on Npgsql 8 and 9, which the query methods convert from and to a `string`: one given to a database type that is not read as a `string`, as `int=System.Text.Json.JsonElement` on SQL Server, is this error, for a column and a parameter alike, and the message says that its converters convert from and to `string`, not `int`: see JSON on [SQL Server](sqlserver.md#json) and [PostgreSQL](postgresql.md#json).  A class of yours in a column that holds JSON whose converters are all of other types than `string` is this error too, and is not read through System.Text.Json's serializer: see [a class in a JSON column](settings.md#json-class).  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.
 
 See: [Converters](settings.md#converters)
 
@@ -2731,7 +2742,7 @@ See: [Converters](settings.md#converters)
 
 **A library that is on is not referenced**
 
-The `libraryTypes` of a settings file, or a `-- library-types:` marker, turns a library on, such as NodaTime, for queries whose output is `codegen`, and the project does not reference what the library needs on the database of those queries.  On PostgreSQL that is the library's plugin for Npgsql, which brings the library and lets Npgsql read and send its types: `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`.  On SQL Server it is `NodaTime`, or for NetTopologySuite `NetTopologySuite.IO.SqlServerBytes`, which brings NetTopologySuite.  The message names the library, the database and the package that is missing.
+The `libraryTypes` of a settings file, or a `-- library-types:` marker, turns a library on, such as NodaTime, for queries whose output is `codegen`, and the project does not reference what the library needs on the database of those queries.  On PostgreSQL that is the library's plugin for Npgsql, which brings the library and lets Npgsql read and send its types: `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`.  On SQL Server it is `NodaTime`, or for NetTopologySuite `NetTopologySuite.IO.SqlServerBytes`, which brings NetTopologySuite.  System.Text.Json, which `json` turns on, is in every .NET project.  The message names the library, the database and the package that is missing.
 
 ```console
 /work/App/sqlsource.json(5,5): error SQLSRC281: NodaTime is on for the PostgreSQL query methods it reaches here, but the project does not reference Npgsql.NodaTime.  Reference Npgsql.NodaTime, or turn NodaTime off for these queries.
@@ -2754,6 +2765,20 @@ CSC : error SQLSRC282: This project references NodaTime 3.1.8, and SqlSource nee
 Until the package is updated, a query that uses the library gets no method; its models are still generated, with the library's types.  Any other error about its method is reported beside this one: fix it too, or the query still has no method once the package is updated.  The queries that do not use the library keep their methods.  Update the package to the version the message gives or later.  When another package brings the older version, reference the library's package from the project itself, at the version you want.  The error has no file and line, because it is about the project's references, and it is reported once for the project and package, however many queries and databases use the library, and never for a query whose output is `models` or `sql`.
 
 See: [Library types](settings.md#setting-library-types)
+
+## SQLSRC283
+
+**JSON opt-in does not apply**
+
+A column type, a `-- column:` marker or a `-- param:` marker gives a column or a parameter of a query whose output is `codegen` a C# type with the word `json` before it, `"json": true` in a settings file or `-> json OrderMetadata` in a marker, and the opt-in cannot read and send that column or parameter as JSON.  The opt-in says that a column of a string type, such as `text` or `nvarchar(max)`, holds JSON, so that your own class is read and sent through System.Text.Json's serializer, as a `json` or `jsonb` column of it is.  It does not apply to a column or parameter of any other database type, such as `int` or `text[]`, or with a C# type that is not a class of your own: a type of System.Text.Json, such as `JsonElement`, or a type that the database's driver reads, such as `string` or `long`.  On an array of a JSON type, such as `jsonb[]`, each element is read and sent on its own, so the opt-in takes an array of your class, `OrderMetadata[]`, and not an array of a type of System.Text.Json or of a type the driver reads, such as `JsonElement[]` or `string[]`; the message then names the element.  The message names the column or parameter, its C# type, the place that chose it, as [SQLSRC250](#sqlsrc250) does, and the reason.
+
+```console
+/work/App/Queries/Orders.sql(1,10): error SQLSRC283: The column 'id' is mapped to json 'App.OrderMetadata' in a -- column: marker of the query, but the database type 'int4' is read as 'int', not as a string.  Remove json, or use it only to map a column or parameter of a string or JSON type to a class of this project.
+```
+
+Remove the word `json` from the place the message names, or `"json": true` from the column type, to map the column or parameter as any other type is mapped.  Or move the opt-in to the column or parameter that holds JSON, and give it your class: a `string` column of a database that has no JSON type, or a `json` or `jsonb` column, on which the opt-in is allowed and changes nothing.  The error is reported at the query's name, and the query gets no method until it is fixed; its models are still generated.  A query whose output is `models` is not reported.
+
+See: [The JSON opt-in](settings.md#json-opt-in), [a class in a JSON column](settings.md#json-class)
 
 ## SQLSRC284
 

@@ -11,4 +11,7 @@ internal enum SqlLibrary
 
     /// <summary>NetTopologySuite's geometries.</summary>
     NetTopologySuite,
+
+    /// <summary>System.Text.Json's <c>JsonElement</c> for the JSON types of the databases.</summary>
+    Json,
 }

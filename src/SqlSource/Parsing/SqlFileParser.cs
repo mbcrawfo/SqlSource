@@ -631,7 +631,8 @@ internal static class SqlFileParser
                         column.IsNullable,
                         column.ClrType,
                         column.ResetsType,
-                        column.Marker.Span
+                        column.Marker.Span,
+                        column.IsJson
                     )
                 );
             }

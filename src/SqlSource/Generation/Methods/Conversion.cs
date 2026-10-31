@@ -45,6 +45,17 @@ namespace SqlSource.Generation.Methods;
 /// <c>GetStream</c>, and <paramref name="DatabaseText" /> is <c>global::System.Data.SqlTypes.SqlBytes</c>, which a
 /// parameter is bound as.
 /// </param>
+/// <param name="MayReturnNull">
+/// Whether the call, on a read, can return null for a value that is not a <c>NULL</c>: the parse of a JSON
+/// <c>null</c> into a <see cref="Converters.JsonTypes.IsNode" /> type.  A not-null element read by element then
+/// throws on it.  Also every read of the serializer, which gives a JSON <c>null</c> as null: a value type is read as
+/// <c>JsonSerializer.Deserialize&lt;T?&gt;</c> for it.
+/// </param>
+/// <param name="IsSerializer">
+/// Whether the call is System.Text.Json's serializer, <c>JsonSerializer.Deserialize&lt;T&gt;</c> or
+/// <c>JsonSerializer.Serialize&lt;T&gt;</c> with its default options, for a project's own class in a type that holds
+/// JSON, rather than a converter.  It has no <paramref name="Library" />: no class is emitted for it.
+/// </param>
 internal sealed record Conversion(
     string Method,
     string DatabaseText,
@@ -54,7 +65,9 @@ internal sealed record Conversion(
     bool ElementIsValueType,
     EquatableArray<string> WarningIds = default,
     SqlLibrary? Library = null,
-    bool IsSpatial = false
+    bool IsSpatial = false,
+    bool MayReturnNull = false,
+    bool IsSerializer = false
 )
 {
     /// <summary>

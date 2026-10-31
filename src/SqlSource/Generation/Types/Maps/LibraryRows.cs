@@ -80,12 +80,13 @@ internal sealed class LibraryRows
 
     /// <summary>
     /// The library as the place that chose a type, which <c>SQLSRC250</c> to <c>SQLSRC252</c> word: <c>the NodaTime
-    /// library</c> or <c>the NetTopologySuite library</c>.
+    /// library</c>, <c>the NetTopologySuite library</c> or <c>the System.Text.Json library</c>.
     /// </summary>
     public static string PlaceOf(SqlLibrary library) =>
         library switch
         {
             SqlLibrary.NetTopologySuite => "the NetTopologySuite library",
+            SqlLibrary.Json => "the System.Text.Json library",
             SqlLibrary.NodaTime or _ => "the NodaTime library",
         };
 
@@ -182,6 +183,7 @@ internal sealed class LibraryRows
         library switch
         {
             SqlLibrary.NetTopologySuite => (Empty(), Empty()),
+            SqlLibrary.Json => (JsonRows(), JsonSqlServerRows()),
             SqlLibrary.NodaTime or _ => (NodaTimeRows(), NodaTimeSqlServerRows()),
         };
 
@@ -212,6 +214,31 @@ internal sealed class LibraryRows
                 {
                     Detail = place,
                     Library = SqlLibrary.NetTopologySuite,
+                }
+            );
+        }
+
+        return rows;
+    }
+
+    // JSON is System.Text.Json's JsonElement on both engines: json and jsonb on PostgreSQL, json on SQL Server.  The
+    // base map has the other types that read as text, jsonpath and xml, as a string, and keeps them.
+    private static Dictionary<string, TypeMapping> JsonRows() => JsonRowsOf("json", "jsonb");
+
+    private static Dictionary<string, TypeMapping> JsonSqlServerRows() => JsonRowsOf("json");
+
+    private static Dictionary<string, TypeMapping> JsonRowsOf(params string[] keys)
+    {
+        var rows = new Dictionary<string, TypeMapping>(StringComparer.OrdinalIgnoreCase);
+        var place = PlaceOf(SqlLibrary.Json);
+        foreach (var key in keys)
+        {
+            rows.Add(
+                key,
+                TypeMapping.Mapped(key, "global::System.Text.Json.JsonElement", true) with
+                {
+                    Detail = place,
+                    Library = SqlLibrary.Json,
                 }
             );
         }

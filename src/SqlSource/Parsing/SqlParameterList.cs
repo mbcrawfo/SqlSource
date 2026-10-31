@@ -142,6 +142,7 @@ internal static class SqlParameterList
                 Nullable = declaration.Nullable,
                 IsDeclared = true,
                 ClrType = declaration.ClrType,
+                IsJson = declaration.IsJson,
             };
             return;
         }
@@ -158,7 +159,14 @@ internal static class SqlParameterList
         }
 
         parameters.Add(
-            new SqlQueryParameter(declaration.Name, declaration.Type, declaration.Nullable, true, declaration.ClrType)
+            new SqlQueryParameter(
+                declaration.Name,
+                declaration.Type,
+                declaration.Nullable,
+                true,
+                declaration.ClrType,
+                declaration.IsJson
+            )
         );
     }
 

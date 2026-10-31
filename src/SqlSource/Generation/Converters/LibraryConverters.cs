@@ -19,14 +19,21 @@ internal static class LibraryConverters
     /// <see cref="AttributeSource.GeneratedTypes" />.
     /// </summary>
     public static ImmutableArray<string> ClassMetadataNames { get; } =
-        ImmutableArray.Create(NodaTimeConversions.MetadataName, NetTopologySuiteConversions.MetadataName);
+        ImmutableArray.Create(
+            NodaTimeConversions.MetadataName,
+            NetTopologySuiteConversions.MetadataName,
+            JsonConversions.MetadataName
+        );
 
     /// <summary>
     /// The edges of every library <paramref name="probe" /> finds, in the order of <see cref="ConverterSet.Comparer"
-    /// />: NodaTime's when the project references it, else none.
+    /// />: NodaTime's when the project references it, and System.Text.Json's when it does.
     /// </summary>
     public static EquatableArray<Converter> Of(LibraryProbe probe) =>
-        probe.NodaTime ? NodaTimeConversions.Edges : EquatableArray<Converter>.Empty;
+        Merge(
+            probe.NodaTime ? NodaTimeConversions.Edges : EquatableArray<Converter>.Empty,
+            probe.Json ? JsonConversions.Edges : EquatableArray<Converter>.Empty
+        );
 
     /// <summary>
     /// The text of the file of <paramref name="library" />'s class, or null for a library with none.
@@ -36,6 +43,7 @@ internal static class LibraryConverters
         {
             SqlLibrary.NodaTime => NodaTimeConversions.Source,
             SqlLibrary.NetTopologySuite => NetTopologySuiteConversions.Source,
+            SqlLibrary.Json => JsonConversions.Source,
             _ => null,
         };
 
@@ -45,4 +53,34 @@ internal static class LibraryConverters
     /// methods' can, since those end in <c>-Model.g.cs</c> and <c>-Methods.g.cs</c>; and it is not the attribute's.
     /// </summary>
     public static string HintNameOf(SqlLibrary library) => "SqlSource-" + library + "Conversions.g.cs";
+
+    // Two libraries' edges, each in the order of ConverterSet.Comparer, as one in that order: either as it is when the
+    // other has none.
+    private static EquatableArray<Converter> Merge(EquatableArray<Converter> first, EquatableArray<Converter> second)
+    {
+        if (second.Count == 0)
+        {
+            return first;
+        }
+
+        if (first.Count == 0)
+        {
+            return second;
+        }
+
+        var merged = ImmutableArray.CreateBuilder<Converter>(first.Count + second.Count);
+        var left = 0;
+        var right = 0;
+        while (left < first.Count || right < second.Count)
+        {
+            merged.Add(
+                right == second.Count
+                || (left < first.Count && ConverterSet.Comparer.Compare(first[left], second[right]) <= 0)
+                    ? first[left++]
+                    : second[right++]
+            );
+        }
+
+        return new EquatableArray<Converter>(merged.MoveToImmutable());
+    }
 }

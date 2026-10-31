@@ -16,12 +16,17 @@ namespace SqlSource.Generation;
 /// Whether the marker says <c>-&gt; default</c>, which takes the column out of the column types of every level.
 /// </param>
 /// <param name="Location">The whole marker comment in the file.</param>
+/// <param name="IsJson">
+/// Whether the marker writes the word <c>json</c> before the C# type, the JSON opt-in, which says that the column holds
+/// JSON.  Never true without a C# type.
+/// </param>
 internal sealed record ColumnMarker(
     string Name,
     bool? IsNullable,
     string? ClrType,
     bool ResetsType,
-    LocationInfo Location
+    LocationInfo Location,
+    bool IsJson = false
 )
 {
     /// <summary>

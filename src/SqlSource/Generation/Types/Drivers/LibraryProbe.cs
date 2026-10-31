@@ -10,9 +10,9 @@ namespace SqlSource.Generation.Types.Drivers;
 
 /// <summary>
 /// Which libraries a project references, which the library switch needs to know whether a library can be on: whether
-/// it references NodaTime and NetTopologySuite, the plugins that let Npgsql read and write their types, and
-/// NetTopologySuite's reader and writer of SQL Server's bytes.  Each flag is the presence of a type that the library
-/// has.  The value is equal from one edit to the next, so nothing after the probe runs again.
+/// it references NodaTime and NetTopologySuite, the plugins that let Npgsql read and write their types,
+/// NetTopologySuite's reader and writer of SQL Server's bytes, and System.Text.Json.  Each flag is the presence of a
+/// type that the library has.  The value is equal from one edit to the next, so nothing after the probe runs again.
 /// It is not an <see cref="IDriverProbe" />, since it reports nothing by itself.
 /// </summary>
 /// <param name="NodaTime">Whether <c>NodaTime.Instant</c> is found.</param>
@@ -43,6 +43,7 @@ namespace SqlSource.Generation.Types.Drivers;
 /// <c>SqlServerBytesReader</c>, as <paramref name="NetTopologySuiteVersion" /> is read, since 2.0.0 and 2.1.0 have one
 /// identity.  For the diagnostics alone.
 /// </param>
+/// <param name="Json">Whether <c>System.Text.Json.JsonElement</c> is found.</param>
 internal sealed record LibraryProbe(
     bool NodaTime,
     bool NpgsqlNodaTime,
@@ -52,7 +53,8 @@ internal sealed record LibraryProbe(
     string? NetTopologySuiteVersion = null,
     bool NpgsqlNetTopologySuite = false,
     bool SqlServerBytes = false,
-    string? SqlServerBytesVersion = null
+    string? SqlServerBytesVersion = null,
+    bool Json = false
 )
 {
     private const string NodaTimeAssemblyName = "NodaTime";
@@ -85,20 +87,30 @@ internal sealed record LibraryProbe(
             SqlLibrary.NodaTime => engine == DatabaseEngine.PostgreSql ? NodaTime && NpgsqlNodaTime : NodaTime,
             SqlLibrary.NetTopologySuite => NetTopologySuite
                 && (engine == DatabaseEngine.PostgreSql ? NpgsqlNetTopologySuite : SqlServerBytes),
+            SqlLibrary.Json => Json,
             _ => false,
         };
 
     /// <summary>
-    /// The state that applies when no setting chooses one: on, on PostgreSQL only, when the project references what
-    /// <paramref name="library" /> needs there, and off otherwise.
+    /// The state that applies when no setting chooses one: for NodaTime and NetTopologySuite, on, on PostgreSQL only,
+    /// when the project references what the library needs there, and off otherwise; for JSON, off on both engines,
+    /// since a string is what a project written before the library reads.
     /// </summary>
     public LibraryState DefaultOf(SqlLibrary library, DatabaseEngine engine) =>
-        engine == DatabaseEngine.PostgreSql && IsAvailable(library, engine) ? LibraryState.On : LibraryState.Off;
+        library switch
+        {
+            SqlLibrary.NodaTime or SqlLibrary.NetTopologySuite => engine == DatabaseEngine.PostgreSql
+            && IsAvailable(library, engine)
+                ? LibraryState.On
+                : LibraryState.Off,
+            SqlLibrary.Json or _ => LibraryState.Off,
+        };
 
     /// <summary>
     /// The assemblies that a project has to reference to use <paramref name="library" /> on
     /// <paramref name="engine" />, as a diagnostic names them: the plugin on PostgreSQL, which brings its library;
-    /// NodaTime on SQL Server, and NetTopologySuite.IO.SqlServerBytes, which brings NetTopologySuite.
+    /// NodaTime on SQL Server, and NetTopologySuite.IO.SqlServerBytes, which brings NetTopologySuite; System.Text.Json
+    /// for JSON, on both.
     /// </summary>
     public static string MissingAssembliesOf(SqlLibrary library, DatabaseEngine engine) =>
         library switch
@@ -107,6 +119,7 @@ internal sealed record LibraryProbe(
             SqlLibrary.NetTopologySuite => engine == DatabaseEngine.PostgreSql
                 ? "Npgsql.NetTopologySuite"
                 : "NetTopologySuite.IO.SqlServerBytes",
+            SqlLibrary.Json => "System.Text.Json",
             _ => "",
         };
 
@@ -120,7 +133,7 @@ internal sealed record LibraryProbe(
             SqlLibrary.NodaTime => IsNodaTimeBelowTheFloor,
             SqlLibrary.NetTopologySuite => IsNetTopologySuiteBelowTheFloor
                 || (engine == DatabaseEngine.SqlServer && IsSqlServerBytesBelowTheFloor),
-            _ => false,
+            SqlLibrary.Json or _ => false,
         };
 
     /// <summary>
@@ -173,7 +186,7 @@ internal sealed record LibraryProbe(
         SqlServerBytes && NumbersOf(SqlServerBytesVersion) is { } version && version < SqlServerBytesFloor;
 
     /// <summary>
-    /// Reads the probe from <paramref name="compilation" />: six type lookups, the identities of its references, and
+    /// Reads the probe from <paramref name="compilation" />: seven type lookups, the identities of its references, and
     /// the informational versions of the assemblies of two types.  Of two references named <c>NodaTime</c>, the newer
     /// gives the version.  Never throws.
     /// </summary>
@@ -202,7 +215,8 @@ internal sealed record LibraryProbe(
             PackageVersionOf(geometries, NetTopologySuiteAssemblyName),
             DriverProbes.Has(compilation, "Npgsql.NpgsqlNetTopologySuiteExtensions"),
             !readers.IsEmpty,
-            PackageVersionOf(readers, SqlServerBytesAssemblyName)
+            PackageVersionOf(readers, SqlServerBytesAssemblyName),
+            DriverProbes.Has(compilation, "System.Text.Json.JsonElement")
         );
     }
 

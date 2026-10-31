@@ -41,6 +41,10 @@ namespace SqlSource.Generation.Types.Maps;
 /// The library whose row gave the C# type, or null for the type override's, the column types', a marker's and the
 /// base map's.  An array's or a domain's mapping that is its element's or base's keeps it.
 /// </param>
+/// <param name="ElementIsValueType">
+/// Whether the C# type is an array of one rank whose element, without the <c>?</c> of a nullable element, is a value
+/// type: <see cref="PropertyType.ElementIsValueType" />.
+/// </param>
 internal sealed record TypeMapping(
     TypeMappingKind Kind,
     string Key,
@@ -51,7 +55,8 @@ internal sealed record TypeMapping(
     string? Detail,
     PackageBinding? Package = null,
     string? Written = null,
-    SqlLibrary? Library = null
+    SqlLibrary? Library = null,
+    bool ElementIsValueType = false
 )
 {
     /// <summary>A public C# type whose use gives no warning.</summary>

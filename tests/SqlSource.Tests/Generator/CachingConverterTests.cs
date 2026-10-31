@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Converters;
+using SqlSource.Settings.Libraries;
 using SqlSource.Testing.Generator;
 using Xunit;
 using static SqlSource.Testing.Generator.CachingScene;
@@ -281,14 +282,14 @@ public sealed class CachingConverterTests
         var compilation = Compilation(ConversionsSource);
         var driver = FirstRun(compilation);
         AllReasons(driver.GetRunResult(), TrackingNames.LibraryConverters).ShouldBe([IncrementalStepRunReason.New]);
-        LibraryEdgesOf(driver.GetRunResult()).ShouldBeEmpty();
+        NodaTimeEdgesOf(driver.GetRunResult()).ShouldBeEmpty();
 
         var result = Run(driver, compilation.AddReferences(LibraryReferences.NodaTime("3.3.7")));
 
         result.Diagnostics.ShouldBeEmpty();
         AllReasons(result, TrackingNames.LibraryConverters).ShouldBe([IncrementalStepRunReason.Modified]);
         AllReasons(result, TrackingNames.Converters).ShouldBe([IncrementalStepRunReason.Modified]);
-        LibraryEdgesOf(result).Count().ShouldBe(14);
+        NodaTimeEdgesOf(result).Count().ShouldBe(14);
         AllReasons(result, TrackingNames.ProjectConverters)
             .ShouldBe([IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Unchanged]);
     }
@@ -308,12 +309,12 @@ public sealed class CachingConverterTests
         result.Diagnostics.ShouldBeEmpty();
         AllReasons(result, TrackingNames.LibraryConverters).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.Converters).ShouldBe([IncrementalStepRunReason.Cached]);
-        LibraryEdgesOf(result).Count().ShouldBe(14);
+        NodaTimeEdgesOf(result).Count().ShouldBe(14);
     }
 
-    // The edges of the libraries that the set holds.
-    private static IEnumerable<Converter> LibraryEdgesOf(GeneratorDriverRunResult result) =>
-        ConvertersOf(result).Where(converter => converter.Origin == ConverterOrigin.Library);
+    // The edges of NodaTime that the set holds, without System.Text.Json's, which the runtime's references bring.
+    private static IEnumerable<Converter> NodaTimeEdgesOf(GeneratorDriverRunResult result) =>
+        ConvertersOf(result).Where(converter => converter.Library?.Library == SqlLibrary.NodaTime);
 
     // Both types' sources, and Conversions with this source.
     private static CSharpCompilation Compilation(string conversions) =>

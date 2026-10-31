@@ -92,6 +92,20 @@ public sealed class SqlQueryHashTests
         Hash("-- name: Q\n-- param: @id int4 -> UserId\nSELECT @id;")
             .ShouldBe(Hash("-- name: Q\n-- param: @id int4\nSELECT @id;"));
 
+    // The JSON opt-in says how a value is converted in C#, not what the database describes.
+    [Theory]
+    [InlineData("-- param: @a jsonb -> json Meta\n", "-- param: @a jsonb -> Meta\n")]
+    [InlineData("-- param: @a jsonb null -> json Meta\n", "-- param: @a jsonb null\n")]
+    [InlineData("-- column: m -> json Meta\n", "-- column: m -> Meta\n")]
+    [InlineData("-- column: m not null -> json Meta\n", "")]
+    public void Compute_JsonOptIn_KeepsTheHash(string withJson, string without) =>
+        Hash("-- name: Q\n" + withJson + "SELECT @a AS m;\n")
+            .ShouldBe(Hash("-- name: Q\n" + without + "SELECT @a AS m;\n"));
+
+    [Fact]
+    public void Compute_HeaderColumnTypeWithJsonOptIn_KeepsTheHash() =>
+        Hash("-- column: orders.metadata -> json Meta\n-- name: Q\nSELECT 1;\n").ShouldBe(Hash(Simple));
+
     // A library switch changes the C# types of a query, not the SQL the database describes.
     [Fact]
     public void Hash_IgnoresALibraryTypesMarker() =>

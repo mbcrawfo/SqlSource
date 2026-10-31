@@ -1,0 +1,7 @@
+{
+  "libraryTypes": {
+    // System.Text.Json on for the queries of this folder alone, so that json and jsonb are JsonElement and jsonb[] is
+    // JsonElement[], where the project's settings file leaves the library at its default, off.
+    "json": "on",
+  },
+}

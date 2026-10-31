@@ -8,7 +8,8 @@ using Xunit;
 namespace SqlSource.Testing.Generator;
 
 // References to NodaTime, NetTopologySuite and their Npgsql plugins, and to NetTopologySuite's reader and writer of SQL
-// Server's bytes, for the probe of the libraries.  The real ones are the packages that
+// Server's bytes, for the probe of the libraries, and to .NET 8's reference assemblies, whose System.Text.Json is the
+// oldest that generated code compiles against.  The real ones are the packages that
 // this library downloads and does not reference: each is read as metadata from the NuGet folder, whose path the
 // assembly records, and never loaded.  A synthetic one is an assembly of any name and version, with the types the probe
 // looks for.
@@ -46,6 +47,16 @@ internal static class LibraryReferences
             version.StartsWith("8.", System.StringComparison.Ordinal) ? "net6.0" : "net8.0",
             "Npgsql.NodaTime"
         );
+
+    // The reference assemblies of .NET 8, of the targeting pack at the version of the PackageDownload item, in place of
+    // the runtime's: a run given them, and not the runtime's, compiles against .NET 8.
+    public static MetadataReference[] Net8Framework { get; } =
+    [
+        .. Directory
+            .GetFiles(Path.Combine(PackageRoot, "microsoft.netcore.app.ref", "8.0.31", "ref", "net8.0"), "*.dll")
+            .OrderBy(path => path, System.StringComparer.Ordinal)
+            .Select(path => MetadataReference.CreateFromFile(path)),
+    ];
 
     // NetTopologySuite's geometries, whose classes derive from Geometry, as declarations, without ConcaveHull.
     private const string NetTopologySuiteTypes = """
@@ -155,12 +166,15 @@ internal static class LibraryReferences
         string assembly
     )
     {
-        var root = typeof(LibraryReferences)
+        return MetadataReference.CreateFromFile(
+            Path.Combine(PackageRoot, package, version, "lib", framework, assembly + ".dll")
+        );
+    }
+
+    // The NuGet folder, which the assembly records.
+    private static string PackageRoot =>
+        typeof(LibraryReferences)
             .Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
             .Single(attribute => attribute.Key == "NuGetPackageRoot")
             .Value!;
-        return MetadataReference.CreateFromFile(
-            Path.Combine(root, package, version, "lib", framework, assembly + ".dll")
-        );
-    }
 }

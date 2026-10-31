@@ -13,9 +13,10 @@ using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
-// The class of a library's conversions, SqlSource.NodaTimeConversions, which a project gets once, in a file of its
-// own, when a method of a CodeGen query calls one of its conversions, and never otherwise.  Each run is under mssql on
-// SqlClient 7 with NodaTime 3.3.7, unless it says otherwise, with an entry written for each query's current hash.
+// The class of a library's conversions, SqlSource.NodaTimeConversions or SqlSource.JsonConversions, which a project
+// gets once, in a file of its own, when a method of a CodeGen query calls one of its conversions, and never otherwise.
+// Each run is under mssql on SqlClient 7 with NodaTime 3.3.7, unless it says otherwise, with an entry written for each
+// query's current hash.
 public sealed class LibraryConversionTests
 {
     // The file of the class, as the tests name it, not taken from the product.
@@ -32,9 +33,53 @@ public sealed class LibraryConversionTests
     // A query that reads a date and finds by one.
     private const string FindDates = "-- name: FindDates\nSELECT d FROM dates WHERE d = @d;\n";
 
+    // System.Text.Json's class, as the tests name it, not taken from the product.
+    private const string JsonClassFile = "SqlSource-JsonConversions.g.cs";
+
+    private const string Json = "global::SqlSource.JsonConversions.";
+
+    private const string JsonOn = "-- library-types: json=on\n\n";
+
+    private const string JsonElement = "global::System.Text.Json.JsonElement";
+
+    private const string JsonDocument = "global::System.Text.Json.JsonDocument";
+
+    private const string JsonNode = "global::System.Text.Json.Nodes.JsonNode";
+
+    // A query that reads a document that is not null and one that can be, and finds by both.
+    private const string FindDocs =
+        "-- name: FindDocs\nSELECT doc, maybe_doc FROM docs WHERE doc = @doc AND maybe_doc = @maybe_doc;\n";
+
     private static readonly SqlServerType Date = TestSidecars.SqlServer("date", 3, 10);
 
     private static readonly SqlServerType DateTime2 = TestSidecars.SqlServer("datetime2", 8, 27, 7);
+
+    private static readonly SqlServerType SqlServerJson = TestSidecars.SqlServer("json", -1, 0);
+
+    private static readonly SqlServerType NVarCharMax = TestSidecars.SqlServer("nvarchar(max)", -1, 0);
+
+    // The nodes, as an override names them.
+    private static readonly string[] NodeTypes =
+    [
+        "System.Text.Json.Nodes.JsonNode",
+        "System.Text.Json.Nodes.JsonObject",
+        "System.Text.Json.Nodes.JsonArray",
+    ];
+
+    // App.Sample, with a class and a value type that the serializer reads and sends.
+    private const string SerializedSource = """
+        using SqlSource;
+
+        namespace App
+        {
+            [SqlSourceGenerate]
+            public partial class Sample;
+
+            public sealed record Metadata(string Note);
+
+            public readonly record struct Spot(int X, int Y);
+        }
+        """;
 
     // SqlClient 7 and NodaTime 3.3.7.
     private static MetadataReference[] WithNodaTime =>
@@ -319,6 +364,351 @@ public sealed class LibraryConversionTests
         run.Sources.Keys.ShouldContain(ClassFile);
     }
 
+    // json on: SQL Server's json is a JsonElement, which the driver reads and binds as a string, so the class's
+    // conversions turn it from and to one, behind the check of a NULL for the column that can be one.
+    [Fact]
+    public void Run_SqlServerJsonColumnWithJsonOn_ReadsAndWritesThroughJsonConversions()
+    {
+        var run = RunSqlServerDocs(JsonOn + FindDocs, SqlServerJson);
+
+        run.ShouldBeClean();
+        run.Sources[JsonClassFile].ShouldBe(JsonConversions.Source);
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("FindDocsDto(" + Json + "JsonElementFromString(reader.GetFieldValue<string>(0)), ");
+        methods.ShouldContain(
+            "reader.IsDBNull(1) ? default("
+                + JsonElement
+                + "?) : "
+                + Json
+                + "JsonElementFromString(reader.GetFieldValue<string>(1))"
+        );
+        methods.ShouldContain("parameter.Value = " + Json + "StringFromJsonElement(parameters.Doc);\n");
+        methods.ShouldContain(
+            "parameter.Value = parameters.MaybeDoc is { } value ? (object)"
+                + Json
+                + "StringFromJsonElement(value) : global::System.DBNull.Value;\n"
+        );
+        methods.ShouldContain(
+            "parameter.SqlDbType = global::System.Data.SqlDbType.NVarChar;\n                    parameter.Size = -1;\n"
+        );
+        methods.ShouldNotContain("NodaTimeConversions");
+    }
+
+    // An override to each of System.Text.Json's types, on nvarchar(max) and on json with the switch off: each column
+    // is converted by the edge of its type.
+    [Theory]
+    [InlineData("System.Text.Json.JsonDocument", "JsonDocumentFromString")]
+    [InlineData("System.Text.Json.Nodes.JsonNode", "JsonNodeFromString")]
+    [InlineData("System.Text.Json.Nodes.JsonObject", "JsonObjectFromString")]
+    [InlineData("System.Text.Json.Nodes.JsonArray", "JsonArrayFromString")]
+    [InlineData("System.Text.Json.JsonElement", "JsonElementFromString")]
+    public void Run_SqlServerOverridesToEachJsonType_ConvertWithJsonOff(string type, string read)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: ListDocs\n-- column: text_doc -> "
+                + type
+                + "\n-- column: json_doc -> "
+                + type
+                + "\nSELECT text_doc, json_doc FROM docs;\n"
+        );
+
+        var run = MethodRuns.RunSqlServer(
+            file,
+            [
+                MethodRuns.SqlServerEntry(
+                    file,
+                    "ListDocs",
+                    [],
+                    [
+                        TestSidecars.Column(0, "text_doc", NVarCharMax, nullable: true),
+                        TestSidecars.Column(0, "json_doc", SqlServerJson, nullable: true),
+                    ]
+                ),
+            ]
+        );
+
+        run.ShouldBeClean();
+        run.Sources[JsonClassFile].ShouldBe(JsonConversions.Source);
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain(" : " + Json + read + "(reader.GetFieldValue<string>(0))");
+        methods.ShouldContain(" : " + Json + read + "(reader.GetFieldValue<string>(1))");
+    }
+
+    // Npgsql before 10 reads and writes no JsonNode, so its edge converts it from and to the string Npgsql reads jsonb
+    // as; Npgsql 10 reads and writes it itself, and nothing is converted.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Run_PostgresJsonNode_ByEdgeOnNpgsql8AndByTheDriverOn10(bool npgsql10)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: jsonb=System.Text.Json.Nodes.JsonNode\n\n-- name: FindDocs\n"
+                + "SELECT doc FROM docs WHERE doc = @doc;\n"
+        );
+        var jsonb = Catalog("jsonb") with { BindName = "jsonb" };
+
+        var run = MethodRuns.Run(
+            file,
+            [
+                Entry(
+                    file,
+                    "FindDocs",
+                    [Parameter("doc", jsonb, nullable: false)],
+                    [Column("doc", jsonb, nullable: true)]
+                ),
+            ],
+            references: [npgsql10 ? NpgsqlReferences.Npgsql10 : NpgsqlReferences.Npgsql8]
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        if (npgsql10)
+        {
+            methods.ShouldContain("reader.GetFieldValue<" + JsonNode + ">(0)");
+            methods.ShouldContain("new global::Npgsql.NpgsqlParameter<" + JsonNode + ">();");
+            methods.ShouldNotContain("JsonConversions");
+            run.Sources.Keys.ShouldNotContain(JsonClassFile);
+        }
+        else
+        {
+            methods.ShouldContain(" : " + Json + "JsonNodeFromString(reader.GetFieldValue<string>(0))");
+            methods.ShouldContain("new global::Npgsql.NpgsqlParameter<string>();");
+            methods.ShouldContain(
+                "parameter.TypedValue = parameters.Doc is { } value ? " + Json + "StringFromJsonNode(value) : null;\n"
+            );
+            run.Sources[JsonClassFile].ShouldBe(JsonConversions.Source);
+        }
+
+        methods.ShouldContain(" parameter.DataTypeName = \"pg_catalog.jsonb\";\n");
+    }
+
+    // Every version of Npgsql reads and writes the element and the document, so the library's row and an override go
+    // to the driver, and no class is emitted.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Run_PostgresJsonElementAndDocument_GoToTheDriver(bool npgsql10)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- library-types: json=on\n-- type-override: jsonb=System.Text.Json.JsonDocument\n\n-- name: FindDocs\n"
+                + "SELECT element, document FROM docs WHERE element = @element AND document = @document;\n"
+        );
+        var json = Catalog("json") with { BindName = "json" };
+        var jsonb = Catalog("jsonb") with { BindName = "jsonb" };
+
+        var run = MethodRuns.Run(
+            file,
+            [
+                Entry(
+                    file,
+                    "FindDocs",
+                    [Parameter("element", json, nullable: false), Parameter("document", jsonb, nullable: false)],
+                    [Column("element", json), Column("document", jsonb)]
+                ),
+            ],
+            references: [npgsql10 ? NpgsqlReferences.Npgsql10 : NpgsqlReferences.Npgsql8]
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("reader.GetFieldValue<" + JsonElement + ">(0)");
+        methods.ShouldContain("reader.GetFieldValue<" + JsonDocument + ">(1)");
+        methods.ShouldContain("new global::Npgsql.NpgsqlParameter<" + JsonElement + ">();");
+        methods.ShouldContain("new global::Npgsql.NpgsqlParameter<" + JsonDocument + ">();");
+        methods.ShouldContain(" parameter.DataTypeName = \"pg_catalog.json\";\n");
+        methods.ShouldContain(" parameter.DataTypeName = \"pg_catalog.jsonb\";\n");
+        methods.ShouldNotContain("JsonConversions");
+        run.Sources.Keys.ShouldNotContain(JsonClassFile);
+    }
+
+    // The project's converters of string and JsonElement replace both of the library's, with no diagnostic, and the
+    // class is not emitted, since nothing calls it.
+    [Fact]
+    public void Run_ProjectConverterOfJsonElement_ReplacesTheLibrarys()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate]
+                public partial class Sample;
+
+                public static class Documents
+                {
+                    [SqlSourceConverter]
+                    public static global::System.Text.Json.JsonElement FromDb(string value) =>
+                        global::System.Text.Json.JsonDocument.Parse(value).RootElement;
+
+                    [SqlSourceConverter]
+                    public static string ToDb(global::System.Text.Json.JsonElement value) => value.GetRawText();
+                }
+            }
+            """;
+
+        var run = RunSqlServerDocs(JsonOn + FindDocs, SqlServerJson, Source);
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("FindDocsDto(global::App.Documents.FromDb(reader.GetFieldValue<string>(0)), ");
+        methods.ShouldContain("parameter.Value = global::App.Documents.ToDb(parameters.Doc);\n");
+        methods.ShouldNotContain("JsonConversions");
+        run.Sources.Keys.ShouldNotContain(JsonClassFile);
+    }
+
+    // A type at Models has JsonElement in its models and calls nothing.
+    [Fact]
+    public void Run_NoCodeGenUse_EmitsNoJsonConversions()
+    {
+        const string Models = """
+            using SqlSource;
+
+            namespace App
+            {
+                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                public partial class Sample;
+            }
+            """;
+
+        var run = RunSqlServerDocs(JsonOn + FindDocs, SqlServerJson, Models);
+
+        run.ShouldBeClean();
+        run.Sources.Keys.ShouldNotContain(JsonClassFile);
+    }
+
+    // Every edge of System.Text.Json that a query of SQL Server and one of Npgsql 8 use, read and written, nullable and
+    // not, whole and, on Npgsql, by element, compiles with no error and no warning in what is generated, against each
+    // driver, with the reference assemblies of .NET 8 and with the runtime's, of .NET 10.  Npgsql 10 reads and writes
+    // the same nodes itself.  A not-null node, whose read can give null for a JSON null, throws on one.  A second query
+    // of the file reads and sends a project's classes through the serializer beside them.
+    [Theory]
+    [InlineData("SqlClient 6.1", false)]
+    [InlineData("SqlClient 6.1", true)]
+    [InlineData("SqlClient 7", false)]
+    [InlineData("SqlClient 7", true)]
+    [InlineData("Npgsql 8", false)]
+    [InlineData("Npgsql 8", true)]
+    [InlineData("Npgsql 10", false)]
+    [InlineData("Npgsql 10", true)]
+    public void Run_JsonGeneratedCode_CompilesWithoutWarnings(string driver, bool net8)
+    {
+        string[] types = ["System.Text.Json.JsonElement", "System.Text.Json.JsonDocument", .. NodeTypes];
+        var isSqlServer = driver.StartsWith("SqlClient", System.StringComparison.Ordinal);
+        string[] postgres =
+        [
+            .. NodeTypes,
+            .. NodeTypes.Select(node => node + "[]"),
+            .. NodeTypes.Select(node => node + "?[]"),
+        ];
+        var used = isSqlServer ? types : postgres;
+        var markers = new System.Text.StringBuilder();
+        for (var index = 0; index < used.Length; index++)
+        {
+            var name = "v" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            _ = markers.Append("-- column: ").Append(name).Append(" -> ").Append(used[index]).Append('\n');
+            _ = markers.Append("-- column: maybe_").Append(name).Append(" -> ").Append(used[index]).Append('\n');
+            _ = markers.Append("-- param: @").Append(name).Append(" -> ").Append(used[index]).Append('\n');
+            _ = markers.Append("-- param: @maybe_").Append(name).Append(" -> ").Append(used[index]).Append('\n');
+        }
+
+        string[] serialized = isSqlServer
+            ? ["App.Metadata", "App.Spot"]
+            : ["App.Metadata", "App.Spot", "App.Metadata[]", "App.Spot?[]"];
+        var serializedMarkers = new System.Text.StringBuilder();
+        for (var index = 0; index < serialized.Length; index++)
+        {
+            var name = "v" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            foreach (var each in new[] { name, "maybe_" + name })
+            {
+                _ = serializedMarkers.Append("-- column: ").Append(each).Append(" -> ").Append(serialized[index]);
+                _ = serializedMarkers.Append("\n-- param: @").Append(each).Append(" -> ").Append(serialized[index]);
+                _ = serializedMarkers.Append('\n');
+            }
+        }
+
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            EverythingQuery("Everything", used.Length, markers.ToString())
+                + "\n"
+                + EverythingQuery("Serialized", serialized.Length, serializedMarkers.ToString())
+        );
+        var jsonb = Catalog("jsonb") with { BindName = "jsonb" };
+        var json = Catalog("json") with { BindName = "json" };
+        var entry = isSqlServer
+            ? JsonEntry(file, "Everything", used, NVarCharMax, SqlServerJson)
+            : JsonEntry(file, "Everything", used, jsonb, json);
+        var serializedEntry = isSqlServer
+            ? JsonEntry(file, "Serialized", serialized, SqlServerJson, SqlServerJson)
+            : JsonEntry(file, "Serialized", serialized, jsonb, json);
+        var driverReference = driver switch
+        {
+            "SqlClient 6.1" => SqlClientReferences.SqlClient61,
+            "SqlClient 7" => SqlClientReferences.SqlClient7,
+            "Npgsql 8" => NpgsqlReferences.Npgsql8,
+            _ => NpgsqlReferences.Npgsql10,
+        };
+
+        var run = GeneratorHarness.Run(
+            OutputKind.CodeGen,
+            [new SourceFile(GeneratorHarness.SourcePath, SerializedSource)],
+            [file, Sidecars.Of(file, entry, serializedEntry)],
+            supportedFramework: !net8,
+            references: net8 ? [.. LibraryReferences.Net8Framework, driverReference] : [driverReference],
+            dialect: isSqlServer ? "mssql" : "postgres"
+        );
+
+        run.ShouldBeClean();
+        var methods = run.Sources[MethodRuns.MethodsFile];
+        methods.ShouldContain("holds a JSON null.");
+        methods.ShouldContain("global::System.Text.Json.JsonSerializer.Deserialize<global::App.Metadata>(");
+        methods.ShouldContain("global::System.Text.Json.JsonSerializer.Serialize<global::App.Spot>(");
+        if (driver == "Npgsql 10")
+        {
+            methods.ShouldNotContain("JsonConversions");
+            run.Sources.Keys.ShouldNotContain(JsonClassFile);
+            return;
+        }
+
+        foreach (var each in used.Where(each => !each.EndsWith("[]", System.StringComparison.Ordinal)))
+        {
+            var shortName = each[(each.LastIndexOf('.') + 1)..];
+            methods.ShouldContain(Json + shortName + "FromString(");
+            methods.ShouldContain(Json + "StringFrom" + shortName + "(");
+        }
+
+        run.Sources[JsonClassFile].ShouldBe(JsonConversions.Source);
+    }
+
+    // The entry of a query of Run_JsonGeneratedCode_CompilesWithoutWarnings, over the types the override names: v<i>
+    // and its parameter not null, and maybe_v<i> nullable; the even ones of the first database type and the odd ones
+    // of the second, or of its array for an array.
+    private static SidecarEntry JsonEntry(SqlFile file, string query, string[] types, SidecarType even, SidecarType odd)
+    {
+        var parameters = new System.Collections.Generic.List<SidecarParameter>();
+        var columns = new System.Collections.Generic.List<SidecarColumn>();
+        for (var index = 0; index < types.Length; index++)
+        {
+            var type = index % 2 == 0 ? even : odd;
+            if (types[index].EndsWith("[]", System.StringComparison.Ordinal) && type is PostgresType element)
+            {
+                type = ArrayOf(element, "_" + element.InternalName) with { BindName = element.BindName + "[]" };
+            }
+
+            var name = "v" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            parameters.Add(TestSidecars.Parameter(0, name, type, false));
+            parameters.Add(TestSidecars.Parameter(0, "maybe_" + name, type, true));
+            columns.Add(TestSidecars.Column(0, name, type, nullable: false));
+            columns.Add(TestSidecars.Column(0, "maybe_" + name, type, nullable: true));
+        }
+
+        return even is SqlServerType
+            ? MethodRuns.SqlServerEntry(file, query, [.. parameters], [.. columns])
+            : Entry(file, query, [.. parameters], [.. columns]);
+    }
+
     // The type of SQL Server of the name, with the facets the tool writes for it.
     private static SqlServerType TypeOf(string name) =>
         name switch
@@ -329,8 +719,8 @@ public sealed class LibraryConversionTests
         };
 
     // A query of the name that reads v0 to v<count - 1> and maybe_v0 to maybe_v<count - 1>, and finds by parameters
-    // of the same names.
-    private static string EverythingQuery(string name, int count)
+    // of the same names, with the markers after its name.
+    private static string EverythingQuery(string name, int count, string markers = "")
     {
         var names = Enumerable
             .Range(0, count)
@@ -338,7 +728,9 @@ public sealed class LibraryConversionTests
             .ToArray();
         return "-- name: "
             + name
-            + "\nSELECT "
+            + "\n"
+            + markers
+            + "SELECT "
             + string.Join(", ", names.Select(each => each + ", maybe_" + each))
             + " FROM everything WHERE "
             + string.Join(
@@ -373,6 +765,28 @@ public sealed class LibraryConversionTests
             )
             .ToArray();
         return MethodRuns.SqlServerEntry(file, name, parameters, columns);
+    }
+
+    // The query of the text, FindDocs, whose column and parameter doc are not null and maybe_doc can be, all of the
+    // type, at CodeGen under mssql on the source, App.Sample unless another is given.
+    private static GeneratorRun RunSqlServerDocs(string text, SqlServerType type, string? source = null)
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, text);
+        return MethodRuns.RunSqlServer(
+            file,
+            [
+                MethodRuns.SqlServerEntry(
+                    file,
+                    "FindDocs",
+                    [TestSidecars.Parameter(0, "doc", type, false), TestSidecars.Parameter(0, "maybe_doc", type, true)],
+                    [
+                        TestSidecars.Column(0, "doc", type, nullable: false),
+                        TestSidecars.Column(0, "maybe_doc", type, nullable: true),
+                    ]
+                ),
+            ],
+            source ?? MethodRuns.Source
+        );
     }
 
     // FindDates, or the query of the text, whose column and parameter d are a not-null date, at CodeGen under mssql on

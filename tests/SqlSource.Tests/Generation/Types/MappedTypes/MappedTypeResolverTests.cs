@@ -360,9 +360,12 @@ public sealed class MappedTypeResolverTests
         true,
         ""
     )]
-    [InlineData("int?[]", nameof(MappedTypeStatus.Found), false, true, "")]
+    [InlineData("int?[]", nameof(MappedTypeStatus.Found), false, true, "", true)]
     [InlineData("int[,]", nameof(MappedTypeStatus.Found), false, true, "")]
-    [InlineData("global::MyApp.UserId[]", nameof(MappedTypeStatus.Found), false, true, "")]
+    [InlineData("int[][]", nameof(MappedTypeStatus.Found), false, true, "")]
+    [InlineData("string[]", nameof(MappedTypeStatus.Found), false, true, "")]
+    [InlineData("global::MyApp.UserId[]", nameof(MappedTypeStatus.Found), false, true, "", true)]
+    [InlineData("global::System.Uri[]", nameof(MappedTypeStatus.Found), false, true, "")]
     [InlineData("global::System.Collections.Generic.List<int?>", nameof(MappedTypeStatus.Found), false, true, "")]
     [InlineData("global::MyApp.Box<global::Other.Thing>", nameof(MappedTypeStatus.Found), false, true, "")]
     [InlineData("global::MyApp.Missing", nameof(MappedTypeStatus.NotFound), false, false, "")]
@@ -410,7 +413,7 @@ public sealed class MappedTypeResolverTests
         true,
         ""
     )]
-    [InlineData("global::System.Nullable<int>[]", nameof(MappedTypeStatus.Found), false, true, "")]
+    [InlineData("global::System.Nullable<int>[]", nameof(MappedTypeStatus.Found), false, true, "", true)]
     [InlineData("global::System.Nullable<int>?[]", nameof(MappedTypeStatus.NotAPropertyType), false, false, "")]
     [InlineData("global::MyApp.OldThing", nameof(MappedTypeStatus.Found), false, true, "CS0612,CS0618")]
     [InlineData(
@@ -450,7 +453,8 @@ public sealed class MappedTypeResolverTests
         string status,
         bool isValueType,
         bool isPublic,
-        string warningIds
+        string warningIds,
+        bool elementIsValueType = false
     )
     {
         var types = MappedTypeResolver
@@ -473,7 +477,8 @@ public sealed class MappedTypeResolverTests
                     warningIds.Length == 0 ? NoWarnings : TestSidecars.Of(warningIds.Split(',')),
                     name,
                     NoCandidates,
-                    null
+                    null,
+                    elementIsValueType
                 )
             );
     }

@@ -29,6 +29,11 @@ internal static class SettingsFileDiagnostics
         + JoinOr([.. Enum.GetValues(typeof(LibraryState)).Cast<LibraryState>().Select(SettingValue.NameOf)])
         + ".";
 
+    // The end of SQLSRC019's message for a member of columnTypes written as an object.
+    private const string ColumnTypeObjectHelp =
+        ".  A column type written as an object takes \"type\", its C# type, and may take \"json\", true or false, "
+        + "and no other member; with \"json\": true its type cannot be default.";
+
     // What SQLSRC018 says a key takes when the error names no key of the table, which the reader never gives.
     private const string OtherType = "another JSON type";
 
@@ -108,11 +113,14 @@ internal static class SettingsFileDiagnostics
             SettingsFileValueType.Boolean => "true or false",
             SettingsFileValueType.ArrayOfStrings => "an array of strings",
             SettingsFileValueType.ObjectOfStrings => "an object whose values are strings",
+            SettingsFileValueType.ObjectOfColumnTypes =>
+                "an object whose values are strings, or objects of a \"type\" string and an optional \"json\" boolean",
             _ => OtherType,
         };
 
     // The end of SQLSRC019's message, after the setting: the names of the dialects, why default stands alone, the
-    // forms of a type override's key that is written in brackets, or what libraryTypes takes.  Empty for every other
+    // forms of a type override's key that is written in brackets, what libraryTypes takes, or what a column type
+    // written as an object takes.  Empty for every other
     // value.
     private static string HelpOf(SettingsFileError error, string argument) =>
         error.Setting switch
@@ -121,6 +129,7 @@ internal static class SettingsFileDiagnostics
             SettingsFileKeys.GeneratorParameters when GeneratorParameterList.IsDefault(argument.AsSpan()) =>
                 GeneratorParametersDefaultHelp,
             SettingsFileKeys.LibraryTypes => LibraryTypesHelp,
+            SettingsFileKeys.ColumnTypes when error.IsObjectForm => ColumnTypeObjectHelp,
             SettingsFileKeys.TypeOverrides when error.Other is not null => TypeOverrideGrammar.BracketHelp(
                 argument.AsSpan()
             ),

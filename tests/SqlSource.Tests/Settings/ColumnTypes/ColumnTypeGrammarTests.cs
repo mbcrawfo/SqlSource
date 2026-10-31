@@ -83,6 +83,49 @@ public sealed class ColumnTypeGrammarTests
         repeated.ShouldBe([(2, 0)]);
     }
 
+    // The flags say which member is written in the object form with "json": true.
+    [Fact]
+    public void ReadMembers_MemberFlaggedAsJson_IsAnEntryThatSaysSo()
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        ColumnTypeGrammar
+            .ReadMembers(
+                [new("orders.metadata", "OrderMetadata"), new("orders.note", "Note")],
+                Place,
+                invalid,
+                repeated,
+                [true, false]
+            )
+            .ShouldBe([
+                new ColumnType("orders.metadata", "OrderMetadata", Place, IsJson: true),
+                new ColumnType("orders.note", "Note", Place),
+            ]);
+        invalid.ShouldBeEmpty();
+        repeated.ShouldBeEmpty();
+    }
+
+    // The opt-in needs a type: default with it is not valid, as -> json default is not in a marker.
+    [Theory]
+    [InlineData("default")]
+    [InlineData(" Default ")]
+    public void ReadMembers_JsonMemberOfDefault_IsItsIndexAndTheOthersApply(string type)
+    {
+        var (invalid, repeated) = (new List<int>(), new List<(int Index, int First)>());
+
+        ColumnTypeGrammar
+            .ReadMembers(
+                [new("posts.id", "PostId"), new("orders.metadata", type)],
+                Place,
+                invalid,
+                repeated,
+                [false, true]
+            )
+            .ShouldBe([new ColumnType("posts.id", "PostId", Place)]);
+        invalid.ShouldBe([1]);
+        repeated.ShouldBeEmpty();
+    }
+
     [Fact]
     public void ReadMembers_NoMember_IsEmpty()
     {
@@ -108,9 +151,27 @@ public sealed class ColumnTypeGrammarTests
         entry.ShouldBe(new ColumnType(key, type, SettingPlace.FileHeader));
     }
 
+    // The word json, white space, then the type is the JSON opt-in.  json alone is a type of that name, as it was
+    // before the opt-in.
+    [Theory]
+    [InlineData("orders.metadata -> json OrderMetadata", "OrderMetadata", true)]
+    [InlineData("orders.metadata->JSON\tMyApp.OrderMetadata", "global::MyApp.OrderMetadata", true)]
+    [InlineData("orders.metadata -> json  json", "json", true)]
+    [InlineData("orders.metadata -> json", "json", false)]
+    [InlineData("orders.metadata -> jsonOrderMetadata", "jsonOrderMetadata", false)]
+    public void TryReadHeaderEntry_JsonBeforeTheType_IsTheOptIn(string value, string type, bool isJson)
+    {
+        ColumnTypeGrammar.TryReadHeaderEntry(value.AsSpan(), out var entry).ShouldBeTrue();
+
+        entry.ShouldBe(new ColumnType("orders.metadata", type, SettingPlace.FileHeader, isJson));
+    }
+
     [Theory]
     [InlineData("posts.id not null -> PostId")]
     [InlineData("posts.id null -> PostId")]
+    [InlineData("orders.metadata -> json default")]
+    [InlineData("orders.metadata -> json not a type")]
+    [InlineData("orders.metadata -> json int?")]
     [InlineData("posts.id not null")]
     [InlineData("posts.id")]
     [InlineData("id -> PostId")]
@@ -124,4 +185,30 @@ public sealed class ColumnTypeGrammarTests
 
         entry.ShouldBeNull();
     }
+
+    [Theory]
+    [InlineData("OrderMetadata", "OrderMetadata", false)]
+    [InlineData("default", null, false)]
+    [InlineData("json", "json", false)]
+    [InlineData("json OrderMetadata", "OrderMetadata", true)]
+    [InlineData("Json \t App.OrderMetadata", "global::App.OrderMetadata", true)]
+    public void TryReadMarkerType_TypeAfterTheArrow_IsReadWithTheOptIn(string written, string? type, bool isJson)
+    {
+        ColumnTypeGrammar.TryReadMarkerType(written.AsSpan(), out var read, out var json).ShouldBeTrue();
+
+        read.ShouldBe(type);
+        json.ShouldBe(isJson);
+    }
+
+    // The opt-in with nothing after its white space, with default, or with a type that is not valid.
+    [Theory]
+    [InlineData("json ")]
+    [InlineData("json default")]
+    [InlineData("json DEFAULT")]
+    [InlineData("json int?")]
+    [InlineData("json a b")]
+    [InlineData("")]
+    [InlineData("not a type")]
+    public void TryReadMarkerType_TypeThatIsNotValid_IsFalse(string written) =>
+        ColumnTypeGrammar.TryReadMarkerType(written.AsSpan(), out _, out _).ShouldBeFalse();
 }

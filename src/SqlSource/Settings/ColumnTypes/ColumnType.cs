@@ -14,4 +14,8 @@ namespace SqlSource.Settings.ColumnTypes;
 /// the entries of the levels below.
 /// </param>
 /// <param name="Place">Where the entry was written.</param>
-internal sealed record ColumnType(string Key, string? Type, SettingPlace Place);
+/// <param name="IsJson">
+/// Whether the entry says that the column holds JSON, the JSON opt-in: <c>"json": true</c> in a settings file, or the
+/// word <c>json</c> before the type in a marker.  Never true for <c>default</c>.
+/// </param>
+internal sealed record ColumnType(string Key, string? Type, SettingPlace Place, bool IsJson = false);

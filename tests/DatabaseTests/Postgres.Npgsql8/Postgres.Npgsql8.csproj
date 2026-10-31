@@ -3,8 +3,9 @@
         The end-to-end write and read of all_types on Npgsql 8.0.9, the latest 8.0 release; 8.0 is the oldest version
         that is supported: through the generated methods, and the read through Dapper; the streaming method; and the
         write and read of noda_values through the methods and Npgsql.NodaTime 8, and of spatial_values through the
-        methods and Npgsql.NetTopologySuite 8, on a PostGIS container of its own.  A project of its own, since the
-        end-to-end project gets Npgsql 10 through the tool it references.
+        methods and Npgsql.NetTopologySuite 8, on a PostGIS container of its own; and the write and read of json_values
+        through the methods.  A project of its own, since the end-to-end project gets Npgsql 10 through the tool it
+        references.
         The generator comes from a project reference, which does not bring the package's MSBuild files, so the real
         ones are imported here and at the end of this file.
     -->
@@ -47,6 +48,14 @@
         <AdditionalFiles
             Include="../Postgres/EndToEnd/NetTopologySuite/Queries/NetTopologySuite.sql.json"
             Link="NetTopologySuite/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../Postgres/EndToEnd/Json/Queries/Json.sql"
+            Link="Json/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../Postgres/EndToEnd/Json/Queries/Json.sql.json"
+            Link="Json/Queries/%(Filename)%(Extension)"
         />
     </ItemGroup>
     <ItemGroup>

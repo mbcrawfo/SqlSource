@@ -39,7 +39,9 @@ internal enum SettingsFileErrorKind
     /// <summary>
     /// A string, or an element or a member, is not valid for its setting.  Span: the string, quotes included; for a
     /// member, from its key's opening quote to its value's closing quote.  Setting: the key of the top level.
-    /// Argument: the value trimmed; for a member, its key trimmed.  Other: for a member, its value trimmed.
+    /// Argument: the value trimmed; for a member, its key trimmed.  Other: for a member, its value trimmed; for a
+    /// member of the column types written as an object, the text of its type trimmed, or null when the object is not
+    /// one of a type string and an optional json boolean.  IsObjectForm: whether the member is written as an object.
     /// </summary>
     InvalidValue,
 

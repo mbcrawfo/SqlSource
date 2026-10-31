@@ -4,7 +4,7 @@
 
 ## Sidecars
 
-- **Every sidecar of `EndToEnd/Queries/`, `EndToEnd/NodaTime/Queries/` and `EndToEnd/NetTopologySuite/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
+- **Every sidecar of `EndToEnd/Queries/`, `EndToEnd/NodaTime/Queries/`, `EndToEnd/NetTopologySuite/Queries/` and `EndToEnd/Json/Queries/` is written by `tools/describe-end-to-end.sh` alone, never by hand.**
 - **`CheckTests` runs `--check` over the real project, never a copy, through `CliRun.Real`**, which reads the test process's environment and runs the real MSBuild, as `ErrorPathTests` does.
 - **`CheckTests` is in `UsesPostgis` and gives every database of both containers its connection**, since a check of a database without its connection fails: a database added to either container gets its connection and its count line there.
 - **On a server that checks every realistic case, `CheckTests` runs once on the whole, with no `--database` and no file**, since only such a run reports a sidecar beside a file that needs none.
@@ -29,6 +29,11 @@
 - **NetTopologySuite is on in `EndToEnd/NetTopologySuite/` alone, whose `sqlsource.json` also names the database `gis`**: the project's `sqlsource.json` turns it off, since the project gets `Npgsql.NetTopologySuite` through the tool.  Its methods run on `EndToEndSources.GisWithNetTopologySuite`, in the collection `UsesPostgis`.
 - **A column of `spatial_values` changes `EndToEnd/gis/schema.sql`, `EndToEnd/gis/seed.sql`, `NetTopologySuite/Queries/NetTopologySuite.sql` and the rows of `NetTopologySuite/NetTopologySuiteQueryTests.cs` and of its copy in `tests/DatabaseTests/Postgres.Npgsql8` together.**
 - **A subtype such as `Point` is given by a query's `-- type-override:` of `public.geometry`**, never the file header's, since every column of `geometry` has that one key, whatever its modifier.
+
+## JSON
+
+- **System.Text.Json is on in `EndToEnd/Json/` alone**, by its `sqlsource.json`, since the library's default is off: a query that needs its types or a class in a JSON column goes in that folder, and its methods run on `EndToEndSources.App`, which calls no `EnableDynamicJson()`.
+- **A column of `json_values` changes `EndToEnd/app/schema.sql`, `Json/Queries/Json.sql` and `Json/JsonQueryTests.cs`, and its copy in `tests/DatabaseTests/Postgres.Npgsql8`, together**; a class of `Json/Types/` changes that project's copy too.
 
 ## `all_types` and the recipe
 

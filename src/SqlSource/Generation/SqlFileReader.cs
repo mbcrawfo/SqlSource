@@ -119,7 +119,8 @@ internal static class SqlFileReader
                     marker.IsNullable,
                     marker.ClrType,
                     marker.ResetsType,
-                    LocationInfo.From(path, text, marker.Span)
+                    LocationInfo.From(path, text, marker.Span),
+                    marker.IsJson
                 )
             );
         }

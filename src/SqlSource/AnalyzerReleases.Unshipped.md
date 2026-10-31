@@ -126,4 +126,5 @@ SQLSRC279 | SqlSource | Error | Converters do not convert from the database type
 SQLSRC280 | SqlSource | Error | Converter is missing for one direction
 SQLSRC281 | SqlSource | Error | A library that is on is not referenced
 SQLSRC282 | SqlSource | Error | A library is older than SqlSource supports
+SQLSRC283 | SqlSource | Error | JSON opt-in does not apply
 SQLSRC284 | SqlSource | Warning | Short name finds a type that only a package brings

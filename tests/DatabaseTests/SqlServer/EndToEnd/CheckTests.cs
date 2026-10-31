@@ -56,30 +56,33 @@ public sealed class CheckTests(SqlServerDatabases sqlServer)
             return;
         }
 
-        // A server before major 17 cannot describe NewTypes.sql, whose table is not made there, and no server
-        // describes as their sidecars hold the realistic cases that a minimumMajor or a checkedFrom leaves out on it.
-        // A filtered check compares only what it names, so the run names every other query file of EndToEnd/Queries/,
-        // EndToEnd/NodaTime/Queries/ and EndToEnd/NetTopologySuite/Queries/ and the query.sql of each realistic case
-        // that it checks, by their paths.  A "--database" filter would take the files it leaves out in with the rest.
-        // SQL Server 2017, which CI runs, and 2019 and 2022, which the nightly run runs, take this path: a local run on
-        // the default image does not exercise it.
+        // A server before major 17 cannot describe NewTypes.sql and JsonColumns.sql, whose tables are not made there,
+        // and no server describes as their sidecars hold the realistic cases that a minimumMajor or a checkedFrom
+        // leaves out on it.  A filtered check compares only what it names, so the run names every other query file of
+        // EndToEnd/Queries/, EndToEnd/NodaTime/Queries/, EndToEnd/NetTopologySuite/Queries/ and EndToEnd/Json/Queries/
+        // and the query.sql of each realistic case that it checks, by their paths.
+        // A "--database" filter would take the files it leaves out in with the rest.  SQL Server 2017, which CI runs,
+        // and 2019 and 2022, which the nightly run runs, take this path: a local run on the default image does not
+        // exercise it.
         var leavesOutNewTypes = sqlServer.Major < 17;
+        string[] newTypesFiles = [RepositoryPaths.NewTypesQueries, RepositoryPaths.JsonColumnsQueries];
         var newTypes = CommittedEntries.Count(
-            [RepositoryPaths.NewTypesQueries + ".json"],
+            [.. newTypesFiles.Select(static path => path + ".json")],
             SqlServerDatabases.AppDatabase
         );
         newTypes.ShouldBeGreaterThan(0);
         checkedHere.ShouldNotBeEmpty();
-        // The named files include Constants.sql, whose only query has no sidecar and counts nothing; NewTypes.sql is
-        // the one file of EndToEnd/Queries/ that only 2025 describes.
+        // The named files include Constants.sql, whose only query has no sidecar and counts nothing; NewTypes.sql and
+        // JsonColumns.sql are the files of the end-to-end queries that only 2025 describes.
         var named = new[]
         {
             RepositoryPaths.EndToEndQueries,
             RepositoryPaths.EndToEndNodaTimeQueries,
             RepositoryPaths.EndToEndNetTopologySuiteQueries,
+            RepositoryPaths.EndToEndJsonQueries,
         }
             .SelectMany(static folder => Directory.EnumerateFiles(folder, "*.sql", SearchOption.AllDirectories))
-            .Where(path => !leavesOutNewTypes || path != RepositoryPaths.NewTypesQueries)
+            .Where(path => !leavesOutNewTypes || !newTypesFiles.Contains(path))
             .Order()
             .Concat(checkedHere.Select(static found => Path.Combine(found.Folder, RealisticCase.QueryFile)))
             .ToList();

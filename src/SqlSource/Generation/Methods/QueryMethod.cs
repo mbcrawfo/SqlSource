@@ -101,12 +101,18 @@ internal sealed record MethodOutput(
 /// The converter the value read is converted through into the property's type, or null for a value read as the
 /// property's type.
 /// </param>
+/// <param name="ThrowsOnJsonNull">
+/// Whether the read of the column, which is not null, can give null for a value that is not a <c>NULL</c>, a JSON
+/// <c>null</c>, which then throws: for a property of a <see cref="Converters.JsonTypes.IsNode" /> type, whether
+/// converted or read by the driver, and for the serializer's read of a reference type whole.
+/// </param>
 internal sealed record MethodColumn(
     string Name,
     string Property,
     string TypeText,
     bool IsNullable,
-    Conversion? Read = null
+    Conversion? Read = null,
+    bool ThrowsOnJsonNull = false
 )
 {
     /// <summary>

@@ -619,6 +619,81 @@ public sealed class PostgresTypeMapTests
     public void Of_NoLibraries_IsNull() => LibraryRows.Of([]).ShouldBeNull();
 
     [Fact]
+    public void Of_SameSet_IsTheSameInstance()
+    {
+        LibraryRows
+            .Of([SqlLibrary.Json, SqlLibrary.NodaTime])
+            .ShouldBeSameAs(LibraryRows.Of([SqlLibrary.NodaTime, SqlLibrary.Json, SqlLibrary.Json]));
+        LibraryRows.Of([SqlLibrary.Json]).ShouldNotBeSameAs(LibraryRows.Of([SqlLibrary.NodaTime]));
+    }
+
+    // Each set has the rows of its libraries alone: the set of Json finds no NodaTime row, and the set of both finds
+    // the rows of each.
+    [Fact]
+    public void Of_JsonOnly_FindsNoNodaTimeRow()
+    {
+        var json = LibraryRows.Of([SqlLibrary.Json])!;
+        var both = LibraryRows.Of([SqlLibrary.NodaTime, SqlLibrary.Json])!;
+        var timestamptz = ModelRuns.Catalog("timestamptz");
+        var jsonb = ModelRuns.Catalog("jsonb");
+
+        json.Find(timestamptz).ShouldBeNull();
+        json.Find(jsonb).ShouldNotBeNull().Library.ShouldBe(SqlLibrary.Json);
+        both.Find(timestamptz).ShouldNotBeNull().Library.ShouldBe(SqlLibrary.NodaTime);
+        both.Find(jsonb).ShouldNotBeNull().Library.ShouldBe(SqlLibrary.Json);
+    }
+
+    [Theory]
+    [InlineData("json")]
+    [InlineData("jsonb")]
+    public void Map_JsonOn_GivesJsonElement(string internalName)
+    {
+        foreach (var column in Enum.GetValues<NpgsqlColumn>())
+        {
+            var mapping = PostgresTypeMap.Map(
+                ModelRuns.Catalog(internalName),
+                column,
+                libraries: LibraryRows.Of([SqlLibrary.Json])
+            );
+
+            ShouldMapTo(mapping, "global::System.Text.Json.JsonElement", true, internalName);
+            mapping.Library.ShouldBe(SqlLibrary.Json);
+            mapping.Detail.ShouldBe("the System.Text.Json library");
+        }
+    }
+
+    [Theory]
+    [InlineData("jsonpath")]
+    [InlineData("xml")]
+    public void Map_JsonOn_KeepsStringForOtherTypes(string internalName)
+    {
+        var mapping = PostgresTypeMap.Map(
+            ModelRuns.Catalog(internalName),
+            NpgsqlColumn.Npgsql10,
+            libraries: LibraryRows.Of([SqlLibrary.Json])
+        );
+
+        ShouldMapTo(mapping, "string", false, internalName);
+        mapping.Library.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Map_JsonOn_ArrayOfJsonbIsAnArrayOfJsonElement()
+    {
+        var mapping = PostgresTypeMap.Map(
+            ModelRuns.ArrayOf(ModelRuns.Catalog("jsonb"), "_jsonb"),
+            NpgsqlColumn.Npgsql10,
+            libraries: LibraryRows.Of([SqlLibrary.Json])
+        );
+
+        mapping.Text.ShouldBe("global::System.Text.Json.JsonElement[]");
+    }
+
+    [Fact]
+    public void PlaceOf_Json_IsTheSystemTextJsonLibrary() =>
+        LibraryRows.PlaceOf(SqlLibrary.Json).ShouldBe("the System.Text.Json library");
+
+    [Fact]
     public void Of_ALibrary_IsTheSameInstanceEachTime() =>
         LibraryRows.Of([SqlLibrary.NodaTime]).ShouldBeSameAs(LibraryRows.Of([SqlLibrary.NodaTime]));
 

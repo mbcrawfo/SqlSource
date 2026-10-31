@@ -30,6 +30,10 @@ namespace SqlSource.Generation.Types.MappedTypes;
 /// type is of an assembly that only a package the project does not list itself brings.  Null for a name with no such
 /// short name, a full name, a keyword, a type of the project, or a name that is not found.
 /// </param>
+/// <param name="ElementIsValueType">
+/// Whether the type is an array of one rank whose element, without the <c>?</c> of a nullable element, is a value
+/// type.  False unless it is found.
+/// </param>
 internal sealed record MappedType(
     string Name,
     MappedTypeStatus Status,
@@ -38,5 +42,6 @@ internal sealed record MappedType(
     EquatableArray<string> WarningIds,
     string Text,
     EquatableArray<string> Candidates,
-    PackageBinding? Package
+    PackageBinding? Package,
+    bool ElementIsValueType = false
 );

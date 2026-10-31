@@ -603,6 +603,120 @@ public sealed class LibraryTypeTests
         run.Sources.Keys.ShouldNotContain(LibraryConverters.HintNameOf(SqlLibrary.NodaTime));
     }
 
+    private const string JsonElement = "global::System.Text.Json.JsonElement";
+
+    // JSON in a query, with Npgsql 10 and the runtime's System.Text.Json: json, jsonb and an array of jsonb as columns
+    // and parameters, and the types that are not JSON as the same.
+    [Theory]
+    [InlineData("json", JsonElement, "the System.Text.Json library")]
+    [InlineData("jsonb", JsonElement, "the System.Text.Json library")]
+    [InlineData("_jsonb", JsonElement + "[]", null)]
+    [InlineData("jsonpath", "string", null)]
+    [InlineData("xml", "string", null)]
+    public void Type_JsonOn_GivesJsonElement(string internalName, string expected, string? place)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- library-types: json=on\n\n-- name: ListDocs\nSELECT doc FROM docs WHERE doc = @doc;\n"
+        );
+        var type = internalName == "_jsonb" ? ArrayOf(Catalog("jsonb"), "_jsonb") : Catalog(internalName);
+        var entry = Entry(file, "ListDocs", [Parameter("doc", type)], [Column("doc", type)]);
+
+        var run = MethodRuns.Run(file, [entry], references: [NpgsqlReferences.Npgsql10]);
+
+        run.ShouldBeClean();
+        var query = QueryOf(run);
+        var column = query.Columns.ShouldNotBeNull().ShouldHaveSingleItem();
+        var parameter = query.Parameters.ShouldHaveSingleItem();
+        column.Text.ShouldBe(expected);
+        parameter.Text.ShouldBe(expected);
+        column.Library.ShouldBe(expected.StartsWith(JsonElement, StringComparison.Ordinal) ? SqlLibrary.Json : null);
+        if (place is not null)
+        {
+            column.Place.ShouldBe(place);
+            parameter.Place.ShouldBe(place);
+        }
+    }
+
+    [Theory]
+    [InlineData("json", JsonElement)]
+    [InlineData("nvarchar", "string")]
+    public void Type_JsonOnSqlServer_GivesJsonElementForJson(string name, string expected)
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- library-types: json=on\n\n-- name: ListDocs\nSELECT doc FROM docs WHERE doc = @doc;\n"
+        );
+        var type = TestSidecars.SqlServer(name, -1);
+        var entry = MethodRuns.SqlServerEntry(
+            file,
+            "ListDocs",
+            [TestSidecars.Parameter(0, "doc", type, nullable: true)],
+            [TestSidecars.Column(0, "doc", type, nullable: true)]
+        );
+
+        var run = MethodRuns.RunSqlServer(file, [entry], references: [SqlClientReferences.SqlClient7]);
+
+        run.ShouldBeClean();
+        var query = QueryOf(run);
+        query.Columns.ShouldNotBeNull().ShouldHaveSingleItem().Text.ShouldBe(expected);
+        query.Parameters.ShouldHaveSingleItem().Text.ShouldBe(expected);
+    }
+
+    // No setting: JSON stays a string, though System.Text.Json is referenced.
+    [Fact]
+    public void Type_JsonUnset_KeepsString()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListDocs\nSELECT doc FROM docs;\n");
+        var postgres = MethodRuns.Run(
+            file,
+            [Entry(file, "ListDocs", [], [Column("doc", Catalog("jsonb"))])],
+            references: [NpgsqlReferences.Npgsql10]
+        );
+        var sqlServerType = TestSidecars.SqlServer("json", -1);
+        var sqlServer = MethodRuns.RunSqlServer(
+            file,
+            [MethodRuns.SqlServerEntry(file, "ListDocs", [], [TestSidecars.Column(0, "doc", sqlServerType)])],
+            references: [SqlClientReferences.SqlClient7]
+        );
+
+        postgres.ShouldBeClean();
+        sqlServer.ShouldBeClean();
+        var columns = new[] { QueryOf(postgres).Columns, QueryOf(sqlServer).Columns };
+        foreach (var column in columns)
+        {
+            var only = column.ShouldNotBeNull().ShouldHaveSingleItem();
+            only.Text.ShouldBe("string");
+            only.Library.ShouldBeNull();
+        }
+    }
+
+    // Both libraries on in one query: each column takes its own library's type.
+    [Fact]
+    public void Type_JsonAndNodaTimeOn_GivesBoth()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- library-types: json=on nodatime=on\n\n-- name: ListEvents\nSELECT at, doc FROM events;\n"
+        );
+        var entry = Entry(
+            file,
+            "ListEvents",
+            [],
+            [Column("at", Timestamptz, origin: EventsAt), Column("doc", Catalog("jsonb"))]
+        );
+
+        var run = MethodRuns.Run(file, [entry], references: WithThePlugin);
+
+        run.ShouldBeClean();
+        var columns = QueryOf(run).Columns.ShouldNotBeNull();
+        columns.Count.ShouldBe(2);
+        columns[0].Text.ShouldBe(Instant);
+        columns[0].Library.ShouldBe(SqlLibrary.NodaTime);
+        columns[1].Text.ShouldBe(JsonElement);
+        columns[1].Library.ShouldBe(SqlLibrary.Json);
+    }
+
     // PostGIS's types under NetTopologySuite's row, read by the plugin: a column of geometry, of geography in another
     // schema, of an array of geometry and of a domain over it.  Without the library none has a C# type, so the row
     // stays, with nothing beside it, and the query keeps the failure of its first column for a claim at Models.

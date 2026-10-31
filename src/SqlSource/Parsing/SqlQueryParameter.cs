@@ -17,10 +17,15 @@ namespace SqlSource.Parsing;
 /// The C# type that a <c>-- param:</c> marker gives after <c>-&gt;</c>, as <c>ClrTypeName.Text</c> writes it, or null.
 /// It describes nothing to the database, so the hash leaves it out.
 /// </param>
+/// <param name="IsJson">
+/// Whether the marker writes the word <c>json</c> before the C# type, the JSON opt-in, which says that the parameter
+/// holds JSON.  It describes nothing to the database either, so the hash leaves it out.
+/// </param>
 internal sealed record SqlQueryParameter(
     string Name,
     string? Type,
     bool? Nullable,
     bool IsDeclared,
-    string? ClrType = null
+    string? ClrType = null,
+    bool IsJson = false
 );

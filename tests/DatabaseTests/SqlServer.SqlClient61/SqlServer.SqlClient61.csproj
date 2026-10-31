@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
         The end-to-end read of all_types and new_types through Dapper, and their write and read through the generated
-        methods, the write and read of noda_values through the methods and NodaTime 3.1.9, and of spatial_values
-        through the methods, NetTopologySuite 2.5.0 and NetTopologySuite.IO.SqlServerBytes 2.1.0, on
+        methods, the write and read of noda_values through the methods and NodaTime 3.1.9, of spatial_values through
+        the methods, NetTopologySuite 2.5.0 and NetTopologySuite.IO.SqlServerBytes 2.1.0, and of json_values and
+        json_columns through the methods, on
         Microsoft.Data.SqlClient 6.1.7, the newest release of 6.1, the oldest version that is supported.  A project of
         its own, since the end-to-end project gets SqlClient 7 through the tool it references.  The generator comes
         from a project reference, which does not bring the package's MSBuild files, so the real ones are imported here
@@ -68,6 +69,22 @@
         <AdditionalFiles
             Include="../SqlServer/EndToEnd/NetTopologySuite/Queries/NetTopologySuiteOverrides.sql.json"
             Link="NetTopologySuite/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/Json/Queries/Json.sql"
+            Link="Json/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/Json/Queries/Json.sql.json"
+            Link="Json/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/Json/Queries/JsonColumns.sql"
+            Link="Json/Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlServer/EndToEnd/Json/Queries/JsonColumns.sql.json"
+            Link="Json/Queries/%(Filename)%(Extension)"
         />
     </ItemGroup>
     <ItemGroup>

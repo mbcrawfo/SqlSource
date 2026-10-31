@@ -100,7 +100,7 @@ internal static class SettingsLevelReader
     }
 
     // An entry that is not valid is recorded by its index, and the other entries apply.  A list with no valid entry is
-    // not set.
+    // not set.  The source says which member is written with the JSON opt-in.
     private static EquatableArray<ColumnType>? ReadColumnTypes<TSource>(ref TSource source)
         where TSource : struct, ISettingSource
     {
@@ -109,8 +109,14 @@ internal static class SettingsLevelReader
             return null;
         }
 
+        var json = new bool[members.Count];
+        for (var index = 0; index < json.Length; index++)
+        {
+            json[index] = source.IsJsonMember(SettingId.ColumnTypes, index);
+        }
+
         var (indexes, repeated) = (new List<int>(), new List<(int Index, int First)>());
-        var columnTypes = ColumnTypeGrammar.ReadMembers(members, source.Place, indexes, repeated);
+        var columnTypes = ColumnTypeGrammar.ReadMembers(members, source.Place, indexes, repeated, json);
         ReportParts(ref source, SettingId.ColumnTypes, indexes, repeated);
 
         return columnTypes.Count == 0 ? null : columnTypes;

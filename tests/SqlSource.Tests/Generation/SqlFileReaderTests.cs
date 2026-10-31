@@ -73,6 +73,15 @@ public sealed class SqlFileReaderTests
                 new ColumnMarker("b", true, null, false, Location(new TextSpan(33, 17), 2, 0, 2, 17)),
             ]);
 
+    // "-- column: m -> json Meta" is the 25 characters from 11, on the second line.
+    [Fact]
+    public void Read_QueryWithAJsonColumnMarker_CopiesTheOptIn() =>
+        Read("-- name: Q\n-- column: m -> json Meta\nSELECT 1 AS m;\n")
+            .Queries.ShouldHaveSingleItem()
+            .ColumnMarkers.ShouldBe([
+                new ColumnMarker("m", null, "Meta", false, Location(new TextSpan(11, 25), 1, 0, 1, 25), IsJson: true),
+            ]);
+
     [Fact]
     public void Read_QueryWithAShape_CopiesIt() =>
         Read("-- name: Q -> one-optional\nSELECT 1;\n")

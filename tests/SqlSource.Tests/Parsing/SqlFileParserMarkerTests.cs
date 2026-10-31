@@ -322,20 +322,25 @@ public sealed class SqlFileParserMarkerTests
     [Fact]
     public void LibraryTypes_SeveralEntriesOnOneLine()
     {
-        var block = Blocks("-- name: Q\n-- library-types: netTopologySuite=on nodatime=off\nSELECT 1\n")
+        var block = Blocks("-- name: Q\n-- library-types: json=on netTopologySuite=on nodatime=off\nSELECT 1\n")
             .ShouldHaveSingleItem();
 
         block
             .Markers.LibraryTypes.ShouldNotBeNull()
             .Select(static entry => (entry.Library, entry.State))
-            .ShouldBe([(SqlLibrary.NodaTime, LibraryState.Off), (SqlLibrary.NetTopologySuite, LibraryState.On)]);
+            .ShouldBe([
+                (SqlLibrary.NodaTime, LibraryState.Off),
+                (SqlLibrary.NetTopologySuite, LibraryState.On),
+                (SqlLibrary.Json, LibraryState.On),
+            ]);
     }
 
     [Theory]
     [InlineData("nodatime")]
     [InlineData("nodatime=maybe")]
-    [InlineData("json=on")]
+    [InlineData("json=maybe")]
     [InlineData("netTopologySuites=on")]
+    [InlineData("jsons=on")]
     [InlineData("=on")]
     [InlineData("")]
     public void LibraryTypes_Invalid_IsSQLSRC111(string value)
@@ -347,6 +352,7 @@ public sealed class SqlFileParserMarkerTests
         error.Kind.ShouldBe(SqlParseErrorKind.InvalidMarkerValue);
         error.Arguments[0].ShouldBe(value.Length == 0 ? "library-types:" : "library-types: " + value);
         error.Arguments[1].ShouldContain("nodatime");
+        error.Arguments[1].ShouldContain("json");
         error.Arguments[1].ShouldContain("nettopologysuite");
         error.Arguments[1].ShouldContain("default");
         error.Span.ShouldBe(value.Length == 0 ? TextSpans.Of(text, "-- library-types:") : TextSpans.Of(text, value));
@@ -653,6 +659,11 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("-> PostCount")]
     [InlineData("null -> PostCount")]
     [InlineData("total->PostCount")]
+    // The JSON opt-in with default, or with a type that is not valid.
+    [InlineData("total -> json default")]
+    [InlineData("total not null -> json Default")]
+    [InlineData("total -> json int?")]
+    [InlineData("total -> json not a type")]
     public void Parse_ColumnMarkerWithoutANameAndANullability_IsInvalid(string value)
     {
         var text = "-- name: Q\n-- column: " + value + "\nSELECT 1\n";
@@ -701,6 +712,30 @@ public sealed class SqlFileParserMarkerTests
         column.ResetsType.ShouldBe(resetsType);
     }
 
+    // The word json and white space before the C# type is the JSON opt-in; json alone is a type of that name.
+    [Theory]
+    [InlineData("-- column: metadata -> json OrderMetadata", null, "OrderMetadata", true)]
+    [InlineData("-- column: metadata not null -> json OrderMetadata", false, "OrderMetadata", true)]
+    [InlineData("-- column: metadata null ->JSON\tApp.OrderMetadata", true, "global::App.OrderMetadata", true)]
+    [InlineData("-- column: metadata -> json", null, "json", false)]
+    [InlineData("-- column: metadata -> OrderMetadata", null, "OrderMetadata", false)]
+    public void Parse_ColumnMarkerWithTheJsonOptInInAQuery_ReadsTheOptIn(
+        string marker,
+        bool? isNullable,
+        string clrType,
+        bool isJson
+    )
+    {
+        var column = Blocks("-- name: Q\n" + marker + "\nSELECT 1\n")
+            .ShouldHaveSingleItem()
+            .ColumnMarkers.ShouldHaveSingleItem();
+
+        column.IsNullable.ShouldBe(isNullable);
+        column.ClrType.ShouldBe(clrType);
+        column.ResetsType.ShouldBeFalse();
+        column.IsJson.ShouldBe(isJson);
+    }
+
     [Fact]
     public void Parse_ColumnMarkerInAQuery_KeepsTheNameWithoutQuotes() =>
         Blocks("-- name: Q\n-- column: \"a -> b\" -> PostCount\nSELECT 1\n")
@@ -735,6 +770,19 @@ public sealed class SqlFileParserMarkerTests
         }
     }
 
+    [Fact]
+    public void Parse_ColumnMarkerWithTheJsonOptInInTheHeader_IsAColumnTypeThatSaysSo() =>
+        Blocks(
+                "-- column: orders.metadata -> json OrderMetadata\n-- column: orders.note -> json\n"
+                    + "-- name: A\nSELECT 1\n"
+            )
+            .ShouldHaveSingleItem()
+            .Markers.ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([
+                new ColumnType("orders.metadata", "OrderMetadata", SettingPlace.FileHeader, IsJson: true),
+                new ColumnType("orders.note", "json", SettingPlace.FileHeader),
+            ]);
+
     // The header's entries reach the level of a query that has markers of its own.
     [Fact]
     public void Parse_ColumnMarkerInTheHeader_ReachesAQueryWithMarkersOfItsOwn() =>
@@ -752,6 +800,8 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("total null")]
     [InlineData("posts.id -> int?")]
     [InlineData("a.b.c.d -> PostId")]
+    [InlineData("orders.metadata -> json default")]
+    [InlineData("orders.metadata -> json int?")]
     public void Parse_ColumnMarkerWithNullabilityInTheHeader_IsSqlsrc111(string value)
     {
         var text = "-- column: " + value + "\n-- name: Q\nSELECT 1\n";
@@ -840,6 +890,8 @@ public sealed class SqlFileParserMarkerTests
     [InlineData("-- column: total -> PostCount", "TOTAL -> default")]
     [InlineData("-- column: total -> default", "total null -> PostCount")]
     [InlineData("-- column: total null -> PostCount", "total not null")]
+    [InlineData("-- column: total -> PostCount", "total -> json PostCount")]
+    [InlineData("-- column: total -> json PostCount", "TOTAL null -> PostCount")]
     public void Parse_ColumnMarkersOfTwoTypes_IsSqlsrc112(string first, string second)
     {
         var text = "-- name: Q\n" + first + "\n-- column: " + second + "\nSELECT 1\n";
@@ -868,6 +920,40 @@ public sealed class SqlFileParserMarkerTests
                     "column: " + Second
                 ),
             ]);
+    }
+
+    [Fact]
+    public void Parse_HeaderColumnMarkersThatDifferOnlyInTheJsonOptIn_IsSqlsrc112()
+    {
+        const string Second = "orders.metadata -> json Meta";
+        const string Text = "-- column: orders.metadata -> Meta\n-- column: " + Second + "\n-- name: Q\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ConflictingSettings,
+                    TextSpans.Of(Text, Second),
+                    "column: " + Second
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_ColumnMarkersOfOneJsonOptInTwice_IsNoConflict()
+    {
+        var block = Blocks(
+                "-- column: orders.metadata -> json Meta\n-- column: orders.metadata -> JSON Meta\n"
+                    + "-- name: Q\n-- column: m -> json Meta\n-- column: m not null\n-- column: M -> json Meta\n"
+                    + "SELECT 1\n"
+            )
+            .ShouldHaveSingleItem();
+
+        block
+            .Markers.ColumnTypes.ShouldNotBeNull()
+            .ShouldBe([new ColumnType("orders.metadata", "Meta", SettingPlace.FileHeader, IsJson: true)]);
+        block
+            .ColumnMarkers.Select(static marker => (marker.Name, marker.IsNullable, marker.ClrType, marker.IsJson))
+            .ShouldBe([("m", null, "Meta", true), ("m", false, null, false)]);
     }
 
     // A quoted part and a plain part of one text are one key; keys that differ only by case are two.

@@ -28,7 +28,18 @@ namespace SqlSource.Generation.Methods;
 /// chose is never <c>SQLSRC279</c> or <c>SQLSRC280</c>: where no edge fits, the driver reads and binds it, as the
 /// plugin does on PostgreSQL.  SQL Server's <c>geography</c> or <c>geometry</c> read as one of NetTopologySuite's
 /// geometries, when the project references NetTopologySuite.IO.SqlServerBytes, takes the spatial read path before any
-/// edge is looked for, which no converter replaces and which reports nothing.
+/// edge is looked for, after the JSON opt-in's check alone, which no converter replaces and which reports nothing.
+/// <para>
+/// A project's own class, a type that is no type of System.Text.Json and none the base map gives, on a type that holds
+/// JSON and is read as <c>string</c>, is read and sent through System.Text.Json's serializer when no converter touches
+/// it, whole or, for an array of a type that holds JSON, element by element.  The serializer never reports anything: a
+/// class with converters of other types keeps the rules above.
+/// </para>
+/// <para>
+/// The JSON opt-in, a place that wrote <c>json</c> before the type, makes a type read as <c>string</c> hold JSON for
+/// the serializer.  It is checked before the spatial read path and any edge: on a type that neither holds JSON nor is
+/// read as <c>string</c>, or with a type the serializer never takes, it is <c>SQLSRC283</c>, which blocks the query.
+/// </para>
 /// </remarks>
 internal static class ConversionPlanner
 {
@@ -42,6 +53,13 @@ internal static class ConversionPlanner
 
     // Before the subject of an array's element: "element of column 'ids'".
     private const string ElementSubject = "element of ";
+
+    // The type the base map reads a type that holds JSON as, which the serializer reads and sends.
+    private const string JsonText = "string";
+
+    private const string Deserialize = "global::System.Text.Json.JsonSerializer.Deserialize<";
+
+    private const string Serialize = "global::System.Text.Json.JsonSerializer.Serialize<";
 
     /// <summary>
     /// The conversion of one column or parameter, or null for one read or bound as its type is.  Its problems are
@@ -64,14 +82,9 @@ internal static class ConversionPlanner
     )
     {
         blocked = false;
-        if (SpatialOf(type, isRead, context) is { } spatial)
-        {
-            return spatial;
-        }
-
         if (type.Place is null || type.Database is not { } database)
         {
-            return null;
+            return SpatialOf(type, isRead, context);
         }
 
         var decision = new Decision(isRead, subject, context, type.Library is not null);
@@ -79,6 +92,27 @@ internal static class ConversionPlanner
         // which the element of a conversion by element keeps, so that a nullable element is seen as one.
         var text = ClrTypeName.KeywordTextOf(type.Text);
         var element = EdgeElementOf(text);
+        if (type.IsJson && OptInProblemOf(text, database, type.Key, decision) is { } reason)
+        {
+            context.Problems.Add(
+                DiagnosticInfo.Create(
+                    SqlDiagnostics.JsonOptInNotApplicable,
+                    context.At,
+                    subject,
+                    ClrTypeName.AsWritten(text),
+                    type.Place,
+                    reason
+                )
+            );
+            blocked = true;
+            return null;
+        }
+
+        if (SpatialOf(type, isRead, context) is { } spatial)
+        {
+            return spatial;
+        }
+
         if (database.Text is not { } databaseText)
         {
             // A foreign type with converters, else a foreign element with them, which the message names.
@@ -108,7 +142,8 @@ internal static class ConversionPlanner
                     null,
                     false,
                     whole.WarningIds,
-                    whole.Library?.Library
+                    whole.Library?.Library,
+                    MayReturnNull: isRead && JsonTypes.IsNode(whole.ReturnText)
                 );
         }
 
@@ -133,12 +168,42 @@ internal static class ConversionPlanner
                     ElementOf(text),
                     elementIsValueType,
                     byElement.WarningIds,
-                    byElement.Library?.Library
+                    byElement.Library?.Library,
+                    MayReturnNull: isRead && JsonTypes.IsNode(byElement.ReturnText)
+                );
+            }
+
+            if (TakesSerializer(database.HoldsJson, databaseElement, element, ofElement))
+            {
+                return new Conversion(
+                    SerializerOf(element, isRead, type.ElementIsValueType),
+                    databaseText,
+                    database.ElementIsValueType,
+                    true,
+                    ElementOf(text),
+                    type.ElementIsValueType,
+                    MayReturnNull: isRead,
+                    IsSerializer: true
                 );
             }
 
             blocked = ofElement.ReportForeign(element, databaseElement, ElementKeyOf(type.Key));
             return null;
+        }
+
+        var holdsJson = database.HoldsJson || (type.IsJson && databaseText.Equals(JsonText, StringComparison.Ordinal));
+        if (TakesSerializer(holdsJson, databaseText, text, decision))
+        {
+            return new Conversion(
+                SerializerOf(text, isRead, type.IsValueType),
+                databaseText,
+                database.IsValueType,
+                false,
+                null,
+                false,
+                MayReturnNull: isRead,
+                IsSerializer: true
+            );
         }
 
         blocked = decision.ReportForeign(text, databaseText, type.Key);
@@ -163,6 +228,67 @@ internal static class ConversionPlanner
             ? element.Substring(0, element.Length - 1)
             : element;
     }
+
+    // Why the JSON opt-in does not apply to the type on the database type, as SQLSRC283's {3} words it, or null when it
+    // does: on a type that holds JSON or is read as string, with a type the serializer takes.  On an array that holds
+    // JSON, the type's element is checked, as the serializer converts such an array element by element.
+    private static string? OptInProblemOf(string type, DatabaseType database, string key, Decision decision)
+    {
+        if (!database.HoldsJson && !JsonText.Equals(database.Text, StringComparison.Ordinal))
+        {
+            return database.Text is { } read
+                ? "the database type '" + key + "' is read as '" + ClrTypeName.AsWritten(read) + "', not as a string"
+                : "the database type '" + key + "' is not read as a string";
+        }
+
+        var (bare, named) =
+            database.Text is { } text && ElementOf(text) is not null && EdgeElementOf(type) is { } element
+                ? (element, "its element '")
+                : (WithoutQuestionMark(type), "'");
+        if (JsonTypes.IsJsonType(bare))
+        {
+            return named
+                + ClrTypeName.AsWritten(bare)
+                + "' is a type of System.Text.Json, which is read without the "
+                + "serializer";
+        }
+
+        return decision.IsSerializable(bare)
+            ? null
+            : named
+                + ClrTypeName.AsWritten(bare)
+                + "' is a type that the driver reads, which the serializer never takes";
+    }
+
+    // Whether the serializer reads and sends the type, the property's or its element's: a class that no converter
+    // touches, on a type that holds JSON, which the base map reads as string.  The type is matched without the ? of a
+    // nullable value type.
+    private static bool TakesSerializer(bool holdsJson, string database, string type, Decision decision)
+    {
+        var bare = WithoutQuestionMark(type);
+        return holdsJson
+            && database.Equals(JsonText, StringComparison.Ordinal)
+            && !decision.Touches(bare)
+            && decision.IsSerializable(bare);
+    }
+
+    // The serializer's call for the type, with the default options: JsonSerializer.Serialize<T> to send, T without the
+    // ? of a nullable value type, which the method never passes a null; JsonSerializer.Deserialize<T> to read, and
+    // Deserialize<T?> for a value type, whose Deserialize<T> throws JsonException on a JSON null, so that the read of
+    // either kind gives null for one.
+    private static string SerializerOf(string type, bool isRead, bool isValueType)
+    {
+        var bare = WithoutQuestionMark(type);
+        if (!isRead)
+        {
+            return Serialize + bare + ">";
+        }
+
+        return Deserialize + bare + (isValueType ? "?>" : ">");
+    }
+
+    private static string WithoutQuestionMark(string type) =>
+        type.EndsWith("?", StringComparison.Ordinal) ? type.Substring(0, type.Length - 1) : type;
 
     // The spatial read path of a SQL Server geography or geometry that one of NetTopologySuite's geometries is read as,
     // by an override or the library's row, when the project references NetTopologySuite.IO.SqlServerBytes; null for
@@ -353,6 +479,9 @@ internal static class ConversionPlanner
                 ),
             ];
         }
+
+        // Whether the type is a class for the serializer: no type of System.Text.Json, and none the base map gives.
+        public bool IsSerializable(string type) => !JsonTypes.IsJsonType(type) && IsForeign(type);
 
         private bool IsForeign(string type) =>
             context.Engine == DatabaseEngine.SqlServer ? !SqlServerTypeMap.Gives(type) : !PostgresTypeMap.Gives(type);

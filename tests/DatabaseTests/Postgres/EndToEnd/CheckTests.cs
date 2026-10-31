@@ -42,10 +42,10 @@ public sealed class CheckTests(PostgresDatabases postgres, PostgisDatabases post
         billing.ShouldBeGreaterThan(0);
         realistic.ShouldBeGreaterThan(0);
         gis.ShouldBeGreaterThan(0);
-        // In the tool's order, which puts "gis" first.
-        var gisAppAndBilling =
-            $"gis (postgres): {gis} same, 0 differ, 0 failed\n"
-            + $"app (postgres): {app} same, 0 differ, 0 failed\n"
+        // In the tool's order, which puts "app" first, by the queries of EndToEnd/Json/, and then "gis".
+        var appGisAndBilling =
+            $"app (postgres): {app} same, 0 differ, 0 failed\n"
+            + $"gis (postgres): {gis} same, 0 differ, 0 failed\n"
             + $"billing (postgres): {billing} same, 0 differ, 0 failed\n";
         string[] others =
         [
@@ -63,7 +63,7 @@ public sealed class CheckTests(PostgresDatabases postgres, PostgisDatabases post
             var result = await CheckAsync([.. others, .. Connection(PostgresDatabases.RealisticDatabase)]);
 
             result.ExitCode.ShouldBe(0, result.Error);
-            result.Out.ShouldBe(gisAppAndBilling + $"realistic (postgres): {realistic} same, 0 differ, 0 failed\n");
+            result.Out.ShouldBe(appGisAndBilling + $"realistic (postgres): {realistic} same, 0 differ, 0 failed\n");
             return;
         }
 
@@ -98,7 +98,7 @@ public sealed class CheckTests(PostgresDatabases postgres, PostgisDatabases post
         realisticResult.ExitCode.ShouldBe(0, realisticResult.Error);
         realisticResult.Out.ShouldBe($"realistic (postgres): {checkedEntries} same, 0 differ, 0 failed\n");
         othersResult.ExitCode.ShouldBe(0, othersResult.Error);
-        othersResult.Out.ShouldBe(gisAppAndBilling);
+        othersResult.Out.ShouldBe(appGisAndBilling);
     }
 
     // "describe --check" over the real project, on the real MSBuild and the PostgreSQL describer.

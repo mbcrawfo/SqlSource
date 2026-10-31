@@ -586,6 +586,48 @@ public sealed class CachingTypeTests
             );
     }
 
+    // The same edit of the marker for JSON: Users' query is typed again with its column a string, and Orders, which the
+    // marker does not reach, is cached.
+    [Fact]
+    public void JsonLibraryTypesMarker_Edit_RetypesOnlyItsFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
+        var users = UsersWithJsonMarker("on");
+        var driver = CreateDriver(
+                ProjectFileWithTypeOverrides(null),
+                [
+                    users,
+                    _scene.Orders,
+                    TypedSidecar(users, "GetUser", "jsonb"),
+                    TypedSidecar(_scene.Orders, "GetOrder", "jsonb"),
+                ]
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        ColumnTextOf(driver.GetRunResult(), "app/Users/Users.sql").ShouldBe("global::System.Text.Json.JsonElement");
+        ColumnTextOf(driver.GetRunResult(), "app/Orders/Orders.sql").ShouldBe("string");
+
+        var result = Run(driver.ReplaceAdditionalText(users, UsersWithJsonMarker("off")), compilation);
+
+        AllReasons(result, TrackingNames.LibraryProbe).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        Reasons<TypedFile>(result, TrackingNames.TypedFile, file => file.Types.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        result.Diagnostics.ShouldBeEmpty();
+        ColumnTextOf(result, "app/Users/Users.sql").ShouldBe("string");
+        ColumnTextOf(result, "app/Orders/Orders.sql").ShouldBe("string");
+    }
+
+    // Users, whose query's -- library-types: marker gives JSON this state.
+    private InMemoryAdditionalText UsersWithJsonMarker(string state) =>
+        new(_scene.Users.Path, "-- name: GetUser\n-- library-types: json=" + state + "\nSELECT 1 AS value;\n");
+
     // Users, whose query's -- library-types: marker gives NodaTime this state.
     private InMemoryAdditionalText UsersWithLibraryTypes(string state) =>
         new(_scene.Users.Path, "-- name: GetUser\n-- library-types: nodatime=" + state + "\nSELECT 1 AS value;\n");

@@ -5,20 +5,21 @@
 # request that raises VersionPrefix, since every sidecar holds the tool's version, and reads the diff of what it wrote
 # before committing it.  It has a part for each engine, which starts its own container and removes it:
 # - PostgreSQL: the .sql.json files of the realistic cases under tests/DatabaseTests/Postgres/Realistic/Cases and of
-#   the end-to-end queries under tests/DatabaseTests/Postgres/EndToEnd/Queries, EndToEnd/NodaTime/Queries and
-#   EndToEnd/NetTopologySuite/Queries, against the databases "realistic", "app" and "billing", each made from the
-#   schema.sql and seed.sql of Realistic/, EndToEnd/app/ and EndToEnd/billing/, and "gis", made from those of
-#   EndToEnd/gis/ in a second container, of the PostGIS image that the harness's PostgisContainer builds from
-#   tests/DatabaseTests/TestHarness/Postgis/Dockerfile on the same postgres image.  That image is kept, as the tests
-#   keep it.
+#   the end-to-end queries under tests/DatabaseTests/Postgres/EndToEnd/Queries, EndToEnd/NodaTime/Queries,
+#   EndToEnd/NetTopologySuite/Queries and EndToEnd/Json/Queries, against the databases "realistic", "app" and
+#   "billing", each made from the schema.sql and seed.sql of Realistic/, EndToEnd/app/ and EndToEnd/billing/, and
+#   "gis", made from those of EndToEnd/gis/ in a second container, of the PostGIS image that the harness's
+#   PostgisContainer builds from tests/DatabaseTests/TestHarness/Postgis/Dockerfile on the same postgres image.  That
+#   image is kept, as the tests keep it.
 #   It then writes the sidecars of examples/PostgresExamples the same way, against a database "examples" made from its
 #   schema.sql, and runs after a change to a query or to the schema of the examples too.
 # - SQL Server: the .sql.json files of the realistic cases under tests/DatabaseTests/SqlServer/Realistic/Cases and of
-#   the end-to-end queries under tests/DatabaseTests/SqlServer/EndToEnd/Queries, EndToEnd/NodaTime/Queries and
-#   EndToEnd/NetTopologySuite/Queries, against the databases "realistic", "app" and "billing", each made from the
-#   schema.sql and seed.sql of Realistic/, EndToEnd/app/ and EndToEnd/billing/, with EndToEnd/app/new-types.sql after
-#   the seed of "app".  It then writes the sidecars of examples/SqlServerExamples the same way, against a database
-#   "examples" made from its schema.sql, and runs after a change to a query or to the schema of those examples too.
+#   the end-to-end queries under tests/DatabaseTests/SqlServer/EndToEnd/Queries, EndToEnd/NodaTime/Queries,
+#   EndToEnd/NetTopologySuite/Queries and EndToEnd/Json/Queries, against the databases "realistic", "app" and
+#   "billing", each made from the schema.sql and seed.sql of Realistic/, EndToEnd/app/ and EndToEnd/billing/, with
+#   EndToEnd/app/new-types.sql after the seed of "app".  It then writes the sidecars of examples/SqlServerExamples the
+#   same way, against a database "examples" made from its schema.sql, and runs after a change to a query or to the
+#   schema of those examples too.
 # It runs the tool as a project, where the other recording scripts run a test: a test project does not build until its
 # sidecars are current.  Each image is the default image of its engine's tests, which the sidecars are recorded on, so
 # SQLSOURCE_TESTS_POSTGRES_IMAGE and SQLSOURCE_TESTS_SQLSERVER_IMAGE are ignored.  It needs Docker.
@@ -171,7 +172,8 @@ describe_postgres() {
     connections+=(--connection "$POSTGIS_DATABASE=$connection;Database=$POSTGIS_DATABASE")
 
     find "$POSTGRES_END_TO_END/Queries" "$POSTGRES_END_TO_END/NodaTime/Queries" \
-        "$POSTGRES_END_TO_END/NetTopologySuite/Queries" "$POSTGRES_REALISTIC/Cases" -name '*.sql.json' -type f -delete
+        "$POSTGRES_END_TO_END/NetTopologySuite/Queries" "$POSTGRES_END_TO_END/Json/Queries" \
+        "$POSTGRES_REALISTIC/Cases" -name '*.sql.json' -type f -delete
 
     dotnet run --project src/SqlSource.Tool -- \
         describe --force "$POSTGRES_PROJECT/Postgres.csproj" "${connections[@]}"
@@ -245,7 +247,8 @@ describe_sqlserver() {
     done
 
     find "$SQLSERVER_END_TO_END/Queries" "$SQLSERVER_END_TO_END/NodaTime/Queries" \
-        "$SQLSERVER_END_TO_END/NetTopologySuite/Queries" "$SQLSERVER_REALISTIC/Cases" -name '*.sql.json' -type f -delete
+        "$SQLSERVER_END_TO_END/NetTopologySuite/Queries" "$SQLSERVER_END_TO_END/Json/Queries" \
+        "$SQLSERVER_REALISTIC/Cases" -name '*.sql.json' -type f -delete
 
     dotnet run --project src/SqlSource.Tool -- \
         describe --force "$SQLSERVER_PROJECT/SqlServer.csproj" "${connections[@]}"

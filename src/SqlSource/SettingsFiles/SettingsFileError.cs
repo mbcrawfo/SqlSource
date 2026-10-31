@@ -10,12 +10,17 @@ namespace SqlSource.SettingsFiles;
 /// <param name="Setting">The key of the top level whose value is wrong, when the kind has one.</param>
 /// <param name="Argument">The text a message quotes first, when the kind has one.</param>
 /// <param name="Other">The text a message quotes second, when the kind has one.</param>
+/// <param name="IsObjectForm">
+/// For a member of the column types that is not valid, whether it is written as an object, so that the message can say
+/// what that form takes.
+/// </param>
 internal sealed record SettingsFileError(
     SettingsFileErrorKind Kind,
     TextSpan Span,
     string? Setting,
     string? Argument,
-    string? Other
+    string? Other,
+    bool IsObjectForm = false
 )
 {
     /// <summary>

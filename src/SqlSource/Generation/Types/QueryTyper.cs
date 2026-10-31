@@ -136,6 +136,7 @@ internal static class QueryTyper
                 parameter.Type is { } sidecarType && MarkedParameter(declared, parameter.Name) is { } marked
                     ? Chosen(
                         marked.ClrType!,
+                        marked.IsJson,
                         ParamMarker,
                         prefix + marked.Name,
                         sidecarType,
@@ -202,6 +203,7 @@ internal static class QueryTyper
         {
             return Chosen(
                 marked,
+                marker.IsJson,
                 QueryColumnMarker,
                 marker.Name,
                 column.Type,
@@ -215,6 +217,7 @@ internal static class QueryTyper
         {
             return Chosen(
                 type,
+                source.IsJson,
                 ColumnTypePlaceOf(source.Place),
                 source.Key,
                 column.Type,
@@ -273,6 +276,7 @@ internal static class QueryTyper
     /// converter's message names, and <paramref name="key" /> as its <c>Mapped</c>, which the model's message names.
     /// </summary>
     /// <param name="clrType">The C# type, as <c>ClrTypeName.Text</c> writes it.</param>
+    /// <param name="isJson">Whether the place wrote the word <c>json</c> before the C# type, the JSON opt-in.</param>
     /// <param name="place">Where it was chosen, as <c>SQLSRC250</c> to <c>SQLSRC252</c> name it.</param>
     /// <param name="key">What their messages name as mapped: <c>@author</c>, or the key of a column.</param>
     /// <param name="type">The database type.</param>
@@ -281,6 +285,7 @@ internal static class QueryTyper
     /// <param name="typing">What the typing of the query reads, and where its error goes.</param>
     private static PropertyType? Chosen(
         string clrType,
+        bool isJson,
         string place,
         string key,
         SidecarType type,
@@ -309,7 +314,9 @@ internal static class QueryTyper
                 KeyOf(type),
                 place,
                 DatabaseTypeOf(type, typing),
-                key
+                key,
+                ElementIsValueType: mapping.ElementIsValueType,
+                IsJson: isJson
             );
         }
 
@@ -361,7 +368,8 @@ internal static class QueryTyper
             mapped.WarningIds,
             place,
             mapped.Package,
-            written
+            written,
+            ElementIsValueType: mapped.ElementIsValueType
         );
     }
 
@@ -554,16 +562,20 @@ internal static class QueryTyper
             mapping.WarningIds,
             mapping.Key,
             mapping.Detail,
-            mapping.Detail is null ? null : DatabaseTypeOf(type, typing)
+            mapping.Detail is null ? null : DatabaseTypeOf(type, typing),
+            ElementIsValueType: mapping.Detail is not null && mapping.ElementIsValueType
         );
 
-    // What the base map alone reads the type as, with no lookup of the override at any level, and the element's value
-    // type for an array or a domain over one.
+    // What the base map alone reads the type as, with no lookup of the override at any level, the element's value
+    // type for an array or a domain over one, and whether the type holds JSON.
     private static DatabaseType DatabaseTypeOf(SidecarType type, Typing typing)
     {
         if (type is SqlServerType sqlServer)
         {
-            return DatabaseTypeOf(SqlServerTypeMap.Map(sqlServer, typing.SqlClientColumn, null), null);
+            return DatabaseTypeOf(SqlServerTypeMap.Map(sqlServer, typing.SqlClientColumn, null), null) with
+            {
+                HoldsJson = HoldsJson(sqlServer),
+            };
         }
 
         var postgres = (PostgresType)type;
@@ -577,7 +589,12 @@ internal static class QueryTyper
             array.Kind.Equals(SidecarValues.Kind.Array, StringComparison.Ordinal) && array.Element is { } item
                 ? PostgresTypeMap.Map(item, typing.Column)
                 : null;
-        return DatabaseTypeOf(PostgresTypeMap.Map(postgres, typing.Column), element);
+        return DatabaseTypeOf(PostgresTypeMap.Map(postgres, typing.Column), element) with
+        {
+            HoldsJson = HoldsJson(
+                array.Kind.Equals(SidecarValues.Kind.Array, StringComparison.Ordinal) ? array.Element : array
+            ),
+        };
     }
 
     private static DatabaseType DatabaseTypeOf(TypeMapping mapping, TypeMapping? element) =>
@@ -588,6 +605,29 @@ internal static class QueryTyper
                 element is { Kind: TypeMappingKind.Mapped, IsValueType: true }
             )
             : new DatabaseType(null, false, false);
+
+    // Whether the type, through the domains it is built on, is json or jsonb of pg_catalog, by its internal name
+    // ignoring case, as the base map's rows are found.
+    private static bool HoldsJson(PostgresType? type)
+    {
+        while (type is not null && type.Kind.Equals(SidecarValues.Kind.Domain, StringComparison.Ordinal))
+        {
+            type = type.Base;
+        }
+
+        return type is not null
+            && PostgresTypeMap.IsSystemType(type)
+            && (
+                type.InternalName.Equals("json", StringComparison.OrdinalIgnoreCase)
+                || type.InternalName.Equals("jsonb", StringComparison.OrdinalIgnoreCase)
+            );
+    }
+
+    // Whether the type is SQL Server's json, by its base name ignoring case: an alias type's name is the system type it
+    // is an alias of, and a CLR type, whose user type names an assembly, is never json.
+    private static bool HoldsJson(SqlServerType type) =>
+        string.IsNullOrEmpty(type.UserType?.AssemblyQualifiedName)
+        && SqlServerTypeMap.BaseName(type.Name).Equals("json", StringComparison.OrdinalIgnoreCase);
 
     // The failure's diagnostic.  NeedsDriver and Unreadable occur for both engines, and their helps name the engine's
     // driver and system schema; NeedsSqlServerTypes and NeedsNewerSqlClient are SQL Server's alone, and

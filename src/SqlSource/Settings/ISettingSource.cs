@@ -37,6 +37,13 @@ internal interface ISettingSource
     IReadOnlyList<KeyValuePair<string, string>>? Members(SettingId setting);
 
     /// <summary>
+    /// Whether the member at <paramref name="index" /> of <see cref="Members" /> says that its column holds JSON, as a
+    /// settings file writes a column type as an object with <c>"json": true</c>.  False for a source that writes no
+    /// such member.
+    /// </summary>
+    bool IsJsonMember(SettingId setting, int index);
+
+    /// <summary>
     /// Records that the member at <paramref name="index" /> of the library types gives the entry of
     /// <paramref name="library" />.  A source that knows where its members are keeps that position apart from the
     /// level, so that a member that only moves changes no level; one that never gives the library types ignores it.

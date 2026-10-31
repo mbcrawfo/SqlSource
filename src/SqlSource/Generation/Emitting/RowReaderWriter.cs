@@ -88,7 +88,8 @@ internal static class RowReaderWriter
     // A not-null column by GetFieldValue<T> alone; a nullable one by IsDBNull first, and never by GetFieldValue<T?>,
     // which SqlClient refuses on a NULL.  A column with a converter is read as the converter's database side and
     // passed to it, so that the converter never sees a NULL; an array converted by element is read as the database's
-    // array and each of its elements passed to it; and the spatial read path reads the column's bytes.
+    // array and each of its elements passed to it; and the spatial read path reads the column's bytes.  A not-null
+    // column whose read can give null for a JSON null throws on one.
     private static void AppendColumn(StringBuilder builder, MethodOutput output, int ordinal, QueryMethodLocals locals)
     {
         var column = output.Columns[ordinal];
@@ -135,11 +136,17 @@ internal static class RowReaderWriter
         {
             _ = builder.Append(')');
         }
+
+        if (column.ThrowsOnJsonNull)
+        {
+            AppendJsonNullThrow(builder, column);
+        }
     }
 
     // Array.ConvertAll of the database's array, by a static lambda that converts each element that is not null.  A
     // NULL element of a value type throws, naming the column, which Npgsql's throw does not; one of a reference type,
-    // or of an element the property writes nullable, stays null.
+    // or of an element the property writes nullable, stays null.  A JSON null that the converter gives null for throws
+    // too, unless the element is nullable.
     private static void AppendByElement(
         StringBuilder builder,
         MethodColumn column,
@@ -163,11 +170,21 @@ internal static class RowReaderWriter
             .Append(names.Element)
             .Append(" is { } ")
             .Append(names.Item)
-            .Append(" ? ")
+            .Append(" ? ");
+        var throwsOnJsonNull = read.MayReturnNull && !read.ElementIsNullable;
+        _ = builder
+            .Append(throwsOnJsonNull ? "(" : string.Empty)
             .Append(read.Method)
             .Append('(')
             .Append(names.Item)
-            .Append(") : ");
+            .Append(')');
+        if (throwsOnJsonNull)
+        {
+            AppendJsonNullThrow(builder, column);
+            _ = builder.Append(')');
+        }
+
+        _ = builder.Append(" : ");
         if (read.ElementIsNullable)
         {
             _ = builder.Append("null");
@@ -186,6 +203,14 @@ internal static class RowReaderWriter
 
         _ = builder.Append(')');
     }
+
+    // After a read that can give null for a JSON null, which a not-null property or element refuses, naming the
+    // column.
+    private static void AppendJsonNullThrow(StringBuilder builder, MethodColumn column) =>
+        _ = builder
+            .Append(" ?? throw new global::System.InvalidCastException(")
+            .Append(SymbolDisplay.FormatLiteral("Column '" + column.Name + "' holds a JSON null.", quote: true))
+            .Append(')');
 
     // The shared reader's geometry of the column's bytes, read through GetStream, which every DbDataReader has, cast to
     // the property's type unless it is Geometry itself.
