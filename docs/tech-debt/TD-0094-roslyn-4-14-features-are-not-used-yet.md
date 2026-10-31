@@ -12,7 +12,7 @@ The floor raise was scoped to the workarounds that 4.8.0 forced.  Finding what e
 
 ## Impact
 
-Low.  Nothing is wrong; the pipeline may cost more than it has to, in the compiler and the IDE.
+Low.  Nothing is wrong; the pipeline may cost more than it has to, in the compiler and the IDE.  The override keeps IDE0301 to IDE0305 silent in `src/SqlSource`, so new `ImmutableArray` code is not nudged toward collection expressions.
 
 ## Proposed fix
 
