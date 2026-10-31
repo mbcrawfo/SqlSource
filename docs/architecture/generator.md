@@ -676,7 +676,7 @@ A nullable property is its type's text with `?`, which is `Nullable<T>` for a va
 
 A model's file is named by `HintName.ForModel`: its full name, from identifier values, then `-Model.g.cs`.  No type's file can have such a name, since a `-` in a type's name is followed only by its arity's digits, so the models' names are made unique among themselves alone: `ModelCollector.Resolve` runs `HintName.FindAmbiguous` over them, which also finds a clash with the attribute's file, and `HintName.MakeUnique` adds the hash to each that would clash, such as the files of `UserDto` and `UserDTO`.
 
-A library's class of conversions is named by `LibraryConverters.HintNameOf`: `SqlSource-`, the library, then `Conversions.g.cs`, `SqlSource-NodaTimeConversions.g.cs` and `SqlSource-NetTopologySuiteConversions.g.cs`.  No type's file can have it, since a `-` in a type's name is followed only by its arity's digits, and no model's or methods' file, which end in `-Model.g.cs` and `-Methods.g.cs`.
+A library's class of conversions is named by `LibraryConverters.HintNameOf`: `SqlSource-`, the library, then `Conversions.g.cs`, `SqlSource-NodaTimeConversions.g.cs`, `SqlSource-NetTopologySuiteConversions.g.cs` and `SqlSource-JsonConversions.g.cs`.  No type's file can have it, since a `-` in a type's name is followed only by its arity's digits, and no model's or methods' file, which end in `-Model.g.cs` and `-Methods.g.cs`.
 
 ### What costs every type its code
 

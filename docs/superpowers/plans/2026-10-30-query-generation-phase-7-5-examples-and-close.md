@@ -14,7 +14,7 @@
 
 - 7.3 already removed every "Coming in a later release" callout of phase 7 (README, `settings.md`), flipped the manual's "What works today" row, and removed the architecture's `## Not built yet / ### Library maps` placeholder.  7.5 checks they are gone and that nothing of phase 7 is still described as coming; it does not redo them.
 - The README's "NodaTime and other libraries" section names each plugin's `Use...()` call but not the two traps the spec asks for (EF Core's plugin turning the library on, Dapper on a data source that calls `UseNodaTime()`).  Both are in `docs/manual/postgresql.md`; Task 3 adds them to the README.
-- The spec lists, for SQL Server, "NodaTime and the `json` library turned on, and a class in `json`", while its rule is "each library its database supports", and SQL Server supports NetTopologySuite since 7.4.  This plan includes NetTopologySuite on SQL Server (one `geography` column).  It is an owner question sent to the manager ("blocks merge: yes"); if the answer is no, Task 2's `location` column, its parameter and the `NetTopologySuite.IO.SqlServerBytes` reference come out.
+- The spec lists, for SQL Server, "NodaTime and the `json` library turned on, and a class in `json`", while its rule is "each library its database supports", and SQL Server supports NetTopologySuite since 7.4.  This plan includes NetTopologySuite on SQL Server (one `geography` column), as the owner decided on 2026-10-30: "Yes, include it".
 
 ## Global constraints
 

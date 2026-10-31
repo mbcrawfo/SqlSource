@@ -57,7 +57,6 @@ The pages each phase touches, besides those:
 
 | Phase | Pages |
 |----|----|
-| 7. Library maps | README: "NodaTime and other libraries", with the call each library needs on the data source.  Both database pages' Types: in `sqlserver.md` `json`, and `hierarchyid`, `geography` and `geometry`, whose help names the type override and Microsoft.SqlServer.Types, as `SQLSRC246`'s help in `diagnostics.md` does.  `settings.md`: `libraryTypes` and `-- library-types:`, each library's default by engine.  Where a library's map makes a converter or a taught driver unnecessary: `settings.md`'s converters, the README's FAQ on `InvalidCastException`, and how a row is read and a parameter sent in `generator.md` and each database page's Query methods. |
 | 9. Build integration | `tool.md`: running in the build, the `.env` file and what to keep out of git, watch mode, the new options in the command reference.  `settings.md`: what turns it on.  README: step 5 |
 | 10. Bug reports | `tool.md`: making a bundle, what it holds before you share it, the new commands in the command reference |
 
