@@ -737,4 +737,4 @@ The reader follows the format's [reader rules](sidecar-format.md#reader-rules), 
 
 ### Library maps
 
-> **Not built yet.**  How the generator maps the types of NetTopologySuite and System.Text.Json.  Delivered by phase 7 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
+> **Not built yet.**  How the generator maps the types of System.Text.Json.  Delivered by phase 7 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
