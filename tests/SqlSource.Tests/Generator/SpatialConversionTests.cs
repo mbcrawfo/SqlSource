@@ -209,6 +209,43 @@ public sealed class SpatialConversionTests
             ]
         );
 
+    // The JSON opt-in on a geography, which neither holds JSON nor is read as a string, is SQLSRC283 at the query, in
+    // place of the spatial read path, and the query gets no method, whether a column's marker or a parameter's says it.
+    [Theory]
+    [InlineData(
+        "-- column: place -> json NetTopologySuite.Geometries.Geometry",
+        "column",
+        "a -- column: marker of the query"
+    )]
+    [InlineData(
+        "-- param: @place -> json NetTopologySuite.Geometries.Geometry",
+        "parameter",
+        "the -- param: marker of the parameter"
+    )]
+    public void Run_JsonOptInOnGeography_IsSQLSRC283(string marker, string subject, string place)
+    {
+        var text =
+            "-- name: FindPlaces\n"
+            + marker
+            + "\nSELECT place, shape FROM places WHERE place = @place AND shape = @shape;\n";
+
+        var run = RunPlaces(text, WithSqlServerBytes, NetTopologySuiteOn);
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC283 "
+                    + GeneratorHarness.UsersPath
+                    + "(1,10)-(1,20): The "
+                    + subject
+                    + " 'place' is mapped to json 'NetTopologySuite.Geometries.Geometry' in "
+                    + place
+                    + ", but the database type 'geography' is not read as a string.  Remove json, or use it only to "
+                    + "map a column or parameter of a string or JSON type to a class of this project.",
+            ]);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+        run.Sources.Keys.ShouldNotContain(ClassFile);
+    }
+
     // A CLR type of sys, as the tool describes one.
     private static SqlServerType SqlServerClr(string name) =>
         TestSidecars.SqlServer(

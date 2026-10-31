@@ -28,7 +28,7 @@ namespace SqlSource.Generation.Methods;
 /// chose is never <c>SQLSRC279</c> or <c>SQLSRC280</c>: where no edge fits, the driver reads and binds it, as the
 /// plugin does on PostgreSQL.  SQL Server's <c>geography</c> or <c>geometry</c> read as one of NetTopologySuite's
 /// geometries, when the project references NetTopologySuite.IO.SqlServerBytes, takes the spatial read path before any
-/// edge is looked for, which no converter replaces and which reports nothing.
+/// edge is looked for, after the JSON opt-in's check alone, which no converter replaces and which reports nothing.
 /// <para>
 /// A project's own class, a type that is no type of System.Text.Json and none the base map gives, on a type that holds
 /// JSON and is read as <c>string</c>, is read and sent through System.Text.Json's serializer when no converter touches
@@ -37,8 +37,8 @@ namespace SqlSource.Generation.Methods;
 /// </para>
 /// <para>
 /// The JSON opt-in, a place that wrote <c>json</c> before the type, makes a type read as <c>string</c> hold JSON for
-/// the serializer.  It is checked before any edge: on a type that neither holds JSON nor is read as <c>string</c>, or
-/// with a type the serializer never takes, it is <c>SQLSRC283</c>, which blocks the query.
+/// the serializer.  It is checked before the spatial read path and any edge: on a type that neither holds JSON nor is
+/// read as <c>string</c>, or with a type the serializer never takes, it is <c>SQLSRC283</c>, which blocks the query.
 /// </para>
 /// </remarks>
 internal static class ConversionPlanner
@@ -82,14 +82,9 @@ internal static class ConversionPlanner
     )
     {
         blocked = false;
-        if (SpatialOf(type, isRead, context) is { } spatial)
-        {
-            return spatial;
-        }
-
         if (type.Place is null || type.Database is not { } database)
         {
-            return null;
+            return SpatialOf(type, isRead, context);
         }
 
         var decision = new Decision(isRead, subject, context, type.Library is not null);
@@ -111,6 +106,11 @@ internal static class ConversionPlanner
             );
             blocked = true;
             return null;
+        }
+
+        if (SpatialOf(type, isRead, context) is { } spatial)
+        {
+            return spatial;
         }
 
         if (database.Text is not { } databaseText)
