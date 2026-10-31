@@ -805,7 +805,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
 
     // The file of each type's methods, and their diagnostics, with the clashes across types, SQLSRC281 at each member
     // of a settings file that turns on a library the project cannot use, SQLSRC273 for each engine whose methods have
-    // no driver, and SQLSRC282 for each library older than its floor that a query uses.
+    // no driver, and SQLSRC282 for each package older than its floor that a query's library needs.
     private static void RegisterMethodSources(
         IncrementalGeneratorInitializationContext context,
         IncrementalValueProvider<SettingsFileSet> settingsFiles,
