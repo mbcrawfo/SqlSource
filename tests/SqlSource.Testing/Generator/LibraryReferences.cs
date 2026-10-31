@@ -100,6 +100,20 @@ internal static class LibraryReferences
         return Emit(new SourceFile("/nettopologysuite/NetTopologySuite.cs", source), "NetTopologySuite");
     }
 
+    // An assembly named NetTopologySuite.IO.SqlServerBytes of the identity 2.0.0.0, which 2.0.0 and 2.1.0 share, and
+    // the informational version, with NetTopologySuite.IO.SqlServerBytesReader, which has no members.
+    public static MetadataReference SyntheticSqlServerBytes(string informationalVersion)
+    {
+        var source =
+            "[assembly: System.Reflection.AssemblyVersion(\"2.0.0.0\")]\n"
+            + $"[assembly: System.Reflection.AssemblyInformationalVersion(\"{informationalVersion}\")]\n"
+            + "\nnamespace NetTopologySuite.IO\n{\n    public class SqlServerBytesReader;\n}\n";
+        return Emit(
+            new SourceFile("/nettopologysuite.io.sqlserverbytes/SqlServerBytes.cs", source),
+            "NetTopologySuite.IO.SqlServerBytes"
+        );
+    }
+
     // An assembly of the AssemblyVersion, with NodaTime's value types that a row names, Instant among them, and
     // Npgsql.NpgsqlNodaTimeExtensions, when asked for.  It is named NodaTime, unless another name is given, as for a
     // library merged into an assembly of another name.  The types have no members: a model can name them, and a method
