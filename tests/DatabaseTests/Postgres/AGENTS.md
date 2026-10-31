@@ -2,10 +2,12 @@
 
 ## The container
 
-- **A test of `tests/DatabaseTests/Postgres` that needs the server is in the collection `UsesPostgres`**, which starts one container for the run through `tests/DatabaseTests/Postgres/PostgresDatabases.cs`, a subclass of the harness's `PostgresContainer`.  The tests that need none are not in it ([which they are](README.md#running)).
+- **A test of `tests/DatabaseTests/Postgres` that needs the server is in the collection `UsesPostgres`**, which starts one container for the run through `tests/DatabaseTests/Postgres/PostgresDatabases.cs`, a subclass of the harness's `PostgresContainer`, but for `EndToEnd/CheckTests`, of `UsesPostgis`.  The tests that need none are not in it ([which they are](README.md#running)).
 - **The container runs on `EngineImage.Postgres.Image` of `tests/DatabaseTests/TestHarness`, the one place a test takes the image from**: the image that `DefaultImages.Postgres` names, unless the variable `EngineImage.Postgres.Variable` names another.  Another tag in `tests/` is a sample that no test reads as the default ([the image](README.md#the-image)).
 - **A container starts through `EngineImage.Postgres.StartAsync`, never through the container's own `StartAsync`**, since it disposes a container whose start threw, which xunit does not.  The harness starts every container so.
 - **Its databases are `fixtures`, `realistic`, and `app` and `billing` for `EndToEnd/`**, built from `EndToEnd/app/` and `EndToEnd/billing/`, each through `EndToEndFiles` of the harness (schema first, then seed), as the Npgsql 8 project builds its own.
+- **`gis`, of `EndToEnd/gis/`, is the one database of `PostgisDatabases.cs`, the PostGIS container of the collection `UsesPostgis`, on `EngineImage.Postgres.Image`**: a query of PostGIS's types goes in `EndToEnd/NetTopologySuite/`, never into `app`, whose container has no PostGIS.
+- **`UsesPostgis` also starts a `PostgresDatabases` of its own, for `EndToEnd/CheckTests` alone**, since xunit gives each collection its own fixtures and the check needs both containers in one run.
 - **The project reads `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/` from the repository** through `DescriberFixtures.Postgres` of the harness, found through `RepositoryRoot.Path`, and not from an output folder.
 
 ## Versions

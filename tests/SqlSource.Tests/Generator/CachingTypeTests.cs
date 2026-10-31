@@ -23,6 +23,11 @@ namespace SqlSource.Tests.Generator;
 public sealed class CachingTypeTests
 {
     private const string Instant = "global::NodaTime.Instant";
+    private const string Geometry = "global::NetTopologySuite.Geometries.Geometry";
+
+    // The project's settings that turn NetTopologySuite on, which SQL Server leaves off until they do.
+    private const string NetTopologySuiteOn = /*lang=json,strict*/
+        "{\"libraryTypes\": {\"netTopologySuite\": \"on\"}}";
 
     private readonly CachingScene _scene = new();
 
@@ -611,6 +616,104 @@ public sealed class CachingTypeTests
         AllReasons(result, TrackingNames.LibraryProbe).ShouldBe([IncrementalStepRunReason.Modified]);
         AllReasons(result, TrackingNames.FileTypesInput).ShouldAllBeCached();
         AllReasons(result, TrackingNames.TypedFile).ShouldAllBeCached();
+    }
+
+    // NetTopologySuite's version is for its floor, as NodaTime's is: 2.5.0 and 2.6.0 both have ConcaveHull and one
+    // identity, so the reference changes the version alone, and no file is typed again nor the drivers decided again.
+    // The queries are at CodeGen, the only output that reads PostGIS's geometry.
+    [Fact]
+    public void NetTopologySuiteVersion_Changed_TypesNoFileAgain()
+    {
+        var older = LibraryReferences.NetTopologySuite("2.5.0");
+        var compilation = MethodsWith(
+            NpgsqlReferences.Npgsql10,
+            older,
+            LibraryReferences.NpgsqlNetTopologySuite("10.0.3")
+        );
+        var driver = _scene.FirstRunWithTypes(
+            compilation,
+            ProjectFile(OutputKind.CodeGen, "postgres"),
+            GeometrySidecar(_scene.Users, "GetUser"),
+            GeometrySidecar(_scene.Orders, "GetOrder")
+        );
+        ColumnTextOf(driver.GetRunResult(), "app/Users/Users.sql").ShouldBe(Geometry);
+
+        var result = Run(driver, compilation.ReplaceReference(older, LibraryReferences.NetTopologySuite("2.6.0")));
+
+        AllReasons(result, TrackingNames.LibraryProbe).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.FileTypesInput).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.TypedFile).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.MethodDrivers).ShouldAllBeCached();
+    }
+
+    // NetTopologySuite.IO.SqlServerBytes's version is for its floor too, and two versions above it change the version
+    // alone, so no SQL Server file is typed again nor the drivers decided again.  The queries are at CodeGen, the only
+    // output that reads SQL Server's geography.
+    [Fact]
+    public void SqlServerBytesVersion_Changed_TypesNoFileAgain()
+    {
+        var older = LibraryReferences.SyntheticSqlServerBytes("2.1.0");
+        var compilation = MethodsWith(
+            SqlClientReferences.SqlClient7,
+            LibraryReferences.NetTopologySuite("2.5.0"),
+            older
+        );
+        var driver = _scene.FirstRunWithTypes(
+            compilation,
+            ProjectFile(OutputKind.CodeGen, "mssql", NetTopologySuiteOn),
+            GeographySidecar(_scene.Users, "GetUser"),
+            GeographySidecar(_scene.Orders, "GetOrder")
+        );
+        ColumnTextOf(driver.GetRunResult(), "app/Users/Users.sql").ShouldBe(Geometry);
+
+        var result = Run(
+            driver,
+            compilation.ReplaceReference(older, LibraryReferences.SyntheticSqlServerBytes("2.1.1"))
+        );
+
+        AllReasons(result, TrackingNames.LibraryProbe).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.FileTypesInput).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.TypedFile).ShouldAllBeCached();
+        AllReasons(result, TrackingNames.MethodDrivers).ShouldAllBeCached();
+    }
+
+    // The two types of the scene, with no constant to read, since a query at CodeGen has none, and these references.
+    private static CSharpCompilation MethodsWith(params MetadataReference[] references) =>
+        GeneratorHarness.CreateCompilation(
+            [
+                new(UsersSourcePath, TypeSource("App", "UserQueries")),
+                new(OrdersSourcePath, TypeSource("App", "OrderQueries")),
+            ],
+            references: references
+        );
+
+    // A current sidecar whose entry has one column, value, of PostGIS's geometry, in public, where PostGIS puts it.
+    private static InMemoryAdditionalText GeometrySidecar(InMemoryAdditionalText sqlFile, string queryName)
+    {
+        var file = ToSqlFile(sqlFile);
+        var geometry = TestSidecars.Postgres(name: "geometry", schema: "public", internalName: "geometry");
+        var sidecar = Sidecars.Of(
+            file,
+            ModelRuns.Entry(file, queryName, [], [TestSidecars.Column(0, "value", geometry)])
+        );
+        return new InMemoryAdditionalText(sidecar.Path, sidecar.Text);
+    }
+
+    // A current sidecar under mssql whose entry has one column, value, of SQL Server's geography.
+    private static InMemoryAdditionalText GeographySidecar(InMemoryAdditionalText sqlFile, string queryName)
+    {
+        var file = ToSqlFile(sqlFile);
+        var geography = TestSidecars.SqlServer(
+            "geography",
+            maxLength: -1,
+            precision: 0,
+            userType: new SqlServerUserType("sys", "geography", "Microsoft.SqlServer.Types, Version=11.0.0.0")
+        );
+        var sidecar = Sidecars.Of(
+            file,
+            MethodRuns.SqlServerEntry(file, queryName, [], [TestSidecars.Column(0, "value", geography)])
+        );
+        return new InMemoryAdditionalText(sidecar.Path, sidecar.Text);
     }
 
     // Users, whose one parameter a -- param: marker gives the C# type of MyApp.

@@ -10,6 +10,8 @@
 ## Containers
 
 - **A test that needs the server is in the project's collection** (`UsesPostgres`, `UsesSqlServer` or `UsesApp`, and `MeasuresPostgres` or `MeasuresSqlServer` in `QueryMethodAllocation`), whose fixture is the project's public sealed subclass of the harness's `PostgresContainer` or `SqlServerContainer`, started once for the run through `EngineImage`; the project gives it its driver's `DbProviderFactory`, its image and its databases with their scripts, and the harness brings no driver.
+- **A test that needs PostGIS is in the project's PostGIS collection** (`UsesPostgis`, or `UsesGis` in `Postgres.Npgsql8`), whose fixture subclasses the harness's `PostgisContainer`, so that no other test waits for its image; it builds `TestHarness/Postgis/Dockerfile` on the postgres image the fixture names, the run's or the default as the project's other container, and keeps it ([the image](Postgres/README.md#the-postgis-image)).
+- **The PostGIS image is built from the pinned postgres image with PostGIS at `PostgisContainer.Package`, never from a `postgis/postgis` tag**, which names no minor (root `AGENTS.md` rule 5).
 - **A change here is run on both of the engine's images before it is pushed**, since `pre-commit-validation.sh` runs the default image alone ([the commands](README.md#running)).
 - **The allocation tests of the generated methods are in `QueryMethodAllocation` and run only in the nightly's `allocation-postgres` and `allocation-sqlserver` jobs**, never in `dotnet test --solution`, `pre-commit-validation.sh` or `build.yml`: its `.csproj` is a test project only under `RunQueryMethodAllocation=true` ([why](QueryMethodAllocation/README.md)).
 

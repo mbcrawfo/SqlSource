@@ -977,9 +977,10 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    // {0} is the library, as "NodaTime", {1} the version the project references, as "3.1.8", and {2} the oldest that
-    // SqlSource supports.  Reported with no position, once for the project and library, when a codegen query uses the
-    // library; the queries that use it get no method.  The library is an argument, so every library's floor shares it.
+    // {0} is the package, as "NodaTime" or "NetTopologySuite.IO.SqlServerBytes", {1} the version the project
+    // references, as "3.1.8", and {2} the oldest that SqlSource supports.  Reported with no position, once for the
+    // project and package, when a codegen query uses a library that needs the package; the queries that use it get no
+    // method.  The package is an argument, so every package's floor shares it.
     public static readonly DiagnosticDescriptor LibraryBelowTheFloor = new(
         id: "SQLSRC282",
         title: "A library is older than SqlSource supports",

@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
+using SqlSource.Generation.Converters;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 using Conversion = SqlSource.Generation.Methods.Conversion;
@@ -112,13 +113,7 @@ internal abstract class ParameterBinder
         var builder = context.Builder;
         if (!bound.IsNullable && bound.IsValueType)
         {
-            _ = builder
-                .Append(write.Method)
-                .Append('(')
-                .Append(context.Parameters)
-                .Append('.')
-                .Append(bound.Property)
-                .Append(')');
+            AppendCall(builder, write, context.Parameters + "." + bound.Property);
             return;
         }
 
@@ -136,10 +131,29 @@ internal abstract class ParameterBinder
         }
         else
         {
-            _ = builder.Append(write.Method).Append('(').Append(context.Names.Value).Append(')');
+            AppendCall(builder, write, context.Names.Value);
         }
 
         _ = builder.Append(" : ").Append(nullText);
+    }
+
+    // The converter's call of the value; for the spatial read path, the shared writer's bytes of it, as SqlBytes.
+    private static void AppendCall(StringBuilder builder, Conversion write, string value)
+    {
+        if (write.IsSpatial)
+        {
+            _ = builder
+                .Append("new ")
+                .Append(NetTopologySuiteConversions.SqlBytes)
+                .Append('(')
+                .Append(write.Method)
+                .Append(".Write(")
+                .Append(value)
+                .Append("))");
+            return;
+        }
+
+        _ = builder.Append(write.Method).Append('(').Append(value).Append(')');
     }
 
     /// <summary>

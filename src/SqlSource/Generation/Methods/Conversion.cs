@@ -36,7 +36,14 @@ namespace SqlSource.Generation.Methods;
 /// </param>
 /// <param name="Library">
 /// The library whose generated conversion the converter is, for an edge of origin
-/// <see cref="Converters.ConverterOrigin.Library" />; null for any other.
+/// <see cref="Converters.ConverterOrigin.Library" /> or for the spatial read path; null for any other.
+/// </param>
+/// <param name="IsSpatial">
+/// Whether it is SQL Server's spatial read path, NetTopologySuite's: <paramref name="Method" /> is then the shared
+/// reader or writer of NetTopologySuite.IO.SqlServerBytes that the method calls,
+/// <c>global::SqlSource.NetTopologySuiteConversions.GeographyReader</c>, a column is read through its
+/// <c>GetStream</c>, and <paramref name="DatabaseText" /> is <c>global::System.Data.SqlTypes.SqlBytes</c>, which a
+/// parameter is bound as.
 /// </param>
 internal sealed record Conversion(
     string Method,
@@ -46,7 +53,8 @@ internal sealed record Conversion(
     string? ElementText,
     bool ElementIsValueType,
     EquatableArray<string> WarningIds = default,
-    SqlLibrary? Library = null
+    SqlLibrary? Library = null,
+    bool IsSpatial = false
 )
 {
     /// <summary>

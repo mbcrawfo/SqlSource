@@ -12,7 +12,7 @@ The reader keeps the text it sends to `PREPARE` narrow, so that nothing a `.sql`
 
 ## Impact
 
-Low.  A user who copies a column's type with a modifier of words into a `-- param:` marker gets `SQLSRC228` and must write the type without its modifier.  The parameter's type is the same either way.  It reaches PostGIS's types above all, which phase 7 sub-phase 7.4 makes usable as parameters, and any other extension type whose modifier holds words.
+Low.  A user who copies a column's type with a modifier of words into a `-- param:` marker gets `SQLSRC228` and must write the type without its modifier, `-- param: @shape geometry`, as the manual's known issue says.  The parameter's type is the same either way.  It reaches PostGIS's types above all, which the tool describes and checks as parameters since phase 7 sub-phase 7.4, and any other extension type whose modifier holds words.
 
 ## Proposed fix
 

@@ -29,6 +29,12 @@
             off.
         -->
         <PackageReference Include="NodaTime" />
+        <!--
+            The library of the queries of EndToEnd/NetTopologySuite/, whose settings file turns it on, and its reader
+            and writer of SQL Server's bytes, which the generated methods read and send geography and geometry through.
+        -->
+        <PackageReference Include="NetTopologySuite" />
+        <PackageReference Include="NetTopologySuite.IO.SqlServerBytes" />
         <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
         <PackageReference Include="Shouldly" />
         <PackageReference Include="xunit.v3" />

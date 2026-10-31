@@ -8,4 +8,7 @@ internal enum SqlLibrary
 {
     /// <summary>NodaTime's date and time types.</summary>
     NodaTime,
+
+    /// <summary>NetTopologySuite's geometries.</summary>
+    NetTopologySuite,
 }

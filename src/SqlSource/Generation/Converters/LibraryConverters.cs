@@ -6,8 +6,9 @@ namespace SqlSource.Generation.Converters;
 
 /// <summary>
 /// The edges that SqlSource generates for the libraries a project references, and the text of the class that holds
-/// their methods.  An edge is offered whenever the project references the library, whether the library's setting is
-/// on or not: the setting decides only what an unmapped column becomes.
+/// their methods, or, for NetTopologySuite, the shared instances of its spatial read path.  An edge is offered
+/// whenever the project references the library, whether the library's setting is on or not: the setting decides only
+/// what an unmapped column becomes.
 /// </summary>
 internal static class LibraryConverters
 {
@@ -18,7 +19,7 @@ internal static class LibraryConverters
     /// <see cref="AttributeSource.GeneratedTypes" />.
     /// </summary>
     public static ImmutableArray<string> ClassMetadataNames { get; } =
-        ImmutableArray.Create(NodaTimeConversions.MetadataName);
+        ImmutableArray.Create(NodaTimeConversions.MetadataName, NetTopologySuiteConversions.MetadataName);
 
     /// <summary>
     /// The edges of every library <paramref name="probe" /> finds, in the order of <see cref="ConverterSet.Comparer"
@@ -28,12 +29,13 @@ internal static class LibraryConverters
         probe.NodaTime ? NodaTimeConversions.Edges : EquatableArray<Converter>.Empty;
 
     /// <summary>
-    /// The text of the file of <paramref name="library" />'s class, or null for a library with no edges.
+    /// The text of the file of <paramref name="library" />'s class, or null for a library with none.
     /// </summary>
     public static string? SourceOf(SqlLibrary library) =>
         library switch
         {
             SqlLibrary.NodaTime => NodaTimeConversions.Source,
+            SqlLibrary.NetTopologySuite => NetTopologySuiteConversions.Source,
             _ => null,
         };
 

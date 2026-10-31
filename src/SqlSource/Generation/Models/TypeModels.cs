@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Paths;
 using SqlSource.Parsing;
@@ -19,7 +20,10 @@ internal static class TypeModels
     /// <summary>
     /// The requests of the type, for each query of a file it can use whose output is <see cref="OutputKind.Models" />
     /// or <see cref="OutputKind.CodeGen" /> and whose models are in <paramref name="files" />.  A type with a
-    /// diagnostic of its own asks for none, as it gets no file of its own.
+    /// diagnostic of its own asks for none, as it gets no file of its own.  A query at <see cref="OutputKind.Models" />
+    /// whose models have a <see cref="QueryModels.WithoutLibraryFailure" /> gets none: a property of it has a type only
+    /// through a library, which only <see cref="OutputKind.CodeGen" /> reads, and <see cref="LibraryFailuresOf" />
+    /// reports the failure instead.
     /// </summary>
     /// <param name="type">The type with its parsed files.</param>
     /// <param name="files">The models of every claimed file, sorted by path.</param>
@@ -37,27 +41,16 @@ internal static class TypeModels
         FileModels? models = null;
         foreach (var usable in UsableQueries.Of(type, null))
         {
-            if (usable.FileIndex != fileIndex)
-            {
-                // The queries come in file order, so a file's models are looked up once.
-                fileIndex = usable.FileIndex;
-                var modelsAt = SqlPath.IndexOf(
-                    files,
-                    type.Files[fileIndex].NormalizedPath,
-                    static file => file.NormalizedPath
-                );
-                models = modelsAt < 0 ? null : files[modelsAt];
-            }
-
-            // The models were read from the same parse, so they match the query; a mismatch is skipped rather than
-            // thrown on.
-            if (models?.Find(usable.QueryIndex, usable.Query.Name) is not { } query)
+            if (FindModels(type, files, usable, ref fileIndex, ref models) is not { } query)
             {
                 continue;
             }
 
             var settings = usable.Settings;
-            if (settings.Output is not (OutputKind.Models or OutputKind.CodeGen))
+            if (
+                settings.Output is not (OutputKind.Models or OutputKind.CodeGen)
+                || (settings.Output != OutputKind.CodeGen && query.WithoutLibraryFailure is not null)
+            )
             {
                 continue;
             }
@@ -77,6 +70,66 @@ internal static class TypeModels
         }
 
         return new EquatableArray<ModelRequest>(requests.ToImmutable());
+    }
+
+    /// <summary>
+    /// The failure without its libraries of each query that the type claims at <see cref="OutputKind.Models" /> and
+    /// whose models have one, <see cref="QueryModels.WithoutLibraryFailure" />, once for each query: the error that
+    /// takes the place of its models.  A query at <see cref="OutputKind.CodeGen" /> reads the library's type, and one
+    /// at <see cref="OutputKind.Sql" /> has no models.  A type with a diagnostic of its own reports none, as it asks
+    /// for no models.
+    /// </summary>
+    /// <param name="type">The type with its parsed files.</param>
+    /// <param name="files">The models of every claimed file, sorted by path.</param>
+    public static EquatableArray<DiagnosticInfo> LibraryFailuresOf(TypeQueries type, EquatableArray<FileModels> files)
+    {
+        if (type.Type.Diagnostics.Count > 0 || type.Files.Count == 0)
+        {
+            return EquatableArray<DiagnosticInfo>.Empty;
+        }
+
+        ImmutableArray<DiagnosticInfo>.Builder? failures = null;
+        var fileIndex = -1;
+        FileModels? models = null;
+        foreach (var usable in UsableQueries.Of(type, null))
+        {
+            if (
+                usable.Settings.Output == OutputKind.Models
+                && FindModels(type, files, usable, ref fileIndex, ref models) is { WithoutLibraryFailure: { } failure }
+            )
+            {
+                (failures ??= ImmutableArray.CreateBuilder<DiagnosticInfo>()).Add(failure);
+            }
+        }
+
+        return failures is null
+            ? EquatableArray<DiagnosticInfo>.Empty
+            : new EquatableArray<DiagnosticInfo>(failures.ToImmutable());
+    }
+
+    // The models of the usable query, or null when it has none.  The queries come in file order, so a file's models
+    // are looked up once, and kept in fileIndex and models.  The models were read from the same parse, so they match
+    // the query; a mismatch is skipped rather than thrown on.
+    private static QueryModels? FindModels(
+        TypeQueries type,
+        EquatableArray<FileModels> files,
+        UsableQuery usable,
+        ref int fileIndex,
+        ref FileModels? models
+    )
+    {
+        if (usable.FileIndex != fileIndex)
+        {
+            fileIndex = usable.FileIndex;
+            var modelsAt = SqlPath.IndexOf(
+                files,
+                type.Files[fileIndex].NormalizedPath,
+                static file => file.NormalizedPath
+            );
+            models = modelsAt < 0 ? null : files[modelsAt];
+        }
+
+        return models?.Find(usable.QueryIndex, usable.Query.Name);
     }
 
     private static ModelRequest Request(

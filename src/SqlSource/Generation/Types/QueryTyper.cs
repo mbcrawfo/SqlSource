@@ -123,9 +123,11 @@ internal static class QueryTyper
     }
 
     // The query's types, or null after its first failure is reported.  A parameter whose marker gives a C# type, found
-    // by its name ignoring case, has that type, which the message of its failure names it by, with its prefix.
+    // by its name ignoring case, has that type, which the message of its failure names it by, with its prefix.  The
+    // first failure without its libraries, of a type that a library's row alone gives a C# type, is kept with them.
     private static QueryTypes? TypeQuery(SidecarEntry entry, SqlQuery query, char prefix, Typing typing)
     {
+        DiagnosticInfo? withoutLibraryFailure = null;
         var declared = query.Parameters;
         var parameters = ImmutableArray.CreateBuilder<PropertyType>(entry.Parameters.Count);
         foreach (var parameter in entry.Parameters)
@@ -141,7 +143,13 @@ internal static class QueryTyper
                         parameter.Name,
                         typing
                     )
-                    : TypeOf(parameter.Type, MessageSubject.Parameter, parameter.Name, typing);
+                    : TypeOf(
+                        parameter.Type,
+                        MessageSubject.Parameter,
+                        parameter.Name,
+                        typing,
+                        ref withoutLibraryFailure
+                    );
             if (chosen is not { } type)
             {
                 return null;
@@ -152,13 +160,18 @@ internal static class QueryTyper
 
         if (entry.Columns is not { } entryColumns)
         {
-            return new QueryTypes(entry.Name, new EquatableArray<PropertyType>(parameters.MoveToImmutable()), null);
+            return new QueryTypes(
+                entry.Name,
+                new EquatableArray<PropertyType>(parameters.MoveToImmutable()),
+                null,
+                WithoutLibraryFailure: withoutLibraryFailure
+            );
         }
 
         var columns = ImmutableArray.CreateBuilder<PropertyType>(entryColumns.Count);
         foreach (var column in entryColumns)
         {
-            if (TypeColumn(column, query.ColumnMarkers, typing) is not { } type)
+            if (TypeColumn(column, query.ColumnMarkers, typing, ref withoutLibraryFailure) is not { } type)
             {
                 return null;
             }
@@ -169,14 +182,20 @@ internal static class QueryTyper
         return new QueryTypes(
             entry.Name,
             new EquatableArray<PropertyType>(parameters.MoveToImmutable()),
-            new EquatableArray<PropertyType>(columns.MoveToImmutable())
+            new EquatableArray<PropertyType>(columns.MoveToImmutable()),
+            WithoutLibraryFailure: withoutLibraryFailure
         );
     }
 
     // A column's type: the one its query's marker gives, which the message of its failure names it by; else, unless
     // that marker says -> default, the column types' entry for its source, which the message names by its key; else
     // the type override's or the map's.
-    private static PropertyType? TypeColumn(SidecarColumn column, EquatableArray<ColumnMarker> markers, Typing typing)
+    private static PropertyType? TypeColumn(
+        SidecarColumn column,
+        EquatableArray<ColumnMarker> markers,
+        Typing typing,
+        ref DiagnosticInfo? withoutLibraryFailure
+    )
     {
         var marker = TypeMarkerOf(markers, column.Name);
         if (marker is { ClrType: { } marked })
@@ -205,7 +224,7 @@ internal static class QueryTyper
             );
         }
 
-        return TypeOf(column.Type, MessageSubject.Column, column.Name, typing);
+        return TypeOf(column.Type, MessageSubject.Column, column.Name, typing, ref withoutLibraryFailure);
     }
 
     // The query's -- column: marker of the column that gives it a C# type or -> default, or null.
@@ -270,10 +289,12 @@ internal static class QueryTyper
         Typing typing
     )
     {
-        // A type of an engine this version does not know has no base map: its error is the map's.
+        // A type of an engine this version does not know has no base map: its error is the map's, and no library's row
+        // gives it a type.
         if (type is not (PostgresType or SqlServerType))
         {
-            return TypeOf(type, owner, name, typing);
+            DiagnosticInfo? none = null;
+            return TypeOf(type, owner, name, typing, ref none);
         }
 
         var mapping = MappingOf(typing.MappedTypes, clrType, key, place);
@@ -377,11 +398,21 @@ internal static class QueryTyper
     // The property type of one parameter or column, by the map of its type's engine, or null after its error is
     // added.  A type of an engine this version does not know, or a parameter's that is null, is only in a sidecar
     // edited by hand, and describing again mends it.  A type that a library's row gives keeps beside it the type it
-    // has without the library, unless that one fails, when the failure is the type's and the row is not used.
-    private static PropertyType? TypeOf(SidecarType? type, string owner, string name, Typing typing)
+    // has without the library.  When that one fails because the type has no C# type without a library, as PostGIS's
+    // geometry has none, the row is kept with nothing beside it, and the failure's diagnostic is the query's
+    // withoutLibraryFailure, the first one, for the claims whose output is not CodeGen.  Any other failure, as of a
+    // driver the project lacks, is the type's, and the row is not used.
+    private static PropertyType? TypeOf(
+        SidecarType? type,
+        string owner,
+        string name,
+        Typing typing,
+        ref DiagnosticInfo? withoutLibraryFailure
+    )
     {
         TypeMapping mapping;
         TypeMapping? withoutLibrary = null;
+        TypeMapping? deferred = null;
         DatabaseEngine engine;
         switch (type)
         {
@@ -390,11 +421,10 @@ internal static class QueryTyper
                 mapping = PostgresTypeMap.Map(postgres, typing.Column, overrideOf, typing.Libraries);
                 if (mapping.Library is not null)
                 {
-                    withoutLibrary = PostgresTypeMap.Map(postgres, typing.Column, overrideOf);
-                    if (withoutLibrary.Kind != TypeMappingKind.Mapped)
-                    {
-                        (mapping, withoutLibrary) = (withoutLibrary, null);
-                    }
+                    (mapping, withoutLibrary, deferred) = WithoutTheLibrary(
+                        mapping,
+                        PostgresTypeMap.Map(postgres, typing.Column, overrideOf)
+                    );
                 }
 
                 engine = DatabaseEngine.PostgreSql;
@@ -409,11 +439,10 @@ internal static class QueryTyper
                 );
                 if (mapping.Library is not null)
                 {
-                    withoutLibrary = SqlServerTypeMap.Map(sqlServer, typing.SqlClientColumn, overrideOfSqlServer);
-                    if (withoutLibrary.Kind != TypeMappingKind.Mapped)
-                    {
-                        (mapping, withoutLibrary) = (withoutLibrary, null);
-                    }
+                    (mapping, withoutLibrary, deferred) = WithoutTheLibrary(
+                        mapping,
+                        SqlServerTypeMap.Map(sqlServer, typing.SqlClientColumn, overrideOfSqlServer)
+                    );
                 }
 
                 engine = DatabaseEngine.SqlServer;
@@ -435,6 +464,19 @@ internal static class QueryTyper
         {
             WarnOfPackage(mapping, MessageSubject.Of(owner, name), typing);
             var property = PropertyOf(mapping, text, type, typing);
+            if (deferred is not null)
+            {
+                withoutLibraryFailure ??= Diagnose(
+                    deferred,
+                    MessageSubject.Of(owner, name),
+                    type.Name,
+                    typing,
+                    engine,
+                    IsPostgisAtItsLeaf(type)
+                );
+                return property with { Library = mapping.Library };
+            }
+
             return withoutLibrary is { Text: { } baseText }
                 ? property with
                 {
@@ -444,8 +486,61 @@ internal static class QueryTyper
                 : property;
         }
 
-        typing.Diagnostics.Add(Diagnose(mapping, MessageSubject.Of(owner, name), type.Name, typing, engine));
+        typing.Diagnostics.Add(
+            Diagnose(mapping, MessageSubject.Of(owner, name), type.Name, typing, engine, IsPostgisAtItsLeaf(type))
+        );
         return null;
+    }
+
+    // A library's mapping beside the one the type has without the library: the library's with that one beside it when
+    // it is found; the library's with that failure deferred when the type has no C# type without a library; or else
+    // that failure, which is the type's.  NodaTime's rows are all of types that the base map reads, so only a driver's
+    // failure reaches one of them, which stays the type's.
+    private static (TypeMapping Mapping, TypeMapping? WithoutLibrary, TypeMapping? Deferred) WithoutTheLibrary(
+        TypeMapping library,
+        TypeMapping withoutLibrary
+    )
+    {
+        if (withoutLibrary.Kind == TypeMappingKind.Mapped)
+        {
+            return (library, withoutLibrary, null);
+        }
+
+        return withoutLibrary.Kind is TypeMappingKind.Unreadable or TypeMappingKind.NeedsSqlServerTypes
+            ? (library, null, withoutLibrary)
+            : (withoutLibrary, null, null);
+    }
+
+    // Whether the type, or the base type that its domains and arrays end in, is one of PostGIS's, whose help names the
+    // plugin of NetTopologySuite.  Only that type's failure, Unreadable, is an array's or a domain's own.
+    private static bool IsPostgisAtItsLeaf(SidecarType type)
+    {
+        if (type is not PostgresType postgres)
+        {
+            return false;
+        }
+
+        while (true)
+        {
+            if (
+                postgres.Kind.Equals(SidecarValues.Kind.Domain, StringComparison.Ordinal)
+                && postgres.Base is { } baseType
+            )
+            {
+                postgres = baseType;
+            }
+            else if (
+                postgres.Kind.Equals(SidecarValues.Kind.Array, StringComparison.Ordinal)
+                && postgres.Element is { } element
+            )
+            {
+                postgres = element;
+            }
+            else
+            {
+                return LibraryRows.IsPostgis(postgres);
+            }
+        }
     }
 
     // The property type of a found mapping.  A type of the map has no place, so the driver reads it as it is; one that
@@ -503,7 +598,8 @@ internal static class QueryTyper
         string subject,
         string typeName,
         Typing typing,
-        DatabaseEngine engine
+        DatabaseEngine engine,
+        bool isPostgis = false
     )
     {
         var key = failure.Key;
@@ -564,6 +660,19 @@ internal static class QueryTyper
                 typeName,
                 "Reference Npgsql"
             ),
+            // A spatial type, which NetTopologySuite's row reads in a CodeGen query, or the package's type.
+            TypeMappingKind.NeedsSqlServerTypes when SqlServerNames.IsSpatial(key) => DiagnosticInfo.Create(
+                SqlDiagnostics.TypeHasNoCSharpType,
+                at,
+                subject,
+                typeName,
+                "Reference NetTopologySuite.IO.SqlServerBytes and turn the netTopologySuite library on, to read it as "
+                    + "NetTopologySuite's Geometry in a codegen query, or reference the package "
+                    + "Microsoft.SqlServer.Types and map it with the type override, as "
+                    + key
+                    + "="
+                    + failure.Detail
+            ),
             // A type of the package, which SqlClient reads only when the application references it.
             TypeMappingKind.NeedsSqlServerTypes => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,
@@ -613,6 +722,17 @@ internal static class QueryTyper
                 key,
                 failure.Detail ?? "",
                 failure.Text ?? ""
+            ),
+            // PostGIS's types are read by the plugin of NetTopologySuite, through its row, in a CodeGen query.
+            TypeMappingKind.Unreadable when isPostgis => DiagnosticInfo.Create(
+                SqlDiagnostics.TypeHasNoCSharpType,
+                at,
+                subject,
+                typeName,
+                "Reference Npgsql.NetTopologySuite to read it as NetTopologySuite's Geometry in a codegen query, "
+                    + "or map it with the type override, as "
+                    + AsAKey(key, engine)
+                    + "=<a C# type>"
             ),
             TypeMappingKind.Mapped or TypeMappingKind.Unreadable or _ => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,

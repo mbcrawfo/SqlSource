@@ -307,10 +307,9 @@ public sealed class SqlFileParserMarkerTests
         entry.Place.ShouldBe(SettingPlace.Query);
     }
 
-    // There is one library today, so the only entries that can share a line are the same one twice, which is no
-    // conflict.
+    // The same library twice with one state is no conflict, so it is one entry.
     [Fact]
-    public void LibraryTypes_SeveralEntriesOnOneLine()
+    public void LibraryTypes_SameEntryTwiceOnOneLine()
     {
         var block = Blocks("-- name: Q\n-- library-types: nodatime=on   nodatime=on\nSELECT 1\n")
             .ShouldHaveSingleItem();
@@ -319,10 +318,24 @@ public sealed class SqlFileParserMarkerTests
         LibraryEntry(block).State.ShouldBe(LibraryState.On);
     }
 
+    // Two libraries share a line, each with its own state, in the order of the libraries.
+    [Fact]
+    public void LibraryTypes_SeveralEntriesOnOneLine()
+    {
+        var block = Blocks("-- name: Q\n-- library-types: netTopologySuite=on nodatime=off\nSELECT 1\n")
+            .ShouldHaveSingleItem();
+
+        block
+            .Markers.LibraryTypes.ShouldNotBeNull()
+            .Select(static entry => (entry.Library, entry.State))
+            .ShouldBe([(SqlLibrary.NodaTime, LibraryState.Off), (SqlLibrary.NetTopologySuite, LibraryState.On)]);
+    }
+
     [Theory]
     [InlineData("nodatime")]
     [InlineData("nodatime=maybe")]
     [InlineData("json=on")]
+    [InlineData("netTopologySuites=on")]
     [InlineData("=on")]
     [InlineData("")]
     public void LibraryTypes_Invalid_IsSQLSRC111(string value)
@@ -334,6 +347,7 @@ public sealed class SqlFileParserMarkerTests
         error.Kind.ShouldBe(SqlParseErrorKind.InvalidMarkerValue);
         error.Arguments[0].ShouldBe(value.Length == 0 ? "library-types:" : "library-types: " + value);
         error.Arguments[1].ShouldContain("nodatime");
+        error.Arguments[1].ShouldContain("nettopologysuite");
         error.Arguments[1].ShouldContain("default");
         error.Span.ShouldBe(value.Length == 0 ? TextSpans.Of(text, "-- library-types:") : TextSpans.Of(text, value));
     }

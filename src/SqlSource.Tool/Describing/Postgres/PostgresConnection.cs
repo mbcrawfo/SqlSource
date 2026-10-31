@@ -325,6 +325,11 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
             builder.ConnectionStringBuilder.LogParameters = false;
         }
 
+        // Npgsql binds a parameter of PostGIS's geometry or geography only through its plugin, so without it the check
+        // refuses every query that has one.  It changes nothing of a column's description, refuses another
+        // extension's type as before, and describes as before against a database without PostGIS.
+        _ = builder.UseNetTopologySuite();
+
         var driverLog = NpgsqlRunLogger.For(log);
         if (driverLog is not null)
         {

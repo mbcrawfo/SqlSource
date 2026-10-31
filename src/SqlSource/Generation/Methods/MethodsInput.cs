@@ -7,6 +7,7 @@ using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Models;
 using SqlSource.Generation.Paths;
 using SqlSource.Generation.Types.Drivers;
+using SqlSource.Settings;
 using SqlSource.Settings.ClrTypes;
 using SqlSource.Settings.Libraries;
 
@@ -37,9 +38,9 @@ namespace SqlSource.Generation.Methods;
 /// converter plans no method again.
 /// </param>
 /// <param name="LibrariesBelowTheFloor">
-/// The libraries that the project references older than their floor, from <see cref="BelowTheFloorOf" />, in the
-/// order of <see cref="SqlLibrary" />: a query that uses one gets no method.  Without the versions, so that a version
-/// that stays on one side of the floor plans no method again.
+/// The libraries that the project references older than their floor, each with the engine whose queries use the old
+/// package, from <see cref="BelowTheFloorOf" />: a query of that engine that uses one gets no method.  Without the
+/// versions, so that a version that stays on one side of the floor plans no method again.
 /// </param>
 internal sealed record MethodsInput(
     TypeQueries Type,
@@ -48,24 +49,38 @@ internal sealed record MethodsInput(
     EquatableArray<string> MemberNames,
     MethodDrivers Drivers,
     EquatableArray<Converter> Converters,
-    EquatableArray<LibraryValue> LibrariesBelowTheFloor
+    EquatableArray<LibraryUse> LibrariesBelowTheFloor
 )
 {
-    /// <summary>
-    /// The libraries that <paramref name="probe" /> says the project references older than their floor, in the order
-    /// of <see cref="SqlLibrary" />.
-    /// </summary>
-    public static EquatableArray<LibraryValue> BelowTheFloorOf(LibraryProbe probe) =>
-        probe.IsBelowTheFloor(SqlLibrary.NodaTime)
-            ? new EquatableArray<LibraryValue>(ImmutableArray.Create(new LibraryValue(SqlLibrary.NodaTime)))
-            : EquatableArray<LibraryValue>.Empty;
+    // Every library and engine, in the order of SqlLibrary and then of DatabaseEngine.
+    private static readonly LibraryUse[] AllUses =
+    [
+        new(SqlLibrary.NodaTime, DatabaseEngine.PostgreSql),
+        new(SqlLibrary.NodaTime, DatabaseEngine.SqlServer),
+        new(SqlLibrary.NetTopologySuite, DatabaseEngine.PostgreSql),
+        new(SqlLibrary.NetTopologySuite, DatabaseEngine.SqlServer),
+    ];
 
-    /// <summary>Whether <paramref name="library" /> is one of <see cref="LibrariesBelowTheFloor" />.</summary>
-    public bool IsBelowTheFloor(SqlLibrary library)
+    /// <summary>
+    /// The libraries that <paramref name="probe" /> says the project references older than their floor, each with
+    /// the engine whose queries use the old package, in the order of <see cref="SqlLibrary" /> and then of
+    /// <see cref="DatabaseEngine" />.
+    /// </summary>
+    public static EquatableArray<LibraryUse> BelowTheFloorOf(LibraryProbe probe)
+    {
+        var below = AllUses.Where(use => probe.IsBelowTheFloor(use.Library, use.Engine)).ToImmutableArray();
+        return below.IsEmpty ? EquatableArray<LibraryUse>.Empty : new EquatableArray<LibraryUse>(below);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="library" /> is one of <see cref="LibrariesBelowTheFloor" /> for
+    /// <paramref name="engine" />'s queries.
+    /// </summary>
+    public bool IsBelowTheFloor(SqlLibrary library, DatabaseEngine engine)
     {
         for (var index = 0; index < LibrariesBelowTheFloor.Count; index++)
         {
-            if (LibrariesBelowTheFloor[index].Library == library)
+            if (LibrariesBelowTheFloor[index] == new LibraryUse(library, engine))
             {
                 return true;
             }
@@ -92,7 +107,7 @@ internal sealed record MethodsInput(
         EquatableArray<TypeMemberNames> memberNames,
         MethodDrivers drivers,
         ConverterSet converters,
-        EquatableArray<LibraryValue> librariesBelowTheFloor
+        EquatableArray<LibraryUse> librariesBelowTheFloor
     )
     {
         var files = ImmutableArray.CreateBuilder<FileModels>(type.Files.Count);

@@ -154,7 +154,7 @@ WHERE id = @id;
 
 Each column and each parameter of a described SQL Server query gets a C# type: the type that Microsoft.Data.SqlClient reads a value of its SQL Server type as.  If `id` is a `bigint`, `placed_at` a `datetime2(7)`, `total` a `decimal(12,2)`, `notes` an `nvarchar(max)` and `row_version` a `rowversion`, they are `long`, `System.DateTime`, `decimal`, `string` and `byte[]`; `@id` is a `long`.  A column that can be null gets its type with `?`: a `bigint` column that can be null is a `long?`, and an `nvarchar` one a `string?`.
 
-The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for `geography`.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides), `"date": "System.DateOnly"` in a settings file's `typeOverrides`.  To give one column another, use a [column type](settings.md#setting-column-types), `"users.id": "MyApp.UserId"` in its `columnTypes`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Microsoft.Data.SqlClient does not read, such as an id or an `Email` over an alias type, needs [converters](settings.md#converters) to and from the type of the table below.  Rows read through Dapper with a type of your choice need a type handler: see [the recipe](recipes.md#dapper-with-sql-server).  A project that references NodaTime can give the date and time types of its queries whose output is `codegen` NodaTime's types: see [NodaTime](#nodatime).
+The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for `geography`.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides), `"date": "System.DateOnly"` in a settings file's `typeOverrides`.  To give one column another, use a [column type](settings.md#setting-column-types), `"users.id": "MyApp.UserId"` in its `columnTypes`, and one parameter, its [`-- param:` marker](parameters-and-tokens.md#param-marker), `-- param: @id -> MyApp.UserId`.  A query method reads and sends that C# type as it is, so a type of yours that Microsoft.Data.SqlClient does not read, such as an id or an `Email` over an alias type, needs [converters](settings.md#converters) to and from the type of the table below.  Rows read through Dapper with a type of your choice need a type handler: see [the recipe](recipes.md#dapper-with-sql-server).  A project that references NodaTime can give the date and time types of its queries whose output is `codegen` NodaTime's types: see [NodaTime](#nodatime).  One that references `NetTopologySuite.IO.SqlServerBytes` can give their `geography` and `geometry` NetTopologySuite's: see [NetTopologySuite](#nettopologysuite).
 
 <a id="which-sqlclient"></a>
 
@@ -191,7 +191,7 @@ The names are SQL Server's, which are the [type override's](settings.md#setting-
 | `uniqueidentifier` | `System.Guid` |
 | `sql_variant` | `object` |
 | `vector` | `Microsoft.Data.SqlTypes.SqlVector<float>`.  Without Microsoft.Data.SqlClient, SQLSRC269; with one older than 6.1, SQLSRC270 |
-| `hierarchyid`, `geography`, `geometry` | None: SQLSRC246.  Reference the package `Microsoft.SqlServer.Types` and map the type with the type override: `hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId`, `geography=Microsoft.SqlServer.Types.SqlGeography`, `geometry=Microsoft.SqlServer.Types.SqlGeometry`.  A query method then reads the column as that type, and sends the parameter as its SQL Server type |
+| `hierarchyid`, `geography`, `geometry` | None: SQLSRC246.  Reference the package `Microsoft.SqlServer.Types` and map the type with the type override: `hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId`, `geography=Microsoft.SqlServer.Types.SqlGeography`, `geometry=Microsoft.SqlServer.Types.SqlGeometry`.  A query method then reads the column as that type, and sends the parameter as its SQL Server type.  For `geography` and `geometry`, the query methods of a project that turns [NetTopologySuite](#nettopologysuite) on get `NetTopologySuite.Geometries.Geometry` instead |
 
 A type that the table does not name gets its C# type by what it is:
 
@@ -268,6 +268,56 @@ What sending a value of NodaTime can change or refuse:
 - **`datetime` and `smalldatetime` are rounded**, as for a `System.DateTime`, before they are sent: a `datetime` to its three-hundredths of a second, `.1234567` to `.123`, and a `smalldatetime` to the minute, `12:34:56` to `12:35`.  `23:59:59.999` sent to a `datetime` is the next day's `00:00:00`.  A value outside their ranges, or rounded past them, throws before the query is sent: `SqlTypeException` for a `datetime` before 1753, and `OverflowException` for a `smalldatetime` before 1900 or that rounds past `2079-06-06 23:59`, and for a `datetime` of `9999-12-31 23:59:59.999`.  `9999-12-31 23:59:59.9999999`, the last value before year 10000, is stored in a `datetime` as `23:59:59.997`.
 - **A `Duration` of 24 hours or more, or below zero**, throws `OverflowException`, "SqlDbType.Time overflow", before the query is sent: a `time` holds less than a day.
 
+<a id="nettopologysuite"></a>
+
+### NetTopologySuite
+
+```jsonc
+// sqlsource.json, in the folder of a project that references NetTopologySuite.IO.SqlServerBytes
+{
+    "root": true,
+    "dialect": "mssql",
+    "libraryTypes": {
+        "netTopologySuite": "on",
+    },
+}
+```
+
+```sql mssql
+-- name: GetPlace -> one
+SELECT id, centre, outline
+FROM dbo.places
+WHERE id = @id;
+```
+
+```csharp
+public sealed record GetPlaceDto(
+    long Id,
+    global::NetTopologySuite.Geometries.Geometry Centre,
+    global::NetTopologySuite.Geometries.Geometry Outline);
+```
+
+A project that references `NetTopologySuite.IO.SqlServerBytes`, which brings NetTopologySuite, and turns NetTopologySuite on with the [library types](settings.md#setting-library-types), gets NetTopologySuite's `Geometry` for the `geography` and `geometry` columns and parameters of its queries whose output is `codegen`.  Above, `centre` is a `geography` and `outline` a `geometry`, each `NOT NULL`.  On SQL Server NetTopologySuite is off until a settings file or a marker turns it on, for a project, a folder, a file or a query, whatever the project references.  Microsoft.Data.SqlClient reads and sends no NetTopologySuite type, so the query methods read and write each value themselves: nothing is registered in your application, and Microsoft.SqlServer.Types is not needed.  The query methods that use NetTopologySuite need NetTopologySuite 2.5.0 or later and `NetTopologySuite.IO.SqlServerBytes` 2.1.0 or later, and an older one is [SQLSRC282](diagnostics.md#sqlsrc282).
+
+| SQL Server type | C# type with NetTopologySuite |
+|----|----|
+| `geography`, `geometry` | `NetTopologySuite.Geometries.Geometry` |
+
+Every other type keeps the type of [the types](#type-table).
+
+- **Only query methods get NetTopologySuite's types.**  A query whose output is `models` has no C# type for `geography` or `geometry`, with NetTopologySuite on or off, and is [SQLSRC246](diagnostics.md#sqlsrc246): give the query the output `codegen`, or map the type to a type of Microsoft.SqlServer.Types, as [the types](#type-table) say.
+- **A shape is yours to choose**, with the [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a `-- param:` or `-- column:` marker, whether NetTopologySuite is on or not: `geography=NetTopologySuite.Geometries.Point`, `Polygon` or another of `Geometry`'s subtypes.  A value of another shape throws `InvalidCastException` when it is read.
+- **Your converters do not replace these reads and writes.**  A [converter](settings.md#converters) of yours between a NetTopologySuite type and another is not used for a `geography` or a `geometry`.  To read one in another way, map it to `Microsoft.SqlServer.Types.SqlGeography` or `SqlGeometry`, and convert from that.
+- **Without `NetTopologySuite.IO.SqlServerBytes`**, NetTopologySuite turned on is [SQLSRC281](diagnostics.md#sqlsrc281), and a type override to a NetTopologySuite type is asked of Microsoft.Data.SqlClient, which cannot read it, and fails when the query runs.
+- **On a connection that wraps a `SqlConnection`**, a method reads a spatial column as it does on the `SqlConnection`.  A method with parameters has the [known issue](generator.md#known-issues) of such a connection.
+
+What reading and sending a value of NetTopologySuite keeps or refuses:
+
+- **The SRID is the value's own**, sent with the geometry and read from the column, and Z and M are kept: a point of four dimensions comes back with both.
+- **A `geography` needs an SRID.**  SQL Server refuses a `geography` of SRID 0, NetTopologySuite's default, with `SqlException` `Number` 8023, whose message says the value is not a valid instance of `geography`.  Make a `geography`'s values with its SRID, as a `GeometryFactory` of SRID 4326 does.  A `geometry` takes SRID 0.
+- **A `geography` polygon's shell is counter-clockwise.**  One whose shell is clockwise throws `ArgumentException` before the query is sent.  Reverse it, with `Reverse()`, before the call.
+- **NetTopologySuite's services are taken once.**  The query methods read and write with `NtsGeometryServices.Instance` as it is at the first query that reads or sends a spatial value, and keep it.  An application that uses services of its own, such as another precision model, sets `NtsGeometryServices.Instance` at startup, before that query.  Entity Framework Core's `UseNetTopologySuite(...)`, inside `UseSqlServer(...)`, configures EF Core's own services and not `NtsGeometryServices.Instance`, so the query methods use NetTopologySuite's defaults unless the application sets it.
+
 <a id="models"></a>
 
 ## Models
@@ -289,7 +339,7 @@ public sealed record FindOrdersDto(long Id, global::System.DateTime PlacedAt, st
 
 A described SQL Server query gets the [models](generator.md#models) that every described query gets, by the rules of the generator page; their namespace and documentation are left out above.  What SQL Server decides in them:
 
-- **Each property's type** is its column's or parameter's C# type, from [the type table](#type-table) under the version of Microsoft.Data.SqlClient that the project references, or [NodaTime's](#nodatime) for a query whose output is `codegen` where the library types turn NodaTime on, or the one you chose, by the [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a marker.  Above, `id` is a `bigint`, `placed_at` a `datetime2` and `status` an `nvarchar(20)`, all `NOT NULL`: `@since` takes the type of `placed_at`, and `@status` that of `status`.
+- **Each property's type** is its column's or parameter's C# type, from [the type table](#type-table) under the version of Microsoft.Data.SqlClient that the project references, or [NodaTime's](#nodatime) or [NetTopologySuite's](#nettopologysuite) for a query whose output is `codegen` where the library types turn that library on, or the one you chose, by the [type override](settings.md#setting-type-overrides), a [column type](settings.md#setting-column-types) or a marker.  Above, `id` is a `bigint`, `placed_at` a `datetime2` and `status` an `nvarchar(20)`, all `NOT NULL`: `@since` takes the type of `placed_at`, and `@status` that of `status`.
 - **A column's property can be null** by [which columns can be null](#nullability): `customer_name` comes from the optional side of the `LEFT JOIN`, so its property is a `string?`.  A [`-- column:` marker](generator.md#column-marker) can say otherwise, and so can a column's alias with `!` or `?`.
 - **A parameter's property can be null** only when its `-- param:` marker says `null`, as `@status` does, since SQL Server does not say whether a parameter can be null.  A marker with `null` and no type leaves the type to SQL Server.
 - **A column with no name**, as an expression or a literal without an alias, is [SQLSRC266](diagnostics.md#sqlsrc266) when the tool describes the query.  Give it an alias.
@@ -331,7 +381,8 @@ Each parameter is sent as the SQL Server type it was described with, with that t
 - **An alias type** is sent as its base type: a parameter of `dbo.Email`, made `FROM nvarchar(320)`, as an `nvarchar(320)`.
 - **A parameter that has a [converter](settings.md#converters)** is sent as its database type too: an `Email` whose converter returns a `string` is sent as that `nvarchar(320)`, and a converted string longer than that whole, as above.
 - **A parameter of a [NodaTime](#nodatime) type** is converted to the C# type of [the table](#type-table) and sent as its database type, as a parameter with a converter is: a `NodaTime.LocalDateTime` for a `datetime` is sent as a `datetime`, and a `NodaTime.LocalTime` as a `time`.  What the conversion does to a value that its column cannot hold is under [NodaTime](#nodatime).
-- **`hierarchyid`, `geography`, `geometry` and a CLR type of your own assembly**, which only a [type override](settings.md#setting-type-overrides) gives a C# type, such as `Microsoft.SqlServer.Types.SqlGeography`, are sent as their SQL Server type, and a null as a `NULL` of it.  A CLR type is named by its schema: `Money` of the schema `dbo` is sent as `dbo.Money`.
+- **A parameter of a [NetTopologySuite](#nettopologysuite) type** is sent as its `geography` or `geometry`, with the value's SRID, and a null as a `NULL` of it.
+- **`hierarchyid`, `geography`, `geometry` and a CLR type of your own assembly**, given a C# type by a [type override](settings.md#setting-type-overrides), such as `Microsoft.SqlServer.Types.SqlGeography`, are sent as their SQL Server type, and a null as a `NULL` of it.  A CLR type is named by its schema: `Money` of the schema `dbo` is sent as `dbo.Money`.
 - **A type of a newer SQL Server**, which only a type override gives a C# type too, is sent by its value, and Microsoft.Data.SqlClient chooses its type from it.
 
 <a id="method-results"></a>
@@ -342,6 +393,7 @@ Each parameter is sent as the SQL Server type it was described with, with that t
 - **A method refuses a transaction that has completed.**  Given a transaction that was committed or rolled back before the call, every method throws `InvalidOperationException`, "The transaction given to the query 'ListOrders' has completed; it is no longer usable.", with the query's name, and nothing runs: the connection is not opened and no command is sent.  Microsoft.Data.SqlClient would otherwise run the command outside any transaction and commit it on its own.  A loop over [streamed rows](settings.md#streaming-rows) checks when the loop starts, so it throws when the loop asks for its first row, and a transaction that completes between the call and the loop is refused too.  A method knows that a transaction has completed by its `Connection`, which Microsoft.Data.SqlClient's `SqlTransaction` sets to null.  A transaction of a library that wraps Microsoft.Data.SqlClient's and keeps its `Connection` set after it completes is not refused, and its command runs outside any transaction as before: give the method the `SqlTransaction` inside.
 - **A column is read as its property's C# type**, the one [the types](#types) give it.  A type of yours that Microsoft.Data.SqlClient never reads, such as an id of your own, takes [converters](settings.md#converters): the column is read as the type of [the table](#type-table), an alias type as its base type, and converted.
 - **A column of a [NodaTime](#nodatime) type** is read as the type of [the table](#type-table) and converted, with nothing registered on the connection or in the application.
+- **A column of a [NetTopologySuite](#nettopologysuite) type** is read with nothing registered on the connection or in the application, and without Microsoft.SqlServer.Types.  A column read as a shape, such as a `Point`, that holds another throws `InvalidCastException`.
 - **A C# enum is read only from a column of its own underlying type**: an enum over `int`, the default, from an `int`, and an enum over `byte` from a `tinyint`.  An enum over `int` throws `InvalidCastException` for a `tinyint`, a `smallint` or a `bigint`, since Microsoft.Data.SqlClient never widens or narrows a value.  Declare the enum over its column's type, `enum Level : byte` for a `tinyint`.
 - **A column whose property cannot be null** throws Microsoft.Data.SqlClient's `SqlNullValueException` when it holds a null, and a `vector` column the method's own `InvalidCastException`, "Column 'name' is null.", before any converter is called.
 - **A query of several statements returns the rows of its first result set**, as its model has them, and its other statements still run.  An error that a statement after that result set raises, such as a `THROW`, is thrown as the error's `SqlException` by every method: one that reads rows, `one`, `one-optional` or `many`, reads the rest of the batch before it returns, so it throws the error in place of its rows, and a loop over [streamed rows](settings.md#streaming-rows) throws it after the last row.  The statements before the error have run, and in a transaction the error may have rolled the transaction back, depending on the error and on `XACT_ABORT`: under `SET XACT_ABORT ON` nearly every error does, and with it off `CAST('x' AS int)` does where a `THROW`, a divide by zero or `CAST(300 AS tinyint)` leaves it open.  Its `rowcount` adds up the rows its statements insert, update or delete, and a `SELECT` among them adds nothing.

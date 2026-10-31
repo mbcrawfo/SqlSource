@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
+using SqlSource.Generation.Converters;
 using SqlSource.Generation.Methods;
 using Conversion = SqlSource.Generation.Methods.Conversion;
 
@@ -87,7 +88,7 @@ internal static class RowReaderWriter
     // A not-null column by GetFieldValue<T> alone; a nullable one by IsDBNull first, and never by GetFieldValue<T?>,
     // which SqlClient refuses on a NULL.  A column with a converter is read as the converter's database side and
     // passed to it, so that the converter never sees a NULL; an array converted by element is read as the database's
-    // array and each of its elements passed to it.
+    // array and each of its elements passed to it; and the spatial read path reads the column's bytes.
     private static void AppendColumn(StringBuilder builder, MethodOutput output, int ordinal, QueryMethodLocals locals)
     {
         var column = output.Columns[ordinal];
@@ -115,6 +116,12 @@ internal static class RowReaderWriter
         if (read is { IsByElement: true })
         {
             AppendByElement(builder, column, read, ordinalText, locals);
+            return;
+        }
+
+        if (read is { IsSpatial: true })
+        {
+            AppendSpatial(builder, column, read, ordinalText, locals);
             return;
         }
 
@@ -178,6 +185,30 @@ internal static class RowReaderWriter
         }
 
         _ = builder.Append(')');
+    }
+
+    // The shared reader's geometry of the column's bytes, read through GetStream, which every DbDataReader has, cast to
+    // the property's type unless it is Geometry itself.
+    private static void AppendSpatial(
+        StringBuilder builder,
+        MethodColumn column,
+        Conversion read,
+        string ordinalText,
+        QueryMethodLocals locals
+    )
+    {
+        if (column.TypeText != NetTopologySuiteConversions.Geometry)
+        {
+            _ = builder.Append('(').Append(column.TypeText).Append(')');
+        }
+
+        _ = builder
+            .Append(read.Method)
+            .Append(".Read(")
+            .Append(locals.Reader)
+            .Append(".GetStream(")
+            .Append(ordinalText)
+            .Append("))");
     }
 
     private static void AppendGetFieldValue(

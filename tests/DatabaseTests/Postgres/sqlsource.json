@@ -19,5 +19,8 @@
     // Off for every query of the project but those of EndToEnd/NodaTime/, whose own settings file gives the detected
     // library back: the project references Npgsql.NodaTime, which would otherwise turn NodaTime on here.
     "nodaTime": "off",
+    // Off for every query of the project but those of EndToEnd/NetTopologySuite/, as for NodaTime: the project gets
+    // Npgsql.NetTopologySuite through the tool and references it for those queries.
+    "netTopologySuite": "off",
   },
 }

@@ -34,6 +34,10 @@ namespace SqlSource.Generation.Models;
 /// for the query's engine, as its types have them: a method of the query reports each.  Empty when every library that
 /// is on can be used.
 /// </param>
+/// <param name="WithoutLibraryFailure">
+/// The query's first failure without its libraries, as its types have it, or null: a claim whose output is not
+/// <c>CodeGen</c> gets no models of the query, and this diagnostic, from <c>TypeModels.LibraryFailuresOf</c>.
+/// </param>
 internal sealed record QueryModels(
     string Name,
     int Index,
@@ -46,5 +50,6 @@ internal sealed record QueryModels(
     EquatableArray<string>? ColumnNames,
     SidecarTable? Table,
     EquatableArray<SidecarType>? ParameterTypes,
-    EquatableArray<LibrarySetting> UnavailableLibraries
+    EquatableArray<LibrarySetting> UnavailableLibraries,
+    DiagnosticInfo? WithoutLibraryFailure = null
 );

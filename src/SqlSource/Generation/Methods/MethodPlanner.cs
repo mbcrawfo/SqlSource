@@ -57,7 +57,7 @@ internal static class MethodPlanner
         var warningIds = new SortedSet<string>(StringComparer.Ordinal);
         // Made only when a first library is added, so that a type that uses none allocates nothing for them.
         SortedSet<SqlLibrary>? conversionLibraries = null;
-        SortedSet<SqlLibrary>? usedLibraries = null;
+        HashSet<LibraryUse>? usedLibraries = null;
         if (typeQueries.Type.Diagnostics.Count == 0 && typeQueries.Files.Count > 0)
         {
             engines = Collect(
@@ -88,7 +88,11 @@ internal static class MethodPlanner
             engines,
             new EquatableArray<string>(warningIds.ToImmutableArray()),
             ToValues(conversionLibraries),
-            ToValues(usedLibraries)
+            usedLibraries is null
+                ? EquatableArray<LibraryUse>.Empty
+                : new EquatableArray<LibraryUse>(
+                    usedLibraries.OrderBy(static use => use, LibraryUse.Order).ToImmutableArray()
+                )
         );
     }
 
@@ -116,7 +120,7 @@ internal static class MethodPlanner
         ImmutableArray<SettingsFileLibraryUse>.Builder libraryUses,
         SortedSet<string> warningIds,
         ref SortedSet<SqlLibrary>? conversionLibraries,
-        ref SortedSet<SqlLibrary>? usedLibraries
+        ref HashSet<LibraryUse>? usedLibraries
     )
     {
         var typeQueries = input.Type;
@@ -180,7 +184,7 @@ internal static class MethodPlanner
         HashSet<string> written,
         ConverterTargets target,
         EquatableArray<Converter> converters,
-        ref SortedSet<SqlLibrary>? usedLibraries
+        ref HashSet<LibraryUse>? usedLibraries
     )
     {
         var (input, _, file, engine, usable) = context;
@@ -222,12 +226,19 @@ internal static class MethodPlanner
         var isUsable = input.Drivers.Allows(engine);
         var reading = new Reading(
             isUsable,
-            new ConversionContext(engine, target, converters, query.NameLocation, problems)
+            new ConversionContext(
+                engine,
+                target,
+                converters,
+                query.NameLocation,
+                problems,
+                input.Drivers.SqlServerSpatial
+            )
         );
         var hasInput = TryReadInput(context, models, reading, out var methodInput);
         var hasOutput = TryReadOutput(context, models, reading, out var methodOutput);
         // SQLSRC282, for the project, says why a query that uses a library below its floor has no method.
-        var isBelowTheFloor = AddUsedLibraries(input, models, methodInput, methodOutput, ref usedLibraries);
+        var isBelowTheFloor = AddUsedLibraries(input, engine, models, methodInput, methodOutput, ref usedLibraries);
         if (problems.Count > 0 || !hasInput || !hasOutput || isBelowTheFloor)
         {
             return planned;
@@ -298,28 +309,31 @@ internal static class MethodPlanner
     public static string LibraryName(SqlLibrary library) =>
         library switch
         {
+            SqlLibrary.NetTopologySuite => "NetTopologySuite",
             SqlLibrary.NodaTime or _ => "NodaTime",
         };
 
-    // The libraries that the query uses, added to the type's, which are made only when the first is added: of each
-    // property that a library's row typed, and of each conversion of its parameters and columns that is a library's
-    // generated one.  True when one of them is older than its floor.  By index, so that the passes box no enumerator.
+    // The libraries that the query uses, each with its engine, added to the type's, which are made only when the first
+    // is added: of each property that a library's row typed, and of each conversion of its parameters and columns
+    // that is a library's generated one.  True when one of them is older than its floor for the engine.  By index, so
+    // that the passes box no enumerator.
     private static bool AddUsedLibraries(
         MethodsInput input,
+        DatabaseEngine engine,
         QueryModels models,
         MethodInput? methodInput,
         MethodOutput? methodOutput,
-        ref SortedSet<SqlLibrary>? used
+        ref HashSet<LibraryUse>? used
     )
     {
         var isBelowTheFloor = false;
-        AddProperties(input, models.Input, ref used, ref isBelowTheFloor);
-        AddProperties(input, models.Output, ref used, ref isBelowTheFloor);
+        AddProperties(input, engine, models.Input, ref used, ref isBelowTheFloor);
+        AddProperties(input, engine, models.Output, ref used, ref isBelowTheFloor);
         if (methodInput is { Parameters: var parameters })
         {
             for (var index = 0; index < parameters.Count; index++)
             {
-                Add(input, parameters[index].Write?.Library, ref used, ref isBelowTheFloor);
+                Add(input, engine, parameters[index].Write?.Library, ref used, ref isBelowTheFloor);
             }
         }
 
@@ -327,7 +341,7 @@ internal static class MethodPlanner
         {
             for (var index = 0; index < columns.Count; index++)
             {
-                Add(input, columns[index].Read?.Library, ref used, ref isBelowTheFloor);
+                Add(input, engine, columns[index].Read?.Library, ref used, ref isBelowTheFloor);
             }
         }
 
@@ -336,8 +350,9 @@ internal static class MethodPlanner
 
     private static void AddProperties(
         MethodsInput input,
+        DatabaseEngine engine,
         EquatableArray<ModelProperty>? properties,
-        ref SortedSet<SqlLibrary>? used,
+        ref HashSet<LibraryUse>? used,
         ref bool isBelowTheFloor
     )
     {
@@ -348,14 +363,15 @@ internal static class MethodPlanner
 
         for (var index = 0; index < each.Count; index++)
         {
-            Add(input, each[index].Type.Library, ref used, ref isBelowTheFloor);
+            Add(input, engine, each[index].Type.Library, ref used, ref isBelowTheFloor);
         }
     }
 
     private static void Add(
         MethodsInput input,
+        DatabaseEngine engine,
         SqlLibrary? library,
-        ref SortedSet<SqlLibrary>? used,
+        ref HashSet<LibraryUse>? used,
         ref bool isBelowTheFloor
     )
     {
@@ -364,8 +380,8 @@ internal static class MethodPlanner
             return;
         }
 
-        _ = (used ??= []).Add(value);
-        isBelowTheFloor |= input.IsBelowTheFloor(value);
+        _ = (used ??= []).Add(new LibraryUse(value, engine));
+        isBelowTheFloor |= input.IsBelowTheFloor(value, engine);
     }
 
     // The libraries in order, or the empty array when there are none.

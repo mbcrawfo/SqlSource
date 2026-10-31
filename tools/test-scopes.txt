@@ -18,6 +18,7 @@ project sqlserver tests/DatabaseTests/SqlServer.SqlClient61/SqlServer.SqlClient6
 postgres src/SqlSource.Tool/Describing/Postgres/*
 postgres tests/DatabaseTests/Postgres/*
 postgres tests/DatabaseTests/Postgres.Npgsql8/*
+postgres tests/DatabaseTests/TestHarness/Postgis/*
 postgres tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/*
 postgres tests/SqlSource.Tool.Tests/Fixtures/Projects/Single/*
 
