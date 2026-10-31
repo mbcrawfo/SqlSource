@@ -44,7 +44,7 @@
             tests/DatabaseTests/SqlServer references, pinned here so that every project that brings it has this
             version.  tests/DatabaseTests/Postgres.Npgsql8 and tests/DatabaseTests/SqlServer.SqlClient61 override it
             to 2.5.0, the floor of Npgsql.NetTopologySuite 8 and of SqlSource, which central transitive pinning would
-            otherwise hold here.
+            otherwise hold here.  examples/SqlServerExamples/README.md lists this version.
         -->
         <PackageVersion Include="NetTopologySuite" Version="2.6.0" />
         <!--

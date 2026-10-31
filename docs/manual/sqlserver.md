@@ -273,7 +273,7 @@ What sending a value of NodaTime can change or refuse:
 ### NetTopologySuite
 
 ```jsonc
-// sqlsource.json, in the folder of a project that references NetTopologySuite.IO.SqlServerBytes
+// sqlsource.json, in the folder of a project that references NetTopologySuite and NetTopologySuite.IO.SqlServerBytes
 {
     "root": true,
     "dialect": "mssql",
@@ -297,7 +297,7 @@ public sealed record GetPlaceDto(
     global::NetTopologySuite.Geometries.Geometry Outline);
 ```
 
-A project that references `NetTopologySuite.IO.SqlServerBytes`, which brings NetTopologySuite, and turns NetTopologySuite on with the [library types](settings.md#setting-library-types), gets NetTopologySuite's `Geometry` for the `geography` and `geometry` columns and parameters of its queries whose output is `codegen`.  Above, `centre` is a `geography` and `outline` a `geometry`, each `NOT NULL`.  On SQL Server NetTopologySuite is off until a settings file or a marker turns it on, for a project, a folder, a file or a query, whatever the project references.  Microsoft.Data.SqlClient reads and sends no NetTopologySuite type, so the query methods read and write each value themselves: nothing is registered in your application, and Microsoft.SqlServer.Types is not needed.  The query methods that use NetTopologySuite need NetTopologySuite 2.5.0 or later and `NetTopologySuite.IO.SqlServerBytes` 2.1.0 or later, and an older one is [SQLSRC282](diagnostics.md#sqlsrc282).
+A project that references `NetTopologySuite.IO.SqlServerBytes` and NetTopologySuite 2.5.0 or later, and turns NetTopologySuite on with the [library types](settings.md#setting-library-types), gets NetTopologySuite's `Geometry` for the `geography` and `geometry` columns and parameters of its queries whose output is `codegen`.  Reference NetTopologySuite by name: `NetTopologySuite.IO.SqlServerBytes` alone brings NetTopologySuite 2.0.0, which is [SQLSRC282](diagnostics.md#sqlsrc282).  Above, `centre` is a `geography` and `outline` a `geometry`, each `NOT NULL`.  On SQL Server NetTopologySuite is off until a settings file or a marker turns it on, for a project, a folder, a file or a query, whatever the project references.  Microsoft.Data.SqlClient reads and sends no NetTopologySuite type, so the query methods read and write each value themselves: nothing is registered in your application, and Microsoft.SqlServer.Types is not needed.  The query methods that use NetTopologySuite need NetTopologySuite 2.5.0 or later and `NetTopologySuite.IO.SqlServerBytes` 2.1.0 or later, and an older one is [SQLSRC282](diagnostics.md#sqlsrc282).
 
 | SQL Server type | C# type with NetTopologySuite |
 |----|----|
