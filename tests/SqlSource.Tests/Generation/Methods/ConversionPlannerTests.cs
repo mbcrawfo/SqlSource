@@ -655,18 +655,28 @@ public sealed class ConversionPlannerTests
         blocked.ShouldBeFalse();
     }
 
-    // The serializer's read of a value type is never null; a nullable one is written without its question mark.
+    // A value type is read as the nullable value type, whose read gives null for a JSON null where its own throws, and
+    // so can return null; a nullable one is written with one question mark.
     [Theory]
     [InlineData(Point)]
     [InlineData(Point + "?")]
-    public void Plan_ValueTypeOnJson_CannotReturnNull(string text)
+    public void Plan_ValueTypeOnJson_IsReadAsItsNullable(string text)
     {
         var type = HoldingJson(text, true, "json", "string");
 
         var (conversion, _, _) = Plan(type, isRead: true, Of<Converter>(), engine: DatabaseEngine.SqlServer);
 
         conversion.ShouldBe(
-            new Conversion(Deserialize + Point + ">", "string", false, false, null, false, IsSerializer: true)
+            new Conversion(
+                Deserialize + Point + "?>",
+                "string",
+                false,
+                false,
+                null,
+                false,
+                MayReturnNull: true,
+                IsSerializer: true
+            )
         );
     }
 
@@ -676,7 +686,8 @@ public sealed class ConversionPlannerTests
     [InlineData(true, OrderMetadata, false, Deserialize + OrderMetadata + ">")]
     [InlineData(false, OrderMetadata, false, Serialize + OrderMetadata + ">")]
     [InlineData(true, OrderMetadata + "?", false, Deserialize + OrderMetadata + ">")]
-    [InlineData(true, Point, true, Deserialize + Point + ">")]
+    [InlineData(true, Point, true, Deserialize + Point + "?>")]
+    [InlineData(true, Point + "?", true, Deserialize + Point + "?>")]
     [InlineData(false, Point + "?", true, Serialize + Point + ">")]
     public void Plan_ClassArrayOnJsonArray_GoesThroughTheSerializerByElement(
         bool isRead,
@@ -700,7 +711,7 @@ public sealed class ConversionPlannerTests
                 true,
                 element,
                 elementIsValueType,
-                MayReturnNull: isRead && !elementIsValueType,
+                MayReturnNull: isRead,
                 IsSerializer: true
             )
         );

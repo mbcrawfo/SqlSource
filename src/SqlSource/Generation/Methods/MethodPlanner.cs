@@ -528,7 +528,7 @@ internal static class MethodPlanner
 
     // Whether the read of a column into the property can give null for a JSON null, which a not-null property then
     // refuses: a node of System.Text.Json, whether a generated parse or the driver reads it, and the serializer's read
-    // of a reference type whole.  An element read by element is checked by its conversion's MayReturnNull.
+    // of the whole value.  An element read by element is checked by its conversion's MayReturnNull.
     private static bool ThrowsOnJsonNull(ModelProperty property, Conversion? read) =>
         !property.IsNullable
         && (

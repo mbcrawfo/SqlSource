@@ -195,30 +195,42 @@ public sealed class JsonSerializerMethodTests
         );
     }
 
-    // An array of a value type is converted by element too: a NULL element of a not-null element throws, and the
-    // serializer's read of a value type is never null.
-    [Fact]
-    public void Run_ValueTypeArrayOnJsonbArray_IsConvertedByElement()
+    // An array of a value type is converted by element too, each element read as the nullable value type, so a JSON
+    // null element gives null: a not-null element throws on it, naming the column, as on a NULL element, and a
+    // nullable element is null for both.  The write is the value type's.
+    [Theory]
+    [InlineData(
+        "App.Point[]",
+        "global::System.Array.ConvertAll<string, global::App.Point>(reader.GetFieldValue<string[]>(0), static "
+            + "element => element is { } item ? ("
+            + Deserialize
+            + "global::App.Point?>(item) ?? throw new global::System.InvalidCastException(\"Column 'meta' holds a "
+            + "JSON null.\")) : throw new global::System.InvalidCastException(\"Column 'meta' holds a null "
+            + "element.\"))",
+        "parameter.TypedValue = parameters.Meta is { } value ? global::System.Array.ConvertAll<global::App.Point, "
+            + "string>(value, static element => "
+            + Serialize
+            + "global::App.Point>(element)) : null;\n"
+    )]
+    [InlineData(
+        "App.Point?[]",
+        "global::System.Array.ConvertAll<string, global::App.Point?>(reader.GetFieldValue<string[]>(0), static "
+            + "element => element is { } item ? "
+            + Deserialize
+            + "global::App.Point?>(item) : null)",
+        "parameter.TypedValue = parameters.Meta is { } value ? global::System.Array.ConvertAll<global::App.Point?, "
+            + "string?>(value, static element => element is { } item ? "
+            + Serialize
+            + "global::App.Point>(item) : null) : null;\n"
+    )]
+    public void Run_ValueTypeArrayOnJsonbArray_ReadsEachElementNullable(string type, string read, string write)
     {
-        var run = RunMeta("Npgsql 10", "-- name: SaveMeta\n" + Markers("App.Point[]") + SaveMeta, type: JsonbArray);
+        var run = RunMeta("Npgsql 10", "-- name: SaveMeta\n" + Markers(type) + SaveMeta, type: JsonbArray);
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain(
-            "global::System.Array.ConvertAll<string, global::App.Point>(reader.GetFieldValue<string[]>(0), static "
-                + "element => element is { } item ? "
-                + Deserialize
-                + "global::App.Point>(item) : throw new global::System.InvalidCastException("
-                + "\"Column 'meta' holds a null element.\"))"
-        );
-        methods.ShouldContain(
-            "parameter.TypedValue = parameters.Meta is { } value ? global::System.Array.ConvertAll<global::App.Point, "
-                + "string>(value, static element => "
-                + Serialize
-                + "global::App.Point>(element)) : null;\n"
-        );
-        methods.ShouldContain("var parameter = new global::Npgsql.NpgsqlParameter<string[]>();\n");
-        methods.ShouldNotContain("holds a JSON null");
+        methods.ShouldContain(read);
+        methods.ShouldContain(write);
     }
 
     // A collection, a record or an array given to a plain JSON column is a class, serialized whole.
@@ -253,24 +265,31 @@ public sealed class JsonSerializerMethodTests
         methods.ShouldNotContain("ConvertAll");
     }
 
-    // The serializer's read of a value type is never null, so it has no check; a NULL of the nullable one is null.
+    // A value type is read as the nullable value type, whose read gives null for a JSON null, where its own throws
+    // JsonException: the not-null column throws on one, naming the column, and the nullable column is null for it, as
+    // for a NULL.  The write is the value type's.
     [Theory]
     [InlineData("Npgsql 8")]
     [InlineData("Npgsql 10")]
     [InlineData("SqlClient 7")]
-    public void Run_ValueTypeClassOnJsonb_HasNoJsonNullCheck(string driver)
+    public void Run_ValueTypeClassOnJsonb_ReadsAJsonNullAsNull(string driver)
     {
         var run = RunMeta(driver, "-- name: SaveMeta\n" + Markers("App.Point") + SaveMeta);
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain("(" + Deserialize + "global::App.Point>(reader.GetFieldValue<string>(0)), ");
+        methods.ShouldContain(
+            "("
+                + Deserialize
+                + "global::App.Point?>(reader.GetFieldValue<string>(0)) ?? throw new "
+                + "global::System.InvalidCastException(\"Column 'meta' holds a JSON null.\"), "
+        );
         methods.ShouldContain(
             "reader.IsDBNull(1) ? default(global::App.Point?) : "
                 + Deserialize
-                + "global::App.Point>(reader.GetFieldValue<string>(1)))"
+                + "global::App.Point?>(reader.GetFieldValue<string>(1)))"
         );
-        methods.ShouldNotContain("holds a JSON null");
+        methods.ShouldNotContain("Column 'maybe_meta' holds a JSON null.");
         methods.ShouldContain(
             IsSqlServer(driver)
                 ? "parameter.Value = " + Serialize + "global::App.Point>(parameters.Meta);\n"

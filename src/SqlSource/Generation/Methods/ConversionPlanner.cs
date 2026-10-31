@@ -168,13 +168,13 @@ internal static class ConversionPlanner
             if (TakesSerializer(database.HoldsJson, databaseElement, element, ofElement))
             {
                 return new Conversion(
-                    SerializerOf(element, isRead),
+                    SerializerOf(element, isRead, type.ElementIsValueType),
                     databaseText,
                     database.ElementIsValueType,
                     true,
                     ElementOf(text),
                     type.ElementIsValueType,
-                    MayReturnNull: isRead && !type.ElementIsValueType,
+                    MayReturnNull: isRead,
                     IsSerializer: true
                 );
             }
@@ -187,13 +187,13 @@ internal static class ConversionPlanner
         if (TakesSerializer(holdsJson, databaseText, text, decision))
         {
             return new Conversion(
-                SerializerOf(text, isRead),
+                SerializerOf(text, isRead, type.IsValueType),
                 databaseText,
                 database.IsValueType,
                 false,
                 null,
                 false,
-                MayReturnNull: isRead && !type.IsValueType,
+                MayReturnNull: isRead,
                 IsSerializer: true
             );
         }
@@ -264,10 +264,20 @@ internal static class ConversionPlanner
             && decision.IsSerializable(bare);
     }
 
-    // The serializer's call for the type, without the ? of a nullable value type, which the method never passes a
-    // null: JsonSerializer.Deserialize<T> to read, JsonSerializer.Serialize<T> to send, with the default options.
-    private static string SerializerOf(string type, bool isRead) =>
-        (isRead ? Deserialize : Serialize) + WithoutQuestionMark(type) + ">";
+    // The serializer's call for the type, with the default options: JsonSerializer.Serialize<T> to send, T without the
+    // ? of a nullable value type, which the method never passes a null; JsonSerializer.Deserialize<T> to read, and
+    // Deserialize<T?> for a value type, whose Deserialize<T> throws JsonException on a JSON null, so that the read of
+    // either kind gives null for one.
+    private static string SerializerOf(string type, bool isRead, bool isValueType)
+    {
+        var bare = WithoutQuestionMark(type);
+        if (!isRead)
+        {
+            return Serialize + bare + ">";
+        }
+
+        return Deserialize + bare + (isValueType ? "?>" : ">");
+    }
 
     private static string WithoutQuestionMark(string type) =>
         type.EndsWith("?", StringComparison.Ordinal) ? type.Substring(0, type.Length - 1) : type;

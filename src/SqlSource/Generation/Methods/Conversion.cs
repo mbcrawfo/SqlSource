@@ -41,7 +41,8 @@ namespace SqlSource.Generation.Methods;
 /// <param name="MayReturnNull">
 /// Whether the call, on a read, can return null for a value that is not a <c>NULL</c>: the parse of a JSON
 /// <c>null</c> into a <see cref="Converters.JsonTypes.IsNode" /> type.  A not-null element read by element then
-/// throws on it.  Also the serializer's read of a reference type, whose JSON <c>null</c> it gives as null.
+/// throws on it.  Also every read of the serializer, which gives a JSON <c>null</c> as null: a value type is read as
+/// <c>JsonSerializer.Deserialize&lt;T?&gt;</c> for it.
 /// </param>
 /// <param name="IsSerializer">
 /// Whether the call is System.Text.Json's serializer, <c>JsonSerializer.Deserialize&lt;T&gt;</c> or

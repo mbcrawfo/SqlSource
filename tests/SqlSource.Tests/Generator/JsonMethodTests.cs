@@ -144,4 +144,40 @@ public sealed class JsonMethodTests
         );
         methods.ShouldNotContain("holds a JSON null");
     }
+
+    // On SQL Server a JsonElement is converted from and to a string, so one given to a database type that is not read
+    // as a string, an int, is SQLSRC279 for the column and for the parameter, and the query gets no method.
+    [Fact]
+    public void Run_JsonElementOnAnIntOnSqlServer_IsSqlsrc279()
+    {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: int=System.Text.Json.JsonElement\n\n-- name: GetDoc\nSELECT n FROM docs WHERE n = @n;\n"
+        );
+        var integer = TestSidecars.SqlServer("int", 4, 10);
+
+        var run = MethodRuns.RunSqlServer(
+            file,
+            [
+                MethodRuns.SqlServerEntry(
+                    file,
+                    "GetDoc",
+                    [TestSidecars.Parameter(0, "n", integer, false)],
+                    [TestSidecars.Column(0, "n", integer, nullable: false)]
+                ),
+            ]
+        );
+
+        run.Problems()
+            .ShouldBe([
+                "SQLSRC279 /app/Repo/Users.sql(3,10)-(3,16): The column 'n' has type 'System.Text.Json.JsonElement', "
+                    + "whose converters convert from and to 'string', and not from and to 'int', the type the database "
+                    + "type 'int' is read as.  Add a converter between 'System.Text.Json.JsonElement' and 'int'.",
+                "SQLSRC279 /app/Repo/Users.sql(3,10)-(3,16): The parameter 'n' has type "
+                    + "'System.Text.Json.JsonElement', whose converters convert from and to 'string', and not from and "
+                    + "to 'int', the type the database type 'int' is read as.  Add a converter between "
+                    + "'System.Text.Json.JsonElement' and 'int'.",
+            ]);
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+    }
 }
