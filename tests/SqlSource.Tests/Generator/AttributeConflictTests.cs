@@ -24,7 +24,7 @@ public sealed class AttributeConflictTests
     // The file of the class of NodaTime's conversions.
     private const string ConversionsFile = "SqlSource-NodaTimeConversions.g.cs";
 
-    // The folder of the generated files, as the compiler names it in a diagnostic.
+    // The folder of the generated files, as Places gives it in a diagnostic: with '/' on every OS.
     private const string GeneratedPath = "SqlSource/SqlSource.SqlSourceGenerator/";
 
     [Theory]
