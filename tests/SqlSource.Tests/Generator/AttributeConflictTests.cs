@@ -24,7 +24,7 @@ public sealed class AttributeConflictTests
     // The file of the class of NodaTime's conversions.
     private const string ConversionsFile = "SqlSource-NodaTimeConversions.g.cs";
 
-    // The folder of the generated files, as the compiler names it in a diagnostic.
+    // The folder of the generated files, as Places gives it in a diagnostic: with '/' on every OS.
     private const string GeneratedPath = "SqlSource/SqlSource.SqlSourceGenerator/";
 
     [Theory]
@@ -333,7 +333,10 @@ public sealed class AttributeConflictTests
     private static MetadataReference Other(OutputKind? output) =>
         GeneratorHarness.CreateReference(output, "Other", InternalsVisible + "public class InOther { }\n");
 
-    // Each diagnostic without its message, which for CS0436 names files and assemblies.
+    // Each diagnostic without its message, which for CS0436 names files and assemblies, and with
+    // '/' between folders, since on Windows the compiler names a generated file's folder with '\'.
     private static IEnumerable<string> Places(IEnumerable<string> diagnostics) =>
-        diagnostics.Select(diagnostic => diagnostic[..diagnostic.IndexOf(": ", System.StringComparison.Ordinal)]);
+        diagnostics.Select(diagnostic =>
+            diagnostic[..diagnostic.IndexOf(": ", System.StringComparison.Ordinal)].Replace('\\', '/')
+        );
 }
