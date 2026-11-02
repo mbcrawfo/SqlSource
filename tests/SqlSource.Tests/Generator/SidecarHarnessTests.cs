@@ -7,11 +7,13 @@ using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generator;
 
-// The harness hands the generator a sidecar beside a .sql file, and computes a query's hash as the generator does.
+// The harness hands the generator a sidecar beside a .sql file, computes a query's hash as the generator does, and
+// fails a test whose current entry does not list its query's parameters as the tool writes them.
 public sealed class SidecarHarnessTests
 {
     private const string QuerySql = "-- name: Q\nSELECT @id;\n";
@@ -90,4 +92,157 @@ public sealed class SidecarHarnessTests
         entry.Parameters.Count.ShouldBe(0);
         entry.Columns.ShouldBeNull();
     }
+
+    [Fact]
+    public void Of_CurrentEntryWithoutTheSqlsParameter_ThrowsNamingBothLists()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, QuerySql);
+
+        var thrown = Should.Throw<InvalidOperationException>(() => Sidecars.Of(file, EntryOf(file, "Q")));
+
+        thrown.Message.ShouldContain("Q");
+        thrown.Message.ShouldContain("[]");
+        thrown.Message.ShouldContain("[id]");
+    }
+
+    [Fact]
+    public void Of_CurrentEntryWithAParameterTheSqlLacks_Throws()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Q\nSELECT 1;\n");
+
+        _ = Should.Throw<InvalidOperationException>(() => Sidecars.Of(file, EntryOf(file, "Q", Parameter(0, "id"))));
+    }
+
+    [Fact]
+    public void Of_CurrentEntryOutOfTheSqlsOrder_Throws()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Q\nSELECT @a, @b;\n");
+
+        _ = Should.Throw<InvalidOperationException>(() =>
+            Sidecars.Of(file, EntryOf(file, "Q", Parameter(0, "b"), Parameter(1, "a")))
+        );
+    }
+
+    [Fact]
+    public void Of_CurrentEntryInAnotherSpelling_Throws()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Q\nSELECT @author;\n");
+
+        _ = Should.Throw<InvalidOperationException>(() =>
+            Sidecars.Of(file, EntryOf(file, "Q", Parameter(0, "Author")))
+        );
+    }
+
+    [Fact]
+    public void Of_CurrentEntryWhoseOrdinalIsNotItsPlace_Throws()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Q\nSELECT @a;\n");
+
+        var thrown = Should.Throw<InvalidOperationException>(() =>
+            Sidecars.Of(file, EntryOf(file, "Q", Parameter(1, "a")))
+        );
+
+        thrown.Message.ShouldContain("[a@1]");
+    }
+
+    [Fact]
+    public void Of_StaleEntry_IsNotChecked()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Q\nSELECT 1;\n");
+        var entry = Sidecars.Entry("Q", "h") with { Parameters = TestSidecars.Of(Parameter(0, "id")) };
+
+        _ = Should.NotThrow(() => Sidecars.Of(file, entry));
+    }
+
+    [Fact]
+    public void Of_EntryOfAQueryTheFileLacks_IsNotChecked()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, QuerySql);
+        var entry = EntryOf(file, "Q", Parameter(0, "x")) with { Name = "Gone" };
+
+        _ = Should.NotThrow(() => Sidecars.Of(file, entry));
+    }
+
+    [Fact]
+    public void Of_FileThatDoesNotParse_WritesTheSidecar()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Q\nSELECT 1;\n\n-- name: Q\nSELECT 2;\n");
+
+        var sidecar = Sidecars.Of(file, Sidecars.Entry("Q", "h"));
+
+        SidecarReader.Read(sidecar.Text!).Sidecar!.Queries.Single().Name.ShouldBe("Q");
+    }
+
+    [Fact]
+    public void Of_EntryHashedUnderAnotherDialect_IsChecked()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, QuerySql);
+        var entry = Sidecars.Entry("Q", Sidecars.HashOf(file, "Q"), "postgres");
+
+        _ = Should.Throw<InvalidOperationException>(() => Sidecars.Of(file, entry));
+    }
+
+    [Fact]
+    public void Of_EntryListingTheSqlsParameters_WritesTheSidecar()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Q\nSELECT @b, @a, @b;\n");
+
+        var sidecar = Sidecars.Of(file, EntryOf(file, "Q", Parameter(0, "b"), Parameter(1, "a")));
+
+        SidecarReader
+            .Read(sidecar.Text!)
+            .Sidecar!.Queries.Single()
+            .Parameters.Select(parameter => parameter.Name)
+            .ShouldBe(["b", "a"]);
+    }
+
+    [Fact]
+    public void HandEdited_EntryInAnotherSpelling_WritesItAsGiven()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Q\nSELECT @author;\n");
+
+        var sidecar = Sidecars.HandEdited(file, EntryOf(file, "Q", Parameter(0, "Author")));
+
+        SidecarReader
+            .Read(sidecar.Text!)
+            .Sidecar!.Queries.Single()
+            .Parameters.Select(parameter => parameter.Name)
+            .ShouldBe(["Author"]);
+    }
+
+    [Fact]
+    public void Current_QueryWithParameters_ListsThemAsTheSqlHasThem()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Q\nSELECT @b, @a, @b;\n");
+
+        var sidecar = Sidecars.Current(file, SqlDialect.PostgreSql, "Q");
+
+        var parameters = SidecarReader.Read(sidecar.Text!).Sidecar!.Queries.Single().Parameters;
+        parameters.Select(parameter => parameter.Name).ShouldBe(["b", "a"]);
+        parameters.Select(parameter => parameter.Ordinal).ShouldBe([0, 1]);
+        parameters.ShouldAllBe(parameter => parameter.Type == null);
+    }
+
+    [Fact]
+    public void Current_QueryWithAMarkerOnlyParameter_ListsItLast()
+    {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Q\n-- param: @z int4\nSELECT @a;\n");
+
+        var sidecar = Sidecars.Current(file, SqlDialect.PostgreSql, "Q");
+
+        SidecarReader
+            .Read(sidecar.Text!)
+            .Sidecar!.Queries.Single()
+            .Parameters.Select(parameter => parameter.Name)
+            .ShouldBe(["a", "z"]);
+    }
+
+    // An entry of the query for its hash under PostgreSQL, against the engine postgres.
+    private static SidecarEntry EntryOf(SqlFile file, string name, params SidecarParameter[] parameters) =>
+        Sidecars.Entry(name, Sidecars.HashOf(file, name, SqlDialect.PostgreSql)) with
+        {
+            Parameters = TestSidecars.Of(parameters),
+        };
+
+    private static SidecarParameter Parameter(int ordinal, string name) => TestSidecars.Parameter(ordinal, name, null);
 }

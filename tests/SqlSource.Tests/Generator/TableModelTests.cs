@@ -27,6 +27,12 @@ public sealed class TableModelTests
         "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
     );
 
+    // The query of Users without its parameter, which reads every user, for the tests of a query that has none.
+    private static readonly SqlFile AllUsers = new(
+        GeneratorHarness.UsersPath,
+        "-- name: GetUser\nSELECT id FROM users;\n"
+    );
+
     private static readonly SidecarTable PublicUsers = new("public", "users");
 
     // The levels that give the generator parameters of a query, from the least specific.
@@ -83,7 +89,10 @@ public sealed class TableModelTests
     [Fact]
     public void Run_TableOfAnotherSchema_HasTheSchemaBeforeItsName()
     {
-        var run = Run(Users, Entry(Users, "GetUser", [], [Column("id")], new SidecarTable("billing", "invoices")));
+        var run = Run(
+            AllUsers,
+            Entry(AllUsers, "GetUser", [], [Column("id")], new SidecarTable("billing", "invoices"))
+        );
 
         run.ShouldBeClean();
         ModelFiles(run).ShouldBe(["App.BillingInvoicesDto-Model.g.cs"]);
@@ -96,8 +105,8 @@ public sealed class TableModelTests
     public void Run_OutputSuffix_FollowsTheTablesName()
     {
         var run = Run(
-            Users,
-            [Entry(Users, "GetUser", [], [Column("id")], new SidecarTable("public", "order_lines"))],
+            AllUsers,
+            [Entry(AllUsers, "GetUser", [], [Column("id")], new SidecarTable("public", "order_lines"))],
             settings: /*lang=json,strict*/
             """{"outputModelSuffix": "Row"}"""
         );
@@ -115,7 +124,7 @@ public sealed class TableModelTests
             Setting.GeneratorParameters,
             LevelSettings.WordsAt(level, "no-table-models")
         );
-        var files = settings.Files(Users);
+        var files = settings.Files(AllUsers);
         var file = files[0];
 
         var run = Run(
@@ -134,8 +143,8 @@ public sealed class TableModelTests
     public void Run_OtherParameters_LeaveTableModelsOn()
     {
         var run = Run(
-            Users,
-            [Entry(Users, "GetUser", [], [Column("id")], PublicUsers)],
+            AllUsers,
+            [Entry(AllUsers, "GetUser", [], [Column("id")], PublicUsers)],
             settings: /*lang=json,strict*/
             """{"generatorParameters": ["sort-output"]}"""
         );
@@ -185,7 +194,7 @@ public sealed class TableModelTests
     [InlineData("public", null)]
     public void Run_TableThatGivesNoIdentifier_NamesTheModelAfterTheQuery(string? schema, string? table)
     {
-        var run = Run(Users, Entry(Users, "GetUser", [], [Column("id")], new SidecarTable(schema, table)));
+        var run = Run(AllUsers, Entry(AllUsers, "GetUser", [], [Column("id")], new SidecarTable(schema, table)));
 
         run.ShouldBeClean();
         ModelFiles(run).ShouldBe([GetUserDtoFile]);
@@ -307,7 +316,7 @@ public sealed class TableModelTests
 
         var run = Run(
             source,
-            [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("id")], PublicUsers))],
+            [AllUsers, Sidecars.Of(AllUsers, Entry(AllUsers, "GetUser", [], [Column("id")], PublicUsers))],
             withNamespace
                 ? /*lang=json,strict*/
                 """{"modelNamespace": "Shared"}"""

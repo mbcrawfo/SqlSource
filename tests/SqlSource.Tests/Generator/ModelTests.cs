@@ -137,6 +137,12 @@ public sealed class ModelTests
         "-- name: GetUser\nSELECT id, name FROM users WHERE id = @id;\n"
     );
 
+    // The query of Users without its parameter, which reads every user, for the tests of a query that has none.
+    private static readonly SqlFile AllUsers = new(
+        GeneratorHarness.UsersPath,
+        "-- name: GetUser\nSELECT id, name FROM users;\n"
+    );
+
     private static readonly PostgresType IntArray = TestSidecars.Postgres(
         name: "integer[]",
         kind: SidecarValues.Kind.Array,
@@ -214,7 +220,7 @@ public sealed class ModelTests
     [Fact]
     public void Run_RowsWithoutParameters_EmitsTheOutputModelAlone()
     {
-        var run = Run(Users, Entry(Users, "GetUser", [], [Column("id")]));
+        var run = Run(AllUsers, Entry(AllUsers, "GetUser", [], [Column("id")]));
 
         run.ShouldBeClean();
         ModelFiles(run).ShouldBe([GetUserDtoFile]);
@@ -232,7 +238,7 @@ public sealed class ModelTests
     [Fact]
     public void Run_NoRowsWithoutParameters_EmitsNoModel()
     {
-        var run = Run(Users, Entry(Users, "GetUser", [], null));
+        var run = Run(AllUsers, Entry(AllUsers, "GetUser", [], null));
 
         run.ShouldBeClean();
         ModelFiles(run).ShouldBeEmpty();
@@ -243,10 +249,10 @@ public sealed class ModelTests
     public void Run_EachModelType_WritesItsShape(string kind, string expected)
     {
         var run = Run(
-            Users,
+            AllUsers,
             [
                 Entry(
-                    Users,
+                    AllUsers,
                     "GetUser",
                     [],
                     [Column("name", Text), Column("count", nullable: true), Column("note", Text, nullable: true)]
@@ -263,11 +269,16 @@ public sealed class ModelTests
     [MemberData(nameof(InputShapes))]
     public void Run_EachInputModelType_WritesItsShape(string kind, string expected)
     {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\nSELECT id FROM users WHERE name = @name AND count = @count AND note = @note;\n"
+        );
+
         var run = Run(
-            Users,
+            file,
             [
                 Entry(
-                    Users,
+                    file,
                     "GetUser",
                     [Parameter("name", Text), Parameter("count", nullable: true), Parameter("note", Text, true)],
                     null
@@ -284,7 +295,7 @@ public sealed class ModelTests
     [Fact]
     public void Run_EmptyOutputModel_IsAnEmptyRecord()
     {
-        var run = Run(Users, Entry(Users, "GetUser", [], []));
+        var run = Run(AllUsers, Entry(AllUsers, "GetUser", [], []));
 
         run.ShouldBeClean();
         run.Sources[GetUserDtoFile]
@@ -307,8 +318,8 @@ public sealed class ModelTests
     public void Run_EmptyOutputModel_IsAnEmptyClass()
     {
         var run = Run(
-            Users,
-            [Entry(Users, "GetUser", [], [])],
+            AllUsers,
+            [Entry(AllUsers, "GetUser", [], [])],
             settings: /*lang=json,strict*/
             """{"outputModelType": "sealed class"}"""
         );
@@ -419,7 +430,7 @@ public sealed class ModelTests
             public partial class Sample;
             """;
 
-        var run = Run(source, [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("id")]))]);
+        var run = Run(source, [AllUsers, Sidecars.Of(AllUsers, Entry(AllUsers, "GetUser", [], [Column("id")]))]);
 
         run.ShouldBeClean();
         run.Sources["GetUserDto-Model.g.cs"]
@@ -450,7 +461,7 @@ public sealed class ModelTests
             }
             """;
 
-        var run = Run(source, [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("id")]))]);
+        var run = Run(source, [AllUsers, Sidecars.Of(AllUsers, Entry(AllUsers, "GetUser", [], [Column("id")]))]);
 
         run.ShouldBeClean();
         run.Sources["App.class.GetUserDto-Model.g.cs"].ShouldContain("namespace App.@class\n{\n");
@@ -491,7 +502,7 @@ public sealed class ModelTests
             )
             + "\n}\n";
 
-        var run = Run(source, [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("id")]))]);
+        var run = Run(source, [AllUsers, Sidecars.Of(AllUsers, Entry(AllUsers, "GetUser", [], [Column("id")]))]);
 
         run.ShouldBeClean();
         run.Sources[GetUserDtoFile].ShouldContain($"    {expected} sealed record GetUserDto(int Id);\n");
@@ -520,11 +531,16 @@ public sealed class ModelTests
     [Fact]
     public void Run_SortInput_SortsTheInputModelAlone()
     {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\nSELECT ba, b_x, a FROM t WHERE ba = @ba AND b_x = @b_x AND a = @a;\n"
+        );
+
         var run = Run(
-            Users,
+            file,
             [
                 Entry(
-                    Users,
+                    file,
                     "GetUser",
                     [Parameter("ba"), Parameter("b_x"), Parameter("a")],
                     [Column("ba"), Column("b_x"), Column("a")]
@@ -542,11 +558,16 @@ public sealed class ModelTests
     [Fact]
     public void Run_SortOutput_SortsTheOutputModelAlone()
     {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\nSELECT ba, b_x, a FROM t WHERE ba = @ba AND b_x = @b_x AND a = @a;\n"
+        );
+
         var run = Run(
-            Users,
+            file,
             [
                 Entry(
-                    Users,
+                    file,
                     "GetUser",
                     [Parameter("ba"), Parameter("b_x"), Parameter("a")],
                     [Column("ba"), Column("b_x"), Column("a")]
@@ -612,8 +633,8 @@ public sealed class ModelTests
     public void Run_DocumentationWithALineTerminator_StaysInTheComment()
     {
         var run = Run(
-            Users,
-            Entry(Users, "GetUser", [], [Column("id", origin: new SidecarOrigin("public", "my\ntable", "id"))])
+            AllUsers,
+            Entry(AllUsers, "GetUser", [], [Column("id", origin: new SidecarOrigin("public", "my\ntable", "id"))])
         );
 
         run.ShouldBeClean();
@@ -633,12 +654,16 @@ public sealed class ModelTests
     {
         var names = DeclaredNames().Where(name => !PropertyNames.IsReserved(name)).ToArray();
         names.ShouldNotBeEmpty();
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\nSELECT " + string.Join(", ", names.Select(name => "@" + name)) + ";\n"
+        );
 
         var run = Run(
-            Users,
+            file,
             [
                 Entry(
-                    Users,
+                    file,
                     "GetUser",
                     [.. names.Select(name => Parameter(name))],
                     [.. names.Select(name => Column(name))]
@@ -697,7 +722,7 @@ public sealed class ModelTests
             }
             """;
 
-        var run = Run(source, [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("id")]))]);
+        var run = Run(source, [AllUsers, Sidecars.Of(AllUsers, Entry(AllUsers, "GetUser", [], [Column("id")]))]);
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC001 ");
         run.CompilationErrors.ShouldBeEmpty();
@@ -730,8 +755,8 @@ public sealed class ModelTests
         var run = Run(
             source,
             [
-                Users,
-                Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("id")])),
+                AllUsers,
+                Sidecars.Of(AllUsers, Entry(AllUsers, "GetUser", [], [Column("id")])),
                 other,
                 Sidecars.Of(other, Entry(other, "GetUser", [], [Column("one")])),
             ]
@@ -809,9 +834,9 @@ public sealed class ModelTests
     public void Run_RecordWithAnArrayColumn_HasAPrivateConstructorWithoutParameters()
     {
         var run = Run(
-            Users,
+            AllUsers,
             Entry(
-                Users,
+                AllUsers,
                 "GetUser",
                 [],
                 [Column("id"), Column("tags", TextArray), Column("scores", IntArray, nullable: true)]
@@ -826,8 +851,8 @@ public sealed class ModelTests
     public void Run_NonSealedRecordWithAnArrayColumn_HasAPrivateConstructorWithoutParameters()
     {
         var run = Run(
-            Users,
-            [Entry(Users, "GetUser", [], [Column("id"), Column("scores", IntArray, nullable: true)])],
+            AllUsers,
+            [Entry(AllUsers, "GetUser", [], [Column("id"), Column("scores", IntArray, nullable: true)])],
             settings: /*lang=json,strict*/
             """{"outputModelType": "record"}"""
         );
@@ -841,7 +866,7 @@ public sealed class ModelTests
     [Fact]
     public void Run_RecordWithOnlyAnArrayColumn_Compiles()
     {
-        var run = Run(Users, Entry(Users, "GetUser", [], [Column("scores", IntArray, nullable: true)]));
+        var run = Run(AllUsers, Entry(AllUsers, "GetUser", [], [Column("scores", IntArray, nullable: true)]));
 
         run.ShouldBeClean();
         run.Sources[GetUserDtoFile].ShouldContain(": this(default(int[]?)) { }");
@@ -858,7 +883,7 @@ public sealed class ModelTests
             baseType: IntArray
         );
 
-        var run = Run(Users, Entry(Users, "GetUser", [], [Column("scores", domain)]));
+        var run = Run(AllUsers, Entry(AllUsers, "GetUser", [], [Column("scores", domain)]));
 
         run.ShouldBeClean();
         run.Sources[GetUserDtoFile].ShouldContain("private GetUserDto() : this(");
@@ -867,7 +892,7 @@ public sealed class ModelTests
     [Fact]
     public void Run_RecordWithoutAnArrayColumn_HasNoConstructor()
     {
-        var run = Run(Users, Entry(Users, "GetUser", [], [Column("id")]));
+        var run = Run(AllUsers, Entry(AllUsers, "GetUser", [], [Column("id")]));
 
         run.ShouldBeClean();
         var model = run.Sources[GetUserDtoFile];
@@ -880,11 +905,16 @@ public sealed class ModelTests
     [Fact]
     public void Run_ClassOrInputModelWithAnArray_IsUnchanged()
     {
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\nSELECT id, scores FROM users WHERE tags = @tags;\n"
+        );
+
         var run = Run(
-            Users,
+            file,
             [
                 Entry(
-                    Users,
+                    file,
                     "GetUser",
                     [Parameter("tags", TextArray)],
                     [Column("id"), Column("scores", IntArray, nullable: true)]
@@ -936,7 +966,10 @@ public sealed class ModelTests
     [Fact]
     public void Run_RecordWithAnArrayColumn_KeepsItsPositionalConstructorEqualityAndWith()
     {
-        var entries = Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("id"), Column("scores", IntArray, true)]));
+        var entries = Sidecars.Of(
+            AllUsers,
+            Entry(AllUsers, "GetUser", [], [Column("id"), Column("scores", IntArray, true)])
+        );
         const string Use = """
             namespace App
             {
@@ -952,10 +985,10 @@ public sealed class ModelTests
             }
             """;
 
-        var run = Run(Source + Use, [Users, entries]);
+        var run = Run(Source + Use, [AllUsers, entries]);
         var withoutParameters = Run(
             Source + Use.Replace("new GetUserDto(1, null)", "new GetUserDto()", StringComparison.Ordinal),
-            [Users, entries]
+            [AllUsers, entries]
         );
 
         run.Diagnostics.ShouldBeEmpty();

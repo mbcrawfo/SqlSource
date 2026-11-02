@@ -434,7 +434,7 @@ public sealed class TypeOverrideLevelTests
     [Fact]
     public void Run_ArraysOwnKeyOnAParameter_NamesTheParameter()
     {
-        const string Text = SqlTexts.GetUser;
+        const string Text = "-- name: GetUser\nSELECT @statuses;\n";
         var file = new SqlFile(GeneratorHarness.UsersPath, Text);
         var entry = TestSidecars.Entry(
             "GetUser",
@@ -854,7 +854,7 @@ public sealed class TypeOverrideLevelTests
     [Fact]
     public void Run_MappedTypeNotFoundForAParameter_NamesTheParameter()
     {
-        var file = GeneratorHarness.UsersFile;
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @id;\n");
         var entry = TestSidecars.Entry(
             "GetUser",
             Sidecars.HashOf(file, "GetUser", SqlDialect.PostgreSql),

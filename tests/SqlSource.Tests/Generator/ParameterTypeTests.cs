@@ -200,14 +200,15 @@ public sealed class ParameterTypeTests
         ]);
     }
 
-    // The entry names the parameter as the tool wrote it, and the marker's name is found ignoring case.
+    // The entry spells the SQL's @author as Author on purpose: a person edited the sidecar, which the tool never writes
+    // so, and the generator matches the marker's name to the entry's ignoring case.
     [Fact]
     public void Run_ParamMarkerWhoseEntryNamesTheParameterInAnotherCase_GivesItsType()
     {
         var file = PostsFile("-- param: @author -> UserId\n");
         var entry = Entry(file, "ListPosts", [Parameter("Author", Int8, false)], [Column("id")]);
 
-        var run = Run(UserIdSource, [file, Sidecars.Of(file, entry)]);
+        var run = Run(UserIdSource, [file, Sidecars.HandEdited(file, entry)]);
 
         run.ShouldBeClean();
         run.Sources[ParamsModel].ShouldContain("global::App.UserId Author");

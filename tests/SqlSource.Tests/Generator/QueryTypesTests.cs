@@ -49,15 +49,12 @@ public sealed class QueryTypesTests
     [InlineData("10")]
     public void Run_Int4_IsIntUnderEachDriver(string driver)
     {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @id;\n");
+
         var run = Run(
             Driver(driver),
-            GeneratorHarness.UsersFile,
-            Entry(
-                GeneratorHarness.UsersFile,
-                "GetUser",
-                [Parameter("id", Catalog("int4"))],
-                [Column("id", Catalog("int4"))]
-            )
+            file,
+            Entry(file, "GetUser", [Parameter("id", Catalog("int4"))], [Column("id", Catalog("int4"))])
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -333,11 +330,9 @@ public sealed class QueryTypesTests
     [Fact]
     public void Run_ParameterWithoutAType_IsSqlsrc246()
     {
-        var run = Run(
-            [NpgsqlReferences.Npgsql10],
-            GeneratorHarness.UsersFile,
-            Entry(GeneratorHarness.UsersFile, "GetUser", [Parameter("id", null)], null)
-        );
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @id;\n");
+
+        var run = Run([NpgsqlReferences.Npgsql10], file, Entry(file, "GetUser", [Parameter("id", null)], null));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The parameter 'id' has the type 'null', which SqlSource cannot give a C# "
@@ -453,7 +448,7 @@ public sealed class QueryTypesTests
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- name: GetUser\nSELECT 1;\n\n-- name: ListUsers\nSELECT 2;\n"
+            "-- name: GetUser\nSELECT @relation;\n\n-- name: ListUsers\nSELECT 2;\n"
         );
 
         var run = Run(
@@ -528,7 +523,7 @@ public sealed class QueryTypesTests
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- name: GetUser\nSELECT 1;\n\n-- name: DeleteUser\nDELETE FROM users;\n"
+            "-- name: GetUser\nSELECT 1;\n\n-- name: DeleteUser\nDELETE FROM users WHERE id = @id;\n"
         );
 
         var run = Run(
