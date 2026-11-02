@@ -15,7 +15,7 @@ namespace SqlSource.Testing.Generator;
 //   Dialect: the dialect of the project's settings file.
 //   Driver: the references of a run that gives none.
 //   Int, Text: an integer and a string of the engine, as a sidecar describes them.
-//   IntOverrideKey: the name of Int in a `-- type-override:` marker.
+//   IntOverrideKey, TextOverrideKey: the names of Int and Text in a `-- type-override:` marker.
 //
 // Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
@@ -25,7 +25,8 @@ internal sealed record CorpusEngine(
     MetadataReference[] Driver,
     SidecarType Int,
     SidecarType Text,
-    string IntOverrideKey
+    string IntOverrideKey,
+    string TextOverrideKey
 )
 {
     public static readonly CorpusEngine Postgres = new(
@@ -34,7 +35,8 @@ internal sealed record CorpusEngine(
         [NpgsqlReferences.Npgsql10],
         ModelRuns.Int4,
         ModelRuns.Text,
-        "int4"
+        "int4",
+        "text"
     )
     {
         EntryOf = (file, name, parameters, columns) => ModelRuns.Entry(file, name, parameters, columns),
@@ -46,7 +48,8 @@ internal sealed record CorpusEngine(
         [SqlClientReferences.SqlClient7],
         TestSidecars.SqlServer(),
         TestSidecars.SqlServer("nvarchar(100)", 200, 0),
-        "int"
+        "int",
+        "nvarchar"
     )
     {
         EntryOf = MethodRuns.SqlServerEntry,
