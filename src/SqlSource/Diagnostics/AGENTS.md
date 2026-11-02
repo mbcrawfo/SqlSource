@@ -14,8 +14,9 @@ The generator's are in `Diagnostics/SqlDiagnostics.cs`, and the errors of the `s
 
 ## Diagnostics with no position
 
-- **`SQLSRC247`, `SQLSRC248`, `SQLSRC267`, `SQLSRC268`, `SQLSRC273` and `SQLSRC282` have no position**, so they are reported with `Location.None` in an output step and never travel as a `DiagnosticInfo`.
+- **`SQLSRC022`, `SQLSRC023`, `SQLSRC247`, `SQLSRC248`, `SQLSRC267`, `SQLSRC268`, `SQLSRC273` and `SQLSRC282` have no position**, so they are reported with `Location.None` in an output step and never travel as a `DiagnosticInfo`.
 - **`SQLSRC247`, `SQLSRC248`, `SQLSRC267` and `SQLSRC268` are reported once for the project**, each pair by its own driver's probe and its own engine's `UsesPostgresEntries` or `UsesSqlServerEntries`, independently of the other.
+- **`SQLSRC022` and `SQLSRC023` are reported once for the project**, from `ExceptionProbe`, by the output that writes the exceptions' file.
 - **`SQLSRC273` is reported once for each engine** that the collected `CodeGenEngines` of the types' methods holds and whose probe finds no driver.
 - **`SQLSRC282` is reported once for each package** that `LibraryProbe.PackagesBelowTheFloor` gives for a library and engine of the collected `UsedLibraries`: by engine, so that an old NetTopologySuite.IO.SqlServerBytes, which only SQL Server's queries use, never reaches a PostgreSQL query.
 

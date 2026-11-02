@@ -21,10 +21,6 @@ internal static class AttributeSource
 
     public const string MethodLocationMetadataName = "SqlSource.MethodLocation";
 
-    public const string UnexpectedRowCountMetadataName = "SqlSource.UnexpectedRowCountException";
-
-    public const string TransactionRolledBackMetadataName = "SqlSource.TransactionRolledBackException";
-
     public const string ConverterAttributeMetadataName = "SqlSource.SqlSourceConverterAttribute";
 
     public const string PathProperty = "Path";
@@ -64,8 +60,6 @@ internal static class AttributeSource
             ModelTypeMetadataName,
             CollectionTypeMetadataName,
             MethodLocationMetadataName,
-            UnexpectedRowCountMetadataName,
-            TransactionRolledBackMetadataName,
             ConverterAttributeMetadataName
         );
 
@@ -239,64 +233,6 @@ internal static class AttributeSource
                 /// On the type, as private static methods.
                 /// </summary>
                 Private = 3,
-            }
-
-            /// <summary>
-            /// What a generated method throws when a query that must return one row returns none, or more than one.  It
-            /// derives from <see cref="global::System.InvalidOperationException" />, so a caller in another assembly
-            /// that does not know this type catches that.
-            /// </summary>
-            internal sealed class UnexpectedRowCountException : global::System.InvalidOperationException
-            {
-                /// <summary>
-                /// Creates the exception for a query.
-                /// </summary>
-                /// <param name="queryName">The name of the query.</param>
-                /// <param name="moreThanOne">
-                /// <c>true</c> if the query returned more than one row, <c>false</c> if it returned none.
-                /// </param>
-                public UnexpectedRowCountException(string queryName, bool moreThanOne)
-                    : base(
-                        "The query '" + queryName + "' returned " + (moreThanOne ? "more than one row." : "no rows.")
-                    )
-                {
-                    QueryName = queryName;
-                }
-
-                /// <summary>
-                /// The name of the query.
-                /// </summary>
-                public string QueryName { get; }
-            }
-
-            /// <summary>
-            /// What a generated SQL Server method throws when it was given a transaction, threw an exception of its
-            /// own, and an error that the rest of its query raised then rolled the transaction back.  Its inner
-            /// exception is the method's own.  It derives from <see cref="global::System.InvalidOperationException" />,
-            /// so a caller in another assembly that does not know this type catches that.
-            /// </summary>
-            internal sealed class TransactionRolledBackException : global::System.InvalidOperationException
-            {
-                /// <summary>
-                /// Creates the exception for a query.
-                /// </summary>
-                /// <param name="queryName">The name of the query.</param>
-                /// <param name="innerException">The exception that the method threw.</param>
-                public TransactionRolledBackException(string queryName, global::System.Exception innerException)
-                    : base(
-                        "The transaction was rolled back by an error that the query '"
-                            + queryName
-                            + "' raised after the inner exception was thrown.",
-                        innerException
-                    )
-                {
-                    QueryName = queryName;
-                }
-
-                /// <summary>
-                /// The name of the query.
-                /// </summary>
-                public string QueryName { get; }
             }
 
             /// <summary>

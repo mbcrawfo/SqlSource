@@ -36,11 +36,6 @@ public sealed class AttributeConflictTests
     [InlineData("internal class Sample { object o = SqlSource.SqlLocation.Direct; }", "(1,36)-(1,57)")]
     [InlineData("internal class Sample { object o = typeof(SqlSource.GeneratorOutput); }", "(1,53)-(1,68)")]
     [InlineData("internal class Sample { object o = SqlSource.GeneratorOutput.Sql; }", "(1,36)-(1,61)")]
-    [InlineData("internal class Sample { object o = typeof(SqlSource.UnexpectedRowCountException); }", "(1,53)-(1,80)")]
-    [InlineData(
-        "internal class Sample { object o = typeof(SqlSource.TransactionRolledBackException); }",
-        "(1,53)-(1,83)"
-    )]
     [InlineData(
         "internal static class C { [SqlSource.SqlSourceConverter] internal static int F(long v) => (int)v; }",
         "(1,38)-(1,56)"

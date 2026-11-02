@@ -14,11 +14,11 @@ namespace SqlSource.Tests.Generator;
 public sealed class GeneratedSourceTests
 {
     [Fact]
-    public void Run_NoAttributedType_EmitsOnlyTheAttribute()
+    public void Run_NoAttributedType_EmitsOnlyTheAttributeAndTheExceptions()
     {
         var run = GeneratorHarness.Run(OutputKind.Sql, "public class Sample;", GeneratorHarness.UsersFile);
 
-        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs"]);
+        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs", "SqlSource-Exceptions.g.cs"], ignoreOrder: true);
         run.Sources["SqlSourceGenerateAttribute.g.cs"].ShouldBe(AttributeSource.Text);
         run.ShouldBeClean();
     }
@@ -58,7 +58,10 @@ public sealed class GeneratedSourceTests
         );
 
         run.ShouldBeClean();
-        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs", GeneratorHarness.SampleFile], ignoreOrder: true);
+        run.Sources.Keys.ShouldBe(
+            ["SqlSourceGenerateAttribute.g.cs", "SqlSource-Exceptions.g.cs", GeneratorHarness.SampleFile],
+            ignoreOrder: true
+        );
         run.Sources[GeneratorHarness.SampleFile]
             .ShouldBe(
                 $$"""

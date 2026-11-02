@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -61,70 +60,6 @@ public sealed partial class AttributeSourceTests
             .Select(match => "SqlSource." + match.Groups["name"].Value);
 
         AttributeSource.GeneratedTypes.ShouldBe(declared, ignoreOrder: true);
-    }
-
-    // The file goes into every project that references the package, so a project on an older language gets it too.
-    [Fact]
-    public void Text_CompiledAsCSharp73_DeclaresUnexpectedRowCountException()
-    {
-        var compilation = CompileText();
-
-        compilation.GetDiagnostics(TestContext.Current.CancellationToken).ShouldBeEmpty();
-        var exception = compilation
-            .GetTypeByMetadataName(AttributeSource.UnexpectedRowCountMetadataName)
-            .ShouldNotBeNull();
-        exception.BaseType!.ToDisplayString().ShouldBe("System.InvalidOperationException");
-    }
-
-    [Theory]
-    [InlineData(false, "The query 'GetUser' returned no rows.")]
-    [InlineData(true, "The query 'GetUser' returned more than one row.")]
-    public void UnexpectedRowCountException_Created_NamesTheQueryAndWhatWentWrong(bool moreThanOne, string message)
-    {
-        using var image = new MemoryStream();
-        CompileText().Emit(image, cancellationToken: TestContext.Current.CancellationToken).Success.ShouldBeTrue();
-        var type = Assembly
-            .Load(image.ToArray())
-            .GetType(AttributeSource.UnexpectedRowCountMetadataName)
-            .ShouldNotBeNull();
-
-        var exception = (InvalidOperationException)Activator.CreateInstance(type, "GetUser", moreThanOne)!;
-
-        exception.Message.ShouldBe(message);
-        type.GetProperty("QueryName")!.GetValue(exception).ShouldBe("GetUser");
-    }
-
-    [Fact]
-    public void Text_CompiledAsCSharp73_DeclaresTransactionRolledBackException()
-    {
-        var compilation = CompileText();
-
-        compilation.GetDiagnostics(TestContext.Current.CancellationToken).ShouldBeEmpty();
-        var exception = compilation
-            .GetTypeByMetadataName(AttributeSource.TransactionRolledBackMetadataName)
-            .ShouldNotBeNull();
-        exception.BaseType!.ToDisplayString().ShouldBe("System.InvalidOperationException");
-    }
-
-    [Fact]
-    public void TransactionRolledBackException_Created_NamesTheQueryAndKeepsTheInnerException()
-    {
-        using var image = new MemoryStream();
-        CompileText().Emit(image, cancellationToken: TestContext.Current.CancellationToken).Success.ShouldBeTrue();
-        var type = Assembly
-            .Load(image.ToArray())
-            .GetType(AttributeSource.TransactionRolledBackMetadataName)
-            .ShouldNotBeNull();
-        var inner = new FormatException("The value is not a number.");
-
-        var exception = (InvalidOperationException)Activator.CreateInstance(type, "GetUser", inner)!;
-
-        exception.Message.ShouldBe(
-            "The transaction was rolled back by an error that the query 'GetUser' raised after the inner exception "
-                + "was thrown."
-        );
-        exception.InnerException.ShouldBeSameAs(inner);
-        type.GetProperty("QueryName")!.GetValue(exception).ShouldBe("GetUser");
     }
 
     // A library's converters have to be found from the project that references it, so the attribute stays in metadata.

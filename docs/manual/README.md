@@ -24,7 +24,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Run several queries in a transaction | [The recipe](recipes.md#queries-in-a-transaction) |
 | Use the queries with Dapper or ADO.NET | [The recipe](recipes.md#dapper-and-adonet) |
 | Read rows into the models with Dapper | [The recipe](recipes.md#models-through-dapper) |
-| Let a test project see the internals of another project | [Projects that share internals](generator.md#projects-that-share-internals) |
+| Let a test project see the internals of another project, or catch another project's exceptions by type | [Projects that share internals](generator.md#projects-that-share-internals), [public exceptions](settings.md#public-exceptions), or the recipes for [a test project](recipes.md#test-project-sees-internals) and [two data projects](recipes.md#share-the-exceptions) |
 | Install the tool and describe my queries | [Install the tool](tool.md#install-the-tool) |
 | Give the tool a connection, or work with several databases | [Connections](tool.md#connections), or the [recipe](recipes.md#use-several-databases) |
 | Keep the sidecars current after a schema change | [After a schema change](tool.md#after-a-schema-change) |

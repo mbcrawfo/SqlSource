@@ -41,7 +41,13 @@ public sealed class GeneratedFileNameTests
 
         run.ShouldBeClean();
         run.Sources.Keys.ShouldBe(
-            ["SqlSourceGenerateAttribute.g.cs", "App.Sample.g.cs", "App.Sample-1.g.cs", "Other.Sample.g.cs"],
+            [
+                "SqlSourceGenerateAttribute.g.cs",
+                "SqlSource-Exceptions.g.cs",
+                "App.Sample.g.cs",
+                "App.Sample-1.g.cs",
+                "Other.Sample.g.cs",
+            ],
             ignoreOrder: true
         );
     }
@@ -79,8 +85,8 @@ public sealed class GeneratedFileNameTests
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
-        run.Sources.Count.ShouldBe(5);
-        run.Sources.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count().ShouldBe(5);
+        run.Sources.Count.ShouldBe(6);
+        run.Sources.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count().ShouldBe(6);
         run.Sources.Keys.ShouldContain("App.Other.g.cs");
         run.Sources.Keys.ShouldNotContain("App.Sample.g.cs");
         run.Sources.Values.Count(source => source.Contains("public const string GetUser", StringComparison.Ordinal))
@@ -104,7 +110,7 @@ public sealed class GeneratedFileNameTests
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
-        run.Sources.Count.ShouldBe(2);
+        run.Sources.Count.ShouldBe(3);
         run.Sources["SqlSourceGenerateAttribute.g.cs"].ShouldBe(AttributeSource.Text);
     }
 
@@ -144,7 +150,10 @@ public sealed class GeneratedFileNameTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs", "Sample.g.cs"], ignoreOrder: true);
+        run.Sources.Keys.ShouldBe(
+            ["SqlSourceGenerateAttribute.g.cs", "SqlSource-Exceptions.g.cs", "Sample.g.cs"],
+            ignoreOrder: true
+        );
         run.Sources["Sample.g.cs"].ShouldContain("public const string GetUser");
         run.CompilationErrors.ShouldHaveSingleItem().ShouldStartWith("CS0579 /app/Other/Sample.cs(1,2)");
     }

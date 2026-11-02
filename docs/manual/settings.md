@@ -841,6 +841,22 @@ To turn the default off and list the files yourself:
 
 Turning the default off turns it off for sidecars too, so list them as well, as the example does.  A file the project includes is only handed to the compiler.  Which of them belong to a type is the type's [`Path`](#setting-path), and a file no type claims is ignored.
 
+<a id="public-exceptions"></a>
+
+## Public exceptions
+
+```xml
+<PropertyGroup>
+    <SqlSourcePublicExceptions>true</SqlSourcePublicExceptions>
+</PropertyGroup>
+```
+
+`SqlSourcePublicExceptions` makes the two exceptions that the query methods throw, [`UnexpectedRowCountException`](generator.md#unexpected-row-count) and [`TransactionRolledBackException`](generator.md#transaction-rolled-back), `public` in the project that sets it, so that every project that references it catches them by type.  Without it they are `internal`, and only a project that the project grants `InternalsVisibleTo` sees them.  `true` is matched ignoring case; any other value, and none, leaves them `internal`.
+
+- **It is a property of the project file**, and not a setting of a settings file: the exceptions are one pair of types for the whole project.
+- **A project that sees the exceptions of a project it references** uses those and gets none of its own, so the property changes nothing there: see [projects that share internals](generator.md#projects-that-share-internals).
+- **Leave it off in a library you publish**, unless its callers must catch the exceptions by type.  Public exceptions are part of its public API, and an app that references two such libraries sees two copies: it gets [SQLSRC022](diagnostics.md#sqlsrc022) if it uses SqlSource, and an error that the name is ambiguous where it names one if it does not.
+
 <a id="settings-files"></a>
 
 ## Settings files
@@ -882,7 +898,7 @@ A settings file is a file named `sqlsource.json`, in any folder.  It sets the se
 
 **Which files are checked.**  The build reads each settings file that the search of some `.sql` file or C# file of the project reaches, whether or not a type claims that `.sql` file, and reports each mistake in it at its file, line and column.  A `sqlsource.json` beyond the first `"root": true` is never read, so it cannot fail a build.  The C# files that the build writes itself, into its output and intermediate folders, reach no settings file, wherever those folders are.  Nor do the C# files that a NuGet package adds to your project, as Polyfill does, from the folder where NuGet keeps its packages, so a broken `sqlsource.json` above that folder, in your home folder, say, is not read on their account.  Your own `.sql` and C# files still reach such a file when your project is in a folder below it, unless a `"root": true` stands between them, and its mistakes then fail the build and `sqlsource describe`: put `"root": true` in the settings file of your project's folder, or of your repository's.  A C# file that your project lists itself from another folder still reaches the settings files of its own folder.  A value that is wrong is not set by its file, so a farther settings file, or the default, gives the setting meanwhile.  The `sqlsource` tool reads the same settings files.  It reports the mistakes of [SQLSRC015](diagnostics.md#sqlsrc015) to [SQLSRC018](diagnostics.md#sqlsrc018) as the build does, and a value of `dialect`, `output` or `database` that is not valid, once in a run however many projects reach the file.  The build reports a value that is not valid for every key but `database`, which only the tool reads.
 
-**In the build**, SqlSource keeps a settings file out of the output and publish folders where the SDK would copy it, as the Web SDK copies every `.json` file of a web project.  A copy rule of your own still copies it: a rule written for `appsettings.json`, such as `<None Update="**/*.json" CopyToOutputDirectory="PreserveNewest" />`, copies every `sqlsource.json` of the project too.  So name the files such a rule copies, as `Update="appsettings*.json"` does, or follow it with `<None Update="**/sqlsource.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />`.  Adding, deleting, moving or editing one makes the next build compile again, and an IDE that builds the project reads the same files.  The project file holds no setting: an MSBuild property or item metadata named after a setting is not read, and nothing reports it, so move such a value to a settings file.  The one MSBuild property of SqlSource that a project sets is [`SqlSourceIncludeFiles`](#included-files), which says which `.sql` files are included.
+**In the build**, SqlSource keeps a settings file out of the output and publish folders where the SDK would copy it, as the Web SDK copies every `.json` file of a web project.  A copy rule of your own still copies it: a rule written for `appsettings.json`, such as `<None Update="**/*.json" CopyToOutputDirectory="PreserveNewest" />`, copies every `sqlsource.json` of the project too.  So name the files such a rule copies, as `Update="appsettings*.json"` does, or follow it with `<None Update="**/sqlsource.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />`.  Adding, deleting, moving or editing one makes the next build compile again, and an IDE that builds the project reads the same files.  The project file holds no setting: an MSBuild property or item metadata named after a setting is not read, and nothing reports it, so move such a value to a settings file.  The MSBuild properties of SqlSource that a project sets are [`SqlSourceIncludeFiles`](#included-files), which says which `.sql` files are included, and [`SqlSourcePublicExceptions`](#public-exceptions), which makes the exceptions of the query methods public.
 
 See: [SQLSRC015](diagnostics.md#sqlsrc015), a file that is not a JSON object; [SQLSRC016](diagnostics.md#sqlsrc016), a key that is not known; [SQLSRC017](diagnostics.md#sqlsrc017), a key written twice; [SQLSRC018](diagnostics.md#sqlsrc018), a value of the wrong JSON type; [SQLSRC019](diagnostics.md#sqlsrc019), a value that is not valid; [SQLSRC020](diagnostics.md#sqlsrc020), a key repeated in `typeOverrides`, `columnTypes` or `libraryTypes`.
 

@@ -224,6 +224,32 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the names of the assemblies, in ordinal order, joined by ", ".
+    public static readonly DiagnosticDescriptor ExceptionsSeenTwice = new(
+        id: "SQLSRC022",
+        title: "Exceptions are seen in two assemblies",
+        messageFormat: "This project sees UnexpectedRowCountException or TransactionRolledBackException in more than "
+            + "one referenced assembly: {0}.  Use SqlSource in one project that the others reference and that grants "
+            + "them InternalsVisibleTo, so that they all use its exceptions.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc022",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor ExceptionsOfAnotherShape = new(
+        id: "SQLSRC023",
+        title: "Exceptions come from another version of SqlSource",
+        messageFormat: "The UnexpectedRowCountException and TransactionRolledBackException that this project sees in "
+            + "{0} are not those of this version of SqlSource.  Use the same version of SqlSource in both projects.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc023",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor UnterminatedQuote = new(
         id: "SQLSRC101",
         title: "Quote is not closed",
@@ -1069,6 +1095,8 @@ internal static class SqlDiagnostics
             SettingsFileInvalidValue,
             SettingsFileRepeatedKey,
             CompilerTooOld,
+            ExceptionsSeenTwice,
+            ExceptionsOfAnotherShape,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,

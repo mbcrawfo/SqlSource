@@ -14,6 +14,7 @@ Short answers to "how do I...", each a sample you can copy and a link to the pag
 - [Run the models through Dapper](#models-through-dapper)
 - [Choose a table name at run time](#table-name-at-run-time)
 - [Let a test project see the internals of the main project](#test-project-sees-internals)
+- [Share the exceptions between two data projects and an app](#share-the-exceptions)
 
 <a id="folder-with-another-dialect"></a>
 
@@ -716,4 +717,44 @@ using SqlSource;
 internal static partial class TestQueries;
 ```
 
+```csharp
+// App.Tests catches the exception that a method of App throws by its type
+await Should.ThrowAsync<UnexpectedRowCountException>(() => connection.GetActiveUser(new GetActiveUserParams(email)));
+```
+
+The test project uses App's `UnexpectedRowCountException` and `TransactionRolledBackException`, whether it uses SqlSource or not, and the attribute and enums of each project do not conflict.
+
 Rules: [projects that share internals](generator.md#projects-that-share-internals), and [known issues](generator.md#known-issues) for an editor that still shows the warning.
+
+<a id="share-the-exceptions"></a>
+
+## Share the exceptions between two data projects and an app
+
+```xml
+<!-- Data.Shared.csproj: references the SqlSource package, and has no query -->
+<ItemGroup>
+    <InternalsVisibleTo Include="Data.Orders" />
+    <InternalsVisibleTo Include="Data.Users" />
+    <InternalsVisibleTo Include="App" />
+</ItemGroup>
+```
+
+```xml
+<!-- Data.Orders.csproj and Data.Users.csproj: each references the SqlSource package and has its queries -->
+<ItemGroup>
+    <ProjectReference Include="../Data.Shared/Data.Shared.csproj" />
+    <InternalsVisibleTo Include="App" />
+</ItemGroup>
+```
+
+```csharp
+// App, which sees the internals of all three
+catch (UnexpectedRowCountException exception)
+{
+    // thrown by a method of Data.Orders or of Data.Users
+}
+```
+
+Each data project uses the shared project's exceptions instead of writing its own, so the app sees one copy and catches what a method of either throws by its type.  Without the shared project, an app that uses SqlSource and sees the internals of both gets [SQLSRC022](diagnostics.md#sqlsrc022).
+
+Rules: [projects that share internals](generator.md#projects-that-share-internals), [SQLSRC022](diagnostics.md#sqlsrc022).

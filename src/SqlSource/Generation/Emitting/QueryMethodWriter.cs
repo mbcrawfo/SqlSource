@@ -38,6 +38,13 @@ internal static class QueryMethodWriter
 
     private const string RolledBackType = "global::SqlSource.TransactionRolledBackException";
 
+    // The two exceptions as their documentation names them: a documentation ID, which the compiler does not bind.  A
+    // project that uses a referenced copy of the exceptions and references another assembly's copy too would find a
+    // bound cref ambiguous (CS0419), since a cref is bound without regard to accessibility.
+    private const string ExceptionCref = "T:SqlSource.UnexpectedRowCountException";
+
+    private const string RolledBackCref = "T:SqlSource.TransactionRolledBackException";
+
     private const string CompletedTransactionType = "global::System.InvalidOperationException";
 
     // The lines around the assignment of a command's SQL when its tokens build it.
@@ -298,13 +305,13 @@ internal static class QueryMethodWriter
             XmlDocWriter.AppendException(
                 builder,
                 indent,
-                ExceptionType,
+                ExceptionCref,
                 "The query returned no rows, or more than one."
             );
         }
         else if (method.Shape == ResultShape.OneOptional)
         {
-            XmlDocWriter.AppendException(builder, indent, ExceptionType, "The query returned more than one row.");
+            XmlDocWriter.AppendException(builder, indent, ExceptionCref, "The query returned more than one row.");
         }
 
         if (method.Engine == DatabaseEngine.SqlServer)
@@ -322,7 +329,7 @@ internal static class QueryMethodWriter
             XmlDocWriter.AppendException(
                 builder,
                 indent,
-                RolledBackType,
+                RolledBackCref,
                 "The query threw an exception of its own, its inner exception, and an error that the rest of the "
                     + "query raised rolled back the transaction."
             );

@@ -42,11 +42,13 @@ public sealed class GeneratedSourceWarningTests
     [InlineData(LanguageVersion.CSharp7_3)]
     [InlineData(LanguageVersion.CSharp8)]
     [InlineData(LanguageVersion.CSharp9)]
-    public void Run_ProjectOnAnOlderLanguageVersion_CompilesTheGeneratedAttribute(LanguageVersion languageVersion)
+    public void Run_ProjectOnAnOlderLanguageVersion_CompilesTheAttributeAndTheExceptions(
+        LanguageVersion languageVersion
+    )
     {
-        // The attribute goes into every project that references the package, including one that targets an older
-        // framework and so defaults to an older language.  Such a project must get SQLSRC003 if it uses the
-        // attribute, not a compiler error in a file it did not write.
+        // The attribute and the exceptions go into every project that references the package, including one that
+        // targets an older framework and so defaults to an older language.  Such a project must get SQLSRC003 if it
+        // uses the attribute, not a compiler error in a file it did not write.
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, "public class Sample { }")],
@@ -54,7 +56,7 @@ public sealed class GeneratedSourceWarningTests
             languageVersion: languageVersion
         );
 
-        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs"]);
+        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs", "SqlSource-Exceptions.g.cs"], ignoreOrder: true);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
     }

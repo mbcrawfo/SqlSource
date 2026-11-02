@@ -124,8 +124,8 @@ internal static class GeneratorHarness
             compilation = compilation.WithOptions(compilation.Options.WithSpecificDiagnosticOptions(diagnosticOptions));
         }
 
-        // The properties are what MSBuild tells the generator, for the tests of SqlSourceBuildFolders and
-        // SqlSourceTransitivePackageAssemblies.
+        // The properties are what MSBuild tells the generator, for the tests of SqlSourceBuildFolders,
+        // SqlSourceTransitivePackageAssemblies and SqlSourcePublicExceptions.
         var options = new TestOptionsProvider(properties);
         var projectSettings = ProjectSettings(output, dialect, generatorParameters, settings);
         var files = WithProjectSettings(sqlFiles, projectSettings);
@@ -300,15 +300,19 @@ internal static class GeneratorHarness
     public static MetadataReference CreateReference(OutputKind? output, string assemblyName, string source) =>
         CreateProject(output, assemblyName, source).Reference;
 
-    // The same with the .sql files the generator reads, the references and the dialect of the project, and the code the
-    // generator gave it by name.  The output and the dialect are its settings file, as a run's are.
+    // The same with the .sql files the generator reads, the references, the dialect and the properties of the project,
+    // and the code the generator gave it by name.  The output and the dialect are its settings file, as a run's are.
+    // The reference is the compiled image, as a build references a project, or, with compilationReference, the
+    // compilation itself, as an IDE references a project of the same solution.
     public static (MetadataReference Reference, IReadOnlyDictionary<string, string> Sources) CreateProject(
         OutputKind? output,
         string assemblyName,
         string source,
         SqlFile[]? sqlFiles = null,
         MetadataReference[]? references = null,
-        string? dialect = null
+        string? dialect = null,
+        IReadOnlyDictionary<string, string?>? properties = null,
+        bool compilationReference = false
     )
     {
         var compilation = CreateCompilation(
@@ -319,7 +323,7 @@ internal static class GeneratorHarness
         var driver = CreateDriver(
                 WithProjectSettings(sqlFiles ?? [], ProjectSettings(output, dialect))
                     .Select(file => file.ToAdditionalText()),
-                new TestOptionsProvider()
+                new TestOptionsProvider(properties)
             )
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
@@ -330,7 +334,25 @@ internal static class GeneratorHarness
 
         using var image = new MemoryStream();
         updated.Emit(image, cancellationToken: TestContext.Current.CancellationToken).Success.ShouldBeTrue();
-        return (MetadataReference.CreateFromImage(image.ToArray()), SourcesOf(driver));
+        return (
+            compilationReference ? updated.ToMetadataReference() : MetadataReference.CreateFromImage(image.ToArray()),
+            SourcesOf(driver)
+        );
+    }
+
+    // The compiler's warnings and errors for the source alone, against the references, as a build of a project that
+    // does not use SqlSource reports them: the generator does not run.
+    public static Task<IReadOnlyList<string>> CompileAsync(string source, MetadataReference[] references)
+    {
+        var compilation = CreateCompilation([new SourceFile(SourcePath, source)], references: references);
+        IReadOnlyList<string> diagnostics =
+        [
+            .. compilation
+                .GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning)
+                .Select(Format),
+        ];
+        return Task.FromResult(diagnostics);
     }
 
     // The compiler's warnings and errors for the source together with the generated code, as a build of the project
@@ -343,7 +365,8 @@ internal static class GeneratorHarness
         MetadataReference[] references,
         bool warningsAsErrors = false,
         bool packageAnalyzers = true,
-        string? dialect = null
+        string? dialect = null,
+        IReadOnlyDictionary<string, string?>? properties = null
     )
     {
         var (diagnostics, _) = await BuildProjectAsync(
@@ -353,12 +376,14 @@ internal static class GeneratorHarness
             references,
             warningsAsErrors,
             packageAnalyzers,
-            dialect
+            dialect,
+            properties
         );
         return diagnostics;
     }
 
-    // The same, with the code the generator gave the project by name.
+    // The same, with the code the generator gave the project by name.  The properties are what MSBuild tells the
+    // generator.
     public static async Task<(
         IReadOnlyList<string> Diagnostics,
         IReadOnlyDictionary<string, string> Sources
@@ -369,7 +394,8 @@ internal static class GeneratorHarness
         MetadataReference[] references,
         bool warningsAsErrors = false,
         bool packageAnalyzers = true,
-        string? dialect = null
+        string? dialect = null,
+        IReadOnlyDictionary<string, string?>? properties = null
     )
     {
         var compilation = CreateCompilation([new SourceFile(SourcePath, source)], references: references);
@@ -382,7 +408,7 @@ internal static class GeneratorHarness
 
         var driver = CreateDriver(
                 WithProjectSettings(sqlFiles, ProjectSettings(output, dialect)).Select(file => file.ToAdditionalText()),
-                new TestOptionsProvider()
+                new TestOptionsProvider(properties)
             )
             .RunGeneratorsAndUpdateCompilation(
                 compilation,

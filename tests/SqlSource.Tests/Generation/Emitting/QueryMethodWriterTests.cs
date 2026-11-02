@@ -112,7 +112,7 @@ public sealed class QueryMethodWriterTests
                     The command's timeout in seconds, or null for the driver's.</param>
                         /// <param name="cancellationToken">Cancels the query.</param>
                         /// <returns>The row, or null when there is none.</returns>
-                        /// <exception cref="global::SqlSource.UnexpectedRowCountException">↩
+                        /// <exception cref="T:SqlSource.UnexpectedRowCountException">↩
                     The query returned more than one row.</exception>
                         public static async global::System.Threading.Tasks.Task<global::App.GetUserDto?> GetUser(
                             this global::System.Data.Common.DbConnection connection,
@@ -255,7 +255,7 @@ public sealed class QueryMethodWriterTests
         var text = Write(GetUser with { Shape = ResultShape.One });
 
         text.ShouldContain(
-            "/// <exception cref=\"global::SqlSource.UnexpectedRowCountException\">"
+            "/// <exception cref=\"T:SqlSource.UnexpectedRowCountException\">"
                 + "The query returned no rows, or more than one.</exception>\n"
         );
         text.ShouldNotContain("return null;");
@@ -272,7 +272,7 @@ public sealed class QueryMethodWriterTests
         var text = Write(GetUser with { Shape = ResultShape.OneOptional });
 
         text.ShouldContain(
-            "/// <exception cref=\"global::SqlSource.UnexpectedRowCountException\">"
+            "/// <exception cref=\"T:SqlSource.UnexpectedRowCountException\">"
                 + "The query returned more than one row.</exception>\n"
         );
         text.ShouldContain("            return null;\n");
@@ -513,7 +513,7 @@ public sealed class QueryMethodWriterTests
                 }
             )
             .ShouldContain(
-                "/// <exception cref=\"global::SqlSource.TransactionRolledBackException\">"
+                "/// <exception cref=\"T:SqlSource.TransactionRolledBackException\">"
                     + "The query threw an exception of its own, its inner exception, and an error that the rest of "
                     + "the query raised rolled back the transaction.</exception>\n"
             );

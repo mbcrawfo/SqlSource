@@ -5,6 +5,10 @@ namespace SqlSource.Generation;
 /// </summary>
 internal static class TrackingNames
 {
+    public const string ExceptionProbe = nameof(ExceptionProbe);
+
+    public const string PublicExceptions = nameof(PublicExceptions);
+
     public const string SettingsFile = nameof(SettingsFile);
 
     public const string SettingsFiles = nameof(SettingsFiles);

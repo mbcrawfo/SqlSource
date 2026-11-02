@@ -23,6 +23,8 @@ SQLSRC018 | SqlSource | Error | Settings file value has the wrong type
 SQLSRC019 | SqlSource | Error | Settings file value is not valid
 SQLSRC020 | SqlSource | Error | Settings file entry repeats a key
 SQLSRC021 | SqlSource | Error | Compiler is too old
+SQLSRC022 | SqlSource | Error | Exceptions are seen in two assemblies
+SQLSRC023 | SqlSource | Error | Exceptions come from another version of SqlSource
 SQLSRC101 | SqlSource | Error | Quote is not closed
 SQLSRC102 | SqlSource | Error | Comment is not closed
 SQLSRC103 | SqlSource | Error | Query name is not valid
