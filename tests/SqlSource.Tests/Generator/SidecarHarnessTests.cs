@@ -224,17 +224,15 @@ public sealed class SidecarHarnessTests
     }
 
     [Fact]
-    public void Current_QueryWithAMarkerOnlyParameter_ListsItLast()
+    public void Current_QueryWithAMarkerOnlyParameter_ListsItLastWithItsNullability()
     {
-        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Q\n-- param: @z int4\nSELECT @a;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Q\n-- param: @z int4 null\nSELECT @a;\n");
 
         var sidecar = Sidecars.Current(file, SqlDialect.PostgreSql, "Q");
 
-        SidecarReader
-            .Read(sidecar.Text!)
-            .Sidecar!.Queries.Single()
-            .Parameters.Select(parameter => parameter.Name)
-            .ShouldBe(["a", "z"]);
+        var parameters = SidecarReader.Read(sidecar.Text!).Sidecar!.Queries.Single().Parameters;
+        parameters.Select(parameter => parameter.Name).ShouldBe(["a", "z"]);
+        parameters.Select(parameter => parameter.Nullable).ShouldBe([null, true]);
     }
 
     // An entry of the query for its hash under PostgreSQL, against the engine postgres.
