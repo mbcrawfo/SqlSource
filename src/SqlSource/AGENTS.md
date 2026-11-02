@@ -2,17 +2,18 @@
 
 How the generator works: [`docs/architecture/generator.md`](../../docs/architecture/generator.md).
 
-The generator is loaded into the C# compiler of whoever consumes it, which constrains what the project may target and reference.
+The generator runs inside its consumers' C# compiler, which constrains what the project may target and reference.
 
 - **`netstandard2.0` only.**  The compiler loads Roslyn components built for `netstandard2.0`.  Do not add or change target frameworks in `SqlSource.csproj`.
-- **The Roslyn pin is the support floor.**  `Microsoft.CodeAnalysis.CSharp` is pinned to 4.14.0 in `Directory.Packages.props`, the compiler in the .NET SDK 9.0.300 and Visual Studio 2022 17.14.  An API added after 4.14.0 means raising the pin, which drops consumers: ask the user first, and update the support target in `README.md` in the same commit.
-- **Language features need runtime support.**  `LangVersion` is `preview`, but `netstandard2.0` lacks the types behind some features.  One other than `init` and records (`required` members, say) needs a polyfill in `Polyfills/`, beside `IsExternalInit.cs`, in the namespace of the type it stands in for; `.editorconfig` turns IDE0130 off there.
+- **The Roslyn pin is the support floor.**  `Microsoft.CodeAnalysis.CSharp` is pinned to 4.14.0 in `Directory.Packages.props`.  An API added after 4.14.0 means raising the pin, which drops consumers: ask the user first, and update the support target in `README.md` in the same commit.
+- **Language features need runtime support.**  One whose types `netstandard2.0` lacks, other than `init` and records (`required` members, say), needs a polyfill beside `Polyfills/IsExternalInit.cs`, in the namespace of the type it stands in for.
 - **Existing `ImmutableArray` calls stay.**  `Create`, `Empty`, builders and `ToImmutableArray` become collection expressions only with a measurement (TD-0094), never in bulk.  New code may use one.
 - **Models need value equality.**  A type the pipeline caches is a record, and holds its collections in `EquatableArray<T>`, never `ImmutableArray<T>`.
-- **Performance is a requirement.**  The generator runs in the compiler and the IDE, on every edit.  Allocate nothing per character or line, copy text in runs, rent buffers from `ArrayPool<T>`, and make a string only where a result needs one.  The allocation budgets are tests, and `tests/AGENTS.md` holds their rule.
-- **A change to a hot path states its time and allocation, before and after, in its pull request**, from a `Stopwatch` loop over a `Release` build, since there is no benchmark project.
-- **Do not reference `System.Memory`, `System.Buffers` or `System.Collections.Immutable` directly.**  They arrive with Roslyn 4.14.0 at the versions the compiler host loads; a newer one can fail to load there.
-- **Keep Roslyn references private.**  Package references here use `PrivateAssets="all"` so that nothing flows to the projects that reference the generator.
+- **Performance is a requirement**, in the compiler and IDE, on every edit.  Allocate nothing per character or line, copy text in runs, rent buffers from `ArrayPool<T>`, and make a string only where a result needs one.  The allocation budgets are tests, and `tests/AGENTS.md` holds their rule.
+- **A change to a hot path states its time and allocation, before and after, in its pull request**, from a `Stopwatch` loop over a `Release` build.
+- **Do not reference `System.Memory`, `System.Buffers` or `System.Collections.Immutable` directly.**  They come with Roslyn at the versions the compiler host loads; a newer one can fail to load.
+- **Keep package references private**, with `PrivateAssets="all"`, so nothing flows to the projects that reference the generator.
+- **A switch expression over an enum names every member, with no `_ =>` arm**, so a new member is CS8509 at each switch; nothing catches a discard yet (TD-0096).  Every `DatabaseEngine` decision is one: see [adding an engine](../../docs/architecture/generator.md#adding-a-database-engine).
 
 ## The pipeline
 

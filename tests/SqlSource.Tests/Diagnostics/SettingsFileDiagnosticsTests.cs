@@ -40,17 +40,6 @@ public sealed class SettingsFileDiagnosticsTests
     }
 
     [Fact]
-    public void Create_KindThatIsNoMember_NamesItsNumberAndNoOtherKind()
-    {
-        var error = new SettingsFileError((SettingsFileErrorKind)99, new TextSpan(0, 1), null, null, null);
-
-        var diagnostic = Create(error);
-
-        diagnostic.Descriptor.ShouldBe(SqlDiagnostics.SettingsFileNotAnObject);
-        Message(diagnostic).ShouldBe("This settings file is not one JSON object: it has an error of kind 99");
-    }
-
-    [Fact]
     public void Create_Location_IsTheLineAndColumnOfTheSpan()
     {
         const string Text = /*lang=json,strict*/

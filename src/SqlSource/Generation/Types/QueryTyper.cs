@@ -260,7 +260,7 @@ internal static class QueryTyper
             SettingPlaceKind.FileHeader => "a -- column: marker in the file header",
             SettingPlaceKind.Query => QueryColumnMarker,
             SettingPlaceKind.SettingsFile => "the columnTypes of the settings file " + place.Path,
-            SettingPlaceKind.Attribute or _ => "the attribute",
+            SettingPlaceKind.Attribute => "the attribute",
         };
 
     // The query's parameter of the name, ignoring case, when its marker gives it a C# type, or null.
@@ -294,12 +294,20 @@ internal static class QueryTyper
         Typing typing
     )
     {
-        // A type of an engine this version does not know has no base map: its error is the map's, and no library's row
-        // gives it a type.
-        if (type is not (PostgresType or SqlServerType))
+        DatabaseEngine engine;
+        switch (type)
         {
-            DiagnosticInfo? none = null;
-            return TypeOf(type, owner, name, typing, ref none);
+            case PostgresType:
+                engine = DatabaseEngine.PostgreSql;
+                break;
+            case SqlServerType:
+                engine = DatabaseEngine.SqlServer;
+                break;
+            default:
+                // A type of an engine this version does not know has no base map: its error is the map's, and no
+                // library's row gives it a type.
+                DiagnosticInfo? none = null;
+                return TypeOf(type, owner, name, typing, ref none);
         }
 
         var mapping = MappingOf(typing.MappedTypes, clrType, key, place);
@@ -320,7 +328,6 @@ internal static class QueryTyper
             );
         }
 
-        var engine = type is SqlServerType ? DatabaseEngine.SqlServer : DatabaseEngine.PostgreSql;
         typing.Diagnostics.Add(Diagnose(mapping, MessageSubject.Of(owner, name), type.Name, typing, engine));
         return null;
     }
@@ -351,7 +358,7 @@ internal static class QueryTyper
             MappedTypeStatus.Found => TypeMappingKind.Mapped,
             MappedTypeStatus.NotAccessible => TypeMappingKind.MappedTypeNotAccessible,
             MappedTypeStatus.NotAPropertyType => TypeMappingKind.MappedTypeNotAPropertyType,
-            MappedTypeStatus.NotFound or MappedTypeStatus.Ambiguous or _ => TypeMappingKind.MappedTypeNotFound,
+            MappedTypeStatus.NotFound or MappedTypeStatus.Ambiguous => TypeMappingKind.MappedTypeNotFound,
         };
         if (kind != TypeMappingKind.Mapped)
         {
@@ -678,13 +685,23 @@ internal static class QueryTyper
                     + key
                     + "=NpgsqlTypes.NpgsqlRange<T> with the data source's EnableUnmappedTypes()"
             ),
-            TypeMappingKind.NeedsDriver when engine == DatabaseEngine.SqlServer => DiagnosticInfo.Create(
-                SqlDiagnostics.TypeNeedsSqlClient,
-                at,
-                subject,
-                typeName,
-                "Reference Microsoft.Data.SqlClient"
-            ),
+            TypeMappingKind.NeedsDriver => engine switch
+            {
+                DatabaseEngine.PostgreSql => DiagnosticInfo.Create(
+                    SqlDiagnostics.TypeNeedsNpgsql,
+                    at,
+                    subject,
+                    typeName,
+                    "Reference Npgsql"
+                ),
+                DatabaseEngine.SqlServer => DiagnosticInfo.Create(
+                    SqlDiagnostics.TypeNeedsSqlClient,
+                    at,
+                    subject,
+                    typeName,
+                    "Reference Microsoft.Data.SqlClient"
+                ),
+            },
             TypeMappingKind.NeedsNewerSqlClient => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeNeedsNewerSqlClient,
                 at,
@@ -692,13 +709,6 @@ internal static class QueryTyper
                 typeName,
                 failure.Detail ?? "",
                 typing.SqlClientVersion
-            ),
-            TypeMappingKind.NeedsDriver => DiagnosticInfo.Create(
-                SqlDiagnostics.TypeNeedsNpgsql,
-                at,
-                subject,
-                typeName,
-                "Reference Npgsql"
             ),
             // A spatial type, which NetTopologySuite's row reads in a CodeGen query, or the package's type.
             TypeMappingKind.NeedsSqlServerTypes when SqlServerNames.IsSpatial(key) => DiagnosticInfo.Create(
@@ -776,7 +786,7 @@ internal static class QueryTyper
                     + AsAKey(key, engine)
                     + "=<a C# type>"
             ),
-            TypeMappingKind.Mapped or TypeMappingKind.Unreadable or _ => DiagnosticInfo.Create(
+            TypeMappingKind.Mapped or TypeMappingKind.Unreadable => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,
                 at,
                 subject,
@@ -798,18 +808,18 @@ internal static class QueryTyper
             return key;
         }
 
-        if (engine == DatabaseEngine.SqlServer)
+        return engine switch
         {
+            DatabaseEngine.PostgreSql => TypeKeys.TryNormalizePostgres(key.AsSpan(), out _)
+                ? key
+                : SystemSchemas.Postgres + "." + key,
             // A bare key that SQL Server reads as another name, as rowversion is read as timestamp, names that type
             // and not this one, which sys. names as it is.
-            return
-                TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out var normalized)
-                && string.Equals(normalized, key, StringComparison.Ordinal)
+            DatabaseEngine.SqlServer => TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out var normalized)
+            && string.Equals(normalized, key, StringComparison.Ordinal)
                 ? key
-                : SystemSchemas.SqlServer + "." + key;
-        }
-
-        return TypeKeys.TryNormalizePostgres(key.AsSpan(), out _) ? key : SystemSchemas.Postgres + "." + key;
+                : SystemSchemas.SqlServer + "." + key,
+        };
     }
 
     // SQLSRC250's last argument: the types a short name in the type could mean, after ", and it could be ", the first
@@ -999,14 +1009,16 @@ internal static class QueryTyper
         {
             _map = map;
             _mappedTypes = mappedTypes;
-            if (engine == DatabaseEngine.SqlServer)
+            OfPostgres = engine switch
             {
-                OfSqlServer = Find;
-            }
-            else
+                DatabaseEngine.PostgreSql => Find,
+                DatabaseEngine.SqlServer => null,
+            };
+            OfSqlServer = engine switch
             {
-                OfPostgres = Find;
-            }
+                DatabaseEngine.PostgreSql => null,
+                DatabaseEngine.SqlServer => Find,
+            };
         }
 
         /// <summary>The lookup of a PostgreSQL file's types, or null in a SQL Server file.</summary>
@@ -1071,7 +1083,7 @@ internal static class QueryTyper
                 SettingPlaceKind.FileHeader => "a -- type-override: marker in the file header",
                 SettingPlaceKind.Query => "a -- type-override: marker of the query",
                 SettingPlaceKind.SettingsFile => "the typeOverrides of the settings file " + place.Path,
-                SettingPlaceKind.Attribute or _ => "the attribute",
+                SettingPlaceKind.Attribute => "the attribute",
             };
     }
 }

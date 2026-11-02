@@ -14,6 +14,6 @@ internal static class SettingPlaces
             SettingPlaceKind.Query => int.MaxValue,
             SettingPlaceKind.FileHeader => int.MaxValue - 1,
             SettingPlaceKind.SettingsFile => 1 + place.Depth,
-            SettingPlaceKind.Attribute or _ => 0,
+            SettingPlaceKind.Attribute => 0,
         };
 }

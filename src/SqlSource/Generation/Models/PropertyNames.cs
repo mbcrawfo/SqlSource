@@ -83,7 +83,11 @@ internal static class PropertyNames
             return null;
         }
 
-        var defaultSchema = engine == DatabaseEngine.SqlServer ? "dbo" : "public";
+        var defaultSchema = engine switch
+        {
+            DatabaseEngine.PostgreSql => "public",
+            DatabaseEngine.SqlServer => "dbo",
+        };
         if (string.Equals(schema, defaultSchema, StringComparison.Ordinal))
         {
             return tableName;

@@ -87,7 +87,7 @@ internal sealed class LibraryRows
         {
             SqlLibrary.NetTopologySuite => "the NetTopologySuite library",
             SqlLibrary.Json => "the System.Text.Json library",
-            SqlLibrary.NodaTime or _ => "the NodaTime library",
+            SqlLibrary.NodaTime => "the NodaTime library",
         };
 
     /// <summary>
@@ -184,7 +184,7 @@ internal sealed class LibraryRows
         {
             SqlLibrary.NetTopologySuite => (Empty(), Empty()),
             SqlLibrary.Json => (JsonRows(), JsonSqlServerRows()),
-            SqlLibrary.NodaTime or _ => (NodaTimeRows(), NodaTimeSqlServerRows()),
+            SqlLibrary.NodaTime => (NodaTimeRows(), NodaTimeSqlServerRows()),
         };
 
     // No rows, which a set only reads to copy, so it needs no comparer: NetTopologySuite has none in pg_catalog, and no

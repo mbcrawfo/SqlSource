@@ -212,7 +212,6 @@ internal sealed class SqlMarkerScope(
             SqlScopeKind.Preamble => IsAllowedInPreamble(kind),
             SqlScopeKind.Query => IsAllowedInQuery(kind),
             SqlScopeKind.WholeFile => IsAllowedInQuery(kind) || IsAllowedInPreamble(kind),
-            _ => false,
         };
 
     internal static bool IsAllowedInQuery(SqlMarkerKind kind) =>
@@ -269,7 +268,11 @@ internal sealed class SqlMarkerScope(
 
         // The entries are the file's engine's alone.
         var typeOverrides = BuildTypeOverrides();
-        var isSqlServer = Engine == DatabaseEngine.SqlServer;
+        var isSqlServer = Engine switch
+        {
+            DatabaseEngine.PostgreSql => false,
+            DatabaseEngine.SqlServer => true,
+        };
         return new SettingsLevel
         {
             Parameters = Generator.Parameters,

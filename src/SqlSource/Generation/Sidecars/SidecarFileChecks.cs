@@ -70,8 +70,7 @@ internal static class SidecarFileChecks
     }
 
     /// <summary>
-    /// What the message of <c>SQLSRC237</c> says is wrong.  A kind that is no member gives a reason that names its
-    /// number, never another kind's.
+    /// What the message of <c>SQLSRC237</c> says is wrong.
     /// </summary>
     internal static string ReasonOf(SidecarError error) =>
         error.Kind switch
@@ -83,6 +82,5 @@ internal static class SidecarFileChecks
             SidecarErrorKind.OrdinalMismatch => $"the ordinal {error.Argument} is not the position of its element",
             SidecarErrorKind.ColumnsWithoutRows => "it has columns for a query without rows",
             SidecarErrorKind.UnknownResultKind => $"'{error.Argument}' is not a result kind",
-            _ => "it has an error of kind " + ((int)error.Kind).ToString(CultureInfo.InvariantCulture),
         };
 }

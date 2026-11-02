@@ -17,6 +17,6 @@ internal static class ModelKinds
             ModelKind.Record => "record",
             ModelKind.SealedRecord => "sealed record",
             ModelKind.Class => "class",
-            ModelKind.SealedClass or _ => "sealed class",
+            ModelKind.SealedClass => "sealed class",
         };
 }

@@ -31,8 +31,4 @@ public sealed class SidecarFileChecksTests
 
         reasons.ShouldBeUnique();
     }
-
-    [Fact]
-    public void ReasonOf_KindThatIsNoMember_DoesNotThrow() =>
-        SidecarFileChecks.ReasonOf(new SidecarError((SidecarErrorKind)99, default, null)).ShouldNotBeEmpty();
 }
