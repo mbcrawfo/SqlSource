@@ -75,6 +75,8 @@ dotnet reportgenerator '-reports:artifacts/test-results/*.cobertura.xml' -target
 
 Each test project writes its own Cobertura file, and the report merges them.  It is `artifacts/coverage/index.html`.  The allocation tests of `tests/DatabaseTests/QueryMethodAllocation` skip under coverage and run only in the nightly; its readme has the command.
 
+A change to what the generator writes updates the golden corpus, as [`tests/README.md`](tests/README.md#the-golden-corpus-of-query-methods) says.
+
 ## Pack
 
 ```bash

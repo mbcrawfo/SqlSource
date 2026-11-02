@@ -15,6 +15,9 @@
 *.sql.json text eol=lf
 schemas/*.json text eol=lf
 
+# The golden corpus is compared byte for byte with what the generator writes, at LF
+tests/SqlSource.Tests/Generator/Golden/** text eol=lf
+
 # A describer's fixture is compared byte for byte, and its SQL is in a request that keys a recorded answer
 tests/SqlSource.Tool.Tests/Fixtures/Describers/** text eol=lf
 
