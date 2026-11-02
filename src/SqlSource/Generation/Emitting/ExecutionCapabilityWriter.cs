@@ -187,13 +187,23 @@ internal static class ExecutionCapabilityWriter
     /// token the caller cancelled before an early exit neither throws nor cancels the command, and the drain throws
     /// only what the database raises.
     /// </summary>
-    public static void AppendLeftAtARowEnd(StringBuilder builder, string indent, QueryMethodLocals locals)
+    /// <param name="builder">The source being built.</param>
+    /// <param name="indent">The indent of the <c>try</c>.</param>
+    /// <param name="loopIndent">The indent of the loop inside it, one deeper.</param>
+    /// <param name="innerIndent">The indent of the loop's body, one deeper again.</param>
+    /// <param name="locals">The method's locals.</param>
+    public static void AppendLeftAtARowEnd(
+        StringBuilder builder,
+        string indent,
+        string loopIndent,
+        string innerIndent,
+        QueryMethodLocals locals
+    )
     {
-        var blockIndent = indent + GeneratedText.Indent;
         _ = builder.Append(indent).Append("}\n").Append(indent).Append("finally\n").Append(indent).Append("{\n");
-        QueryMethodWriter.AppendIf(builder, blockIndent, locals.AtRow);
-        AppendDrainLoop(builder, blockIndent + GeneratedText.Indent, locals, NoCancellation);
-        QueryMethodWriter.AppendEnd(builder, blockIndent);
+        QueryMethodWriter.AppendIf(builder, loopIndent, locals.AtRow);
+        AppendDrainLoop(builder, innerIndent, locals, NoCancellation);
+        QueryMethodWriter.AppendEnd(builder, loopIndent);
         QueryMethodWriter.AppendEnd(builder, indent);
     }
 

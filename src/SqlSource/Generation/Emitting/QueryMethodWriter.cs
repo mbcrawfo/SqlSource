@@ -630,7 +630,7 @@ internal static class QueryMethodWriter
 
         if (tracksRow)
         {
-            ExecutionCapabilityWriter.AppendLeftAtARowEnd(builder, indent, locals);
+            ExecutionCapabilityWriter.AppendLeftAtARowEnd(builder, indent, loopIndent, innerIndent, locals);
         }
     }
 
