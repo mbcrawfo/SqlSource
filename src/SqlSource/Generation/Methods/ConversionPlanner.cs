@@ -182,8 +182,8 @@ internal static class ConversionPlanner
                     true,
                     ElementOf(text),
                     type.ElementIsValueType,
-                    MayReturnNull: isRead,
-                    IsSerializer: true
+                    Kind: ConversionKind.Serializer,
+                    MayReturnNull: isRead
                 );
             }
 
@@ -201,8 +201,8 @@ internal static class ConversionPlanner
                 false,
                 null,
                 false,
-                MayReturnNull: isRead,
-                IsSerializer: true
+                Kind: ConversionKind.Serializer,
+                MayReturnNull: isRead
             );
         }
 
@@ -312,7 +312,7 @@ internal static class ConversionPlanner
                 null,
                 false,
                 Library: SqlLibrary.NetTopologySuite,
-                IsSpatial: true
+                Kind: ConversionKind.Spatial
             )
             : null;
 

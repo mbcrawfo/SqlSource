@@ -80,7 +80,14 @@ internal sealed class SqlServerParameterBinder : ParameterBinder
         else
         {
             // The spatial read path binds SqlBytes, whose null is SqlBytes.Null.
-            AppendValueOrNull(context, bound, bound.Write is { IsSpatial: true } ? SqlBytesNull : DbNull);
+            var nullText = bound.Write is { } write
+                ? write.Kind switch
+                {
+                    ConversionKind.Converter or ConversionKind.Serializer => DbNull,
+                    ConversionKind.Spatial => SqlBytesNull,
+                }
+                : DbNull;
+            AppendValueOrNull(context, bound, nullText);
         }
 
         _ = builder.Append(";\n");

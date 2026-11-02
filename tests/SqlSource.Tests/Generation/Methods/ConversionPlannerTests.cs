@@ -651,7 +651,16 @@ public sealed class ConversionPlannerTests
         var (conversion, problems, blocked) = Plan(type, isRead, Of<Converter>());
 
         conversion.ShouldBe(
-            new Conversion(method, "string", false, false, null, false, MayReturnNull: isRead, IsSerializer: true)
+            new Conversion(
+                method,
+                "string",
+                false,
+                false,
+                null,
+                false,
+                Kind: ConversionKind.Serializer,
+                MayReturnNull: isRead
+            )
         );
         problems.ShouldBeEmpty();
         blocked.ShouldBeFalse();
@@ -677,7 +686,7 @@ public sealed class ConversionPlannerTests
                 null,
                 false,
                 MayReturnNull: true,
-                IsSerializer: true
+                Kind: ConversionKind.Serializer
             )
         );
     }
@@ -714,7 +723,7 @@ public sealed class ConversionPlannerTests
                 element,
                 elementIsValueType,
                 MayReturnNull: isRead,
-                IsSerializer: true
+                Kind: ConversionKind.Serializer
             )
         );
         problems.ShouldBeEmpty();
@@ -738,7 +747,7 @@ public sealed class ConversionPlannerTests
                 null,
                 false,
                 MayReturnNull: true,
-                IsSerializer: true
+                Kind: ConversionKind.Serializer
             )
         );
     }
@@ -904,8 +913,8 @@ public sealed class ConversionPlannerTests
 
         read.ShouldBe(new Conversion("global::MyApp.Shapes.FromBytes", "byte[]", false, false, null, false));
         write.ShouldBe(new Conversion("global::MyApp.Shapes.ToBytes", "byte[]", false, false, null, false));
-        read!.IsSpatial.ShouldBeFalse();
-        write!.IsSpatial.ShouldBeFalse();
+        read!.Kind.ShouldBe(ConversionKind.Converter);
+        write!.Kind.ShouldBe(ConversionKind.Converter);
         readProblems.ShouldBeEmpty();
         writeProblems.ShouldBeEmpty();
         readBlocked.ShouldBeFalse();
@@ -958,7 +967,7 @@ public sealed class ConversionPlannerTests
             null,
             false,
             Library: SqlLibrary.NetTopologySuite,
-            IsSpatial: true
+            Kind: ConversionKind.Spatial
         );
 
     // A type that NetTopologySuite's row gave, whose database type the base map gives no C# type.
