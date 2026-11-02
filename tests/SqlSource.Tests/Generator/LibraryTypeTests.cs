@@ -521,15 +521,19 @@ public sealed class LibraryTypeTests
                 )
                 + ";\n"
         );
+        // In the order of the SQL, as the tool writes them: each name, then the one that can be null.
         SidecarParameter[] parameters =
         [
-            .. types.Select(
+            .. types.SelectMany(
                 (type, index) =>
-                    Parameter(names[index], type with { BindName = type.InternalName.TrimStart('_') }, false)
-            ),
-            .. types.Select(
-                (type, index) =>
-                    Parameter("maybe_" + names[index], type with { BindName = type.InternalName.TrimStart('_') }, true)
+                {
+                    var bound = type with { BindName = type.InternalName.TrimStart('_') };
+                    return new[]
+                    {
+                        Parameter(names[index], bound, false),
+                        Parameter("maybe_" + names[index], bound, true),
+                    };
+                }
             ),
         ];
         SidecarColumn[] columns =
