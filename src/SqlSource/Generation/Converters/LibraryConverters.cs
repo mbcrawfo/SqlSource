@@ -35,7 +35,8 @@ internal static class LibraryConverters
         );
 
     /// <summary>
-    /// The text of the file of <paramref name="library" />'s class, or null for a library with none.
+    /// The text of the file of <paramref name="library" />'s class.  It is nullable because the output it feeds takes a
+    /// file that may have no text.
     /// </summary>
     public static string? SourceOf(SqlLibrary library) =>
         library switch
@@ -43,7 +44,6 @@ internal static class LibraryConverters
             SqlLibrary.NodaTime => NodaTimeConversions.Source,
             SqlLibrary.NetTopologySuite => NetTopologySuiteConversions.Source,
             SqlLibrary.Json => JsonConversions.Source,
-            _ => null,
         };
 
     /// <summary>

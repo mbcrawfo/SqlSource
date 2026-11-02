@@ -103,10 +103,7 @@ internal static class PostgresTypeMap
                 key,
                 TextType
             ),
-            PostgresTypeKind.Base or PostgresTypeKind.Composite or _ => TypeMapping.Failed(
-                TypeMappingKind.Unreadable,
-                key
-            ),
+            PostgresTypeKind.Base or PostgresTypeKind.Composite => TypeMapping.Failed(TypeMappingKind.Unreadable, key),
         };
     }
 

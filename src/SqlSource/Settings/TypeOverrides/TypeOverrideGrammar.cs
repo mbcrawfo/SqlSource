@@ -178,9 +178,11 @@ internal static class TypeOverrideGrammar
     }
 
     private static bool TryNormalize(ReadOnlySpan<char> key, DatabaseEngine engine, out string normalized) =>
-        engine == DatabaseEngine.SqlServer
-            ? TypeKeys.TryNormalizeSqlServer(key, out normalized)
-            : TypeKeys.TryNormalizePostgres(key, out normalized);
+        engine switch
+        {
+            DatabaseEngine.PostgreSql => TypeKeys.TryNormalizePostgres(key, out normalized),
+            DatabaseEngine.SqlServer => TypeKeys.TryNormalizeSqlServer(key, out normalized),
+        };
 
     private static EquatableArray<TypeOverride> ToArray(List<TypeOverride>? entries) =>
         entries is null

@@ -134,13 +134,21 @@ internal static class QueryMethodWriter
     // A streaming method on SQL Server, whose iterator reads the later results in a finally when its loop is left at
     // a row.
     private static bool DrainsWhenLeftAtARow(QueryMethod method) =>
-        Streams(method) && method.Engine == DatabaseEngine.SqlServer;
+        Streams(method)
+        && method.Engine switch
+        {
+            DatabaseEngine.PostgreSql => false,
+            DatabaseEngine.SqlServer => true,
+        };
 
     // A method on SQL Server that reads rows, which can throw an exception of its own before it has read the rest of
     // the batch, so that the reader's disposal reads it, and an error there can roll back the transaction unannounced.
     private static bool ChecksTransaction(QueryMethod method) =>
-        method.Engine == DatabaseEngine.SqlServer
-        && method.Shape is ResultShape.Many or ResultShape.One or ResultShape.OneOptional;
+        method.Engine switch
+        {
+            DatabaseEngine.PostgreSql => false,
+            DatabaseEngine.SqlServer => true,
+        } && method.Shape is ResultShape.Many or ResultShape.One or ResultShape.OneOptional;
 
     // On SQL Server the refusal of a completed transaction, then the SQL, the opening of a closed connection, the
     // command, its parameters and its execution, and the closing of the connection in a finally, at the indent of the
@@ -219,7 +227,12 @@ internal static class QueryMethodWriter
     // followed by a blank line, as the SQL follows it.
     private static void AppendCompletedTransactionCheck(StringBuilder builder, string indent, QueryMethod method)
     {
-        if (method.Engine != DatabaseEngine.SqlServer)
+        var refusesCompleted = method.Engine switch
+        {
+            DatabaseEngine.PostgreSql => false,
+            DatabaseEngine.SqlServer => true,
+        };
+        if (!refusesCompleted)
         {
             return;
         }
@@ -291,7 +304,7 @@ internal static class QueryMethodWriter
                 ResultShape.One => "The row.",
                 ResultShape.OneOptional => "The row, or null when there is none.",
                 ResultShape.RowCount => "The number of rows the query affected.",
-                ResultShape.None or _ => "A task that completes when the query has run.",
+                ResultShape.None => "A task that completes when the query has run.",
             }
         );
         if (method.Shape == ResultShape.One)
@@ -308,7 +321,12 @@ internal static class QueryMethodWriter
             XmlDocWriter.AppendException(builder, indent, ExceptionCref, "The query returned more than one row.");
         }
 
-        if (method.Engine == DatabaseEngine.SqlServer)
+        var refusesCompleted = method.Engine switch
+        {
+            DatabaseEngine.PostgreSql => false,
+            DatabaseEngine.SqlServer => true,
+        };
+        if (refusesCompleted)
         {
             XmlDocWriter.AppendException(
                 builder,
@@ -440,7 +458,7 @@ internal static class QueryMethodWriter
             ResultShape.One => method.Output!.TypeText,
             ResultShape.OneOptional => method.Output!.TypeText + "?",
             ResultShape.RowCount => "int",
-            ResultShape.None or _ => null,
+            ResultShape.None => null,
         };
 
     private static string GetCollectionType(CollectionKind collection, string row) =>
@@ -456,7 +474,7 @@ internal static class QueryMethodWriter
             CollectionKind.ImmutableArray => "global::System.Collections.Immutable.ImmutableArray<" + row + ">",
             CollectionKind.ImmutableList => "global::System.Collections.Immutable.ImmutableList<" + row + ">",
             CollectionKind.IAsyncEnumerable => "global::System.Collections.Generic.IAsyncEnumerable<" + row + ">",
-            CollectionKind.IImmutableList or _ => "global::System.Collections.Immutable.IImmutableList<" + row + ">",
+            CollectionKind.IImmutableList => "global::System.Collections.Immutable.IImmutableList<" + row + ">",
         };
 
     // The buffer the rows are read into, and the expression that gives the collection from it.
@@ -476,8 +494,7 @@ internal static class QueryMethodWriter
                 or CollectionKind.IReadOnlyList
                 or CollectionKind.ImmutableList
                 or CollectionKind.IImmutableList
-                or CollectionKind.IAsyncEnumerable
-                or _ => ".ToArray()",
+                or CollectionKind.IAsyncEnumerable => ".ToArray()",
             };
             return ("new " + RowBuffer.TypeText + "<" + row + ">()", rows + toResult);
         }
@@ -502,8 +519,10 @@ internal static class QueryMethodWriter
             or CollectionKind.IEnumerable
             or CollectionKind.IReadOnlyCollection
             or CollectionKind.IReadOnlyList
-            or CollectionKind.IAsyncEnumerable
-            or _ => ("new global::System.Collections.Generic.List<" + row + ">()", rows + ".ToArray()"),
+            or CollectionKind.IAsyncEnumerable => (
+                "new global::System.Collections.Generic.List<" + row + ">()",
+                rows + ".ToArray()"
+            ),
         };
     }
 
@@ -834,7 +853,12 @@ internal static class QueryMethodWriter
     // a return follows it.
     private static void AppendDrain(StringBuilder builder, string indent, QueryMethod method, QueryMethodLocals locals)
     {
-        if (method.Engine != DatabaseEngine.SqlServer)
+        var drains = method.Engine switch
+        {
+            DatabaseEngine.PostgreSql => false,
+            DatabaseEngine.SqlServer => true,
+        };
+        if (!drains)
         {
             return;
         }

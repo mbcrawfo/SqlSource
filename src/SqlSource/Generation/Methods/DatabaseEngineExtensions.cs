@@ -6,9 +6,17 @@ internal static class DatabaseEngineExtensions
 {
     /// <summary>The flag of the engine's queries in <see cref="CodeGenEngines" />.</summary>
     public static CodeGenEngines ToCodeGenEngines(this DatabaseEngine engine) =>
-        engine == DatabaseEngine.SqlServer ? CodeGenEngines.SqlServer : CodeGenEngines.Postgres;
+        engine switch
+        {
+            DatabaseEngine.PostgreSql => CodeGenEngines.Postgres,
+            DatabaseEngine.SqlServer => CodeGenEngines.SqlServer,
+        };
 
     /// <summary>The database's name as a diagnostic gives it: <c>PostgreSQL</c> or <c>SQL Server</c>.</summary>
     public static string DatabaseName(this DatabaseEngine engine) =>
-        engine == DatabaseEngine.SqlServer ? "SQL Server" : "PostgreSQL";
+        engine switch
+        {
+            DatabaseEngine.PostgreSql => "PostgreSQL",
+            DatabaseEngine.SqlServer => "SQL Server",
+        };
 }

@@ -29,6 +29,5 @@ internal static class SettingsFileSides
                 is SettingsFileKeys.Dialect
                     or SettingsFileKeys.Output
                     or SettingsFileKeys.Database,
-            _ => false,
         };
 }

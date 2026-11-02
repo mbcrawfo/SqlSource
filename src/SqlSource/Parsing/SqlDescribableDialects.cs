@@ -20,5 +20,17 @@ internal static class SqlDescribableDialects
     /// PostgreSQL for every other dialect.
     /// </summary>
     public static DatabaseEngine EngineOf(SqlDialect dialect) =>
-        dialect == SqlDialect.SqlServer ? DatabaseEngine.SqlServer : DatabaseEngine.PostgreSql;
+        dialect switch
+        {
+            SqlDialect.SqlServer => DatabaseEngine.SqlServer,
+            SqlDialect.PostgreSql => DatabaseEngine.PostgreSql,
+            // These cannot be described, so only a marker's type override reads their keys, by PostgreSQL's rules, as
+            // before.  A dialect that becomes describable gets an engine of its own; see the guide to adding one.
+            SqlDialect.Ansi
+            or SqlDialect.MySql
+            or SqlDialect.MariaDb
+            or SqlDialect.Sqlite
+            or SqlDialect.Oracle
+            or SqlDialect.CockroachDb => DatabaseEngine.PostgreSql,
+        };
 }

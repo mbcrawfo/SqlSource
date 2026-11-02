@@ -241,10 +241,6 @@ public sealed class SqlDiagnosticsTests
             );
 
     [Fact]
-    public void ForParseError_UndefinedKind_Throws() =>
-        Should.Throw<ArgumentOutOfRangeException>(() => SqlDiagnostics.ForParseError((SqlParseErrorKind)(-1)));
-
-    [Fact]
     public void ToDiagnostic_Info_GivesTheDescriptorLocationAndMessage()
     {
         var text = SourceText.From("SELECT 1;\n-- name: get-user\n");

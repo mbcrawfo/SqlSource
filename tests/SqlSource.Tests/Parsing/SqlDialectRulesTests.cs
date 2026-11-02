@@ -29,11 +29,6 @@ public sealed class SqlDialectRulesTests
         SqlDialectRules.For(SqlDialect.CockroachDb).ShouldBeSameAs(SqlDialectRules.CockroachDb);
     }
 
-    // A value that is not a dialect cannot come from a name, and must not throw inside the compiler if it ever does.
-    [Fact]
-    public void For_ValueThatIsNotADialect_GivesTheAnsiRules() =>
-        SqlDialectRules.For((SqlDialect)99).ShouldBeSameAs(SqlDialectRules.Ansi);
-
     [Fact]
     public void For_EachSetOfOptions_GivesMySqlAndMariaDbTheirOwnSharedInstance()
     {

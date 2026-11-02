@@ -38,5 +38,10 @@ internal readonly record struct MethodDrivers(
         );
 
     /// <summary>Whether the methods of the engine's queries can be generated.</summary>
-    public bool Allows(DatabaseEngine engine) => engine == DatabaseEngine.SqlServer ? SqlServer : Postgres;
+    public bool Allows(DatabaseEngine engine) =>
+        engine switch
+        {
+            DatabaseEngine.PostgreSql => Postgres,
+            DatabaseEngine.SqlServer => SqlServer,
+        };
 }

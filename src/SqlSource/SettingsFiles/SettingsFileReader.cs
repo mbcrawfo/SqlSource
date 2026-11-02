@@ -167,7 +167,6 @@ internal static class SettingsFileReader
                 SettingsFileValueType.ArrayOfStrings => kind == SidecarTokenKind.ArrayStart,
                 SettingsFileValueType.ObjectOfStrings or SettingsFileValueType.ObjectOfColumnTypes => kind
                     == SidecarTokenKind.ObjectStart,
-                _ => false,
             };
 
         // Blank sets nothing, as for every other text.

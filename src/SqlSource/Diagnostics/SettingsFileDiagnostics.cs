@@ -96,12 +96,6 @@ internal static class SettingsFileDiagnostics
                 error.Other ?? string.Empty,
                 setting
             ),
-            // A kind that is no member names its number, never another kind's.
-            _ => DiagnosticInfo.Create(
-                SqlDiagnostics.SettingsFileNotAnObject,
-                location,
-                "it has an error of kind " + ((int)error.Kind).ToString(CultureInfo.InvariantCulture)
-            ),
         };
     }
 
@@ -115,7 +109,6 @@ internal static class SettingsFileDiagnostics
             SettingsFileValueType.ObjectOfStrings => "an object whose values are strings",
             SettingsFileValueType.ObjectOfColumnTypes =>
                 "an object whose values are strings, or objects of a \"type\" string and an optional \"json\" boolean",
-            _ => OtherType,
         };
 
     // The end of SQLSRC019's message, after the setting: the names of the dialects, why default stands alone, the

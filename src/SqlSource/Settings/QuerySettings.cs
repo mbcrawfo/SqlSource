@@ -86,9 +86,14 @@ internal readonly record struct QuerySettings(
         DatabaseEngine engine
     ) =>
         (
-            engine == DatabaseEngine.SqlServer
-                ? TypeOverrideMap.Over(markers.SqlServerTypeOverrides, file.SqlServerTypeOverrides)
-                : TypeOverrideMap.Over(markers.TypeOverrides, file.TypeOverrides)
+            engine switch
+            {
+                DatabaseEngine.PostgreSql => TypeOverrideMap.Over(markers.TypeOverrides, file.TypeOverrides),
+                DatabaseEngine.SqlServer => TypeOverrideMap.Over(
+                    markers.SqlServerTypeOverrides,
+                    file.SqlServerTypeOverrides
+                ),
+            }
         ) ?? EquatableArray<TypeOverride>.Empty;
 
     /// <summary>
