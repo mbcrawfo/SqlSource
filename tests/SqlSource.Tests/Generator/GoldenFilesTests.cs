@@ -8,8 +8,8 @@ using Xunit;
 
 namespace SqlSource.Tests.Generator;
 
-// How the golden corpus renders a run and checks it against its file, without running the generator.  The checks use
-// a temporary folder and never touch Golden/.
+// How the golden corpus renders a run, checks it against its file and finds the files of no case, without running the
+// generator.  The checks and the search use a temporary folder and never touch Golden/.
 public sealed class GoldenFilesTests
 {
     private const string Header =
@@ -129,6 +129,56 @@ public sealed class GoldenFilesTests
 
             File.ReadAllText(path).ShouldBe("new\n");
         });
+
+    // Every golden file is in the folder of its engine.
+    [Fact]
+    public void Leftovers_NestedFileOfNoCase_ListsItByCaseName() =>
+        InTemporaryFolder(folder =>
+        {
+            WriteFile(folder, "postgres", "removed.txt");
+
+            GoldenFiles.Leftovers(folder, ["postgres/shapes"]).ShouldBe(["postgres/removed"]);
+        });
+
+    [Fact]
+    public void Leftovers_FileOfACase_IsNotListed() =>
+        InTemporaryFolder(folder =>
+        {
+            WriteFile(folder, "postgres", "shapes.txt");
+
+            GoldenFiles.Leftovers(folder, ["postgres/shapes"]).ShouldBeEmpty();
+        });
+
+    [Fact]
+    public void Leftovers_FileThatIsNotText_IsIgnored() =>
+        InTemporaryFolder(folder =>
+        {
+            WriteFile(folder, "postgres", "shapes.orig");
+
+            GoldenFiles.Leftovers(folder, []).ShouldBeEmpty();
+        });
+
+    // Ordinal order puts `C` before `b`, which a culture's order does not.
+    [Fact]
+    public void Leftovers_SeveralFilesOfNoCase_ListsThemInOrdinalOrder() =>
+        InTemporaryFolder(folder =>
+        {
+            WriteFile(folder, "sqlserver", "a.txt");
+            WriteFile(folder, "postgres", "b.txt");
+            WriteFile(folder, "postgres", "C.txt");
+
+            GoldenFiles.Leftovers(folder, []).ShouldBe(["postgres/C", "postgres/b", "sqlserver/a"]);
+        });
+
+    [Fact]
+    public void Leftovers_MissingFolder_ListsNone() =>
+        InTemporaryFolder(folder => GoldenFiles.Leftovers(Path.Combine(folder, "Golden"), []).ShouldBeEmpty());
+
+    private static void WriteFile(string folder, string engine, string name)
+    {
+        _ = Directory.CreateDirectory(Path.Combine(folder, engine));
+        File.WriteAllText(Path.Combine(folder, engine, name), "x\n");
+    }
 
     private static void InTemporaryFolder(System.Action<string> test)
     {

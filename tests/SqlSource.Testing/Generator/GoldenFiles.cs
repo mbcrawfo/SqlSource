@@ -93,10 +93,13 @@ internal static class GoldenFiles
         );
     }
 
-    // The case names of the golden files below Folder that none of the cases has, `/`-separated, in ordinal order.
-    public static IReadOnlyList<string> Leftovers(IEnumerable<string> caseNames)
+    public static IReadOnlyList<string> Leftovers(IEnumerable<string> caseNames) => Leftovers(Folder, caseNames);
+
+    // The case names of the golden files below the folder that none of the cases has, `/`-separated, in ordinal order;
+    // none when there is no folder.
+    internal static IReadOnlyList<string> Leftovers(string folder, IEnumerable<string> caseNames)
     {
-        if (!Directory.Exists(Folder))
+        if (!Directory.Exists(folder))
         {
             return [];
         }
@@ -105,8 +108,8 @@ internal static class GoldenFiles
         return
         [
             .. Directory
-                .EnumerateFiles(Folder, "*.txt", SearchOption.AllDirectories)
-                .Select(file => Path.ChangeExtension(Path.GetRelativePath(Folder, file), null).Replace('\\', '/'))
+                .EnumerateFiles(folder, "*.txt", SearchOption.AllDirectories)
+                .Select(file => Path.ChangeExtension(Path.GetRelativePath(folder, file), null).Replace('\\', '/'))
                 .Where(name => !cases.Contains(name))
                 .OrderBy(name => name, StringComparer.Ordinal),
         ];
