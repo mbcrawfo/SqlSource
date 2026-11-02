@@ -9,8 +9,9 @@ namespace SqlSource.Generation.Emitting;
 /// The names of the locals of a query's method and of its lambdas' parameters, none of which an argument has.  The
 /// locals that read rows are named only for a method that reads them, whose output is given, the value of a converted
 /// parameter only for a method that has one, the element of an array and its value only for a method that converts one
-/// by element, the iterator only for a method that streams, the flag of a row being yielded only for one that drains
-/// when its loop is left at a row, and the exception its catch takes only for one that checks the transaction.
+/// by element, the iterator only for a method that streams, the flag of a row being yielded only for one whose
+/// <see cref="ExecutionCapabilities" /> drain when its loop is left at a row, and the exception its catch takes only
+/// for one whose capabilities check for a rollback at its read.
 /// </summary>
 internal sealed class QueryMethodLocals
 {
@@ -19,8 +20,7 @@ internal sealed class QueryMethodLocals
         MethodInput? input,
         MethodOutput? output,
         bool streams,
-        bool tracksRow,
-        bool checksTransaction
+        ExecutionCapabilities capabilities
     )
     {
         var names = new LocalNames(Seed(arguments));
@@ -60,8 +60,10 @@ internal sealed class QueryMethodLocals
         Span = names.Take("span");
         State = names.Take("state");
         Iterator = streams ? names.Take("ReadRows") : string.Empty;
-        AtRow = tracksRow ? names.Take("atRow") : string.Empty;
-        Exception = checksTransaction ? names.Take("exception") : string.Empty;
+        AtRow = capabilities.Has(ExecutionCapabilities.DrainsWhenLeftAtARow) ? names.Take("atRow") : string.Empty;
+        Exception = capabilities.Has(ExecutionCapabilities.ChecksRollbackAtRead)
+            ? names.Take("exception")
+            : string.Empty;
     }
 
     public string Sql { get; }
@@ -100,7 +102,7 @@ internal sealed class QueryMethodLocals
     // The flag that is true while the iterator is suspended at the yield of a row.
     public string AtRow { get; }
 
-    // The exception that the catch of a method that checks the transaction takes.
+    // The exception that the catch of a method that checks for a rollback takes.
     public string Exception { get; }
 
     private static bool HasWrite(MethodInput? input) =>
