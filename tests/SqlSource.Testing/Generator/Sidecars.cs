@@ -12,8 +12,10 @@ namespace SqlSource.Testing.Generator;
 //
 // Of fails a test whose current entry, one whose hash is its query's under some dialect, does not list the query's
 // parameters as the tool writes them: each as the SQL spells it, in the order of the SQL, numbered from 0.  It does not
-// compare their types or nullability.  A stale entry, one of a query the file lacks and a file that does not parse are
-// not checked.  A test of a sidecar a person edited writes it with HandEdited.
+// compare their types, which the database gives, and it never compares their nullability, by design: a hand-built
+// entry may give a parameter a nullability that no marker gives, which the tool never writes, to test how the
+// generator reads it.  A stale entry, one of a query the file lacks and a file that does not parse are not checked.  A
+// test of a sidecar a person edited writes it with HandEdited.
 //
 // Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
