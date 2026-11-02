@@ -56,7 +56,10 @@ public sealed class GeneratedSourceWarningTests
             languageVersion: languageVersion
         );
 
-        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs", "SqlSource-Exceptions.g.cs"], ignoreOrder: true);
+        run.Sources.Keys.ShouldBe(
+            [GeneratedFile.EmbeddedAttributeName, "SqlSourceGenerateAttribute.g.cs", "SqlSource-Exceptions.g.cs"],
+            ignoreOrder: true
+        );
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
     }
@@ -64,9 +67,8 @@ public sealed class GeneratedSourceWarningTests
     [Fact]
     public void Run_ProjectThatSeesTheInternalsOfAnotherWithTheGenerator_GetsNoWarningInGeneratedCode()
     {
-        // Both assemblies hold the generated attribute and enums.  This one sees both copies, and the compiler warns
-        // (CS0436) wherever one of their names is used: inside the generated file itself, unless that file says
-        // otherwise.
+        // Both assemblies hold the generated attribute and enums, each marked embedded, so this one does not see the
+        // other's copies, and the compiler has no conflict (CS0436) to warn about inside the generated file.
         var other = GeneratorHarness.CreateReference(
             OutputKind.Sql,
             "Other",

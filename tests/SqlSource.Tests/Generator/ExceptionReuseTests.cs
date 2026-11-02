@@ -126,7 +126,10 @@ public sealed class ExceptionReuseTests
         );
 
         run.ShouldBeClean();
-        run.Sources.Keys.ShouldBe([AttributeSource.HintName, ExceptionSource.HintName], ignoreOrder: true);
+        run.Sources.Keys.ShouldBe(
+            [GeneratedFile.EmbeddedAttributeName, AttributeSource.HintName, ExceptionSource.HintName],
+            ignoreOrder: true
+        );
         run.Sources[ExceptionSource.HintName].ShouldBe(ExceptionSource.TextFor(isPublic: false));
     }
 

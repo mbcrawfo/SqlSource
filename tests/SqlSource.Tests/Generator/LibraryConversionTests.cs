@@ -104,7 +104,11 @@ public sealed class LibraryConversionTests
         var run = RunDates(NodaTimeOn + FindDates, WithNodaTime);
 
         run.Sources[ClassFile].ShouldStartWith(GeneratedFile.ModelHeader);
-        run.Sources[ClassFile].ShouldContain("namespace SqlSource\n{\n    internal static class NodaTimeConversions\n");
+        run.Sources[ClassFile]
+            .ShouldContain(
+                "namespace SqlSource\n{\n    [global::Microsoft.CodeAnalysis.Embedded]\n"
+                    + "    internal static class NodaTimeConversions\n"
+            );
     }
 
     // A type at Models has the library's types in no model and calls nothing.

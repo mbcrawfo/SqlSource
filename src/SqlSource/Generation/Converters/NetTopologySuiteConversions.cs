@@ -16,9 +16,6 @@ internal static class NetTopologySuiteConversions
     /// <summary>The class's name, as a method names one of its fields.</summary>
     public const string ClassName = "global::SqlSource.NetTopologySuiteConversions";
 
-    /// <summary>The class's metadata name, which <see cref="LibraryConverters.ClassMetadataNames" /> lists.</summary>
-    public const string MetadataName = Namespace + "." + ShortClassName;
-
     /// <summary>NetTopologySuite's <c>Geometry</c>, which the read gives without a cast.</summary>
     public const string Geometry = Geometries + "Geometry";
 
@@ -62,9 +59,9 @@ internal static class NetTopologySuiteConversions
 
     /// <summary>
     /// The whole file of the class: the header every generated file has, then <c>internal static class
-    /// NetTopologySuiteConversions</c> in the namespace <c>SqlSource</c> with the four shared instances and an empty
-    /// static constructor.  It has <c>\n</c> line endings and compiles without a warning against NetTopologySuite 2.5.0
-    /// and later with NetTopologySuite.IO.SqlServerBytes 2.1.0.
+    /// NetTopologySuiteConversions</c>, marked embedded, in the namespace <c>SqlSource</c> with the four shared
+    /// instances and an empty static constructor.  It has <c>\n</c> line endings and compiles without a warning
+    /// against NetTopologySuite 2.5.0 and later with NetTopologySuite.IO.SqlServerBytes 2.1.0.
     /// </summary>
     public static string Source { get; } = BuildSource();
 
@@ -90,7 +87,7 @@ internal static class NetTopologySuiteConversions
         const string Member = GeneratedText.Indent + GeneratedText.Indent;
         var builder = new StringBuilder(GeneratedText.Header);
         _ = builder.Append("\nnamespace ").Append(Namespace).Append("\n{\n");
-        _ = builder.Append(GeneratedText.Indent).Append("internal static class ").Append(ShortClassName).Append('\n');
+        _ = builder.Append(LibraryConverters.ClassDeclaration).Append(ShortClassName).Append('\n');
         _ = builder.Append(GeneratedText.Indent).Append("{\n");
         foreach (var (name, type, isGeography) in Fields)
         {

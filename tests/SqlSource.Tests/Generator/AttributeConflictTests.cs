@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
@@ -14,8 +15,9 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // A project that sees the internals of another one that uses SqlSource, as a test project sees the project it tests.
-// Both hold the generated attribute and enums, and the compiler warns (CS0436) at every use of one of their names
-// in this project's own code.  The package turns that warning off, for the generated types only.
+// Both hold the generated attribute and enums, but each marks them embedded, so neither sees the other's copy and the
+// compiler has no conflict (CS0436) to warn about, with no analyzer loaded.  Each test that builds across the boundary
+// runs on an image, as a build references a project, and on a compilation, as an IDE does.
 public sealed class AttributeConflictTests
 {
     private const string InternalsVisible =
@@ -24,39 +26,59 @@ public sealed class AttributeConflictTests
     // The file of the class of NodaTime's conversions.
     private const string ConversionsFile = "SqlSource-NodaTimeConversions.g.cs";
 
-    // The folder of the generated files, as Places gives it in a diagnostic: with '/' on every OS.
-    private const string GeneratedPath = "SqlSource/SqlSource.SqlSourceGenerator/";
+    // A query of each project that reads a datetime2 overridden to NodaTime's Instant, so that its method calls
+    // SqlSource.NodaTimeConversions.
+    private const string Override = "-- type-override: datetime2=NodaTime.Instant\n\n";
+
+    // This project's type and the other's, each with the queries of its .sql files.
+    private const string QueriesSource =
+        "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate]\ninternal partial class Sample;\n";
+
+    private const string OtherQueriesSource =
+        "using SqlSource;\n" + InternalsVisible + "namespace App { [SqlSourceGenerate] public partial class Sample; }";
+
+    private static readonly MetadataReference[] SqlServerReferences =
+    [
+        SqlClientReferences.SqlClient7,
+        LibraryReferences.NodaTime("3.3.7"),
+    ];
+
+    // Each use of a generated type in the project's own code, as an image and as a compilation.
+    public static TheoryData<string, bool> UsesOfAGeneratedType()
+    {
+        string[] sources =
+        [
+            "using SqlSource;\n[SqlSourceGenerate]\ninternal partial class Sample { }",
+            "using SqlSource;\n[SqlSourceGenerateAttribute]\ninternal partial class Sample { }",
+            "[SqlSource.SqlSourceGenerate]\ninternal partial class Sample { }",
+            "[global::SqlSource.SqlSourceGenerate()]\ninternal partial class Sample { }",
+            "internal class Sample { object o = typeof(SqlSource.SqlLocation); }",
+            "internal class Sample { object o = SqlSource.SqlLocation.Direct; }",
+            "internal class Sample { object o = typeof(SqlSource.GeneratorOutput); }",
+            "internal class Sample { object o = SqlSource.GeneratorOutput.Sql; }",
+            "internal static class C { [SqlSource.SqlSourceConverter] internal static int F(long v) => (int)v; }",
+        ];
+        var uses = new TheoryData<string, bool>();
+        foreach (var source in sources)
+        {
+            uses.Add(source, false);
+            uses.Add(source, true);
+        }
+
+        return uses;
+    }
 
     [Theory]
-    [InlineData("using SqlSource;\n[SqlSourceGenerate]\ninternal partial class Sample { }", "(2,2)-(2,19)")]
-    [InlineData("using SqlSource;\n[SqlSourceGenerateAttribute]\ninternal partial class Sample { }", "(2,2)-(2,28)")]
-    [InlineData("[SqlSource.SqlSourceGenerate]\ninternal partial class Sample { }", "(1,12)-(1,29)")]
-    [InlineData("[global::SqlSource.SqlSourceGenerate()]\ninternal partial class Sample { }", "(1,20)-(1,37)")]
-    [InlineData("internal class Sample { object o = typeof(SqlSource.SqlLocation); }", "(1,53)-(1,64)")]
-    [InlineData("internal class Sample { object o = SqlSource.SqlLocation.Direct; }", "(1,36)-(1,57)")]
-    [InlineData("internal class Sample { object o = typeof(SqlSource.GeneratorOutput); }", "(1,53)-(1,68)")]
-    [InlineData("internal class Sample { object o = SqlSource.GeneratorOutput.Sql; }", "(1,36)-(1,61)")]
-    [InlineData(
-        "internal static class C { [SqlSource.SqlSourceConverter] internal static int F(long v) => (int)v; }",
-        "(1,38)-(1,56)"
-    )]
-    public async Task Build_UseOfAGeneratedType_IsAConflictOnlyWithoutThePackageAnalyzers(string source, string span)
+    [MemberData(nameof(UsesOfAGeneratedType))]
+    public async Task Build_UseOfAGeneratedType_HasNoConflict(string source, bool compilationReference)
     {
-        var compilerAlone = await GeneratorHarness.BuildAsync(
-            OutputKind.Sql,
-            source,
-            [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql)],
-            packageAnalyzers: false
-        );
         var build = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
             source,
             [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql)]
+            [Other(OutputKind.Sql, compilationReference)]
         );
 
-        Places(compilerAlone).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}{span}"]);
         build.ShouldBeEmpty();
     }
 
@@ -69,13 +91,6 @@ public sealed class AttributeConflictTests
             internal partial class Sample { }
             """;
 
-        var compilerAlone = await GeneratorHarness.BuildAsync(
-            OutputKind.Sql,
-            Source,
-            [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql)],
-            packageAnalyzers: false
-        );
         var build = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
             Source,
@@ -83,11 +98,6 @@ public sealed class AttributeConflictTests
             [Other(OutputKind.Sql)]
         );
 
-        Places(compilerAlone)
-            .ShouldBe([
-                $"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)",
-                $"CS0436 {GeneratorHarness.SourcePath}(2,34)-(2,45)",
-            ]);
         build.ShouldBeEmpty();
     }
 
@@ -100,13 +110,6 @@ public sealed class AttributeConflictTests
             internal partial class Sample { }
             """;
 
-        var compilerAlone = await GeneratorHarness.BuildAsync(
-            OutputKind.Sql,
-            Source,
-            [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql)],
-            packageAnalyzers: false
-        );
         var build = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
             Source,
@@ -114,11 +117,6 @@ public sealed class AttributeConflictTests
             [Other(OutputKind.Sql)]
         );
 
-        Places(compilerAlone)
-            .ShouldBe([
-                $"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)",
-                $"CS0436 {GeneratorHarness.SourcePath}(2,29)-(2,44)",
-            ]);
         build.ShouldBeEmpty();
     }
 
@@ -134,13 +132,6 @@ public sealed class AttributeConflictTests
             internal partial class Sample { }
             """;
 
-        var compilerAlone = await GeneratorHarness.BuildAsync(
-            OutputKind.Sql,
-            Source,
-            [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql)],
-            packageAnalyzers: false
-        );
         var build = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
             Source,
@@ -148,13 +139,6 @@ public sealed class AttributeConflictTests
             [Other(OutputKind.Sql)]
         );
 
-        Places(compilerAlone)
-            .ShouldBe([
-                $"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)",
-                $"CS0436 {GeneratorHarness.SourcePath}(3,22)-(3,40)",
-                $"CS0436 {GeneratorHarness.SourcePath}(4,22)-(4,45)",
-                $"CS0436 {GeneratorHarness.SourcePath}(5,22)-(5,36)",
-            ]);
         build.ShouldBeEmpty();
     }
 
@@ -164,14 +148,6 @@ public sealed class AttributeConflictTests
     {
         const string Source = "using SqlSource;\n[SqlSourceGenerate]\ninternal partial class Sample { }";
 
-        var compilerAlone = await GeneratorHarness.BuildAsync(
-            OutputKind.Sql,
-            Source,
-            [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql)],
-            warningsAsErrors: true,
-            packageAnalyzers: false
-        );
         var build = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
             Source,
@@ -180,7 +156,6 @@ public sealed class AttributeConflictTests
             warningsAsErrors: true
         );
 
-        Places(compilerAlone).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)"]);
         build.ShouldBeEmpty();
     }
 
@@ -192,13 +167,6 @@ public sealed class AttributeConflictTests
     {
         var source = $"using SqlSource;\n{attribute}\ninternal partial class Sample {{ }}";
 
-        var compilerAlone = await GeneratorHarness.BuildAsync(
-            OutputKind.Sql,
-            source,
-            [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql)],
-            packageAnalyzers: false
-        );
         var build = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
             source,
@@ -206,7 +174,6 @@ public sealed class AttributeConflictTests
             [Other(OutputKind.Sql)]
         );
 
-        Places(compilerAlone).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)", error], true);
         Places(build).ShouldBe([error]);
     }
 
@@ -230,25 +197,17 @@ public sealed class AttributeConflictTests
     }
 
     // Both projects generate App.SqlSourceRowBuffer, as a type private to the methods file, so that neither sees the
-    // other's.  A buffer that other code could name would be a CS0436 here, which the package does not hide for it.
-    // The queries have different names, so that their models are not a conflict of their own.  What is left is the
-    // attribute's, which the package hides.
+    // other's.  The queries have different names, so that their models are not a conflict of their own.
     [Fact]
     public async Task Build_TwoProjectsSharingInternalsWithPooledMethods_HaveNoConflict()
     {
-        const string Source =
-            "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate]\ninternal partial class Sample;\n";
-        const string OtherSource =
-            "using SqlSource;\n"
-            + InternalsVisible
-            + "namespace App { [SqlSourceGenerate] public partial class Sample; }";
         var otherFile = new SqlFile("/other/Users.sql", "-- name: ListUsers\nSELECT id, name FROM users;\n");
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListOthers\nSELECT id, name FROM users;\n");
         var columns = new[] { Column("id"), Column("name", Text, nullable: true) };
         var (reference, sources) = GeneratorHarness.CreateProject(
             OutputKind.CodeGen,
             "Other",
-            OtherSource,
+            OtherQueriesSource,
             [otherFile, Sidecars.Of(otherFile, Entry(otherFile, "ListUsers", [], columns))],
             [NpgsqlReferences.Npgsql10],
             "postgres"
@@ -257,76 +216,119 @@ public sealed class AttributeConflictTests
 
         var (diagnostics, builtSources) = await GeneratorHarness.BuildProjectAsync(
             OutputKind.CodeGen,
-            Source,
+            QueriesSource,
             [file, Sidecars.Of(file, entry)],
             [reference, NpgsqlReferences.Npgsql10],
-            packageAnalyzers: false,
             dialect: "postgres"
         );
 
-        Places(diagnostics).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(5,2)-(5,19)"]);
+        diagnostics.ShouldBeEmpty();
         sources[MethodRuns.MethodsFile].ShouldContain("file struct SqlSourceRowBuffer<T>\n");
         builtSources[MethodRuns.MethodsFile].ShouldContain("file struct SqlSourceRowBuffer<T>\n");
     }
 
     // Both projects call a conversion of NodaTime's, so both hold SqlSource.NodaTimeConversions, and the methods this
-    // project generates name it where the other's is seen too.  The package hides that conflict as it hides the
-    // attribute's.  The queries have different names, so that their models are not a conflict of their own.
-    [Fact]
-    public async Task Run_NodaTimeConversionsSeenTwice_IsSuppressed()
+    // project generates name it where the other's is too.  The queries have different names, so that their models are
+    // not a conflict of their own.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Build_NodaTimeConversionsInBothProjects_HaveNoConflict(bool compilationReference)
     {
-        const string Source =
-            "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate]\ninternal partial class Sample;\n";
-        const string OtherSource =
-            "using SqlSource;\n"
-            + InternalsVisible
-            + "namespace App { [SqlSourceGenerate] public partial class Sample; }";
-        const string Override = "-- type-override: datetime2=NodaTime.Instant\n\n";
-        var otherFile = new SqlFile("/other/Events.sql", Override + "-- name: ListEvents\nSELECT at FROM events;\n");
         var file = new SqlFile(GeneratorHarness.UsersPath, Override + "-- name: ListOthers\nSELECT at FROM events;\n");
-        var at = TestSidecars.Column(0, "at", TestSidecars.SqlServer("datetime2", 8, 27, 7));
-        MetadataReference[] references = [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")];
-        var (reference, sources) = GeneratorHarness.CreateProject(
-            OutputKind.CodeGen,
-            "Other",
-            OtherSource,
-            [otherFile, Sidecars.Of(otherFile, MethodRuns.SqlServerEntry(otherFile, "ListEvents", [], [at]))],
-            references,
-            "mssql"
-        );
-        SqlFile[] files = [file, Sidecars.Of(file, MethodRuns.SqlServerEntry(file, "ListOthers", [], [at]))];
+        var (reference, sources) = OtherWithConversions(compilationReference);
+        SqlFile[] files = [file, Sidecars.Of(file, MethodRuns.SqlServerEntry(file, "ListOthers", [], [At()]))];
 
-        var (compilerAlone, builtSources) = await GeneratorHarness.BuildProjectAsync(
+        var (diagnostics, builtSources) = await GeneratorHarness.BuildProjectAsync(
             OutputKind.CodeGen,
-            Source,
+            QueriesSource,
             files,
-            [reference, .. references],
-            packageAnalyzers: false,
-            dialect: "mssql"
-        );
-        var build = await GeneratorHarness.BuildAsync(
-            OutputKind.CodeGen,
-            Source,
-            files,
-            [reference, .. references],
+            [reference, .. SqlServerReferences],
             dialect: "mssql"
         );
 
         sources.Keys.ShouldContain(ConversionsFile);
         builtSources.Keys.ShouldContain(ConversionsFile);
-        Places(compilerAlone)
-            .ShouldContain(place =>
-                place.StartsWith(
-                    "CS0436 " + GeneratedPath + MethodRuns.MethodsFile + "(",
-                    System.StringComparison.Ordinal
-                )
-            );
-        build.ShouldBeEmpty();
+        diagnostics.ShouldBeEmpty();
+    }
+
+    // A project without SqlSource that sees the other's internals does not see the types SqlSource gave the other: the
+    // attribute's enums and a library's class of conversions are the other's alone.
+    [Theory]
+    [InlineData("typeof(SqlSource.NodaTimeConversions)", "NodaTimeConversions", false)]
+    [InlineData("typeof(SqlSource.NodaTimeConversions)", "NodaTimeConversions", true)]
+    [InlineData("SqlSource.SqlLocation.Direct", "SqlLocation", false)]
+    [InlineData("SqlSource.SqlLocation.Direct", "SqlLocation", true)]
+    public async Task Build_FriendWithoutSqlSource_CannotNameTheOthersEmbeddedTypes(
+        string expression,
+        string name,
+        bool compilationReference
+    )
+    {
+        var (other, _) = OtherWithConversions(compilationReference);
+
+        var diagnostics = await GeneratorHarness.CompileAsync(
+            "internal class Sample { object o = " + expression + "; }",
+            [other, .. SqlServerReferences]
+        );
+
+        diagnostics.ShouldHaveSingleItem().ShouldStartWith($"CS0234 {GeneratorHarness.SourcePath}(1,");
+        diagnostics[0].ShouldContain($"'{name}' does not exist in the namespace 'SqlSource'");
+    }
+
+    // A project that declares Microsoft.CodeAnalysis.EmbeddedAttribute itself, as another generator may have it do,
+    // compiles only when its declaration is one Roslyn's can be merged with: a non-partial one is the compiler's error
+    // CS0260 at the project's declaration, which SqlSource cannot report first.
+    [Theory]
+    [InlineData("partial ", null)]
+    [InlineData("", "CS0260 /app/Repo/Sample.cs(1,58)-(1,75)")]
+    public async Task Build_ProjectThatDeclaresEmbeddedAttribute_CompilesOnlyWhenItIsPartial(
+        string modifier,
+        string? error
+    )
+    {
+        var source =
+            "namespace Microsoft.CodeAnalysis { internal sealed "
+            + modifier
+            + "class EmbeddedAttribute : global::System.Attribute { } }\n"
+            + "namespace App { [SqlSource.SqlSourceGenerate] internal partial class Sample { } }\n";
+
+        var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, source, [GeneratorHarness.UsersFile], []);
+
+        Places(build).ShouldBe(error is null ? [] : [error]);
     }
 
     // The other project, compiled with the generator: it holds the attribute and the enums too.
-    private static MetadataReference Other(OutputKind? output) =>
-        GeneratorHarness.CreateReference(output, "Other", InternalsVisible + "public class InOther { }\n");
+    private static MetadataReference Other(OutputKind? output, bool compilationReference = false) =>
+        GeneratorHarness
+            .CreateProject(
+                output,
+                "Other",
+                InternalsVisible + "public class InOther { }\n",
+                compilationReference: compilationReference
+            )
+            .Reference;
+
+    // The other project with a CodeGen query on SQL Server whose method calls a conversion of NodaTime's, so that it
+    // holds SqlSource.NodaTimeConversions as well as the attribute and the enums.
+    private static (MetadataReference Reference, IReadOnlyDictionary<string, string> Sources) OtherWithConversions(
+        bool compilationReference
+    )
+    {
+        var otherFile = new SqlFile("/other/Events.sql", Override + "-- name: ListEvents\nSELECT at FROM events;\n");
+        return GeneratorHarness.CreateProject(
+            OutputKind.CodeGen,
+            "Other",
+            OtherQueriesSource,
+            [otherFile, Sidecars.Of(otherFile, MethodRuns.SqlServerEntry(otherFile, "ListEvents", [], [At()]))],
+            SqlServerReferences,
+            "mssql",
+            compilationReference: compilationReference
+        );
+    }
+
+    // The column at, a datetime2.
+    private static SidecarColumn At() => TestSidecars.Column(0, "at", TestSidecars.SqlServer("datetime2", 8, 27, 7));
 
     // Each diagnostic without its message, which for CS0436 names files and assemblies, and with
     // '/' between folders, since on Windows the compiler names a generated file's folder with '\'.

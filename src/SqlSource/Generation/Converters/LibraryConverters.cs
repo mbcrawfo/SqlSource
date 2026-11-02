@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Types.Drivers;
 using SqlSource.Settings.Libraries;
 
@@ -13,17 +14,15 @@ namespace SqlSource.Generation.Converters;
 internal static class LibraryConverters
 {
     /// <summary>
-    /// The metadata name of each library's class of conversions, which a project gets when its methods call one.  A
-    /// project that sees the internals of another one whose methods call it too sees it twice, and
-    /// <c>AttributeConflictSuppressor</c> turns the compiler's warning off for these as for
-    /// <see cref="AttributeSource.GeneratedTypes" />.
+    /// What starts the declaration of each library's class, before its name: it is marked
+    /// <c>[Microsoft.CodeAnalysis.Embedded]</c>, so that a project that sees the internals of another one whose methods
+    /// call it too does not see the other's.
     /// </summary>
-    public static ImmutableArray<string> ClassMetadataNames { get; } =
-        ImmutableArray.Create(
-            NodaTimeConversions.MetadataName,
-            NetTopologySuiteConversions.MetadataName,
-            JsonConversions.MetadataName
-        );
+    public const string ClassDeclaration =
+        GeneratedText.Indent
+        + "[global::Microsoft.CodeAnalysis.Embedded]\n"
+        + GeneratedText.Indent
+        + "internal static class ";
 
     /// <summary>
     /// The edges of every library <paramref name="probe" /> finds, in the order of <see cref="ConverterSet.Comparer"

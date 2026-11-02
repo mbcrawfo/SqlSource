@@ -15,9 +15,6 @@ internal static class NodaTimeConversions
     /// <summary>The class's name, as a converter's method is written.</summary>
     public const string ClassName = "global::SqlSource.NodaTimeConversions";
 
-    /// <summary>The class's metadata name, which <see cref="LibraryConverters.ClassMetadataNames" /> lists.</summary>
-    public const string MetadataName = Namespace + "." + ShortClassName;
-
     private const string Namespace = "SqlSource";
 
     private const string ShortClassName = "NodaTimeConversions";
@@ -64,8 +61,8 @@ internal static class NodaTimeConversions
 
     /// <summary>
     /// The whole file of the class: the header every generated file has, then <c>internal static class
-    /// NodaTimeConversions</c> in the namespace <c>SqlSource</c> with one method for each edge.  It has <c>\n</c> line
-    /// endings and compiles without a warning against NodaTime 3.1.9 and later.
+    /// NodaTimeConversions</c>, marked embedded, in the namespace <c>SqlSource</c> with one method for each edge.  It
+    /// has <c>\n</c> line endings and compiles without a warning against NodaTime 3.1.9 and later.
     /// </summary>
     public static string Source { get; } = BuildSource();
 
@@ -99,7 +96,7 @@ internal static class NodaTimeConversions
     {
         var builder = new StringBuilder(GeneratedText.Header);
         _ = builder.Append("\nnamespace ").Append(Namespace).Append("\n{\n");
-        _ = builder.Append(GeneratedText.Indent).Append("internal static class ").Append(ShortClassName).Append('\n');
+        _ = builder.Append(LibraryConverters.ClassDeclaration).Append(ShortClassName).Append('\n');
         _ = builder.Append(GeneratedText.Indent).Append("{\n");
         for (var index = 0; index < Table.Length; index++)
         {

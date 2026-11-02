@@ -18,7 +18,10 @@ public sealed class GeneratedSourceTests
     {
         var run = GeneratorHarness.Run(OutputKind.Sql, "public class Sample;", GeneratorHarness.UsersFile);
 
-        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs", "SqlSource-Exceptions.g.cs"], ignoreOrder: true);
+        run.Sources.Keys.ShouldBe(
+            [GeneratedFile.EmbeddedAttributeName, "SqlSourceGenerateAttribute.g.cs", "SqlSource-Exceptions.g.cs"],
+            ignoreOrder: true
+        );
         run.Sources["SqlSourceGenerateAttribute.g.cs"].ShouldBe(AttributeSource.Text);
         run.ShouldBeClean();
     }
@@ -59,7 +62,12 @@ public sealed class GeneratedSourceTests
 
         run.ShouldBeClean();
         run.Sources.Keys.ShouldBe(
-            ["SqlSourceGenerateAttribute.g.cs", "SqlSource-Exceptions.g.cs", GeneratorHarness.SampleFile],
+            [
+                GeneratedFile.EmbeddedAttributeName,
+                "SqlSourceGenerateAttribute.g.cs",
+                "SqlSource-Exceptions.g.cs",
+                GeneratorHarness.SampleFile,
+            ],
             ignoreOrder: true
         );
         run.Sources[GeneratorHarness.SampleFile]

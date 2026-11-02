@@ -77,11 +77,15 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
-    // The attribute's file, which every compilation gets before the pipeline runs.
+    // The attribute's file, which every compilation gets before the pipeline runs, with Roslyn's
+    // Microsoft.CodeAnalysis.EmbeddedAttribute, which marks its types and a library's class of conversions as the
+    // project's own, unseen by a project that sees its internals.
     private static void RegisterAttribute(IncrementalGeneratorInitializationContext context) =>
         context.RegisterPostInitializationOutput(static output =>
-            output.AddSource(AttributeSource.HintName, SourceText.From(AttributeSource.Text, Encoding.UTF8))
-        );
+        {
+            output.AddEmbeddedAttributeDefinition();
+            output.AddSource(AttributeSource.HintName, SourceText.From(AttributeSource.Text, Encoding.UTF8));
+        });
 
     // The exceptions' file, which every compilation gets unless one referenced assembly that it sees gives it both
     // exceptions.  The probe, like the framework check, runs on every compilation, two lookups and nothing for each

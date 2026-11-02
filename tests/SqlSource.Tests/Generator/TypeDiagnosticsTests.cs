@@ -16,6 +16,7 @@ public sealed class TypeDiagnosticsTests
     // The files every project gets, and a type with a problem adds none.
     private static readonly string[] AttributeAndExceptions =
     [
+        GeneratedFile.EmbeddedAttributeName,
         "SqlSourceGenerateAttribute.g.cs",
         "SqlSource-Exceptions.g.cs",
     ];

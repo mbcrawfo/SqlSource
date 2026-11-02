@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Settings;
+using SqlSource.Testing.Generator;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
 using RoslynOutputKind = Microsoft.CodeAnalysis.OutputKind;
@@ -52,14 +53,25 @@ public sealed partial class AttributeSourceTests
         );
     }
 
+    // A project that sees the internals of another one that uses SqlSource sees none of the other's copies.
     [Fact]
-    public void GeneratedTypes_ComparedWithTheFile_AreEveryTypeItDeclares()
+    public void Text_EveryType_IsEmbedded()
     {
-        var declared = Declaration()
-            .Matches(AttributeSource.Text)
-            .Select(match => "SqlSource." + match.Groups["name"].Value);
+        var compilation = CompileText();
 
-        AttributeSource.GeneratedTypes.ShouldBe(declared, ignoreOrder: true);
+        var types = compilation
+            .GetSymbolsWithName(_ => true, SymbolFilter.Type, TestContext.Current.CancellationToken)
+            .OfType<INamedTypeSymbol>()
+            .Where(type => type.ContainingNamespace.ToDisplayString() == "SqlSource")
+            .ToList();
+
+        types.Count.ShouldBe(7);
+        types.ShouldAllBe(type =>
+            type.GetAttributes()
+                .Any(attribute =>
+                    attribute.AttributeClass!.ToDisplayString() == "Microsoft.CodeAnalysis.EmbeddedAttribute"
+                )
+        );
     }
 
     // A library's converters have to be found from the project that references it, so the attribute stays in metadata.
@@ -86,6 +98,7 @@ public sealed partial class AttributeSourceTests
         var library = CompileLibrary(
             "Library",
             AttributeSource.Text,
+            GeneratedFile.EmbeddedAttribute,
             "public static class C { [SqlSource.SqlSourceConverter] public static int F(long v) => (int)v; }"
         );
         using var image = new MemoryStream();
@@ -118,16 +131,19 @@ public sealed partial class AttributeSourceTests
             .Split(Path.PathSeparator)
             .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path));
 
+    // The language of a project that targets a framework older than .NET 8, which gets the attribute's file too.
+    private static readonly CSharpParseOptions CSharp73 = new(LanguageVersion.CSharp7_3);
+
     private static CSharpCompilation CompileText() =>
         CSharpCompilation.Create(
             "AttributeText",
-            [CSharpSyntaxTree.ParseText(AttributeSource.Text, new CSharpParseOptions(LanguageVersion.CSharp7_3))],
+            [
+                CSharpSyntaxTree.ParseText(AttributeSource.Text, CSharp73),
+                CSharpSyntaxTree.ParseText(GeneratedFile.EmbeddedAttribute, CSharp73),
+            ],
             References(),
             new CSharpCompilationOptions(RoslynOutputKind.DynamicallyLinkedLibrary)
         );
-
-    [GeneratedRegex(@"internal (?:enum|sealed class) (?<name>\w+)")]
-    private static partial Regex Declaration();
 
     [GeneratedRegex(@"^\s*(?<name>\w+) = (?<value>\d+),", RegexOptions.Multiline)]
     private static partial Regex Member();

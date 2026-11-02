@@ -724,7 +724,7 @@ await Should.ThrowAsync<UnexpectedRowCountException>(() => connection.GetActiveU
 
 The test project uses App's `UnexpectedRowCountException` and `TransactionRolledBackException`, whether it uses SqlSource or not, and the attribute and enums of each project do not conflict.  When App uses the exceptions of a [shared project](#share-the-exceptions), the shared project grants `InternalsVisibleTo` to App.Tests too.
 
-Rules: [projects that share internals](generator.md#projects-that-share-internals), and [known issues](generator.md#known-issues) for an editor that still shows the warning.
+Rules: [projects that share internals](generator.md#projects-that-share-internals).
 
 <a id="share-the-exceptions"></a>
 

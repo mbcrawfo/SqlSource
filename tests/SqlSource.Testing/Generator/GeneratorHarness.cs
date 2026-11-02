@@ -4,7 +4,6 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -12,7 +11,6 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Generation.Paths;
@@ -73,13 +71,6 @@ internal static class GeneratorHarness
             .Split(Path.PathSeparator)
             .Select(path => MetadataReference.CreateFromFile(path)),
     ];
-
-    // The analyzers that the compiler finds in the generator's assembly, looked up the way it looks them up in a
-    // package: by their attribute, not by name.
-    private static readonly ImmutableArray<DiagnosticAnalyzer> PackageAnalyzers = new AnalyzerFileReference(
-        typeof(SqlSourceGenerator).Assembly.Location,
-        new LoadedAssembly()
-    ).GetAnalyzers(LanguageNames.CSharp);
 
     // The source of the type App.Sample, whose attribute has SqlLocation.Direct and these arguments after it: null for
     // none, or text such as Parameters = "keep-comments".
@@ -356,15 +347,13 @@ internal static class GeneratorHarness
     }
 
     // The compiler's warnings and errors for the source together with the generated code, as a build of the project
-    // reports them: after the analyzers that the package brings have run.  Without them it is what the compiler
-    // reports on its own.
+    // reports them.  The package brings no analyzer, so they are what the compiler reports on its own.
     public static async Task<IReadOnlyList<string>> BuildAsync(
         OutputKind? output,
         string source,
         SqlFile[] sqlFiles,
         MetadataReference[] references,
         bool warningsAsErrors = false,
-        bool packageAnalyzers = true,
         string? dialect = null,
         IReadOnlyDictionary<string, string?>? properties = null
     )
@@ -375,7 +364,6 @@ internal static class GeneratorHarness
             sqlFiles,
             references,
             warningsAsErrors,
-            packageAnalyzers,
             dialect,
             properties
         );
@@ -384,7 +372,7 @@ internal static class GeneratorHarness
 
     // The same, with the code the generator gave the project by name.  The properties are what MSBuild tells the
     // generator.
-    public static async Task<(
+    public static Task<(
         IReadOnlyList<string> Diagnostics,
         IReadOnlyDictionary<string, string> Sources
     )> BuildProjectAsync(
@@ -393,7 +381,6 @@ internal static class GeneratorHarness
         SqlFile[] sqlFiles,
         MetadataReference[] references,
         bool warningsAsErrors = false,
-        bool packageAnalyzers = true,
         string? dialect = null,
         IReadOnlyDictionary<string, string?>? properties = null
     )
@@ -417,15 +404,13 @@ internal static class GeneratorHarness
                 TestContext.Current.CancellationToken
             );
 
-        var diagnostics = packageAnalyzers
-            ? await updated
-                .WithAnalyzers(PackageAnalyzers)
-                .GetAllDiagnosticsAsync(TestContext.Current.CancellationToken)
-            : updated.GetDiagnostics(TestContext.Current.CancellationToken);
+        var diagnostics = updated.GetDiagnostics(TestContext.Current.CancellationToken);
 
-        return (
-            [.. diagnostics.Where(diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning).Select(Format)],
-            SourcesOf(driver)
+        return Task.FromResult<(IReadOnlyList<string>, IReadOnlyDictionary<string, string>)>(
+            (
+                [.. diagnostics.Where(diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning).Select(Format)],
+                SourcesOf(driver)
+            )
         );
     }
 
@@ -454,14 +439,6 @@ internal static class GeneratorHarness
 }
 
 internal sealed record SourceFile(string Path, string Text);
-
-// The generator's assembly is already loaded, by the reference to its project.
-internal sealed class LoadedAssembly : IAnalyzerAssemblyLoader
-{
-    public void AddDependencyLocation(string fullPath) { }
-
-    public Assembly LoadFromPath(string fullPath) => typeof(SqlSourceGenerator).Assembly;
-}
 
 // A .sql file, or any other additional file, as the compiler gives it to the generator.
 internal sealed record SqlFile(string Path, string? Text)
@@ -522,6 +499,22 @@ internal static class GeneratedFile
 
     public const string Header =
         ModelHeader + "#pragma warning disable CS0108, CS0114 // A query can have the name of an inherited member.\n";
+
+    // The name of the file of Roslyn's Microsoft.CodeAnalysis.EmbeddedAttribute, which every project gets.
+    public const string EmbeddedAttributeName = "Microsoft.CodeAnalysis.EmbeddedAttribute.cs";
+
+    // Roslyn's Microsoft.CodeAnalysis.EmbeddedAttribute, which the generator adds beside the attribute's file and which
+    // the attribute's types and a library's class of conversions are marked with, for a test that compiles one of those
+    // files without the generator.
+    public const string EmbeddedAttribute = """
+        namespace Microsoft.CodeAnalysis
+        {
+            internal sealed partial class EmbeddedAttribute : global::System.Attribute
+            {
+            }
+        }
+
+        """;
 
     public const string RowBuffer =
         RowBufferToImmutable + RowBufferAsImmutableLine + RowBufferToGrow + RowBufferGrowLine + RowBufferAfterGrow;

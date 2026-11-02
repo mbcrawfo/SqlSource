@@ -172,8 +172,17 @@ public sealed class EndToEndTests
     {
         var assembly = typeof(EndToEndTests).Assembly;
 
-        AttributeSource.GeneratedTypes.ShouldNotBeEmpty();
-        foreach (var name in AttributeSource.GeneratedTypes)
+        string[] names =
+        [
+            AttributeSource.AttributeMetadataName,
+            AttributeSource.LocationMetadataName,
+            AttributeSource.OutputMetadataName,
+            AttributeSource.ModelTypeMetadataName,
+            AttributeSource.CollectionTypeMetadataName,
+            AttributeSource.MethodLocationMetadataName,
+            AttributeSource.ConverterAttributeMetadataName,
+        ];
+        foreach (var name in names)
         {
             assembly.GetType(name).ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
         }
