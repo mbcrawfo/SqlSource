@@ -25,7 +25,7 @@
 - **The count holds:** 28 branches in 13 files, as the spec says, counting `SqlDescribableDialects.EngineOf` and `QueryTyper`'s engine from a `SidecarType`.
 - **`QueryTyper.Chosen` takes its engine from the type's class, not from an engine** (`type is SqlServerType ? SqlServer : PostgreSql`, after a guard that returns for any other class).  A class hierarchy cannot be switched exhaustively, so the guard and the engine become one `switch` statement over the type, whose `default` is the guard's return.  A new `SidecarType` then falls to the unknown-engine path, never to PostgreSQL.
 - **The `_ =>` rule goes in `Generation/AGENTS.md`, as the spec says, and in `Settings/AGENTS.md`, where the enum is:** `src/SqlSource/AGENTS.md`, which would cover `Parsing/` too, is at its 8 KB limit.
-- **IDE0072 is off beside CS8524:** with `EnforceCodeStyleInBuild` and `latest-all` it asks for the same discard arm.  CS8509 still catches a missing member.
+- **IDE0072 is off beside CS8524:** with `EnforceCodeStyleInBuild` and `latest-all` it asks for the same discard arm.  It also made every enum switch with a discard name each member, so, by the owner's choice on review finding R1-F1, every enum switch expression under `src/SqlSource` drops its discard too and CS8509 guards them all.  Five tests that passed an unnamed value (`(Enum)99`) to pin the old fallbacks go with the fallbacks; no enum the generator switches on is ever cast from a number read from input.
 
 ## Review Focus
 

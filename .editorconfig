@@ -247,10 +247,10 @@ dotnet_diagnostic.CA2100.severity = none
 dotnet_diagnostic.IDE0130.severity = none
 
 [src/SqlSource/**.cs]
-# CS8524 (a switch expression does not handle an unnamed enum value) and IDE0072 (populate switch), which asks for a
-# discard for the same reason: a switch expression over DatabaseEngine or SqlDialect names every member and has no
-# discard, so that adding a member fails the build with CS8509 at every switch.  The code never makes an unnamed value.
-# See docs/architecture/generator.md#adding-a-database-engine.
+# CS8524 (a switch expression does not handle an unnamed enum value) and IDE0072 (populate switch), which both ask a
+# switch expression over an enum for a discard arm: every one in the generator names each member and has no discard, so
+# that adding a member to any enum fails the build with CS8509 at every switch over it.  The code never makes an unnamed
+# value.  See docs/architecture/generator.md#adding-a-database-engine.
 dotnet_diagnostic.CS8524.severity = none
 dotnet_diagnostic.IDE0072.severity = none
 

@@ -9,7 +9,8 @@
 
 ## Engines
 
-- **Decide on a `DatabaseEngine` only with a switch expression that names every member, never with a `_ =>` arm, a ternary or an `if` on one member.**  A missing member is then CS8509 at every place a new engine must decide; `.editorconfig` turns CS8524 and IDE0072 off for that.  A statement takes its value from such a switch first.
+- **Decide on a `DatabaseEngine` only with a switch expression that names every member, never with a ternary or an `if` on one member.**  A statement takes its value from such a switch first.
+- **A switch expression over any enum names every member and has no `_ =>` arm**, so a new member is CS8509 at every switch over it; `.editorconfig` turns CS8524 and IDE0072 off for that.
 - **Adding an engine follows [the guide](../../../docs/architecture/generator.md#adding-a-database-engine).**
 
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.
