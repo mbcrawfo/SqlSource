@@ -16,6 +16,7 @@ namespace SqlSource.Testing.Generator;
 //   Driver: the references of a run that gives none.
 //   Int, Text: an integer and a string of the engine, as a sidecar describes them.
 //   IntOverrideKey, TextOverrideKey: the names of Int and Text in a `-- type-override:` marker.
+// The members after the record's own give what a shared scenario needs of the engine beyond these.
 //
 // Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
@@ -29,6 +30,9 @@ internal sealed record CorpusEngine(
     string TextOverrideKey
 )
 {
+    // jsonb, the JSON document of PostgreSQL, bound by its name.
+    private static readonly PostgresType PostgresJsonb = ModelRuns.Catalog("jsonb") with { BindName = "jsonb" };
+
     public static readonly CorpusEngine Postgres = new(
         "postgres",
         "postgres",
@@ -40,6 +44,25 @@ internal sealed record CorpusEngine(
     )
     {
         EntryOf = (file, name, parameters, columns) => ModelRuns.Entry(file, name, parameters, columns),
+        NodaTimeReferences =
+        [
+            NpgsqlReferences.Npgsql10,
+            LibraryReferences.NodaTime("3.3.7"),
+            LibraryReferences.NpgsqlNodaTime("10.0.3"),
+        ],
+        NodaTimeTypes =
+        [
+            ("at", ModelRuns.Catalog("timestamptz") with { Name = "timestamp with time zone" }),
+            ("day", ModelRuns.Catalog("date")),
+        ],
+        Json = PostgresJsonb,
+        UnboundedText = ModelRuns.Catalog("text") with { BindName = "text" },
+        JsonArray = ModelRuns.ArrayOf(PostgresJsonb, "_jsonb") with { BindName = "jsonb[]" },
+        OwnScenarios =
+        [
+            new("driver-npgsql8", engine => QueryMethodCorpus.Driver(engine, NpgsqlReferences.Npgsql8)),
+            new("driver-npgsql10", engine => QueryMethodCorpus.Driver(engine, NpgsqlReferences.Npgsql10)),
+        ],
     };
 
     public static readonly CorpusEngine SqlServer = new(
@@ -53,12 +76,45 @@ internal sealed record CorpusEngine(
     )
     {
         EntryOf = MethodRuns.SqlServerEntry,
+        NodaTimeReferences = [SqlClientReferences.SqlClient7, LibraryReferences.NodaTime("3.3.7")],
+        NodaTimeSettings = /*lang=json,strict*/
+            """{"libraryTypes": {"nodaTime": "on"}}""",
+        NodaTimeTypes =
+        [
+            ("day", TestSidecars.SqlServer("date", 3, 10)),
+            ("stamp", TestSidecars.SqlServer("datetime2", 8, 27, 7)),
+            ("clock", TestSidecars.SqlServer("time", 5, 16, 7)),
+            ("moment", TestSidecars.SqlServer("datetimeoffset", 10, 34, 7)),
+        ],
+        Json = TestSidecars.SqlServer("json", -1, 0),
+        UnboundedText = TestSidecars.SqlServer("nvarchar(max)", -1, 0),
     };
 
     public static IReadOnlyList<CorpusEngine> All { get; } = [Postgres, SqlServer];
 
     // The scenarios that only this engine runs, after the shared ones.
     public IReadOnlyList<CorpusScenario> OwnScenarios { get; init; } = [];
+
+    // The references of nodatime: the driver and NodaTime, with the plugin that teaches the driver NodaTime's types
+    // when the engine has one.
+    public MetadataReference[] NodaTimeReferences { get; init; } = [];
+
+    // The settings of nodatime, a JSON object over the project's settings file: what turns NodaTime's types on, when
+    // the engine's driver does not read them itself.
+    public string? NodaTimeSettings { get; init; }
+
+    // The types of the engine that NodaTime's types read and write, each with the name of its columns and parameters.
+    public IReadOnlyList<(string Name, SidecarType Type)> NodaTimeTypes { get; init; } = [];
+
+    // A JSON document of the engine, which a class is read from and written to whole.
+    public SidecarType Json { get; init; } = null!;
+
+    // A string of the engine with no limit on its length, which a column marker with `json` reads as JSON.
+    public SidecarType UnboundedText { get; init; } = null!;
+
+    // An array of Json, whose elements a class is read from and written to one by one, or null when the engine has
+    // no arrays.
+    public SidecarType? JsonArray { get; init; }
 
     // The engine's entry of a query for its current hash: with rows when it has columns, and without when they are
     // null.  The parameters and columns are numbered by their place.
