@@ -2,7 +2,7 @@
 
 ## Problem
 
-Raising the floor of [`src/SqlSource`](../../src/SqlSource) from Roslyn 4.8.0 to 4.14.0 adopted only `AddEmbeddedAttributeDefinition`.  The public API of `Microsoft.CodeAnalysis` and `Microsoft.CodeAnalysis.CSharp` that 4.9 to 4.14 added for incremental pipelines, caching and allocation was not looked at, so the pipeline's steps may cost more time or allocations than 4.14 allows.
+Raising the floor of [`src/SqlSource`](../../src/SqlSource) from Roslyn 4.8.0 to 4.14.0 adopted only the compiler's handling of `Microsoft.CodeAnalysis.EmbeddedAttribute`, whose definition the generator writes itself, since `AddEmbeddedAttributeDefinition` writes it on 4.14 without the generated-code header.  The public API of `Microsoft.CodeAnalysis` and `Microsoft.CodeAnalysis.CSharp` that 4.9 to 4.14 added for incremental pipelines, caching and allocation was not looked at, so the pipeline's steps may cost more time or allocations than 4.14 allows.
 
 The floor raise also lets a collection expression target `ImmutableArray<T>`, and the style rules IDE0301, IDE0303, IDE0304 and IDE0305 now flag the generator's existing `ImmutableArray.Create`, `Empty`, builder and `ToImmutableArray()` calls.  The `[src/SqlSource/**.cs]` section of [`.editorconfig`](../../.editorconfig) lowers those four rules to suggestions, so the calls stay as they are.
 

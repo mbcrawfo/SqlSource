@@ -77,13 +77,17 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
-    // The attribute's file, which every compilation gets before the pipeline runs, with Roslyn's
-    // Microsoft.CodeAnalysis.EmbeddedAttribute, which marks its types and a library's class of conversions as the
-    // project's own, unseen by a project that sees its internals.
+    // The attribute's file, which every compilation gets before the pipeline runs, with the generator's own file of
+    // Microsoft.CodeAnalysis.EmbeddedAttribute, which marks its types, a library's class of conversions and the row
+    // buffer as the project's own, unseen by a project that sees its internals.  AttributeSource.EmbeddedText says why
+    // it is not AddEmbeddedAttributeDefinition.
     private static void RegisterAttribute(IncrementalGeneratorInitializationContext context) =>
         context.RegisterPostInitializationOutput(static output =>
         {
-            output.AddEmbeddedAttributeDefinition();
+            output.AddSource(
+                AttributeSource.EmbeddedHintName,
+                SourceText.From(AttributeSource.EmbeddedText, Encoding.UTF8)
+            );
             output.AddSource(AttributeSource.HintName, SourceText.From(AttributeSource.Text, Encoding.UTF8));
         });
 

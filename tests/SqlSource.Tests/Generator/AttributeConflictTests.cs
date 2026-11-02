@@ -297,6 +297,28 @@ public sealed class AttributeConflictTests
         diagnostics[0].ShouldContain($"'{name}' does not exist in the namespace 'SqlSource'");
     }
 
+    // Another package's generator adds Roslyn's own Microsoft.CodeAnalysis.EmbeddedAttribute to the project, which
+    // merges with SqlSource's declaration of it.
+    [Fact]
+    public async Task Build_ProjectWithAnotherGeneratorsEmbeddedAttribute_CompilesClean()
+    {
+        const string Source =
+            "using SqlSource;\n[SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]\n"
+            + "internal partial class Sample { }";
+
+        var (diagnostics, sources) = await GeneratorHarness.BuildProjectAsync(
+            OutputKind.Sql,
+            Source,
+            [GeneratorHarness.UsersFile],
+            [],
+            otherGenerator: new RoslynEmbeddedAttributeGenerator()
+        );
+
+        diagnostics.ShouldBeEmpty();
+        sources.Keys.ShouldContain(GeneratedFile.EmbeddedAttributeName);
+        sources.Keys.ShouldContain("Microsoft.CodeAnalysis.EmbeddedAttribute.cs");
+    }
+
     // A project that declares Microsoft.CodeAnalysis.EmbeddedAttribute itself, as another generator may have it do,
     // compiles only when its declaration can be merged with Roslyn's internal sealed partial class: it is partial,
     // internal, not static, and a class that derives from System.Attribute or names no base.  Otherwise the build fails

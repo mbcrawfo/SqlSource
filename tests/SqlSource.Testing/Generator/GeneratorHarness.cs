@@ -272,14 +272,17 @@ internal static class GeneratorHarness
         );
 
     // Step tracking is on, so that a test can read why each step of the pipeline ran.  The options are what MSBuild
-    // tells the generator.
+    // tells the generator.  The other generator, when one is given, runs after SqlSource's, as another package's does.
     public static GeneratorDriver CreateDriver(
         IEnumerable<AdditionalText> sqlFiles,
         TestOptionsProvider options,
-        CSharpParseOptions? parseOptions = null
+        CSharpParseOptions? parseOptions = null,
+        IIncrementalGenerator? otherGenerator = null
     ) =>
         CSharpGeneratorDriver.Create(
-            [new SqlSourceGenerator().AsSourceGenerator()],
+            otherGenerator is null
+                ? [new SqlSourceGenerator().AsSourceGenerator()]
+                : [new SqlSourceGenerator().AsSourceGenerator(), otherGenerator.AsSourceGenerator()],
             sqlFiles,
             parseOptions ?? ParseOptions,
             options,
@@ -355,7 +358,8 @@ internal static class GeneratorHarness
         MetadataReference[] references,
         bool warningsAsErrors = false,
         string? dialect = null,
-        IReadOnlyDictionary<string, string?>? properties = null
+        IReadOnlyDictionary<string, string?>? properties = null,
+        IIncrementalGenerator? otherGenerator = null
     )
     {
         var (diagnostics, _) = await BuildProjectAsync(
@@ -365,13 +369,14 @@ internal static class GeneratorHarness
             references,
             warningsAsErrors,
             dialect,
-            properties
+            properties,
+            otherGenerator
         );
         return diagnostics;
     }
 
-    // The same, with the code the generator gave the project by name.  The properties are what MSBuild tells the
-    // generator.
+    // The same, with the code the generators gave the project by name.  The properties are what MSBuild tells the
+    // generator, and the other generator runs beside it, as CreateDriver says.
     public static Task<(
         IReadOnlyList<string> Diagnostics,
         IReadOnlyDictionary<string, string> Sources
@@ -382,7 +387,8 @@ internal static class GeneratorHarness
         MetadataReference[] references,
         bool warningsAsErrors = false,
         string? dialect = null,
-        IReadOnlyDictionary<string, string?>? properties = null
+        IReadOnlyDictionary<string, string?>? properties = null,
+        IIncrementalGenerator? otherGenerator = null
     )
     {
         var compilation = CreateCompilation([new SourceFile(SourcePath, source)], references: references);
@@ -395,7 +401,8 @@ internal static class GeneratorHarness
 
         var driver = CreateDriver(
                 WithProjectSettings(sqlFiles, ProjectSettings(output, dialect)).Select(file => file.ToAdditionalText()),
-                new TestOptionsProvider(properties)
+                new TestOptionsProvider(properties),
+                otherGenerator: otherGenerator
             )
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
@@ -414,15 +421,12 @@ internal static class GeneratorHarness
         );
     }
 
-    // The code the generator gave, by name.
+    // The code the generators gave, by name: SqlSource's, and the other generator's when there is one.
     private static Dictionary<string, string> SourcesOf(GeneratorDriver driver) =>
         driver
             .GetRunResult()
-            .Results.Single()
-            .GeneratedSources.ToDictionary(
-                generated => generated.HintName,
-                generated => generated.SourceText.ToString()
-            );
+            .Results.SelectMany(result => result.GeneratedSources)
+            .ToDictionary(generated => generated.HintName, generated => generated.SourceText.ToString());
 
     // "SQLSRC001 /app/Repo/Sample.cs(3,14)-(3,20): message", with lines and columns counted from one as an IDE
     // shows them.
@@ -439,6 +443,14 @@ internal static class GeneratorHarness
 }
 
 internal sealed record SourceFile(string Path, string Text);
+
+// Another package's generator that adds Roslyn's Microsoft.CodeAnalysis.EmbeddedAttribute, which SqlSource's own
+// declaration must merge with.
+internal sealed class RoslynEmbeddedAttributeGenerator : IIncrementalGenerator
+{
+    public void Initialize(IncrementalGeneratorInitializationContext context) =>
+        context.RegisterPostInitializationOutput(static output => output.AddEmbeddedAttributeDefinition());
+}
 
 // A .sql file, or any other additional file, as the compiler gives it to the generator.
 internal sealed record SqlFile(string Path, string? Text)
@@ -500,12 +512,12 @@ internal static class GeneratedFile
     public const string Header =
         ModelHeader + "#pragma warning disable CS0108, CS0114 // A query can have the name of an inherited member.\n";
 
-    // The name of the file of Roslyn's Microsoft.CodeAnalysis.EmbeddedAttribute, which every project gets.
-    public const string EmbeddedAttributeName = "Microsoft.CodeAnalysis.EmbeddedAttribute.cs";
+    // The name of SqlSource's file of Microsoft.CodeAnalysis.EmbeddedAttribute, which every project gets.
+    public const string EmbeddedAttributeName = "SqlSource-EmbeddedAttribute.g.cs";
 
-    // Roslyn's Microsoft.CodeAnalysis.EmbeddedAttribute, which the generator adds beside the attribute's file and which
-    // the attribute's types and a library's class of conversions are marked with, for a test that compiles one of those
-    // files without the generator.
+    // The declaration of Microsoft.CodeAnalysis.EmbeddedAttribute, Roslyn's, which SqlSource's file holds and which the
+    // attribute's types, a library's class of conversions and the row buffer are marked with, for a test that compiles
+    // one of those files without the generator.
     public const string EmbeddedAttribute = """
         namespace Microsoft.CodeAnalysis
         {

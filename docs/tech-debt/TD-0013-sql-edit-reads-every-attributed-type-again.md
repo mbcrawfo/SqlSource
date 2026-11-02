@@ -25,7 +25,7 @@ None for a project of ordinary size: about 30 µs and 10 KB for each attributed 
 
 1. Check the IDE first: if it builds a new compilation for an edit to an additional file, nothing can be saved and this item closes.
 2. Measure `TargetTypeReader.Read` on its own and cut what it allocates.  At most the difference between the first two columns is SqlSource's, and that difference also holds the rest of the pipeline.
-3. Check whether `AddEmbeddedAttributeDefinition`, which the post-initialization step now calls, changes what the driver does with the compilation.
+3. Check whether the post-initialization step's file of `Microsoft.CodeAnalysis.EmbeddedAttribute` changes what the driver does with the compilation.
 4. Shipping the attribute in an assembly removes the step and reverses the epic's decision.  It is not worth that for this cost alone.
 
 ## Trigger
