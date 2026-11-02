@@ -488,8 +488,8 @@ internal sealed record GeneratorRun(
 }
 
 // The lines that start a generated file: Header a file of queries, ModelHeader a file of models.  RowBuffer is the
-// buffer a file of methods ends with when one reads its rows into it, at the depth of a namespace.  They are the
-// tests' own text, not read from the product, so the snapshots that hold them still say what the text is.
+// file of the buffer that a project's methods read their rows into, when one does.  They are the tests' own text, not
+// read from the product, so the snapshots that hold them still say what the text is.
 internal static class GeneratedFile
 {
     // Ends a line of an expected text that goes on in the next, written so to keep within the width of a line.
@@ -517,7 +517,14 @@ internal static class GeneratedFile
         """;
 
     public const string RowBuffer =
-        RowBufferToImmutable + RowBufferAsImmutableLine + RowBufferToGrow + RowBufferGrowLine + RowBufferAfterGrow;
+        ModelHeader
+        + "\nnamespace SqlSource\n{\n"
+        + RowBufferToImmutable
+        + RowBufferAsImmutableLine
+        + RowBufferToGrow
+        + RowBufferGrowLine
+        + RowBufferAfterGrow
+        + "}\n";
 
     // The buffer up to the line of ToImmutableArray that is longer than the width of a line here, up to the line of
     // Grow that is, and after it.
@@ -526,7 +533,8 @@ internal static class GeneratedFile
             /// The rows of a query method, read into buffers from the shared array pool: one of up to 1,024 elements is
             /// rented and returned cleared, and a larger one is left to the garbage collector.
             /// </summary>
-            file struct SqlSourceRowBuffer<T>
+            [global::Microsoft.CodeAnalysis.Embedded]
+            internal struct SqlSourceRowBuffer<T>
                 where T : class
             {
                 private object[]? items;

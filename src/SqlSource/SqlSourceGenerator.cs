@@ -953,7 +953,20 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(methodDiagnostics, ReportAll);
         context.RegisterSourceOutput(settingsFileLibraryDiagnostics, ReportAll);
         context.RegisterSourceOutput(conflicts, ReportConflicts);
-        context.RegisterSourceOutput(methodOutputs, AddFile);
+        context.RegisterSourceOutput(
+            methodOutputs.Select(static (output, _) => (output.HintName, output.Source)),
+            AddFile
+        );
+
+        // Whether a method the project keeps reads its rows into the buffer, which almost never changes: the buffer's
+        // file is written once for the project, however many methods use it.
+        var usesRowBuffer = methodOutputs
+            .Select(static (output, _) => output.UsesRowBuffer)
+            .Collect()
+            .Select(static (each, _) => each.Contains(true))
+            .WithTrackingName(TrackingNames.UsesRowBuffer);
+
+        context.RegisterSourceOutput(usesRowBuffer, AddRowBuffer);
 
         // The engines of the project's CodeGen queries, which almost never change.
         var codeGenEngines = typeMethods
@@ -1019,6 +1032,15 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         if (file.Source is not null)
         {
             output.AddSource(file.HintName, SourceText.From(file.Source, Encoding.UTF8));
+        }
+    }
+
+    // The project's one row buffer, when a method it keeps uses it.
+    private static void AddRowBuffer(SourceProductionContext output, bool usesRowBuffer)
+    {
+        if (usesRowBuffer)
+        {
+            output.AddSource(RowBuffer.HintName, SourceText.From(RowBuffer.Source, Encoding.UTF8));
         }
     }
 

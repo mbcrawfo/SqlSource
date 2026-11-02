@@ -147,6 +147,8 @@ internal static class TrackingNames
 
     public const string MethodOutput = nameof(MethodOutput);
 
+    public const string UsesRowBuffer = nameof(UsesRowBuffer);
+
     public const string MethodDiagnostics = nameof(MethodDiagnostics);
 
     public const string SettingsFileLibraryUses = nameof(SettingsFileLibraryUses);

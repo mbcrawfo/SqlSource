@@ -4,6 +4,7 @@ using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Shouldly;
+using SqlSource.Generation.Emitting;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using Xunit;
@@ -12,14 +13,34 @@ using static SqlSource.Testing.Generator.ModelRuns;
 namespace SqlSource.Tests.Generator;
 
 // The buffer a many method reads its rows into when it returns an array, a list, an immutable array or one of their
-// interfaces: written once at the end of a file of methods that uses it, at the depth of the namespace, and named from
+// interfaces: written once for the project, in a file of its own, when a method it keeps uses it, and named from
 // global:: in each method.  Each run is at CodeGen under postgres on Npgsql 10, and every method must compile without
 // a warning.
 public sealed class RowBufferTests
 {
-    private const string Struct = "file struct SqlSourceRowBuffer<T>\n";
+    private const string Struct = "struct SqlSourceRowBuffer";
+
+    private const string NewBuffer = "new global::SqlSource.SqlSourceRowBuffer<";
 
     private const string Select = "SELECT id, name FROM users;\n";
+
+    private const string APath = "/app/Repo/A.sql";
+
+    private const string BPath = "/app/Repo/B.sql";
+
+    // Two types of one namespace, each claiming a file of its own.
+    private const string TwoTypesSource = """
+        using SqlSource;
+
+        namespace App
+        {
+            [SqlSourceGenerate(Path = "A.sql")]
+            public partial class First;
+
+            [SqlSourceGenerate(Path = "B.sql")]
+            public partial class Second;
+        }
+        """;
 
     private static readonly SqlFile ListUsers = new(GeneratorHarness.UsersPath, "-- name: ListUsers\n" + Select);
 
@@ -38,9 +59,10 @@ public sealed class RowBufferTests
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        methods.ShouldContain("var rows = new global::App.SqlSourceRowBuffer<global::App.ListUsersDto>();\n");
+        methods.ShouldContain("var rows = new global::SqlSource.SqlSourceRowBuffer<global::App.ListUsersDto>();\n");
         methods.ShouldContain("return rows." + result + "();\n");
-        Count(methods, Struct).ShouldBe(1);
+        methods.ShouldNotContain(Struct);
+        run.Sources[RowBuffer.HintName].ShouldBe(RowBuffer.Source);
     }
 
     [Theory]
@@ -83,9 +105,10 @@ public sealed class RowBufferTests
         methods.ShouldContain("var rows = " + buffer + ";\n");
         methods.ShouldContain("return " + result + ";\n");
         methods.ShouldNotContain("SqlSourceRowBuffer");
+        run.Sources.Keys.ShouldNotContain(RowBuffer.HintName);
     }
 
-    // One of each pooled type in one file: the struct is written once, and every member of it, ToList and
+    // One of each pooled type in one file: the buffer is written once, and every member of it, ToList and
     // ToImmutableArray among them, compiles beside a method of each pooled type.
     [Fact]
     public void Run_MethodOfEveryPooledType_CompilesWithOneBufferAndNoWarning()
@@ -116,33 +139,38 @@ public sealed class RowBufferTests
         run.ShouldBeClean();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        Count(methods, Struct).ShouldBe(1);
-        Count(methods, "new global::App.SqlSourceRowBuffer<").ShouldBe(collections.Length);
+        methods.ShouldNotContain(Struct);
+        Count(methods, NewBuffer).ShouldBe(collections.Length);
+        run.Sources[RowBuffer.HintName].ShouldBe(RowBuffer.Source);
     }
 
+    // Two types, each with a pooled method in a file of methods of its own, share the project's one buffer.
     [Fact]
-    public void Run_SeveralPooledMethods_WriteTheBufferOnce()
+    public void Run_PooledMethodsInSeveralFiles_WriteOneBufferFile()
     {
-        var file = new SqlFile(
-            GeneratorHarness.UsersPath,
-            "-- name: ListUsers\n-- collection-type: Array\n"
-                + Select
-                + "\n-- name: ListOthers\n-- collection-type: IEnumerable\n"
-                + Select
-                + "\n-- name: ListMore\n-- collection-type: IReadOnlyList\n"
-                + Select
+        var a = new SqlFile(APath, "-- name: ListFirst\n" + Select);
+        var b = new SqlFile(BPath, "-- name: ListSecond\n-- collection-type: List\n" + Select);
+
+        var run = MethodRuns.Run(
+            TwoTypesSource,
+            a,
+            Sidecars.Of(a, Users(a, "ListFirst")),
+            b,
+            Sidecars.Of(b, Users(b, "ListSecond"))
         );
 
-        var run = MethodRuns.Run(file, [Users(file, "ListUsers"), Users(file, "ListOthers"), Users(file, "ListMore")]);
-
         run.ShouldBeClean();
-        var methods = run.Sources[MethodRuns.MethodsFile];
-        Count(methods, Struct).ShouldBe(1);
-        Count(methods, "new global::App.SqlSourceRowBuffer<").ShouldBe(3);
+        run.Sources.Keys.Count(key => key == RowBuffer.HintName).ShouldBe(1);
+        run.Sources[RowBuffer.HintName].ShouldBe(RowBuffer.Source);
+        foreach (var name in new[] { "App.First-Methods.g.cs", "App.Second-Methods.g.cs" })
+        {
+            run.Sources[name].ShouldNotContain(Struct);
+            Count(run.Sources[name], NewBuffer).ShouldBe(1);
+        }
     }
 
     [Fact]
-    public void Run_FileWithNoPooledMethod_HasNoBuffer()
+    public void Run_ProjectWithNoPooledMethod_HasNoBufferFile()
     {
         var file = new SqlFile(
             GeneratorHarness.UsersPath,
@@ -160,6 +188,7 @@ public sealed class RowBufferTests
 
         run.ShouldBeClean();
         run.Sources[MethodRuns.MethodsFile].ShouldNotContain("SqlSourceRowBuffer");
+        run.Sources.Keys.ShouldNotContain(RowBuffer.HintName);
     }
 
     // A many method of IAsyncEnumerable yields its rows one at a time, so it uses no buffer.
@@ -176,6 +205,7 @@ public sealed class RowBufferTests
         run.ShouldBeClean();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
         run.Sources[MethodRuns.MethodsFile].ShouldNotContain("SqlSourceRowBuffer");
+        run.Sources.Keys.ShouldNotContain(RowBuffer.HintName);
     }
 
     [Fact]
@@ -191,15 +221,15 @@ public sealed class RowBufferTests
         run.ShouldBeClean();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        Count(methods, Struct).ShouldBe(1);
-        Count(methods, "new global::App.SqlSourceRowBuffer<").ShouldBe(1);
+        run.Sources.Keys.ShouldContain(RowBuffer.HintName);
+        Count(methods, NewBuffer).ShouldBe(1);
         // The one buffer is read by the array method, which follows the streaming method in the file.
         var streaming = methods.IndexOf(" StreamUsers(\n", StringComparison.Ordinal);
         var array = methods.IndexOf(" ListUsers(\n", StringComparison.Ordinal);
         streaming.ShouldBeGreaterThan(-1);
         array.ShouldBeGreaterThan(streaming);
         methods[streaming..array].ShouldNotContain("SqlSourceRowBuffer");
-        methods[array..].ShouldContain("new global::App.SqlSourceRowBuffer<");
+        methods[array..].ShouldContain(NewBuffer);
     }
 
     [Fact]
@@ -214,27 +244,12 @@ public sealed class RowBufferTests
 
         run.ShouldBeClean();
         var methods = run.Sources[MethodRuns.MethodsFile];
-        Count(methods, Struct).ShouldBe(1);
-        Count(methods, "var rows = new global::App.SqlSourceRowBuffer<").ShouldBe(1);
+        run.Sources.Keys.ShouldContain(RowBuffer.HintName);
+        Count(methods, "var rows = " + NewBuffer).ShouldBe(1);
         Count(methods, "var rows = new global::System.Collections.Generic.List<").ShouldBe(1);
     }
 
-    [Fact]
-    public void Run_PooledMethod_WritesTheBufferAfterTheClassInTheNamespace()
-    {
-        var run = MethodRuns.Run(ListUsers, [Users(ListUsers, "ListUsers")]);
-
-        run.ShouldBeClean();
-        run.Sources[MethodRuns.MethodsFile]
-            .ShouldBe(
-                ListUsersMethods(
-                    "new global::App.SqlSourceRowBuffer<global::App.ListUsersDto>()",
-                    "\n" + GeneratedFile.RowBuffer + "}\n"
-                )
-            );
-    }
-
-    // Under no-array-pool the method reads its rows into a list, as before the buffer, and the file has no buffer.
+    // Under no-array-pool the method reads its rows into a list, as before the buffer, and the project has no buffer.
     [Fact]
     public void Run_ArrayMethodUnderNoArrayPool_WritesTheMethodWithAListAndNoBuffer()
     {
@@ -246,9 +261,30 @@ public sealed class RowBufferTests
 
         run.ShouldBeClean();
         run.Sources[MethodRuns.MethodsFile]
-            .ShouldBe(
-                ListUsersMethods("new global::System.Collections.Generic.List<global::App.ListUsersDto>()", "}\n")
-            );
+            .ShouldBe(ListUsersMethods("new global::System.Collections.Generic.List<global::App.ListUsersDto>()"));
+        run.Sources.Keys.ShouldNotContain(RowBuffer.HintName);
+    }
+
+    // The one pooled method clashes with the second type's and is dropped, so no method the project keeps uses the
+    // buffer, though the first type keeps a method that reads one row.
+    [Fact]
+    public void Run_PooledMethodDroppedForAConflict_IsNoReasonForTheBuffer()
+    {
+        var a = new SqlFile(APath, "-- name: Get\n" + Select + "\n-- name: Find -> one\n" + Select);
+        var b = new SqlFile(BPath, "-- name: Get -> one\n" + Select);
+
+        var run = MethodRuns.Run(
+            TwoTypesSource,
+            a,
+            Sidecars.Of(a, Users(a, "Get"), Users(a, "Find")),
+            b,
+            Sidecars.Of(b, Users(b, "Get"))
+        );
+
+        run.Problems().Count(problem => problem.StartsWith("SQLSRC274 ", StringComparison.Ordinal)).ShouldBe(2);
+        run.Sources["App.First-Methods.g.cs"].ShouldContain(" Find(\n");
+        run.Sources["App.First-Methods.g.cs"].ShouldNotContain(" Get(\n");
+        run.Sources.Keys.ShouldNotContain(RowBuffer.HintName);
     }
 
     [Theory]
@@ -272,13 +308,13 @@ public sealed class RowBufferTests
         var run = MethodRuns.Run(ListUsers, [Users(ListUsers, "ListUsers")], source);
 
         run.ShouldBeClean();
-        var methods = MethodsOf(run);
-        methods.ShouldContain("\n    " + Struct);
-        methods.ShouldContain("new global::App.SqlSourceRowBuffer<");
+        MethodsOf(run).ShouldContain(NewBuffer);
+        run.Sources.Keys.ShouldContain(RowBuffer.HintName);
     }
 
+    // The buffer is in the namespace SqlSource, so a type of the user's with its name, the methods on it, is no clash.
     [Fact]
-    public void Run_TypeNamedLikeTheBuffer_NamesTheBufferOtherwise()
+    public void Run_TypeNamedLikeTheBuffer_CompilesBesideIt()
     {
         var source = """
             using SqlSource;
@@ -293,30 +329,28 @@ public sealed class RowBufferTests
         var run = MethodRuns.Run(ListUsers, [Users(ListUsers, "ListUsers")], source);
 
         run.ShouldBeClean();
-        var methods = MethodsOf(run);
-        methods.ShouldContain("file struct SqlSourceRowBufferOfRows<T>\n");
-        methods.ShouldContain("new global::App.SqlSourceRowBufferOfRows<");
+        MethodsOf(run).ShouldContain(NewBuffer);
+        run.Sources.Keys.ShouldContain(RowBuffer.HintName);
     }
 
+    // A namespace of the user's named SqlSource, below App, would hide the buffer's from a name that did not start at
+    // global::.
     [Theory]
-    [InlineData("", "global::SqlSourceRowBuffer<")]
-    [InlineData("namespace @class.Rows;\n\n", "global::@class.Rows.SqlSourceRowBuffer<")]
-    public void Run_TypeInTheGlobalNamespaceOrUnderAnEscapedKeyword_NamesTheBufferFromGlobal(
-        string namespaceLine,
-        string buffer
-    )
+    [InlineData("")]
+    [InlineData("namespace @class.Rows;\n\n")]
+    [InlineData("namespace App.SqlSource;\n\n")]
+    public void Run_TypeInTheGlobalNamespaceOrUnderAnEscapedKeyword_NamesTheBufferFromGlobal(string namespaceLine)
     {
         var source = "using SqlSource;\n\n" + namespaceLine + "[SqlSourceGenerate]\npublic partial class Sample;\n";
 
         var run = MethodRuns.Run(ListUsers, [Users(ListUsers, "ListUsers")], source);
 
         run.ShouldBeClean();
-        MethodsOf(run).ShouldContain(buffer);
+        MethodsOf(run).ShouldContain(NewBuffer);
     }
 
-    // The file of ListUsers's methods on App.Sample, its rows read into the given buffer, the pooled one or a list, and
-    // the end after the extension class: the buffer's struct and the namespace's brace, or the brace alone.
-    private static string ListUsersMethods(string buffer, string end) =>
+    // The file of ListUsers's methods on App.Sample, its rows read into the given buffer.
+    private static string ListUsersMethods(string buffer) =>
         GeneratedFile.Joined(
             $$$"""
             {{{GeneratedFile.ModelHeader}}}
@@ -391,7 +425,8 @@ public sealed class RowBufferTests
                         }
                     }
                 }
-            {{{end}}}
+            }
+
             """
         );
 

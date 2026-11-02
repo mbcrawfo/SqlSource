@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Shouldly;
+using SqlSource.Generation.Emitting;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
@@ -211,8 +212,8 @@ public sealed class AttributeConflictTests
         Places(build).ShouldHaveSingleItem().ShouldStartWith("CS0436 ");
     }
 
-    // Both projects generate App.SqlSourceRowBuffer, as a type private to the methods file, so that neither sees the
-    // other's.  The queries have different names, so that their models are not a conflict of their own.
+    // Both projects generate SqlSource.SqlSourceRowBuffer, marked as embedded, so that neither sees the other's.  The
+    // queries have different names, so that their models are not a conflict of their own.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -241,8 +242,10 @@ public sealed class AttributeConflictTests
         );
 
         diagnostics.ShouldBeEmpty();
-        sources[MethodRuns.MethodsFile].ShouldContain("file struct SqlSourceRowBuffer<T>\n");
-        builtSources[MethodRuns.MethodsFile].ShouldContain("file struct SqlSourceRowBuffer<T>\n");
+        sources.Keys.ShouldContain(RowBuffer.HintName);
+        builtSources.Keys.ShouldContain(RowBuffer.HintName);
+        sources[MethodRuns.MethodsFile].ShouldNotContain("struct SqlSourceRowBuffer");
+        builtSources[MethodRuns.MethodsFile].ShouldNotContain("struct SqlSourceRowBuffer");
     }
 
     // Both projects call a conversion of NodaTime's, so both hold SqlSource.NodaTimeConversions, and the methods this

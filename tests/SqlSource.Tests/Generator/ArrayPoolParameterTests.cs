@@ -2,6 +2,7 @@
 
 using Shouldly;
 using SqlSource.Generation;
+using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
@@ -78,6 +79,7 @@ public sealed class ArrayPoolParameterTests
 
         unpooled.Sources[MethodRuns.MethodsFile].ShouldBe(pooled.Sources[MethodRuns.MethodsFile]);
         pooled.Sources[MethodRuns.MethodsFile].ShouldNotContain("SqlSourceRowBuffer");
+        pooled.Sources.Keys.ShouldNotContain(RowBuffer.HintName);
     }
 
     [Theory]
@@ -97,6 +99,8 @@ public sealed class ArrayPoolParameterTests
         unpooledMethods.ShouldNotBe(pooled.Sources[MethodRuns.MethodsFile]);
         unpooledMethods.ShouldContain(buffer);
         unpooledMethods.ShouldNotContain("SqlSourceRowBuffer");
+        unpooled.Sources.Keys.ShouldNotContain(RowBuffer.HintName);
+        pooled.Sources.Keys.ShouldContain(RowBuffer.HintName);
     }
 
     // The other shapes read no list of rows, and the parameter leaves their methods as they are too.

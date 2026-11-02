@@ -146,7 +146,7 @@ public sealed class ConverterMethodTests
         cancellationToken).ConfigureAwait(false);
                         await using var readerScope = ↩
         global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
-                        var rows = new global::App.SqlSourceRowBuffer<global::App.FindEmailDto>();
+                        var rows = new global::SqlSource.SqlSourceRowBuffer<global::App.FindEmailDto>();
                         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                         {
                             rows.Add(new global::App.FindEmailDto(reader.IsDBNull(0) ? default(global::MyApp.Email?) ↩
@@ -164,8 +164,7 @@ public sealed class ConverterMethodTests
                     }
                 }
             }
-
-        {{{GeneratedFile.RowBuffer}}}}
+        }
 
         """
     );

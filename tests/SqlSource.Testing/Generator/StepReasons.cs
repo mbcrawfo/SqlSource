@@ -150,12 +150,13 @@ internal static class StepReasons
                 .Select(output => output.Reason),
         ];
 
-    // A method output is its hint name and its source, as a model output is.
+    // A method output is its hint name, its source and whether it uses the row buffer.
     private static string MethodsFileOf(object value) =>
         value switch
         {
             MethodsInput input => HintName.ForMethods(input.Type.HintName),
             TypeMethods methods => methods.HintName,
+            ValueTuple<string, string?, bool> output => output.Item1,
             _ => HintNameOf(value),
         };
 }
