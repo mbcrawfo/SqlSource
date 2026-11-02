@@ -171,4 +171,4 @@ Release build, `Stopwatch` loop over `QueryMethodWriter.Append` of four methods 
 | | Write, per method | Signature, per method |
 |---|---|---|
 | Before (`e158a5fe`) | 5.71 µs, 4,052 B | 0.178 µs, 488 B |
-| After | | |
+| After (`2d5f18ea`), the middle of six runs | 5.62 µs, 3,870 B | 0.202 µs, 488 B |
