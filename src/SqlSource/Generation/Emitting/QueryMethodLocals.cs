@@ -15,7 +15,7 @@ namespace SqlSource.Generation.Emitting;
 internal sealed class QueryMethodLocals
 {
     public QueryMethodLocals(
-        List<string> tokens,
+        MethodArguments arguments,
         MethodInput? input,
         MethodOutput? output,
         bool streams,
@@ -23,7 +23,7 @@ internal sealed class QueryMethodLocals
         bool checksTransaction
     )
     {
-        var names = new LocalNames(Seed(tokens));
+        var names = new LocalNames(Seed(arguments));
         Sql = names.Take("sql");
         WasClosed = names.Take("wasClosed");
         Command = names.Take("command");
@@ -110,16 +110,12 @@ internal sealed class QueryMethodLocals
         (input is not null && input.Parameters.Any(static parameter => parameter.Write is { IsByElement: true }))
         || (output is not null && output.Columns.Any(static column => column.Read is { IsByElement: true }));
 
-    private static IEnumerable<string> Seed(List<string> tokens)
+    // The names of the method's arguments, which no local may take.
+    private static IEnumerable<string> Seed(MethodArguments arguments)
     {
-        yield return QueryMethodWriter.Connection;
-        yield return QueryMethodWriter.Parameters;
-        yield return QueryMethodWriter.Transaction;
-        yield return QueryMethodWriter.CommandTimeout;
-        yield return QueryMethodWriter.CancellationToken;
-        foreach (var token in tokens)
+        foreach (var argument in arguments)
         {
-            yield return token;
+            yield return argument.Name;
         }
     }
 }

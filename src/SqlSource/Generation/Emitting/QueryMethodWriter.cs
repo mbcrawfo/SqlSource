@@ -13,7 +13,8 @@ namespace SqlSource.Generation.Emitting;
 /// that does the rest as the loop asks for each row.
 /// </summary>
 /// <remarks>
-/// A token's argument can have any name that is not a fixed argument's, so every local, and the parameters of the
+/// The arguments, their documentation and their checks come from <see cref="MethodArguments" />.  A token's argument
+/// can have any name that <see cref="MethodArguments.IsReserved" /> allows, so every local, and the parameters of the
 /// lambda that builds the SQL, take a name no argument has from one <see cref="LocalNames" />, which
 /// <see cref="QueryMethodLocals" /> holds.  <see cref="RowReaderWriter" /> writes the reading of each row.  Every
 /// framework type is written from <c>global::</c>, an extension method is called as a static method, and
@@ -21,16 +22,6 @@ namespace SqlSource.Generation.Emitting;
 /// </remarks>
 internal static class QueryMethodWriter
 {
-    internal const string Connection = "connection";
-
-    internal const string Parameters = "parameters";
-
-    internal const string Transaction = "transaction";
-
-    internal const string CommandTimeout = "commandTimeout";
-
-    internal const string CancellationToken = "cancellationToken";
-
     // The token of a call that nothing cancels.
     private const string NoCancellation = "global::System.Threading.CancellationToken.None";
 
@@ -84,10 +75,10 @@ internal static class QueryMethodWriter
     )
     {
         var tokens = MethodWriter.GetTokens(method.Segments);
-        var arguments = GetArguments(tokens);
-        var streams = Streams(method);
+        var arguments = MethodArguments.Of(method, tokens);
+        var streams = method.Streams;
         var locals = new QueryMethodLocals(
-            tokens,
+            arguments,
             method.Input,
             method.Shape is ResultShape.None or ResultShape.RowCount ? null : method.Output,
             streams,
@@ -97,13 +88,13 @@ internal static class QueryMethodWriter
         var bodyIndent = indent + GeneratedText.Indent;
         var blockIndent = bodyIndent + GeneratedText.Indent;
 
-        AppendDocumentation(builder, indent, method, tokens, streams);
+        AppendDocumentation(builder, indent, method, arguments, streams);
         AppendSignature(builder, indent, method, modifiers, isExtension, arguments, streams);
         _ = builder.Append(indent).Append("{\n");
         AppendChecks(builder, bodyIndent, method, arguments);
         if (!streams)
         {
-            AppendBody(builder, bodyIndent, method, tokens, arguments, locals, streams);
+            AppendBody(builder, bodyIndent, method, tokens, locals, streams);
             AppendEnd(builder, indent);
             return;
         }
@@ -111,7 +102,7 @@ internal static class QueryMethodWriter
         // The checks run when the method is called, and the rest when the loop asks for the first row.  The iterator
         // captures nothing: it takes every argument by the same name, so the body is written as in any other method.
         _ = builder.Append('\n').Append(bodyIndent).Append("return ").Append(locals.Iterator).Append('(');
-        AppendCallArguments(builder, method, arguments);
+        arguments.AppendCall(builder);
         _ = builder
             .Append(");\n\n")
             .Append(bodyIndent)
@@ -120,21 +111,17 @@ internal static class QueryMethodWriter
             .Append(' ')
             .Append(locals.Iterator)
             .Append("(\n");
-        AppendArguments(builder, bodyIndent, method, arguments, isExtension: false, isIterator: true);
+        arguments.AppendIteratorDeclaration(builder, bodyIndent);
         _ = builder.Append(bodyIndent).Append("{\n");
-        AppendBody(builder, blockIndent, method, tokens, arguments, locals, streams);
+        AppendBody(builder, blockIndent, method, tokens, locals, streams);
         AppendEnd(builder, bodyIndent);
         AppendEnd(builder, indent);
     }
 
-    // A many query of IAsyncEnumerable, whose method returns a local iterator that reads each row as it is asked for.
-    private static bool Streams(QueryMethod method) =>
-        method.Shape == ResultShape.Many && method.Collection == CollectionKind.IAsyncEnumerable;
-
     // A streaming method on SQL Server, whose iterator reads the later results in a finally when its loop is left at
     // a row.
     private static bool DrainsWhenLeftAtARow(QueryMethod method) =>
-        Streams(method)
+        method.Streams
         && method.Engine switch
         {
             DatabaseEngine.PostgreSql => false,
@@ -158,29 +145,28 @@ internal static class QueryMethodWriter
         string indent,
         QueryMethod method,
         List<string> tokens,
-        List<string> arguments,
         QueryMethodLocals locals,
         bool streams
     )
     {
         var blockIndent = indent + GeneratedText.Indent;
         AppendCompletedTransactionCheck(builder, indent, method);
-        AppendSql(builder, indent, method, tokens, arguments, locals);
+        AppendSql(builder, indent, method, tokens, MethodArguments.SpellTokens(tokens), locals);
 
         _ = builder
             .Append(indent)
             .Append("var ")
             .Append(locals.WasClosed)
             .Append(" = ")
-            .Append(Connection)
+            .Append(MethodArguments.Connection)
             .Append(".State == global::System.Data.ConnectionState.Closed;\n");
         AppendIf(builder, indent, locals.WasClosed);
         _ = builder
             .Append(blockIndent)
             .Append("await ")
-            .Append(Connection)
+            .Append(MethodArguments.Connection)
             .Append(".OpenAsync(")
-            .Append(CancellationToken)
+            .Append(MethodArguments.CancellationToken)
             .Append(").ConfigureAwait(false);\n");
         AppendEnd(builder, indent);
         _ = builder.Append('\n').Append(indent).Append("try\n").Append(indent).Append("{\n");
@@ -194,7 +180,7 @@ internal static class QueryMethodWriter
                 blockIndent + GeneratedText.Indent,
                 locals.Command,
                 locals.Parameter,
-                Parameters,
+                MethodArguments.Parameters,
                 locals.ConversionNames
             );
             foreach (var parameter in input.Parameters)
@@ -214,7 +200,7 @@ internal static class QueryMethodWriter
             .Append(blockIndent)
             .Append(GeneratedText.Indent)
             .Append("await ")
-            .Append(Connection)
+            .Append(MethodArguments.Connection)
             .Append(".CloseAsync().ConfigureAwait(false);\n");
         AppendEnd(builder, blockIndent);
         AppendEnd(builder, indent);
@@ -237,7 +223,11 @@ internal static class QueryMethodWriter
             return;
         }
 
-        AppendIf(builder, indent, Transaction + " is not null && " + Transaction + ".Connection is null");
+        AppendIf(
+            builder,
+            indent,
+            MethodArguments.Transaction + " is not null && " + MethodArguments.Transaction + ".Connection is null"
+        );
         _ = builder
             .Append(indent)
             .Append(GeneratedText.Indent)
@@ -261,39 +251,23 @@ internal static class QueryMethodWriter
         StringBuilder builder,
         string indent,
         QueryMethod method,
-        List<string> tokens,
+        MethodArguments arguments,
         bool streams
     )
     {
         XmlDocWriter.AppendMember(builder, indent, method.SummaryXml, MethodWriter.GetSql(method.Segments));
-        XmlDocWriter.AppendParam(
-            builder,
-            indent,
-            Connection,
-            streams
-                ? "The connection to run the query on.  When it is closed, it is opened when the loop starts and "
-                    + "closed again when the loop ends."
-                : "The connection to run the query on.  It is opened when it is closed, and closed again when the "
-                    + "method opened it."
-        );
-        if (method.Input is not null)
+        foreach (var argument in arguments)
         {
-            XmlDocWriter.AppendParam(builder, indent, Parameters, "The query's parameters.");
+            if (argument.DocumentationXml is { } documentationXml)
+            {
+                XmlDocWriter.AppendParam(builder, indent, argument.Name, documentationXml);
+            }
+            else
+            {
+                XmlDocWriter.AppendParam(builder, indent, argument.Name);
+            }
         }
 
-        foreach (var token in tokens)
-        {
-            XmlDocWriter.AppendParam(builder, indent, token);
-        }
-
-        XmlDocWriter.AppendParam(builder, indent, Transaction, "The transaction to run the query in, or null.");
-        XmlDocWriter.AppendParam(
-            builder,
-            indent,
-            CommandTimeout,
-            "The command's timeout in seconds, or null for the driver's."
-        );
-        XmlDocWriter.AppendParam(builder, indent, CancellationToken, "Cancels the query.");
         XmlDocWriter.AppendReturns(
             builder,
             indent,
@@ -354,7 +328,7 @@ internal static class QueryMethodWriter
         QueryMethod method,
         string modifiers,
         bool isExtension,
-        List<string> arguments,
+        MethodArguments arguments,
         bool streams
     )
     {
@@ -376,78 +350,7 @@ internal static class QueryMethodWriter
         }
 
         _ = builder.Append(method.Name).Append("(\n");
-        AppendArguments(builder, indent, method, arguments, isExtension, isIterator: false);
-    }
-
-    // The arguments of the method, one to a line, and the parenthesis that closes them.  The iterator of a streaming
-    // method takes them without this or a default, and marks its token as the one WithCancellation gives.
-    private static void AppendArguments(
-        StringBuilder builder,
-        string indent,
-        QueryMethod method,
-        List<string> arguments,
-        bool isExtension,
-        bool isIterator
-    )
-    {
-        var argumentIndent = indent + GeneratedText.Indent;
-        _ = builder
-            .Append(argumentIndent)
-            .Append(isExtension ? "this " : string.Empty)
-            .Append("global::System.Data.Common.DbConnection ")
-            .Append(Connection)
-            .Append(",\n");
-        if (method.Input is { } input)
-        {
-            _ = builder.Append(argumentIndent).Append(input.TypeText).Append(' ').Append(Parameters).Append(",\n");
-        }
-
-        foreach (var argument in arguments)
-        {
-            _ = builder.Append(argumentIndent).Append("string ").Append(argument).Append(",\n");
-        }
-
-        _ = builder
-            .Append(argumentIndent)
-            .Append("global::System.Data.Common.DbTransaction? ")
-            .Append(Transaction)
-            .Append(isIterator ? ",\n" : " = null,\n")
-            .Append(argumentIndent)
-            .Append("int? ")
-            .Append(CommandTimeout)
-            .Append(isIterator ? ",\n" : " = null,\n")
-            .Append(argumentIndent)
-            .Append(
-                isIterator
-                    ? "[global::System.Runtime.CompilerServices.EnumeratorCancellation] "
-                        + "global::System.Threading.CancellationToken "
-                    : "global::System.Threading.CancellationToken "
-            )
-            .Append(CancellationToken)
-            .Append(isIterator ? ")\n" : " = default)\n");
-    }
-
-    // The arguments of the call to the iterator, in the order of the method's.
-    private static void AppendCallArguments(StringBuilder builder, QueryMethod method, List<string> arguments)
-    {
-        _ = builder.Append(Connection);
-        if (method.Input is not null)
-        {
-            _ = builder.Append(", ").Append(Parameters);
-        }
-
-        foreach (var argument in arguments)
-        {
-            _ = builder.Append(", ").Append(argument);
-        }
-
-        _ = builder
-            .Append(", ")
-            .Append(Transaction)
-            .Append(", ")
-            .Append(CommandTimeout)
-            .Append(", ")
-            .Append(CancellationToken);
+        arguments.AppendDeclaration(builder, indent, isExtension);
     }
 
     // The type the task gives, or null for a task that gives nothing.
@@ -526,51 +429,33 @@ internal static class QueryMethodWriter
         };
     }
 
-    private static void AppendChecks(StringBuilder builder, string indent, QueryMethod method, List<string> arguments)
+    // The receiver and the input are refused when null, and under validate-tokens each token's text when it is null
+    // or white space.
+    private static void AppendChecks(
+        StringBuilder builder,
+        string indent,
+        QueryMethod method,
+        MethodArguments arguments
+    )
     {
-        AppendThrowIfNull(builder, indent, Connection);
-        if (method.Input is not null)
+        foreach (var argument in arguments)
         {
-            AppendThrowIfNull(builder, indent, Parameters);
-        }
-
-        if (method.ValidateTokens)
-        {
-            foreach (var argument in arguments)
+            var check = argument.Role switch
             {
-                _ = builder
-                    .Append(indent)
-                    .Append("global::System.ArgumentException.ThrowIfNullOrWhiteSpace(")
-                    .Append(argument)
-                    .Append(");\n");
+                ArgumentRole.Receiver or ArgumentRole.Input => "global::System.ArgumentNullException.ThrowIfNull(",
+                ArgumentRole.Token => method.ValidateTokens
+                    ? "global::System.ArgumentException.ThrowIfNullOrWhiteSpace("
+                    : null,
+                ArgumentRole.Transaction or ArgumentRole.CommandTimeout or ArgumentRole.Cancellation => null,
+            };
+            if (check is not null)
+            {
+                _ = builder.Append(indent).Append(check);
+                MethodArguments.AppendName(builder, argument.Name);
+                _ = builder.Append(");\n");
             }
         }
     }
-
-    // How each token's argument is written in the method.  An asynchronous method cannot use await as an identifier,
-    // so that one is verbatim; its documentation keeps the name.
-    private static List<string> GetArguments(List<string> tokens)
-    {
-        if (!tokens.Contains("await"))
-        {
-            return tokens;
-        }
-
-        var arguments = new List<string>(tokens.Count);
-        foreach (var token in tokens)
-        {
-            arguments.Add(token == "await" ? "@await" : token);
-        }
-
-        return arguments;
-    }
-
-    private static void AppendThrowIfNull(StringBuilder builder, string indent, string argument) =>
-        _ = builder
-            .Append(indent)
-            .Append("global::System.ArgumentNullException.ThrowIfNull(")
-            .Append(argument)
-            .Append(");\n");
 
     // The SQL the constant would have held, or, with tokens, the string the token method would have returned, built
     // by the same code.
@@ -623,7 +508,7 @@ internal static class QueryMethodWriter
             .Append("var ")
             .Append(locals.Command)
             .Append(" = ")
-            .Append(Connection)
+            .Append(MethodArguments.Connection)
             .Append(".CreateCommand();\n");
         AppendScope(builder, indent, locals.CommandScope, locals.Command);
         _ = builder
@@ -637,15 +522,15 @@ internal static class QueryMethodWriter
             .Append(indent)
             .Append(locals.Command)
             .Append(".Transaction = ")
-            .Append(Transaction)
+            .Append(MethodArguments.Transaction)
             .Append(";\n");
-        AppendIf(builder, indent, CommandTimeout + ".HasValue");
+        AppendIf(builder, indent, MethodArguments.CommandTimeout + ".HasValue");
         _ = builder
             .Append(indent)
             .Append(GeneratedText.Indent)
             .Append(locals.Command)
             .Append(".CommandTimeout = ")
-            .Append(CommandTimeout)
+            .Append(MethodArguments.CommandTimeout)
             .Append(".Value;\n");
         AppendEnd(builder, indent);
         _ = builder.Append('\n');
@@ -666,7 +551,7 @@ internal static class QueryMethodWriter
                 .Append(method.Shape == ResultShape.RowCount ? "return await " : "await ")
                 .Append(locals.Command)
                 .Append(".ExecuteNonQueryAsync(")
-                .Append(CancellationToken)
+                .Append(MethodArguments.CancellationToken)
                 .Append(").ConfigureAwait(false);\n");
             return;
         }
@@ -679,7 +564,7 @@ internal static class QueryMethodWriter
             .Append(" = await ")
             .Append(locals.Command)
             .Append(".ExecuteReaderAsync(global::System.Data.CommandBehavior.Default, ")
-            .Append(CancellationToken)
+            .Append(MethodArguments.CancellationToken)
             .Append(").ConfigureAwait(false);\n");
         AppendScope(builder, indent, locals.ReaderScope, locals.Reader);
 
@@ -837,7 +722,7 @@ internal static class QueryMethodWriter
             .Append(" = false;\n");
         AppendEnd(builder, loopIndent);
         _ = builder.Append('\n');
-        AppendDrainLoop(builder, loopIndent, locals, CancellationToken);
+        AppendDrainLoop(builder, loopIndent, locals, MethodArguments.CancellationToken);
         _ = builder.Append(indent).Append("}\n").Append(indent).Append("finally\n").Append(indent).Append("{\n");
         AppendIf(builder, loopIndent, locals.AtRow);
         AppendDrainLoop(builder, innerIndent, locals, NoCancellation);
@@ -863,7 +748,7 @@ internal static class QueryMethodWriter
             return;
         }
 
-        AppendDrainLoop(builder, indent, locals, CancellationToken);
+        AppendDrainLoop(builder, indent, locals, MethodArguments.CancellationToken);
         _ = builder.Append('\n');
     }
 
@@ -889,7 +774,7 @@ internal static class QueryMethodWriter
             .Append("catch (global::System.Exception ")
             .Append(locals.Exception)
             .Append(") when (")
-            .Append(Transaction)
+            .Append(MethodArguments.Transaction)
             .Append(" is not null && ")
             .Append(locals.Exception)
             .Append(" is not (global::System.Data.Common.DbException or global::System.OperationCanceledException))\n")
@@ -899,7 +784,7 @@ internal static class QueryMethodWriter
             .Append("await ")
             .Append(locals.Reader)
             .Append(".DisposeAsync().ConfigureAwait(false);\n");
-        AppendIf(builder, blockIndent, Transaction + ".Connection is null");
+        AppendIf(builder, blockIndent, MethodArguments.Transaction + ".Connection is null");
         _ = builder
             .Append(blockIndent)
             .Append(GeneratedText.Indent)
@@ -945,7 +830,7 @@ internal static class QueryMethodWriter
             .Append("await ")
             .Append(locals.Reader)
             .Append(".ReadAsync(")
-            .Append(CancellationToken)
+            .Append(MethodArguments.CancellationToken)
             .Append(").ConfigureAwait(false)");
 
     private static void AppendThrow(StringBuilder builder, string indent, string queryName, bool moreThanOne) =>

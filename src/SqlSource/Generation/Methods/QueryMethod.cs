@@ -38,7 +38,15 @@ internal sealed record QueryMethod(
     MethodInput? Input,
     MethodOutput? Output,
     LocationInfo NameLocation
-);
+)
+{
+    /// <summary>
+    /// Whether the method streams its rows: a <see cref="ResultShape.Many" /> query of
+    /// <see cref="CollectionKind.IAsyncEnumerable" />, whose method returns a local iterator that reads each row as it
+    /// is asked for.  It is computed, so it takes no part in equality.
+    /// </summary>
+    public bool Streams => Shape == ResultShape.Many && Collection == CollectionKind.IAsyncEnumerable;
+}
 
 /// <summary>
 /// The input model of a query's method.
