@@ -24,7 +24,8 @@
 
 - **The count holds:** 28 branches in 13 files, as the spec says, counting `SqlDescribableDialects.EngineOf` and `QueryTyper`'s engine from a `SidecarType`.
 - **`QueryTyper.Chosen` takes its engine from the type's class, not from an engine** (`type is SqlServerType ? SqlServer : PostgreSql`, after a guard that returns for any other class).  A class hierarchy cannot be switched exhaustively, so the guard and the engine become one `switch` statement over the type, whose `default` is the guard's return.  A new `SidecarType` then falls to the unknown-engine path, never to PostgreSQL.
-- **The `_ =>` rule goes in `src/SqlSource/AGENTS.md`, not `Generation/AGENTS.md`:** the branches are in `Settings/` and `Parsing/` too, and root rule 8 puts a rule at the deepest level that covers all of them.
+- **The `_ =>` rule goes in `Generation/AGENTS.md`, as the spec says, and in `Settings/AGENTS.md`, where the enum is:** `src/SqlSource/AGENTS.md`, which would cover `Parsing/` too, is at its 8 KB limit.
+- **IDE0072 is off beside CS8524:** with `EnforceCodeStyleInBuild` and `latest-all` it asks for the same discard arm.  CS8509 still catches a missing member.
 
 ## Review Focus
 
@@ -105,7 +106,7 @@ Both pass today (they pin behaviour); run them to confirm, since the refactor mu
 
 **Files:**
 - Modify: `docs/architecture/generator.md` (new `### Extending query methods` after `### Query methods`; the `### The type override` marker bullet)
-- Modify: `src/SqlSource/AGENTS.md`
+- Modify: `src/SqlSource/Generation/AGENTS.md`, `src/SqlSource/Settings/AGENTS.md`
 
 - [ ] **Step 1: Write `### Extending query methods`** with a one-paragraph lead (the generator's engines are a closed set: each decision is a switch expression that names every member, and the compiler lists the places a new one must decide) and `#### Adding a database engine`, an ordered list for the code as it is:
   1. The `DatabaseEngine` member, then each switch CS8509 lists, and the two-engine structures no switch guards: `MethodDrivers` (a field), `CodeGenEngines` (a bit) and `ReportMissingDrivers` in `SqlSourceGenerator` (SQLSRC273), `TypeOverrideLists` and `TypeKeys.TryNormalizeEach`, `MethodsInput.AllUses`.
@@ -117,7 +118,7 @@ Both pass today (they pin behaviour); run them to confirm, since the refactor mu
   7. Golden-corpus rows (a `CorpusEngine` row, its `OwnScenarios` and golden files, `tests/README.md`), database tests and image pins (root `AGENTS.md` rule 5), and the manual.
   Every name is checked against the code before it is written.
 - [ ] **Step 2: Fix the marker bullet of `### The type override`**: it names `EngineOf` as SQL Server's rules for `mssql` and PostgreSQL's for every other dialect; add that the other dialects cannot be described, so only their markers reach it.  Fix any other line the change makes wrong (`grep -n 'EngineOf\|every other dialect\|every dialect' docs/architecture/*.md`).
-- [ ] **Step 3: Add to `src/SqlSource/AGENTS.md`**, under the opening rules, two bullets: no `_ =>` arm over `DatabaseEngine`, and a decision on an engine is a switch expression that names every member (CS8524 is off for that); adding an engine follows [the guide](../../docs/architecture/generator.md#adding-a-database-engine).  Keep the file under 8 KB.
+- [ ] **Step 3: Add to `src/SqlSource/Generation/AGENTS.md`** a section `## Engines` with two bullets: a decision on a `DatabaseEngine` is a switch expression that names every member, with no `_ =>` arm (CS8524 and IDE0072 are off for that); adding an engine follows [the guide](../../docs/architecture/generator.md#adding-a-database-engine).  Add one bullet to `src/SqlSource/Settings/AGENTS.md`, where the enum is.  Keep each file under 8 KB.
 - [ ] **Step 4: Validate** `dotnet test --project tests/SqlSource.Tests -- --filter-namespace "SqlSource.Tests.Documentation"` (link and AGENTS size tests).
 - [ ] **Step 5: Commit.**  `docs: add the guide to adding a database engine`
 
