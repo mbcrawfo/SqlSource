@@ -9,8 +9,8 @@ namespace SqlSource.Generation.Emitting;
 
 /// <summary>
 /// Writes the binding of one parameter of a query's method: the lines that create a parameter of the command, set it
-/// and add it.  Each engine has its own, chosen by the engine of the query's file.  A new engine adds a subclass and its
-/// arm in <see cref="For" />; see <c>docs/architecture/generator.md</c>, "Adding a database engine".
+/// and add it.  Each engine has its own, chosen by the engine of the query's file.  A new engine adds a subclass and
+/// its arm in <see cref="For" />; see <c>docs/architecture/generator.md</c>, "Adding a database engine".
 /// </summary>
 internal abstract class ParameterBinder
 {
