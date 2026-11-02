@@ -20,13 +20,20 @@ internal static class SidecarFiles
     // The text of a sidecar that a newer tool wrote: a format above the one this tool writes.
     public static string Newer { get; } = Empty(2, "9.9.9");
 
-    // An entry that is current for the query: its hash and its database, and a statement without rows.
+    // An entry that is current for the query: its hash and its database, a statement without rows, and the query's
+    // parameters as the tool writes them, by name as the SQL spells it and in its order, without a type.
     public static SidecarEntry EntryFor(PlannedQuery query) =>
         TestSidecars.Entry(
             query.Query.Name,
             query.Hash.ShouldNotBeNull(),
             database: query.Database,
-            resultKind: SidecarResultKind.None
+            resultKind: SidecarResultKind.None,
+            parameters:
+            [
+                .. query.Query.Parameters.Select(
+                    (parameter, ordinal) => TestSidecars.Parameter(ordinal, parameter.Name, null, parameter.Nullable)
+                ),
+            ]
         );
 
     // The text of a sidecar with no entry.  The versions are the tool's unless given.

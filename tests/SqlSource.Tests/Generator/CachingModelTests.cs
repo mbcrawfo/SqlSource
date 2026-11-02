@@ -320,27 +320,29 @@ public sealed class CachingModelTests
         );
     }
 
-    // The query of Orders gains its parameter in the sidecar, and with it its input model, whose name sorts before
-    // the models of Payments and Users.  Its row model keeps the slot of its role, and the other files keep their
-    // nodes, so none of them is emitted again.
+    // The query of Orders gains its parameter in its SQL and its sidecar, and with it its input model, whose name sorts
+    // before the models of Payments and Users.  Its row model keeps the slot of its role, and the other files keep
+    // their nodes, so none of them is emitted again.
     [Fact]
     public void Run_QueryGainsParameters_EmitsOnlyItsInputModel()
     {
         var compilation = ModelsCompilation();
+        var ordersSidecar = TypedSidecar(_scene.Orders, "GetOrder", "int4");
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, [ordersSidecar]);
         var orders = new InMemoryAdditionalText(_scene.Orders.Path, "-- name: GetOrder\nSELECT 2 WHERE 1 = @id;\n");
-        var ordersSidecar = TypedSidecar(orders, "GetOrder", "int4");
-        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, orders, [ordersSidecar]);
 
         var result = Run(
-            driver.ReplaceAdditionalText(
-                ordersSidecar,
-                TypedSidecar(
-                    orders,
-                    "GetOrder",
-                    "int4",
-                    [TestSidecars.Parameter(0, "id", TestSidecars.Postgres("int4", internalName: "int4"))]
-                )
-            ),
+            driver
+                .ReplaceAdditionalText(_scene.Orders, orders)
+                .ReplaceAdditionalText(
+                    ordersSidecar,
+                    TypedSidecar(
+                        orders,
+                        "GetOrder",
+                        "int4",
+                        [TestSidecars.Parameter(0, "id", TestSidecars.Postgres("int4", internalName: "int4"))]
+                    )
+                ),
             compilation
         );
 

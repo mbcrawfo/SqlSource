@@ -42,10 +42,9 @@ public sealed class ModelRunsTests
     [Fact]
     public void ModelFiles_Run_AreTheModelsHintNames()
     {
-        var run = Run(
-            GeneratorHarness.UsersFile,
-            Entry(GeneratorHarness.UsersFile, "GetUser", [Parameter("id")], [Column("id")])
-        );
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @id;\n");
+
+        var run = Run(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")]));
 
         ModelFiles(run).ShouldBe([GetUserDtoFile, "App.GetUserParams-Model.g.cs"]);
     }

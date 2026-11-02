@@ -14,7 +14,7 @@ public sealed class ModelWarningTests
 {
     private static readonly SqlFile Users = new(
         GeneratorHarness.UsersPath,
-        "-- name: GetUser\nSELECT id, name FROM users WHERE id = @id;\n"
+        "-- name: GetUser\nSELECT id, name FROM users;\n"
     );
 
     // The pragma, the order and = default! where it is needed, in a class in the global namespace.
