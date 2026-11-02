@@ -145,6 +145,7 @@ internal static class RowBuffer
                 or CollectionKind.ICollection
                 or CollectionKind.ImmutableArray;
 
+    // Declared after Summary and Body, which static initializers set first, in the order of the text.
     /// <summary>
     /// The buffer's file: the struct, its documentation comment first, in the namespace <c>SqlSource</c>.
     /// </summary>

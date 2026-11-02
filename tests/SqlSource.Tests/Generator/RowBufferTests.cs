@@ -3,12 +3,14 @@
 using System;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation.Emitting;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using Xunit;
 using static SqlSource.Testing.Generator.ModelRuns;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -287,6 +289,32 @@ public sealed class RowBufferTests
         run.Sources.Keys.ShouldNotContain(RowBuffer.HintName);
     }
 
+    // A project on a framework older than .NET 8, or a language older than C# 12, gets no type's methods, so its pooled
+    // many query is no reason for the buffer.
+    [Theory]
+    [InlineData(false, LanguageVersion.CSharp12, "SQLSRC003")]
+    [InlineData(true, LanguageVersion.CSharp11, "SQLSRC012")]
+    public void Run_UnsupportedFrameworkWithAPooledManyQuery_HasNoBufferFile(
+        bool supportedFramework,
+        LanguageVersion languageVersion,
+        string id
+    )
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.CodeGen,
+            [new SourceFile(GeneratorHarness.SourcePath, MethodRuns.Source)],
+            [ListUsers, Sidecars.Of(ListUsers, Users(ListUsers, "ListUsers"))],
+            supportedFramework: supportedFramework,
+            languageVersion: languageVersion,
+            references: [NpgsqlReferences.Npgsql10],
+            dialect: "postgres"
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith(id + " ");
+        run.Sources.Keys.ShouldNotContain(MethodRuns.MethodsFile);
+        run.Sources.Keys.ShouldNotContain(RowBuffer.HintName);
+    }
+
     [Theory]
     [InlineData("ExtensionClass", false)]
     [InlineData("Public", false)]
@@ -333,13 +361,13 @@ public sealed class RowBufferTests
         run.Sources.Keys.ShouldContain(RowBuffer.HintName);
     }
 
-    // A namespace of the user's named SqlSource, below App, would hide the buffer's from a name that did not start at
-    // global::.
+    // The global namespace, one under an escaped keyword, and one of the user's named SqlSource, below App, which would
+    // hide the buffer's from a name that did not start at global::.
     [Theory]
     [InlineData("")]
     [InlineData("namespace @class.Rows;\n\n")]
     [InlineData("namespace App.SqlSource;\n\n")]
-    public void Run_TypeInTheGlobalNamespaceOrUnderAnEscapedKeyword_NamesTheBufferFromGlobal(string namespaceLine)
+    public void Run_TypeInAnyNamespace_NamesTheBufferFromGlobal(string namespaceLine)
     {
         var source = "using SqlSource;\n\n" + namespaceLine + "[SqlSourceGenerate]\npublic partial class Sample;\n";
 

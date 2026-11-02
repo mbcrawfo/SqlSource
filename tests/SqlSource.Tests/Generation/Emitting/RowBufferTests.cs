@@ -108,16 +108,21 @@ public sealed class RowBufferTests
         end.ShouldBeGreaterThan(start);
 
         const string Attribute = "    [global::Microsoft.CodeAnalysis.Embedded]\n";
+        const string LastBrace = "\n    }\n";
         var source = RowBuffer.Source;
         var declaration = source.IndexOf(Attribute, StringComparison.Ordinal) + Attribute.Length;
-        var lastBrace = source.IndexOf("\n    }\n", declaration, StringComparison.Ordinal);
+        var lastBrace = source.IndexOf(LastBrace, declaration, StringComparison.Ordinal);
         declaration.ShouldBeGreaterThanOrEqualTo(Attribute.Length);
         lastBrace.ShouldBeGreaterThan(declaration);
         var generated = string.Join(
             "\n",
-            source[declaration..(lastBrace + 7)]
+            source[declaration..(lastBrace + LastBrace.Length)]
                 .Split('\n')
-                .Select(line => line.StartsWith(GeneratedText.Indent, StringComparison.Ordinal) ? line[4..] : line)
+                .Select(line =>
+                    line.StartsWith(GeneratedText.Indent, StringComparison.Ordinal)
+                        ? line[GeneratedText.Indent.Length..]
+                        : line
+                )
         );
 
         generated
