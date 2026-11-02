@@ -11,7 +11,8 @@ namespace SqlSource.Testing.Generator;
 // the engine's own, each named `<engine>/<scenario>`, the path of its golden file under GoldenFiles.Folder.  See "The
 // golden corpus of query methods" in tests/README.md.  The shared scenarios are here and, by theme, in the other parts
 // of this class: CorpusTokenScenarios.cs, CorpusTypeScenarios.cs, CorpusConverterScenarios.cs and
-// CorpusLibraryScenarios.cs.
+// CorpusLibraryScenarios.cs.  The scenarios only one engine has, which CorpusEngine.cs lists, are in
+// CorpusLibraryScenarios.cs and CorpusEngineScenarios.cs.
 //
 // Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.

@@ -62,6 +62,8 @@ internal sealed record CorpusEngine(
         [
             new("driver-npgsql8", engine => QueryMethodCorpus.Driver(engine, NpgsqlReferences.Npgsql8)),
             new("driver-npgsql10", engine => QueryMethodCorpus.Driver(engine, NpgsqlReferences.Npgsql10)),
+            new("binding", QueryMethodCorpus.PostgresBinding),
+            new("by-element", QueryMethodCorpus.ByElement),
         ],
     };
 
@@ -88,6 +90,12 @@ internal sealed record CorpusEngine(
         ],
         Json = TestSidecars.SqlServer("json", -1, 0),
         UnboundedText = TestSidecars.SqlServer("nvarchar(max)", -1, 0),
+        OwnScenarios =
+        [
+            new("binding", QueryMethodCorpus.SqlServerBinding),
+            new("vector", QueryMethodCorpus.Vector),
+            new("spatial", QueryMethodCorpus.Spatial),
+        ],
     };
 
     public static IReadOnlyList<CorpusEngine> All { get; } = [Postgres, SqlServer];
