@@ -64,17 +64,25 @@ public sealed class GeneratedSourceWarningTests
         run.GeneratedCodeWarnings.ShouldBeEmpty();
     }
 
-    [Fact]
-    public void Run_ProjectThatSeesTheInternalsOfAnotherWithTheGenerator_GetsNoWarningInGeneratedCode()
+    // On an image, as a build references a project, and on a compilation, as an IDE does.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Run_ProjectThatSeesTheInternalsOfAnotherWithTheGenerator_GetsNoWarningInGeneratedCode(
+        bool compilationReference
+    )
     {
         // Both assemblies hold the generated attribute and enums, each marked embedded, so this one does not see the
         // other's copies, and the compiler has no conflict (CS0436) to warn about inside the generated file.
-        var other = GeneratorHarness.CreateReference(
-            OutputKind.Sql,
-            "Other",
-            "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"TestAssembly\")]\n"
-                + "public class InOther { }\n"
-        );
+        var other = GeneratorHarness
+            .CreateProject(
+                OutputKind.Sql,
+                "Other",
+                "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"TestAssembly\")]\n"
+                    + "public class InOther { }\n",
+                compilationReference: compilationReference
+            )
+            .Reference;
 
         var run = GeneratorHarness.Run(
             OutputKind.Sql,

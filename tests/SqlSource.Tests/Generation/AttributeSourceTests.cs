@@ -20,6 +20,9 @@ namespace SqlSource.Tests.Generation;
 // two must agree member by member, or a value a user writes would mean another.
 public sealed partial class AttributeSourceTests
 {
+    // The language of a project that targets a framework older than .NET 8, which gets the attribute's file too.
+    private static readonly CSharpParseOptions CSharp73 = new(LanguageVersion.CSharp7_3);
+
     // The generator's own forms are internal, so a public theory names them and the test looks them up.
     [Theory]
     [InlineData("SqlLocation", nameof(MemberPlacement))]
@@ -130,9 +133,6 @@ public sealed partial class AttributeSourceTests
         ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)
             .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path));
-
-    // The language of a project that targets a framework older than .NET 8, which gets the attribute's file too.
-    private static readonly CSharpParseOptions CSharp73 = new(LanguageVersion.CSharp7_3);
 
     private static CSharpCompilation CompileText() =>
         CSharpCompilation.Create(

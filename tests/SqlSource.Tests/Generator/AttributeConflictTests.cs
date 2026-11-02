@@ -16,8 +16,9 @@ namespace SqlSource.Tests.Generator;
 
 // A project that sees the internals of another one that uses SqlSource, as a test project sees the project it tests.
 // Both hold the generated attribute and enums, but each marks them embedded, so neither sees the other's copy and the
-// compiler has no conflict (CS0436) to warn about, with no analyzer loaded.  Each test that builds across the boundary
-// runs on an image, as a build references a project, and on a compilation, as an IDE does.
+// compiler has no conflict (CS0436) to warn about, with no analyzer loaded.  Each test of a generated type across the
+// boundary runs on an image, as a build references a project, and on a compilation, as an IDE does; the test of a type
+// the user declares in both projects needs only one.
 public sealed class AttributeConflictTests
 {
     private const string InternalsVisible =
@@ -82,8 +83,10 @@ public sealed class AttributeConflictTests
         build.ShouldBeEmpty();
     }
 
-    [Fact]
-    public async Task Build_AttributeThatSetsTheLocation_HasNoConflictForEitherType()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Build_AttributeThatSetsTheLocation_HasNoConflictForEitherType(bool compilationReference)
     {
         const string Source = """
             using SqlSource;
@@ -95,14 +98,16 @@ public sealed class AttributeConflictTests
             OutputKind.Sql,
             Source,
             [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql)]
+            [Other(OutputKind.Sql, compilationReference)]
         );
 
         build.ShouldBeEmpty();
     }
 
-    [Fact]
-    public async Task Build_AttributeThatSetsTheOutput_HasNoConflictForTheEnum()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Build_AttributeThatSetsTheOutput_HasNoConflictForTheEnum(bool compilationReference)
     {
         const string Source = """
             using SqlSource;
@@ -114,14 +119,16 @@ public sealed class AttributeConflictTests
             OutputKind.Sql,
             Source,
             [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql)]
+            [Other(OutputKind.Sql, compilationReference)]
         );
 
         build.ShouldBeEmpty();
     }
 
-    [Fact]
-    public async Task Build_AttributeThatSetsTheModelsAndTheMethods_HasNoConflictForTheEnums()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Build_AttributeThatSetsTheModelsAndTheMethods_HasNoConflictForTheEnums(bool compilationReference)
     {
         const string Source = """
             using SqlSource;
@@ -136,15 +143,17 @@ public sealed class AttributeConflictTests
             OutputKind.Sql,
             Source,
             [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql)]
+            [Other(OutputKind.Sql, compilationReference)]
         );
 
         build.ShouldBeEmpty();
     }
 
     // The case that fails a build: a project that treats warnings as errors.
-    [Fact]
-    public async Task Build_WarningsAsErrors_HasNoConflictForAGeneratedType()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Build_WarningsAsErrors_HasNoConflictForAGeneratedType(bool compilationReference)
     {
         const string Source = "using SqlSource;\n[SqlSourceGenerate]\ninternal partial class Sample { }";
 
@@ -152,7 +161,7 @@ public sealed class AttributeConflictTests
             OutputKind.Sql,
             Source,
             [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql)],
+            [Other(OutputKind.Sql, compilationReference)],
             warningsAsErrors: true
         );
 
@@ -161,9 +170,15 @@ public sealed class AttributeConflictTests
 
     // The compiler's error is the whole story: the conflict is not reported next to it.
     [Theory]
-    [InlineData("[SqlSourceGenerate(1)]", "CS1729 /app/Repo/Sample.cs(2,2)-(2,22)")]
-    [InlineData("[SqlSourceGenerate(Missing = 1)]", "CS0246 /app/Repo/Sample.cs(2,20)-(2,27)")]
-    public async Task Build_AttributeThatDoesNotCompile_HasItsErrorAndNoConflict(string attribute, string error)
+    [InlineData("[SqlSourceGenerate(1)]", "CS1729 /app/Repo/Sample.cs(2,2)-(2,22)", false)]
+    [InlineData("[SqlSourceGenerate(1)]", "CS1729 /app/Repo/Sample.cs(2,2)-(2,22)", true)]
+    [InlineData("[SqlSourceGenerate(Missing = 1)]", "CS0246 /app/Repo/Sample.cs(2,20)-(2,27)", false)]
+    [InlineData("[SqlSourceGenerate(Missing = 1)]", "CS0246 /app/Repo/Sample.cs(2,20)-(2,27)", true)]
+    public async Task Build_AttributeThatDoesNotCompile_HasItsErrorAndNoConflict(
+        string attribute,
+        string error,
+        bool compilationReference
+    )
     {
         var source = $"using SqlSource;\n{attribute}\ninternal partial class Sample {{ }}";
 
@@ -171,7 +186,7 @@ public sealed class AttributeConflictTests
             OutputKind.Sql,
             source,
             [GeneratorHarness.UsersFile],
-            [Other(OutputKind.Sql)]
+            [Other(OutputKind.Sql, compilationReference)]
         );
 
         Places(build).ShouldBe([error]);
@@ -198,8 +213,10 @@ public sealed class AttributeConflictTests
 
     // Both projects generate App.SqlSourceRowBuffer, as a type private to the methods file, so that neither sees the
     // other's.  The queries have different names, so that their models are not a conflict of their own.
-    [Fact]
-    public async Task Build_TwoProjectsSharingInternalsWithPooledMethods_HaveNoConflict()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Build_TwoProjectsSharingInternalsWithPooledMethods_HaveNoConflict(bool compilationReference)
     {
         var otherFile = new SqlFile("/other/Users.sql", "-- name: ListUsers\nSELECT id, name FROM users;\n");
         var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: ListOthers\nSELECT id, name FROM users;\n");
@@ -210,7 +227,8 @@ public sealed class AttributeConflictTests
             OtherQueriesSource,
             [otherFile, Sidecars.Of(otherFile, Entry(otherFile, "ListUsers", [], columns))],
             [NpgsqlReferences.Npgsql10],
-            "postgres"
+            "postgres",
+            compilationReference: compilationReference
         );
         var entry = Entry(file, "ListOthers", [], columns);
 
@@ -277,29 +295,42 @@ public sealed class AttributeConflictTests
     }
 
     // A project that declares Microsoft.CodeAnalysis.EmbeddedAttribute itself, as another generator may have it do,
-    // compiles only when its declaration is one Roslyn's can be merged with: a non-partial one is the compiler's error
-    // CS0260 at the project's declaration, which SqlSource cannot report first.
+    // compiles only when its declaration can be merged with Roslyn's internal sealed partial class: it is partial,
+    // internal, not static, and a class that derives from System.Attribute or names no base.  Otherwise the build fails
+    // with the compiler's errors, which SqlSource cannot report first; their order varies, so their ids are compared.
     [Theory]
-    [InlineData("partial ", null)]
-    [InlineData("", "CS0260 /app/Repo/Sample.cs(1,58)-(1,75)")]
-    public async Task Build_ProjectThatDeclaresEmbeddedAttribute_CompilesOnlyWhenItIsPartial(
-        string modifier,
-        string? error
+    [InlineData("internal sealed partial class EmbeddedAttribute : global::System.Attribute", "")]
+    [InlineData("internal partial class EmbeddedAttribute : global::System.Attribute", "")]
+    [InlineData("internal sealed partial class EmbeddedAttribute", "")]
+    [InlineData("internal sealed class EmbeddedAttribute : global::System.Attribute", "CS0260")]
+    [InlineData("public sealed partial class EmbeddedAttribute : global::System.Attribute", "CS0262 CS9271")]
+    [InlineData("internal sealed partial class EmbeddedAttribute : global::System.Exception", "CS0263 CS0616 CS9271")]
+    [InlineData("internal static partial class EmbeddedAttribute", "CS0441 CS0616 CS0713 CS9271")]
+    [InlineData("internal sealed partial record EmbeddedAttribute", "CS0261 CS9271")]
+    public async Task Build_ProjectThatDeclaresEmbeddedAttribute_CompilesOnlyWhenRoslynsCanBeMergedWithIt(
+        string declaration,
+        string ids
     )
     {
         var source =
-            "namespace Microsoft.CodeAnalysis { internal sealed "
-            + modifier
-            + "class EmbeddedAttribute : global::System.Attribute { } }\n"
-            + "namespace App { [SqlSource.SqlSourceGenerate] internal partial class Sample { } }\n";
+            "namespace Microsoft.CodeAnalysis\n{\n    /// <summary>The project's own.</summary>\n    "
+            + declaration
+            + " { }\n}\n\nnamespace App { [SqlSource.SqlSourceGenerate] internal partial class Sample { } }\n";
 
         var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, source, [GeneratorHarness.UsersFile], []);
 
-        Places(build).ShouldBe(error is null ? [] : [error]);
+        string.Join(
+                " ",
+                build
+                    .Select(diagnostic => diagnostic[..diagnostic.IndexOf(' ', System.StringComparison.Ordinal)])
+                    .Distinct()
+                    .Order(System.StringComparer.Ordinal)
+            )
+            .ShouldBe(ids);
     }
 
     // The other project, compiled with the generator: it holds the attribute and the enums too.
-    private static MetadataReference Other(OutputKind? output, bool compilationReference = false) =>
+    private static MetadataReference Other(OutputKind? output, bool compilationReference) =>
         GeneratorHarness
             .CreateProject(
                 output,
