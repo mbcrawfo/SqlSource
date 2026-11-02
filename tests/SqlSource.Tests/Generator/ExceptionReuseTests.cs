@@ -173,6 +173,37 @@ public sealed class ExceptionReuseTests
         sources[MethodRuns.MethodsFile].ShouldContain("cref=\"T:SqlSource.UnexpectedRowCountException\"");
     }
 
+    // The project's own documentation: a cref is bound without regard to accessibility, so beside the friend's copy
+    // that it uses, the stranger's that it cannot see makes a bound cref ambiguous (CS0419).  This pins today's
+    // behaviour (TD-0095).
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Build_UserCrefWithAStrangersCopyReferenced_IsAmbiguous(bool compilationReference)
+    {
+        var (diagnostics, sources) = await BuildWithCref("SqlSource.UnexpectedRowCountException", compilationReference);
+
+        sources.Keys.ShouldNotContain(ExceptionSource.HintName);
+        diagnostics.ShouldHaveSingleItem().ShouldStartWith("CS0419 " + GeneratorHarness.SourcePath + "(7,");
+    }
+
+    // The workaround the manual gives: a documentation ID, which the compiler does not bind.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Build_UserCrefAsADocumentationIdWithAStrangersCopyReferenced_HasNoDiagnostic(
+        bool compilationReference
+    )
+    {
+        var (diagnostics, sources) = await BuildWithCref(
+            "T:SqlSource.UnexpectedRowCountException",
+            compilationReference
+        );
+
+        sources.Keys.ShouldNotContain(ExceptionSource.HintName);
+        diagnostics.ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -277,36 +308,33 @@ public sealed class ExceptionReuseTests
     }
 
     // A reference under an extern alias that is not global is no copy that the generated methods can name as
-    // global::SqlSource.UnexpectedRowCountException, so the project writes its own; one that is global too is used.
+    // global::SqlSource.UnexpectedRowCountException, so the project writes its own.
     [Theory]
-    [InlineData("friend", false, false)]
-    [InlineData("friend", true, false)]
-    [InlineData("global,friend", false, true)]
-    [InlineData("global,friend", true, true)]
-    [InlineData("", false, true)]
-    [InlineData("", true, true)]
-    public async Task Build_FriendUnderAnAlias_IsUsedOnlyWhenItIsGlobal(
-        string aliases,
-        bool compilationReference,
-        bool reused
-    )
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Build_FriendOnlyUnderAnAlias_WritesItsOwn(bool compilationReference)
     {
-        var friend = Friend("Friend", compilationReference);
-        if (aliases.Length > 0)
-        {
-            friend = friend.WithAliases(aliases.Split(','));
-        }
-
-        var (diagnostics, sources) = await GeneratorHarness.BuildProjectAsync(
-            OutputKind.CodeGen,
-            "namespace App { [SqlSource.SqlSourceGenerate] internal partial class Sample; }\n",
-            [OwnFile, Sidecars.Of(OwnFile, Entry(OwnFile, "GetOne", [], [Column("id")]))],
-            [friend, NpgsqlReferences.Npgsql10],
-            dialect: "postgres"
+        var (diagnostics, sources) = await BuildOwnQuery(
+            Friend("Friend", compilationReference).WithAliases(["friend"])
         );
 
         diagnostics.ShouldBeEmpty();
-        sources.ContainsKey(ExceptionSource.HintName).ShouldBe(!reused);
+        sources.Keys.ShouldContain(ExceptionSource.HintName);
+        sources.Keys.ShouldContain(MethodRuns.MethodsFile);
+    }
+
+    // A reference with no alias, or with global among its aliases, is reached from global::, and its copy is used.
+    [Theory]
+    [InlineData(new string[0], false)]
+    [InlineData(new string[0], true)]
+    [InlineData(new[] { "global", "friend" }, false)]
+    [InlineData(new[] { "global", "friend" }, true)]
+    public async Task Build_FriendReachedFromGlobal_IsUsed(string[] aliases, bool compilationReference)
+    {
+        var (diagnostics, sources) = await BuildOwnQuery(Friend("Friend", compilationReference).WithAliases(aliases));
+
+        diagnostics.ShouldBeEmpty();
+        sources.Keys.ShouldNotContain(ExceptionSource.HintName);
         sources.Keys.ShouldContain(MethodRuns.MethodsFile);
     }
 
@@ -518,6 +546,50 @@ public sealed class ExceptionReuseTests
                 compilationReference
             )
             .Reference;
+
+    // This project, which uses SqlSource with a CodeGen query of the shape one and nothing else, over the reference.
+    private static Task<(IReadOnlyList<string> Diagnostics, IReadOnlyDictionary<string, string> Sources)> BuildOwnQuery(
+        MetadataReference reference
+    ) =>
+        GeneratorHarness.BuildProjectAsync(
+            OutputKind.CodeGen,
+            "namespace App { [SqlSource.SqlSourceGenerate] internal partial class Sample; }\n",
+            [OwnFile, Sidecars.Of(OwnFile, Entry(OwnFile, "GetOne", [], [Column("id")]))],
+            [reference, NpgsqlReferences.Npgsql10],
+            dialect: "postgres"
+        );
+
+    // This project, which uses SqlSource and documents a method with the cref, over a friend whose exceptions it uses
+    // and a stranger whose copy it cannot see.
+    private static Task<(IReadOnlyList<string> Diagnostics, IReadOnlyDictionary<string, string> Sources)> BuildWithCref(
+        string cref,
+        bool compilationReference
+    )
+    {
+        var friend = Friend("Friend", compilationReference);
+        var stranger = GeneratorHarness
+            .CreateProject(
+                OutputKind.Sql,
+                "Stranger",
+                "public class InStranger { }\n",
+                compilationReference: compilationReference
+            )
+            .Reference;
+        var source = $$"""
+            namespace App
+            {
+                /// <summary>Calls the queries.</summary>
+                public static class Calls
+                {
+                    /// <summary>Runs a query.</summary>
+                    /// <exception cref="{{cref}}">The query returned no rows.</exception>
+                    public static void Run() { }
+                }
+            }
+
+            """;
+        return GeneratorHarness.BuildProjectAsync(OutputKind.Sql, source, [], [friend, stranger]);
+    }
 
     // A friend that uses SqlSource with no query.
     private static MetadataReference Friend(string assemblyName, bool compilationReference) =>
