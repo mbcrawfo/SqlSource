@@ -247,10 +247,17 @@ dotnet_diagnostic.CA2100.severity = none
 dotnet_diagnostic.IDE0130.severity = none
 
 [src/SqlSource/**.cs]
+# CS8524 (a switch expression does not handle an unnamed enum value) and IDE0072 (populate switch), which asks for a
+# discard for the same reason: a switch expression over DatabaseEngine or SqlDialect names every member and has no
+# discard, so that adding a member fails the build with CS8509 at every switch.  The code never makes an unnamed value.
+# See docs/architecture/generator.md#adding-a-database-engine.
+dotnet_diagnostic.CS8524.severity = none
+dotnet_diagnostic.IDE0072.severity = none
+
 # IDE0301, IDE0303, IDE0304, IDE0305 (use a collection expression): Roslyn 4.14.0 made a collection expression able to
 # target ImmutableArray<T>, and they now flag the existing Create, Empty, builder and ToImmutableArray calls of the
 # generator, whose allocation budgets are measured with those calls.  A call is converted only with a measurement; see
-# TD-0094, which removes this section.
+# TD-0094, which removes these four.
 dotnet_diagnostic.IDE0301.severity = suggestion
 dotnet_diagnostic.IDE0303.severity = suggestion
 dotnet_diagnostic.IDE0304.severity = suggestion

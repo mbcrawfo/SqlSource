@@ -269,7 +269,11 @@ internal sealed class SqlMarkerScope(
 
         // The entries are the file's engine's alone.
         var typeOverrides = BuildTypeOverrides();
-        var isSqlServer = Engine == DatabaseEngine.SqlServer;
+        var isSqlServer = Engine switch
+        {
+            DatabaseEngine.PostgreSql => false,
+            DatabaseEngine.SqlServer => true,
+        };
         return new SettingsLevel
         {
             Parameters = Generator.Parameters,

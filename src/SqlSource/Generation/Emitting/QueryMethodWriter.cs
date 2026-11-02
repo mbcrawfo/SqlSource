@@ -134,13 +134,21 @@ internal static class QueryMethodWriter
     // A streaming method on SQL Server, whose iterator reads the later results in a finally when its loop is left at
     // a row.
     private static bool DrainsWhenLeftAtARow(QueryMethod method) =>
-        Streams(method) && method.Engine == DatabaseEngine.SqlServer;
+        Streams(method)
+        && method.Engine switch
+        {
+            DatabaseEngine.PostgreSql => false,
+            DatabaseEngine.SqlServer => true,
+        };
 
     // A method on SQL Server that reads rows, which can throw an exception of its own before it has read the rest of
     // the batch, so that the reader's disposal reads it, and an error there can roll back the transaction unannounced.
     private static bool ChecksTransaction(QueryMethod method) =>
-        method.Engine == DatabaseEngine.SqlServer
-        && method.Shape is ResultShape.Many or ResultShape.One or ResultShape.OneOptional;
+        method.Engine switch
+        {
+            DatabaseEngine.PostgreSql => false,
+            DatabaseEngine.SqlServer => true,
+        } && method.Shape is ResultShape.Many or ResultShape.One or ResultShape.OneOptional;
 
     // On SQL Server the refusal of a completed transaction, then the SQL, the opening of a closed connection, the
     // command, its parameters and its execution, and the closing of the connection in a finally, at the indent of the
@@ -219,7 +227,12 @@ internal static class QueryMethodWriter
     // followed by a blank line, as the SQL follows it.
     private static void AppendCompletedTransactionCheck(StringBuilder builder, string indent, QueryMethod method)
     {
-        if (method.Engine != DatabaseEngine.SqlServer)
+        var refusesCompleted = method.Engine switch
+        {
+            DatabaseEngine.PostgreSql => false,
+            DatabaseEngine.SqlServer => true,
+        };
+        if (!refusesCompleted)
         {
             return;
         }
@@ -308,7 +321,12 @@ internal static class QueryMethodWriter
             XmlDocWriter.AppendException(builder, indent, ExceptionCref, "The query returned more than one row.");
         }
 
-        if (method.Engine == DatabaseEngine.SqlServer)
+        var refusesCompleted = method.Engine switch
+        {
+            DatabaseEngine.PostgreSql => false,
+            DatabaseEngine.SqlServer => true,
+        };
+        if (refusesCompleted)
         {
             XmlDocWriter.AppendException(
                 builder,
@@ -834,7 +852,12 @@ internal static class QueryMethodWriter
     // a return follows it.
     private static void AppendDrain(StringBuilder builder, string indent, QueryMethod method, QueryMethodLocals locals)
     {
-        if (method.Engine != DatabaseEngine.SqlServer)
+        var drains = method.Engine switch
+        {
+            DatabaseEngine.PostgreSql => false,
+            DatabaseEngine.SqlServer => true,
+        };
+        if (!drains)
         {
             return;
         }

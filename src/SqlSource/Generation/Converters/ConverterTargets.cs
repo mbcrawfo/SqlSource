@@ -37,13 +37,10 @@ internal static class ConverterTargetsExtensions
     /// for PostgreSQL <see cref="ConverterTargets.Npgsql10" /> when <paramref name="npgsqlAtLeast10" />, else
     /// <see cref="ConverterTargets.NpgsqlBefore10" />.
     /// </summary>
-    public static ConverterTargets Of(DatabaseEngine engine, bool npgsqlAtLeast10)
-    {
-        if (engine == DatabaseEngine.SqlServer)
+    public static ConverterTargets Of(DatabaseEngine engine, bool npgsqlAtLeast10) =>
+        engine switch
         {
-            return ConverterTargets.SqlServer;
-        }
-
-        return npgsqlAtLeast10 ? ConverterTargets.Npgsql10 : ConverterTargets.NpgsqlBefore10;
-    }
+            DatabaseEngine.PostgreSql => npgsqlAtLeast10 ? ConverterTargets.Npgsql10 : ConverterTargets.NpgsqlBefore10,
+            DatabaseEngine.SqlServer => ConverterTargets.SqlServer,
+        };
 }

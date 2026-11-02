@@ -92,9 +92,17 @@ internal sealed record LibraryProbe(
     public bool IsAvailable(SqlLibrary library, DatabaseEngine engine) =>
         library switch
         {
-            SqlLibrary.NodaTime => engine == DatabaseEngine.PostgreSql ? NodaTime && NpgsqlNodaTime : NodaTime,
+            SqlLibrary.NodaTime => engine switch
+            {
+                DatabaseEngine.PostgreSql => NodaTime && NpgsqlNodaTime,
+                DatabaseEngine.SqlServer => NodaTime,
+            },
             SqlLibrary.NetTopologySuite => NetTopologySuite
-                && (engine == DatabaseEngine.PostgreSql ? NpgsqlNetTopologySuite : SqlServerBytes),
+                && engine switch
+                {
+                    DatabaseEngine.PostgreSql => NpgsqlNetTopologySuite,
+                    DatabaseEngine.SqlServer => SqlServerBytes,
+                },
             SqlLibrary.Json => Json,
             _ => false,
         };
@@ -107,8 +115,11 @@ internal sealed record LibraryProbe(
     public LibraryState DefaultOf(SqlLibrary library, DatabaseEngine engine) =>
         library switch
         {
-            SqlLibrary.NodaTime or SqlLibrary.NetTopologySuite => engine == DatabaseEngine.PostgreSql
-            && IsAvailable(library, engine)
+            SqlLibrary.NodaTime or SqlLibrary.NetTopologySuite => engine switch
+            {
+                DatabaseEngine.PostgreSql => IsAvailable(library, engine),
+                DatabaseEngine.SqlServer => false,
+            }
                 ? LibraryState.On
                 : LibraryState.Off,
             SqlLibrary.Json or _ => LibraryState.Off,
@@ -123,10 +134,16 @@ internal sealed record LibraryProbe(
     public static string MissingAssembliesOf(SqlLibrary library, DatabaseEngine engine) =>
         library switch
         {
-            SqlLibrary.NodaTime => engine == DatabaseEngine.PostgreSql ? "Npgsql.NodaTime" : "NodaTime",
-            SqlLibrary.NetTopologySuite => engine == DatabaseEngine.PostgreSql
-                ? "Npgsql.NetTopologySuite"
-                : SqlServerSpatialPackages,
+            SqlLibrary.NodaTime => engine switch
+            {
+                DatabaseEngine.PostgreSql => "Npgsql.NodaTime",
+                DatabaseEngine.SqlServer => "NodaTime",
+            },
+            SqlLibrary.NetTopologySuite => engine switch
+            {
+                DatabaseEngine.PostgreSql => "Npgsql.NetTopologySuite",
+                DatabaseEngine.SqlServer => SqlServerSpatialPackages,
+            },
             SqlLibrary.Json => "System.Text.Json",
             _ => "",
         };
@@ -139,8 +156,7 @@ internal sealed record LibraryProbe(
         library switch
         {
             SqlLibrary.NodaTime => IsNodaTimeBelowTheFloor,
-            SqlLibrary.NetTopologySuite => IsNetTopologySuiteBelowTheFloor
-                || (engine == DatabaseEngine.SqlServer && IsSqlServerBytesBelowTheFloor),
+            SqlLibrary.NetTopologySuite => IsNetTopologySuiteBelowTheFloor || SqlServerBytesBelowTheFloorOn(engine),
             SqlLibrary.Json or _ => false,
         };
 
@@ -174,7 +190,7 @@ internal sealed record LibraryProbe(
             );
         }
 
-        if (engine == DatabaseEngine.SqlServer && IsSqlServerBytesBelowTheFloor)
+        if (SqlServerBytesBelowTheFloorOn(engine))
         {
             yield return (SqlServerBytesAssemblyName, SqlServerBytesVersion!, TextOf(SqlServerBytesFloor));
         }
@@ -192,6 +208,14 @@ internal sealed record LibraryProbe(
     // starts with a number, is not below it.
     private bool IsSqlServerBytesBelowTheFloor =>
         SqlServerBytes && NumbersOf(SqlServerBytesVersion) is { } version && version < SqlServerBytesFloor;
+
+    // A reader of SQL Server's bytes below its floor, on an engine whose queries use it: SQL Server's alone.
+    private bool SqlServerBytesBelowTheFloorOn(DatabaseEngine engine) =>
+        engine switch
+        {
+            DatabaseEngine.PostgreSql => false,
+            DatabaseEngine.SqlServer => IsSqlServerBytesBelowTheFloor,
+        };
 
     /// <summary>
     /// Reads the probe from <paramref name="compilation" />: seven type lookups, the identities of its references, and

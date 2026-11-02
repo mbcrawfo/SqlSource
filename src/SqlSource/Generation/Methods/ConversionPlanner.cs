@@ -294,7 +294,13 @@ internal static class ConversionPlanner
     // by an override or the library's row, when the project references NetTopologySuite.IO.SqlServerBytes; null for
     // any other type, as Microsoft.SqlServer.Types.SqlGeography, which is read and bound as the driver does.
     private static Conversion? SpatialOf(PropertyType type, bool isRead, ConversionContext context) =>
-        context.Engine == DatabaseEngine.SqlServer
+        (
+            context.Engine switch
+            {
+                DatabaseEngine.PostgreSql => false,
+                DatabaseEngine.SqlServer => true,
+            }
+        )
         && context.SqlServerSpatial
         && SqlServerNames.IsSpatial(type.Key)
         && NetTopologySuiteConversions.IsGeometryType(type.Text)
@@ -484,7 +490,11 @@ internal static class ConversionPlanner
         public bool IsSerializable(string type) => !JsonTypes.IsJsonType(type) && IsForeign(type);
 
         private bool IsForeign(string type) =>
-            context.Engine == DatabaseEngine.SqlServer ? !SqlServerTypeMap.Gives(type) : !PostgresTypeMap.Gives(type);
+            context.Engine switch
+            {
+                DatabaseEngine.PostgreSql => !PostgresTypeMap.Gives(type),
+                DatabaseEngine.SqlServer => !SqlServerTypeMap.Gives(type),
+            };
 
         // 'int', 'int' and 'short', or 'a', 'b' and 'c'.
         private static string ListOf(List<string> types)
