@@ -39,10 +39,9 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_ParameterName_IsItsBareName()
     {
-        var run = Run(
-            GeneratorHarness.UsersFile,
-            Entry(GeneratorHarness.UsersFile, "GetUser", [Parameter("accountId"), Parameter("user_id")], null)
-        );
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @accountId, @user_id;\n");
+
+        var run = Run(file, Entry(file, "GetUser", [Parameter("accountId"), Parameter("user_id")], null));
 
         run.Diagnostics.ShouldBeEmpty();
         NamesOf(QueryOf(run).Input).ShouldBe(["AccountId", "UserId"]);
@@ -81,10 +80,9 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_ParameterNotAnIdentifier_IsSqlsrc254WithRename()
     {
-        var run = Run(
-            GeneratorHarness.UsersFile,
-            Entry(GeneratorHarness.UsersFile, "GetUser", [Parameter("2fa")], null)
-        );
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @2fa;\n");
+
+        var run = Run(file, Entry(file, "GetUser", [Parameter("2fa")], null));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC254 {GetUserName}: The parameter '2fa' gives the property name '2fa', which is not a C# "
@@ -127,10 +125,9 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_TwoParametersOneName_IsSqlsrc255()
     {
-        var run = Run(
-            GeneratorHarness.UsersFile,
-            Entry(GeneratorHarness.UsersFile, "GetUser", [Parameter("a_b"), Parameter("aB")], null)
-        );
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @a_b, @aB;\n");
+
+        var run = Run(file, Entry(file, "GetUser", [Parameter("a_b"), Parameter("aB")], null));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC255 {GetUserName}: The parameter 'a_b' at position 1 and the parameter 'aB' at position 2 give "
@@ -165,10 +162,9 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_ReservedParameterName_IsSqlsrc256WithRename()
     {
-        var run = Run(
-            GeneratorHarness.UsersFile,
-            Entry(GeneratorHarness.UsersFile, "GetUser", [Parameter("to_string")], null)
-        );
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @to_string;\n");
+
+        var run = Run(file, Entry(file, "GetUser", [Parameter("to_string")], null));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC256 {GetUserName}: The parameter 'to_string' gives the property name 'ToString', which a record "
@@ -200,14 +196,11 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_QueryWithSeveralErrors_ReportsEach()
     {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @2fa;\n");
+
         var run = Run(
-            GeneratorHarness.UsersFile,
-            Entry(
-                GeneratorHarness.UsersFile,
-                "GetUser",
-                [Parameter("2fa")],
-                [Column("?column?"), Column("id"), Column("ID")]
-            )
+            file,
+            Entry(file, "GetUser", [Parameter("2fa")], [Column("?column?"), Column("id"), Column("ID")])
         );
 
         run.Diagnostics.ShouldBe([
@@ -262,10 +255,12 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_ParameterNullability_IsTrueOnly()
     {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @p, @q, @r;\n");
+
         var run = Run(
-            GeneratorHarness.UsersFile,
+            file,
             Entry(
-                GeneratorHarness.UsersFile,
+                file,
                 "GetUser",
                 [Parameter("p", nullable: true), Parameter("q", nullable: false), Parameter("r", nullable: null)],
                 null
@@ -282,11 +277,12 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_PropertyDocumentation_NamesTypeOriginAndFlags()
     {
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @id;\n");
         var numeric = TestSidecars.Postgres(name: "numeric(10,2)", internalName: "numeric");
         var run = Run(
-            GeneratorHarness.UsersFile,
+            file,
             Entry(
-                GeneratorHarness.UsersFile,
+                file,
                 "GetUser",
                 [Parameter("id")],
                 [
@@ -341,10 +337,9 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_Property_HasItsTypeAndSubject()
     {
-        var run = Run(
-            GeneratorHarness.UsersFile,
-            Entry(GeneratorHarness.UsersFile, "GetUser", [Parameter("user_id")], [Column("id")])
-        );
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @user_id;\n");
+
+        var run = Run(file, Entry(file, "GetUser", [Parameter("user_id")], [Column("id")]));
 
         run.Diagnostics.ShouldBeEmpty();
         var query = QueryOf(run);
@@ -370,10 +365,9 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_NoRows_HasNoOutputModel()
     {
-        var run = Run(
-            GeneratorHarness.UsersFile,
-            Entry(GeneratorHarness.UsersFile, "GetUser", [Parameter("id")], null)
-        );
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT @id;\n");
+
+        var run = Run(file, Entry(file, "GetUser", [Parameter("id")], null));
 
         run.Diagnostics.ShouldBeEmpty();
         var query = QueryOf(run);

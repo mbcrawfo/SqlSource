@@ -43,6 +43,12 @@ public sealed class SharedModelTests
         "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
     );
 
+    // The query of Users without its parameter, which reads every user, for the tests of a query that has none.
+    private static readonly SqlFile AllUsers = new(
+        GeneratorHarness.UsersPath,
+        "-- name: GetUser\nSELECT id FROM users;\n"
+    );
+
     private static readonly SqlFile EventsFile = new(
         GeneratorHarness.UsersPath,
         "-- name: ListEvents\nSELECT at FROM events;\n"
@@ -324,7 +330,7 @@ public sealed class SharedModelTests
             + (genericFirst ? Generic + "\n\n" + Plain : Plain + "\n\n" + Generic)
             + "\n}\n";
 
-        var run = Run(source, [Users, Sidecar(Users, "GetUser", [Column("id")])]);
+        var run = Run(source, [AllUsers, Sidecar(AllUsers, "GetUser", [Column("id")])]);
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC257 {GetUserName}: The output model 'App.GetUserDto' of the query 'GetUser' is not the same as the "
@@ -353,7 +359,7 @@ public sealed class SharedModelTests
             }
             """;
 
-        var run = Run(source, [Users, Sidecar(Users, "GetUser", [Column("id")])]);
+        var run = Run(source, [AllUsers, Sidecar(AllUsers, "GetUser", [Column("id")])]);
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC257 {GetUserName}: The output model 'App.GetUserDto' of the query 'GetUser' is not the same as the "
@@ -381,7 +387,7 @@ public sealed class SharedModelTests
             }
             """;
 
-        var run = Run(source, [Users, Sidecar(Users, "GetUser", [Column("id")])]);
+        var run = Run(source, [AllUsers, Sidecar(AllUsers, "GetUser", [Column("id")])]);
 
         run.ShouldBeClean();
         ModelFiles(run).ShouldBe([GetUserDtoFile]);
@@ -407,7 +413,7 @@ public sealed class SharedModelTests
             }
             """;
 
-        var run = Run(source, [Users, Sidecar(Users, "GetUser", [Column("id")])]);
+        var run = Run(source, [AllUsers, Sidecar(AllUsers, "GetUser", [Column("id")])]);
 
         run.ShouldBeClean();
         ModelFiles(run).ShouldBe([GetUserDtoFile, "Other.GetUserDto-Model.g.cs"]);
@@ -430,7 +436,7 @@ public sealed class SharedModelTests
             }
             """;
 
-        var run = Run(source, [Users, Sidecar(Users, "GetUser", [Column("id")])]);
+        var run = Run(source, [AllUsers, Sidecar(AllUsers, "GetUser", [Column("id")])]);
 
         run.ShouldBeClean();
         run.Sources[GetUserDtoFile].ShouldContain("    public sealed record GetUserDto(int Id);\n");
@@ -474,7 +480,7 @@ public sealed class SharedModelTests
     {
         var source = Source + "\n\nnamespace App\n{\n    public class GetUserDto;\n}\n";
 
-        var run = Run(source, [Users, Sidecar(Users, "GetUser", [Column("id")])]);
+        var run = Run(source, [AllUsers, Sidecar(AllUsers, "GetUser", [Column("id")])]);
 
         AssertUnusable(
             run,
@@ -519,7 +525,7 @@ public sealed class SharedModelTests
 
         var run = Run(
             source,
-            [Users, Sidecar(Users, "GetUser", [Column("id")])],
+            [AllUsers, Sidecar(AllUsers, "GetUser", [Column("id")])],
             settings: /*lang=json,strict*/
             """{"modelNamespace": "App.Queries"}"""
         );
@@ -614,7 +620,7 @@ public sealed class SharedModelTests
     {
         var run = Run(
             Source + "\n\nnamespace MyApp\n{\n    internal readonly struct Inner;\n}\n",
-            [Users, Sidecar(Users, "GetUser", [Column("id")])],
+            [AllUsers, Sidecar(AllUsers, "GetUser", [Column("id")])],
             settings: /*lang=json,strict*/
             """{"typeOverrides": {"int4": "MyApp.Inner"}}"""
         );
@@ -710,7 +716,7 @@ public sealed class SharedModelTests
 
         var run = Run(
             source + "\n\nnamespace MyApp\n{\n    internal readonly struct Inner;\n}\n",
-            [Users, Sidecar(Users, "GetUser", [Column("id")])],
+            [AllUsers, Sidecar(AllUsers, "GetUser", [Column("id")])],
             settings: /*lang=json,strict*/
             """{"typeOverrides": {"int4": "MyApp.Inner"}}"""
         );
