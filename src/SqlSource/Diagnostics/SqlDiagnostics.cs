@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using SqlSource.Parsing;
@@ -1189,6 +1188,5 @@ internal static class SqlDiagnostics
             SqlParseErrorKind.InputModelWithoutParameters => InputModelWithoutParameters,
             SqlParseErrorKind.TokenCrossesComment => TokenCrossesComment,
             SqlParseErrorKind.ParameterInTwoSpellings => ParameterInTwoSpellings,
-            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "No descriptor is defined for this kind."),
         };
 }

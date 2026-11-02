@@ -434,7 +434,7 @@ internal static class ModelCollector
                 {
                     TakenReason.Type => "a type of this project has that full name",
                     TakenReason.Namespace => "it is a namespace of this project",
-                    TakenReason.NamespacePartIsType or _ => "'"
+                    TakenReason.NamespacePartIsType => "'"
                         + taken.Part
                         + "' is a type of this project, and a part of its namespace",
                 };

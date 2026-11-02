@@ -119,6 +119,6 @@ internal static class MethodEmitter
         {
             MethodPlacement.Internal => "internal static",
             MethodPlacement.Private => "private static",
-            MethodPlacement.Public or MethodPlacement.ExtensionClass or _ => "public static",
+            MethodPlacement.Public or MethodPlacement.ExtensionClass => "public static",
         };
 }

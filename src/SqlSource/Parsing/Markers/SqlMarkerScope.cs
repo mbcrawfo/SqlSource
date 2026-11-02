@@ -212,7 +212,6 @@ internal sealed class SqlMarkerScope(
             SqlScopeKind.Preamble => IsAllowedInPreamble(kind),
             SqlScopeKind.Query => IsAllowedInQuery(kind),
             SqlScopeKind.WholeFile => IsAllowedInQuery(kind) || IsAllowedInPreamble(kind),
-            _ => false,
         };
 
     internal static bool IsAllowedInQuery(SqlMarkerKind kind) =>

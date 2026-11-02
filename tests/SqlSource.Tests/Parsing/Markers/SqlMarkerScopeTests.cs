@@ -65,11 +65,6 @@ public sealed class SqlMarkerScopeTests
 
     public static TheoryData<string> MarkerKindNames => [.. Enum.GetNames<SqlMarkerKind>()];
 
-    // A kind that is none of the three takes nothing: the scope does not guess what it is.
-    [Fact]
-    public void Read_ScopeOfAnUnknownKind_TakesNoMarker() =>
-        IsTaken("-- generator: keep-comments", (SqlScopeKind)99).ShouldBeFalse();
-
     // The header of a file is the place of its preamble's entries, and a query the place of its own.  A file with no
     // name marker is one query.
     // An internal enum cannot be the parameter of a public test method, so a row gives the names.

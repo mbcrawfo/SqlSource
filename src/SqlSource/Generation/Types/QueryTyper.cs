@@ -260,7 +260,7 @@ internal static class QueryTyper
             SettingPlaceKind.FileHeader => "a -- column: marker in the file header",
             SettingPlaceKind.Query => QueryColumnMarker,
             SettingPlaceKind.SettingsFile => "the columnTypes of the settings file " + place.Path,
-            SettingPlaceKind.Attribute or _ => "the attribute",
+            SettingPlaceKind.Attribute => "the attribute",
         };
 
     // The query's parameter of the name, ignoring case, when its marker gives it a C# type, or null.
@@ -358,7 +358,7 @@ internal static class QueryTyper
             MappedTypeStatus.Found => TypeMappingKind.Mapped,
             MappedTypeStatus.NotAccessible => TypeMappingKind.MappedTypeNotAccessible,
             MappedTypeStatus.NotAPropertyType => TypeMappingKind.MappedTypeNotAPropertyType,
-            MappedTypeStatus.NotFound or MappedTypeStatus.Ambiguous or _ => TypeMappingKind.MappedTypeNotFound,
+            MappedTypeStatus.NotFound or MappedTypeStatus.Ambiguous => TypeMappingKind.MappedTypeNotFound,
         };
         if (kind != TypeMappingKind.Mapped)
         {
@@ -786,7 +786,7 @@ internal static class QueryTyper
                     + AsAKey(key, engine)
                     + "=<a C# type>"
             ),
-            TypeMappingKind.Mapped or TypeMappingKind.Unreadable or _ => DiagnosticInfo.Create(
+            TypeMappingKind.Mapped or TypeMappingKind.Unreadable => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,
                 at,
                 subject,
@@ -1083,7 +1083,7 @@ internal static class QueryTyper
                 SettingPlaceKind.FileHeader => "a -- type-override: marker in the file header",
                 SettingPlaceKind.Query => "a -- type-override: marker of the query",
                 SettingPlaceKind.SettingsFile => "the typeOverrides of the settings file " + place.Path,
-                SettingPlaceKind.Attribute or _ => "the attribute",
+                SettingPlaceKind.Attribute => "the attribute",
             };
     }
 }

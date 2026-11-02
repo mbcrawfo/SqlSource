@@ -312,7 +312,7 @@ internal static class MethodPlanner
         {
             SqlLibrary.NetTopologySuite => "NetTopologySuite",
             SqlLibrary.Json => "System.Text.Json",
-            SqlLibrary.NodaTime or _ => "NodaTime",
+            SqlLibrary.NodaTime => "NodaTime",
         };
 
     // The libraries that the query uses, each with its engine, added to the type's, which are made only when the first
@@ -716,7 +716,7 @@ internal static class MethodPlanner
             ResultShape.OneOptional => "one-optional",
             ResultShape.Many => "many",
             ResultShape.None => "none",
-            ResultShape.RowCount or _ => "rowcount",
+            ResultShape.RowCount => "rowcount",
         };
 
     // The values that planning one query reads from its type and its file: the type's input and key, the query's file

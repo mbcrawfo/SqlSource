@@ -104,7 +104,6 @@ internal sealed record LibraryProbe(
                     DatabaseEngine.SqlServer => SqlServerBytes,
                 },
             SqlLibrary.Json => Json,
-            _ => false,
         };
 
     /// <summary>
@@ -122,7 +121,7 @@ internal sealed record LibraryProbe(
             }
                 ? LibraryState.On
                 : LibraryState.Off,
-            SqlLibrary.Json or _ => LibraryState.Off,
+            SqlLibrary.Json => LibraryState.Off,
         };
 
     /// <summary>
@@ -145,7 +144,6 @@ internal sealed record LibraryProbe(
                 DatabaseEngine.SqlServer => SqlServerSpatialPackages,
             },
             SqlLibrary.Json => "System.Text.Json",
-            _ => "",
         };
 
     /// <summary>
@@ -157,7 +155,7 @@ internal sealed record LibraryProbe(
         {
             SqlLibrary.NodaTime => IsNodaTimeBelowTheFloor,
             SqlLibrary.NetTopologySuite => IsNetTopologySuiteBelowTheFloor || SqlServerBytesBelowTheFloorOn(engine),
-            SqlLibrary.Json or _ => false,
+            SqlLibrary.Json => false,
         };
 
     /// <summary>

@@ -304,7 +304,7 @@ internal static class QueryMethodWriter
                 ResultShape.One => "The row.",
                 ResultShape.OneOptional => "The row, or null when there is none.",
                 ResultShape.RowCount => "The number of rows the query affected.",
-                ResultShape.None or _ => "A task that completes when the query has run.",
+                ResultShape.None => "A task that completes when the query has run.",
             }
         );
         if (method.Shape == ResultShape.One)
@@ -458,7 +458,7 @@ internal static class QueryMethodWriter
             ResultShape.One => method.Output!.TypeText,
             ResultShape.OneOptional => method.Output!.TypeText + "?",
             ResultShape.RowCount => "int",
-            ResultShape.None or _ => null,
+            ResultShape.None => null,
         };
 
     private static string GetCollectionType(CollectionKind collection, string row) =>
@@ -474,7 +474,7 @@ internal static class QueryMethodWriter
             CollectionKind.ImmutableArray => "global::System.Collections.Immutable.ImmutableArray<" + row + ">",
             CollectionKind.ImmutableList => "global::System.Collections.Immutable.ImmutableList<" + row + ">",
             CollectionKind.IAsyncEnumerable => "global::System.Collections.Generic.IAsyncEnumerable<" + row + ">",
-            CollectionKind.IImmutableList or _ => "global::System.Collections.Immutable.IImmutableList<" + row + ">",
+            CollectionKind.IImmutableList => "global::System.Collections.Immutable.IImmutableList<" + row + ">",
         };
 
     // The buffer the rows are read into, and the expression that gives the collection from it.
@@ -494,8 +494,7 @@ internal static class QueryMethodWriter
                 or CollectionKind.IReadOnlyList
                 or CollectionKind.ImmutableList
                 or CollectionKind.IImmutableList
-                or CollectionKind.IAsyncEnumerable
-                or _ => ".ToArray()",
+                or CollectionKind.IAsyncEnumerable => ".ToArray()",
             };
             return ("new " + RowBuffer.TypeText + "<" + row + ">()", rows + toResult);
         }
@@ -520,8 +519,10 @@ internal static class QueryMethodWriter
             or CollectionKind.IEnumerable
             or CollectionKind.IReadOnlyCollection
             or CollectionKind.IReadOnlyList
-            or CollectionKind.IAsyncEnumerable
-            or _ => ("new global::System.Collections.Generic.List<" + row + ">()", rows + ".ToArray()"),
+            or CollectionKind.IAsyncEnumerable => (
+                "new global::System.Collections.Generic.List<" + row + ">()",
+                rows + ".ToArray()"
+            ),
         };
     }
 
