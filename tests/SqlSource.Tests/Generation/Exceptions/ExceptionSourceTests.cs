@@ -80,11 +80,11 @@ public sealed class ExceptionSourceTests
         type.GetProperty("QueryName")!.GetValue(exception).ShouldBe("GetUser");
     }
 
-    // The public text, compiled and loaded, so that Activator reaches the constructors.
+    // The internal text, the default, compiled and loaded.  Its constructors are public, so Activator calls them.
     private static Type Load(string metadataName)
     {
         using var image = new MemoryStream();
-        CompileText(isPublic: true)
+        CompileText(isPublic: false)
             .Emit(image, cancellationToken: TestContext.Current.CancellationToken)
             .Success.ShouldBeTrue();
         return Assembly.Load(image.ToArray()).GetType(metadataName).ShouldNotBeNull();

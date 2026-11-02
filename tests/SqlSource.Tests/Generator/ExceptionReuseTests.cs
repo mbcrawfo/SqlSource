@@ -9,7 +9,6 @@ using SqlSource.Generation.Exceptions;
 using SqlSource.Testing.Generator;
 using Xunit;
 using static SqlSource.Testing.Generator.ModelRuns;
-using static SqlSource.Testing.Generator.StepReasons;
 using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
@@ -308,33 +307,45 @@ public sealed class ExceptionReuseTests
         sources.Keys.ShouldNotContain(ExceptionSource.HintName);
     }
 
-    // A copy of another version of SqlSource: one exception without the other, or a constructor that a generated
-    // method calls missing.
-    [Theory]
-    [InlineData(
-        "internal sealed class UnexpectedRowCountException : System.InvalidOperationException { "
-            + "public UnexpectedRowCountException(string queryName, bool moreThanOne) { } }"
-    )]
-    [InlineData(
-        "internal sealed class UnexpectedRowCountException : System.InvalidOperationException { "
-            + "public UnexpectedRowCountException(string queryName) { } } "
-            + "internal sealed class TransactionRolledBackException : System.InvalidOperationException { "
-            + "public TransactionRolledBackException(string queryName, System.Exception inner) { } }"
-    )]
-    [InlineData(
-        "internal sealed class UnexpectedRowCountException : System.InvalidOperationException { "
-            + "public UnexpectedRowCountException(string queryName, bool moreThanOne) { } } "
-            + "internal sealed class TransactionRolledBackException : System.InvalidOperationException { "
-            + "public TransactionRolledBackException(string queryName) { } }"
-    )]
-    public void Run_ReferenceOfAnotherShape_ReportsSqlsrc023AndWritesItsOwn(string declarations)
+    // Copies of another version of SqlSource: one exception without the other, a constructor that a generated method
+    // calls missing, a class that is no exception, or one that cannot be created.  Each as an image and as a
+    // compilation.
+    public static TheoryData<string, bool> OtherShapes()
     {
-        var old = GeneratorHarness
-            .CreateCompilation(
-                [new SourceFile("/old/Old.cs", InternalsVisible + "namespace SqlSource { " + declarations + " }\n")],
-                assemblyName: "Old"
-            )
-            .ToMetadataReference();
+        string[] declarations =
+        [
+            RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne"),
+            RowCount("System.InvalidOperationException", "string queryName")
+                + RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner"),
+            RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne")
+                + RolledBack("System.InvalidOperationException", "string queryName"),
+            RowCount("System.Object", "string queryName, bool moreThanOne")
+                + RolledBack("System.Object", "string queryName, System.Exception inner"),
+            RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne", "abstract")
+                + RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner"),
+        ];
+        var shapes = new TheoryData<string, bool>();
+        foreach (var declaration in declarations)
+        {
+            shapes.Add(declaration, false);
+            shapes.Add(declaration, true);
+        }
+
+        return shapes;
+    }
+
+    [Theory]
+    [MemberData(nameof(OtherShapes))]
+    public void Run_ReferenceOfAnotherShape_ReportsSqlsrc023AndWritesItsOwn(
+        string declarations,
+        bool compilationReference
+    )
+    {
+        var compilation = GeneratorHarness.CreateCompilation(
+            [new SourceFile("/old/Old.cs", InternalsVisible + "namespace SqlSource { " + declarations + " }\n")],
+            assemblyName: "Old"
+        );
+        MetadataReference old = compilationReference ? compilation.ToMetadataReference() : ImageOf(compilation);
 
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
@@ -352,21 +363,32 @@ public sealed class ExceptionReuseTests
         run.CompilationErrors.ShouldBeEmpty();
     }
 
-    // The probe reads the compilation's references, which an edit of a .sql file leaves alone.
-    [Fact]
-    public void Run_EditOfASqlFile_LeavesTheExceptionProbeUnchanged()
+    // A copy of UnexpectedRowCountException, sealed unless the modifier is given, of this base and constructor.
+    private static string RowCount(string baseType, string parameters, string modifier = "sealed") =>
+        "internal "
+        + modifier
+        + " class UnexpectedRowCountException : "
+        + baseType
+        + " { "
+        + "public UnexpectedRowCountException("
+        + parameters
+        + ") { } } ";
+
+    // A copy of TransactionRolledBackException of this base and constructor.
+    private static string RolledBack(string baseType, string parameters) =>
+        "internal sealed class TransactionRolledBackException : "
+        + baseType
+        + " { "
+        + "public TransactionRolledBackException("
+        + parameters
+        + ") { } } ";
+
+    // The compilation's image, as a build references a project.
+    private static PortableExecutableReference ImageOf(Compilation compilation)
     {
-        var scene = new CachingScene();
-        var compilation = GeneratorHarness.CreateCompilation(CachingScene.Sources);
-        var driver = scene.FirstRun(OutputKind.Sql, compilation);
-
-        var edited = new InMemoryAdditionalText(scene.Users.Path, "-- name: GetUser\nSELECT 1, 2;\n");
-        var result = Run(driver.ReplaceAdditionalText(scene.Users, edited), compilation);
-
-        AllReasons(result, TrackingNames.ExceptionProbe)
-            .ShouldHaveSingleItem()
-            .ShouldBeOneOf(IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.PublicExceptions).ShouldBe([IncrementalStepRunReason.Cached]);
+        using var image = new System.IO.MemoryStream();
+        compilation.Emit(image, cancellationToken: TestContext.Current.CancellationToken).Success.ShouldBeTrue();
+        return MetadataReference.CreateFromImage(image.ToArray());
     }
 
     private static GeneratorRun RunWithPublicExceptions(string value) =>

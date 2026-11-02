@@ -591,7 +591,7 @@ A project that uses SqlSource sees `UnexpectedRowCountException` or `Transaction
 CSC : error SQLSRC022: This project sees UnexpectedRowCountException or TransactionRolledBackException in more than one referenced assembly: DataA, DataB.  Use SqlSource in one project that the others reference and that grants them InternalsVisibleTo, so that they all use its exceptions.
 ```
 
-Add a shared project that references SqlSource, needs no query, and grants `InternalsVisibleTo` to each project that uses SqlSource and sees it, this project among them.  Have those projects reference it.  Each then uses the shared project's exceptions instead of writing its own, and this project sees one copy: see [the recipe](recipes.md#share-the-exceptions).  The error has no file and line, because it is about the project's references.
+Add a shared project that references SqlSource, needs no query, and grants `InternalsVisibleTo` to each project that uses SqlSource and sees it, this project among them.  Have those projects reference it.  Each then uses the shared project's exceptions instead of writing its own, and this project sees one copy: see [the recipe](recipes.md#share-the-exceptions).  The shared project grants `InternalsVisibleTo` to every project that catches the exceptions by type, and to every project that uses SqlSource and sees a data project's internals, the data projects' test projects among them: such a project that does not see the shared project's copy gets its own, and its `catch (UnexpectedRowCountException)` compiles but does not catch what a data project's method throws.  The error has no file and line, because it is about the project's references.
 
 See: [Projects that share internals](generator.md#projects-that-share-internals)
 
@@ -599,7 +599,7 @@ See: [Projects that share internals](generator.md#projects-that-share-internals)
 
 **Exceptions come from another version of SqlSource**
 
-A project that uses SqlSource sees `UnexpectedRowCountException` and `TransactionRolledBackException` in a project or package it references, but not as this version of SqlSource writes them: one of them is missing, or it cannot be created the way this version's query methods create it.  That happens when the other project uses another version of SqlSource.  The message names the assembly.  The project still gets its own exceptions, so the error is the only one.
+A project that uses SqlSource sees `UnexpectedRowCountException` and `TransactionRolledBackException` in a project or package it references, but not as this version of SqlSource writes them: one of them is missing, or its constructors differ from this version's.  That happens when the other project uses another version of SqlSource.  The message names the assembly.  The project still gets its own exceptions, so the error is the only one from SqlSource, but code that names the exceptions, its query methods among them, may also get the compiler's warning CS0436.
 
 ```console
 CSC : error SQLSRC023: The UnexpectedRowCountException and TransactionRolledBackException that this project sees in Data are not those of this version of SqlSource.  Use the same version of SqlSource in both projects.

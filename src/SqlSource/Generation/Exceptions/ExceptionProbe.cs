@@ -45,8 +45,8 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
         return new ExceptionProbe(OriginOf(compilation, assemblies.Length, rowCounts, rolledBacks), new(assemblies));
     }
 
-    // Two or more assemblies are SeenTwice.  One is Referenced when it gives both, with the constructors the generated
-    // methods call, and OtherShape otherwise.
+    // Two or more assemblies are SeenTwice.  One is Referenced when it gives both, each an exception that can be
+    // created with the constructor the generated methods call, and OtherShape otherwise.
     private static ExceptionOrigin OriginOf(
         Compilation compilation,
         int assemblies,
@@ -62,6 +62,8 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
         return
             rowCounts.Length == 1
             && rolledBacks.Length == 1
+            && IsThrowable(rowCounts[0])
+            && IsThrowable(rolledBacks[0])
             && HasConstructor(compilation, rowCounts[0], IsBoolean)
             && HasConstructor(compilation, rolledBacks[0], IsException)
             ? ExceptionOrigin.Referenced
@@ -98,6 +100,26 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
                 && isSecond(parameters[1].Type)
                 && compilation.IsSymbolAccessibleWithin(constructor, compilation.Assembly)
             )
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Whether a method can create the type and throw it: a class that is not abstract and derives from
+    // System.Exception.
+    private static bool IsThrowable(INamedTypeSymbol type)
+    {
+        if (type.IsAbstract)
+        {
+            return false;
+        }
+
+        for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
+        {
+            if (IsException(baseType))
             {
                 return true;
             }

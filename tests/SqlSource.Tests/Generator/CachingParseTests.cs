@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
+using SqlSource.Generation.Exceptions;
 using SqlSource.Testing.Generator;
 using Xunit;
 using static SqlSource.Testing.Generator.CachingScene;
@@ -78,6 +79,7 @@ public sealed class CachingParseTests
         AllReasons(result, TrackingNames.SupportedFramework).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.NpgsqlProbe).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.SqlClientProbe).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.ExceptionProbe).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.ResolvedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.CompilePaths).ShouldBe([IncrementalStepRunReason.Unchanged]);
         // The project's settings file, which gives the output, is the one settings file, and is not read again.
@@ -120,6 +122,28 @@ public sealed class CachingParseTests
             AllReasons(result, step).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached, step);
         }
 
+        OutputReasons(result).ShouldAllBeCached();
+    }
+
+    // A friend gives the project its exceptions, so the probe holds the friend's name.  On a new compilation it runs
+    // again, and its record, equal by value, stops there.
+    [Fact]
+    public void Run_MethodBodyEditedWithAFriendsExceptions_LeavesTheExceptionProbeUnchanged()
+    {
+        var friend = GeneratorHarness.CreateReference(
+            OutputKind.Sql,
+            "Friend",
+            "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"TestAssembly\")]\n"
+                + "public class InFriend { }\n"
+        );
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [friend]);
+        var driver = _scene.FirstRun(OutputKind.Sql, compilation);
+
+        var result = Run(driver, WithMethodBodyEdited(compilation));
+
+        var (probe, reason) = Outputs(result, TrackingNames.ExceptionProbe).ShouldHaveSingleItem();
+        reason.ShouldBe(IncrementalStepRunReason.Unchanged);
+        probe.ShouldBe(new ExceptionProbe(ExceptionOrigin.Referenced, new(["Friend"])));
         OutputReasons(result).ShouldAllBeCached();
     }
 

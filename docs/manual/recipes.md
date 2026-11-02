@@ -722,7 +722,7 @@ internal static partial class TestQueries;
 await Should.ThrowAsync<UnexpectedRowCountException>(() => connection.GetActiveUser(new GetActiveUserParams(email)));
 ```
 
-The test project uses App's `UnexpectedRowCountException` and `TransactionRolledBackException`, whether it uses SqlSource or not, and the attribute and enums of each project do not conflict.
+The test project uses App's `UnexpectedRowCountException` and `TransactionRolledBackException`, whether it uses SqlSource or not, and the attribute and enums of each project do not conflict.  When App uses the exceptions of a [shared project](#share-the-exceptions), the shared project grants `InternalsVisibleTo` to App.Tests too.
 
 Rules: [projects that share internals](generator.md#projects-that-share-internals), and [known issues](generator.md#known-issues) for an editor that still shows the warning.
 
@@ -736,6 +736,9 @@ Rules: [projects that share internals](generator.md#projects-that-share-internal
     <InternalsVisibleTo Include="Data.Orders" />
     <InternalsVisibleTo Include="Data.Users" />
     <InternalsVisibleTo Include="App" />
+    <!-- and each test project of a data project -->
+    <InternalsVisibleTo Include="Data.Orders.Tests" />
+    <InternalsVisibleTo Include="Data.Users.Tests" />
 </ItemGroup>
 ```
 
@@ -755,6 +758,6 @@ catch (UnexpectedRowCountException exception)
 }
 ```
 
-Each data project uses the shared project's exceptions instead of writing its own, so the app sees one copy and catches what a method of either throws by its type.  Without the shared project, an app that uses SqlSource and sees the internals of both gets [SQLSRC022](diagnostics.md#sqlsrc022).
+Each data project uses the shared project's exceptions instead of writing its own, so the app sees one copy and catches what a method of either throws by its type.  Grant `InternalsVisibleTo` from Data.Shared to every project that catches the exceptions, or that uses SqlSource and sees a data project's internals, the data projects' test projects among them: one that does not see Data.Shared's copy gets its own, and its `catch` compiles but misses what a data project throws.  Without the shared project, an app that uses SqlSource and sees the internals of both gets [SQLSRC022](diagnostics.md#sqlsrc022).
 
 Rules: [projects that share internals](generator.md#projects-that-share-internals), [SQLSRC022](diagnostics.md#sqlsrc022).

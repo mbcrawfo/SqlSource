@@ -224,7 +224,7 @@ Hover over the member in your editor: its documentation holds the SQL as it was 
 
 ### My test project sees the internals of my main project
 
-Both projects can use SqlSource, and the attributes and enums that each gets do not conflict.  The test project uses the main project's `UnexpectedRowCountException` and `TransactionRolledBackException`, so it catches what a method of either project throws by its type.  See [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#test-project-sees-internals), and [the other recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#share-the-exceptions) for an app that sees two data projects.
+Both projects can use SqlSource, and the attributes and enums that each gets do not conflict.  The test project uses the main project's `UnexpectedRowCountException` and `TransactionRolledBackException`, so it catches what a method of either project throws by its type.  When the main project uses the exceptions of a shared project, the shared project grants `InternalsVisibleTo` to the test project too.  See [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#test-project-sees-internals), and [the other recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#share-the-exceptions) for an app that sees two data projects.
 
 ## NodaTime and other libraries
 
