@@ -6,7 +6,7 @@ Every switch expression over an enum in [`src/SqlSource`](../../src/SqlSource) n
 
 No rule of the compiler or the analyzers asks for the opposite.  IDE0072 wants every member named and a discard too, and CS8509 fires only when a switch has no discard.  So a `_ =>` arm written back into a switch over an enum builds, and the next member added to that enum falls into it without a word.  Only the rule in [`src/SqlSource/AGENTS.md`](../../src/SqlSource/AGENTS.md) stands against it, and only an agent reads that.
 
-[`src/SqlSource.Tool`](../../src/SqlSource.Tool) still has IDE0072 on, so a new member fails its build at each switch expression over the enum, but those switches keep a discard that a value the code never makes can reach, and the two projects then follow two rules.  Its 65 `_ =>` and `default:` arms have not been sorted into those over enums and those over strings and types, which cannot name every value.  Switch statements over an enum are guarded in both projects by IDE0010, which asks for each member a statement does not name.
+[`src/SqlSource.Tool`](../../src/SqlSource.Tool) still has IDE0072 on, so a new member fails its build at each switch expression over the enum, but those switches keep a discard that a value the code never makes can reach, and the two projects then follow two rules.  Its 58 `_ =>` arms have not been sorted into those over enums and those over strings and types, which cannot name every value.  Switch statements over an enum need no such check: IDE0010, on in both projects, asks for each member a statement does not name even when it has a `default:` label.
 
 ## Why it exists
 
@@ -18,9 +18,9 @@ Low today: no switch over an enum in `src/SqlSource` has a discard.  As the code
 
 ## Proposed fix
 
-Add an analyzer project to the repository, referenced by `src/SqlSource` and `src/SqlSource.Tool` as an analyzer only (`OutputItemType="Analyzer"`, `ReferenceOutputAssembly="false"`), and never packed.  It reports an error at a switch expression or statement whose governing type is an enum and that has a discard arm or a `default:` label, unless the enum is `[Flags]`.  Give it tests, and a line in `CONTRIBUTING.md`.  Then:
+Add an analyzer project to the repository, referenced by `src/SqlSource` and `src/SqlSource.Tool` as an analyzer only (`OutputItemType="Analyzer"`, `ReferenceOutputAssembly="false"`), and never packed.  It reports an error at a switch expression whose governing type is an enum and that has a discard arm, unless the enum is `[Flags]`; switch statements are left to IDE0010.  Give it tests, and a line in `CONTRIBUTING.md`.  Then:
 
-- Turn IDE0072 off for `src/SqlSource.Tool` as for `src/SqlSource`, drop the discards of its switch expressions over enums, and sort its `default:` labels the same way.
+- Turn IDE0072 off for `src/SqlSource.Tool` as for `src/SqlSource`, and drop the discards of its switch expressions over enums.
 - Replace the rule in `src/SqlSource/AGENTS.md` with a pointer to the analyzer, update the `.editorconfig` comment and `docs/architecture/generator.md`'s "Extending query methods", and resolve this item.
 
 ## Trigger
