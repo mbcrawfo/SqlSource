@@ -20,8 +20,8 @@ namespace SqlSource.Generation.Methods;
 /// <param name="Name">The method's name.</param>
 /// <param name="QueryName">The query's name.</param>
 /// <param name="ParameterKey">
-/// The arguments a call gives beside those every method has: the input model's type, or empty, then <c>,string</c>
-/// for each token.
+/// The types of the arguments a call must give, beyond the receiver, since an argument with a default cannot tell two
+/// overloads apart: the input model's type, or empty, then <c>,string</c> for each token.
 /// </param>
 /// <param name="NameLocation">Where the query's name is.</param>
 /// <param name="AttributeLocation">Where the type's attribute is.</param>
@@ -87,21 +87,29 @@ internal sealed record MethodSignature(
         return new EquatableArray<MethodSignature>(signatures.MoveToImmutable());
     }
 
+    // The input's type, then a comma and the type of each other argument that a call must give, beyond the receiver.
+    // A string is built only when there is such an argument.
     private static string ParameterKeyOf(QueryMethod method)
     {
-        var input = method.Input?.TypeText ?? string.Empty;
-        var tokens = MethodWriter.GetTokens(method.Segments).Count;
-        if (tokens == 0)
+        var key = string.Empty;
+        StringBuilder? builder = null;
+        foreach (var argument in MethodArguments.Of(method, MethodWriter.GetTokens(method.Segments)))
         {
-            return input;
+            if (argument.Role == ArgumentRole.Receiver || argument.DefaultText is not null)
+            {
+                continue;
+            }
+
+            if (argument.Role == ArgumentRole.Input)
+            {
+                key = argument.TypeText;
+                continue;
+            }
+
+            builder ??= new StringBuilder(key);
+            _ = builder.Append(',').Append(argument.TypeText);
         }
 
-        var key = new StringBuilder(input);
-        for (var token = 0; token < tokens; token++)
-        {
-            _ = key.Append(",string");
-        }
-
-        return key.ToString();
+        return builder?.ToString() ?? key;
     }
 }

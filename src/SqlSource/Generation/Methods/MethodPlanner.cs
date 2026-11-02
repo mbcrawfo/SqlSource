@@ -30,16 +30,6 @@ internal static class MethodPlanner
 
     private const string ExtensionsSuffix = "Extensions";
 
-    // The names of the arguments that every method has, which no token may take.
-    private static readonly string[] FixedArguments =
-    [
-        "connection",
-        "parameters",
-        "transaction",
-        "commandTimeout",
-        "cancellationToken",
-    ];
-
     /// <summary>
     /// The methods of the type: one for each query of a file it can use whose output is
     /// <see cref="OutputKind.CodeGen" />, whose entry has the models it needs, whose shape, name, tokens and
@@ -422,11 +412,11 @@ internal static class MethodPlanner
         }
     }
 
-    // SQLSRC275 for each token named as a fixed argument.
+    // SQLSRC275 for each token named as an argument that every method can have, as MethodArguments.IsReserved says.
     private static List<DiagnosticInfo> FindTokenProblems(SqlQuery query) =>
         [
             .. query
-                .Tokens.Where(static token => Array.IndexOf(FixedArguments, token.Name) >= 0)
+                .Tokens.Where(static token => MethodArguments.IsReserved(token.Name))
                 .Select(token =>
                     DiagnosticInfo.Create(
                         SqlDiagnostics.TokenNamedAsAnArgument,
