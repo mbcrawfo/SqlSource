@@ -661,7 +661,7 @@ Every framework type is written from `global::`, every `await` has `ConfigureAwa
 
 ### Extending query methods
 
-The engines are a closed set.  Every decision on a [`DatabaseEngine`](../../src/SqlSource/Settings/DatabaseEngine.cs) under `src/SqlSource` is a switch expression that names each member and has no `_ =>` arm, and a decision written as a statement, an `if` or a `return`, first takes its value from one.  `.editorconfig` turns off CS8524 and IDE0072 for `src/SqlSource`, which ask for that arm, so a member that a switch does not name is CS8509, an error under `TreatWarningsAsErrors`.  No branch can let a new engine behave as PostgreSQL unannounced.  Every other switch expression over an enum in the generator follows the same rule, so a new member of any enum, a library or a shape, fails the build where it must be handled.
+The engines are a closed set.  Every decision on a [`DatabaseEngine`](../../src/SqlSource/Settings/DatabaseEngine.cs) under `src/SqlSource` is a switch expression that names each member and has no `_ =>` arm, and a decision written as a statement, an `if` or a `return`, first takes its value from one.  `.editorconfig` turns off CS8524 and IDE0072 for `src/SqlSource`, which ask for that arm, so a member that a switch does not name is CS8509, an error under `TreatWarningsAsErrors`.  No branch can let a new engine behave as PostgreSQL unannounced.  Every other switch expression over an enum in the generator follows the same rule, so a new member of any enum, a library or a shape, fails the build where it must be handled.  No rule of the compiler stops a discard arm written back, which the rule in `src/SqlSource/AGENTS.md` forbids.
 
 #### Adding a database engine
 
