@@ -41,7 +41,7 @@
 
 ## Allocation budgets
 
-- **Allocation budgets are tests.**  `Parsing/SqlFileParserAllocationTests.cs`, `Generation/Paths/PathResolverAllocationTests.cs` and `Snapshot/Reading/SidecarReaderAllocationTests.cs` in `tests/SqlSource.Tests` hold a number of bytes, and `ChainOf_PathFarBelowItsNearestFile_AllocatesNothing` of `Generation/Chains/SettingsFileSetTests.cs` and `Enumerate_AndAppendEachForm_AllocatesNothing` of `Generation/Methods/MethodArgumentsTests.cs` hold none.  Lower one when the code improves; never raise one to make a change pass.
+- **Allocation budgets are tests.**  `Parsing/SqlFileParserAllocationTests.cs`, `Generation/Paths/PathResolverAllocationTests.cs` and `Snapshot/Reading/SidecarReaderAllocationTests.cs` in `tests/SqlSource.Tests` hold a number of bytes, and `ChainOf_PathFarBelowItsNearestFile_AllocatesNothing` of `Generation/Chains/SettingsFileSetTests.cs` and `GetEnumerator_AndEachForm_AllocatesNothing` of `Generation/Methods/MethodArgumentsTests.cs` hold none.  Lower one when the code improves; never raise one to make a change pass.
 
 ## Documents
 

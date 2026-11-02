@@ -20,7 +20,7 @@ public sealed class MethodArgumentsTests
     private static readonly MethodInput Input = new("global::App.P", EquatableArray<MethodParameter>.Empty);
 
     [Fact]
-    public void Enumerate_WithInputAndTokens_GivesEachArgumentInOrder()
+    public void GetEnumerator_WithInputAndTokens_GivesEachArgumentInOrder()
     {
         var arguments = Enumerate(Of());
 
@@ -50,7 +50,7 @@ public sealed class MethodArgumentsTests
     }
 
     [Fact]
-    public void Enumerate_WithoutInput_LeavesTheInputOut() =>
+    public void GetEnumerator_WithoutInput_LeavesTheInputOut() =>
         Enumerate(new MethodArguments(null, ["orderBy", "await"], streams: false))
             .ConvertAll(static argument => argument.Role)
             .ShouldBe([
@@ -63,7 +63,7 @@ public sealed class MethodArgumentsTests
             ]);
 
     [Fact]
-    public void Enumerate_Streams_DocumentsTheReceiverForTheLoop()
+    public void GetEnumerator_Streams_DocumentsTheReceiverForTheLoop()
     {
         Enumerate(Of(streams: true))[0].DocumentationXml.ShouldBe(StreamConnectionXml);
         Enumerate(Of())[0].DocumentationXml.ShouldBe(ConnectionXml);
@@ -140,7 +140,7 @@ public sealed class MethodArgumentsTests
     public void IsReserved_NameDifferingByCase_IsFalse(string name) => MethodArguments.IsReserved(name).ShouldBeFalse();
 
     [Fact]
-    public void Enumerate_AndAppendEachForm_AllocatesNothing()
+    public void GetEnumerator_AndEachForm_AllocatesNothing()
     {
         var arguments = Of();
         var builder = new StringBuilder(4096);
