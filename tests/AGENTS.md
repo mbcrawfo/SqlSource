@@ -15,7 +15,7 @@
 ## Where a test goes
 
 - **Tests mirror the source folders.**  A test of `src/SqlSource/<Folder>/<Type>.cs` is `tests/SqlSource.Tests/<Folder>/<Type>Tests.cs`, and a test of the tool's `<Folder>/` is in `tests/SqlSource.Tool.Tests/<Folder>/`.  Namespaces follow folders, so a moved test changes its namespace.
-- **The driver tests of `tests/SqlSource.Tests/Generator/` stay there**, though some, such as `ModelTests` and `SidecarTests`, are named after types of other folders, since RoslynFloor compiles that folder alone.
+- **The driver tests of `tests/SqlSource.Tests/Generator/` stay there**, though some are named after types of other folders, since RoslynFloor compiles that folder alone.
 - **Classes split from one share their cases through a static helper, and no base class**, as `SqlFileParser*` of `tests/SqlSource.Tests/Parsing/` share `ParseOf`.
 
 ## Running the generator
@@ -27,8 +27,8 @@
 
 ## Programs, time and waits
 
-- **A test starts a program through `Programs.RunAsync`, never `Process.Start`**, and starts `dotnet` as `Programs.Dotnet`, the one that the tool runs, never as `"dotnet"`.
-- **A test that waits for what a program or the server does waits through `Eventually`**, whose `Patience` is the one limit, which `ProcessGate` and every caller of `Programs.RunAsync` use too, and not with a loop of `Task.Delay`.
+- **A test starts a program through `Programs.RunAsync`, never `Process.Start`**, and starts `dotnet` as `Programs.Dotnet`, the one the tool runs, never as `"dotnet"`.
+- **A test that waits for what a program or the server does waits through `Eventually`**, never a loop of `Task.Delay`; its `Patience` is the one limit, which `ProcessGate` and every caller of `Programs.RunAsync` use too.
 - **Only one test of a project starts the built tool as a process**: `Commands/TerminationTests.cs` of `tests/SqlSource.Tool.Tests`, and `Describer/ToolProcessTests.cs` of each container project, through `ToolProcess.ShouldDescribeOneQueryAsync`.  Each starts it through `Programs` of `tests/SqlSource.Tool.Testing`: `Programs.ToolStart`, or for the closed console `cmd /c start` with `Programs.ToolPath` and `Programs.SetToolEnvironment` ([why](SqlSource.Tool.Testing/Programs.cs)).
 - **A run, a host and a session of the tests stand on `TestClock` of `tests/SqlSource.Tool.Testing`**, which stands still until a test moves it, unless the test brings a clock: a test that needs the machine's passes `TimeProvider.System` and says why.
 
@@ -41,7 +41,7 @@
 
 ## Allocation budgets
 
-- **Allocation budgets are tests.**  `Parsing/SqlFileParserAllocationTests.cs`, `Generation/Paths/PathResolverAllocationTests.cs` and `Snapshot/Reading/SidecarReaderAllocationTests.cs` in `tests/SqlSource.Tests` hold a number of bytes, and `ChainOf_PathFarBelowItsNearestFile_AllocatesNothing` of `Generation/Chains/SettingsFileSetTests.cs` holds none.  Lower one when the code improves; never raise one to make a change pass.
+- **Allocation budgets are tests.**  `Parsing/SqlFileParserAllocationTests.cs`, `Generation/Paths/PathResolverAllocationTests.cs` and `Snapshot/Reading/SidecarReaderAllocationTests.cs` in `tests/SqlSource.Tests` hold a number of bytes, and `ChainOf_PathFarBelowItsNearestFile_AllocatesNothing` of `Generation/Chains/SettingsFileSetTests.cs` and `Enumerate_AndAppendEachForm_AllocatesNothing` of `Generation/Methods/MethodArgumentsTests.cs` hold none.  Lower one when the code improves; never raise one to make a change pass.
 
 ## Documents
 
@@ -49,8 +49,8 @@
 
 ## Style and CI
 
-- **Assertions are Shouldly's**, and test names are `Method_Scenario_Outcome`.  `.editorconfig` turns the analyzer rules off that this needs, under `[tests/**.cs]`.
-- **`Method` is what the test calls**: the C# method in full, `DescribeAsync_` and never `Describe_`, or the command or statement it runs, as the `Describe_` of `DescribeCommandTests`, which runs `describe`, and the `Explain_` of `PlanOutputTests`, which runs the server's `EXPLAIN`.  A test of a value names the value as `Method` and what it is read under as `Scenario`, as `Patience_OfEveryWait_IsTwoMinutes`.
+- **Assertions are Shouldly's**, and test names are `Method_Scenario_Outcome`.  `.editorconfig` turns off the analyzer rules this needs, under `[tests/**.cs]`.
+- **`Method` is what the test calls**: the C# method in full, `DescribeAsync_` and never `Describe_`, or the command or statement it runs, as the `Describe_` of `DescribeCommandTests`, which runs `describe`, and the `Explain_` of `PlanOutputTests`.  A test of a value names the value as `Method` and what it is read under as `Scenario`, as `Patience_OfEveryWait_IsTwoMinutes`.
 - **A test that needs another current culture takes it from `CultureScope` of `tests/SqlSource.Testing`**, which puts back the one it found.
 - **A unit-test class and a container class may share a name**, as the two `NpgsqlCheckTests` do: their folders tell them apart.
 - **Every test class is `sealed`**, a `partial` one `public sealed partial class`.

@@ -10,6 +10,10 @@ See [emitting](../../../../docs/architecture/generator.md#emitting).
 - **The one pragma inside a method is the `#pragma warning disable CA2100` and its `restore`** around the `CommandText` of a query whose tokens build its SQL at run time, which the analyzer reports even in generated code; keep it ([why](../../../../docs/architecture/generator.md#query-methods)).
 - **A generated file's name comes from `Generation/Emitting/HintName.cs`**, built from identifier values, never the text as written.  See [hint names](../../../../docs/architecture/generator.md#hint-names).
 
+## A query method's arguments
+
+- **A query method's argument list comes only from `MethodArguments` of `Generation/Methods/MethodArguments.cs`**: its declaration, its iterator's, the call, the `<param>` documentation and the checks.  A writer never spells an argument's name, type or default, and the body names one through the constants of `MethodArguments`.  See [query methods](../../../../docs/architecture/generator.md#query-methods).
+
 ## Names a token could hide
 
 - **Nothing a token method writes may be hidden by a parameter.**  `Generation/Emitting/MethodWriter.cs` reads the state tuple by position, names the lambda's parameters with `GetUnusedName`, writes framework types from `global::` and `string` as the keyword.  See [token methods](../../../../docs/architecture/generator.md#token-methods).
