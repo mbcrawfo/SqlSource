@@ -1,10 +1,10 @@
-# TD-0095 - A cref to a reused exception can be ambiguous
+# TD-0095 - A cref to a reused exception can be ambiguous or unresolved
 
 ## Problem
 
-A project that uses a referenced copy of `UnexpectedRowCountException` and `TransactionRolledBackException` declares no copy in source ([`ExceptionProbe`](../../src/SqlSource/Generation/Exceptions/ExceptionProbe.cs) gives `Referenced`).  The compiler binds a `cref` without regard to accessibility.  So when the project also references another assembly built with SqlSource whose internal copy it cannot see, a bound cref in the project's own documentation comments, such as `<exception cref="UnexpectedRowCountException"/>`, finds both copies and the compiler reports CS0419.  Before the exceptions were reused, the project's own source copy always won the lookup and nothing was reported.
+A project that uses a referenced copy of `UnexpectedRowCountException` and `TransactionRolledBackException` declares no copy in source ([`ExceptionProbe`](../../src/SqlSource/Generation/Exceptions/ExceptionProbe.cs) gives `Referenced`).  The compiler binds a `cref` without regard to accessibility.  So when the project also references another assembly built with SqlSource whose internal copy it cannot see, a bound cref in the project's own documentation comments finds both copies: one that names either exception, such as `<exception cref="UnexpectedRowCountException"/>`, gets CS0419, and one that names a member of either, such as `<see cref="UnexpectedRowCountException.QueryName"/>` or a constructor, gets CS1574.  Before the exceptions were reused, the project's own source copy always won the lookup and nothing was reported.
 
-The generated methods avoid this by writing documentation IDs (`T:SqlSource.UnexpectedRowCountException`) in [`QueryMethodWriter`](../../src/SqlSource/Generation/Emitting/QueryMethodWriter.cs).  A user's own crefs cannot be changed by the generator.  `ExceptionReuseTests.Build_UserCrefWithAStrangersCopyReferenced_IsAmbiguous` pins the behaviour, and `Build_UserCrefAsADocumentationIdWithAStrangersCopyReferenced_HasNoDiagnostic` the workaround.
+The generated methods avoid this by writing documentation IDs (`T:SqlSource.UnexpectedRowCountException`) in [`QueryMethodWriter`](../../src/SqlSource/Generation/Emitting/QueryMethodWriter.cs).  A user's own crefs cannot be changed by the generator; the workaround is the documentation ID of what the cref names, `T:` for an exception, `P:` or `M:` for a member.  `ExceptionReuseTests.Build_UserCrefWithAStrangersCopyReferenced_IsAWarning` pins the behaviour, `Build_UserCrefWithTheFriendsCopyAlone_HasNoDiagnostic` that the stranger's copy is its cause, and `Build_UserCrefAsADocumentationIdWithAStrangersCopyReferenced_HasNoDiagnostic` the workaround.
 
 ## Why it exists
 
@@ -20,4 +20,4 @@ Investigate making the copies that a project cannot see invisible to cref bindin
 
 ## Trigger
 
-A user report of CS0419 at a cref to `UnexpectedRowCountException` or `TransactionRolledBackException`.
+A user report of CS0419 at a cref to `UnexpectedRowCountException` or `TransactionRolledBackException`, or of CS1574 at a cref to a member of either.

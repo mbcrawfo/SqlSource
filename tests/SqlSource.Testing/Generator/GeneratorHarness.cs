@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -13,6 +14,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
+using SqlSource.Generation.Exceptions;
 using SqlSource.Generation.Paths;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
@@ -64,13 +66,27 @@ internal static class GeneratorHarness
     // generated code is reported.
     public static readonly CSharpParseOptions ParseOptions = new(LanguageVersion.CSharp12, DocumentationMode.Diagnose);
 
-    // The assemblies of the runtime the tests run on, which is .NET 8 or later.
-    private static readonly ImmutableArray<MetadataReference> RuntimeReferences =
-    [
-        .. ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Select(path => MetadataReference.CreateFromFile(path)),
-    ];
+    // The assemblies of the runtime the tests run on, which is .NET 8 or later, without the test project's own when the
+    // generator ran on it, as on tests/SqlSource.Tests and the database test projects: that one holds an internal
+    // SqlSource.UnexpectedRowCountException that no compilation of a test sees, which would still make a cref to the
+    // exceptions ambiguous in every run.  A test that needs such a copy references one of its own.
+    private static readonly ImmutableArray<MetadataReference> RuntimeReferences = ReadRuntimeReferences();
+
+    // The entry assembly is the test project, the only assembly of the runtime that the generator ran on.
+    private static ImmutableArray<MetadataReference> ReadRuntimeReferences()
+    {
+        var entry = Assembly.GetEntryAssembly();
+        var leftOut = entry?.GetType(ExceptionSource.UnexpectedRowCountMetadataName) is null
+            ? null
+            : Path.GetFullPath(entry.Location);
+        return
+        [
+            .. ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+                .Split(Path.PathSeparator)
+                .Where(path => !string.Equals(Path.GetFullPath(path), leftOut, StringComparison.Ordinal))
+                .Select(path => MetadataReference.CreateFromFile(path)),
+        ];
+    }
 
     // The source of the type App.Sample, whose attribute has SqlLocation.Direct and these arguments after it: null for
     // none, or text such as Parameters = "keep-comments".

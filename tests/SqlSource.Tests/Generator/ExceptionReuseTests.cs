@@ -174,31 +174,51 @@ public sealed class ExceptionReuseTests
     }
 
     // The project's own documentation: a cref is bound without regard to accessibility, so beside the friend's copy
-    // that it uses, the stranger's that it cannot see makes a bound cref ambiguous (CS0419).  This pins today's
-    // behaviour (TD-0095).
+    // that it uses, the stranger's that it cannot see makes a bound cref to an exception ambiguous (CS0419), and one to
+    // a member of it unresolved (CS1574).  This pins today's behaviour (TD-0095).
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Build_UserCrefWithAStrangersCopyReferenced_IsAmbiguous(bool compilationReference)
-    {
-        var (diagnostics, sources) = await BuildWithCref("SqlSource.UnexpectedRowCountException", compilationReference);
-
-        sources.Keys.ShouldNotContain(ExceptionSource.HintName);
-        diagnostics.ShouldHaveSingleItem().ShouldStartWith("CS0419 " + GeneratorHarness.SourcePath + "(7,");
-    }
-
-    // The workaround the manual gives: a documentation ID, which the compiler does not bind.
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Build_UserCrefAsADocumentationIdWithAStrangersCopyReferenced_HasNoDiagnostic(
+    [InlineData("SqlSource.UnexpectedRowCountException", "CS0419", false)]
+    [InlineData("SqlSource.UnexpectedRowCountException", "CS0419", true)]
+    [InlineData("SqlSource.UnexpectedRowCountException.QueryName", "CS1574", false)]
+    [InlineData("SqlSource.UnexpectedRowCountException.QueryName", "CS1574", true)]
+    public async Task Build_UserCrefWithAStrangersCopyReferenced_IsAWarning(
+        string cref,
+        string id,
         bool compilationReference
     )
     {
-        var (diagnostics, sources) = await BuildWithCref(
-            "T:SqlSource.UnexpectedRowCountException",
-            compilationReference
-        );
+        var (diagnostics, sources) = await BuildWithCref(cref, compilationReference, withStranger: true);
+
+        sources.Keys.ShouldNotContain(ExceptionSource.HintName);
+        diagnostics.ShouldHaveSingleItem().ShouldStartWith(id + " " + GeneratorHarness.SourcePath + "(7,");
+    }
+
+    // The control: with the friend's copy alone, the same crefs bind.
+    [Theory]
+    [InlineData("SqlSource.UnexpectedRowCountException", false)]
+    [InlineData("SqlSource.UnexpectedRowCountException", true)]
+    [InlineData("SqlSource.UnexpectedRowCountException.QueryName", false)]
+    [InlineData("SqlSource.UnexpectedRowCountException.QueryName", true)]
+    public async Task Build_UserCrefWithTheFriendsCopyAlone_HasNoDiagnostic(string cref, bool compilationReference)
+    {
+        var (diagnostics, sources) = await BuildWithCref(cref, compilationReference, withStranger: false);
+
+        sources.Keys.ShouldNotContain(ExceptionSource.HintName);
+        diagnostics.ShouldBeEmpty();
+    }
+
+    // The workaround the manual gives: the documentation ID of what the cref names, which the compiler does not bind.
+    [Theory]
+    [InlineData("T:SqlSource.UnexpectedRowCountException", false)]
+    [InlineData("T:SqlSource.UnexpectedRowCountException", true)]
+    [InlineData("P:SqlSource.UnexpectedRowCountException.QueryName", false)]
+    [InlineData("P:SqlSource.UnexpectedRowCountException.QueryName", true)]
+    public async Task Build_UserCrefAsADocumentationIdWithAStrangersCopyReferenced_HasNoDiagnostic(
+        string cref,
+        bool compilationReference
+    )
+    {
+        var (diagnostics, sources) = await BuildWithCref(cref, compilationReference, withStranger: true);
 
         sources.Keys.ShouldNotContain(ExceptionSource.HintName);
         diagnostics.ShouldBeEmpty();
@@ -560,21 +580,16 @@ public sealed class ExceptionReuseTests
         );
 
     // This project, which uses SqlSource and documents a method with the cref, over a friend whose exceptions it uses
-    // and a stranger whose copy it cannot see.
+    // and, when asked, a stranger whose copy it cannot see.
     private static Task<(IReadOnlyList<string> Diagnostics, IReadOnlyDictionary<string, string> Sources)> BuildWithCref(
         string cref,
-        bool compilationReference
+        bool compilationReference,
+        bool withStranger
     )
     {
-        var friend = Friend("Friend", compilationReference);
-        var stranger = GeneratorHarness
-            .CreateProject(
-                OutputKind.Sql,
-                "Stranger",
-                "public class InStranger { }\n",
-                compilationReference: compilationReference
-            )
-            .Reference;
+        MetadataReference[] references = withStranger
+            ? [Friend("Friend", compilationReference), Stranger(compilationReference)]
+            : [Friend("Friend", compilationReference)];
         var source = $$"""
             namespace App
             {
@@ -582,14 +597,26 @@ public sealed class ExceptionReuseTests
                 public static class Calls
                 {
                     /// <summary>Runs a query.</summary>
-                    /// <exception cref="{{cref}}">The query returned no rows.</exception>
+                    /// <seealso cref="{{cref}}"/>
                     public static void Run() { }
                 }
             }
 
             """;
-        return GeneratorHarness.BuildProjectAsync(OutputKind.Sql, source, [], [friend, stranger]);
+        return GeneratorHarness.BuildProjectAsync(OutputKind.Sql, source, [], references);
     }
+
+    // A project that uses SqlSource and grants this one no InternalsVisibleTo, so that it holds a copy of the
+    // exceptions that this project cannot see.
+    private static MetadataReference Stranger(bool compilationReference) =>
+        GeneratorHarness
+            .CreateProject(
+                OutputKind.Sql,
+                "Stranger",
+                "public class InStranger { }\n",
+                compilationReference: compilationReference
+            )
+            .Reference;
 
     // A friend that uses SqlSource with no query.
     private static MetadataReference Friend(string assemblyName, bool compilationReference) =>
