@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
+using System.Linq;
 using Shouldly;
-using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 using SqlSource.Testing;
-using SqlSource.Testing.Snapshot;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
@@ -81,70 +80,26 @@ public sealed class RowBufferTests
             )
             .ShouldBeFalse();
 
+    // The project's one buffer, in a file of its own: Roslyn's EmbeddedAttribute keeps it from any other assembly that
+    // sees this one's internals, so two projects that each have it do not clash.
     [Fact]
-    public void NameFor_ExtensionClassOfATypeNamedLikeTheBuffer_IsTheName() =>
-        RowBuffer.NameFor(Methods(MethodPlacement.ExtensionClass, "SqlSourceRowBuffer")).ShouldBe(RowBuffer.Name);
+    public void Source_DeclaresAnEmbeddedInternalStructInNamespaceSqlSource()
+    {
+        RowBuffer.Source.ShouldBe(GeneratedFile.RowBuffer);
+        RowBuffer.Source.ShouldStartWith(GeneratedText.Header + "\nnamespace SqlSource\n{\n");
+        RowBuffer.Source.ShouldContain(
+            "    [global::Microsoft.CodeAnalysis.Embedded]\n    internal struct SqlSourceRowBuffer<T>\n"
+        );
+        RowBuffer.Source.ShouldEndWith("    }\n}\n");
+        RowBuffer.TypeText.ShouldBe("global::SqlSource.SqlSourceRowBuffer");
+        RowBuffer.HintName.ShouldBe("SqlSource-RowBuffer.g.cs");
+    }
 
-    [Theory]
-    [InlineData(nameof(MethodPlacement.Public))]
-    [InlineData(nameof(MethodPlacement.Internal))]
-    [InlineData(nameof(MethodPlacement.Private))]
-    public void NameFor_TypeNamedLikeTheBufferWithTheMethodsOnIt_IsTheOtherName(string placement) =>
-        RowBuffer
-            .NameFor(Methods(Enum.Parse<MethodPlacement>(placement), "SqlSourceRowBuffer"))
-            .ShouldBe(RowBuffer.OtherName);
-
-    [Fact]
-    public void NameFor_TypeNamedOtherwiseWithTheMethodsOnIt_IsTheName() =>
-        RowBuffer.NameFor(Methods(MethodPlacement.Public, "Sample")).ShouldBe(RowBuffer.Name);
-
-    // Only the outermost type is in the namespace beside the buffer.
-    [Fact]
-    public void NameFor_NestedTypeNamedLikeTheBuffer_IsTheName() =>
-        RowBuffer
-            .NameFor(
-                Methods(
-                    MethodPlacement.Public,
-                    "Outer",
-                    new TypeDeclaration("class", "SqlSourceRowBuffer", "SqlSourceRowBuffer", string.Empty, 0)
-                )
-            )
-            .ShouldBe(RowBuffer.Name);
-
-    // The value of the name, not its text: @SqlSourceRowBuffer is the same type.
-    [Fact]
-    public void NameFor_EscapedTypeNamedLikeTheBuffer_IsTheOtherName() =>
-        RowBuffer
-            .NameFor(
-                Methods(MethodPlacement.Public, "SqlSourceRowBuffer") with
-                {
-                    Types = TestSidecars.Of(
-                        new TypeDeclaration("class", "@SqlSourceRowBuffer", "SqlSourceRowBuffer", "<T>", 1)
-                    ),
-                }
-            )
-            .ShouldBe(RowBuffer.OtherName);
-
-    [Theory]
-    [InlineData("App", "global::App.SqlSourceRowBuffer")]
-    [InlineData("@class.Rows", "global::@class.Rows.SqlSourceRowBuffer")]
-    [InlineData("", "global::SqlSourceRowBuffer")]
-    public void TypeTextFor_EachNamespace_NamesTheBufferFromGlobal(string namespaceText, string expected) =>
-        RowBuffer
-            .TypeTextFor(Methods(MethodPlacement.ExtensionClass, "Sample") with { NamespaceText = namespaceText })
-            .ShouldBe(expected);
-
-    [Fact]
-    public void TypeTextFor_TypeNamedLikeTheBufferWithTheMethodsOnIt_NamesTheOtherName() =>
-        RowBuffer
-            .TypeTextFor(Methods(MethodPlacement.Public, "SqlSourceRowBuffer"))
-            .ShouldBe("global::App.SqlSourceRowBufferOfRows");
-
-    // The copy is the generated buffer, from its declaration to its last brace, but its name and its modifier, and at
+    // The copy is the generated buffer, from its declaration to its last brace, but its attribute and its name, and at
     // the depth of a file-scoped namespace, so that the hand-written methods of the allocation tests read their rows
     // as the generated methods do.  A change to the generated buffer changes the copy with it.
     [Fact]
-    public void Append_HandWrittenCopyOfTheAllocationTests_IsTheGeneratedBufferButItsNameModifierAndDepth()
+    public void Source_HandWrittenCopyOfTheAllocationTests_IsTheGeneratedBufferButItsAttributeNameAndDepth()
     {
         var copy = File.ReadAllText(HandWrittenCopy).ReplaceLineEndings("\n");
         var start = copy.IndexOf(HandWrittenDeclaration, StringComparison.Ordinal);
@@ -152,33 +107,26 @@ public sealed class RowBufferTests
         start.ShouldBeGreaterThanOrEqualTo(0);
         end.ShouldBeGreaterThan(start);
 
-        var builder = new StringBuilder();
-        RowBuffer.Append(builder, string.Empty, "RowBufferByHand");
-        var generated = builder.ToString();
+        const string Attribute = "    [global::Microsoft.CodeAnalysis.Embedded]\n";
+        const string LastBrace = "\n    }\n";
+        var source = RowBuffer.Source;
+        var declaration = source.IndexOf(Attribute, StringComparison.Ordinal) + Attribute.Length;
+        var lastBrace = source.IndexOf(LastBrace, declaration, StringComparison.Ordinal);
+        declaration.ShouldBeGreaterThanOrEqualTo(Attribute.Length);
+        lastBrace.ShouldBeGreaterThan(declaration);
+        var generated = string.Join(
+            "\n",
+            source[declaration..(lastBrace + LastBrace.Length)]
+                .Split('\n')
+                .Select(line =>
+                    line.StartsWith(GeneratedText.Indent, StringComparison.Ordinal)
+                        ? line[GeneratedText.Indent.Length..]
+                        : line
+                )
+        );
 
-        generated[generated.IndexOf("file struct ", StringComparison.Ordinal)..]
-            .Replace("file struct RowBufferByHand<T>\n", HandWrittenDeclaration, StringComparison.Ordinal)
+        generated
+            .Replace("internal struct SqlSourceRowBuffer<T>\n", HandWrittenDeclaration, StringComparison.Ordinal)
             .ShouldBe(copy[start..(end + 3)]);
     }
-
-    // The methods of App.<name>, and of the types nested in it, under the placement.
-    private static TypeMethods Methods(MethodPlacement placement, string name, params TypeDeclaration[] nested) =>
-        new(
-            "App." + name,
-            "App." + name + "-Methods.g.cs",
-            placement,
-            "App",
-            "App",
-            TestSidecars.Of([new TypeDeclaration("class", name, name, string.Empty, 0), .. nested]),
-            name + "Extensions",
-            true,
-            TestModels.AttributeLocation,
-            TestSidecars.Of(ListUsers),
-            EquatableArray<DiagnosticInfo>.Empty,
-            EquatableArray<SettingsFileLibraryUse>.Empty,
-            CodeGenEngines.Postgres,
-            EquatableArray<string>.Empty,
-            EquatableArray<LibraryValue>.Empty,
-            EquatableArray<LibraryUse>.Empty
-        );
 }

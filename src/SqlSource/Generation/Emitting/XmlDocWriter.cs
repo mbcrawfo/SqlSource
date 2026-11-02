@@ -73,7 +73,7 @@ internal static class XmlDocWriter
     /// </summary>
     /// <param name="builder">The source being built.</param>
     /// <param name="indent">The whitespace that starts the line.</param>
-    /// <param name="cref">The exception's type, from <c>global::</c>.</param>
+    /// <param name="cref">The exception's type, from <c>global::</c>, or its documentation ID.</param>
     /// <param name="descriptionXml">When it is thrown, as XML on one line.</param>
     public static void AppendException(StringBuilder builder, string indent, string cref, string descriptionXml) =>
         _ = builder

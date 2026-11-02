@@ -209,6 +209,47 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // Only the package's MSBuild target SqlSourceCheckCompilerVersion reports this, since the generator cannot load in
+    // a compiler older than Roslyn 4.14.  The target's text is this message, with {0} where it writes the version.
+    public static readonly DiagnosticDescriptor CompilerTooOld = new(
+        id: "SQLSRC021",
+        title: "Compiler is too old",
+        messageFormat: "SqlSource needs the C# compiler of the .NET SDK 9.0.300 or later, or of Visual Studio 2022 "
+            + "17.14 or later, and this build's compiler is Roslyn {0}.  Update the .NET SDK or Visual Studio; a "
+            + "project can still target .NET 8.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc021",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the names of the assemblies, in ordinal order, joined by ", ".
+    public static readonly DiagnosticDescriptor ExceptionsSeenTwice = new(
+        id: "SQLSRC022",
+        title: "Exceptions are seen in two assemblies",
+        messageFormat: "This project sees UnexpectedRowCountException or TransactionRolledBackException in more than "
+            + "one referenced assembly: {0}.  Use SqlSource in one project that the others reference and that grants "
+            + "them InternalsVisibleTo, so that they all use its exceptions.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc022",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor ExceptionsOfAnotherShape = new(
+        id: "SQLSRC023",
+        title: "Exceptions come from another version of SqlSource",
+        messageFormat: "The UnexpectedRowCountException and TransactionRolledBackException that this project sees in "
+            + "{0} are not those of this version of SqlSource.  Use the same version of SqlSource in both projects.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc023",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor UnterminatedQuote = new(
         id: "SQLSRC101",
         title: "Quote is not closed",
@@ -1053,6 +1094,9 @@ internal static class SqlDiagnostics
             SettingsFileWrongType,
             SettingsFileInvalidValue,
             SettingsFileRepeatedKey,
+            CompilerTooOld,
+            ExceptionsSeenTwice,
+            ExceptionsOfAnotherShape,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,

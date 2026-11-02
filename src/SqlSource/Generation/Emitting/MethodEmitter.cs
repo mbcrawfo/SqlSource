@@ -20,7 +20,8 @@ internal static class MethodEmitter
     private const string PragmaEnd = " // A converter or a mapped type is obsolete or experimental.\n";
 
     /// <summary>
-    /// Writes the file of <paramref name="methods" />, or no source when no method is left.
+    /// Writes the file of <paramref name="methods" />, or no source when no method is left, and whether a method it
+    /// keeps reads its rows into the project's <see cref="RowBuffer" />.
     /// </summary>
     /// <param name="methods">The type's methods.</param>
     /// <param name="dropped">The <see cref="QueryMethod.NameLocation" />s of the methods to leave out.</param>
@@ -28,7 +29,7 @@ internal static class MethodEmitter
     /// Whether the extension class cannot be written, which leaves out every method under
     /// <see cref="MethodPlacement.ExtensionClass" />.
     /// </param>
-    public static (string HintName, string? Source) Emit(
+    public static (string HintName, string? Source, bool UsesRowBuffer) Emit(
         TypeMethods methods,
         EquatableArray<LocationInfo> dropped,
         bool extensionClassBlocked
@@ -38,7 +39,7 @@ internal static class MethodEmitter
         var kept = Keep(methods.Methods, dropped, isExtension && extensionClassBlocked);
         if (kept.Count == 0)
         {
-            return (methods.HintName, null);
+            return (methods.HintName, null, false);
         }
 
         var builder = new StringBuilder(isExtension ? GeneratedText.Header : TypeEmitter.HeaderLines);
@@ -87,12 +88,6 @@ internal static class MethodEmitter
         var modifiers = ModifiersOf(methods.Placement);
         var memberIndent = TypeEmitter.GetIndent(depth);
         var usesRowBuffer = false;
-        for (var index = 0; index < kept.Count && !usesRowBuffer; index++)
-        {
-            usesRowBuffer = RowBuffer.IsUsedBy(kept[index]);
-        }
-
-        var rowBufferType = usesRowBuffer ? RowBuffer.TypeTextFor(methods) : string.Empty;
         for (var index = 0; index < kept.Count; index++)
         {
             if (index > 0)
@@ -100,20 +95,8 @@ internal static class MethodEmitter
                 _ = builder.Append('\n');
             }
 
-            QueryMethodWriter.Append(builder, memberIndent, kept[index], modifiers, isExtension, rowBufferType);
-        }
-
-        // The buffer goes after every type, in the namespace.
-        var namespaceDepth = methods.NamespaceText.Length > 0 ? 1 : 0;
-        while (depth > namespaceDepth)
-        {
-            _ = builder.Append(TypeEmitter.GetIndent(--depth)).Append("}\n");
-        }
-
-        if (usesRowBuffer)
-        {
-            _ = builder.Append('\n');
-            RowBuffer.Append(builder, TypeEmitter.GetIndent(depth), RowBuffer.NameFor(methods));
+            QueryMethodWriter.Append(builder, memberIndent, kept[index], modifiers, isExtension);
+            usesRowBuffer |= RowBuffer.IsUsedBy(kept[index]);
         }
 
         while (depth > 0)
@@ -121,7 +104,7 @@ internal static class MethodEmitter
             _ = builder.Append(TypeEmitter.GetIndent(--depth)).Append("}\n");
         }
 
-        return (methods.HintName, builder.ToString());
+        return (methods.HintName, builder.ToString(), usesRowBuffer);
     }
 
     // The list of the dropped is almost always empty, and holds a few clashes when it is not.

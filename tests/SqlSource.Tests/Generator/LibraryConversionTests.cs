@@ -1,4 +1,4 @@
-// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
+// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -104,7 +104,11 @@ public sealed class LibraryConversionTests
         var run = RunDates(NodaTimeOn + FindDates, WithNodaTime);
 
         run.Sources[ClassFile].ShouldStartWith(GeneratedFile.ModelHeader);
-        run.Sources[ClassFile].ShouldContain("namespace SqlSource\n{\n    internal static class NodaTimeConversions\n");
+        run.Sources[ClassFile]
+            .ShouldContain(
+                "namespace SqlSource\n{\n    [global::Microsoft.CodeAnalysis.Embedded]\n"
+                    + "    internal static class NodaTimeConversions\n"
+            );
     }
 
     // A type at Models has the library's types in no model and calls nothing.
@@ -253,9 +257,12 @@ public sealed class LibraryConversionTests
 
     // A referenced assembly's Lib.Clock, which one query maps a bigint to, declares a converter of DateTime to
     // Instant, which joins the set with Clock's own: the other query's read of a datetime2 overridden to Instant calls
-    // it, and its write calls the library's.
-    [Fact]
-    public void Run_MappedTypeConverter_ReplacesTheLibrarys()
+    // it, and its write calls the library's.  The converters are found under the library's own, embedded
+    // [SqlSourceConverter], on an image, as a build references a project, and on a compilation, as an IDE does.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Run_MappedTypeConverter_ReplacesTheLibrarys(bool compilationReference)
     {
         var library = GeneratorHarness
             .CreateProject(
@@ -277,7 +284,8 @@ public sealed class LibraryConversionTests
                         NodaTime.Instant.FromDateTimeUtc(System.DateTime.SpecifyKind(value, System.DateTimeKind.Utc));
                 }
                 """,
-                references: [LibraryReferences.NodaTime("3.3.7")]
+                references: [LibraryReferences.NodaTime("3.3.7")],
+                compilationReference: compilationReference
             )
             .Reference;
         var file = new SqlFile(

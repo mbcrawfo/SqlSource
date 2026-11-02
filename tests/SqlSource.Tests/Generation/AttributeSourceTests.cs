@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Settings;
+using SqlSource.Testing.Generator;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
 using RoslynOutputKind = Microsoft.CodeAnalysis.OutputKind;
@@ -20,6 +20,9 @@ namespace SqlSource.Tests.Generation;
 // two must agree member by member, or a value a user writes would mean another.
 public sealed partial class AttributeSourceTests
 {
+    // The language of a project that targets a framework older than .NET 8, which gets the attribute's file too.
+    private static readonly CSharpParseOptions CSharp73 = new(LanguageVersion.CSharp7_3);
+
     // The generator's own forms are internal, so a public theory names them and the test looks them up.
     [Theory]
     [InlineData("SqlLocation", nameof(MemberPlacement))]
@@ -53,78 +56,25 @@ public sealed partial class AttributeSourceTests
         );
     }
 
+    // A project that sees the internals of another one that uses SqlSource sees none of the other's copies.
     [Fact]
-    public void GeneratedTypes_ComparedWithTheFile_AreEveryTypeItDeclares()
-    {
-        var declared = Declaration()
-            .Matches(AttributeSource.Text)
-            .Select(match => "SqlSource." + match.Groups["name"].Value);
-
-        AttributeSource.GeneratedTypes.ShouldBe(declared, ignoreOrder: true);
-    }
-
-    // The file goes into every project that references the package, so a project on an older language gets it too.
-    [Fact]
-    public void Text_CompiledAsCSharp73_DeclaresUnexpectedRowCountException()
+    public void Text_EveryType_IsEmbedded()
     {
         var compilation = CompileText();
 
-        compilation.GetDiagnostics(TestContext.Current.CancellationToken).ShouldBeEmpty();
-        var exception = compilation
-            .GetTypeByMetadataName(AttributeSource.UnexpectedRowCountMetadataName)
-            .ShouldNotBeNull();
-        exception.BaseType!.ToDisplayString().ShouldBe("System.InvalidOperationException");
-    }
+        var types = compilation
+            .GetSymbolsWithName(_ => true, SymbolFilter.Type, TestContext.Current.CancellationToken)
+            .OfType<INamedTypeSymbol>()
+            .Where(type => type.ContainingNamespace.ToDisplayString() == "SqlSource")
+            .ToList();
 
-    [Theory]
-    [InlineData(false, "The query 'GetUser' returned no rows.")]
-    [InlineData(true, "The query 'GetUser' returned more than one row.")]
-    public void UnexpectedRowCountException_Created_NamesTheQueryAndWhatWentWrong(bool moreThanOne, string message)
-    {
-        using var image = new MemoryStream();
-        CompileText().Emit(image, cancellationToken: TestContext.Current.CancellationToken).Success.ShouldBeTrue();
-        var type = Assembly
-            .Load(image.ToArray())
-            .GetType(AttributeSource.UnexpectedRowCountMetadataName)
-            .ShouldNotBeNull();
-
-        var exception = (InvalidOperationException)Activator.CreateInstance(type, "GetUser", moreThanOne)!;
-
-        exception.Message.ShouldBe(message);
-        type.GetProperty("QueryName")!.GetValue(exception).ShouldBe("GetUser");
-    }
-
-    [Fact]
-    public void Text_CompiledAsCSharp73_DeclaresTransactionRolledBackException()
-    {
-        var compilation = CompileText();
-
-        compilation.GetDiagnostics(TestContext.Current.CancellationToken).ShouldBeEmpty();
-        var exception = compilation
-            .GetTypeByMetadataName(AttributeSource.TransactionRolledBackMetadataName)
-            .ShouldNotBeNull();
-        exception.BaseType!.ToDisplayString().ShouldBe("System.InvalidOperationException");
-    }
-
-    [Fact]
-    public void TransactionRolledBackException_Created_NamesTheQueryAndKeepsTheInnerException()
-    {
-        using var image = new MemoryStream();
-        CompileText().Emit(image, cancellationToken: TestContext.Current.CancellationToken).Success.ShouldBeTrue();
-        var type = Assembly
-            .Load(image.ToArray())
-            .GetType(AttributeSource.TransactionRolledBackMetadataName)
-            .ShouldNotBeNull();
-        var inner = new FormatException("The value is not a number.");
-
-        var exception = (InvalidOperationException)Activator.CreateInstance(type, "GetUser", inner)!;
-
-        exception.Message.ShouldBe(
-            "The transaction was rolled back by an error that the query 'GetUser' raised after the inner exception "
-                + "was thrown."
+        types.Count.ShouldBe(7);
+        types.ShouldAllBe(type =>
+            type.GetAttributes()
+                .Any(attribute =>
+                    attribute.AttributeClass!.ToDisplayString() == "Microsoft.CodeAnalysis.EmbeddedAttribute"
+                )
         );
-        exception.InnerException.ShouldBeSameAs(inner);
-        type.GetProperty("QueryName")!.GetValue(exception).ShouldBe("GetUser");
     }
 
     // A library's converters have to be found from the project that references it, so the attribute stays in metadata.
@@ -151,6 +101,7 @@ public sealed partial class AttributeSourceTests
         var library = CompileLibrary(
             "Library",
             AttributeSource.Text,
+            GeneratedFile.EmbeddedAttribute,
             "public static class C { [SqlSource.SqlSourceConverter] public static int F(long v) => (int)v; }"
         );
         using var image = new MemoryStream();
@@ -186,13 +137,13 @@ public sealed partial class AttributeSourceTests
     private static CSharpCompilation CompileText() =>
         CSharpCompilation.Create(
             "AttributeText",
-            [CSharpSyntaxTree.ParseText(AttributeSource.Text, new CSharpParseOptions(LanguageVersion.CSharp7_3))],
+            [
+                CSharpSyntaxTree.ParseText(AttributeSource.Text, CSharp73),
+                CSharpSyntaxTree.ParseText(GeneratedFile.EmbeddedAttribute, CSharp73),
+            ],
             References(),
             new CSharpCompilationOptions(RoslynOutputKind.DynamicallyLinkedLibrary)
         );
-
-    [GeneratedRegex(@"internal (?:enum|sealed class) (?<name>\w+)")]
-    private static partial Regex Declaration();
 
     [GeneratedRegex(@"^\s*(?<name>\w+) = (?<value>\d+),", RegexOptions.Multiline)]
     private static partial Regex Member();

@@ -1,4 +1,4 @@
-// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
+// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
 using System;
 using System.Collections.Generic;
@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
+using SqlSource.Generation.Emitting;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
@@ -564,6 +565,36 @@ public sealed class CachingMethodTests
         var methods = MethodsOf(result, UserMethods);
         methods.ShouldContain("parameter.Size = 60;\n");
         methods.ShouldNotContain("parameter.Size = 50;\n");
+    }
+
+    // Both types' queries read many rows into an array, so the project has the row buffer.  The edit makes Orders'
+    // query read one row: OrderQueries writes its methods again, which no longer use the buffer, so whether the
+    // project uses it is found again, and is the same, since UserQueries' method still does.
+    [Fact]
+    public void Run_EditThatKeepsAPooledMethod_LeavesTheBufferStepUnchanged()
+    {
+        var compilation = MethodsCompilation(UserQueries());
+        var ordersSidecar = TypedSidecar(_scene.Orders, "GetOrder", "int4");
+        var driver = _scene.FirstRunOfMethods(compilation, ordersSidecar);
+        GeneratedFiles(driver.GetRunResult()).ShouldContain(RowBuffer.HintName);
+
+        var edited = new InMemoryAdditionalText(_scene.Orders.Path, "-- name: GetOrder -> one\nSELECT 2;\n");
+        var result = Run(
+            driver
+                .ReplaceAdditionalText(_scene.Orders, edited)
+                .ReplaceAdditionalText(ordersSidecar, TypedSidecar(edited, "GetOrder", "int4")),
+            compilation
+        );
+
+        result.Diagnostics.ShouldBeEmpty();
+        MethodReasons(result, TrackingNames.MethodOutput)
+            .ShouldBe(
+                UsersAndOrders(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Modified),
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.UsesRowBuffer).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        MethodsOf(result, OrderMethods).ShouldNotContain("SqlSourceRowBuffer");
+        GeneratedFiles(result).ShouldContain(RowBuffer.HintName);
     }
 
     // Under mssql, Users reads a datetime2 that its override makes an Instant, through NodaTime's conversion, so the

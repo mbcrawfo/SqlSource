@@ -156,8 +156,7 @@ internal static class ConverterReader
             inGenericType |= type.IsGenericType;
             inFileLocalType |= type.IsFileLocal;
 
-            // A C# 14 extension block is a type whose kind Roslyn 4.8.0 does not name, so any kind but these is one.
-            inExtensionBlock |= type.TypeKind is not (TypeKind.Class or TypeKind.Struct or TypeKind.Interface);
+            inExtensionBlock |= type.TypeKind == TypeKind.Extension;
         }
 
         if (method.MethodKind == MethodKind.LocalFunction)

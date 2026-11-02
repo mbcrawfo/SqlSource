@@ -5,13 +5,13 @@ How the generator works: [`docs/architecture/generator.md`](../../docs/architect
 The generator is loaded into the C# compiler of whoever consumes it, which constrains what the project may target and reference.
 
 - **`netstandard2.0` only.**  The compiler loads Roslyn components built for `netstandard2.0`.  Do not add or change target frameworks in `SqlSource.csproj`.
-- **The Roslyn pin is the support floor.**  `Microsoft.CodeAnalysis.CSharp` is pinned to 4.8.0 in `Directory.Packages.props`, the compiler in the .NET 8 SDK and Visual Studio 2022 17.8.  An API added after 4.8.0 means raising the pin, which drops consumers: ask the user first, and update the support target in `README.md` in the same commit.
+- **The Roslyn pin is the support floor.**  `Microsoft.CodeAnalysis.CSharp` is pinned to 4.14.0 in `Directory.Packages.props`, the compiler in the .NET SDK 9.0.300 and Visual Studio 2022 17.14.  An API added after 4.14.0 means raising the pin, which drops consumers: ask the user first, and update the support target in `README.md` in the same commit.
 - **Language features need runtime support.**  `LangVersion` is `preview`, but `netstandard2.0` lacks the types behind some features.  One other than `init` and records (`required` members, say) needs a polyfill in `Polyfills/`, beside `IsExternalInit.cs`, in the namespace of the type it stands in for; `.editorconfig` turns IDE0130 off there.
-- **No collection expression may target `ImmutableArray<T>`.**  The `System.Collections.Immutable` that Roslyn 4.8.0 brings predates support for it (CS9210).  Use `ImmutableArray.Create`, a builder or `ToImmutableArray()`.
+- **Existing `ImmutableArray` calls stay.**  `Create`, `Empty`, builders and `ToImmutableArray` become collection expressions only with a measurement (TD-0094), never in bulk.  New code may use one.
 - **Models need value equality.**  A type the pipeline caches is a record, and holds its collections in `EquatableArray<T>`, never `ImmutableArray<T>`.
 - **Performance is a requirement.**  The generator runs in the compiler and the IDE, on every edit.  Allocate nothing per character or line, copy text in runs, rent buffers from `ArrayPool<T>`, and make a string only where a result needs one.  The allocation budgets are tests, and `tests/AGENTS.md` holds their rule.
 - **A change to a hot path states its time and allocation, before and after, in its pull request**, from a `Stopwatch` loop over a `Release` build, since there is no benchmark project.
-- **Do not reference `System.Memory`, `System.Buffers` or `System.Collections.Immutable` directly.**  They arrive with Roslyn 4.8.0 at the versions the compiler host loads; a newer one can fail to load there.
+- **Do not reference `System.Memory`, `System.Buffers` or `System.Collections.Immutable` directly.**  They arrive with Roslyn 4.14.0 at the versions the compiler host loads; a newer one can fail to load there.
 - **Keep Roslyn references private.**  Package references here use `PrivateAssets="all"` so that nothing flows to the projects that reference the generator.
 
 ## The pipeline
@@ -35,7 +35,7 @@ The generator is loaded into the C# compiler of whoever consumes it, which const
 - **A type's methods are planned from its own slice of the project, its `MethodsInput`, and `TypeOutput`'s inputs are never widened for the methods**, so that one type's plan runs again only when something of it changes, and a sidecar's edit writes no type's constants again.
 - **The converters reach the methods alone.**  `ConverterSet` is an input of `MethodsInput`, never of `TypeOutput` or of a step of the types or models, and `MappedTypeConverters` stays apart from `MappedTypes`.  See [converters](../../docs/architecture/generator.md#converters).
 - **The dialect is resolved for each file before the parse**, by `Generation/FileParseInput.cs` from the chain of the file's folder, as an input of the parse.  See [the dialect](../../docs/architecture/generator.md#how-the-dialect-reaches-the-parse).
-- **The build shows the compiler two properties, `SqlSourceBuildFolders` and `SqlSourceTransitivePackageAssemblies`, and no item metadata; a setting is never a property or metadata of the build.**
+- **The build shows the compiler three properties, `SqlSourceBuildFolders`, `SqlSourceTransitivePackageAssemblies` and `SqlSourcePublicExceptions`, and no item metadata; a query's setting is never a property or metadata of the build.**
 - **Only stage one of the settings reaches the parse.**  A setting of stage two is never an input of `SqlFileReader.Read`, or a change to it would parse every file again.  See [the two stages](../../docs/architecture/generator.md#the-settings-have-two-stages).
 - **Stage two reads a file's settings from its `FileLevel`, the chain of its folder**, and a type's nested class from the chain of its C# file's folder, in `NestedClassCheck`, never from one settings file alone.
 

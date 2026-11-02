@@ -291,9 +291,9 @@ public sealed class MethodWriterTests
     }
 
     // The same names as Run_TokenWithAnAwkwardName_Compiles of GeneratedSourceMethodTests, at the newest C#.  This is
-    // not in Generator/: that folder also compiles on Roslyn 4.8.0, which knows C# 12 at most, and a consumer on
-    // .NET 10 compiles the generated code as C# 14, where field and extension are contextual keywords.  The original
-    // theory stays there as the Roslyn floor's check.
+    // not in Generator/: that folder also compiles on Roslyn 4.14.0 and hands the compiler C# 12 at most, and a
+    // consumer on .NET 10 compiles the generated code as C# 14, where field and extension are contextual keywords.
+    // The original theory stays there as the Roslyn floor's check.
     [Theory]
     [InlineData("span")]
     [InlineData("state")]

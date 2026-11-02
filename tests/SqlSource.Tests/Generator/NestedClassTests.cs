@@ -1,4 +1,4 @@
-// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
+// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
 using System.Text.Json.Nodes;
 using Shouldly;
@@ -13,7 +13,13 @@ namespace SqlSource.Tests.Generator;
 // folder, else Sql.
 public sealed class NestedClassTests
 {
-    private const string AttributeOnly = "SqlSourceGenerateAttribute.g.cs";
+    // The files every project gets, and a type with a problem adds none.
+    private static readonly string[] AttributeAndExceptions =
+    [
+        GeneratedFile.EmbeddedAttributeName,
+        "SqlSourceGenerateAttribute.g.cs",
+        "SqlSource-Exceptions.g.cs",
+    ];
 
     // The settings file of the folder of the type's C# file, GeneratorHarness.SourcePath.
     private const string TypesFolderSettingsPath = "/app/Repo/sqlsource.json";
@@ -143,7 +149,7 @@ public sealed class NestedClassTests
             $"SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,19): '{name}' already has a member named 'Queries'.  Rename it, "
                 + "or use SqlLocation.Direct.",
         ]);
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
         run.CompilationErrors.ShouldBeEmpty();
     }
 
@@ -167,7 +173,7 @@ public sealed class NestedClassTests
             "SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,47): 'Sample' already has a member named 'Statements'.  Rename "
                 + "it, or use SqlLocation.Direct.",
         ]);
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
     }
 
     [Fact]
@@ -217,7 +223,7 @@ public sealed class NestedClassTests
             $"SQLSRC006 /app/Repo/Sample.cs(3,2)-(3,{37 + value.Length}): '{value}' is not a valid value of "
                 + "NestedClass",
         ]);
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
     }
 
     // The source with Users, and the nested class, or none, in the settings file of the type's folder.

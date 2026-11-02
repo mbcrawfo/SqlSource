@@ -27,9 +27,6 @@ public sealed class QueryMethodWriterTests
         "var reader = await command.ExecuteReaderAsync("
         + "global::System.Data.CommandBehavior.Default, cancellationToken).ConfigureAwait(false);\n";
 
-    // The row buffer as the methods of a file in the namespace App name it.
-    private const string RowBufferType = "global::App.SqlSourceRowBuffer";
-
     // The type integer, as the entry of a parameter describes it.
     private static readonly PostgresType Integer = TestSidecars.Postgres(bindName: "integer");
 
@@ -87,7 +84,7 @@ public sealed class QueryMethodWriterTests
     {
         var builder = new StringBuilder("before\n");
 
-        QueryMethodWriter.Append(builder, "    ", GetUser, "public static", isExtension: true, RowBufferType);
+        QueryMethodWriter.Append(builder, "    ", GetUser, "public static", isExtension: true);
 
         builder
             .ToString()
@@ -112,7 +109,7 @@ public sealed class QueryMethodWriterTests
                     The command's timeout in seconds, or null for the driver's.</param>
                         /// <param name="cancellationToken">Cancels the query.</param>
                         /// <returns>The row, or null when there is none.</returns>
-                        /// <exception cref="global::SqlSource.UnexpectedRowCountException">↩
+                        /// <exception cref="T:SqlSource.UnexpectedRowCountException">↩
                     The query returned more than one row.</exception>
                         public static async global::System.Threading.Tasks.Task<global::App.GetUserDto?> GetUser(
                             this global::System.Data.Common.DbConnection connection,
@@ -255,7 +252,7 @@ public sealed class QueryMethodWriterTests
         var text = Write(GetUser with { Shape = ResultShape.One });
 
         text.ShouldContain(
-            "/// <exception cref=\"global::SqlSource.UnexpectedRowCountException\">"
+            "/// <exception cref=\"T:SqlSource.UnexpectedRowCountException\">"
                 + "The query returned no rows, or more than one.</exception>\n"
         );
         text.ShouldNotContain("return null;");
@@ -272,7 +269,7 @@ public sealed class QueryMethodWriterTests
         var text = Write(GetUser with { Shape = ResultShape.OneOptional });
 
         text.ShouldContain(
-            "/// <exception cref=\"global::SqlSource.UnexpectedRowCountException\">"
+            "/// <exception cref=\"T:SqlSource.UnexpectedRowCountException\">"
                 + "The query returned more than one row.</exception>\n"
         );
         text.ShouldContain("            return null;\n");
@@ -370,7 +367,7 @@ public sealed class QueryMethodWriterTests
                 + buffer switch
                 {
                     "List" => "new global::System.Collections.Generic.List<global::App.GetUserDto>()",
-                    "RowBuffer" => "new global::App.SqlSourceRowBuffer<global::App.GetUserDto>()",
+                    "RowBuffer" => "new global::SqlSource.SqlSourceRowBuffer<global::App.GetUserDto>()",
                     _ => "global::System.Collections.Immutable." + buffer + ".CreateBuilder<global::App.GetUserDto>()",
                 }
                 + ";\n"
@@ -513,7 +510,7 @@ public sealed class QueryMethodWriterTests
                 }
             )
             .ShouldContain(
-                "/// <exception cref=\"global::SqlSource.TransactionRolledBackException\">"
+                "/// <exception cref=\"T:SqlSource.TransactionRolledBackException\">"
                     + "The query threw an exception of its own, its inner exception, and an error that the rest of "
                     + "the query raised rolled back the transaction.</exception>\n"
             );
@@ -1472,8 +1469,7 @@ public sealed class QueryMethodWriterTests
                             "        ",
                             method,
                             "public static",
-                            isExtension: index % 8 < 4,
-                            RowBufferType
+                            isExtension: index % 8 < 4
                         );
                     }
                 }
@@ -1518,16 +1514,15 @@ public sealed class QueryMethodWriterTests
                 }
             }
 
-            namespace App
-            {
-
             """
         );
-        RowBuffer.Append(builder, "    ", RowBuffer.Name);
-        _ = builder.Append("}\n");
 
         var compilation = GeneratorHarness.CreateCompilation(
-            [new SourceFile("/app/Queries.cs", "#nullable enable\n" + builder)],
+            [
+                new SourceFile("/app/Queries.cs", "#nullable enable\n" + builder),
+                new SourceFile("/app/" + RowBuffer.HintName, RowBuffer.Source),
+                new SourceFile("/app/EmbeddedAttribute.cs", GeneratedFile.EmbeddedAttribute),
+            ],
             references: [NpgsqlReferences.Npgsql10, SqlClientReferences.SqlClient7]
         );
 
@@ -1605,7 +1600,7 @@ public sealed class QueryMethodWriterTests
     private static string Write(QueryMethod method, string modifiers = "public static", bool isExtension = true)
     {
         var builder = new StringBuilder();
-        QueryMethodWriter.Append(builder, string.Empty, method, modifiers, isExtension, RowBufferType);
+        QueryMethodWriter.Append(builder, string.Empty, method, modifiers, isExtension);
         return builder.ToString();
     }
 }

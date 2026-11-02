@@ -1,4 +1,4 @@
-// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
+// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
 using System;
 using System.Linq;
@@ -13,7 +13,13 @@ namespace SqlSource.Tests.Generator;
 // The problems of the attributed type.  A type with any of them gets no generated file.
 public sealed class TypeDiagnosticsTests
 {
-    private const string AttributeOnly = "SqlSourceGenerateAttribute.g.cs";
+    // The files every project gets, and a type with a problem adds none.
+    private static readonly string[] AttributeAndExceptions =
+    [
+        GeneratedFile.EmbeddedAttributeName,
+        "SqlSourceGenerateAttribute.g.cs",
+        "SqlSource-Exceptions.g.cs",
+    ];
 
     [Fact]
     public void Run_TypeThatIsNotPartial_IsAnErrorAtItsName()
@@ -33,7 +39,7 @@ public sealed class TypeDiagnosticsTests
             "SQLSRC001 /app/Repo/Sample.cs(4,14)-(4,20): 'Sample' must be declared partial so that SqlSource can add "
                 + "members to it",
         ]);
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
         run.CompilationErrors.ShouldBeEmpty();
     }
 
@@ -66,7 +72,7 @@ public sealed class TypeDiagnosticsTests
             "SQLSRC001 /app/Repo/Sample.cs(7,23)-(7,29): 'class' must be declared partial so that SqlSource can add "
                 + "members to it",
         ]);
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
     }
 
     [Fact]
@@ -87,7 +93,7 @@ public sealed class TypeDiagnosticsTests
             "SQLSRC002 /app/Repo/Sample.cs(4,20)-(4,26): 'Sample' is a file-local type, and SqlSource cannot add "
                 + "members to it",
         ]);
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
         run.CompilationErrors.ShouldBeEmpty();
     }
 
@@ -112,7 +118,7 @@ public sealed class TypeDiagnosticsTests
             "SQLSRC002 /app/Repo/Sample.cs(3,27)-(3,32): 'Outer' is a file-local type, and SqlSource cannot add "
                 + "members to it",
         ]);
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
     }
 
     [Fact]
@@ -146,7 +152,7 @@ public sealed class TypeDiagnosticsTests
             ],
             ignoreOrder: true
         );
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
     }
 
     [Theory]
@@ -189,7 +195,7 @@ public sealed class TypeDiagnosticsTests
             ],
             ignoreOrder: true
         );
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
 
         // Nothing was generated for the types, so the compiler has no generated code to reject.
         run.CompilationErrors.ShouldBeEmpty();
@@ -219,7 +225,7 @@ public sealed class TypeDiagnosticsTests
             "SQLSRC003 /app/Repo/Sample.cs(2,2)-(2,19): SqlSource generates code for .NET 8 and later, and this "
                 + "project targets an older framework",
         ]);
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
     }
 
     [Theory]
@@ -248,7 +254,7 @@ public sealed class TypeDiagnosticsTests
                     + "is relative to the folder of this file; a value that ends in .sql is one file, and any other "
                     + "value is a folder."
             );
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
         run.CompilationErrors.ShouldBeEmpty();
     }
 
@@ -272,7 +278,7 @@ public sealed class TypeDiagnosticsTests
             "SQLSRC005 /app/Repo/Sample.cs(3,2)-(3,19): The folder of this file has no .sql file.  Add one, or set "
                 + "Path.",
         ]);
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
     }
 
     [Theory]
@@ -295,7 +301,7 @@ public sealed class TypeDiagnosticsTests
             $"SQLSRC006 /app/Repo/Sample.cs(3,2)-(3,{35 + location.Length}): '{value}' is not a valid value of "
                 + "SqlLocation",
         ]);
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
         run.CompilationErrors.ShouldBeEmpty();
     }
 
@@ -324,7 +330,7 @@ public sealed class TypeDiagnosticsTests
             "SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,19): 'Sample' already has a member named 'Sql'.  Rename it, or "
                 + "use SqlLocation.Direct.",
         ]);
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
         run.CompilationErrors.ShouldBeEmpty();
     }
 
@@ -353,7 +359,7 @@ public sealed class TypeDiagnosticsTests
             $"SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,19): '{name}' already has a member named 'Sql'.  Rename it, or "
                 + "use SqlLocation.Direct.",
         ]);
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
         run.CompilationErrors.ShouldBeEmpty();
     }
 
@@ -464,7 +470,7 @@ public sealed class TypeDiagnosticsTests
         run.Diagnostics[1].ShouldStartWith("SQLSRC006 /app/Repo/Sample.cs(3,2)-(3,67)");
         run.Diagnostics[2].ShouldStartWith("SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,67)");
         run.Diagnostics[3].ShouldStartWith("SQLSRC004 /app/Repo/Sample.cs(3,2)-(3,67)");
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
     }
 
     [Fact]
@@ -505,7 +511,7 @@ public sealed class TypeDiagnosticsTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
         run.CompilationErrors.Count.ShouldBe(2);
         run.CompilationErrors.ShouldAllBe(error => error.StartsWith("CS0592 "));
     }

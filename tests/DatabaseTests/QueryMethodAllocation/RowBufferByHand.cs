@@ -3,7 +3,7 @@ namespace SqlSource.DatabaseTests.QueryMethodAllocation;
 // The pooled buffer that a generated many method of any pooled collection type reads its rows into, for the
 // hand-written methods of the allocation tests of both engines, which make the generated method's calls.
 // From its declaration to its last brace it is the generated SqlSourceRowBuffer<T> of
-// src/SqlSource/Generation/Emitting/RowBuffer.cs but its name and its modifier, at the depth of a file-scoped
+// src/SqlSource/Generation/Emitting/RowBuffer.cs but its attribute and its name, at the depth of a file-scoped
 // namespace, and RowBufferTests of tests/SqlSource.Tests fails when the two differ: a change to the generated buffer
 // changes this one with it.  So CSharpier and the rules of the repository's own code leave it as it is generated, and
 // dotnet format with them: IDE0001 would drop each global::, IDE0028 would write new List<T>() as [], IDE0301 would

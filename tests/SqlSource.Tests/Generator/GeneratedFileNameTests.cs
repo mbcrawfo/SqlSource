@@ -1,4 +1,4 @@
-// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
+// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
 using System;
 using System.Linq;
@@ -41,7 +41,14 @@ public sealed class GeneratedFileNameTests
 
         run.ShouldBeClean();
         run.Sources.Keys.ShouldBe(
-            ["SqlSourceGenerateAttribute.g.cs", "App.Sample.g.cs", "App.Sample-1.g.cs", "Other.Sample.g.cs"],
+            [
+                GeneratedFile.EmbeddedAttributeName,
+                "SqlSourceGenerateAttribute.g.cs",
+                "SqlSource-Exceptions.g.cs",
+                "App.Sample.g.cs",
+                "App.Sample-1.g.cs",
+                "Other.Sample.g.cs",
+            ],
             ignoreOrder: true
         );
     }
@@ -79,8 +86,8 @@ public sealed class GeneratedFileNameTests
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
-        run.Sources.Count.ShouldBe(5);
-        run.Sources.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count().ShouldBe(5);
+        run.Sources.Count.ShouldBe(7);
+        run.Sources.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count().ShouldBe(7);
         run.Sources.Keys.ShouldContain("App.Other.g.cs");
         run.Sources.Keys.ShouldNotContain("App.Sample.g.cs");
         run.Sources.Values.Count(source => source.Contains("public const string GetUser", StringComparison.Ordinal))
@@ -104,7 +111,7 @@ public sealed class GeneratedFileNameTests
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
-        run.Sources.Count.ShouldBe(2);
+        run.Sources.Count.ShouldBe(4);
         run.Sources["SqlSourceGenerateAttribute.g.cs"].ShouldBe(AttributeSource.Text);
     }
 
@@ -144,7 +151,15 @@ public sealed class GeneratedFileNameTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs", "Sample.g.cs"], ignoreOrder: true);
+        run.Sources.Keys.ShouldBe(
+            [
+                GeneratedFile.EmbeddedAttributeName,
+                "SqlSourceGenerateAttribute.g.cs",
+                "SqlSource-Exceptions.g.cs",
+                "Sample.g.cs",
+            ],
+            ignoreOrder: true
+        );
         run.Sources["Sample.g.cs"].ShouldContain("public const string GetUser");
         run.CompilationErrors.ShouldHaveSingleItem().ShouldStartWith("CS0579 /app/Other/Sample.cs(1,2)");
     }

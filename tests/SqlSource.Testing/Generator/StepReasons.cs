@@ -17,7 +17,7 @@ namespace SqlSource.Testing.Generator;
 // tests/SqlSource.Tests/Generator/.  The generator runs again on every edit in the IDE, and each step reports, for each
 // of its outputs, whether it was taken from the previous run.  The steps are read by their names in TrackingNames.
 //
-// Like the other files of this folder, it stays within Roslyn 4.8.0, since tests/SqlSource.Tests.RoslynFloor
+// Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
 internal static class StepReasons
 {
@@ -150,12 +150,28 @@ internal static class StepReasons
                 .Select(output => output.Reason),
         ];
 
-    // A method output is its hint name and its source, as a model output is.
+    // Why each output that a step reaches, directly or through unnamed steps such as a Combine, ran.
+    public static IncrementalStepRunReason[] OutputReasonsAfter(GeneratorDriverRunResult result, string step) =>
+        [
+            .. result
+                .Results.Single()
+                .TrackedOutputSteps.SelectMany(steps => steps.Value)
+                .Where(run => Reaches(run, step))
+                .SelectMany(run => run.Outputs)
+                .Select(output => output.Reason),
+        ];
+
+    // Whether the step is the run's own or that of a run before it.
+    private static bool Reaches(IncrementalGeneratorRunStep run, string step) =>
+        run.Name == step || run.Inputs.Any(input => Reaches(input.Source, step));
+
+    // A method output is its hint name, its source and whether it uses the row buffer.
     private static string MethodsFileOf(object value) =>
         value switch
         {
             MethodsInput input => HintName.ForMethods(input.Type.HintName),
             TypeMethods methods => methods.HintName,
+            ValueTuple<string, string?, bool> output => output.Item1,
             _ => HintNameOf(value),
         };
 }

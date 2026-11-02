@@ -14,6 +14,7 @@ Short answers to "how do I...", each a sample you can copy and a link to the pag
 - [Run the models through Dapper](#models-through-dapper)
 - [Choose a table name at run time](#table-name-at-run-time)
 - [Let a test project see the internals of the main project](#test-project-sees-internals)
+- [Share the exceptions between two data projects and an app](#share-the-exceptions)
 
 <a id="folder-with-another-dialect"></a>
 
@@ -716,4 +717,47 @@ using SqlSource;
 internal static partial class TestQueries;
 ```
 
-Rules: [projects that share internals](generator.md#projects-that-share-internals), and [known issues](generator.md#known-issues) for an editor that still shows the warning.
+```csharp
+// App.Tests catches the exception that a method of App throws by its type
+await Should.ThrowAsync<UnexpectedRowCountException>(() => connection.GetActiveUser(new GetActiveUserParams(email)));
+```
+
+The test project uses App's `UnexpectedRowCountException` and `TransactionRolledBackException`, whether it uses SqlSource or not, and the attribute and enums of each project do not conflict.  When App uses the exceptions of a [shared project](#share-the-exceptions), the shared project grants `InternalsVisibleTo` to App.Tests too.
+
+Rules: [projects that share internals](generator.md#projects-that-share-internals).
+
+<a id="share-the-exceptions"></a>
+
+## Share the exceptions between two data projects and an app
+
+```xml
+<!-- Data.Shared.csproj: references the SqlSource package, and has no query -->
+<ItemGroup>
+    <InternalsVisibleTo Include="Data.Orders" />
+    <InternalsVisibleTo Include="Data.Users" />
+    <InternalsVisibleTo Include="App" />
+    <!-- and each test project of a data project -->
+    <InternalsVisibleTo Include="Data.Orders.Tests" />
+    <InternalsVisibleTo Include="Data.Users.Tests" />
+</ItemGroup>
+```
+
+```xml
+<!-- Data.Orders.csproj and Data.Users.csproj: each references the SqlSource package and has its queries -->
+<ItemGroup>
+    <ProjectReference Include="../Data.Shared/Data.Shared.csproj" />
+    <InternalsVisibleTo Include="App" />
+</ItemGroup>
+```
+
+```csharp
+// App, which sees the internals of all three
+catch (UnexpectedRowCountException exception)
+{
+    // thrown by a method of Data.Orders or of Data.Users
+}
+```
+
+Each data project uses the shared project's exceptions instead of writing its own, so the app sees one copy and catches what a method of either throws by its type.  Grant `InternalsVisibleTo` from Data.Shared to every project that catches the exceptions, or that uses SqlSource and sees a data project's internals, the data projects' test projects among them: one that does not see Data.Shared's copy gets its own, and its `catch` compiles but misses what a data project throws.  Without the shared project, an app that uses SqlSource and sees the internals of both gets [SQLSRC022](diagnostics.md#sqlsrc022).
+
+Rules: [projects that share internals](generator.md#projects-that-share-internals), [SQLSRC022](diagnostics.md#sqlsrc022).

@@ -13,7 +13,7 @@ namespace SqlSource.Testing.Generator;
 // The harness of the model tests of tests/SqlSource.Tests/Generator/: a run at Models under postgres on Npgsql 10, the
 // entries written for a query's current hash, and the models the generator gave.
 //
-// Like the other files of this folder, it stays within Roslyn 4.8.0, since tests/SqlSource.Tests.RoslynFloor
+// Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
 internal static class ModelRuns
 {

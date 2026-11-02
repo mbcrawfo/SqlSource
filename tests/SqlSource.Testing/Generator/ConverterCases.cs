@@ -10,7 +10,7 @@ namespace SqlSource.Testing.Generator;
 // writes use, the domain email over text, the kinds of type an Email is declared as, the expected read and write of
 // an email, and a run of a column or a parameter of email.
 //
-// Like the other files of this folder, it stays within Roslyn 4.8.0, since tests/SqlSource.Tests.RoslynFloor
+// Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
 internal static class ConverterCases
 {

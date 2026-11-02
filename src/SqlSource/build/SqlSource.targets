@@ -105,6 +105,25 @@
             <SqlSourceTransitivePackageAssemblies>$(SqlSourcePackageAssemblyNames.Replace('%', '%2525').Replace('|', '%257C').Replace('#', '%2523').Replace(';', '%253B').Replace('/', '|'))</SqlSourceTransitivePackageAssemblies>
         </PropertyGroup>
     </Target>
+    <!--
+        Stops the build on a compiler older than Roslyn 4.14, in which the generator cannot load: the compiler would
+        only warn that it cannot, and the project would then fail on the missing members of the generated code.  The
+        .NET SDK sets CompilerApiVersion to roslyn<major>.<minor>, as roslyn4.14 in the SDK 9.0.300 and later and in
+        Visual Studio 2022 17.14 and later; a value of any other form is not a version this target knows, and passes.
+        The text is that of SqlDiagnostics.CompilerTooOld, with {0} where it writes the version: they change together.
+    -->
+    <Target Name="SqlSourceCheckCompilerVersion" BeforeTargets="GenerateMSBuildEditorConfigFileCore">
+        <PropertyGroup>
+            <SqlSourceCompilerApiVersion
+                Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(CompilerApiVersion)', '^roslyn\d{1,4}\.\d{1,4}$'))"
+                >$(CompilerApiVersion.Substring(6))</SqlSourceCompilerApiVersion>
+        </PropertyGroup>
+        <Error
+            Code="SQLSRC021"
+            Text="SqlSource needs the C# compiler of the .NET SDK 9.0.300 or later, or of Visual Studio 2022 17.14 or later, and this build's compiler is Roslyn $(SqlSourceCompilerApiVersion).  Update the .NET SDK or Visual Studio; a project can still target .NET 8."
+            Condition="'$(SqlSourceCompilerApiVersion)' != '' and $([MSBuild]::VersionLessThan('$(SqlSourceCompilerApiVersion)', '4.14'))"
+        />
+    </Target>
     <!-- editorconfig-checker-enable -->
     <!--
         The hook for a target of a project that adds a .sql file while the build runs, as one that writes its .sql

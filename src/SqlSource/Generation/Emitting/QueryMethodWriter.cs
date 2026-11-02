@@ -38,6 +38,13 @@ internal static class QueryMethodWriter
 
     private const string RolledBackType = "global::SqlSource.TransactionRolledBackException";
 
+    // The two exceptions as their documentation names them: a documentation ID, which the compiler does not bind.  A
+    // project that uses a referenced copy of the exceptions and references another assembly's copy too would find a
+    // bound cref ambiguous (CS0419), since a cref is bound without regard to accessibility.
+    private const string ExceptionCref = "T:SqlSource.UnexpectedRowCountException";
+
+    private const string RolledBackCref = "T:SqlSource.TransactionRolledBackException";
+
     private const string CompletedTransactionType = "global::System.InvalidOperationException";
 
     // The lines around the assignment of a command's SQL when its tokens build it.
@@ -68,17 +75,12 @@ internal static class QueryMethodWriter
     /// </param>
     /// <param name="modifiers"><c>public static</c>, <c>internal static</c> or <c>private static</c>.</param>
     /// <param name="isExtension">Whether the method extends the connection, which writes <c>this</c> before it.</param>
-    /// <param name="rowBufferType">
-    /// The row buffer's type from <see cref="RowBuffer.TypeTextFor" />, read only when
-    /// <see cref="RowBuffer.IsUsedBy" />.
-    /// </param>
     public static void Append(
         StringBuilder builder,
         string indent,
         QueryMethod method,
         string modifiers,
-        bool isExtension,
-        string rowBufferType
+        bool isExtension
     )
     {
         var tokens = MethodWriter.GetTokens(method.Segments);
@@ -101,7 +103,7 @@ internal static class QueryMethodWriter
         AppendChecks(builder, bodyIndent, method, arguments);
         if (!streams)
         {
-            AppendBody(builder, bodyIndent, method, tokens, arguments, locals, rowBufferType, streams);
+            AppendBody(builder, bodyIndent, method, tokens, arguments, locals, streams);
             AppendEnd(builder, indent);
             return;
         }
@@ -120,7 +122,7 @@ internal static class QueryMethodWriter
             .Append("(\n");
         AppendArguments(builder, bodyIndent, method, arguments, isExtension: false, isIterator: true);
         _ = builder.Append(bodyIndent).Append("{\n");
-        AppendBody(builder, blockIndent, method, tokens, arguments, locals, rowBufferType, streams);
+        AppendBody(builder, blockIndent, method, tokens, arguments, locals, streams);
         AppendEnd(builder, bodyIndent);
         AppendEnd(builder, indent);
     }
@@ -150,7 +152,6 @@ internal static class QueryMethodWriter
         List<string> tokens,
         List<string> arguments,
         QueryMethodLocals locals,
-        string rowBufferType,
         bool streams
     )
     {
@@ -197,7 +198,7 @@ internal static class QueryMethodWriter
             }
         }
 
-        AppendExecution(builder, blockIndent, method, locals, rowBufferType, streams);
+        AppendExecution(builder, blockIndent, method, locals, streams);
 
         _ = builder.Append(indent).Append("}\n").Append(indent).Append("finally\n").Append(indent).Append("{\n");
         AppendIf(builder, blockIndent, locals.WasClosed);
@@ -298,13 +299,13 @@ internal static class QueryMethodWriter
             XmlDocWriter.AppendException(
                 builder,
                 indent,
-                ExceptionType,
+                ExceptionCref,
                 "The query returned no rows, or more than one."
             );
         }
         else if (method.Shape == ResultShape.OneOptional)
         {
-            XmlDocWriter.AppendException(builder, indent, ExceptionType, "The query returned more than one row.");
+            XmlDocWriter.AppendException(builder, indent, ExceptionCref, "The query returned more than one row.");
         }
 
         if (method.Engine == DatabaseEngine.SqlServer)
@@ -322,7 +323,7 @@ internal static class QueryMethodWriter
             XmlDocWriter.AppendException(
                 builder,
                 indent,
-                RolledBackType,
+                RolledBackCref,
                 "The query threw an exception of its own, its inner exception, and an error that the rest of the "
                     + "query raised rolled back the transaction."
             );
@@ -459,12 +460,7 @@ internal static class QueryMethodWriter
         };
 
     // The buffer the rows are read into, and the expression that gives the collection from it.
-    private static (string Buffer, string Result) GetBuffer(
-        QueryMethod method,
-        string row,
-        string rows,
-        string rowBufferType
-    )
+    private static (string Buffer, string Result) GetBuffer(QueryMethod method, string row, string rows)
     {
         if (RowBuffer.IsUsedBy(method))
         {
@@ -483,7 +479,7 @@ internal static class QueryMethodWriter
                 or CollectionKind.IAsyncEnumerable
                 or _ => ".ToArray()",
             };
-            return ("new " + rowBufferType + "<" + row + ">()", rows + toResult);
+            return ("new " + RowBuffer.TypeText + "<" + row + ">()", rows + toResult);
         }
 
         return method.Collection switch
@@ -641,7 +637,6 @@ internal static class QueryMethodWriter
         string indent,
         QueryMethod method,
         QueryMethodLocals locals,
-        string rowBufferType,
         bool streams
     )
     {
@@ -680,12 +675,12 @@ internal static class QueryMethodWriter
         // On SQL Server the read, its drain and its returns are in a try whose catch checks the transaction.
         if (!ChecksTransaction(method))
         {
-            AppendRows(builder, indent, method, output, locals, rowBufferType);
+            AppendRows(builder, indent, method, output, locals);
             return;
         }
 
         _ = builder.Append(indent).Append("try\n").Append(indent).Append("{\n");
-        AppendRows(builder, indent + GeneratedText.Indent, method, output, locals, rowBufferType);
+        AppendRows(builder, indent + GeneratedText.Indent, method, output, locals);
         AppendEnd(builder, indent);
         AppendTransactionCheck(builder, indent, method, locals);
     }
@@ -696,14 +691,13 @@ internal static class QueryMethodWriter
         string indent,
         QueryMethod method,
         MethodOutput output,
-        QueryMethodLocals locals,
-        string rowBufferType
+        QueryMethodLocals locals
     )
     {
         var innerIndent = indent + GeneratedText.Indent;
         if (method.Shape == ResultShape.Many)
         {
-            var (buffer, result) = GetBuffer(method, output.TypeText, locals.Rows, rowBufferType);
+            var (buffer, result) = GetBuffer(method, output.TypeText, locals.Rows);
             _ = builder.Append(indent).Append("var ").Append(locals.Rows).Append(" = ").Append(buffer).Append(";\n");
             _ = builder.Append(indent).Append("while (");
             AppendRead(builder, locals);

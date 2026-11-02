@@ -362,7 +362,7 @@
       "sqlsource.testing": {
         "type": "Project",
         "dependencies": {
-          "Microsoft.CodeAnalysis.CSharp": "[4.8.0, )",
+          "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
           "Shouldly": "[4.3.0, )",
           "SqlSource": "[0.1.0-dev, )",
           "xunit.v3.extensibility.core": "[4.0.1, )"

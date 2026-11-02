@@ -6,7 +6,7 @@
 
 ## Why it exists
 
-The conversion that a constraint type asks for is checked with `Compilation.ClassifyConversion`, which ignores nullability, and Roslyn 4.8.0 has no public call that says whether a conversion keeps the nullability of every nested type argument.  Checking it means walking the argument and the constraint type side by side, with the variance of each type parameter on the way, as the compiler does.
+The conversion that a constraint type asks for is checked with `Compilation.ClassifyConversion`, which ignores nullability, and Roslyn 4.14.0 has no public call that says whether a conversion keeps the nullability of every nested type argument.  Checking it means walking the argument and the constraint type side by side, with the variance of each type parameter on the way, as the compiler does.
 
 ## Impact
 

@@ -1,4 +1,4 @@
-// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
+// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
@@ -147,6 +147,27 @@ public sealed class CachingSettingsFileTests
         AllReasons(result, TrackingNames.ReachedSettingsFiles).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.ParsedFile)
             .ShouldBe([IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached]);
+    }
+
+    // Another property changed: the options are new, so whether the exceptions are public is read again, and comes out
+    // equal, so the exceptions' file is not written again.
+    [Fact]
+    public void Run_BuildFolderChanged_LeavesThePublicExceptionsUnchanged()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = _scene.FirstRunWithSettingsFiles(compilation, _usersSettings, _ordersSettings);
+
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(
+                new TestOptionsProvider(
+                    properties: new Dictionary<string, string?> { ["SqlSourceBuildFolders"] = "/app/obj/" }
+                )
+            ),
+            compilation
+        );
+
+        AllReasons(result, TrackingNames.PublicExceptions).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        OutputReasonsAfter(result, TrackingNames.PublicExceptions).ShouldAllBeCached();
     }
 
     // What the IDE does when any property or an .editorconfig changes: new options, and the same folders of the build.

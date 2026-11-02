@@ -15,7 +15,7 @@ The third generator read no type on an edit, and the second read every one.  Mos
 
 ## Why it exists
 
-The epic decided to generate the attribute instead of shipping it in an assembly, so that the package stays a development dependency with nothing in `lib/`; [TD-0006](TD-0006-attribute-conflicts-across-friend-assemblies.md) records another cost of that decision.  This cost was found while measuring the fix for the path resolution that grew with types times files, which had hidden it.
+The epic decided to generate the attribute instead of shipping it in an assembly, so that the package stays a development dependency with nothing in `lib/`.  This cost was found while measuring the fix for the path resolution that grew with types times files, which had hidden it.
 
 ## Impact
 
@@ -25,9 +25,9 @@ None for a project of ordinary size: about 30 µs and 10 KB for each attributed 
 
 1. Check the IDE first: if it builds a new compilation for an edit to an additional file, nothing can be saved and this item closes.
 2. Measure `TargetTypeReader.Read` on its own and cut what it allocates.  At most the difference between the first two columns is SqlSource's, and that difference also holds the rest of the pipeline.
-3. Check whether `AddEmbeddedAttributeDefinition`, which TD-0006 waits for, changes what the driver does with the compilation.
+3. Check whether the post-initialization step's file of `Microsoft.CodeAnalysis.EmbeddedAttribute` changes what the driver does with the compilation.
 4. Shipping the attribute in an assembly removes the step and reverses the epic's decision.  It is not worth that for this cost alone.
 
 ## Trigger
 
-A user reports a slow IDE while editing `.sql` files in a project with many attributed types.  The way the attribute is delivered changes for another reason, such as TD-0006.
+A user reports a slow IDE while editing `.sql` files in a project with many attributed types.  The way the attribute is delivered changes for another reason.

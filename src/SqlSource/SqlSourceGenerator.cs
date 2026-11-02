@@ -10,6 +10,7 @@ using SqlSource.Generation;
 using SqlSource.Generation.Chains;
 using SqlSource.Generation.Converters;
 using SqlSource.Generation.Emitting;
+using SqlSource.Generation.Exceptions;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Models;
 using SqlSource.Generation.Paths;
@@ -38,6 +39,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         RegisterAttribute(context);
+        RegisterExceptions(context);
         var settingsFiles = ReadSettingsFiles(context);
         var claims = ClaimFiles(context, settingsFiles);
         ReportSettingsFiles(context, settingsFiles, claims.SqlPaths);
@@ -75,11 +77,35 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
-    // The attribute's file, which every compilation gets before the pipeline runs.
+    // The attribute's file, which every compilation gets before the pipeline runs, with the generator's own file of
+    // Microsoft.CodeAnalysis.EmbeddedAttribute, which marks its types, a library's class of conversions and the row
+    // buffer as the project's own, unseen by a project that sees its internals.  AttributeSource.EmbeddedText says why
+    // it is not AddEmbeddedAttributeDefinition.
     private static void RegisterAttribute(IncrementalGeneratorInitializationContext context) =>
         context.RegisterPostInitializationOutput(static output =>
-            output.AddSource(AttributeSource.HintName, SourceText.From(AttributeSource.Text, Encoding.UTF8))
-        );
+        {
+            output.AddSource(
+                AttributeSource.EmbeddedHintName,
+                SourceText.From(AttributeSource.EmbeddedText, Encoding.UTF8)
+            );
+            output.AddSource(AttributeSource.HintName, SourceText.From(AttributeSource.Text, Encoding.UTF8));
+        });
+
+    // The exceptions' file, which every compilation gets unless one referenced assembly that it sees gives it both
+    // exceptions.  The probe, like the framework check, runs on every compilation, two lookups and nothing for each
+    // tree, and gives an equal value until a reference changes.
+    private static void RegisterExceptions(IncrementalGeneratorInitializationContext context)
+    {
+        var probe = context
+            .CompilationProvider.Select(ExceptionProbe.Read)
+            .WithTrackingName(TrackingNames.ExceptionProbe);
+
+        var isPublic = context
+            .AnalyzerConfigOptionsProvider.Select(static (options, _) => PublicExceptions.Read(options.GlobalOptions))
+            .WithTrackingName(TrackingNames.PublicExceptions);
+
+        context.RegisterSourceOutput(probe.Combine(isPublic), AddExceptions);
+    }
 
     // The project's settings files, each read once, with the chain of every folder.  Their problems are reported by
     // ReportSettingsFiles, for the files that a chain reaches.
@@ -931,7 +957,20 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(methodDiagnostics, ReportAll);
         context.RegisterSourceOutput(settingsFileLibraryDiagnostics, ReportAll);
         context.RegisterSourceOutput(conflicts, ReportConflicts);
-        context.RegisterSourceOutput(methodOutputs, AddFile);
+        context.RegisterSourceOutput(
+            methodOutputs.Select(static (output, _) => (output.HintName, output.Source)),
+            AddFile
+        );
+
+        // Whether a method the project keeps reads its rows into the buffer, which almost never changes: the buffer's
+        // file is written once for the project, however many methods use it.
+        var usesRowBuffer = methodOutputs
+            .Select(static (output, _) => output.UsesRowBuffer)
+            .Collect()
+            .Select(static (each, _) => each.Contains(true))
+            .WithTrackingName(TrackingNames.UsesRowBuffer);
+
+        context.RegisterSourceOutput(usesRowBuffer, AddRowBuffer);
 
         // The engines of the project's CodeGen queries, which almost never change.
         var codeGenEngines = typeMethods
@@ -1000,6 +1039,15 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         }
     }
 
+    // The project's one row buffer, when a method it keeps uses it.
+    private static void AddRowBuffer(SourceProductionContext output, bool usesRowBuffer)
+    {
+        if (usesRowBuffer)
+        {
+            output.AddSource(RowBuffer.HintName, SourceText.From(RowBuffer.Source, Encoding.UTF8));
+        }
+    }
+
     // The libraries of every type's conversions, each once, in the order of SqlLibrary, so that the value does not
     // depend on the order of the compilation's types.
     private static EquatableArray<LibraryValue> DistinctLibraries(ImmutableArray<EquatableArray<LibraryValue>> each) =>
@@ -1035,6 +1083,31 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 Diagnostic.Create(SqlDiagnostics.LibraryBelowTheFloor, Location.None, name, version, floor)
             );
         }
+    }
+
+    // The exceptions' file, internal or public, unless a referenced assembly gives the project both, and SQLSRC022 or
+    // SQLSRC023, not located and once for the project, when the copies it sees are not one usable pair.
+    private static void AddExceptions(SourceProductionContext output, (ExceptionProbe Probe, bool IsPublic) input)
+    {
+        var probe = input.Probe;
+        if (probe.Origin == ExceptionOrigin.Referenced)
+        {
+            return;
+        }
+
+        if (probe.Origin is ExceptionOrigin.SeenTwice or ExceptionOrigin.OtherShape)
+        {
+            var descriptor =
+                probe.Origin == ExceptionOrigin.SeenTwice
+                    ? SqlDiagnostics.ExceptionsSeenTwice
+                    : SqlDiagnostics.ExceptionsOfAnotherShape;
+            output.ReportDiagnostic(Diagnostic.Create(descriptor, Location.None, string.Join(", ", probe.Assemblies)));
+        }
+
+        output.AddSource(
+            ExceptionSource.HintName,
+            SourceText.From(ExceptionSource.TextFor(input.IsPublic), Encoding.UTF8)
+        );
     }
 
     // SQLSRC273 for each engine that a CodeGen query has and whose driver the project does not reference.

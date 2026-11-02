@@ -12,9 +12,9 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
+using SqlSource.Generation.Exceptions;
 using SqlSource.Generation.Paths;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
@@ -23,8 +23,8 @@ namespace SqlSource.Testing.Generator;
 
 // Runs the generator over in-memory C# and .sql files.
 //
-// tests/SqlSource.Tests.RoslynFloor references this library and runs it on Roslyn 4.8.0, the oldest compiler the
-// generator supports.  So the files of this folder use only API that Roslyn 4.8.0 has, and the C# they hand to the
+// tests/SqlSource.Tests.RoslynFloor references this library and runs it on Roslyn 4.14.0, the oldest compiler the
+// generator supports.  So the files of this folder use only API that Roslyn 4.14.0 has, and the C# they hand to the
 // compiler is C# 12 at most.
 internal static class GeneratorHarness
 {
@@ -61,24 +61,32 @@ internal static class GeneratorHarness
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    // The newest language version that Roslyn 4.8.0 parses.  Documentation comments are checked, as they are in a
-    // project that builds a documentation file, so that a malformed or missing one in generated code is reported.
+    // The C# that the generator tests hand the compiler, the language of generated code.  Documentation comments are
+    // checked, as they are in a project that builds a documentation file, so that a malformed or missing one in
+    // generated code is reported.
     public static readonly CSharpParseOptions ParseOptions = new(LanguageVersion.CSharp12, DocumentationMode.Diagnose);
 
-    // The assemblies of the runtime the tests run on, which is .NET 8 or later.
-    private static readonly ImmutableArray<MetadataReference> RuntimeReferences =
-    [
-        .. ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Select(path => MetadataReference.CreateFromFile(path)),
-    ];
+    // The assemblies of the runtime the tests run on, which is .NET 8 or later, without the test project's own when the
+    // generator ran on it, as on tests/SqlSource.Tests and the database test projects: that one holds an internal
+    // SqlSource.UnexpectedRowCountException that no compilation of a test sees, which would still make a cref to the
+    // exceptions ambiguous in every run.  A test that needs such a copy references one of its own.
+    private static readonly ImmutableArray<MetadataReference> RuntimeReferences = ReadRuntimeReferences();
 
-    // The analyzers that the compiler finds in the generator's assembly, looked up the way it looks them up in a
-    // package: by their attribute, not by name.
-    private static readonly ImmutableArray<DiagnosticAnalyzer> PackageAnalyzers = new AnalyzerFileReference(
-        typeof(SqlSourceGenerator).Assembly.Location,
-        new LoadedAssembly()
-    ).GetAnalyzers(LanguageNames.CSharp);
+    // The entry assembly is the test project, the only assembly of the runtime that the generator ran on.
+    private static ImmutableArray<MetadataReference> ReadRuntimeReferences()
+    {
+        var entry = Assembly.GetEntryAssembly();
+        var leftOut = entry?.GetType(ExceptionSource.UnexpectedRowCountMetadataName) is null
+            ? null
+            : Path.GetFullPath(entry.Location);
+        return
+        [
+            .. ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+                .Split(Path.PathSeparator)
+                .Where(path => !string.Equals(Path.GetFullPath(path), leftOut, StringComparison.Ordinal))
+                .Select(path => MetadataReference.CreateFromFile(path)),
+        ];
+    }
 
     // The source of the type App.Sample, whose attribute has SqlLocation.Direct and these arguments after it: null for
     // none, or text such as Parameters = "keep-comments".
@@ -123,8 +131,8 @@ internal static class GeneratorHarness
             compilation = compilation.WithOptions(compilation.Options.WithSpecificDiagnosticOptions(diagnosticOptions));
         }
 
-        // The properties are what MSBuild tells the generator, for the tests of SqlSourceBuildFolders and
-        // SqlSourceTransitivePackageAssemblies.
+        // The properties are what MSBuild tells the generator, for the tests of SqlSourceBuildFolders,
+        // SqlSourceTransitivePackageAssemblies and SqlSourcePublicExceptions.
         var options = new TestOptionsProvider(properties);
         var projectSettings = ProjectSettings(output, dialect, generatorParameters, settings);
         var files = WithProjectSettings(sqlFiles, projectSettings);
@@ -280,14 +288,17 @@ internal static class GeneratorHarness
         );
 
     // Step tracking is on, so that a test can read why each step of the pipeline ran.  The options are what MSBuild
-    // tells the generator.
+    // tells the generator.  The other generator, when one is given, runs after SqlSource's, as another package's does.
     public static GeneratorDriver CreateDriver(
         IEnumerable<AdditionalText> sqlFiles,
         TestOptionsProvider options,
-        CSharpParseOptions? parseOptions = null
+        CSharpParseOptions? parseOptions = null,
+        IIncrementalGenerator? otherGenerator = null
     ) =>
         CSharpGeneratorDriver.Create(
-            [new SqlSourceGenerator().AsSourceGenerator()],
+            otherGenerator is null
+                ? [new SqlSourceGenerator().AsSourceGenerator()]
+                : [new SqlSourceGenerator().AsSourceGenerator(), otherGenerator.AsSourceGenerator()],
             sqlFiles,
             parseOptions ?? ParseOptions,
             options,
@@ -299,15 +310,19 @@ internal static class GeneratorHarness
     public static MetadataReference CreateReference(OutputKind? output, string assemblyName, string source) =>
         CreateProject(output, assemblyName, source).Reference;
 
-    // The same with the .sql files the generator reads, the references and the dialect of the project, and the code the
-    // generator gave it by name.  The output and the dialect are its settings file, as a run's are.
+    // The same with the .sql files the generator reads, the references, the dialect and the properties of the project,
+    // and the code the generator gave it by name.  The output and the dialect are its settings file, as a run's are.
+    // The reference is the compiled image, as a build references a project, or, with compilationReference, the
+    // compilation itself, as an IDE references a project of the same solution.
     public static (MetadataReference Reference, IReadOnlyDictionary<string, string> Sources) CreateProject(
         OutputKind? output,
         string assemblyName,
         string source,
         SqlFile[]? sqlFiles = null,
         MetadataReference[]? references = null,
-        string? dialect = null
+        string? dialect = null,
+        IReadOnlyDictionary<string, string?>? properties = null,
+        bool compilationReference = false
     )
     {
         var compilation = CreateCompilation(
@@ -318,7 +333,7 @@ internal static class GeneratorHarness
         var driver = CreateDriver(
                 WithProjectSettings(sqlFiles ?? [], ProjectSettings(output, dialect))
                     .Select(file => file.ToAdditionalText()),
-                new TestOptionsProvider()
+                new TestOptionsProvider(properties)
             )
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
@@ -329,20 +344,38 @@ internal static class GeneratorHarness
 
         using var image = new MemoryStream();
         updated.Emit(image, cancellationToken: TestContext.Current.CancellationToken).Success.ShouldBeTrue();
-        return (MetadataReference.CreateFromImage(image.ToArray()), SourcesOf(driver));
+        return (
+            compilationReference ? updated.ToMetadataReference() : MetadataReference.CreateFromImage(image.ToArray()),
+            SourcesOf(driver)
+        );
+    }
+
+    // The compiler's warnings and errors for the source alone, against the references, as a build of a project that
+    // does not use SqlSource reports them: the generator does not run.
+    public static Task<IReadOnlyList<string>> CompileAsync(string source, MetadataReference[] references)
+    {
+        var compilation = CreateCompilation([new SourceFile(SourcePath, source)], references: references);
+        IReadOnlyList<string> diagnostics =
+        [
+            .. compilation
+                .GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning)
+                .Select(Format),
+        ];
+        return Task.FromResult(diagnostics);
     }
 
     // The compiler's warnings and errors for the source together with the generated code, as a build of the project
-    // reports them: after the analyzers that the package brings have run.  Without them it is what the compiler
-    // reports on its own.
+    // reports them.  The package brings no analyzer, so they are what the compiler reports on its own.
     public static async Task<IReadOnlyList<string>> BuildAsync(
         OutputKind? output,
         string source,
         SqlFile[] sqlFiles,
         MetadataReference[] references,
         bool warningsAsErrors = false,
-        bool packageAnalyzers = true,
-        string? dialect = null
+        string? dialect = null,
+        IReadOnlyDictionary<string, string?>? properties = null,
+        IIncrementalGenerator? otherGenerator = null
     )
     {
         var (diagnostics, _) = await BuildProjectAsync(
@@ -351,14 +384,16 @@ internal static class GeneratorHarness
             sqlFiles,
             references,
             warningsAsErrors,
-            packageAnalyzers,
-            dialect
+            dialect,
+            properties,
+            otherGenerator
         );
         return diagnostics;
     }
 
-    // The same, with the code the generator gave the project by name.
-    public static async Task<(
+    // The same, with the code the generators gave the project by name.  The properties are what MSBuild tells the
+    // generator, and the other generator runs beside it, as CreateDriver says.
+    public static Task<(
         IReadOnlyList<string> Diagnostics,
         IReadOnlyDictionary<string, string> Sources
     )> BuildProjectAsync(
@@ -367,8 +402,9 @@ internal static class GeneratorHarness
         SqlFile[] sqlFiles,
         MetadataReference[] references,
         bool warningsAsErrors = false,
-        bool packageAnalyzers = true,
-        string? dialect = null
+        string? dialect = null,
+        IReadOnlyDictionary<string, string?>? properties = null,
+        IIncrementalGenerator? otherGenerator = null
     )
     {
         var compilation = CreateCompilation([new SourceFile(SourcePath, source)], references: references);
@@ -381,7 +417,8 @@ internal static class GeneratorHarness
 
         var driver = CreateDriver(
                 WithProjectSettings(sqlFiles, ProjectSettings(output, dialect)).Select(file => file.ToAdditionalText()),
-                new TestOptionsProvider()
+                new TestOptionsProvider(properties),
+                otherGenerator: otherGenerator
             )
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
@@ -390,27 +427,22 @@ internal static class GeneratorHarness
                 TestContext.Current.CancellationToken
             );
 
-        var diagnostics = packageAnalyzers
-            ? await updated
-                .WithAnalyzers(PackageAnalyzers)
-                .GetAllDiagnosticsAsync(TestContext.Current.CancellationToken)
-            : updated.GetDiagnostics(TestContext.Current.CancellationToken);
+        var diagnostics = updated.GetDiagnostics(TestContext.Current.CancellationToken);
 
-        return (
-            [.. diagnostics.Where(diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning).Select(Format)],
-            SourcesOf(driver)
+        return Task.FromResult<(IReadOnlyList<string>, IReadOnlyDictionary<string, string>)>(
+            (
+                [.. diagnostics.Where(diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning).Select(Format)],
+                SourcesOf(driver)
+            )
         );
     }
 
-    // The code the generator gave, by name.
+    // The code the generators gave, by name: SqlSource's, and the other generator's when there is one.
     private static Dictionary<string, string> SourcesOf(GeneratorDriver driver) =>
         driver
             .GetRunResult()
-            .Results.Single()
-            .GeneratedSources.ToDictionary(
-                generated => generated.HintName,
-                generated => generated.SourceText.ToString()
-            );
+            .Results.SelectMany(result => result.GeneratedSources)
+            .ToDictionary(generated => generated.HintName, generated => generated.SourceText.ToString());
 
     // "SQLSRC001 /app/Repo/Sample.cs(3,14)-(3,20): message", with lines and columns counted from one as an IDE
     // shows them.
@@ -428,12 +460,12 @@ internal static class GeneratorHarness
 
 internal sealed record SourceFile(string Path, string Text);
 
-// The generator's assembly is already loaded, by the reference to its project.
-internal sealed class LoadedAssembly : IAnalyzerAssemblyLoader
+// Another package's generator that adds Roslyn's Microsoft.CodeAnalysis.EmbeddedAttribute, which SqlSource's own
+// declaration must merge with.
+internal sealed class RoslynEmbeddedAttributeGenerator : IIncrementalGenerator
 {
-    public void AddDependencyLocation(string fullPath) { }
-
-    public Assembly LoadFromPath(string fullPath) => typeof(SqlSourceGenerator).Assembly;
+    public void Initialize(IncrementalGeneratorInitializationContext context) =>
+        context.RegisterPostInitializationOutput(static output => output.AddEmbeddedAttributeDefinition());
 }
 
 // A .sql file, or any other additional file, as the compiler gives it to the generator.
@@ -484,8 +516,8 @@ internal sealed record GeneratorRun(
 }
 
 // The lines that start a generated file: Header a file of queries, ModelHeader a file of models.  RowBuffer is the
-// buffer a file of methods ends with when one reads its rows into it, at the depth of a namespace.  They are the
-// tests' own text, not read from the product, so the snapshots that hold them still say what the text is.
+// file of the buffer that a project's methods read their rows into, when one does.  They are the tests' own text, not
+// read from the product, so the snapshots that hold them still say what the text is.
 internal static class GeneratedFile
 {
     // Ends a line of an expected text that goes on in the next, written so to keep within the width of a line.
@@ -496,8 +528,31 @@ internal static class GeneratedFile
     public const string Header =
         ModelHeader + "#pragma warning disable CS0108, CS0114 // A query can have the name of an inherited member.\n";
 
+    // The name of SqlSource's file of Microsoft.CodeAnalysis.EmbeddedAttribute, which every project gets.
+    public const string EmbeddedAttributeName = "SqlSource-EmbeddedAttribute.g.cs";
+
+    // The declaration of Microsoft.CodeAnalysis.EmbeddedAttribute, Roslyn's, which SqlSource's file holds and which the
+    // attribute's types, a library's class of conversions and the row buffer are marked with, for a test that compiles
+    // one of those files without the generator.
+    public const string EmbeddedAttribute = """
+        namespace Microsoft.CodeAnalysis
+        {
+            internal sealed partial class EmbeddedAttribute : global::System.Attribute
+            {
+            }
+        }
+
+        """;
+
     public const string RowBuffer =
-        RowBufferToImmutable + RowBufferAsImmutableLine + RowBufferToGrow + RowBufferGrowLine + RowBufferAfterGrow;
+        ModelHeader
+        + "\nnamespace SqlSource\n{\n"
+        + RowBufferToImmutable
+        + RowBufferAsImmutableLine
+        + RowBufferToGrow
+        + RowBufferGrowLine
+        + RowBufferAfterGrow
+        + "}\n";
 
     // The buffer up to the line of ToImmutableArray that is longer than the width of a line here, up to the line of
     // Grow that is, and after it.
@@ -506,7 +561,8 @@ internal static class GeneratedFile
             /// The rows of a query method, read into buffers from the shared array pool: one of up to 1,024 elements is
             /// rented and returned cleared, and a larger one is left to the garbage collector.
             /// </summary>
-            file struct SqlSourceRowBuffer<T>
+            [global::Microsoft.CodeAnalysis.Embedded]
+            internal struct SqlSourceRowBuffer<T>
                 where T : class
             {
                 private object[]? items;

@@ -1,4 +1,4 @@
-// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
+// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.14.0.  See AGENTS.md beside it.
 
 using System;
 using Shouldly;
@@ -146,7 +146,7 @@ public sealed class ConverterMethodTests
         cancellationToken).ConfigureAwait(false);
                         await using var readerScope = ↩
         global::System.Threading.Tasks.TaskAsyncEnumerableExtensions.ConfigureAwait(reader, false);
-                        var rows = new global::App.SqlSourceRowBuffer<global::App.FindEmailDto>();
+                        var rows = new global::SqlSource.SqlSourceRowBuffer<global::App.FindEmailDto>();
                         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                         {
                             rows.Add(new global::App.FindEmailDto(reader.IsDBNull(0) ? default(global::MyApp.Email?) ↩
@@ -164,8 +164,7 @@ public sealed class ConverterMethodTests
                     }
                 }
             }
-
-        {{{GeneratedFile.RowBuffer}}}}
+        }
 
         """
     );
