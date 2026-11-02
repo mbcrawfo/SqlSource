@@ -70,7 +70,8 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
             : ExceptionOrigin.OtherShape;
     }
 
-    // The types of the name in a referenced assembly that the project can see.
+    // The types of the name in a referenced assembly that the project can see, and name from global::, as the generated
+    // methods do.
     private static ImmutableArray<INamedTypeSymbol> Seen(Compilation compilation, string metadataName)
     {
         var found = compilation.GetTypesByMetadataName(metadataName);
@@ -82,7 +83,16 @@ internal sealed record ExceptionProbe(ExceptionOrigin Origin, EquatableArray<str
         return found.RemoveAll(type =>
             SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, compilation.Assembly)
             || !compilation.IsSymbolAccessibleWithin(type, compilation.Assembly)
+            || OnlyUnderAnAlias(compilation, type.ContainingAssembly)
         );
+    }
+
+    // Whether the assembly's reference has extern aliases and global is not among them, so that global:: does not reach
+    // its types.
+    private static bool OnlyUnderAnAlias(Compilation compilation, IAssemblySymbol assembly)
+    {
+        var aliases = compilation.GetMetadataReference(assembly)?.Properties.Aliases ?? ImmutableArray<string>.Empty;
+        return !aliases.IsEmpty && !aliases.Contains("global");
     }
 
     // Whether the type has a constructor that the project can call with a string and a second argument of the type

@@ -276,6 +276,63 @@ public sealed class ExceptionReuseTests
         run.CompilationErrors.ShouldBeEmpty();
     }
 
+    // A reference under an extern alias that is not global is no copy that the generated methods can name as
+    // global::SqlSource.UnexpectedRowCountException, so the project writes its own; one that is global too is used.
+    [Theory]
+    [InlineData("friend", false, false)]
+    [InlineData("friend", true, false)]
+    [InlineData("global,friend", false, true)]
+    [InlineData("global,friend", true, true)]
+    [InlineData("", false, true)]
+    [InlineData("", true, true)]
+    public async Task Build_FriendUnderAnAlias_IsUsedOnlyWhenItIsGlobal(
+        string aliases,
+        bool compilationReference,
+        bool reused
+    )
+    {
+        var friend = Friend("Friend", compilationReference);
+        if (aliases.Length > 0)
+        {
+            friend = friend.WithAliases(aliases.Split(','));
+        }
+
+        var (diagnostics, sources) = await GeneratorHarness.BuildProjectAsync(
+            OutputKind.CodeGen,
+            "namespace App { [SqlSource.SqlSourceGenerate] internal partial class Sample; }\n",
+            [OwnFile, Sidecars.Of(OwnFile, Entry(OwnFile, "GetOne", [], [Column("id")]))],
+            [friend, NpgsqlReferences.Npgsql10],
+            dialect: "postgres"
+        );
+
+        diagnostics.ShouldBeEmpty();
+        sources.ContainsKey(ExceptionSource.HintName).ShouldBe(!reused);
+        sources.Keys.ShouldContain(MethodRuns.MethodsFile);
+    }
+
+    // Of two friends, one only under an alias: the other is the one copy, used with no SQLSRC022.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Run_TwoFriendsOneUnderAnAlias_UsesTheGlobalOne(bool compilationReference)
+    {
+        var aliased = Friend("OtherA", compilationReference).WithAliases(["friend"]);
+        var global = Friend("OtherB", compilationReference);
+
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            [new SourceFile(GeneratorHarness.SourcePath, "public class Sample { }")],
+            [],
+            references: [aliased, global]
+        );
+
+        run.ShouldBeClean();
+        run.Sources.Keys.ShouldNotContain(ExceptionSource.HintName);
+        StepOutputs
+            .Single<ExceptionProbe>(run, TrackingNames.ExceptionProbe)
+            .ShouldBe(new ExceptionProbe(ExceptionOrigin.Referenced, new(["OtherB"])));
+    }
+
     // The workaround for SQLSRC022: Shared uses SqlSource for its exceptions alone and is the friend of DataA and of
     // this project, so DataA uses its exceptions, and this project, which sees both, sees one copy.
     [Theory]
@@ -311,27 +368,50 @@ public sealed class ExceptionReuseTests
     }
 
     // Copies of another version of SqlSource: one exception without the other, a constructor that a generated method
-    // calls missing, a class that is no exception, or one that cannot be created.  Each as an image and as a
-    // compilation.
+    // calls missing, a class that is no exception, one that cannot be created, or public types whose constructors this
+    // project cannot call.  Each as an image and as a compilation.
     public static TheoryData<string, bool> OtherShapes()
     {
-        string[] declarations =
+        string[] sources =
         [
-            RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne"),
-            RowCount("System.InvalidOperationException", "string queryName")
-                + RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner"),
-            RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne")
-                + RolledBack("System.InvalidOperationException", "string queryName"),
-            RowCount("System.Object", "string queryName, bool moreThanOne")
-                + RolledBack("System.Object", "string queryName, System.Exception inner"),
-            RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne", "abstract")
-                + RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner"),
+            Old(RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne")),
+            Old(
+                RowCount("System.InvalidOperationException", "string queryName")
+                    + RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner")
+            ),
+            Old(
+                RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne")
+                    + RolledBack("System.InvalidOperationException", "string queryName")
+            ),
+            Old(
+                RowCount("System.Object", "string queryName, bool moreThanOne")
+                    + RolledBack("System.Object", "string queryName, System.Exception inner")
+            ),
+            Old(
+                RowCount("System.InvalidOperationException", "string queryName, bool moreThanOne", "abstract")
+                    + RolledBack("System.InvalidOperationException", "string queryName, System.Exception inner")
+            ),
+            Old(
+                RowCount(
+                    "System.InvalidOperationException",
+                    "string queryName, bool moreThanOne",
+                    accessibility: "public",
+                    constructorAccessibility: "internal"
+                )
+                    + RolledBack(
+                        "System.InvalidOperationException",
+                        "string queryName, System.Exception inner",
+                        accessibility: "public",
+                        constructorAccessibility: "internal"
+                    ),
+                internalsVisible: false
+            ),
         ];
         var shapes = new TheoryData<string, bool>();
-        foreach (var declaration in declarations)
+        foreach (var source in sources)
         {
-            shapes.Add(declaration, false);
-            shapes.Add(declaration, true);
+            shapes.Add(source, false);
+            shapes.Add(source, true);
         }
 
         return shapes;
@@ -339,13 +419,10 @@ public sealed class ExceptionReuseTests
 
     [Theory]
     [MemberData(nameof(OtherShapes))]
-    public void Run_ReferenceOfAnotherShape_ReportsSqlsrc023AndWritesItsOwn(
-        string declarations,
-        bool compilationReference
-    )
+    public void Run_ReferenceOfAnotherShape_ReportsSqlsrc023AndWritesItsOwn(string source, bool compilationReference)
     {
         var compilation = GeneratorHarness.CreateCompilation(
-            [new SourceFile("/old/Old.cs", InternalsVisible + "namespace SqlSource { " + declarations + " }\n")],
+            [new SourceFile("/old/Old.cs", source)],
             assemblyName: "Old"
         );
         MetadataReference old = compilationReference ? compilation.ToMetadataReference() : ImageOf(compilation);
@@ -366,23 +443,44 @@ public sealed class ExceptionReuseTests
         run.CompilationErrors.ShouldBeEmpty();
     }
 
-    // A copy of UnexpectedRowCountException, sealed unless the modifier is given, of this base and constructor.
-    private static string RowCount(string baseType, string parameters, string modifier = "sealed") =>
-        "internal "
+    // The source of Old: the declarations in the namespace SqlSource, with InternalsVisibleTo for this project unless
+    // it is left out.
+    private static string Old(string declarations, bool internalsVisible = true) =>
+        (internalsVisible ? InternalsVisible : string.Empty) + "namespace SqlSource { " + declarations + " }\n";
+
+    // A copy of UnexpectedRowCountException, internal and sealed unless they are given, of this base and constructor,
+    // public unless its accessibility is given.
+    private static string RowCount(
+        string baseType,
+        string parameters,
+        string modifier = "sealed",
+        string accessibility = "internal",
+        string constructorAccessibility = "public"
+    ) =>
+        accessibility
+        + " "
         + modifier
         + " class UnexpectedRowCountException : "
         + baseType
         + " { "
-        + "public UnexpectedRowCountException("
+        + constructorAccessibility
+        + " UnexpectedRowCountException("
         + parameters
         + ") { } } ";
 
-    // A copy of TransactionRolledBackException of this base and constructor.
-    private static string RolledBack(string baseType, string parameters) =>
-        "internal sealed class TransactionRolledBackException : "
+    // A copy of TransactionRolledBackException of this base and constructor, with the accessibility of each as given.
+    private static string RolledBack(
+        string baseType,
+        string parameters,
+        string accessibility = "internal",
+        string constructorAccessibility = "public"
+    ) =>
+        accessibility
+        + " sealed class TransactionRolledBackException : "
         + baseType
         + " { "
-        + "public TransactionRolledBackException("
+        + constructorAccessibility
+        + " TransactionRolledBackException("
         + parameters
         + ") { } } ";
 
