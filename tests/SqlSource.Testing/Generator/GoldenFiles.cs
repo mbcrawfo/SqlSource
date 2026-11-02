@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using Shouldly;
 
 namespace SqlSource.Testing.Generator;
@@ -13,7 +14,7 @@ namespace SqlSource.Testing.Generator;
 //
 // Like the other files of this folder, it stays within Roslyn 4.14.0, since tests/SqlSource.Tests.RoslynFloor
 // references this library.
-internal static class GoldenFiles
+internal static partial class GoldenFiles
 {
     public const string UpdateVariable = "SQLSOURCE_UPDATE_GOLDEN";
 
@@ -33,8 +34,8 @@ internal static class GoldenFiles
     public static string Render(string caseName, GeneratorRun run) =>
         Render(caseName, run.Sources, run.Diagnostics, run.CompilationErrors, run.GeneratedCodeWarnings);
 
-    // The header, the three lists of diagnostics and each generated file by its hint name, in ordinal order.  A path
-    // in a diagnostic is written with `/`, so that a run on Windows writes the same text.
+    // The header, the three lists of diagnostics and each generated file by its hint name, in ordinal order.  The path
+    // of a diagnostic is written with `/`, so that a run on Windows writes the same text, and its message as it is.
     internal static string Render(
         string caseName,
         IReadOnlyDictionary<string, string> sources,
@@ -126,9 +127,27 @@ internal static class GoldenFiles
 
         foreach (var line in lines)
         {
-            _ = text.Append(line.Replace('\\', '/')).Append('\n');
+            _ = text.Append(WithSlashes(line)).Append('\n');
         }
     }
+
+    // A diagnostic as GeneratorHarness.Format writes it, "{Id} {Path}({l},{c})-({l},{c}): {message}", with `/` for
+    // every `\` of its path alone; a line of another shape is kept as it is.
+    private static string WithSlashes(string diagnostic)
+    {
+        var match = DiagnosticShape().Match(diagnostic);
+        return match.Success
+            ? string.Concat(
+                match.Groups["id"].Value,
+                match.Groups["path"].Value.Replace('\\', '/'),
+                diagnostic.AsSpan(match.Groups["span"].Index)
+            )
+            : diagnostic;
+    }
+
+    // The id and its space, the path, which may be empty or hold spaces, and the first span after it.
+    [GeneratedRegex(@"^(?<id>\S+ )(?<path>.*?)(?<span>\(\d+,\d+\)-\(\d+,\d+\): )", RegexOptions.CultureInvariant)]
+    private static partial Regex DiagnosticShape();
 
     // "line 2: the golden file has `b`, the output `B`", counted from one; a text that has ended has "(end of text)".
     private static string FirstDifference(string golden, string actual)

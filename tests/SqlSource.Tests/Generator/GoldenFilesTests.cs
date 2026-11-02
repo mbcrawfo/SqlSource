@@ -55,6 +55,26 @@ public sealed class GoldenFilesTests
             )
             .ShouldContain("\n==== Compilation errors\nCS0001 SqlSource/Gen/a.g.cs(1,1)-(1,2): x\n");
 
+    // Only the path is the machine's: a backslash in the message is what the generator reported.  A diagnostic with no
+    // location has no path, and a message may hold text shaped like a path and its span.
+    [Theory]
+    [InlineData(
+        "SQLSRC111 C:\\app\\Repo\\Users.sql(2,1)-(2,30): The marker `List\\Array` is not one.",
+        "SQLSRC111 C:/app/Repo/Users.sql(2,1)-(2,30): The marker `List\\Array` is not one."
+    )]
+    [InlineData("CS0001 (1,1)-(1,1): a\\b", "CS0001 (1,1)-(1,1): a\\b")]
+    [InlineData(
+        "CS0001 Gen\\a.g.cs(1,1)-(1,2): see Gen\\b.g.cs(3,1)-(3,2): c\\d",
+        "CS0001 Gen/a.g.cs(1,1)-(1,2): see Gen\\b.g.cs(3,1)-(3,2): c\\d"
+    )]
+    public void Render_DiagnosticWithBackslashInItsMessage_KeepsIt(string diagnostic, string rendered) =>
+        RenderedError(diagnostic).ShouldBe(rendered);
+
+    // A line that is not a diagnostic's id, path, span and message has no path to tell apart.
+    [Fact]
+    public void Render_LineNotShapedAsADiagnostic_WritesItAsItIs() =>
+        RenderedError("CS8785 Generator failed at C:\\app\\Repo").ShouldBe("CS8785 Generator failed at C:\\app\\Repo");
+
     [Fact]
     public void Check_SameText_Passes() =>
         InTemporaryFolder(folder =>
@@ -173,6 +193,15 @@ public sealed class GoldenFilesTests
     [Fact]
     public void Leftovers_MissingFolder_ListsNone() =>
         InTemporaryFolder(folder => GoldenFiles.Leftovers(Path.Combine(folder, "Golden"), []).ShouldBeEmpty());
+
+    // The one line of the compilation errors that a run of the error renders.
+    private static string RenderedError(string error)
+    {
+        var text = GoldenFiles.Render("postgres/shapes", new Dictionary<string, string>(), [], [error], []);
+        const string Section = "\n==== Compilation errors\n";
+        var start = text.IndexOf(Section, System.StringComparison.Ordinal) + Section.Length;
+        return text[start..text.IndexOf('\n', start)];
+    }
 
     private static void WriteFile(string folder, string engine, string name)
     {
