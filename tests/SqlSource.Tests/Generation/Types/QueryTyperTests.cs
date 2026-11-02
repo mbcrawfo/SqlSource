@@ -399,6 +399,12 @@ public sealed class QueryTyperTests
             columns: columns?.Select((type, at) => TestSidecars.Column(at, "c" + at, type)).ToArray()
         );
 
+    // The text of GetUser: it has the parameters its entry lists, in its order, as a hand-built entry must.
+    private static string SqlOf(SidecarEntry entry) =>
+        entry.Parameters.Count == 0
+            ? SqlTexts.GetUser
+            : "-- name: GetUser\nSELECT " + string.Join(", ", entry.Parameters.Select(p => "@" + p.Name)) + ";\n";
+
     // The file Users of the dialect with the one query GetUser and its entry, under the file's level, Npgsql 10 and the
     // SqlClient given, SqlClient 6.1 unless it is, and no library.
     private static FileTypesInput InputOf(
@@ -409,7 +415,7 @@ public sealed class QueryTyperTests
     )
     {
         var file = SqlFileReader.Read(
-            new InMemoryAdditionalText(GeneratorHarness.UsersPath, SqlTexts.GetUser),
+            new InMemoryAdditionalText(GeneratorHarness.UsersPath, SqlOf(entry)),
             GeneratorHarness.UsersNormalizedPath,
             dialect,
             false,
