@@ -324,11 +324,12 @@ internal static partial class QueryMethodCorpus
     // SQL Server's binding: for each type SqlClient binds, a -> none query of a parameter of it that cannot be null and
     // one that can.  A fixed and a variable length of bytes and of characters, bounded and max, which an over-long
     // value rebinds at max; a decimal, and a numeric of scale 0, whose value is rounded; a datetime2 at scale 7; json;
-    // a vector, whose null is the null vector of its dimension, and one that names its base type; int; sql_variant;
-    // an alias type, bound as its base; a decimal of a precision no SqlParameter holds and a vector with no dimension,
-    // each bound by value; hierarchyid, a CLR type of sys, with and without its user type, and dbo.Money, a CLR type of
-    // a user, each overridden to a stub; and a varchar, an int and a numeric of scale 0 converted through App.Email,
-    // App.UserId and App.Price, whose converted value is checked and rounded.
+    // a vector, whose null is the null vector of its dimension, and one that names its base type; int; sql_variant; an
+    // alias type, bound as its base; a decimal of a precision no SqlParameter holds, a vector with no dimension and a
+    // type this version does not know, overridden by its sys. key, each bound by value; hierarchyid, a CLR type of sys,
+    // with and without its user type, and dbo.Money, a CLR type of a user, each overridden to a stub; and a varchar, an
+    // int and a numeric of scale 0 converted through App.Email, App.UserId and App.Price, whose converted value is
+    // checked and rounded.
     public static GeneratorRun SqlServerBinding(CorpusEngine engine)
     {
         const string HierarchyId = "-- type-override: hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId\n";
@@ -355,6 +356,7 @@ internal static partial class QueryMethodCorpus
             ),
             ("WideDecimal", "", TestSidecars.SqlServer("decimal(300,4)", 17, 300, 4)),
             ("VectorWithNoDimension", "", TestSidecars.SqlServer("vector", 20, 0)),
+            ("UnknownType", "-- type-override: sys.futuretype=string\n", TestSidecars.SqlServer("futuretype", 8, 0)),
             (
                 "HierarchyId",
                 HierarchyId,
