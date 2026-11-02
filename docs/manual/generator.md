@@ -564,7 +564,7 @@ The method has the name of the query, with `Async` after it under the [generator
 
 The method of a query with tokens raises no CA2100 ("Review SQL queries for security vulnerabilities") in your build, though it runs SQL made with their text: that text is your own code's choice, never a user's, as [tokens](parameters-and-tokens.md#tokens) says.
 
-A null `connection` or `parameters` throws `ArgumentNullException`.  The names of the arguments that every method has, `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`, are not names a token can have ([SQLSRC275](diagnostics.md#sqlsrc275)).  What the method returns depends on the query's result shape:
+A null `connection` or `parameters` throws `ArgumentNullException`.  The names of the arguments a query method can have, `connection`, `parameters`, `transaction`, `commandTimeout` and `cancellationToken`, are not names a token can have ([SQLSRC275](diagnostics.md#sqlsrc275)).  What the method returns depends on the query's result shape:
 
 | Shape | Returns |
 |----|----|
