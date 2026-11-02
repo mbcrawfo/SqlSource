@@ -17,9 +17,10 @@ internal static partial class QueryMethodCorpus
         "{{sql:a}} {{command:b}} {{reader:c}} {{row:d}} {{rows:e}} {{wasClosed:f}} {{exception:g}} {{atRow:h}} "
         + "{{ReadRows:i}} {{value:j}} {{span:k}} {{state:l}}";
 
-    // A token's method in each shape and as a stream; the token await, which is written @await; two tokens, and a
-    // token with no -- token: marker, whose default is in the SQL; a stream and a one query whose tokens are not
-    // checked; and a stream and a one query with a token named as each of a method's locals.  Each takes @id.
+    // A token's method in each shape and as a stream; the token await, which is written @await, alone and after
+    // another; two tokens, and a token with no -- token: marker, whose default is in the SQL; a stream and a one query
+    // whose tokens are not checked; and a stream and a one query with a token named as each of a method's locals.  Each
+    // takes @id.
     private static GeneratorRun Tokens(CorpusEngine engine)
     {
         var file = new SqlFile(
@@ -48,6 +49,10 @@ internal static partial class QueryMethodCorpus
             -- collection-type: IAsyncEnumerable
             -- token: {{await:users}}
             SELECT id, name FROM {{await}} WHERE id > @id;
+            -- name: ListAwaitFromSchema
+            -- token: {{schema:app}}
+            -- token: {{await:users}}
+            SELECT id, name FROM {{schema}}.{{await}} WHERE id > @id;
             -- name: ListFromSchema
             -- token: {{schema:app}}
             -- token: {{table:users}}
@@ -81,6 +86,7 @@ internal static partial class QueryMethodCorpus
             "StreamFrom",
             "GetAwait",
             "StreamAwait",
+            "ListAwaitFromSchema",
             "ListFromSchema",
             "ListFromInline",
             "StreamUnchecked",

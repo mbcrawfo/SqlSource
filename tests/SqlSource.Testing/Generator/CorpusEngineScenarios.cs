@@ -160,15 +160,40 @@ internal static partial class QueryMethodCorpus
         internalName: "t"
     );
 
+    // The domain public.outer_t over the domain public.inner_t over the base type of my.schema, whose innermost base
+    // has no canonical name.
+    private static readonly PostgresType DomainOverADottedSchema = TestSidecars.Postgres(
+        name: "outer_t",
+        kind: SidecarValues.Kind.Domain,
+        schema: "public",
+        internalName: "outer_t",
+        baseType: TestSidecars.Postgres(
+            name: "inner_t",
+            kind: SidecarValues.Kind.Domain,
+            schema: "public",
+            internalName: "inner_t",
+            baseType: DottedSchema
+        )
+    );
+
+    // public.thing, a type of a kind this version does not know.
+    private static readonly PostgresType UnknownKind = TestSidecars.Postgres(
+        name: "thing",
+        kind: "shell",
+        schema: "public",
+        internalName: "thing"
+    );
+
     // vector(3) of SQL Server.
     private static readonly SqlServerType Vector3 = TestSidecars.SqlServer("vector(3)", 20, 0);
 
     // PostgreSQL's binding: for each kind of type Npgsql binds, a -> none query of a parameter of it that cannot be
     // null and one that can.  Each row of MethodRuns.ParameterKinds; int4 without a bindName, which sets no
     // DataTypeName; a domain over a domain, bound by its innermost base, and an array of it, bound by its bindName; a
-    // type whose schema holds a dot, an array of it, and one whose name holds one, and a type of a kind this version
-    // does not know, each bound by its bindName, which is not its canonical name; and App.Email, a class, converted
-    // from public.email.  The types the map refuses are given a C# type by an override.
+    // type whose schema holds a dot, an array of it, one whose name holds one, a domain over a domain over the first,
+    // and a type of a kind this version does not know, each bound by its bindName, which is not its canonical name; an
+    // array of that type, bound by its canonical name; and App.Email, a class, converted from public.email.  The types
+    // the map refuses are given a C# type by an override.
     public static GeneratorRun PostgresBinding(CorpusEngine engine)
     {
         (string Query, string Markers, SidecarType Type)[] types =
@@ -206,15 +231,21 @@ internal static partial class QueryMethodCorpus
                 )
             ),
             (
-                "UnknownKind",
+                "DomainOverADomainOverADotInTheSchema",
+                "-- type-override: \"my.schema\".t=string\n",
+                DomainOverADottedSchema with
+                {
+                    BindName = "\"my.schema\".t",
+                }
+            ),
+            ("UnknownKind", "-- type-override: public.thing=string\n", UnknownKind with { BindName = "thing" }),
+            (
+                "ArrayOfAnUnknownKind",
                 "-- type-override: public.thing=string\n",
-                TestSidecars.Postgres(
-                    name: "thing",
-                    kind: "shell",
-                    schema: "public",
-                    internalName: "thing",
-                    bindName: "thing"
-                )
+                ModelRuns.ArrayOf(UnknownKind, "_thing") with
+                {
+                    BindName = "thing[]",
+                }
             ),
             (
                 "ConvertedClass",
@@ -293,11 +324,11 @@ internal static partial class QueryMethodCorpus
     // SQL Server's binding: for each type SqlClient binds, a -> none query of a parameter of it that cannot be null and
     // one that can.  A fixed and a variable length of bytes and of characters, bounded and max, which an over-long
     // value rebinds at max; a decimal, and a numeric of scale 0, whose value is rounded; a datetime2 at scale 7; json;
-    // a vector, whose null is the null vector of its dimension; int; sql_variant; an alias type, bound as its base; a
-    // decimal of a precision no SqlParameter holds and a vector with no dimension, each bound by value; hierarchyid, a
-    // CLR type of sys, with and without its user type, and dbo.Money, a CLR type of a user, each overridden to a stub;
-    // and a varchar, an int and a numeric of scale 0 converted through App.Email, App.UserId and App.Price, whose
-    // converted value is checked and rounded.
+    // a vector, whose null is the null vector of its dimension, and one that names its base type; int; sql_variant;
+    // an alias type, bound as its base; a decimal of a precision no SqlParameter holds and a vector with no dimension,
+    // each bound by value; hierarchyid, a CLR type of sys, with and without its user type, and dbo.Money, a CLR type of
+    // a user, each overridden to a stub; and a varchar, an int and a numeric of scale 0 converted through App.Email,
+    // App.UserId and App.Price, whose converted value is checked and rounded.
     public static GeneratorRun SqlServerBinding(CorpusEngine engine)
     {
         const string HierarchyId = "-- type-override: hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId\n";
@@ -314,6 +345,7 @@ internal static partial class QueryMethodCorpus
             ("DateTime2", "", TestSidecars.SqlServer("datetime2(3)", 7, 23, 3)),
             ("Json", "", TestSidecars.SqlServer("json", -1, 0)),
             ("Vector", "", Vector3),
+            ("VectorWithItsBaseType", "", TestSidecars.SqlServer("vector(3, float32)", 20, 0)),
             ("Int", "", TestSidecars.SqlServer()),
             ("SqlVariant", "", TestSidecars.SqlServer("sql_variant", 8016, 0)),
             (
