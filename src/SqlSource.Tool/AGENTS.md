@@ -36,7 +36,7 @@ The `sqlsource` command, packed as the .NET tool `SqlSource.Tool`.  Its tests, a
 ## A connection's value
 
 - **A connection's value goes to the describer and nowhere else** ([where a connection's value goes](../../docs/architecture/tool.md#where-a-connections-value-goes)).  The parts that `IQueryDescriber.SecretsOf` returns and the text of `RewriteOf` are all a describer gives back that holds it, which the run uses only to remove them and to refuse a capture.
-- **A type that holds the value overrides `ToString` to leave it out**, as `ConnectionArgument`, `ConnectionSecret`, `DatabaseConnection`, `OpenRequest` and `UsageValue` do: a record prints its members.  What the tool may say of a connection is where it came from (`DatabaseConnection.Source`).
+- **A type that holds the value overrides `ToString` to leave it out**, as `ConnectionArgument`, `ConnectionSecret`, `DatabaseConnection`, `OpenRequest` and `UsageValue` do: a record prints its members.  The tool says only where a connection came from: `--connection`, a variable, or a variable and its `.env` file.
 - **Every text of a describer that is printed, said under `--verbose` or logged has the secret removed**, whatever the describer's rule: by `Describing/Redaction.cs`, by a describer's log, `Logging/SessionRunLog.cs`, and by `RunTrace.Without` once a database's connection is found.  What the removal misses is `docs/tech-debt/TD-0034-redaction-of-a-describers-text-has-holes.md`.
 - **A new event that carries what a describer gave gets a case in `tests/SqlSource.Tool.Tests/Logging/RunLogRedactionTests.cs`**, and a new place that prints it one in `tests/SqlSource.Tool.Tests/Commands/SecretTests.cs`.
 

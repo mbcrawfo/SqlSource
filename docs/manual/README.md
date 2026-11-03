@@ -26,7 +26,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Read rows into the models with Dapper | [The recipe](recipes.md#models-through-dapper) |
 | Let a test project see the internals of another project, or catch another project's exceptions by type | [Projects that share internals](generator.md#projects-that-share-internals), [public exceptions](settings.md#public-exceptions), or the recipes for [a test project](recipes.md#test-project-sees-internals) and [two data projects](recipes.md#share-the-exceptions) |
 | Install the tool and describe my queries | [Install the tool](tool.md#install-the-tool) |
-| Give the tool a connection, or work with several databases | [Connections](tool.md#connections), or the [recipe](recipes.md#use-several-databases) |
+| Give the tool a connection, keep it in a `.env` file, or work with several databases | [Connections](tool.md#connections), [a `.env` file](tool.md#env-file), or the [recipe](recipes.md#use-several-databases) |
 | Keep the sidecars current after a schema change | [After a schema change](tool.md#after-a-schema-change) |
 | Set up CI | [Check in CI](tool.md#check-in-ci), or the [recipe](recipes.md#check-sidecars-in-ci) |
 | Look up a command, an option or an exit code | [The command reference](tool.md#command-reference) |
@@ -62,6 +62,7 @@ SqlSource is in early development.  This table is the one list of what works in 
 | `null` or `not null` in a `-- param:` marker | Available | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | Result shapes (`-- name: GetUser -> one`) | Available | [Result shapes](sql-files.md#result-shapes) |
 | Describing queries with the `sqlsource` tool, sidecar files, and `--check` | Available | [The tool](tool.md) |
+| Connections in a `.env` file | Available | [Connections](tool.md#connections) |
 | An error in the build for a query whose sidecar entry is missing or out of date | Available | [Sidecar files](tool.md#sidecar-files), [SQLSRC241](diagnostics.md#sqlsrc241), [SQLSRC244](diagnostics.md#sqlsrc244) |
 | Describing PostgreSQL queries | Available | [PostgreSQL](postgresql.md) |
 | The C# type of each column and parameter of a described PostgreSQL query, and an error in the build for one that has none | Available | [Types](postgresql.md#type-map) |

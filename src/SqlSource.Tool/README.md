@@ -13,10 +13,15 @@ $ dotnet tool install SqlSource.Tool --prerelease
 
 ## Use
 
-Run it from the folder of your project or solution, or name it: `dotnet sqlsource describe src/App/App.csproj`.  The tool connects through the connection string you give it, in an environment variable as on the first line, or with `--connection postgres="..."` on the command line:
+Give it the connection string of your database in a `.env` file at the root of your repository, and keep that file out of git, since it holds your password:
+
+```dotenv
+SQLSOURCE_CONNECTION_POSTGRES="Host=localhost;Database=app;Username=app;Password=secret"
+```
+
+The same variable in the environment wins over the file, and `--connection postgres="..."` gives the connection on the command line instead.  Then run the tool from the folder of your project or solution, or name it: `dotnet sqlsource describe src/App/App.csproj`.
 
 ```console
-$ export SQLSOURCE_CONNECTION_POSTGRES="Host=localhost;Database=app;Username=app;Password=secret"
 $ dotnet sqlsource describe
 $ dotnet sqlsource describe --force
 $ dotnet sqlsource describe --check
