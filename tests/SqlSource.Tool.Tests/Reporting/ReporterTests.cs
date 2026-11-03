@@ -126,6 +126,75 @@ public sealed class ReporterTests : IDisposable
             );
     }
 
+    // A build reads the tool's output a line at a time and takes each line with "error" in it for an error.
+    [Fact]
+    public void Report_OneLine_JoinsTheContinuationLinesAndTheLinkToTheFirst()
+    {
+        var reporter = new Reporter(_error, oneLine: true);
+
+        reporter.Report(
+            (Failure with { Path = "/work/App/Users.sql", Position = new LinePosition(2, 9) }).WithLines(
+                new ContinuationLine("help", "create the table"),
+                new ContinuationLine("query", "GetUser, database app")
+            )
+        );
+
+        _error
+            .ToString()
+            .ShouldBe(
+                "/work/App/Users.sql(3,10): "
+                    + Message.TrimEnd('\n')
+                    + "; help: create the table; query: GetUser, database app; see: "
+                    + Expected.See("SQLSRC200").Replace("    see: ", "", StringComparison.Ordinal)
+            );
+    }
+
+    [Fact]
+    public void Report_OneLineWithNoContinuationLines_IsTheFirstLineAndTheLink()
+    {
+        var reporter = new Reporter(_error, oneLine: true);
+
+        reporter.Report(Failure);
+
+        _error
+            .ToString()
+            .ShouldBe(
+                "sqlsource : "
+                    + Message.TrimEnd('\n')
+                    + "; see: "
+                    + Expected.See("SQLSRC200").Replace("    see: ", "", StringComparison.Ordinal)
+            );
+        reporter.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Report_OneLineWithLineBreaksInTheText_IsOneLine()
+    {
+        var reporter = new Reporter(_error, oneLine: true);
+
+        reporter.Report(
+            (Failure with { Path = "/work/odd\nname/App.csproj" }).WithLines(
+                new ContinuationLine("ser\nver", "ERROR: first\r\nDETAIL: second\nthird")
+            )
+        );
+
+        var text = _error.ToString();
+        text.IndexOf('\n', StringComparison.Ordinal).ShouldBe(text.Length - 1);
+        text.ShouldContain("; ser ver: ERROR: first DETAIL: second third; see: ");
+        text.ShouldStartWith("/work/odd name/App.csproj : error SQLSRC200");
+    }
+
+    [Fact]
+    public void Report_OneLine_IsWrittenWithOneCallToTheWriter()
+    {
+        using var writer = new RecordingWriter();
+        var reporter = new Reporter(writer, oneLine: true);
+
+        reporter.Report(Failure.WithLines(new ContinuationLine("help", "try again")));
+
+        writer.Writes.Count.ShouldBe(1);
+    }
+
     [Fact]
     public void Count_AfterTwoErrors_IsTwo()
     {

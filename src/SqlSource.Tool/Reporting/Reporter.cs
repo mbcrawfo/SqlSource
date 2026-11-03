@@ -25,12 +25,18 @@ namespace SqlSource.Tool.Reporting;
 /// Several threads may report.  An error is one write, under a lock, so the lines of two errors never mix, whatever
 /// the writer is.
 /// </para>
+/// <para>
+/// Under <c>--online</c> an error is one line: the continuation lines follow the first, each as <c>; label: text</c>,
+/// and <c>; see: link</c> last.  A build reads what the tool writes one line at a time and takes each line with
+/// <c>error</c> in it for an error of its own, so no line but a first line may be written.
+/// </para>
 /// </remarks>
 /// <param name="error">Where the errors are written.</param>
 /// <param name="trace">
 /// What the run says of itself beside its errors, when it has one: every error is then also an event of its log.
 /// </param>
-internal sealed class Reporter(TextWriter error, RunTrace? trace = null)
+/// <param name="oneLine">Whether every error is written on one line, as the build that runs the tool reads it.</param>
+internal sealed class Reporter(TextWriter error, RunTrace? trace = null, bool oneLine = false)
 {
     private const string Indent = "    ";
 
@@ -77,7 +83,9 @@ internal sealed class Reporter(TextWriter error, RunTrace? trace = null)
     public void Report(ToolDiagnostic diagnostic)
     {
         var message = MessageOf(diagnostic);
-        var text = Format(diagnostic, message, error.NewLine);
+        var text = oneLine
+            ? FormatOnOneLine(diagnostic, message, error.NewLine)
+            : Format(diagnostic, message, error.NewLine);
         lock (_gate)
         {
             error.Write(text);
@@ -131,6 +139,19 @@ internal sealed class Reporter(TextWriter error, RunTrace? trace = null)
 
         _ = text.Append(Indent).Append("see: ").Append(descriptor.HelpLinkUri).Append(newLine);
         return text.ToString();
+    }
+
+    private static string FormatOnOneLine(ToolDiagnostic diagnostic, string message, string newLine)
+    {
+        var text = new StringBuilder();
+        _ = text.Append(Origin(diagnostic)).Append(": error ").Append(diagnostic.Descriptor.Id).Append(": ");
+        _ = text.Append(message);
+        foreach (var line in diagnostic.Lines)
+        {
+            _ = text.Append("; ").Append(OneLine.Of(line.Label)).Append(": ").Append(OneLine.Of(line.Text));
+        }
+
+        return text.Append("; see: ").Append(diagnostic.Descriptor.HelpLinkUri).Append(newLine).ToString();
     }
 
     // MSBuild's own form: a file with a position has no space before the colon, and anything else has one.

@@ -76,14 +76,25 @@ internal static class DescribeRun
             options.Connections,
             environment
         );
-        await DatabaseRuns.RunAsync(selected, files, connections, host, reporter, cancellationToken);
+        // Found before the databases are run, which changes the queries' states.
+        var offline = OfflineDatabases(options.Online, files, selected, connections);
+        await DatabaseRuns.RunAsync(
+            selected,
+            files,
+            connections,
+            host,
+            reporter,
+            cancellationToken,
+            options.Online,
+            offline: !offline.IsEmpty
+        );
 
         // 4: a run that was cancelled changes no file.
         cancellationToken.ThrowIfCancellationRequested();
         // A sidecar is deleted only by a run on the whole, which knows what every file needs, and never after an
         // error: the plan drops a setting or a claim it could not read, and the file then looks as if it needs no
-        // entry.
-        var mayDelete = !options.HasFilter && reporter.Count == 0;
+        // entry.  An offline run deletes nothing either, as a run that reported SQLSRC213 would not.
+        var mayDelete = !options.HasFilter && reporter.Count == 0 && offline.IsEmpty;
         var outcomes = FileOutcomes.Decide(files, mayDelete, SidecarOnDisk.Read);
         if (options.Mode == RunMode.Check)
         {
@@ -124,10 +135,56 @@ internal static class DescribeRun
             options.Databases,
             options.Mode
         );
+        if (!offline.IsEmpty)
+        {
+            // In place of the summary: the build reads this line to know that the tool ran and found no database.
+            await host.Out.WriteLineAsync(
+                $"sqlsource: offline: no connection for {string.Join(", ", offline.Select(OneLine.Of))}; "
+                    + "the build uses the committed sidecars"
+            );
+            return;
+        }
+
+        // A project with nothing to describe has no summary line, and a build would take the silence for a tool that
+        // did not start.
+        if (lines.IsEmpty && options.Online != OnlineMode.Off)
+        {
+            await host.Out.WriteLineAsync("sqlsource: online: nothing to describe");
+        }
+
         foreach (var line in lines)
         {
             await host.Out.WriteLineAsync(line);
         }
+    }
+
+    // The databases with a query to describe, in the plan's order, when the run is offline; none otherwise.  Under
+    // "auto" the run is offline when none of them has a connection and SQLSOURCE_CONNECTION is not set for several
+    // (SQLSRC215).  A run where every entry is current has no such database and is no offline run.
+    private static ImmutableArray<string> OfflineDatabases(
+        OnlineMode online,
+        ImmutableArray<FileWork> files,
+        ImmutableArray<PlannedDatabase> selected,
+        Connections connections
+    )
+    {
+        if (online != OnlineMode.Auto || connections.UnnamedIsSetAndNotUsed)
+        {
+            return [];
+        }
+
+        var wanting = selected
+            .Where(database =>
+                files
+                    .SelectMany(static file => file.Queries)
+                    .Any(query =>
+                        query.State == QueryState.ToDescribe
+                        && DatabaseName.Comparer.Equals(query.Planned.Database, database.Name)
+                    )
+            )
+            .Select(static database => database.Name)
+            .ToImmutableArray();
+        return wanting.Any(name => connections.For(name).Value is not null) ? [] : wanting;
     }
 
     // The names of --database, for the steps that take no position.

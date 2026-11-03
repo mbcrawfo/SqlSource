@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Diagnostics;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Reporting;
@@ -253,7 +254,11 @@ public static class Cli
     {
         var host = state.Host;
         var logPath = DescribeCommand.LogPathOf(commandLine.Parsed, host.GetEnvironmentVariable);
-        state.MayPoint = commandLine.RunsDescribe && logPath is null;
+        // A build's user cannot give the build's run a log, so a run under --online points at none.
+        state.MayPoint =
+            commandLine.RunsDescribe
+            && logPath is null
+            && DescribeCommand.OnlineOf(commandLine.Parsed) == OnlineMode.Off;
         if (logPath is null)
         {
             return true;
@@ -297,7 +302,8 @@ public static class Cli
             // gets its action only now, so that it cannot run with another.
             state.Reporter = new Reporter(
                 host.Error,
-                new RunTrace(events, DescribeCommand.IsVerbose(parsed) ? host.Out : null)
+                new RunTrace(events, DescribeCommand.IsVerbose(parsed) ? host.Out : null),
+                oneLine: DescribeCommand.OnlineOf(parsed) != OnlineMode.Off
             );
             DescribeCommand.Bind(parsed, commandLine.Usage, host, state.Reporter, counts => state.Databases = counts);
         }

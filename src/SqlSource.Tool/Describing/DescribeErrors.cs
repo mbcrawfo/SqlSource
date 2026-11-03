@@ -138,11 +138,16 @@ internal static class DescribeErrors
     /// <param name="query">The query it is reported at.</param>
     /// <param name="database">The query's database.</param>
     /// <param name="server">The session's server, or null when no session opened.</param>
+    /// <param name="online">
+    /// What <c>--online</c> said.  The help of a database that cannot be opened then also says how to build without
+    /// it, since a build with a connection depends on the database being there.
+    /// </param>
     public static ToolDiagnostic Failure(
         DescribeFailure failure,
         PlannedQuery query,
         PlannedDatabase database,
-        ServerInfo? server
+        ServerInfo? server,
+        OnlineMode online
     )
     {
         var lines = new List<ContinuationLine> { new("query", QueryLine(query, database, server)) };
@@ -154,13 +159,20 @@ internal static class DescribeErrors
         lines.AddRange(failure.ServerLines.Select(static line => new ContinuationLine("server", line)));
         if (failure.Help is { } help)
         {
-            lines.Add(new ContinuationLine(Help, help));
+            lines.Add(new ContinuationLine(Help, online == OnlineMode.Off ? help : OnlineHelp(failure, help)));
         }
 
         return ToolDiagnostic
             .At(failure.Descriptor, query.Query.NameLocation, [.. failure.Arguments])
             .WithLines([.. lines]);
     }
+
+    // The error is all a build's user sees, so the way out that a build offers is added to the describer's help.
+    // A replayed run rebuilds its descriptors, so they are known by their id.
+    private static string OnlineHelp(DescribeFailure failure, string help) =>
+        failure.Descriptor.Id == ToolDiagnostics.DatabaseCannotBeOpened.Id
+            ? help + ".  To build without the database, remove its connection or set SqlSourceOnline to false"
+            : help;
 
     // <name>, database <database>, <engine> <server version>, <driver> <version>
     private static string QueryLine(PlannedQuery query, PlannedDatabase database, ServerInfo? server)

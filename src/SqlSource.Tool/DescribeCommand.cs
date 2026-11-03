@@ -383,7 +383,8 @@ internal static class DescribeCommand
     /// <summary>
     /// The path of the run's log as it was given, by <c>--log</c> or else by <c>SQLSOURCE_LOG</c>, or null when
     /// the run has none.  A command line that does not run <c>describe</c> has none: the help must not empty the
-    /// log of the last run.  A variable that is empty or white space is not set.
+    /// log of the last run.  A variable that is empty or white space is not set, and a run under <c>--online</c>
+    /// does not read it.
     /// </summary>
     public static string? LogPathOf(ParseResult parsed, Func<string, string?> getEnvironmentVariable)
     {
@@ -395,6 +396,13 @@ internal static class DescribeCommand
         if (parsed.GetValue<string>(LogOption) is { } option)
         {
             return option;
+        }
+
+        // The build passes --log, with a path of its own for each project and framework, when SQLSOURCE_LOG asks for
+        // logs.  Read here too, the projects built at once would open one file.
+        if (OnlineOf(parsed) != OnlineMode.Off)
+        {
+            return null;
         }
 
         var variable = getEnvironmentVariable(LogVariable);
