@@ -83,7 +83,6 @@ SqlSource is in early development.  This table is the one list of what works in 
 | Column types: a C# type for one column, by the column it is read from, with `columnTypes` in a settings file or a `-- column:` in the file header, or by a `-- column:` inside a query, and for one parameter by `-- param: @id -> Type` | Available | [Column types](settings.md#setting-column-types), [giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | C# types written by their short names, `UserId` for `MyApp.UserId`, wherever SqlSource takes a C# type | Available | [Type overrides](settings.md#setting-type-overrides) |
 | Build integration: the tool running in your build before it compiles, when a connection is configured, and `SqlSourceOnline` | Available | [Running in the build](tool.md#running-in-the-build), [running the tool in the build](settings.md#online-build) |
-| Watch mode: the tool describing your queries as you save them | Coming | Not documented until it is delivered; today a build describes them: [running in the build](tool.md#running-in-the-build) |
 | Bug-report bundles | Coming | Not documented until it is delivered; today attach a [log](tool.md#logs) |
 
 ## The pages

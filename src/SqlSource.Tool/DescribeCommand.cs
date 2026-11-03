@@ -486,7 +486,7 @@ internal static class DescribeCommand
 
     /// <summary>
     /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--project</c>, <c>--database</c>,
-    /// <c>--connection</c> and <c>--log</c> the same values, in the same order.  True for a command other than
+    /// <c>--connection</c>, <c>--log</c>, <c>--manifest</c> and <c>--online</c> the same values, in the same order.  True for a command other than
     /// <c>describe</c>.
     /// </summary>
     /// <remarks>

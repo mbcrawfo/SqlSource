@@ -391,7 +391,8 @@ public sealed class UsageCheckTests
             }
 
             // The command reads the values of its options from what UsageCheck read, and System.CommandLine gives the
-            // log's path, so the two must give --project, --database, --connection and --log the same values too.
+            // log's path, so the two must give --project, --database, --connection, --log, --manifest and --online the
+            // same values too.
             if (!usage.IsReadTheSameBy(parsed) || !DescribeCommand.ReadsValuesAs(usage, parsed))
             {
                 disagreements.Add(string.Join(' ', args));
