@@ -72,13 +72,13 @@ Each property changes what the generator writes.  `Output` also decides which qu
 ```text
 Repository/
     UserRepository.cs      [SqlSourceGenerate] on UserRepository
-    Users.sql              belongs to UserRepository
-    Orders.sql             belongs to UserRepository
+    UserRepository.sql     belongs to UserRepository: the file named for it
+    Orders.sql             not UserRepository's: another name
     Reports/
         Monthly.sql        not searched: it is in a subfolder
 ```
 
-A type gets the files that its [`Source`](settings.md#setting-source) names, by the rules and with the errors given there.  What follows is what the generator does with the files.
+A type gets the file named for it, beside its C# file, or the files that its [`Source`](settings.md#setting-source) names, `Source = "."` for every `.sql` file of that folder, by the rules and with the errors given there.  What follows is what the generator does with the files.
 
 - **A type's files are one set.**  A query name is used once across all of them: a second use is [SQLSRC008](diagnostics.md#sqlsrc008), and the file with the second one gets no members and no models for that type.
 - **Two types may claim one file**, and each gets its own members from it, though two types of one namespace can give one method twice: see [where the methods go](#method-location).  They can ask for different things: each type's attribute applies to its own members only, and to the models it asks for, which two types share when they are the same ([shared models](#shared-models)).
@@ -164,7 +164,7 @@ Every generated member has a documentation comment, so your editor shows it wher
 public const string GetUser = "SELECT id, name\nFROM users\nWHERE id = @id;";
 ```
 
-The summary is the query's `-- summary:` ([summaries](sql-files.md#summaries)), or "The `GetUser` query from `Users.sql`." when it has none.  The remarks hold the SQL of the constant, so a reader sees what a query does without opening the `.sql` file.
+The summary is the query's `-- summary:` ([summaries](sql-files.md#summaries)), or "The `GetUser` query from `UserRepository.sql`." when it has none.  The remarks hold the SQL of the constant, so a reader sees what a query does without opening the `.sql` file.
 
 A token method adds a line for each token and one for the result, and shows its tokens as `{{table}}`, without their defaults:
 
@@ -204,14 +204,14 @@ namespace App
 {
     /// <summary>
     /// Loads one user by id.
-    /// The parameters of the query <c>GetUser</c> from <c>Users.sql</c>.
+    /// The parameters of the query <c>GetUser</c> from <c>UserRepository.sql</c>.
     /// </summary>
     /// <param name="Id">The parameter <c>id</c>, <c>integer</c>.</param>
     public sealed record GetUserParams(int Id);
 
     /// <summary>
     /// Loads one user by id.
-    /// A row of the query <c>GetUser</c> from <c>Users.sql</c>.
+    /// A row of the query <c>GetUser</c> from <c>UserRepository.sql</c>.
     /// </summary>
     /// <param name="Id">The column <c>id</c>, <c>integer</c>, from <c>public.users.id</c>.  An identity column.</param>
     /// <param name="Name">The column <c>name</c>, <c>text</c>, from <c>public.users.name</c>.</param>
@@ -220,7 +220,7 @@ namespace App
 }
 ```
 
-A model is a type that the generator writes for a described query, from the query's entry in its [sidecar](concepts.md#sidecar): an input model for its parameters, and an output model for a row of its result.  Above, a `public` type in the namespace `App` claims `Users.sql`, and the table `users` has the columns `id`, an identity column, `name` and `email`, both `NOT NULL`, and `deleted_at`, in that order.  The two models are shown together; each is a file of its own among the generated files, named after its full name, such as `App.GetUserDto-Model.g.cs`.
+A model is a type that the generator writes for a described query, from the query's entry in its [sidecar](concepts.md#sidecar): an input model for its parameters, and an output model for a row of its result.  Above, a `public` type in the namespace `App` claims `UserRepository.sql`, and the table `users` has the columns `id`, an identity column, `name` and `email`, both `NOT NULL`, and `deleted_at`, in that order.  The two models are shown together; each is a file of its own among the generated files, named after its full name, such as `App.GetUserDto-Model.g.cs`.
 
 The models are built at every build from the committed sidecars, with no database.  After a change to a query, describe it again (see [sidecar files](tool.md#sidecar-files)): until then its entry is out of date, and the query has no models.
 
@@ -405,7 +405,7 @@ A `-- column:` marker inside a query sets the nullability of one of its columns,
 
 Every model and every property has a documentation comment, which your editor shows where it is used, as in the example at the top.
 
-- **A model's** is the query's `-- summary:`, when it has one ([summaries](sql-files.md#summaries)), then a line that says what the model is and names the query and its file: "The parameters of the query `GetUser` from `Users.sql`." or "A row of the query `GetUser` from `Users.sql`."  A model that several queries share names each of them, and takes the summary of the first: see [shared models](#shared-models).  A table model names its table: see [table models](#table-models).
+- **A model's** is the query's `-- summary:`, when it has one ([summaries](sql-files.md#summaries)), then a line that says what the model is and names the query and its file: "The parameters of the query `GetUser` from `UserRepository.sql`." or "A row of the query `GetUser` from `UserRepository.sql`."  A model that several queries share names each of them, and takes the summary of the first: see [shared models](#shared-models).  A table model names its table: see [table models](#table-models).
 - **A property's** names its column or parameter as the database does, its database type as the tool recorded it, the table column it comes from when it has one, and whether that is an identity column or a computed column.
 - **A record** documents its properties with `<param>` tags, which your editor shows on each property, and **a class** documents each property with its own summary.
 
@@ -423,7 +423,7 @@ SELECT id, name, email, deleted_at FROM users ORDER BY name;
 
 ```csharp
 /// <summary>
-/// A row of the table <c>public.users</c>, read by the queries <c>GetUser</c> from <c>Users.sql</c> and <c>ListUsers</c> from <c>Users.sql</c>.
+/// A row of the table <c>public.users</c>, read by the queries <c>GetUser</c> from <c>UserRepository.sql</c> and <c>ListUsers</c> from <c>UserRepository.sql</c>.
 /// </summary>
 /// <param name="Id">The column <c>id</c>, <c>integer</c>, from <c>public.users.id</c>.  An identity column.</param>
 /// <param name="Name">The column <c>name</c>, <c>text</c>, from <c>public.users.name</c>.</param>
@@ -455,7 +455,7 @@ SELECT id, name FROM users WHERE id = @id;
 SELECT id, name FROM users WHERE email = @email;
 ```
 
-A model is generated once for its full name, however many queries and types ask for it.  Two queries share one model when their models of that name are the same: both input models or both output models, of one shape and sorted or not alike, with properties of the same names, C# types and nullability, in the same order.  Above, `GetUser` and `FindUser` share `UserRow`, and its documentation reads "A row of the queries `GetUser` from `Users.sql` and `FindUser` from `Users.sql`."  Two types in one namespace that claim one file share the models of its queries in the same way, so their settings for models must agree.
+A model is generated once for its full name, however many queries and types ask for it.  Two queries share one model when their models of that name are the same: both input models or both output models, of one shape and sorted or not alike, with properties of the same names, C# types and nullability, in the same order.  Above, `GetUser` and `FindUser` share `UserRow`, and its documentation reads "A row of the queries `GetUser` from `UserRepository.sql` and `FindUser` from `UserRepository.sql`."  Two types in one namespace that claim one file share the models of its queries in the same way, so their settings for models must agree.
 
 - **Two models of one name that differ** are [SQLSRC257](diagnostics.md#sqlsrc257), which names the first difference.  The queries are taken in the order of their files' paths, then of their order in a file, then of the names of the types that claim them, and the error is at the later query, at its `-- input-model:` or `-- output-model:` marker, or at its name when it has none.  The earlier query's model is generated, and the later query has none of that kind until the two agree.
 - **An input model and an output model are never shared**, so one name for both, which two equal suffixes give a query, is SQLSRC257 too.
@@ -506,7 +506,7 @@ namespace App
 GetUserDto? user = await connection.GetUser(new GetUserParams(42));
 ```
 
-A query whose [output](settings.md#setting-output) is `codegen`, the default, gets an asynchronous method that runs it, in place of its constant or token method.  Above, a `public` type `App.UserRepository` claims `Users.sql`.  The method takes the connection and the query's input model, opens the connection when it is closed, sends each parameter, runs the query and reads its row into the output model, here one row or null, by its [result shape](sql-files.md#result-shapes).  It runs on ADO.NET's `DbConnection`, through the driver your project references, Npgsql for PostgreSQL and Microsoft.Data.SqlClient for SQL Server, and uses no reflection and no library of SqlSource's.  Its SQL is a constant inside the method, which your code cannot reach: a project that runs a query's SQL itself, through Dapper or its own code, gives it the output `models`.
+A query whose [output](settings.md#setting-output) is `codegen`, the default, gets an asynchronous method that runs it, in place of its constant or token method.  Above, a `public` type `App.UserRepository` claims `UserRepository.sql`.  The method takes the connection and the query's input model, opens the connection when it is closed, sends each parameter, runs the query and reads its row into the output model, here one row or null, by its [result shape](sql-files.md#result-shapes).  It runs on ADO.NET's `DbConnection`, through the driver your project references, Npgsql for PostgreSQL and Microsoft.Data.SqlClient for SQL Server, and uses no reflection and no library of SqlSource's.  Its SQL is a constant inside the method, which your code cannot reach: a project that runs a query's SQL itself, through Dapper or its own code, gives it the output `models`.
 
 <a id="which-methods"></a>
 

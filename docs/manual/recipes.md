@@ -67,7 +67,7 @@ App/
     App.csproj
     Queries/
         UserRepository.cs      [SqlSourceGenerate] on UserRepository
-        Users.sql              belongs to UserRepository
+        UserRepository.sql     belongs to UserRepository
     Migrations/
         001_create_users.sql   not claimed by any type
 ```

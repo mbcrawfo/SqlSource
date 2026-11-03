@@ -149,7 +149,7 @@ PROJECT
 # The project's settings.  "root" ends the chain at the project, so that no settings file above the temporary
 # directory applies.
 echo '{ "root": true, "dialect": "mssql", "database": "orders" }' >"$mssql/App/sqlsource.json"
-printf -- '-- name: GetOrders\nSELECT 1 AS one;\n' >"$mssql/App/Orders.sql"
+printf -- '-- name: GetOrders\nSELECT 1 AS one;\n' >"$mssql/App/Queries.sql"
 printf '[SqlSource.SqlSourceGenerate]\ninternal static partial class Queries;\n' >"$mssql/App/Queries.cs"
 cd "$mssql"
 code=0

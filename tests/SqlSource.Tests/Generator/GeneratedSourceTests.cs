@@ -36,7 +36,7 @@ public sealed class GeneratedSourceTests
 
             namespace App;
 
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample
             {
                 public static string First => Sql.GetUser;
@@ -119,7 +119,7 @@ public sealed class GeneratedSourceTests
 
             namespace App;
 
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
             public static partial class Sample;
 
             public static class Consumer
@@ -185,7 +185,7 @@ public sealed class GeneratedSourceTests
 
             namespace App;
 
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             {{declaration}}
             {
                 public static string Value => Sql.GetUser;
@@ -213,7 +213,7 @@ public sealed class GeneratedSourceTests
                 {
                     public partial interface IMiddle<TKey, TValue>
                     {
-                        [SqlSourceGenerate]
+                        [SqlSourceGenerate(Source = ".")]
                         private partial record Inner
                         {
                             public static string Value => Sql.GetUser;

@@ -160,6 +160,61 @@ public sealed class AttributeReaderTests : IDisposable
         ]);
     }
 
+    [Theory]
+    [InlineData("internal static partial class Queries;", "Queries")]
+    [InlineData("internal partial class Repo<T>;", "Repo")]
+    [InlineData("internal partial class @event;", "event")]
+    [InlineData("internal partial class \\u0041pp;", "App")]
+    [InlineData("internal partial record struct Point;", "Point")]
+    public void Read_Type_GivesItsName(string declaration, string expected) =>
+        Read($"using SqlSource;\n\n[SqlSourceGenerate]\n{declaration}\n")
+            .Claims.ShouldHaveSingleItem()
+            .TypeName.ShouldBe(expected);
+
+    [Fact]
+    public void Read_NestedType_GivesItsOwnName() =>
+        Read(
+            "using SqlSource;\n\ninternal partial class Outer\n{\n    [SqlSourceGenerate]\n"
+                + "    private partial class Inner;\n}\n"
+        )
+            .Claims.ShouldHaveSingleItem()
+            .TypeName.ShouldBe("Inner");
+
+    // On Windows the compiler reads the name in the system's code page, so the file named for it would not be the one
+    // the build looks for.
+    [Fact]
+    public void Read_NameOutsideAsciiWithNoSourceInAFileThatIsNotUtf8_IsSqlsrc271AtTheNameAndNoClaim()
+    {
+        var claims = ReadLatin1("using SqlSource;\n\n[SqlSourceGenerate]\ninternal partial class Café;\n");
+
+        claims.Claims.ShouldBeEmpty();
+        claims.Errors.ShouldBe([
+            ToolDiagnostic.At(ToolDiagnostics.FileNotUtf8, Source, new LinePosition(3, 23), Source),
+        ]);
+    }
+
+    [Fact]
+    public void Read_NameOutsideAsciiWithASourceInAFileThatIsNotUtf8_IsAClaim()
+    {
+        var claims = ReadLatin1(
+            "using SqlSource;\n\n[SqlSourceGenerate(Source = \".\")]\ninternal partial class Café;\n"
+        );
+
+        claims.Errors.ShouldBeEmpty();
+        claims.Claims.ShouldHaveSingleItem().Source.ShouldBe(".");
+    }
+
+    [Fact]
+    public void Read_NameEscapedInAFileThatIsNotUtf8_IsAClaimWithThatName()
+    {
+        var claims = ReadLatin1(
+            "// café\nusing SqlSource;\n\n[SqlSourceGenerate]\ninternal partial class Caf\\u00e9;\n"
+        );
+
+        claims.Errors.ShouldBeEmpty();
+        claims.Claims.ShouldHaveSingleItem().TypeName.ShouldBe("Café");
+    }
+
     [Fact]
     public void Read_AsciiPathInAFileThatIsNotUtf8_IsAClaim()
     {

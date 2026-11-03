@@ -51,7 +51,7 @@ A `DescribeCapture`: every call a describer made to an engine that answered, wit
 
 ### Claim
 
-A type claims the `.sql` files that the `Source` of its `[SqlSourceGenerate]` resolves to, through `PathResolver`.  A file that no type claims is never parsed by the generator or read by the tool.
+A type claims the `.sql` files that the `Source` of its `[SqlSourceGenerate]` resolves to, through `PathResolver`, or with no `Source` the one file named for the type.  A file that no type claims is never parsed by the generator or read by the tool.
 
 ### Describer
 

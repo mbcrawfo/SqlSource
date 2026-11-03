@@ -68,10 +68,10 @@ public sealed class MethodDiagnosticsTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class First;
 
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Second;
             }
             """;
@@ -170,7 +170,7 @@ public sealed class MethodDiagnosticsTests
 
             namespace App
             {
-                [SqlSourceGenerate(MethodLocation = MethodLocation.Public)]
+                [SqlSourceGenerate(Source = ".", MethodLocation = MethodLocation.Public)]
                 public partial class Sample
                 {
                     public static int Count => 0;
@@ -238,7 +238,7 @@ public sealed class MethodDiagnosticsTests
 
             namespace App
             {
-                [SqlSourceGenerate(MethodLocation = MethodLocation.Public)]
+                [SqlSourceGenerate(Source = ".", MethodLocation = MethodLocation.Public)]
                 public partial class Sample<TRow>;
             }
             """;
@@ -360,7 +360,7 @@ public sealed class MethodDiagnosticsTests
 
             namespace App.A
             {
-                [SqlSourceGenerate(MethodLocation = MethodLocation.Public)]
+                [SqlSourceGenerate(Source = ".", MethodLocation = MethodLocation.Public)]
                 public partial class Sample
                 {
                     public static int Count => 0;
@@ -369,7 +369,7 @@ public sealed class MethodDiagnosticsTests
 
             namespace App.B
             {
-                [SqlSourceGenerate(MethodLocation = MethodLocation.Public)]
+                [SqlSourceGenerate(Source = ".", MethodLocation = MethodLocation.Public)]
                 public partial class Sample
                 {
                     public static int Count => 0;

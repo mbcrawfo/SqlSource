@@ -16,7 +16,7 @@ public sealed class FileDiagnosticsTests
     private const string Source = """
         using SqlSource;
         namespace App;
-        [SqlSourceGenerate]
+        [SqlSourceGenerate(Source = ".")]
         public partial class Sample { }
         """;
 
@@ -217,7 +217,7 @@ public sealed class FileDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class First { }
             [SqlSourceGenerate(Source = "Users.sql")]
             public partial class Second { }
@@ -394,7 +394,7 @@ public sealed class FileDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
             public partial class @class<T> { }
             """,
             new SqlFile(GeneratorHarness.UsersPath, "-- name: Sql\nSELECT 1;\n"),
@@ -414,7 +414,7 @@ public sealed class FileDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
             public partial class Sample { }
             """,
             new SqlFile("/app/Repo/A.sql", "-- name: Kept\nSELECT 1;\n"),

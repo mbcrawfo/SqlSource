@@ -50,7 +50,7 @@ public sealed class SettingsFileTests
 
         namespace App
         {
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
 
             public readonly record struct UserId(long Value);
@@ -189,8 +189,8 @@ public sealed class SettingsFileTests
     {
         var run = RunUsers(
             Source.Replace(
-                "[SqlSourceGenerate]",
-                "[SqlSourceGenerate(InputModelSuffix = \"Args\")]",
+                "[SqlSourceGenerate(Source = \".\")]",
+                "[SqlSourceGenerate(Source = \".\", InputModelSuffix = \"Args\")]",
                 StringComparison.Ordinal
             ),
             null,

@@ -34,13 +34,13 @@ public sealed class GeneratorParameterLevelTests
 
         namespace App;
 
-        [SqlSourceGenerate(SqlLocation = SqlLocation.Direct, Parameters = "default")]
+        [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct, Parameters = "default")]
         public partial class Plain
         {
             public const string Sql = Q;
         }
 
-        [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+        [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
         public partial class Kept { }
         """;
 
@@ -103,13 +103,13 @@ public sealed class GeneratorParameterLevelTests
 
             namespace App;
 
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
             public partial class Plain
             {
                 public const string Sql = Q;
             }
 
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct, Parameters = "keep-comments")]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct, Parameters = "keep-comments")]
             public partial class Kept
             {
                 public static string Sql() => Q("x");
@@ -181,13 +181,13 @@ public sealed class GeneratorParameterLevelTests
 
             namespace App;
 
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct, Parameters = "default")]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct, Parameters = "default")]
             public partial class Plain
             {
                 public static string Sql() => Q("x");
             }
 
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
             public partial class Kept { }
             """;
 
@@ -237,7 +237,7 @@ public sealed class GeneratorParameterLevelTests
         var run = Run(OutputKind.Sql, null, "keep-comments nope");
 
         run.Diagnostics.ShouldHaveSingleItem()
-            .ShouldBe("SQLSRC006 /app/Repo/Sample.cs(5,2)-(5,88): 'nope' is not a valid value of Parameters");
+            .ShouldBe("SQLSRC006 /app/Repo/Sample.cs(5,2)-(5,102): 'nope' is not a valid value of Parameters");
     }
 
     [Theory]

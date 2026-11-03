@@ -15,12 +15,14 @@ public sealed class PathResolverTests
         "app/Queries/Users.sql",
         "app/Repo/Admin/Roles.sql",
         "app/Repo/Count.sql",
+        "app/Repo/UserRepository.sql",
+        "app/Repo/userrepository2.SQL",
         GeneratorHarness.UsersNormalizedPath,
         "app/Root.sql"
     );
 
     [Fact]
-    public void Resolve_NoSource_TakesTheFilesInTheFolderOfTheSourceFileAndNotItsSubfolders()
+    public void Resolve_NoSource_TakesTheFileNamedForTheType()
     {
         var result = PathResolver.Resolve(
             TestModels.Type(),
@@ -29,7 +31,26 @@ public sealed class PathResolverTests
             unsupportedLanguageVersion: null
         );
 
-        result.Files.ShouldBe(["app/Repo/Count.sql", GeneratorHarness.UsersNormalizedPath]);
+        result.Files.ShouldBe(["app/Repo/UserRepository.sql"]);
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Resolve_SourceDot_TakesTheFilesInTheFolderOfTheSourceFileAndNotItsSubfolders()
+    {
+        var result = PathResolver.Resolve(
+            TestModels.Type("."),
+            SqlPaths,
+            isSupportedFramework: true,
+            unsupportedLanguageVersion: null
+        );
+
+        result.Files.ShouldBe([
+            "app/Repo/Count.sql",
+            "app/Repo/UserRepository.sql",
+            "app/Repo/userrepository2.SQL",
+            GeneratorHarness.UsersNormalizedPath,
+        ]);
         result.Diagnostics.ShouldBeEmpty();
     }
 
@@ -98,7 +119,7 @@ public sealed class PathResolverTests
     [InlineData("/app/Empty/UserRepository.cs")]
     [InlineData("UserRepository.cs")]
     [InlineData("")]
-    public void Resolve_NoSourceAndNoSqlFileInTheFolder_IsAnErrorAtTheAttribute(string filePath)
+    public void Resolve_NoSourceAndNoFileNamedForTheType_IsAnErrorAtTheAttribute(string filePath)
     {
         var result = PathResolver.Resolve(
             TestModels.Type(filePath: filePath),
@@ -109,14 +130,14 @@ public sealed class PathResolverTests
 
         result.Files.ShouldBeEmpty();
         result.Diagnostics.ShouldBe([
-            DiagnosticInfo.Create(SqlDiagnostics.FolderHasNoSqlFile, TestModels.AttributeLocation),
+            DiagnosticInfo.Create(SqlDiagnostics.TypeHasNoSqlFile, TestModels.AttributeLocation, "UserRepository"),
         ]);
     }
 
     [Fact]
     public void Resolve_SourceFileWithWindowsPath_MatchesTheSameFolder()
     {
-        var type = TestModels.Type(filePath: "C:\\App\\REPO\\UserRepository.cs");
+        var type = TestModels.Type(".", filePath: "C:\\App\\REPO\\UserRepository.cs");
         var paths = TestSidecars.Of("c:/app/repo/Users.sql", "c:/app/repo2/Users.sql");
 
         PathResolver
@@ -125,8 +146,8 @@ public sealed class PathResolverTests
     }
 
     [Theory]
-    [InlineData("/UserRepository.cs", null)]
-    [InlineData("UserRepository.cs", null)]
+    [InlineData("/UserRepository.cs", ".")]
+    [InlineData("UserRepository.cs", ".")]
     [InlineData("/app/Repo/UserRepository.cs", "../..")]
     public void Resolve_FolderThatIsTheRoot_TakesTheFilesWithNoFolder(string filePath, string? path)
     {
@@ -157,7 +178,7 @@ public sealed class PathResolverTests
         );
 
         PathResolver
-            .Resolve(TestModels.Type(), paths, isSupportedFramework: true, unsupportedLanguageVersion: null)
+            .Resolve(TestModels.Type("."), paths, isSupportedFramework: true, unsupportedLanguageVersion: null)
             .Files.ShouldBe([GeneratorHarness.UsersNormalizedPath]);
     }
 
@@ -250,15 +271,35 @@ public sealed class PathResolverTests
             );
 
     [Theory]
-    [InlineData(null, $"app/Repo/Count.sql|{GeneratorHarness.UsersNormalizedPath}")]
+    [InlineData(null, "app/Repo/UserRepository.sql")]
+    [InlineData(
+        ".",
+        "app/Repo/Count.sql|app/Repo/UserRepository.sql|app/Repo/userrepository2.SQL|"
+            + GeneratorHarness.UsersNormalizedPath
+    )]
     [InlineData("../Queries", "app/Queries/Orders.sql|app/Queries/Users.sql")]
     [InlineData("users.SQL", GeneratorHarness.UsersNormalizedPath)]
     [InlineData("Missing.sql", "")]
     [InlineData("../../..", "")]
     public void FindFiles_SourceOfAnAttribute_GivesTheFilesItNames(string? path, string expected) =>
-        string.Join('|', PathResolver.FindFiles("/app/Repo/UserRepository.cs", path, SqlPaths)).ShouldBe(expected);
+        string.Join('|', PathResolver.FindFiles("/app/Repo/UserRepository.cs", path, "UserRepository", SqlPaths))
+            .ShouldBe(expected);
 
     [Fact]
     public void FindFiles_SourceFileWhosePathLeavesTheRoot_GivesNone() =>
-        PathResolver.FindFiles("../UserRepository.cs", null, SqlPaths).ShouldBeEmpty();
+        PathResolver.FindFiles("../UserRepository.cs", null, "UserRepository", SqlPaths).ShouldBeEmpty();
+
+    [Theory]
+    [InlineData("/app/Repo/A.cs", "UserRepository", "app/Repo/UserRepository.sql")]
+    [InlineData("/app/Repo/A.cs", "USERREPOSITORY2", "app/Repo/userrepository2.SQL")]
+    [InlineData("/app/Root.cs", "Root", "app/Root.sql")]
+    [InlineData("/app/Repo/A.cs", "Orders", "")]
+    // A folder of the type's name is not its file.
+    [InlineData("/app/Repo/A.cs", "Admin", "")]
+    public void FindFiles_NoSource_GivesTheFileNamedForTheType(string sourceFile, string name, string expected) =>
+        string.Join('|', PathResolver.FindFiles(sourceFile, null, name, SqlPaths)).ShouldBe(expected);
+
+    [Fact]
+    public void FindFiles_NoSourceAtTheProjectRoot_FindsTheFileThere() =>
+        PathResolver.FindFiles("/Top.cs", null, "Top", TestSidecars.Of("Top.sql")).ShouldBe(["Top.sql"]);
 }

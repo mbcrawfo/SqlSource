@@ -9,7 +9,7 @@ SQLSRC001 | SqlSource | Error | Type must be partial
 SQLSRC002 | SqlSource | Error | Type is file-local
 SQLSRC003 | SqlSource | Error | Target framework is not supported
 SQLSRC004 | SqlSource | Error | Source matches no SQL file
-SQLSRC005 | SqlSource | Error | Folder has no SQL file
+SQLSRC005 | SqlSource | Error | Type has no SQL file
 SQLSRC006 | SqlSource | Error | Attribute value is not valid
 SQLSRC007 | SqlSource | Error | Type has a member named like its nested class
 SQLSRC008 | SqlSource | Error | Query name is used in two files

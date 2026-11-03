@@ -14,7 +14,7 @@ namespace SqlServerExamples.CodeGen;
 // runs it, an extension method of the connection in the generated class StoreQueriesExtensions, which opens the
 // connection when it is closed, sends the input model's values and reads the rows into the output model.  Each method
 // here passes on the caller's CancellationToken.  See docs/manual/generator.md, "Query methods".
-[SqlSourceGenerate]
+[SqlSourceGenerate(Source = ".")]
 public sealed partial class StoreQueries(DbConnection connection)
 {
     // many, the default for a query with rows, returns an array.  The parameter and the column OrderId are OrderIds,

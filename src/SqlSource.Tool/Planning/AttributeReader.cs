@@ -19,11 +19,13 @@ namespace SqlSource.Tool.Planning;
 /// symbols, and the tool has no compilation, so there is nothing of it to share.
 /// </summary>
 /// <remarks>
-/// It matches the attribute by its name and reads <c>Source</c> and <c>Output</c> alone, each as it is written:
-/// nothing else on the attribute changes what is described.  What it cannot see is in <c>docs/tech-debt/TD-0031</c>:
-/// an alias, a type of the same name in another namespace, and an attribute inside <c>#if</c> under a configuration
-/// other than the manifest's.  A <c>Source</c> outside ASCII in a file that is not UTF-8 is not read: on Windows the
-/// compiler reads that file in the system's code page, so the text here would not be the text it resolves.
+/// It matches the attribute by its name and reads <c>Source</c> and <c>Output</c> alone, each as it is written, and
+/// the type's name, which names its file when there is no <c>Source</c>: nothing else on the attribute changes what is
+/// described.  What it cannot see is in <c>docs/tech-debt/TD-0031</c>: an alias, a type of the same name in another
+/// namespace, and an attribute inside <c>#if</c> under a configuration other than the manifest's.  A <c>Source</c>
+/// outside ASCII in a file that is not UTF-8 is not read, nor a type's name outside ASCII when there is no
+/// <c>Source</c>: on Windows the compiler reads that file in the system's code page, so the text here would not be the
+/// text it resolves.
 /// </remarks>
 internal static class AttributeReader
 {
@@ -62,9 +64,13 @@ internal static class AttributeReader
                 )
             )
             {
-                if (TargetTypeReader.IsCandidate(node) && FindAttribute((TypeDeclarationSyntax)node) is { } attribute)
+                if (
+                    TargetTypeReader.IsCandidate(node)
+                    && node is TypeDeclarationSyntax declaration
+                    && FindAttribute(declaration) is { } attribute
+                )
                 {
-                    ReadAttribute(attribute, path, contents.CompilerFallsBack, claims, errors);
+                    ReadAttribute(declaration, attribute, path, contents.CompilerFallsBack, claims, errors);
                 }
             }
         }
@@ -94,6 +100,7 @@ internal static class AttributeReader
             .FirstOrDefault(static attribute => LastIdentifier(attribute.Name) is ShortName or LongName);
 
     private static void ReadAttribute(
+        TypeDeclarationSyntax declaration,
         AttributeSyntax attribute,
         string path,
         bool compilerFallsBack,
@@ -141,10 +148,18 @@ internal static class AttributeReader
             }
         }
 
+        // With no Source, the type's file is named for it, and a name outside ASCII is read as the Source is.
+        var identifier = declaration.Identifier;
+        if (isRead && typeSource is null && compilerFallsBack && WrittenNameOf(declaration) is { } written)
+        {
+            isRead = false;
+            errors.Add(ToolDiagnostic.At(ToolDiagnostics.FileNotUtf8, path, written, path));
+        }
+
         // A claim that could not be read is not planned: its files may be described for another type.
         if (isRead)
         {
-            claims.Add(new TypeClaim(path, typeSource, output, StartOf(attribute)));
+            claims.Add(new TypeClaim(path, identifier.ValueText, typeSource, output, StartOf(attribute)));
         }
     }
 
@@ -200,4 +215,28 @@ internal static class AttributeReader
         ToolDiagnostic.At(ToolDiagnostics.AttributeArgumentNotLiteral, path, StartOf(expression), argument);
 
     private static LinePosition StartOf(SyntaxNode node) => node.GetLocation().GetLineSpan().StartLinePosition;
+
+    // Where the name is written after the keyword, when it holds a character outside ASCII, and null otherwise.  The
+    // text, not the identifier: a letter that is not UTF-8 reads as U+FFFD, which ends the identifier before it.
+    private static LinePosition? WrittenNameOf(TypeDeclarationSyntax declaration)
+    {
+        var text = declaration.SyntaxTree.GetText();
+        var start = declaration.Keyword.Span.End;
+        while (start < text.Length && char.IsWhiteSpace(text[start]))
+        {
+            start++;
+        }
+
+        for (var end = start; end < text.Length && !EndsTheName(text[end]); end++)
+        {
+            if (text[end] > '\u007F')
+            {
+                return text.Lines.GetLinePosition(start);
+            }
+        }
+
+        return null;
+    }
+
+    private static bool EndsTheName(char c) => char.IsWhiteSpace(c) || c is '<' or '{' or ';' or ':' or '(';
 }

@@ -303,13 +303,13 @@ public sealed class TableModelTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class First;
             }
 
             namespace Other
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Second;
             }
             """;

@@ -34,10 +34,12 @@ public sealed class AttributeConflictTests
 
     // This project's type and the other's, each with the queries of its .sql files.
     private const string QueriesSource =
-        "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate]\ninternal partial class Sample;\n";
+        "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate(Source = \".\")]\ninternal partial class Sample;\n";
 
     private const string OtherQueriesSource =
-        "using SqlSource;\n" + InternalsVisible + "namespace App { [SqlSourceGenerate] public partial class Sample; }";
+        "using SqlSource;\n"
+        + InternalsVisible
+        + "namespace App { [SqlSourceGenerate(Source = \".\")] public partial class Sample; }";
 
     private static readonly MetadataReference[] SqlServerReferences =
     [
@@ -50,10 +52,10 @@ public sealed class AttributeConflictTests
     {
         string[] sources =
         [
-            "using SqlSource;\n[SqlSourceGenerate]\ninternal partial class Sample { }",
-            "using SqlSource;\n[SqlSourceGenerateAttribute]\ninternal partial class Sample { }",
-            "[SqlSource.SqlSourceGenerate]\ninternal partial class Sample { }",
-            "[global::SqlSource.SqlSourceGenerate()]\ninternal partial class Sample { }",
+            "using SqlSource;\n[SqlSourceGenerate(Source = \".\")]\ninternal partial class Sample { }",
+            "using SqlSource;\n[SqlSourceGenerateAttribute(Source = \".\")]\ninternal partial class Sample { }",
+            "[SqlSource.SqlSourceGenerate(Source = \".\")]\ninternal partial class Sample { }",
+            "[global::SqlSource.SqlSourceGenerate(Source = \".\")]\ninternal partial class Sample { }",
             "internal class Sample { object o = typeof(SqlSource.SqlLocation); }",
             "internal class Sample { object o = SqlSource.SqlLocation.Direct; }",
             "internal class Sample { object o = typeof(SqlSource.GeneratorOutput); }",
@@ -91,7 +93,7 @@ public sealed class AttributeConflictTests
     {
         const string Source = """
             using SqlSource;
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
             internal partial class Sample { }
             """;
 
@@ -112,7 +114,7 @@ public sealed class AttributeConflictTests
     {
         const string Source = """
             using SqlSource;
-            [SqlSourceGenerate(Output = GeneratorOutput.Sql)]
+            [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Sql)]
             internal partial class Sample { }
             """;
 
@@ -134,6 +136,7 @@ public sealed class AttributeConflictTests
         const string Source = """
             using SqlSource;
             [SqlSourceGenerate(
+                Source = ".",
                 InputModelType = GeneratorModelType.Class,
                 CollectionType = GeneratorCollectionType.List,
                 MethodLocation = MethodLocation.Internal)]
@@ -156,7 +159,8 @@ public sealed class AttributeConflictTests
     [InlineData(true)]
     public async Task Build_WarningsAsErrors_HasNoConflictForAGeneratedType(bool compilationReference)
     {
-        const string Source = "using SqlSource;\n[SqlSourceGenerate]\ninternal partial class Sample { }";
+        const string Source =
+            "using SqlSource;\n[SqlSourceGenerate(Source = \".\")]\ninternal partial class Sample { }";
 
         var build = await GeneratorHarness.BuildAsync(
             OutputKind.Sql,
@@ -173,8 +177,8 @@ public sealed class AttributeConflictTests
     [Theory]
     [InlineData("[SqlSourceGenerate(1)]", "CS1729 /app/Repo/Sample.cs(2,2)-(2,22)", false)]
     [InlineData("[SqlSourceGenerate(1)]", "CS1729 /app/Repo/Sample.cs(2,2)-(2,22)", true)]
-    [InlineData("[SqlSourceGenerate(Missing = 1)]", "CS0246 /app/Repo/Sample.cs(2,20)-(2,27)", false)]
-    [InlineData("[SqlSourceGenerate(Missing = 1)]", "CS0246 /app/Repo/Sample.cs(2,20)-(2,27)", true)]
+    [InlineData("[SqlSourceGenerate(Source = \".\", Missing = 1)]", "CS0246 /app/Repo/Sample.cs(2,34)-(2,41)", false)]
+    [InlineData("[SqlSourceGenerate(Source = \".\", Missing = 1)]", "CS0246 /app/Repo/Sample.cs(2,34)-(2,41)", true)]
     public async Task Build_AttributeThatDoesNotCompile_HasItsErrorAndNoConflict(
         string attribute,
         string error,
@@ -303,7 +307,7 @@ public sealed class AttributeConflictTests
     public async Task Build_ProjectWithAnotherGeneratorsEmbeddedAttribute_CompilesClean()
     {
         const string Source =
-            "using SqlSource;\n[SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]\n"
+            "using SqlSource;\n[SqlSourceGenerate(Source = \".\", SqlLocation = SqlLocation.Direct)]\n"
             + "internal partial class Sample { }";
 
         var (diagnostics, sources) = await GeneratorHarness.BuildProjectAsync(
@@ -340,7 +344,8 @@ public sealed class AttributeConflictTests
         var source =
             "namespace Microsoft.CodeAnalysis\n{\n    /// <summary>The project's own.</summary>\n    "
             + declaration
-            + " { }\n}\n\nnamespace App { [SqlSource.SqlSourceGenerate] internal partial class Sample { } }\n";
+            + " { }\n}\n\nnamespace App\n{\n    [SqlSource.SqlSourceGenerate(Source = \".\")]\n"
+            + "    internal partial class Sample { }\n}\n";
 
         var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, source, [GeneratorHarness.UsersFile], []);
 

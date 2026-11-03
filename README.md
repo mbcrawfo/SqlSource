@@ -32,7 +32,7 @@ $ dotnet tool install SqlSource.Tool --prerelease
 
 ### 1. Write your queries
 
-Save this as `Queries/Users.sql`:
+Save this as `Queries/UserRepository.sql`:
 
 ```sql postgres
 -- name: GetUser -> one-optional
@@ -68,7 +68,7 @@ using SqlSource;
 public partial class UserRepository;
 ```
 
-The type gets every `.sql` file in the folder of its C# file.  Once the queries are described, in step 5, the build generates a method for each query that runs it, `GetUser` and `FindUsers`.  Until then it reports an error for each query: by default each query must be described by its database, which needs the dialect of step 3 and the tool of step 5.  More: [the generator](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md), for another folder, one file, or methods on the type itself.
+The type gets the `.sql` file named for it, `UserRepository.sql`, in the folder of its C# file.  Once the queries are described, in step 5, the build generates a method for each query that runs it, `GetUser` and `FindUsers`.  Until then it reports an error for each query: by default each query must be described by its database, which needs the dialect of step 3 and the tool of step 5.  More: [the generator](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md), for every file of a folder, another file, or methods on the type itself.
 
 ### 3. Set the dialect
 
@@ -126,7 +126,7 @@ Then run the tool from the folder of your project or solution, or name it, as in
 ```console
 $ dotnet sqlsource describe
 postgres (postgres): 2 described, 0 skipped, 0 failed
-$ git add Queries/Users.sql.json
+$ git add Queries/UserRepository.sql.json
 ```
 
 `postgres`, in the variable's name and first in the summary, is the name SqlSource gives the database your queries belong to: the dialect's name, until you [name your databases](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#use-several-databases).  The name in parentheses is its dialect.  The tool reads the `.env` nearest to the project or solution it runs on, up to the root of the repository, and only its `SQLSOURCE_CONNECTION` variables, so the file can be your application's own too: see [the `.env` file](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#env-file).  The same variable set in the environment wins over the file, and `--connection postgres="..."` gives the connection on the command line instead.  For SQL Server files the database's name is `mssql`, so the variable is `SQLSOURCE_CONNECTION_MSSQL`, and the connection string is SqlClient's, `Server=localhost,1433;Database=app;User ID=app;Password=secret`, with `TrustServerCertificate=True` for SQL Server in a local container: see [connecting to SQL Server](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/sqlserver.md#connecting).  The tool needs your schema, not your data.  Commit the sidecars with the project: every build reads them, and a copy of the project without them reports an error for each query.  A project that sets `SqlSourceIncludeFiles` to `false` lists its sidecars itself, beside its `.sql` files: see [which `.sql` files are included](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#included-files).

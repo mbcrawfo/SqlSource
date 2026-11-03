@@ -31,7 +31,7 @@ public sealed class SidecarTests
 
         namespace App;
 
-        [SqlSourceGenerate]
+        [SqlSourceGenerate(Source = ".")]
         public partial class Sample;
         """;
 
@@ -434,7 +434,7 @@ public sealed class SidecarTests
     public void Run_SidecarOfAFileNoTypeClaims_IsNotRead()
     {
         var source = Source.Replace(
-            "[SqlSourceGenerate]",
+            "[SqlSourceGenerate(Source = \".\")]",
             "[SqlSourceGenerate(Source = \"Users.sql\")]",
             StringComparison.Ordinal
         );
@@ -767,9 +767,9 @@ public sealed class SidecarTests
             [
                 new SourceFile(
                     GeneratorHarness.SourcePath,
-                    $"using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate({first})]\n"
+                    $"using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate(Source = \".\", {first})]\n"
                         + "public partial class First;\n\n"
-                        + $"[SqlSourceGenerate({second})]\npublic partial class Second;\n"
+                        + $"[SqlSourceGenerate(Source = \".\", {second})]\npublic partial class Second;\n"
                 ),
             ],
             files,

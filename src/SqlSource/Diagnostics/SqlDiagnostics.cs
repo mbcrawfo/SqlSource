@@ -64,10 +64,10 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor FolderHasNoSqlFile = new(
+    public static readonly DiagnosticDescriptor TypeHasNoSqlFile = new(
         id: "SQLSRC005",
-        title: "Folder has no SQL file",
-        messageFormat: "The folder of this file has no .sql file.  Add one, or set Source.",
+        title: "Type has no SQL file",
+        messageFormat: "No '{0}.sql' beside this file.  Add it, or set Source.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -1080,7 +1080,7 @@ internal static class SqlDiagnostics
             TypeIsFileLocal,
             UnsupportedTargetFramework,
             SourceMatchesNothing,
-            FolderHasNoSqlFile,
+            TypeHasNoSqlFile,
             InvalidAttributeValue,
             NestedClassNameTaken,
             DuplicateQueryName,

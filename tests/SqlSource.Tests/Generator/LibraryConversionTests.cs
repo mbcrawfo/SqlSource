@@ -72,7 +72,7 @@ public sealed class LibraryConversionTests
 
         namespace App
         {
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
 
             public sealed record Metadata(string Note);
@@ -120,7 +120,7 @@ public sealed class LibraryConversionTests
 
             namespace App
             {
-                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
                 public partial class Sample;
             }
             """;
@@ -233,7 +233,7 @@ public sealed class LibraryConversionTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
 
                 public static class Dates
@@ -542,7 +542,7 @@ public sealed class LibraryConversionTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
 
                 public static class Documents
@@ -576,7 +576,7 @@ public sealed class LibraryConversionTests
 
             namespace App
             {
-                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
                 public partial class Sample;
             }
             """;

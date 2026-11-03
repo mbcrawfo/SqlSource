@@ -347,7 +347,7 @@ public sealed class MethodTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 internal partial class Sample;
             }
             """;
@@ -539,7 +539,10 @@ public sealed class MethodTests
     [InlineData("namespace @class.Rows;\n\n", "global::@class.Rows.GetUserDto")]
     public void Run_ModelInTheGlobalNamespaceOrUnderAnEscapedKeyword_Compiles(string namespaceLine, string model)
     {
-        var source = "using SqlSource;\n\n" + namespaceLine + "[SqlSourceGenerate]\npublic partial class Sample;\n";
+        var source =
+            "using SqlSource;\n\n"
+            + namespaceLine
+            + "[SqlSourceGenerate(Source = \".\")]\npublic partial class Sample;\n";
 
         var run = MethodRuns.Run(Users, UsersEntries, source);
 

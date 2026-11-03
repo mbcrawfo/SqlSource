@@ -121,10 +121,10 @@ public sealed class MethodConflictTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class First;
 
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Second;
             }
             """;
@@ -172,7 +172,7 @@ public sealed class MethodConflictTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
 
                 public static class SampleExtensions;
@@ -184,7 +184,7 @@ public sealed class MethodConflictTests
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC276 /app/Repo/Sample.cs(5,6)-(5,23): The query methods of 'App.Sample' cannot go into the "
+                "SQLSRC276 /app/Repo/Sample.cs(5,6)-(5,37): The query methods of 'App.Sample' cannot go into the "
                     + "extension class 'App.SampleExtensions', because the project has a type of that name.  Rename "
                     + "the type or what has the name, or set the attribute's MethodLocation to put the methods on the "
                     + "type.",
@@ -199,7 +199,7 @@ public sealed class MethodConflictTests
         const string Source = """
             using SqlSource;
 
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
 
             public static class SampleExtensions;
@@ -210,7 +210,7 @@ public sealed class MethodConflictTests
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC276 /app/Repo/Sample.cs(3,2)-(3,19): The query methods of 'Sample' cannot go into the "
+                "SQLSRC276 /app/Repo/Sample.cs(3,2)-(3,33): The query methods of 'Sample' cannot go into the "
                     + "extension class 'SampleExtensions', because the project has a type of that name.  Rename the "
                     + "type or what has the name, or set the attribute's MethodLocation to put the methods on the "
                     + "type.",
@@ -233,7 +233,7 @@ public sealed class MethodConflictTests
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC276 /app/Repo/Sample.cs(5,6)-(5,23): The query methods of 'App.Sample' cannot go into the "
+                "SQLSRC276 /app/Repo/Sample.cs(5,6)-(5,37): The query methods of 'App.Sample' cannot go into the "
                     + "extension class 'App.SampleExtensions', because SqlSource writes "
                     + what
                     + ".  Rename the type or what has the name, or set the attribute's MethodLocation to put the "

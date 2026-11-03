@@ -10,7 +10,7 @@ namespace SqlServerExamples.Models;
 
 // The output models: each query gets the SQL and its models, read here through Dapper.  The input model is the
 // parameter object, and the output model the type of a row.
-[SqlSourceGenerate(Output = GeneratorOutput.Models)]
+[SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
 public sealed partial class StoreQueries(DbConnection connection)
 {
     // A record of the query's columns.  ShippedOn is a DateOnly?, since the column is a date that can be null, and the

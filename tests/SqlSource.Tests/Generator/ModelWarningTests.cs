@@ -24,7 +24,7 @@ public sealed class ModelWarningTests
         var source = """
             using SqlSource;
 
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
 
             namespace MyApp

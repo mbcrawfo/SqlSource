@@ -14,7 +14,7 @@ namespace PostgresExamples.CodeGen;
 // runs it, an extension method of the connection in the generated class StoreQueriesExtensions, which opens the
 // connection when it is closed, sends the input model's values and reads the rows into the output model.  Each method
 // here passes on the caller's CancellationToken.  See docs/manual/generator.md, "Query methods".
-[SqlSourceGenerate]
+[SqlSourceGenerate(Source = ".")]
 public sealed partial class StoreQueries(DbConnection connection)
 {
     // The data source of the connections given to StoreQueries.  The project references Npgsql's plugins for NodaTime

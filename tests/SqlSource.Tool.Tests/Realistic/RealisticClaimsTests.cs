@@ -86,7 +86,7 @@ public sealed class RealisticClaimsTests
             .ShouldBeEmpty();
 
     [Fact]
-    public void Parse_AttributeWithoutPath_ThrowsNamingTheClass()
+    public void Parse_AttributeWithoutSource_ThrowsNamingTheClass()
     {
         var thrown = Should.Throw<InvalidOperationException>(() =>
             RealisticClaims.Parse(

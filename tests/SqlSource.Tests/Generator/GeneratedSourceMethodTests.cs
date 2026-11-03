@@ -21,7 +21,7 @@ public sealed class GeneratedSourceMethodTests
 
             namespace App;
 
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
             public partial class Sample
             {
                 public static string List() => ListFrom("users", "1 = 1") + GetUser;
@@ -115,7 +115,7 @@ public sealed class GeneratedSourceMethodTests
             namespace App;
 
             /// <summary>Queries.</summary>
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial struct Sample<T>
             {
                 /// <summary>Uses the query.</summary>
@@ -144,7 +144,7 @@ public sealed class GeneratedSourceMethodTests
 
             namespace App;
 
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample
             {
                 public static string Whole() => Sql.Whole("SELECT 1;");
@@ -212,7 +212,7 @@ public sealed class GeneratedSourceMethodTests
 
             namespace App;
 
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample<T>
             {
                 public static string One() => Sql.Probe("a");

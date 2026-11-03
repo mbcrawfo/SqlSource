@@ -43,5 +43,5 @@ internal sealed class ListedFiles
 
     /// <summary>The files that a claim's <c>Source</c> resolves to, by the generator's rule, in member order.</summary>
     public ImmutableArray<string> ClaimedBy(TypeClaim claim) =>
-        PathResolver.FindFiles(claim.SourcePath, claim.Source, Paths);
+        PathResolver.FindFiles(claim.SourcePath, claim.Source, claim.TypeName, Paths);
 }

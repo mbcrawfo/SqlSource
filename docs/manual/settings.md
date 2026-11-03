@@ -50,7 +50,7 @@ Each name links to its section, which gives its values and its rules.  **Written
 | [Library types](#setting-library-types) | Entries `"library": "state"`, the library `nodaTime`, `netTopologySuite` or `json` and the state `on`, `off` or `default`.  Default: on for PostgreSQL where the project references the library's plugin, `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`, and off otherwise; `json` off | `libraryTypes` in a settings file; `-- library-types:` in the file header and inside a query | Works today |
 | [`SqlLocation`](#setting-sql-location) | `Nested`, `Direct`.  Default `Nested` | `SqlLocation` on the attribute | Works today |
 | [Nested class](#setting-nested-class) | A C# identifier that is not a keyword.  Default `Sql` | `nestedClass` in a settings file; `NestedClass` on the attribute | Works today |
-| [`Source`](#setting-source) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: that folder | `Source` on the attribute | Works today |
+| [`Source`](#setting-source) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: the file named for the type in that folder | `Source` on the attribute | Works today |
 | [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`, or `IAsyncEnumerable` to stream the rows: see [its section](#setting-collection-type).  Default `Array` | `collectionType` in a settings file; `CollectionType` on the attribute; `-- collection-type:` in the file header and inside a query | Works today |
 | [`MethodLocation`](#setting-method-location) | `ExtensionClass`, `Public`, `Internal`, `Private`.  Default `ExtensionClass` | `MethodLocation` on the attribute | Works today |
 
@@ -757,8 +757,11 @@ There is no settings file key or marker for it.  `methodLocation` in a settings 
 ## Source
 
 ```csharp
-[SqlSourceGenerate]                                // every .sql file beside this C# file
+[SqlSourceGenerate]                                  // UserRepository.sql, beside this C# file
 public partial class UserRepository;
+
+[SqlSourceGenerate(Source = ".")]                    // every .sql file beside this C# file
+public partial class StoreQueries;
 
 [SqlSourceGenerate(Source = "Queries/Users.sql")]    // one file
 public partial class UserQueries;
@@ -769,11 +772,11 @@ public partial class SharedQueries;
 
 `Source` is a property of the attribute and nothing else.  It says which `.sql` files belong to the type.
 
-- Without `Source`, the type gets every `.sql` file in the folder of the C# file that carries the attribute.  Subfolders are not searched.
-- A `Source` that ends in `.sql` names one file.  Any other `Source` names a folder, whose own `.sql` files the type gets.
+- Without `Source`, the type gets the one `.sql` file named for it in the folder of the C# file that carries the attribute: `UserRepository.sql` for `UserRepository`.  The name is the type's own, without its type parameters, so `Repository<T>` gets `Repository.sql`, and a nested type `Outer.Inner` gets `Inner.sql`.  For a partial type, the folder is the one of the file that carries the attribute.
+- A `Source` that ends in `.sql` names one file.  Any other `Source` names a folder, whose own `.sql` files the type gets: `Source = "."` is every `.sql` file in the folder of the C# file.  Subfolders are not searched.
 - `Source` is relative to the folder of the C# file, never to the project.  Both `/` and `\` separate folders.  Paths are compared ignoring case, so a project builds the same on every operating system: two `.sql` files of a type whose paths differ only by case are [SQLSRC013](diagnostics.md#sqlsrc013).
 - An empty `Source`, `Source = ""`, is the same as no `Source`.  A `Source` of white space is not: it is read as the name of a folder, like any other `Source`, and so matches nothing.
-- A `Source` that matches nothing is [SQLSRC004](diagnostics.md#sqlsrc004), and a folder with no `.sql` file when there is no `Source` is [SQLSRC005](diagnostics.md#sqlsrc005).
+- A `Source` that matches nothing is [SQLSRC004](diagnostics.md#sqlsrc004), and no file named for the type when there is no `Source` is [SQLSRC005](diagnostics.md#sqlsrc005).
 - Two types may use the same file.  A `.sql` file that no type uses is ignored, so a folder of migration scripts elsewhere in the project does no harm.
 
 This is separate from [which files the compiler is given](#included-files), which comes first: a type can only claim a file that the project includes.  The rest of the attribute is on [the generator page](generator.md).
