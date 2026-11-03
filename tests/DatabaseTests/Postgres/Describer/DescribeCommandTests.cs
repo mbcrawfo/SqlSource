@@ -46,6 +46,7 @@ public sealed class DescribeCommandTests : IDisposable
 
     private readonly PostgresDatabases _postgres;
     private readonly CliRun _run = new();
+    private readonly FixtureProjects _fixtures = new();
     private readonly TestProject _project;
 
     public DescribeCommandTests(PostgresDatabases postgres)
@@ -56,7 +57,11 @@ public sealed class DescribeCommandTests : IDisposable
         _project.Settings["database"] = Database;
     }
 
-    public void Dispose() => _run.Dispose();
+    public void Dispose()
+    {
+        _run.Dispose();
+        _fixtures.Dispose();
+    }
 
     // Each case's query as a file of its own, by the case's name.
     private Dictionary<FixtureCase, string> AddCases() =>
@@ -66,6 +71,15 @@ public sealed class DescribeCommandTests : IDisposable
 
     private Task<CliResult> DescribeWithAsync(string connection, params string[] args) =>
         _run.RunAsync(["describe", "--connection", Database + "=" + connection, .. args]);
+
+    // "describe" over the copy of a fixture project on the real host, which takes no --connection: the run's
+    // connections can come from the environment and the .env file alone.
+    private static async Task<CliResult> DescribeWithoutConnectionAsync(string project)
+    {
+        using var run = CliRun.Real(Path.GetDirectoryName(project)!);
+        run.ReleasedDescribers = true;
+        return await run.RunAsync("describe", project);
+    }
 
     // An entry as two runs that describe the same query give it: where its name stands in the text, the version of
     // the server and the name of the database are left out.
@@ -95,6 +109,28 @@ public sealed class DescribeCommandTests : IDisposable
                 .Queries.ShouldHaveSingleItem(fixture.ToString());
             Comparable(written).ShouldBe(Comparable(expected), fixture.ToString());
         }
+    }
+
+    // The copy of the fixture Single names the database "billing", and the connection is in the .env file beside it
+    // alone, in double quotes with the backslash and the quote escaped, which a connection string may hold.
+    [Fact]
+    public async Task Describe_ConnectionInADotEnvFileAlone_WritesItsSidecar()
+    {
+        var project = _fixtures.Copy("Single");
+        // Single has no type that claims its queries.
+        _ = _fixtures.WriteFile("Single/Queries/Queries.cs", Plans.Type);
+        var connection = _postgres
+            .ConnectionString.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal);
+        _ = _fixtures.WriteFile("Single/.env", $"SQLSOURCE_CONNECTION_BILLING=\"{connection}\"\n");
+
+        var result = await DescribeWithoutConnectionAsync(project);
+
+        result.ExitCode.ShouldBe(0, result.Error);
+        result.Out.ShouldBe("billing (postgres): 1 described, 0 skipped, 0 failed\n");
+        var entry = SidecarFiles.Read(_fixtures.PathOf("Single/Queries/Users.sql")).Queries.ShouldHaveSingleItem();
+        entry.Name.ShouldBe("GetUser");
+        entry.Engine.ShouldBe(SidecarValues.Engine.Postgres);
     }
 
     [Fact]
