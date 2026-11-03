@@ -38,12 +38,13 @@
         <MSBuildWarningsNotAsErrors>$(MSBuildWarningsNotAsErrors);SQLSRC026</MSBuildWarningsNotAsErrors>
     </PropertyGroup>
     <!--
-        Runs the sqlsource tool for the first framework before the outer build dispatches the inner builds.  The inner
-        builds run side by side, and each framework but the first calls SqlSourceRunOnline in the first framework's
-        configuration; MSBuild runs one request of a configuration at a time, so without this call each would wait for
-        the first framework's whole build.  The dispatch passes only TargetFramework, as this call does, so its build
-        of the first framework is the configuration this call built, and the run is not repeated there; the other
-        frameworks' calls are answered at once.  The condition is SqlSourceRunOnline's, in the outer build alone.
+        Runs the sqlsource tool for the first framework before the outer build dispatches the inner builds, so that
+        the run comes before any inner build starts and an error of it stops the build before them.  Each inner build
+        calls SqlSourceRunOnline in the same configuration, the first framework's with SqlSourceOnlineRun=true, one of
+        its own that runs nothing of a framework's build, so that each framework searches for settings files after its
+        own hooks of CoreCompile.  The dispatch passes only TargetFramework, so every inner build's call names the
+        configuration this call built, and MSBuild answers it at once without running the tool again.  The condition is
+        SqlSourceRunOnline's, in the outer build alone.
     -->
     <Target
         Name="SqlSourceRunOnlineBeforeDispatch"
@@ -53,7 +54,7 @@
         <MSBuild
             Projects="$(MSBuildProjectFullPath)"
             Targets="SqlSourceRunOnline"
-            Properties="TargetFramework=$(SqlSourceFirstFramework)"
+            Properties="TargetFramework=$(SqlSourceFirstFramework);SqlSourceOnlineRun=true"
         />
     </Target>
     <!-- editorconfig-checker-enable -->

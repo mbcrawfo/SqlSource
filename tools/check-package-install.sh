@@ -296,7 +296,7 @@ if ! grep -q "$manifest_argument" "$stand_in_log"; then
 fi
 
 # The target of buildMultiTargeting/SqlSource.targets finished before the outer build dispatched the inner ones.
-# Without that file the first inner build runs the tool itself, once and for the same framework, which the checks above
+# Without that file an inner build calls the run itself, once and for the same framework, which the checks above
 # cannot tell from this one.  A line that is not in the log is empty, and a grep with no match is not an error here.
 log_line() {
     grep -n -m 1 -F "$1" "$work/multi.log" | cut -d: -f1 || true

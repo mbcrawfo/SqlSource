@@ -14,9 +14,9 @@
 
 See [the online build](../../../docs/architecture/msbuild-and-manifest.md#the-online-build).
 
-- **The online targets hook nothing**: `SqlSourceTrackAdditionalFiles` depends on `SqlSourceDescribeOnline`, which runs `SqlSourceListSidecars` and `SqlSourceRunOnline` through dependencies or a call.  A hook would run the tool where the search does not run.
-- **The tool runs in `SqlSourceRunOnline` alone, once, in the first framework's configuration**; another framework calls it there by `MSBuild`, never runs it itself, since two runs would undo each other's sidecars.
-- **`buildMultiTargeting/SqlSource.targets` holds the outer build's call before `DispatchToInnerBuilds`, and repeats the properties its condition reads with the text of `build/SqlSource.targets`**: change both, `BuildFileTests` holds them equal.
+- **The online targets hook nothing**: `SqlSourceTrackAdditionalFiles` depends on `SqlSourceDescribeOnline`, which reaches `SqlSourceRunOnline` by a dependency or a call.  A hook would run the tool where the search does not run.
+- **The tool runs in `SqlSourceRunOnline` alone, once, for the first framework**, since two runs would undo each other's sidecars.  A multi-targeted project's builds, the first framework's too, call it with `SqlSourceOnlineRun=true`, never in a framework's own configuration ([why](../../../docs/architecture/msbuild-and-manifest.md#the-online-build)).
+- **`buildMultiTargeting/SqlSource.targets` holds the outer build's call, and repeats the properties its condition reads with the text of `build/SqlSource.targets`**: change both, `BuildFileTests` holds them equal.
 - **Never read `$(SQLSOURCE_CONNECTION)`, in any case**: MSBuild logs a variable read as a property with its value.  Test it with `IsNullOrWhiteSpace` of `GetEnvironmentVariable`.
 - **Compare `SqlSourceOnlineValue` with `Equals`, never `==`**: a condition reads `yes` as `true`.
 - **The texts of `SQLSRC024` to `SQLSRC027` in the targets change with their `SqlDiagnostics` descriptors**; `BuildFileTests` holds them equal.
@@ -27,7 +27,7 @@ See [the online build](../../../docs/architecture/msbuild-and-manifest.md#the-on
 
 `SqlSourceWriteManifest` in `build/SqlSource.targets` writes the manifest for the `sqlsource` tool, and `SqlSourceImported`, which `build/SqlSource.props` sets with no condition, tells the tool that a project uses SqlSource.  See [the manifest](../../../docs/architecture/msbuild-and-manifest.md#the-manifest).
 
-- **The target hooks nothing, on purpose.**  The tool runs it by name, and the online build through `SqlSourceRunOnline`'s dependencies; a hook would make every build write it.  Do not give it `BeforeTargets`, `AfterTargets` or a condition: `tests/SqlSource.Tests/Package/BuildFileTests.cs` holds that.
+- **The target hooks nothing, on purpose.**  The tool runs it by name, and the online build through `SqlSourceRunOnline`'s dependencies; a hook would make every build write it.  Do not give it `BeforeTargets`, `AfterTargets` or a condition: `BuildFileTests` holds that.
 - **Its `DependsOnTargets` is the property `SqlSourceManifestDependsOn`**, set in the `PropertyGroup` at the root of the file, which the nesting `ItemGroup` of the sidecars and the `ItemGroup` of the settings files follow; those three and the online build's group are the only elements at the root that are not a target.
 - **The format is a contract with the tool.**  A new key is an addition and keeps the version, since a reader passes over a key it does not know.  A change to what an existing key means, or to how a line is read, raises the version, and a reader of another version then reads nothing.  `src/SqlSource.Tool/Projects/ManifestReader.cs` is the reader.  See [the format](../../../docs/architecture/msbuild-and-manifest.md#the-format).
 - **The manifest holds no setting: version 2 has no `Property.` or `File.<Name>` line, and a setting added to the package is a key of the settings file, never a line here.**  The tool reads the settings from the files of the `Settings` lines, as the generator does.  `SqlSourceBuildFolders=` is a line and no setting: the target `SqlSourceFindBuildFolders` sets it, so the manifest's `DependsOnTargets` names that target.  `BuildFileTests` holds the lines and their order.

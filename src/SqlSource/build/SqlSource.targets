@@ -340,7 +340,8 @@
 
         SqlSourceToolCommand is how the build starts the tool, a local tool of the repository by default; the tests
         set it to a stand-in of the tool.  SqlSourceFirstFramework is the framework of TargetFrameworks that the tool
-        describes, as a run by hand does, and SqlSourceDescribeOnline runs the tool itself only there.
+        describes, as a run by hand does.  SqlSourceDescribeOnline runs the tool itself only in a project with no
+        TargetFrameworks; a multi-targeted project runs it in a configuration of its own.
 
         buildMultiTargeting/SqlSource.targets, which NuGet imports into the outer build of a multi-targeted project,
         where this file is not imported, defines the properties its condition reads with the same text, which
@@ -378,8 +379,7 @@
             >true</SqlSourceGoesOnline>
         <MSBuildWarningsNotAsErrors>$(MSBuildWarningsNotAsErrors);SQLSRC026</MSBuildWarningsNotAsErrors>
         <SqlSourceDescribeOnlineDependsOn />
-        <SqlSourceDescribeOnlineDependsOn
-            Condition="'$(TargetFrameworks)' == '' or '$(TargetFramework)' == '$(SqlSourceFirstFramework)'"
+        <SqlSourceDescribeOnlineDependsOn Condition="'$(TargetFrameworks)' == ''"
             >SqlSourceRunOnline</SqlSourceDescribeOnlineDependsOn>
     </PropertyGroup>
     <!--
@@ -390,13 +390,25 @@
         which an IDE runs on every edit, nor of a compile by -t:Compile, which leaves BuildingProject false.
 
         The tool runs once, for the first framework, in SqlSourceRunOnline: two frameworks can claim different files,
-        and a run for each would undo what the other wrote.  In the first framework, or in a project with no
-        TargetFrameworks, this target depends on it, through SqlSourceDescribeOnlineDependsOn, since a target's
-        dependencies are read before it runs.  Every other framework calls it in the first framework's
-        configuration, which MSBuild runs once, a second caller waiting for it.  In a build of every framework the
-        outer build has called it before it dispatched the inner builds, from buildMultiTargeting/SqlSource.targets,
-        so the call is answered at once and the inner builds still run side by side; a build of one framework, by -f
-        or through a ProjectReference, has no outer build and runs it from here.
+        and a run for each would undo what the other wrote.  In a project with no TargetFrameworks this target depends
+        on it, through SqlSourceDescribeOnlineDependsOn, since a target's dependencies are read before it runs: the run
+        is then part of the build, after the build's own hooks of CoreCompile, and needs no configuration of its own,
+        which would cost the build an evaluation of the project.
+
+        Every framework of a multi-targeted project, the first among them, calls it instead in a configuration of its
+        own, the first framework's with SqlSourceOnlineRun=true, which MSBuild runs once, a second caller waiting for
+        it.  Run in a framework's own configuration, it would run the search for settings files and the manifest's other
+        dependencies there before that build's hooks of CoreCompile, and that build would not run them again, so that a
+        settings file reached only by a .sql file that such a hook adds would never reach its compiler.  In the
+        configuration of its own, SqlSourceRunOnline and its dependencies are all that runs, none of them calls back
+        into a build, and nothing reads SqlSourceOnlineRun, so the run's condition, the CI rule and the test of a
+        design-time build among it, reads there as in the framework's own build.  In a build of every framework the outer
+        build has called it before it dispatched the inner builds, from buildMultiTargeting/SqlSource.targets, so the
+        call is answered at once; a build of one framework, by -f or through a ProjectReference, has no outer build and
+        runs it from here.  The run returns the files it wrote under obj, the first framework's, and they are added to
+        FileWrites, so that IncrementalClean keeps them and a clean deletes them: a configuration that is called by name
+        runs no IncrementalClean of its own.  Another framework's build adds them too, and its IncrementalClean passes
+        over a file outside its own obj folder.
 
         A sidecar the tool created is not among the items, since the props' pattern was expanded when the project was
         evaluated, so the pattern is expanded again, with the props' excludes and under their condition, and each
@@ -419,9 +431,14 @@
         <MSBuild
             Projects="$(MSBuildProjectFullPath)"
             Targets="SqlSourceRunOnline"
-            Properties="TargetFramework=$(SqlSourceFirstFramework)"
-            Condition="'$(SqlSourceGoesOnline)' == 'true' and '$(TargetFrameworks)' != '' and '$(TargetFramework)' != '$(SqlSourceFirstFramework)'"
-        />
+            Properties="TargetFramework=$(SqlSourceFirstFramework);SqlSourceOnlineRun=true"
+            Condition="'$(SqlSourceGoesOnline)' == 'true' and '$(TargetFrameworks)' != ''"
+        >
+            <Output TaskParameter="TargetOutputs" ItemName="SqlSourceOnlineFile" />
+        </MSBuild>
+        <ItemGroup>
+            <FileWrites Include="@(SqlSourceOnlineFile)" />
+        </ItemGroup>
         <ItemGroup Condition="'$(SqlSourceGoesOnline)' == 'true' and '$(SqlSourceIncludeFiles)' != 'false'">
             <SqlSourceSidecarFound
                 Include="**/*.sql.json"
@@ -519,8 +536,9 @@
         Runs the sqlsource tool on the manifest of this build, unless every input is older than the stamp.  Its
         condition is the run's alone, and leaves BuildingProject out: a configuration that another build calls by
         name starts with BuildingProject false.  It depends on the manifest and on SqlSourceListSidecars, so that the
-        files it compares are written first wherever it is called from: from SqlSourceDescribeOnline, from another
-        framework's build, or from the outer build.
+        files it compares are written first wherever it is called from: from SqlSourceDescribeOnline, from a
+        framework's build, or from the outer build.  It returns the files it writes under obj, the manifest only when it
+        is the build's own, for the build that called it to add to FileWrites.
 
         Exec reads the tool's errors as a compiler's, which under online the tool writes on one line each.  It ignores
         the exit code, since it would otherwise add an error of its own to the tool's, and it keeps every line, of both
@@ -546,12 +564,12 @@
         property: they change together.  The lines are joined with line breaks, since a line can hold any character
         but one, and a property function never takes an item's metadata, which MSBuild puts in as text.
 
-        The list of sidecars is written again after the run, from the files on the disk, or a sidecar the run created
-        or deleted would change it and run the tool once more at the next build.  The stamp is touched only after a
-        run that exited with 0 and did not print the offline line, so that a failed or offline run is tried again by
-        the next build.  It is in FileWrites whether or not this run touched it, as it is when the run is skipped,
-        since MSBuild still runs a skipped target's groups: IncrementalClean deletes a file under obj that an earlier
-        build wrote and this one does not list.  The errors come last, since they end the target.
+        The list of sidecars is written again after the run, from the files on the disk, or a sidecar the run created or
+        deleted would change it and run the tool once more at the next build.  The stamp is touched only after a run that
+        exited with 0 and did not print the offline line, so that a failed or offline run is tried again by the next
+        build.  It is in FileWrites, and among the files returned, whether or not this run touched it, as it is when the
+        run is skipped, since MSBuild still runs a skipped target's groups: IncrementalClean deletes a file under obj
+        that an earlier build wrote and this one does not list.  The errors come last, since they end the target.
     -->
     <Target
         Name="SqlSourceRunOnline"
@@ -559,6 +577,7 @@
         DependsOnTargets="SqlSourceWriteManifest;SqlSourceListSidecars"
         Inputs="@(SqlSourceOnlineInput);@(Compile)"
         Outputs="$(SqlSourceOnlineStamp)"
+        Returns="@(SqlSourceOnlineFile)"
     >
         <PropertyGroup>
             <SqlSourceShellSpecial>[$`&quot;\\]</SqlSourceShellSpecial>
@@ -617,6 +636,11 @@
         />
         <ItemGroup>
             <FileWrites Include="$(SqlSourceOnlineStamp)" />
+            <SqlSourceOnlineFile Include="$(SqlSourceOnlineStamp);$(SqlSourceSidecarList);$(SqlSourceOnlineValueFile)" />
+            <SqlSourceOnlineFile
+                Include="$(SqlSourceManifestFile)"
+                Condition="'$(SqlSourceManifestIsDefault)' == 'true'"
+            />
         </ItemGroup>
         <Warning
             Code="SQLSRC026"

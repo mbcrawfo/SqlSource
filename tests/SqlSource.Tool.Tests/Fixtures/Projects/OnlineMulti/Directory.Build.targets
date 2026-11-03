@@ -8,7 +8,16 @@
         fails after a minute without it.  Both pass only when the two run at once: an inner build that waited for the
         whole of the other's, as one that called the run of the tool in the first framework's configuration while
         that framework built would, never meets it.
+
+        Under OnlineMultiLate, OnlineMultiAddLate adds ../Late/Late.sql, which a test writes beside the copy with a
+        sqlsource.json that no other file reaches, from a hook of CoreCompile, as a project's own target that writes
+        its .sql files late would, without hooking SqlSourceListFiles.
     -->
+    <Target Name="OnlineMultiAddLate" BeforeTargets="CoreCompile" Condition="'$(OnlineMultiLate)' == 'true'">
+        <ItemGroup>
+            <AdditionalFiles Include="../Late/Late.sql" />
+        </ItemGroup>
+    </Target>
     <Target Name="ShowItems" AfterTargets="CoreCompile">
         <WriteLinesToFile
             File="$(BaseIntermediateOutputPath)compiled.$(TargetFramework).txt"

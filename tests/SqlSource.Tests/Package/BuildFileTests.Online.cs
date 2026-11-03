@@ -20,7 +20,7 @@ public sealed partial class BuildFileTests
     // The target that runs the tool and gives the compiler the sidecars it left, which the hash depends on.
     private const string DescribeOnlineTarget = "SqlSourceDescribeOnline";
 
-    // The target that runs the tool, once, in the first framework's configuration.
+    // The target that runs the tool, once, for the first framework.
     private const string RunOnlineTarget = "SqlSourceRunOnline";
 
     // The target that writes the files the run compares and gathers its inputs.
@@ -28,6 +28,10 @@ public sealed partial class BuildFileTests
 
     // The outer build's target, in buildMultiTargeting/SqlSource.targets.
     private const string OuterTarget = "SqlSourceRunOnlineBeforeDispatch";
+
+    // The configuration of its own that the run is called in: the first framework's, and a property that no build
+    // of a framework has, so that no target of a framework's own build runs early in it.
+    private const string OnlineRunConfiguration = "TargetFramework=$(SqlSourceFirstFramework);SqlSourceOnlineRun=true";
 
     // The run's condition: not a design-time build, and the build goes online.  BuildingProject is left out: a
     // configuration that another build calls by name starts with it false.
@@ -110,11 +114,7 @@ public sealed partial class BuildFileTests
                     "$(MSBuildWarningsNotAsErrors);" + SqlDiagnostics.OnlineToolCannotRunOffline.Id
                 ),
                 ("SqlSourceDescribeOnlineDependsOn", null, ""),
-                (
-                    "SqlSourceDescribeOnlineDependsOn",
-                    "'$(TargetFrameworks)' == '' or '$(TargetFramework)' == '$(SqlSourceFirstFramework)'",
-                    RunOnlineTarget
-                ),
+                ("SqlSourceDescribeOnlineDependsOn", "'$(TargetFrameworks)' == ''", RunOnlineTarget),
             ]);
 
     // NuGet imports buildMultiTargeting/ alone into the outer build, so that file defines the properties its condition
@@ -183,9 +183,10 @@ public sealed partial class BuildFileTests
     }
 
     // The online build is no part of a design-time build, which an IDE runs on every edit, nor of a compile by
-    // -t:Compile, which leaves BuildingProject false.  It runs the tool itself in the first framework, or a project of
-    // one, and every other framework calls the run in the first framework's configuration.  Then it gives the
-    // compiler the sidecars the run created, as the props' pattern does, and takes away the ones it deleted.
+    // -t:Compile, which leaves BuildingProject false.  It runs the tool itself in a project with no TargetFrameworks,
+    // and every framework of a multi-targeted project, the first among them, calls the run in a configuration of its
+    // own and adds the files the run wrote to FileWrites.  Then it gives the compiler the sidecars the run created, as
+    // the props' pattern does, and takes away the ones it deleted.
     [Fact]
     public void Targets_DescribeOnline_RunsTheToolInABuildAndGivesTheCompilerItsSidecars()
     {
@@ -205,21 +206,31 @@ public sealed partial class BuildFileTests
         target
             .Elements()
             .Select(element => element.Name.LocalName)
-            .ShouldBe(["Error", "MSBuild", "ItemGroup", "ItemGroup"]);
-        Attributes(target.Element("MSBuild")!)
+            .ShouldBe(["Error", "MSBuild", "ItemGroup", "ItemGroup", "ItemGroup"]);
+        var call = target.Element("MSBuild")!;
+        Attributes(call)
             .ShouldBe(
                 new Dictionary<string, string>
                 {
                     ["Projects"] = "$(MSBuildProjectFullPath)",
                     ["Targets"] = RunOnlineTarget,
-                    ["Properties"] = "TargetFramework=$(SqlSourceFirstFramework)",
-                    ["Condition"] =
-                        "'$(SqlSourceGoesOnline)' == 'true' and '$(TargetFrameworks)' != ''"
-                        + " and '$(TargetFramework)' != '$(SqlSourceFirstFramework)'",
+                    ["Properties"] = OnlineRunConfiguration,
+                    ["Condition"] = "'$(SqlSourceGoesOnline)' == 'true' and '$(TargetFrameworks)' != ''",
+                }
+            );
+        Attributes(call.Elements().ShouldHaveSingleItem())
+            .ShouldBe(
+                new Dictionary<string, string>
+                {
+                    ["TaskParameter"] = "TargetOutputs",
+                    ["ItemName"] = "SqlSourceOnlineFile",
                 }
             );
 
         var groups = target.Elements("ItemGroup").ToList();
+        groups[0].Attributes().ShouldBeEmpty();
+        groups[0].Elements().Select(Item).ShouldBe([("FileWrites", "Include=@(SqlSourceOnlineFile)")]);
+        groups.RemoveAt(0);
         groups[0]
             .Attribute("Condition")
             .ShouldNotBeNull()
@@ -291,6 +302,7 @@ public sealed partial class BuildFileTests
                     ["DependsOnTargets"] = ManifestTarget + ";" + ListSidecarsTarget,
                     ["Inputs"] = "@(SqlSourceOnlineInput);@(Compile)",
                     ["Outputs"] = "$(SqlSourceOnlineStamp)",
+                    ["Returns"] = "@(SqlSourceOnlineFile)",
                 }
             );
     }
@@ -551,10 +563,24 @@ public sealed partial class BuildFileTests
                 }
             );
         // In FileWrites whatever the run did, as when it is skipped, or IncrementalClean would delete the stamp of an
-        // earlier build.
+        // earlier build.  The files it writes under obj, the manifest only when it is the build's own, are what it
+        // returns, for a framework's build that called it in a configuration of its own to add to FileWrites.
         var written = target.Elements("ItemGroup").Last();
         written.Attributes().ShouldBeEmpty();
-        written.Elements().Select(Item).ShouldBe([("FileWrites", "Include=$(SqlSourceOnlineStamp)")]);
+        written
+            .Elements()
+            .Select(Item)
+            .ShouldBe([
+                ("FileWrites", "Include=$(SqlSourceOnlineStamp)"),
+                (
+                    "SqlSourceOnlineFile",
+                    "Include=$(SqlSourceOnlineStamp);$(SqlSourceSidecarList);$(SqlSourceOnlineValueFile)"
+                ),
+                (
+                    "SqlSourceOnlineFile",
+                    "Include=$(SqlSourceManifestFile) Condition='$(SqlSourceManifestIsDefault)' == 'true'"
+                ),
+            ]);
     }
 
     // SqlSourceOnline is auto, true or false; any other value stops the build.
@@ -620,8 +646,8 @@ public sealed partial class BuildFileTests
     }
 
     // The outer build of a multi-targeted project runs the tool for the first framework before it dispatches the inner
-    // builds, under the run's condition, so that they still run side by side: each framework but the first calls the
-    // run in the first framework's configuration, which this call has built.
+    // builds, under the run's condition, in the configuration of its own that every inner build's call names, so
+    // that those calls are answered at once.
     [Fact]
     public void Outer_Target_RunsTheToolForTheFirstFrameworkBeforeTheDispatch()
     {
@@ -644,7 +670,7 @@ public sealed partial class BuildFileTests
                 {
                     ["Projects"] = "$(MSBuildProjectFullPath)",
                     ["Targets"] = RunOnlineTarget,
-                    ["Properties"] = "TargetFramework=$(SqlSourceFirstFramework)",
+                    ["Properties"] = OnlineRunConfiguration,
                 }
             );
         target.Elements().Single().Name.LocalName.ShouldBe("MSBuild");
