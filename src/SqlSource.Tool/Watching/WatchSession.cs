@@ -26,9 +26,15 @@ namespace SqlSource.Tool.Watching;
 /// error, or when a listed path that was deleted is still gone.
 /// </para>
 /// <para>
-/// What a change asks is decided when it comes, by the <see cref="WatchSet" /> of the last pass, and a change that
-/// asks nothing is dropped.  A pass starts once <see cref="Debounce" /> has passed since the last change it covers, by
-/// <see cref="ToolHost.Time" />, and a change that comes during a pass makes one more pass after it.
+/// What a change asks is decided when it comes, by the <see cref="WatchSet" /> of the last evaluation, and a change
+/// that asks nothing is dropped.  One that comes while the projects are evaluated is kept as it came, and read by the
+/// sets before and after the evaluation once it ends.  A pass starts once <see cref="Debounce" /> has passed since the
+/// last change it covers, by <see cref="ToolHost.Time" />, and a change that comes during a pass makes one more pass
+/// after it.
+/// </para>
+/// <para>
+/// The folders of the first set are watched before the first pass, and those of each evaluation's set as soon as it
+/// ends, before the pass reads a file, so that no change of a pass is missed.  A folder of both sets keeps its watch.
 /// </para>
 /// </remarks>
 internal sealed class WatchSession
@@ -57,7 +63,8 @@ internal sealed class WatchSession
     private readonly Reporter _session;
     private readonly Action<LogValue> _counted;
 
-    // The changes that came since the last pass began, and what they ask.  Guarded by _gate, as _set is.
+    // The changes that came since the last pass began, and what they ask, and those that came during the evaluation
+    // under way, null when there is none, which are read when it ends.  Guarded by _gate, as _set is.
     private readonly object _gate = new();
     private readonly HashSet<string> _gone = [with(RunProjects.PathComparer)];
     private readonly HashSet<(string Folder, string Message)> _reported = [];
@@ -66,10 +73,14 @@ internal sealed class WatchSession
     private long _lastChange;
     private TaskCompletionSource _wake = NewWake();
     private WatchSet _set;
+    private List<(FileChange Change, long At)>? _duringEvaluation;
 
-    // Read and written by the loop alone.
-    private readonly List<IDisposable> _watches = [];
-    private ImmutableArray<(string Folder, bool Recursive)> _watched = [];
+    // Read and written by the loop alone: the watch of each folder, by its path, with a null watch for one that could
+    // not start, which is not tried again while the folder stays in the set.
+    private readonly Dictionary<string, (bool Recursive, IDisposable? Watch)> _watches =
+    [
+        with(RunProjects.PathComparer),
+    ];
     private ImmutableArray<ProjectManifest> _manifests = [];
     private bool _evaluationFailed = true;
     private int _pass;
@@ -121,11 +132,11 @@ internal sealed class WatchSession
 
     private async Task LoopAsync(RunMode firstMode, CancellationToken cancellationToken)
     {
+        // Before the first pass reads a file, so that a change made during it makes one more pass.
+        Watch(_set);
         await PassAsync(0, evaluate: true, firstMode, cancellationToken);
         while (!cancellationToken.IsCancellationRequested)
         {
-            Watch();
-
             // The wait begins before the marker, so that whoever reads the marker sees the wait for a change that came
             // during the pass.
             var next = NextChangesAsync(cancellationToken);
@@ -191,19 +202,43 @@ internal sealed class WatchSession
     }
 
     // Runs the manifest targets again, and keeps what they gave: the manifests, the set that the changes are read by,
-    // and whether the evaluation reported an error, which makes the next pass evaluate again.
+    // and whether the evaluation reported an error, which makes the next pass evaluate again.  Then watches the folders
+    // of the new set, before the pass reads a file.
     private async Task EvaluateAsync(Reporter reporter, CancellationToken cancellationToken)
     {
         _evaluationFailed = true;
         var errors = reporter.Count;
-        var found = await DescribeCommand.FindManifestsAsync(_unit, _usage, _host, reporter, cancellationToken);
-        _manifests = found.Manifests;
-        _evaluationFailed = reporter.Count > errors;
-        var set = WatchSet.Of(_unit.Path, _unitFolder, found.Projects, found.Manifests);
         lock (_gate)
         {
-            _set = set;
+            _duringEvaluation = [];
         }
+
+        WatchSet? set = null;
+        try
+        {
+            var found = await DescribeCommand.FindManifestsAsync(_unit, _usage, _host, reporter, cancellationToken);
+            _manifests = found.Manifests;
+            _evaluationFailed = reporter.Count > errors;
+            set = WatchSet.Of(_unit.Path, _unitFolder, found.Projects, found.Manifests);
+        }
+        finally
+        {
+            // A change during the evaluation may be of what it read or of what it gives, so it asks as much as the
+            // larger of the two sets says.  An evaluation that threw leaves the set as it was.
+            lock (_gate)
+            {
+                var before = _set;
+                _set = set ?? before;
+                foreach (var (change, at) in _duringEvaluation)
+                {
+                    KeepIfItAsks(change, at, before);
+                }
+
+                _duringEvaluation = null;
+            }
+        }
+
+        Watch(set);
     }
 
     // Waits for the changes of the next pass: until a change comes, then until Debounce has passed since the last
@@ -257,22 +292,59 @@ internal sealed class WatchSession
         }
     }
 
-    // What a watch tells of a change: kept, with what it asks, when it asks something.
+    // What a watch tells of a change: kept, with what it asks, when it asks something.  One of the tool's own
+    // temporary folder, where an evaluation writes the manifests, is dropped.  One that comes during an evaluation is
+    // kept as it came until the evaluation ends.
     private void Changed(FileChange change)
     {
+        if (IsTemporary(change.Path) && (change.OldPath is null || IsTemporary(change.OldPath)))
+        {
+            return;
+        }
+
         lock (_gate)
         {
-            var effect = _set.Classify(change);
-            var gone = _set.Gone(change);
-            if (effect == WatchEffect.None && gone.IsEmpty)
+            var at = _host.Time.GetTimestamp();
+            if (_duringEvaluation is { } held)
             {
+                held.Add((change, at));
                 return;
             }
 
-            _gone.UnionWith(gone);
-            Keep(effect);
+            KeepIfItAsks(change, at, _set);
         }
     }
+
+    // Keeps the change, which came at the time given, with what it asks by the current set and by the one given, when
+    // it asks something.  Under _gate.
+    private void KeepIfItAsks(FileChange change, long at, WatchSet other)
+    {
+        var effect = _set.Classify(change);
+        var gone = _set.Gone(change);
+        if (!ReferenceEquals(other, _set))
+        {
+            var effectBefore = other.Classify(change);
+            effect = effectBefore > effect ? effectBefore : effect;
+            gone = [.. gone.Union(other.Gone(change), RunProjects.PathComparer)];
+        }
+
+        if (effect == WatchEffect.None && gone.IsEmpty)
+        {
+            return;
+        }
+
+        _gone.UnionWith(gone);
+        Keep(effect, at);
+    }
+
+    // True for a path below the tool's own temporary folder.
+    private bool IsTemporary(string path) =>
+        path.StartsWith(
+            Path.EndsInDirectorySeparator(_host.TempDirectory)
+                ? _host.TempDirectory
+                : _host.TempDirectory + Path.DirectorySeparatorChar,
+            StringComparison.OrdinalIgnoreCase
+        );
 
     // What a watch tells of its failure, a lost batch of events included, and what a watch that cannot start is: the
     // folder may have changed unseen, so the next pass evaluates.  A lost batch of events is not reported.  Any other
@@ -283,7 +355,7 @@ internal sealed class WatchSession
         bool report;
         lock (_gate)
         {
-            Keep(WatchEffect.Evaluate);
+            Keep(WatchEffect.Evaluate, _host.Time.GetTimestamp());
             report = !failure.Overflow && _reported.Add((failure.Folder, failure.Message));
         }
 
@@ -297,43 +369,62 @@ internal sealed class WatchSession
         }
     }
 
-    // Under _gate.
-    private void Keep(WatchEffect effect)
+    // Under _gate.  A change held through an evaluation keeps the time it came, which may be before the last one kept.
+    private void Keep(WatchEffect effect, long at)
     {
         _changes++;
         _effect = effect > _effect ? effect : _effect;
-        _lastChange = _host.Time.GetTimestamp();
+        _lastChange = Math.Max(_lastChange, at);
         _ = _wake.TrySetResult();
     }
 
-    // Watches the folders of the set of the last evaluation, when they are not the ones watched already.  A folder that
-    // does not exist is skipped.
-    private void Watch()
+    // Watches each folder of the set that has no watch yet, then stops the watch of each folder that the set no longer
+    // holds, so that a folder of both is watched throughout.  A folder that does not exist is skipped, and tried again
+    // by the next set; one whose watch could not start is not, while it stays in the set.  Nothing for no set.
+    private void Watch(WatchSet? set)
     {
-        WatchSet set;
-        lock (_gate)
-        {
-            set = _set;
-        }
-
-        if (set.Folders.SequenceEqual(_watched))
+        if (set is null)
         {
             return;
         }
 
-        CloseWatches();
-        _watched = set.Folders;
         var poll = PollsForChanges();
-        foreach (var (folder, recursive) in set.Folders.Where(static entry => Directory.Exists(entry.Folder)))
+        var opened = new List<(string Folder, bool Recursive, IDisposable? Watch)>();
+        foreach (var (folder, recursive) in set.Folders)
         {
+            if (
+                (_watches.TryGetValue(folder, out var open) && open.Recursive == recursive) || !Directory.Exists(folder)
+            )
+            {
+                continue;
+            }
+
+            IDisposable? watch = null;
             try
             {
-                _watches.Add(_host.Watch(new WatchRequest(folder, recursive, Poll: poll, Changed, Failed)));
+                watch = _host.Watch(new WatchRequest(folder, recursive, Poll: poll, Changed, Failed));
             }
             catch (Exception exception) when (exception is not OutOfMemoryException)
             {
                 Failed(new WatchFailure(folder, Overflow: false, exception.Message));
             }
+
+            opened.Add((folder, recursive, watch));
+        }
+
+        var held = set.Folders.Select(static entry => entry.Folder).ToHashSet(RunProjects.PathComparer);
+        foreach (var (folder, open) in _watches.ToList())
+        {
+            if (!held.Contains(folder) || opened.Exists(entry => RunProjects.PathComparer.Equals(entry.Folder, folder)))
+            {
+                open.Watch?.Dispose();
+                _ = _watches.Remove(folder);
+            }
+        }
+
+        foreach (var (folder, recursive, watch) in opened)
+        {
+            _watches[folder] = (recursive, watch);
         }
     }
 
@@ -344,9 +435,9 @@ internal sealed class WatchSession
 
     private void CloseWatches()
     {
-        foreach (var watch in _watches)
+        foreach (var (_, watch) in _watches.Values)
         {
-            watch.Dispose();
+            watch?.Dispose();
         }
 
         _watches.Clear();

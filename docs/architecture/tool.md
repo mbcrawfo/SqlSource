@@ -203,12 +203,13 @@ A [capture](README.md#capture) is a file that is committed or sent, and it holds
 
 ```mermaid
 flowchart TD
-    find["DescribeCommand.FindUnit"] --> first["pass 1: evaluate, then plan and describe in the mode of the command line"]
-    first --> watch["open the watches of WatchSet.Folders, then write WatchingMarker"]
-    watch --> wait["wait for a kept change, then for Debounce after the last one"]
+    find["DescribeCommand.FindUnit"] --> open["watch the folders of the unit's first WatchSet"]
+    open --> first["pass 1: evaluate and watch the new set's folders, then plan and describe in the mode of the command line"]
+    first --> watching["write WatchingMarker"]
+    watching --> wait["wait for a kept change, then for Debounce after the last one"]
     wait --> marker["write ChangeDetectedMarker"]
-    marker --> pass["pass n: evaluate when asked, plan from the kept manifests, describe"]
-    pass --> watch
+    marker --> pass["pass n: when asked, evaluate and watch the new set's folders; plan from the kept manifests, describe"]
+    pass --> watching
 ```
 
 ### The steps a pass reuses
@@ -228,11 +229,11 @@ The first pass runs in the mode of `DescribeCommand.ModeOf`, so `--force` forces
 
 Each pass has a [`Reporter`](../../src/SqlSource.Tool/Reporting/Reporter.cs) of its own over the session's trace, so its errors go to standard error and to the log, and count only in the pass.  A pass that reported an error therefore leaves the next one free to delete a sidecar, which `DescribeRun` allows only in a run in which nothing has been reported, and the session's own reporter, whose count `Cli.ExitCodeOf` reads, holds only what the session reports itself.  A pass catches a `DescriberFaultException`, and reports the `SQLSRC200` it holds, and any other exception but a cancellation of the token, and reports `UnexpectedFailure.Of` of it, as `Cli.RunCommandAsync` does for a run; then the session goes on.  A cancellation ends the session, and the watches are closed in a `finally`.
 
-After each pass the session opens the watches of `WatchSet.Folders`, only when they are not the folders it watches already, and skips a folder that does not exist.  It starts to wait for the next changes, and only then writes `WatchSession.WatchingMarker` to standard output, so that a change that came during the pass already has its timer when the marker is read.  When the wait ends it writes `WatchSession.ChangeDetectedMarker` and runs the next pass.  The two markers are the session's constants, since a recipe of an editor reads them.
+Before the first pass the session watches the folders of the first `WatchSet`, made from the unit alone: its folder with the folders below, and the folders of `DotEnvSearch.FoldersOf` of it.  Each evaluation then watches the folders of the set it gives as soon as it ends, inside its pass and before `PlanFromAsync` reads a file, so that a change made during any pass, the first included, is seen: it watches each folder of the new set that has no watch yet, and only then stops the watch of each folder that the set no longer holds, so that a folder of both keeps its watch and a poller its last listing.  A pass that does not evaluate changes no watch.  A folder that does not exist is skipped, and tried again by the next evaluation.  After each pass the session starts to wait for the next changes, and only then writes `WatchSession.WatchingMarker` to standard output, so that a change that came during the pass already has its timer when the marker is read.  When the wait ends it writes `WatchSession.ChangeDetectedMarker` and runs the next pass.  The two markers are the session's constants, since a recipe of an editor reads them.
 
 ### Changes and the debounce
 
-A watch calls `WatchRequest.Changed` with each event as a [`FileChange`](../../src/SqlSource.Tool/Watching/FileChange.cs), on a thread of its own.  The session classifies it at once, under its lock, by the `WatchSet` of the last evaluation: `WatchSet.Classify` gives what it asks, `WatchSet.Gone` the listed paths it may have removed, and a change that gives neither is dropped.  A kept change adds one to the count of changes, raises the effect to the larger of the two, `WatchEffect` being ordered, notes the time of `ToolHost.Time`, and wakes the wait.
+A watch calls `WatchRequest.Changed` with each event as a [`FileChange`](../../src/SqlSource.Tool/Watching/FileChange.cs), on a thread of its own.  The session classifies it at once, under its lock, by the `WatchSet` of the last evaluation: `WatchSet.Classify` gives what it asks, `WatchSet.Gone` the listed paths it may have removed, and a change that gives neither is dropped.  While a pass evaluates, from just before `FindManifestsAsync` until the new set is in place, the session keeps each change as it came, with its time, and classifies it when the evaluation ends, by the set before it and the set it gave, keeping the larger effect and the paths that either says are gone: the change may be of a file that the evaluation read or of one that it now lists.  An evaluation that throws leaves the set as it was and still classifies what it kept.  A change below `ToolHost.TempDirectory`, where an evaluation writes the manifests, is the tool's own and dropped, unless it is a rename from a path outside it.  A kept change adds one to the count of changes, raises the effect to the larger of the two, `WatchEffect` being ordered, notes the time it came by `ToolHost.Time` when it is the latest yet, and wakes the wait.
 
 The wait ends once `WatchSession.Debounce`, 300 ms, has passed by `ToolHost.Time` since the last kept change, with `Task.Delay` on that clock, so a test moves it with [`TestClock`](../../tests/SqlSource.Tool.Testing/TestClock.cs).  A change that comes during the delay moves the end on.  A change that comes during a pass is kept in the same way, so the wait after that pass ends once `Debounce` has passed since the last of them, often at once, with one more pass that covers every change since the last pass began.  `pass.start` holds the count of those changes and whether the pass evaluated, and `pass.end` the pass's errors and its duration ([the trace](#the-trace)).
 
@@ -264,7 +265,7 @@ Every watch comes through `ToolHost.Watch`, which takes a [`WatchRequest`](../..
 
 The session asks to poll when `DOTNET_USE_POLLING_FILE_WATCHER`, read through `ToolHost.GetEnvironmentVariable`, is `true` ignoring case or `1`, as .NET's own watchers read it.  `FileSystemWatcher` does not read the variable itself.  The tests' hosts of [`Hosts`](../../tests/SqlSource.Tool.Testing/Hosts.cs) watch only under the system's temporary folder, and the session's tests give a [`FakeFolderWatcher`](../../tests/SqlSource.Tool.Tests/FakeFolderWatcher.cs) that raises a test's changes and failures.
 
-A `WatchFailure`, and a `ToolHost.Watch` that throws, keep a change that asks to evaluate, since the folder may have changed unseen.  One that is not an overflow is also reported on the session's reporter as `SQLSRC287`, with a help line that names the variable, once for each folder and message in the session, since a limit of the system raises the same error again and again.  A watch that could not start is not tried again until the set's folders change.
+A `WatchFailure`, and a `ToolHost.Watch` that throws, keep a change that asks to evaluate, since the folder may have changed unseen.  One that is not an overflow is also reported on the session's reporter as `SQLSRC287`, with a help line that names the variable, once for each folder and message in the session, since a limit of the system raises the same error again and again.  A watch that could not start is not tried again while its folder stays in the set.
 
 ### How a watch ends
 

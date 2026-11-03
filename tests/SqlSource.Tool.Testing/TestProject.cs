@@ -96,6 +96,14 @@ internal sealed class TestProject
     // gone.
     public void ListSettings(string fullPath) => _settings.Add(fullPath);
 
+    // A file the project no longer lists, which stays on the disk.
+    public void Unlist(string fullPath)
+    {
+        _ = _sql.Remove(fullPath);
+        _ = _settings.Remove(fullPath);
+        _ = _compile.Remove(fullPath);
+    }
+
     public string ManifestText()
     {
         var text = new StringBuilder();

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
@@ -174,7 +175,11 @@ public sealed class WatchEndingTests : IAsyncDisposable
 
         result.ShouldBe(new CliResult(0, "", ""));
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
-        _watch.Watcher.Requests.ShouldBeEmpty();
+        // The unit's folder was watched from before the first pass, and is no longer.
+        _watch
+            .Watcher.Requests.Select(request => (request.Folder, request.Recursive))
+            .ShouldBe([(_watch.Run.Folder.Path, true)]);
+        _watch.Watcher.Open.ShouldBeEmpty();
     }
 
     [Fact]
