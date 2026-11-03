@@ -27,7 +27,7 @@ public sealed class SqlClientProbeTests
 
         namespace App;
 
-        [SqlSourceGenerate]
+        [SqlSourceGenerate(Source = ".")]
         public partial class Sample;
         """;
 

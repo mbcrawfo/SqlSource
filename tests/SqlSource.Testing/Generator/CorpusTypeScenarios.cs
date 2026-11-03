@@ -19,29 +19,29 @@ internal static partial class QueryMethodCorpus
 
         namespace App
         {
-            [SqlSourceGenerate(Path = "Sample.sql")]
+            [SqlSourceGenerate(Source = "Sample.sql")]
             public partial class Sample;
 
-            [SqlSourceGenerate(Path = "InternalSample.sql")]
+            [SqlSourceGenerate(Source = "InternalSample.sql")]
             internal partial class InternalSample;
 
-            [SqlSourceGenerate(Path = "PublicSample.sql", MethodLocation = MethodLocation.Public)]
+            [SqlSourceGenerate(Source = "PublicSample.sql", MethodLocation = MethodLocation.Public)]
             public partial class PublicSample;
 
-            [SqlSourceGenerate(Path = "InternalPlacement.sql", MethodLocation = MethodLocation.Internal)]
+            [SqlSourceGenerate(Source = "InternalPlacement.sql", MethodLocation = MethodLocation.Internal)]
             public partial class InternalPlacement;
 
-            [SqlSourceGenerate(Path = "PrivatePlacement.sql", MethodLocation = MethodLocation.Private)]
+            [SqlSourceGenerate(Source = "PrivatePlacement.sql", MethodLocation = MethodLocation.Private)]
             public partial class PrivatePlacement;
 
             public partial class Outer
             {
-                [SqlSourceGenerate(Path = "Inner.sql", MethodLocation = MethodLocation.Public)]
+                [SqlSourceGenerate(Source = "Inner.sql", MethodLocation = MethodLocation.Public)]
                 public partial class Inner;
             }
         }
 
-        [SqlSourceGenerate(Path = "GlobalSample.sql")]
+        [SqlSourceGenerate(Source = "GlobalSample.sql")]
         public partial class GlobalSample;
         """;
 
@@ -53,25 +53,25 @@ internal static partial class QueryMethodCorpus
 
         namespace App
         {
-            [SqlSourceGenerate(Path = "Users.sql")]
+            [SqlSourceGenerate(Source = "Users.sql")]
             public partial class Sample;
 
             public partial class First
             {
-                [SqlSourceGenerate(Path = "A.sql")]
+                [SqlSourceGenerate(Source = "A.sql")]
                 public partial class Queries;
             }
 
             public partial class Second
             {
-                [SqlSourceGenerate(Path = "B.sql")]
+                [SqlSourceGenerate(Source = "B.sql")]
                 public partial class Queries;
             }
         }
 
         namespace App.Blocked
         {
-            [SqlSourceGenerate(Path = "Blocked.sql")]
+            [SqlSourceGenerate(Source = "Blocked.sql")]
             public partial class Sample;
 
             public static class SampleExtensions;

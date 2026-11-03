@@ -260,7 +260,7 @@ public sealed class CachingModelTests
 
             namespace App.Admin;
 
-            [SqlSourceGenerate(Path = "Users.sql")]
+            [SqlSourceGenerate(Source = "Users.sql")]
             public partial class AdminQueries;
             """,
             GeneratorHarness.ParseOptions,

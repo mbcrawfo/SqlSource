@@ -47,8 +47,9 @@ public sealed class GeneratedSourceOrderTests
     [InlineData("../Queries", "FromQueriesOrders", "FromQueriesUsers")]
     [InlineData("Sub", "FromSub")]
     [InlineData("./Sub/", "FromSub")]
-    [InlineData("", "FromRepo")]
-    public void Run_Path_SelectsAFileOrTheFilesOfAFolder(string path, params string[] expectedMembers)
+    [InlineData(".", "FromSample", "FromRepo")]
+    [InlineData("", "FromSample")]
+    public void Run_Source_SelectsAFileOrTheFilesOfAFolder(string path, params string[] expectedMembers)
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
@@ -57,10 +58,11 @@ public sealed class GeneratedSourceOrderTests
 
             namespace App;
 
-            [SqlSourceGenerate(Path = @"{{path}}", SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = @"{{path}}", SqlLocation = SqlLocation.Direct)]
             public partial class Sample;
             """,
             new SqlFile(GeneratorHarness.UsersPath, "-- name: FromRepo\nSELECT 1;\n"),
+            new SqlFile("/app/Repo/Sample.sql", "-- name: FromSample\nSELECT 5;\n"),
             new SqlFile("/app/Repo/Sub/Users.sql", "-- name: FromSub\nSELECT 2;\n"),
             new SqlFile("/app/Queries/Users.sql", "-- name: FromQueriesUsers\nSELECT 3;\n"),
             new SqlFile("/app/Queries/Orders.sql", "-- name: FromQueriesOrders\nSELECT 4;\n")
@@ -82,7 +84,7 @@ public sealed class GeneratedSourceOrderTests
             [
                 new SourceFile(
                     @"C:\app\Repo\Sample.cs",
-                    "[SqlSource.SqlSourceGenerate]\n"
+                    "[SqlSource.SqlSourceGenerate(Source = \".\")]\n"
                         + "public partial class Sample { public string Value => Sql.GetUser; }\n"
                 ),
             ],
@@ -103,13 +105,13 @@ public sealed class GeneratedSourceOrderTests
 
             namespace App;
 
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class First
             {
                 public static string Value => Sql.GetUser;
             }
 
-            [SqlSourceGenerate(Path = "Users.sql", SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = "Users.sql", SqlLocation = SqlLocation.Direct)]
             public partial class Second
             {
                 public static string Value => GetUser;

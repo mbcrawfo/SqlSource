@@ -12,11 +12,20 @@ namespace SqlSource.Tests.EndToEnd;
 public sealed class EndToEndTests
 {
     [Fact]
-    public void NestedLocation_DefaultFolder_HasAConstantForEachQueryOfEachFile()
+    public void NestedLocation_SourceDot_HasAConstantForEachQueryOfEachFile()
     {
         UserQueries.GetUserSql.ShouldBe("SELECT id, name\nFROM users\nWHERE id = @id;");
         UserQueries.ListUsersSql.ShouldBe("SELECT id, name\nFROM users\nORDER BY name;");
         UserQueries.CountUsersSql.ShouldBe("SELECT COUNT(*) FROM users;");
+    }
+
+    [Fact]
+    public void DirectLocation_NoSource_TakesTheFileNamedForTheType()
+    {
+        // Evaluated by the compiler: the member is a constant.
+        const string Sql = Named.NamedQueries.GetNamed;
+
+        Sql.ShouldBe("SELECT id FROM users WHERE name = @name;");
     }
 
     [Fact]

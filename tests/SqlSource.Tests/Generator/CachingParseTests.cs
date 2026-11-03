@@ -359,7 +359,7 @@ public sealed class CachingParseTests
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var driver = _scene.FirstRun(OutputKind.Sql, compilation);
 
-        var result = Run(driver, WithArgumentsOnUserQueries(compilation, "Path = \"../Orders/Orders.sql\""));
+        var result = Run(driver, WithArgumentsOnUserQueries(compilation, "Source = \"../Orders/Orders.sql\""));
 
         AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Modified]);
         Claims(result)

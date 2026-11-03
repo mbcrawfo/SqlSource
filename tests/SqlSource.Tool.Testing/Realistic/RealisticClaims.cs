@@ -80,12 +80,12 @@ internal static partial class RealisticClaims
             _ => attribute.Name.ToString(),
         };
 
-    // The case of the attribute's Path, which names the query of a folder of Cases relative to this file's folder.
+    // The case of the attribute's Source, which names the query of a folder of Cases relative to this file's folder.
     private static string CaseOf(ClassDeclarationSyntax type, AttributeSyntax attribute)
     {
         var path = attribute
             .ArgumentList?.Arguments.Where(static argument =>
-                argument.NameEquals?.Name.Identifier.ValueText == AttributeSource.PathProperty
+                argument.NameEquals?.Name.Identifier.ValueText == AttributeSource.SourceProperty
             )
             .Select(static argument => argument.Expression)
             .OfType<LiteralExpressionSyntax>()

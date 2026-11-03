@@ -120,13 +120,13 @@ public sealed class LibraryDiagnosticsTests
 
             namespace First
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Repo;
             }
 
             namespace Second
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Repo;
             }
             """;
@@ -244,13 +244,13 @@ public sealed class LibraryDiagnosticsTests
 
             namespace First
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Repo;
             }
 
             namespace Second
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Repo;
             }
             """;

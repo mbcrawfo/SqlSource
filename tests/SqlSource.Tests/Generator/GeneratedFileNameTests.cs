@@ -23,16 +23,16 @@ public sealed class GeneratedFileNameTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
 
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample<T>;
             }
 
             namespace Other
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
             }
             """,
@@ -65,19 +65,19 @@ public sealed class GeneratedFileNameTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample { public static string Value => Sql.GetUser; }
 
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class sample { public static string Value => Sql.GetUser; }
 
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Other { public static string Value => Sql.GetUser; }
             }
 
             namespace APP
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample { public static string Value => Sql.GetUser; }
             }
             """,
@@ -100,7 +100,7 @@ public sealed class GeneratedFileNameTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             """
-            [SqlSource.SqlSourceGenerate]
+            [SqlSource.SqlSourceGenerate(Source = ".")]
             public partial class SqlSourceGenerateAttribute
             {
                 public static string Value => Sql.GetUser;
@@ -124,7 +124,7 @@ public sealed class GeneratedFileNameTests
             """
             namespace App;
 
-            [SqlSource.SqlSourceGenerate]
+            [SqlSource.SqlSourceGenerate(Source = ".")]
             public partial class \u0053ample
             {
                 public static string Value => Sql.GetUser;
@@ -144,8 +144,14 @@ public sealed class GeneratedFileNameTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             [
-                new SourceFile("/app/Repo/Sample.cs", "[SqlSource.SqlSourceGenerate]\npublic partial class Sample;\n"),
-                new SourceFile("/app/Other/Sample.cs", "[SqlSource.SqlSourceGenerate]\npublic partial class Sample;\n"),
+                new SourceFile(
+                    "/app/Repo/Sample.cs",
+                    "[SqlSource.SqlSourceGenerate(Source = \".\")]\npublic partial class Sample;\n"
+                ),
+                new SourceFile(
+                    "/app/Other/Sample.cs",
+                    "[SqlSource.SqlSourceGenerate(Source = \".\")]\npublic partial class Sample;\n"
+                ),
             ],
             [GeneratorHarness.UsersFile, new SqlFile("/app/Other/Orders.sql", "SELECT 2;\n")]
         );

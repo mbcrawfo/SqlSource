@@ -113,9 +113,9 @@ internal sealed class CachingScene
     ) =>
         "using SqlSource;\n\nnamespace "
         + namespaceName
-        + ";\n\n[SqlSourceGenerate"
-        + (arguments is null ? string.Empty : "(" + arguments + ")")
-        + "]\npublic partial class "
+        + ";\n\n[SqlSourceGenerate("
+        + WithFolder(arguments)
+        + ")]\npublic partial class "
         + typeName
         + (members.Length == 0 ? ";\n" : "\n{\n" + members + "}\n");
 
@@ -390,14 +390,26 @@ internal sealed class CachingScene
     public static Compilation WithParametersOnUserQueries(Compilation compilation, string parameters) =>
         WithArgumentsOnUserQueries(compilation, "Parameters = \"" + parameters + "\"");
 
+    // The arguments of an attribute, with Source = "." first unless they set Source, so that the type gets every .sql
+    // file of its folder.
+    private static string WithFolder(string? arguments)
+    {
+        if (arguments is null)
+        {
+            return "Source = \".\"";
+        }
+
+        return arguments.Contains("Source =", StringComparison.Ordinal) ? arguments : "Source = \".\", " + arguments;
+    }
+
     // The compilation with these arguments on the attribute of UserQueries.
     public static Compilation WithArgumentsOnUserQueries(Compilation compilation, string arguments) =>
         compilation.ReplaceSyntaxTree(
             compilation.SyntaxTrees.Single(tree => tree.FilePath == UsersSourcePath),
             CSharpSyntaxTree.ParseText(
                 UsersSource.Replace(
-                    "[SqlSourceGenerate]",
-                    "[SqlSourceGenerate(" + arguments + ")]",
+                    "[SqlSourceGenerate(Source = \".\")]",
+                    "[SqlSourceGenerate(" + WithFolder(arguments) + ")]",
                     StringComparison.Ordinal
                 ),
                 GeneratorHarness.ParseOptions,

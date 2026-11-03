@@ -6,7 +6,7 @@
 
 CREATE TYPE order_status AS ENUM ('pending', 'shipped', 'cancelled');
 
--- An email address, a domain over text.  CodeGen/Users.sql maps it to the C# type EmailAddress.
+-- An email address, a domain over text.  CodeGen/UserQueries.sql maps it to the C# type EmailAddress.
 CREATE DOMAIN email AS text CHECK (VALUE LIKE '%_@_%');
 
 CREATE TABLE users (
@@ -38,8 +38,8 @@ CREATE TABLE order_lines (
 -- PostGIS, which Postgis/Dockerfile installs, for the geography of a delivery.
 CREATE EXTENSION postgis;
 
--- Where and when an order arrived, and the carrier's details, a JSON object.  CodeGen/Deliveries.sql reads location as
--- NetTopologySuite's Geometry and details as the C# class DeliveryDetails.
+-- Where and when an order arrived, and the carrier's details, a JSON object.  CodeGen/DeliveryQueries.sql reads
+-- location as NetTopologySuite's Geometry and details as the C# class DeliveryDetails.
 CREATE TABLE deliveries (
     order_id integer PRIMARY KEY REFERENCES orders (id),
     delivered_at timestamptz NOT NULL,

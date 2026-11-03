@@ -60,10 +60,10 @@ public sealed class SharedModelTests
 
         namespace App
         {
-            [SqlSourceGenerate(Output = GeneratorOutput.CodeGen)]
+            [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.CodeGen)]
             public partial class Repo;
 
-            [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+            [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Models)]
             public partial class Dtos;
         }
         """;
@@ -318,11 +318,11 @@ public sealed class SharedModelTests
     public void Run_GenericAndPlainTypeOfOneName_AreOrderedByArity(bool genericFirst)
     {
         const string Generic = """
-                [SqlSourceGenerate(OutputModelType = GeneratorModelType.Class)]
+                [SqlSourceGenerate(Source = ".", OutputModelType = GeneratorModelType.Class)]
                 public partial class Repo<T>;
             """;
         const string Plain = """
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Repo;
             """;
         var source =
@@ -351,10 +351,10 @@ public sealed class SharedModelTests
 
             namespace App
             {
-                [SqlSourceGenerate(OutputModelType = GeneratorModelType.Class)]
+                [SqlSourceGenerate(Source = ".", OutputModelType = GeneratorModelType.Class)]
                 public partial class Repo<TKey, TValue>;
 
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Repo<TKey>;
             }
             """;
@@ -379,10 +379,10 @@ public sealed class SharedModelTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class First;
 
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Second;
             }
             """;
@@ -402,13 +402,13 @@ public sealed class SharedModelTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class First;
             }
 
             namespace Other
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Second;
             }
             """;
@@ -428,10 +428,10 @@ public sealed class SharedModelTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 internal partial class First;
 
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Second;
             }
             """;
@@ -818,7 +818,7 @@ public sealed class SharedModelTests
 
             namespace App
             {
-                [SqlSourceGenerate(Output = GeneratorOutput.CodeGen)]
+                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.CodeGen)]
                 public partial class Repo;
             }
             """;

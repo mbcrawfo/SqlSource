@@ -426,7 +426,7 @@ public sealed class ModelTests
         var source = """
             using SqlSource;
 
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
             """;
 
@@ -456,7 +456,7 @@ public sealed class ModelTests
 
             namespace App.@class
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
             }
             """;
@@ -490,7 +490,10 @@ public sealed class ModelTests
     [Theory]
     [InlineData("public partial class Sample;", "public")]
     [InlineData("internal partial class Sample;", "internal")]
-    [InlineData("internal partial class Outer { [SqlSourceGenerate] public partial class Sample; }", "internal")]
+    [InlineData(
+        "internal partial class Outer { [SqlSourceGenerate(Source = \".\")] public partial class Sample; }",
+        "internal"
+    )]
     public void Run_TypesAccessibility_IsTheModels(string declaration, string expected)
     {
         var source =
@@ -498,7 +501,7 @@ public sealed class ModelTests
             + (
                 declaration.StartsWith("internal partial class Outer", StringComparison.Ordinal)
                     ? declaration
-                    : "[SqlSourceGenerate]\n" + declaration
+                    : "[SqlSourceGenerate(Source = \".\")]\n" + declaration
             )
             + "\n}\n";
 
@@ -685,13 +688,13 @@ public sealed class ModelTests
 
             namespace App
             {
-                [SqlSourceGenerate(Output = GeneratorOutput.Sql)]
+                [SqlSourceGenerate(Source = ".", Output = GeneratorOutput.Sql)]
                 public partial class First;
             }
 
             namespace Other
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Second;
             }
             """;
@@ -711,13 +714,13 @@ public sealed class ModelTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample;
             }
 
             namespace Broken
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public class NotPartial;
             }
             """;
@@ -740,13 +743,13 @@ public sealed class ModelTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class First;
             }
 
             namespace Other
             {
-                [SqlSourceGenerate(Path = "Users.sql")]
+                [SqlSourceGenerate(Source = "Users.sql")]
                 public partial class Second;
             }
             """;
@@ -780,13 +783,13 @@ public sealed class ModelTests
 
             namespace App
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class First;
             }
 
             namespace Other
             {
-                [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+                [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
                 public partial class Second;
             }
             """;
@@ -810,13 +813,13 @@ public sealed class ModelTests
 
             namespace App
             {
-                [SqlSourceGenerate(Parameters = "keep-comments")]
+                [SqlSourceGenerate(Source = ".", Parameters = "keep-comments")]
                 public partial class First;
             }
 
             namespace Other
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Second;
             }
             """;

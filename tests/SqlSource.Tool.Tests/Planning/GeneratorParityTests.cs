@@ -30,10 +30,76 @@ public sealed class GeneratorParityTests : IDisposable
 
     private static readonly Dictionary<string, Case> Cases = new()
     {
-        ["no path"] = new(
+        ["the folder"] = new(
             1,
-            [("Repo/Repository.cs", Using + "[SqlSourceGenerate]\ninternal partial class Repository;\n")],
+            [
+                (
+                    "Repo/Repository.cs",
+                    Using + "[SqlSourceGenerate(Source = \".\")]\ninternal partial class Repository;\n"
+                ),
+            ],
             ["Repo/A.sql", "Repo/b.sql", "Repo/Sub/C.sql", "Other/D.sql", "E.sql"]
+        ),
+        ["the default, each type its own file"] = new(
+            3,
+            [
+                (
+                    "Repo/Types.cs",
+                    Using
+                        + "[SqlSourceGenerate]\ninternal partial class UserRepository;\n"
+                        + "[SqlSourceGenerate]\ninternal partial class OrderRepository;\n"
+                        + "[SqlSourceGenerate]\ninternal partial class Repo<T>;\n"
+                ),
+            ],
+            [
+                "Repo/UserRepository.sql",
+                "Repo/orderrepository.SQL",
+                "Repo/Repo.sql",
+                "Repo/Other.sql",
+                "UserRepository.sql",
+            ]
+        ),
+        ["the default, nested and escaped"] = new(
+            3,
+            [
+                (
+                    "Types.cs",
+                    Using
+                        + "internal partial class Outer\n{\n"
+                        + "    [SqlSourceGenerate]\n    private partial class Inner;\n}\n"
+                        + "[SqlSourceGenerate]\ninternal partial class @event;\n"
+                        + "[SqlSourceGenerate]\ninternal partial class \\u0041pp;\n"
+                ),
+            ],
+            ["Inner.sql", "Outer.sql", "event.sql", "App.sql"]
+        ),
+        ["the default, the attribute in one part of a partial type"] = new(
+            1,
+            [
+                ("Repo/UserRepository.cs", "internal partial class UserRepository;\n"),
+                (
+                    "Repo/Queries/UserRepository.Queries.cs",
+                    Using + "[SqlSourceGenerate]\ninternal partial class UserRepository;\n"
+                ),
+            ],
+            ["Repo/UserRepository.sql", "Repo/Queries/UserRepository.sql"]
+        ),
+        ["the folder and the default in one folder"] = new(
+            2,
+            [
+                (
+                    "Repo/Types.cs",
+                    Using
+                        + "[SqlSourceGenerate(Source = \".\")]\ninternal partial class All;\n"
+                        + "[SqlSourceGenerate]\ninternal partial class UserRepository;\n"
+                ),
+            ],
+            ["Repo/UserRepository.sql", "Repo/Orders.sql"]
+        ),
+        ["the default with no file"] = new(
+            1,
+            [("Repo/Missing.cs", Using + "[SqlSourceGenerate]\ninternal partial class Missing;\n")],
+            ["Repo/Other.sql", "Missing.sql"]
         ),
         ["a folder, a file and a path that leaves its folder"] = new(
             4,
@@ -41,10 +107,10 @@ public sealed class GeneratorParityTests : IDisposable
                 (
                     "Repo/Types.cs",
                     Using
-                        + "[SqlSourceGenerate(Path = \"Queries\")]\ninternal partial class A;\n"
-                        + "[SqlSourceGenerate(Path = @\"Queries\\Users.sql\")]\ninternal partial class B;\n"
-                        + "[SqlSourceGenerate(Path = \"../Shared/\")]\ninternal partial class C;\n"
-                        + "[SqlSourceGenerate(Path = \"Nowhere\")]\ninternal partial class D;\n"
+                        + "[SqlSourceGenerate(Source = \"Queries\")]\ninternal partial class A;\n"
+                        + "[SqlSourceGenerate(Source = @\"Queries\\Users.sql\")]\ninternal partial class B;\n"
+                        + "[SqlSourceGenerate(Source = \"../Shared/\")]\ninternal partial class C;\n"
+                        + "[SqlSourceGenerate(Source = \"Nowhere\")]\ninternal partial class D;\n"
                 ),
             ],
             ["Repo/Queries/Orders.sql", "Repo/Queries/Users.sql", "Repo/Queries/Deep/X.sql", "Shared/S.sql"]
@@ -55,15 +121,15 @@ public sealed class GeneratorParityTests : IDisposable
                 (
                     "Types.cs",
                     Using
-                        + "[SqlSourceGenerate(Path = \"\")]\ninternal partial class A;\n"
-                        + "[SqlSourceGenerate(Path = null)]\ninternal partial class B;\n"
-                        + "[SqlSourceGenerate(Path = \" \")]\ninternal partial class C;\n"
-                        + "[SqlSourceGenerate(Path = \"\"\"Q\"\"\")]\ninternal partial class D;\n"
-                        + "[SqlSourceGenerate(Path = \"\\u0051\")]\ninternal partial class E;\n"
-                        + "[SqlSourceGenerate(Path = default)]\ninternal partial class F;\n"
+                        + "[SqlSourceGenerate(Source = \"\")]\ninternal partial class A;\n"
+                        + "[SqlSourceGenerate(Source = null)]\ninternal partial class B;\n"
+                        + "[SqlSourceGenerate(Source = \" \")]\ninternal partial class C;\n"
+                        + "[SqlSourceGenerate(Source = \"\"\"Q\"\"\")]\ninternal partial class D;\n"
+                        + "[SqlSourceGenerate(Source = \"\\u0051\")]\ninternal partial class E;\n"
+                        + "[SqlSourceGenerate(Source = default)]\ninternal partial class F;\n"
                 ),
             ],
-            ["Root.sql", "Q/One.sql"]
+            ["Root.sql", "Q/One.sql", "A.sql", "B.sql", "F.sql"]
         ),
         ["each output"] = new(
             5,
@@ -74,13 +140,13 @@ public sealed class GeneratorParityTests : IDisposable
                         + "[SqlSourceGenerate(Output = GeneratorOutput.Sql)]\ninternal partial class A;\n"
                         + "[SqlSourceGenerate(Output = GeneratorOutput.Models)]\ninternal partial class B;\n"
                         + "[SqlSourceGenerate(Output = SqlSource.GeneratorOutput.CodeGen)]\ninternal partial class C;\n"
-                        + "[SqlSourceGenerate(Output = global::SqlSource.GeneratorOutput.Models, Path = \"Q\")]\n"
+                        + "[SqlSourceGenerate(Output = global::SqlSource.GeneratorOutput.Models, Source = \"Q\")]\n"
                         + "internal partial class D;\n"
                         + "[SqlSourceGenerate(Parameters = \"keep-comments\", ModelNamespace = \"App.Models\")]\n"
                         + "internal partial class E;\n"
                 ),
             ],
-            ["Root.sql", "Q/One.sql"]
+            ["Root.sql", "Q/One.sql", "A.sql", "B.sql", "C.sql", "E.sql"]
         ),
         ["each name of the attribute"] = new(
             4,
@@ -90,11 +156,11 @@ public sealed class GeneratorParityTests : IDisposable
                     "[SqlSource.SqlSourceGenerateAttribute]\ninternal partial class A;\n"
                         + "[global::SqlSource.SqlSourceGenerate]\ninternal partial class B;\n"
                         + "[type: SqlSource.SqlSourceGenerate]\ninternal partial class C;\n"
-                        + "[System.Serializable, SqlSource.SqlSourceGenerate(Path = \"Q\")]\n"
+                        + "[System.Serializable, SqlSource.SqlSourceGenerate(Source = \"Q\")]\n"
                         + "internal partial class D;\n"
                 ),
             ],
-            ["Root.sql", "Q/One.sql"]
+            ["Root.sql", "Q/One.sql", "A.sql", "B.sql", "C.sql"]
         ),
         ["each kind of type"] = new(
             5,
@@ -107,13 +173,13 @@ public sealed class GeneratorParityTests : IDisposable
                         + "    [SqlSourceGenerate]\n    internal partial record B;\n"
                         + "    [SqlSourceGenerate]\n    internal partial record struct C;\n"
                         + "    internal partial class Outer\n    {\n"
-                        + "        [SqlSourceGenerate(Path = \"Q\")]\n        private partial class Inner;\n    }\n"
+                        + "        [SqlSourceGenerate(Source = \"Q\")]\n        private partial class Inner;\n    }\n"
                         + "    [SqlSourceGenerate]\n    internal static partial class E;\n"
                         + "    [SqlSourceGenerate]\n    internal partial interface INotOne;\n"
                         + "}\n"
                 ),
             ],
-            ["Root.sql", "Q/One.sql"]
+            ["Root.sql", "Q/One.sql", "A.sql", "B.sql", "C.sql", "E.sql"]
         ),
         ["a type the generator rejects"] = new(
             2,
@@ -122,10 +188,10 @@ public sealed class GeneratorParityTests : IDisposable
                     "Types.cs",
                     Using
                         + "[SqlSourceGenerate]\ninternal class NotPartial;\n"
-                        + "[SqlSourceGenerate(Path = \"Q\")]\nfile partial class FileLocal;\n"
+                        + "[SqlSourceGenerate(Source = \"Q\")]\nfile partial class FileLocal;\n"
                 ),
             ],
-            ["Root.sql", "Q/One.sql"]
+            ["Root.sql", "Q/One.sql", "NotPartial.sql"]
         ),
         ["an attribute inside #if"] = new(
             1,
@@ -136,7 +202,7 @@ public sealed class GeneratorParityTests : IDisposable
                         + "#if OTHER\n[SqlSource.SqlSourceGenerate]\n#endif\ninternal partial class B;\n"
                 ),
             ],
-            ["Root.sql"],
+            ["Root.sql", "A.sql", "B.sql"],
             ["FEATURE"]
         ),
         ["paths that differ only by case"] = new(
@@ -145,8 +211,8 @@ public sealed class GeneratorParityTests : IDisposable
                 (
                     "Types.cs",
                     Using
-                        + "[SqlSourceGenerate(Path = \"q\")]\ninternal partial class A;\n"
-                        + "[SqlSourceGenerate(Path = \"Q/USERS.sql\")]\ninternal partial class B;\n"
+                        + "[SqlSourceGenerate(Source = \"q\")]\ninternal partial class A;\n"
+                        + "[SqlSourceGenerate(Source = \"Q/USERS.sql\")]\ninternal partial class B;\n"
                 ),
             ],
             ["Q/Users.sql", "Q/users.SQL", "Q/Orders.sql"]
@@ -155,10 +221,10 @@ public sealed class GeneratorParityTests : IDisposable
             2,
             [
                 ("A/One.cs", Using + "[SqlSourceGenerate]\ninternal partial class One;\n"),
-                ("B/Two.cs", Using + "[SqlSourceGenerate(Path = \"../A\")]\ninternal partial class Two;\n"),
+                ("B/Two.cs", Using + "[SqlSourceGenerate(Source = \"../A\")]\ninternal partial class Two;\n"),
                 ("B/None.cs", "internal partial class None;\n"),
             ],
-            ["A/A.sql", "B/B.sql"]
+            ["A/A.sql", "A/One.sql", "B/B.sql"]
         ),
     };
 
@@ -268,7 +334,7 @@ public sealed class GeneratorParityTests : IDisposable
         ),
         ["reached by an unclaimed .sql file"] = new(
             1,
-            [("App/Queries.cs", Plans.TypeNamed("Queries", "Path = \"Queries\""))],
+            [("App/Queries.cs", Plans.TypeNamed("Queries", "Source = \"Queries\""))],
             ["App/Other/X.sql"],
             [
                 (
@@ -501,7 +567,8 @@ public sealed class GeneratorParityTests : IDisposable
                 .Select(type => new Claimed(
                     type.Type.FilePath,
                     type.Type.AttributeLocation.LineSpan.Start.Line,
-                    type.Type.Path,
+                    type.Type.Name,
+                    type.Type.Source,
                     type.Type.Settings.Output?.ToString(),
                     string.Join('|', type.Files)
                 ))
@@ -518,7 +585,8 @@ public sealed class GeneratorParityTests : IDisposable
             claims.Claims.Select(claim => new Claimed(
                 claim.SourcePath,
                 claim.Position.Line,
-                claim.Path,
+                claim.TypeName,
+                claim.Source,
                 claim.Output?.ToString(),
                 string.Join('|', listed.ClaimedBy(claim))
             ))
@@ -528,9 +596,16 @@ public sealed class GeneratorParityTests : IDisposable
     private static Claimed[] Ordered(IEnumerable<Claimed> claims) =>
         [.. claims.OrderBy(claim => claim.SourcePath, StringComparer.Ordinal).ThenBy(claim => claim.Line)];
 
-    // One type as each side sees it: the file and the line of its attribute, what the attribute sets, and the .sql
-    // files it claims, in member order.
-    private sealed record Claimed(string SourcePath, int Line, string? Path, string? Output, string Files);
+    // One type as each side sees it: the file and the line of its attribute, the type's name, what the attribute sets,
+    // and the .sql files it claims, in member order.
+    private sealed record Claimed(
+        string SourcePath,
+        int Line,
+        string Name,
+        string? Source,
+        string? Output,
+        string Files
+    );
 
     private sealed record ErrorCase(string Dialect, OutputKind Output, (string Path, string Text)[] SqlFiles);
 

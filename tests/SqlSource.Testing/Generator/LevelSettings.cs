@@ -81,8 +81,8 @@ internal sealed class LevelSettings
         return this;
     }
 
-    // The source with the attribute's arguments, Name = "value" or Name = Enum.Value joined by ", ", in place of
-    // [SqlSourceGenerate], or the source unchanged when no setting is at the attribute's level.
+    // The source with the attribute's arguments, Name = "value" or Name = Enum.Value joined by ", ", after the Source
+    // of its [SqlSourceGenerate(Source = ".")], or the source unchanged when no setting is at the attribute's level.
     public string Source(string source)
     {
         var arguments = AtLevel(SettingLevel.Attribute);
@@ -103,8 +103,8 @@ internal sealed class LevelSettings
             )
         );
         return source.Replace(
-            "[SqlSourceGenerate]",
-            "[SqlSourceGenerate(" + string.Join(", ", written) + ")]",
+            "[SqlSourceGenerate(Source = \".\")]",
+            "[SqlSourceGenerate(Source = \".\", " + string.Join(", ", written) + ")]",
             StringComparison.Ordinal
         );
     }

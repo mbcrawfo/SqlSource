@@ -18,7 +18,7 @@ internal static class TestModels
         new(SourceFile, new TextSpan(20, 10), new LinePositionSpan(new LinePosition(2, 1), new LinePosition(2, 11)));
 
     public static TargetType Type(
-        string? path = null,
+        string? source = null,
         MemberPlacement placement = MemberPlacement.Nested,
         string filePath = SourceFile,
         string @namespace = "App",
@@ -36,7 +36,7 @@ internal static class TestModels
             MethodPlacement.ExtensionClass,
             settings ?? SettingsLevel.None,
             isPublic,
-            path,
+            source,
             filePath,
             AttributeLocation,
             TestSidecars.Of(diagnostics ?? [])

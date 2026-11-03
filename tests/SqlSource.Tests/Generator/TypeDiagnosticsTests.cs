@@ -5,6 +5,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Settings;
+using SqlSource.Testing;
 using SqlSource.Testing.Generator;
 using Xunit;
 
@@ -29,7 +30,7 @@ public sealed class TypeDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public class Sample { }
             """,
             GeneratorHarness.UsersFile
@@ -57,7 +58,7 @@ public sealed class TypeDiagnosticsTests
                 {
                     public record @class
                     {
-                        [SqlSourceGenerate]
+                        [SqlSourceGenerate(Source = ".")]
                         public partial class Sample { }
                     }
                 }
@@ -83,7 +84,7 @@ public sealed class TypeDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             file partial class Sample { }
             """,
             GeneratorHarness.UsersFile
@@ -107,7 +108,7 @@ public sealed class TypeDiagnosticsTests
             namespace App;
             file static partial class Outer
             {
-                [SqlSourceGenerate]
+                [SqlSourceGenerate(Source = ".")]
                 public partial class Sample { }
             }
             """,
@@ -139,7 +140,12 @@ public sealed class TypeDiagnosticsTests
                     """
                 ),
             ],
-            [GeneratorHarness.UsersFile],
+            // With no references the compiler cannot read a string argument, so the types take the files of their
+            // names.
+            [
+                new SqlFile("/app/Repo/First.sql", SqlTexts.GetUser),
+                new SqlFile("/app/Repo/Second.sql", SqlTexts.GetUser),
+            ],
             supportedFramework: false
         );
 
@@ -174,9 +180,9 @@ public sealed class TypeDiagnosticsTests
                     using SqlSource;
                     namespace App
                     {
-                        [SqlSourceGenerate]
+                        [SqlSourceGenerate(Source = ".")]
                         public partial class First { }
-                        [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+                        [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
                         public partial class Second { }
                     }
                     """
@@ -188,9 +194,9 @@ public sealed class TypeDiagnosticsTests
 
         run.Diagnostics.ShouldBe(
             [
-                "SQLSRC012 /app/Repo/Sample.cs(4,6)-(4,23): SqlSource generates C# 12 code, and this project's "
+                "SQLSRC012 /app/Repo/Sample.cs(4,6)-(4,37): SqlSource generates C# 12 code, and this project's "
                     + $"language version is {version}",
-                "SQLSRC012 /app/Repo/Sample.cs(6,6)-(6,57): SqlSource generates C# 12 code, and this project's "
+                "SQLSRC012 /app/Repo/Sample.cs(6,6)-(6,71): SqlSource generates C# 12 code, and this project's "
                     + $"language version is {version}",
             ],
             ignoreOrder: true
@@ -216,7 +222,8 @@ public sealed class TypeDiagnosticsTests
                     """
                 ),
             ],
-            [GeneratorHarness.UsersFile],
+            // With no references the compiler cannot read a string argument, so the type takes the file of its name.
+            [new SqlFile("/app/Repo/Sample.sql", SqlTexts.GetUser)],
             supportedFramework: false,
             languageVersion: LanguageVersion.CSharp7_3
         );
@@ -234,14 +241,14 @@ public sealed class TypeDiagnosticsTests
     [InlineData("Sub")]
     [InlineData("../../../Users.sql")]
     [InlineData(GeneratorHarness.UsersPath)]
-    public void Run_PathThatMatchesNothing_IsAnErrorAtTheAttribute(string path)
+    public void Run_SourceThatMatchesNothing_IsAnErrorAtTheAttribute(string path)
     {
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             $$"""
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Path = "{{path}}")]
+            [SqlSourceGenerate(Source = "{{path}}")]
             public partial class Sample { }
             """,
             GeneratorHarness.UsersFile,
@@ -250,7 +257,7 @@ public sealed class TypeDiagnosticsTests
 
         run.Diagnostics.ShouldHaveSingleItem()
             .ShouldBe(
-                $"SQLSRC004 /app/Repo/Sample.cs(3,2)-(3,{30 + path.Length}): Path '{path}' matches no .sql file.  It "
+                $"SQLSRC004 /app/Repo/Sample.cs(3,2)-(3,{32 + path.Length}): Source '{path}' matches no .sql file.  It "
                     + "is relative to the folder of this file; a value that ends in .sql is one file, and any other "
                     + "value is a folder."
             );
@@ -259,8 +266,9 @@ public sealed class TypeDiagnosticsTests
     }
 
     [Fact]
-    public void Run_NoPathAndNoSqlFileInTheFolder_IsAnErrorAtTheAttribute()
+    public void Run_NoSourceAndNoFileNamedForTheType_IsAnErrorAtTheAttribute()
     {
+        // A file of another name beside it, and the file of its name elsewhere, are not the type's.
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             """
@@ -269,16 +277,56 @@ public sealed class TypeDiagnosticsTests
             [SqlSourceGenerate]
             public partial class Sample { }
             """,
-            new SqlFile("/app/Repo/Sub/Users.sql", "SELECT 1;\n"),
-            new SqlFile("/app/Users.sql", "SELECT 2;\n"),
-            new SqlFile("/app/Repo/Users.txt", "SELECT 3;\n")
+            new SqlFile("/app/Repo/Users.sql", "SELECT 1;\n"),
+            new SqlFile("/app/Repo/Sub/Sample.sql", "SELECT 2;\n"),
+            new SqlFile("/app/Sample.sql", "SELECT 3;\n"),
+            new SqlFile("/app/Repo/Sample.txt", "SELECT 4;\n")
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC005 /app/Repo/Sample.cs(3,2)-(3,19): The folder of this file has no .sql file.  Add one, or set "
-                + "Path.",
+            "SQLSRC005 /app/Repo/Sample.cs(3,2)-(3,19): No 'Sample.sql' beside this file.  Add it, or set Source.",
         ]);
         run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Run_NoSource_TakesTheFileNamedForTheTypeAlone()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            """
+            using SqlSource;
+            namespace App;
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            public partial class Sample { }
+            """,
+            new SqlFile("/app/Repo/sample.SQL", "-- name: First\nSELECT 1;\n"),
+            new SqlFile("/app/Repo/Users.sql", "-- name: Second\nSELECT 2;\n")
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        run.Sources[GeneratorHarness.SampleFile].ShouldContain("First");
+        run.Sources[GeneratorHarness.SampleFile].ShouldNotContain("Second");
+    }
+
+    [Fact]
+    public void Run_SourceDotAndNoSqlFileInTheFolder_IsAnErrorAtTheAttribute()
+    {
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            """
+            using SqlSource;
+            namespace App;
+            [SqlSourceGenerate(Source = ".")]
+            public partial class Sample { }
+            """,
+            new SqlFile("/app/Repo/Sub/Users.sql", "SELECT 1;\n")
+        );
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC004 /app/Repo/Sample.cs(3,2)-(3,33): Source '.' matches no .sql file.  It is relative to the folder "
+                + "of this file; a value that ends in .sql is one file, and any other value is a folder.",
+        ]);
     }
 
     [Theory]
@@ -291,14 +339,14 @@ public sealed class TypeDiagnosticsTests
             $$"""
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(SqlLocation = {{location}})]
+            [SqlSourceGenerate(Source = ".", SqlLocation = {{location}})]
             public partial class Sample { }
             """,
             GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC006 /app/Repo/Sample.cs(3,2)-(3,{35 + location.Length}): '{value}' is not a valid value of "
+            $"SQLSRC006 /app/Repo/Sample.cs(3,2)-(3,{49 + location.Length}): '{value}' is not a valid value of "
                 + "SqlLocation",
         ]);
         run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
@@ -317,7 +365,7 @@ public sealed class TypeDiagnosticsTests
             $$"""
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample
             {
                 {{member}}
@@ -327,7 +375,7 @@ public sealed class TypeDiagnosticsTests
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,19): 'Sample' already has a member named 'Sql'.  Rename it, or "
+            "SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,33): 'Sample' already has a member named 'Sql'.  Rename it, or "
                 + "use SqlLocation.Direct.",
         ]);
         run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
@@ -349,14 +397,14 @@ public sealed class TypeDiagnosticsTests
             $$"""
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             {{declaration}} { }
             """,
             GeneratorHarness.UsersFile
         );
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,19): '{name}' already has a member named 'Sql'.  Rename it, or "
+            $"SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,33): '{name}' already has a member named 'Sql'.  Rename it, or "
                 + "use SqlLocation.Direct.",
         ]);
         run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
@@ -371,7 +419,7 @@ public sealed class TypeDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
             public static partial class Sql { }
             public static class Consumer { public const string Value = Sql.GetUser; }
             """,
@@ -390,7 +438,7 @@ public sealed class TypeDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
             public partial class Sample
             {
                 public static string Sql => GetUser;
@@ -415,6 +463,7 @@ public sealed class TypeDiagnosticsTests
             using SqlSource;
             namespace App;
             [SqlSourceGenerate(
+                Source = ".",
                 CollectionType = (GeneratorCollectionType)91,
                 OutputModelType = (GeneratorModelType)96,
                 InputModelType = (GeneratorModelType)95,
@@ -455,7 +504,7 @@ public sealed class TypeDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Path = "Missing", SqlLocation = (SqlLocation)7)]
+            [SqlSourceGenerate(Source = "Missing", SqlLocation = (SqlLocation)7)]
             public class Sample
             {
                 public int Sql;
@@ -467,9 +516,9 @@ public sealed class TypeDiagnosticsTests
         // A location that is not valid is read as Nested, so the member named Sql is a problem too.
         run.Diagnostics.Count.ShouldBe(4);
         run.Diagnostics[0].ShouldStartWith("SQLSRC001 /app/Repo/Sample.cs(4,14)-(4,20)");
-        run.Diagnostics[1].ShouldStartWith("SQLSRC006 /app/Repo/Sample.cs(3,2)-(3,67)");
-        run.Diagnostics[2].ShouldStartWith("SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,67)");
-        run.Diagnostics[3].ShouldStartWith("SQLSRC004 /app/Repo/Sample.cs(3,2)-(3,67)");
+        run.Diagnostics[1].ShouldStartWith("SQLSRC006 /app/Repo/Sample.cs(3,2)-(3,69)");
+        run.Diagnostics[2].ShouldStartWith("SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,69)");
+        run.Diagnostics[3].ShouldStartWith("SQLSRC004 /app/Repo/Sample.cs(3,2)-(3,69)");
         run.Sources.Keys.ShouldBe(AttributeAndExceptions, ignoreOrder: true);
     }
 
@@ -481,7 +530,7 @@ public sealed class TypeDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public class Sample { }
             """,
             new SqlFile(GeneratorHarness.UsersPath, "-- name: 1x\nSELECT 1;\n")
@@ -502,9 +551,9 @@ public sealed class TypeDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial interface ISample { }
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public enum Kind { None }
             """,
             GeneratorHarness.UsersFile

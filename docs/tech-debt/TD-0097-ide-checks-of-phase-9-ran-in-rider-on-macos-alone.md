@@ -135,7 +135,7 @@ using SqlSource;
 
 namespace Sample;
 
-[SqlSourceGenerate(Path = "Queries", Output = GeneratorOutput.Models)]
+[SqlSourceGenerate(Source = "Queries", Output = GeneratorOutput.Models)]
 internal static partial class Queries;
 SAMPLE_EOF
 cat >Program.cs <<'SAMPLE_EOF'

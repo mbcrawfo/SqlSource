@@ -341,7 +341,7 @@ public sealed class MethodWriterTests
 
             namespace App;
 
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample<T>
             {
                 public static string One() => Sql.Probe("a");

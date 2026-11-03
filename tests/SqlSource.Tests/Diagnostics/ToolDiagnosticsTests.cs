@@ -186,10 +186,10 @@ public sealed class ToolDiagnosticsTests
         string.Format(
                 CultureInfo.InvariantCulture,
                 ToolDiagnostics.AttributeArgumentNotLiteral.MessageFormat.ToString(CultureInfo.InvariantCulture),
-                "Path"
+                "Source"
             )
             .ShouldBe(
-                "'Path' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here"
+                "'Source' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here"
             );
 
     [Fact]

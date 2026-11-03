@@ -17,7 +17,7 @@ internal static partial class QueryMethodCorpus
 
         namespace App
         {
-            [SqlSourceGenerate]
+            [SqlSourceGenerate(Source = ".")]
             public partial class Sample;
 
             public readonly record struct UserId(int Value)

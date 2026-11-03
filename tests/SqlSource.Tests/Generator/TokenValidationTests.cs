@@ -17,7 +17,7 @@ public sealed class TokenValidationTests
 
         namespace App;
 
-        [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+        [SqlSourceGenerate(Source = ".", SqlLocation = SqlLocation.Direct)]
         public partial class Sample
         {
             public static string List() => ListFrom("users");
