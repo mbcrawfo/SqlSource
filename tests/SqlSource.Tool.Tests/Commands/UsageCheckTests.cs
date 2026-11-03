@@ -516,6 +516,15 @@ public sealed class UsageCheckTests
             ]);
 
     [Theory]
+    [InlineData("describe", "--manifest", "m", "--watch")]
+    [InlineData("describe", "--watch", "--manifest=m")]
+    [InlineData("describe", "--manifest", "m", "--online", "auto", "--watch")]
+    public void CheckUsage_ManifestWithWatch_IsReported(params string[] args) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldBe(["sqlsource: option '--manifest' takes no '--watch'"]);
+
+    [Theory]
     [InlineData("describe", "--online", "auto")]
     [InlineData("describe", "--online=true")]
     public void CheckUsage_OnlineWithoutManifest_NeedsIt(params string[] args) =>

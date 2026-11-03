@@ -352,6 +352,12 @@ internal static class DescribeCommand
                         $"sqlsource: option '{ManifestOption}' takes no {named.Kind} (position {named.Position})"
                     )
             );
+
+            // A watch evaluates the projects again after a change, and a run from a manifest evaluates none.
+            if (usage.Flags.Any(static flag => flag.Name == WatchOption))
+            {
+                messages.Add($"sqlsource: option '{ManifestOption}' takes no '{WatchOption}'");
+            }
         }
 
         var onlines = ValuesOf(usage, OnlineOption);
