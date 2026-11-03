@@ -1,0 +1,298 @@
+using Microsoft.CodeAnalysis.CSharp;
+using SqlSource.Generation.Methods;
+using SqlSource.Settings;
+
+namespace SqlSource.Generation.Emitting.QueryMethods;
+
+/// <summary>
+/// Writes the execution of a query's command and the reading of its rows, the last of
+/// <see cref="QueryMethodWriter" />'s phases, inside the <c>try</c> that <see cref="CommandWriter" /> writes: the rows
+/// read into a buffer and the collection returned, the one row read and returned, or each row yielded as the loop asks
+/// for it.  <see cref="RowReaderWriter" /> writes the reading of each row.
+/// </summary>
+internal static class RowsWriter
+{
+    private const string ExceptionType = "global::SqlSource.UnexpectedRowCountException";
+
+    internal static void AppendExecution(in QueryMethodContext context, string indent)
+    {
+        var builder = context.Builder;
+        var method = context.Method;
+        var locals = context.Locals;
+        if (method.Shape is ResultShape.None or ResultShape.RowCount)
+        {
+            _ = builder.Append(indent).Append(method.Shape == ResultShape.RowCount ? "return " : string.Empty);
+            _ = AsyncSpelling
+                .AppendAwaitedCall(builder, locals.Command, "ExecuteNonQueryAsync")
+                .Append(MethodArguments.CancellationToken);
+            _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+            return;
+        }
+
+        var output = method.Output!;
+        _ = builder.Append(indent).Append("var ").Append(locals.Reader).Append(" = ");
+        _ = AsyncSpelling
+            .AppendAwaitedCall(builder, locals.Command, "ExecuteReaderAsync")
+            .Append("global::System.Data.CommandBehavior.Default, ")
+            .Append(MethodArguments.CancellationToken);
+        _ = AsyncSpelling.AppendAwaitedEnd(builder).Append(";\n");
+        _ = AsyncSpelling.AppendUsing(builder, indent, locals.ReaderScope, locals.Reader);
+
+        // A streaming method yields each row as it reads it, where any other reads them into its buffer and returns
+        // the collection.
+        if (context.Streams)
+        {
+            AppendStream(in context, indent, output);
+            return;
+        }
+
+        // A method that checks for a rollback has the read, its drain and its returns in a try whose catch checks.
+        if (!context.Capabilities.Has(ExecutionCapabilities.ChecksRollbackAtRead))
+        {
+            AppendRows(in context, indent, output);
+            return;
+        }
+
+        _ = builder.Append(indent).Append("try\n").Append(indent).Append("{\n");
+        AppendRows(in context, GeneratedText.Deeper(indent), output);
+        QueryMethodWriter.AppendEnd(builder, indent);
+        ExecutionCapabilityWriter.AppendRollbackCheck(in context, indent);
+    }
+
+    // The rows read into the buffer and the collection returned, or the one row read and returned, each return after
+    // the drain when the capabilities have it.
+    private static void AppendRows(in QueryMethodContext context, string indent, MethodOutput output)
+    {
+        var builder = context.Builder;
+        var locals = context.Locals;
+        var innerIndent = GeneratedText.Deeper(indent);
+        if (context.Method.Shape == ResultShape.Many)
+        {
+            var (buffer, result) = GetBuffer(in context, output.TypeText);
+            _ = builder.Append(indent).Append("var ").Append(locals.Rows).Append(" = ").Append(buffer).Append(";\n");
+            _ = builder.Append(indent).Append("while (");
+            AppendRead(in context);
+            _ = builder.Append(")\n").Append(indent).Append("{\n");
+            RowReaderWriter.AppendVectorChecks(in context, innerIndent, output);
+            _ = builder.Append(innerIndent).Append(locals.Rows).Append(".Add(");
+            RowReaderWriter.AppendRow(in context, output);
+            _ = builder.Append(");\n");
+            QueryMethodWriter.AppendEnd(builder, indent);
+            _ = builder.Append('\n');
+            AppendDrain(in context, indent);
+            _ = builder.Append(indent).Append("return ").Append(result).Append(";\n");
+            return;
+        }
+
+        _ = builder.Append(indent).Append("if (!");
+        AppendRead(in context);
+        _ = builder.Append(")\n").Append(indent).Append("{\n");
+        if (context.Method.Shape == ResultShape.One)
+        {
+            AppendThrow(in context, innerIndent, moreThanOne: false);
+        }
+        else
+        {
+            AppendDrain(in context, innerIndent);
+            _ = builder.Append(innerIndent).Append("return null;\n");
+        }
+
+        QueryMethodWriter.AppendEnd(builder, indent);
+        _ = builder.Append('\n');
+        RowReaderWriter.AppendVectorChecks(in context, indent, output);
+        _ = builder.Append(indent).Append("var ").Append(locals.Row).Append(" = ");
+        RowReaderWriter.AppendRow(in context, output);
+        _ = builder.Append(";\n").Append(indent).Append("if (");
+        AppendRead(in context);
+        _ = builder.Append(")\n").Append(indent).Append("{\n");
+        AppendThrow(in context, innerIndent, moreThanOne: true);
+        QueryMethodWriter.AppendEnd(builder, indent);
+        _ = builder.Append('\n');
+        AppendDrain(in context, indent);
+        _ = builder.Append(indent).Append("return ").Append(locals.Row).Append(";\n");
+    }
+
+    // The iterator's loop, which yields each row as it reads it.  A method that drains when its loop is left at a row
+    // has the loop, and the drain after it, in a try whose finally drains then.  C# allows no catch on a try that holds
+    // a yield return, so a method that checks for a rollback builds each row in a try of its own, whose catch checks
+    // when the row's checks or construction throw; a read's exception is the database's or the caller's cancellation,
+    // which the catch would throw as it is.  Either builds the row into a local before it yields it.
+    private static void AppendStream(in QueryMethodContext context, string indent, MethodOutput output)
+    {
+        var builder = context.Builder;
+        var locals = context.Locals;
+        var tracksRow = context.Capabilities.Has(ExecutionCapabilities.DrainsWhenLeftAtARow);
+        var checksRollback = context.Capabilities.Has(ExecutionCapabilities.ChecksRollbackAtRead);
+        var loopIndent = tracksRow ? GeneratedText.Deeper(indent) : indent;
+        var innerIndent = GeneratedText.Deeper(loopIndent);
+        if (tracksRow)
+        {
+            ExecutionCapabilityWriter.AppendLeftAtARowStart(in context, indent);
+        }
+
+        _ = builder.Append(loopIndent).Append("while (");
+        AppendRead(in context);
+        _ = builder.Append(")\n").Append(loopIndent).Append("{\n");
+        if (!tracksRow && !checksRollback)
+        {
+            RowReaderWriter.AppendVectorChecks(in context, innerIndent, output);
+            _ = builder.Append(innerIndent).Append("yield return ");
+            RowReaderWriter.AppendRow(in context, output);
+            _ = builder.Append(";\n");
+        }
+        else
+        {
+            AppendRowIntoLocal(in context, innerIndent, output);
+            _ = builder.Append('\n');
+            if (tracksRow)
+            {
+                ExecutionCapabilityWriter.AppendYieldAtARow(in context, innerIndent);
+            }
+            else
+            {
+                _ = builder.Append(innerIndent).Append("yield return ").Append(locals.Row).Append(";\n");
+            }
+        }
+
+        QueryMethodWriter.AppendEnd(builder, loopIndent);
+        if (context.Capabilities.Has(ExecutionCapabilities.DrainsLaterResults))
+        {
+            ExecutionCapabilityWriter.AppendDrainAfterLoop(in context, loopIndent);
+        }
+
+        if (tracksRow)
+        {
+            ExecutionCapabilityWriter.AppendLeftAtARowEnd(in context, indent, loopIndent, innerIndent);
+        }
+    }
+
+    // The row's local, declared, then its checks and its construction, in a try whose catch checks for a rollback when
+    // the method has it.
+    private static void AppendRowIntoLocal(in QueryMethodContext context, string indent, MethodOutput output)
+    {
+        var builder = context.Builder;
+        var locals = context.Locals;
+        var checksRollback = context.Capabilities.Has(ExecutionCapabilities.ChecksRollbackAtRead);
+        _ = builder.Append(indent).Append(output.TypeText).Append(' ').Append(locals.Row).Append(";\n");
+        var rowIndent = indent;
+        if (checksRollback)
+        {
+            _ = builder.Append(indent).Append("try\n").Append(indent).Append("{\n");
+            rowIndent = GeneratedText.Deeper(indent);
+        }
+
+        RowReaderWriter.AppendVectorChecks(in context, rowIndent, output);
+        _ = builder.Append(rowIndent).Append(locals.Row).Append(" = ");
+        RowReaderWriter.AppendRow(in context, output);
+        _ = builder.Append(";\n");
+        if (checksRollback)
+        {
+            QueryMethodWriter.AppendEnd(builder, indent);
+            ExecutionCapabilityWriter.AppendRollbackCheck(in context, indent);
+        }
+    }
+
+    // The drain before a buffered read returns, when the capabilities have it.
+    private static void AppendDrain(in QueryMethodContext context, string indent)
+    {
+        if (context.Capabilities.Has(ExecutionCapabilities.DrainsLaterResults))
+        {
+            ExecutionCapabilityWriter.AppendDrainBeforeReturn(in context, indent);
+        }
+    }
+
+    private static void AppendRead(in QueryMethodContext context)
+    {
+        _ = AsyncSpelling
+            .AppendAwaitedCall(context.Builder, context.Locals.Reader, "ReadAsync")
+            .Append(MethodArguments.CancellationToken);
+        _ = AsyncSpelling.AppendAwaitedEnd(context.Builder);
+    }
+
+    private static void AppendThrow(in QueryMethodContext context, string indent, bool moreThanOne) =>
+        _ = context
+            .Builder.Append(indent)
+            .Append("throw new ")
+            .Append(ExceptionType)
+            .Append('(')
+            .Append(SymbolDisplay.FormatLiteral(context.Method.QueryName, quote: true))
+            .Append(moreThanOne ? ", true);\n" : ", false);\n");
+
+    // The type the task gives, or null for a task that gives nothing.
+    internal static string? GetResultType(in QueryMethodContext context) =>
+        context.Method.Shape switch
+        {
+            ResultShape.Many => GetCollectionType(context.Method.Collection, context.Method.Output!.TypeText),
+            ResultShape.One => context.Method.Output!.TypeText,
+            ResultShape.OneOptional => context.Method.Output!.TypeText + "?",
+            ResultShape.RowCount => "int",
+            ResultShape.None => null,
+        };
+
+    private static string GetCollectionType(CollectionKind collection, string row) =>
+        collection switch
+        {
+            CollectionKind.Array => row + "[]",
+            CollectionKind.IEnumerable => "global::System.Collections.Generic.IEnumerable<" + row + ">",
+            CollectionKind.ICollection => "global::System.Collections.Generic.ICollection<" + row + ">",
+            CollectionKind.IReadOnlyCollection => "global::System.Collections.Generic.IReadOnlyCollection<" + row + ">",
+            CollectionKind.IList => "global::System.Collections.Generic.IList<" + row + ">",
+            CollectionKind.IReadOnlyList => "global::System.Collections.Generic.IReadOnlyList<" + row + ">",
+            CollectionKind.List => "global::System.Collections.Generic.List<" + row + ">",
+            CollectionKind.ImmutableArray => "global::System.Collections.Immutable.ImmutableArray<" + row + ">",
+            CollectionKind.ImmutableList => "global::System.Collections.Immutable.ImmutableList<" + row + ">",
+            CollectionKind.IAsyncEnumerable => "global::System.Collections.Generic.IAsyncEnumerable<" + row + ">",
+            CollectionKind.IImmutableList => "global::System.Collections.Immutable.IImmutableList<" + row + ">",
+        };
+
+    // The buffer the rows are read into, and the expression that gives the collection from it.
+    private static (string Buffer, string Result) GetBuffer(in QueryMethodContext context, string row)
+    {
+        var method = context.Method;
+        var rows = context.Locals.Rows;
+        if (RowBuffer.IsUsedBy(method))
+        {
+            var toResult = method.Collection switch
+            {
+                CollectionKind.List or CollectionKind.IList or CollectionKind.ICollection => ".ToList()",
+                CollectionKind.ImmutableArray => ".ToImmutableArray()",
+                // The two immutable lists and IAsyncEnumerable never reach this switch, since RowBuffer.IsUsedBy leaves
+                // them out; they are named so that the switch lists every member.
+                CollectionKind.Array
+                or CollectionKind.IEnumerable
+                or CollectionKind.IReadOnlyCollection
+                or CollectionKind.IReadOnlyList
+                or CollectionKind.ImmutableList
+                or CollectionKind.IImmutableList
+                or CollectionKind.IAsyncEnumerable => ".ToArray()",
+            };
+            return ("new " + RowBuffer.TypeText + "<" + row + ">()", rows + toResult);
+        }
+
+        return method.Collection switch
+        {
+            CollectionKind.List or CollectionKind.IList or CollectionKind.ICollection => (
+                "new global::System.Collections.Generic.List<" + row + ">()",
+                rows
+            ),
+            CollectionKind.ImmutableArray => (
+                "global::System.Collections.Immutable.ImmutableArray.CreateBuilder<" + row + ">()",
+                rows + ".DrainToImmutable()"
+            ),
+            CollectionKind.ImmutableList or CollectionKind.IImmutableList => (
+                "global::System.Collections.Immutable.ImmutableList.CreateBuilder<" + row + ">()",
+                rows + ".ToImmutable()"
+            ),
+            // A streaming method buffers nothing and never reaches this switch; IAsyncEnumerable is named so that the
+            // switch lists every member.
+            CollectionKind.Array
+            or CollectionKind.IEnumerable
+            or CollectionKind.IReadOnlyCollection
+            or CollectionKind.IReadOnlyList
+            or CollectionKind.IAsyncEnumerable => (
+                "new global::System.Collections.Generic.List<" + row + ">()",
+                rows + ".ToArray()"
+            ),
+        };
+    }
+}

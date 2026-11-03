@@ -6,9 +6,9 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 /// <summary>
 /// Writes the statements that a query's method's <see cref="ExecutionCapabilities" /> turn on: the refusal of a
 /// completed transaction, the catch that checks for a rollback, and the loops that drain the later results, with
-/// the documentation of what they throw.  <see cref="QueryMethodWriter" /> keeps the structure of the buffered and
-/// streamed reading, asks a flag at each point where one applies, and calls in here.  Why each flag exists is said
-/// once, at <see cref="ExecutionCapabilityRules.Of" />.
+/// the documentation of what they throw.  The phases of <see cref="QueryMethodWriter" /> keep the structure of the
+/// buffered and streamed reading, ask a flag at each point where one applies, and call in here.  Why each flag exists
+/// is said once, at <see cref="ExecutionCapabilityRules.Of" />.
 /// </summary>
 internal static class ExecutionCapabilityWriter
 {
@@ -18,7 +18,7 @@ internal static class ExecutionCapabilityWriter
     private const string RolledBackType = "global::SqlSource.TransactionRolledBackException";
 
     // The exception as its documentation names it: a documentation ID, which the compiler does not bind, as
-    // QueryMethodWriter names UnexpectedRowCountException.
+    // HeaderWriter names UnexpectedRowCountException.
     private const string RolledBackCref = "T:SqlSource.TransactionRolledBackException";
 
     private const string CompletedTransactionType = "global::System.InvalidOperationException";

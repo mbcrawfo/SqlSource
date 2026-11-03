@@ -53,7 +53,7 @@ internal sealed class QueryMethodLocals
             for (var index = 0; index < output.Columns.Count; index++)
             {
                 var column = output.Columns[index];
-                if (!column.IsNullable && column.ReadText == QueryMethodWriter.VectorType)
+                if (!column.IsNullable && column.ReadText == RowReaderWriter.VectorType)
                 {
                     Values[index] = names.Take("value" + index.ToString(CultureInfo.InvariantCulture));
                 }

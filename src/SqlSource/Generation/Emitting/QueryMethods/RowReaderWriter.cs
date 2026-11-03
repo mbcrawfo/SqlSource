@@ -13,6 +13,13 @@ namespace SqlSource.Generation.Emitting.QueryMethods;
 internal static class RowReaderWriter
 {
     /// <summary>
+    /// The spelling of <see cref="MethodColumn.ReadText" /> that marks a column read as SqlClient's vector, which gives
+    /// <c>SqlVector&lt;float&gt;.Null</c> on a <c>NULL</c> instead of throwing: a not-null column read as exactly this
+    /// text is read into a local and refused when it <c>IsNull</c>, before a converter sees it.
+    /// </summary>
+    internal const string VectorType = "global::Microsoft.Data.SqlTypes.SqlVector<float>";
+
+    /// <summary>
     /// A not-null column read as <c>SqlVector&lt;float&gt;</c> is read into a local first, and its <c>Null</c> is
     /// refused as a <c>NULL</c> of any other not-null column is.
     /// </summary>
