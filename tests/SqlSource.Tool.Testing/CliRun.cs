@@ -85,6 +85,24 @@ internal sealed class CliRun : IDisposable
     public Task<CliResult> RunAsync(CancellationToken cancellationToken, params string[] args) =>
         InvokeAsync(args, cancellationToken);
 
+    // A run that goes on while the test reads what it writes, and ends when the token is cancelled or the command
+    // ends by itself: a "describe --watch".
+    public RunningCli Start(CancellationToken cancellationToken, params string[] args)
+    {
+        var output = new SharedWriter();
+        var error = new SharedWriter();
+        var host = CreateHost(output, error);
+        var ended = Task.Run(
+            async () =>
+            {
+                var exitCode = await Cli.RunAsync(args, host, cancellationToken);
+                return new CliResult(exitCode, output.ToString(), error.ToString());
+            },
+            CancellationToken.None
+        );
+        return new RunningCli(output, error, ended);
+    }
+
     public async Task<CliResult> RunCancelledAsync(params string[] args)
     {
         using var cancelled = new CancellationTokenSource();

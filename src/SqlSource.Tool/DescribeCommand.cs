@@ -13,6 +13,7 @@ using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
 using SqlSource.Tool.Reporting;
+using SqlSource.Tool.Watching;
 
 namespace SqlSource.Tool;
 
@@ -164,12 +165,34 @@ internal static class DescribeCommand
         parsed.CommandResult.Command.SetAction(
             async (command, cancellationToken) =>
             {
+                // A watch runs a pass after each change, until it is stopped, and ends only by its token.  A unit that
+                // cannot be found ends it before the first pass.
+                if (Watches(command))
+                {
+                    if (FindUnit(usage, host, reporter) is { } watched)
+                    {
+                        await WatchSession.RunAsync(
+                            watched,
+                            usage,
+                            command,
+                            host,
+                            reporter,
+                            counted,
+                            cancellationToken
+                        );
+                    }
+
+                    return 0;
+                }
+
                 // An error is in the reporter, where the exit code is taken.
                 if (await PlanUnitAsync(usage, host, reporter, cancellationToken) is { } planned)
                 {
-                    await DescribeRun.RunAsync(
+                    await DescribePlanAsync(
                         planned.Plan,
-                        OptionsOf(command, usage, planned.Unit, planned.Plan),
+                        usage,
+                        planned.Unit,
+                        ModeOf(command),
                         host,
                         reporter,
                         counted,
@@ -350,7 +373,7 @@ internal static class DescribeCommand
     // What the command line says of the run, beside its plan.  CheckUsage has held each --connection to its form.
     // The plan's filters hold --database and the .sql paths, and not --project.  A .sql path that names no file still
     // counts as a filter, so that such a run deletes no sidecar.
-    private static DescribeOptions OptionsOf(ParseResult parsed, Usage usage, RunUnit unit, RunPlan plan)
+    private static DescribeOptions OptionsOf(Usage usage, RunUnit unit, RunPlan plan, RunMode mode)
     {
         var connections = ImmutableArray.CreateBuilder<ConnectionArgument>();
         foreach (var value in ValuesOf(usage, ConnectionOption))
@@ -366,7 +389,7 @@ internal static class DescribeCommand
         }
 
         return new DescribeOptions(
-            ModeOf(parsed),
+            mode,
             ValuesOf(usage, ProjectOption).Length > 0 || !plan.Filters.Files.IsEmpty || !plan.Filters.Databases.IsEmpty,
             connections.ToImmutable(),
             plan.Filters.Databases,
@@ -374,8 +397,11 @@ internal static class DescribeCommand
         );
     }
 
-    // --check beside --force is --check: it describes every query, as --force does, and writes nothing.
-    private static RunMode ModeOf(ParseResult parsed) =>
+    /// <summary>
+    /// The mode that the command line asks for.  <c>--check</c> beside <c>--force</c> is <c>--check</c>: it describes
+    /// every query, as <c>--force</c> does, and writes nothing.
+    /// </summary>
+    internal static RunMode ModeOf(ParseResult parsed) =>
         (parsed.GetValue<bool>(CheckOption), parsed.GetValue<bool>(ForceOption)) switch
         {
             (true, _) => RunMode.Check,
@@ -406,9 +432,25 @@ internal static class DescribeCommand
         CancellationToken cancellationToken
     )
     {
+        if (FindUnit(usage, host, reporter) is not { } unit)
+        {
+            return null;
+        }
+
+        var manifests = await FindManifestsAsync(unit, usage, host, reporter, cancellationToken);
+        return await PlanFromAsync(unit, manifests, usage, host, reporter, cancellationToken) is { } plan
+            ? (unit, plan)
+            : null;
+    }
+
+    /// <summary>
+    /// The unit that a command line runs on, from its path or from the working directory.  Null when there is none,
+    /// which is reported.
+    /// </summary>
+    internal static RunUnit? FindUnit(Usage usage, ToolHost host, Reporter reporter)
+    {
         // With file filters and no unit, the unit is found from the working directory, not from the files.
-        var paths = ArgumentsOf(usage);
-        var unitPath = paths.FirstOrDefault(static path => !SqlPath.IsSqlFile(path.Text));
+        var unitPath = ArgumentsOf(usage).FirstOrDefault(static path => !SqlPath.IsSqlFile(path.Text));
         var found = RunUnitFinder.Find(unitPath, host.WorkingDirectory);
         if (!found.Succeeded)
         {
@@ -416,15 +458,35 @@ internal static class DescribeCommand
             return null;
         }
 
-        var unit = found.Value;
-        RunEvents.Unit(reporter.Trace, unit, wasGiven: unitPath is not null);
-        var manifests = await RunProjects.FindAsync(
-            unit,
-            ValuesOf(usage, ProjectOption),
-            host,
-            reporter,
-            cancellationToken
-        );
+        RunEvents.Unit(reporter.Trace, found.Value, wasGiven: unitPath is not null);
+        return found.Value;
+    }
+
+    /// <summary>
+    /// The manifests of the projects of the unit that the command line runs, which <c>--project</c> narrows: the
+    /// evaluation of each, and its manifest target.  A project with an error is reported and left out.
+    /// </summary>
+    internal static Task<ImmutableArray<ProjectManifest>> FindManifestsAsync(
+        RunUnit unit,
+        Usage usage,
+        ToolHost host,
+        Reporter reporter,
+        CancellationToken cancellationToken
+    ) => RunProjects.FindAsync(unit, ValuesOf(usage, ProjectOption), host, reporter, cancellationToken);
+
+    /// <summary>
+    /// The plan of the manifests, which <c>--database</c> and the <c>.sql</c> paths narrow, with what is wrong with it
+    /// reported.  Null when there is no manifest; a run with no error then says that no project uses SqlSource.
+    /// </summary>
+    internal static async Task<RunPlan?> PlanFromAsync(
+        RunUnit unit,
+        ImmutableArray<ProjectManifest> manifests,
+        Usage usage,
+        ToolHost host,
+        Reporter reporter,
+        CancellationToken cancellationToken
+    )
+    {
         if (manifests.IsEmpty)
         {
             if (reporter.Count == 0)
@@ -437,7 +499,7 @@ internal static class DescribeCommand
         }
 
         var filters = RunFilters.Create(
-            paths.Where(static path => SqlPath.IsSqlFile(path.Text)),
+            ArgumentsOf(usage).Where(static path => SqlPath.IsSqlFile(path.Text)),
             ValuesOf(usage, DatabaseOption),
             host.WorkingDirectory
         );
@@ -457,6 +519,21 @@ internal static class DescribeCommand
             reporter.Report(error);
         }
 
-        return (unit, result.Plan);
+        return result.Plan;
     }
+
+    /// <summary>
+    /// Describes the plan, and writes or deletes the sidecars, in the mode given: the steps after the plan, with what
+    /// the command line says of the run beside it.
+    /// </summary>
+    internal static Task DescribePlanAsync(
+        RunPlan plan,
+        Usage usage,
+        RunUnit unit,
+        RunMode mode,
+        ToolHost host,
+        Reporter reporter,
+        Action<LogValue> counted,
+        CancellationToken cancellationToken
+    ) => DescribeRun.RunAsync(plan, OptionsOf(usage, unit, plan, mode), host, reporter, counted, cancellationToken);
 }
