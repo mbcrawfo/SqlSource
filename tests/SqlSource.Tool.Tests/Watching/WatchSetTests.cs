@@ -483,7 +483,17 @@ public sealed class WatchSetTests
 
         var set = Of(project, app, [project], [], (project, assets));
 
-        set.Folders.ShouldBe([(app, true), (assetsFolder, true), (root, false), (src, false)], ignoreOrder: true);
+        set.Folders.ShouldBe(
+            [
+                (app, true),
+                (assetsFolder, true),
+                (temp.PathOf("r/artifacts"), false),
+                (temp.PathOf("r/artifacts/obj"), false),
+                (root, false),
+                (src, false),
+            ],
+            ignoreOrder: true
+        );
         set.Classify(Created(assets)).ShouldBe(WatchEffect.Evaluate);
     }
 

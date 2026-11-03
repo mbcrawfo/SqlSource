@@ -2906,7 +2906,7 @@ See: [A `.env` file](tool.md#env-file)
 
 **The watcher failed**
 
-`sqlsource describe --watch` asks the system to tell it when a file changes, and the system refused to watch a folder or failed while it did.  The message names the folder and ends with the reason the system gave.  The watch goes on, and describes again at once, since the folder may have changed unseen; but it may miss later changes in that folder, so a file you save there may not be described until something else changes.  An error that repeats with the same folder and the same reason is written once in a watch.
+`sqlsource describe --watch` asks the system to tell it when a file changes, and the system refused to watch a folder or failed while it did.  The message names the folder and ends with the reason the system gave.  The watch goes on, and describes again, reading your projects again, since the folder may have changed unseen.  Each time it reads your projects again it tries the folder again, so a file you save there may not be described until it can watch the folder.  An error that repeats with the same folder and the same reason is written once in a watch.
 
 The usual cause is the limit of watched folders on Linux, which a machine with many projects, or with other tools that watch folders, can reach.
 

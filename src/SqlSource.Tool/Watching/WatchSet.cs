@@ -81,7 +81,9 @@ internal sealed class WatchSet
     /// The folders to watch, sorted by ordinal comparison so that two sets compare: the unit's folder, the folder of
     /// each project, with or without a manifest, and the folder of each project's assets file, or the nearest that
     /// exists above it in the project's repository, with their folders below; and each other folder that holds a listed
-    /// file, or may hold a settings file of one, a <c>.env</c> or a <c>Directory.*</c> file, alone.  None is below
+    /// file, or may hold a settings file of one, a <c>.env</c> or a <c>Directory.*</c> file, or is above an assets
+    /// file's folder in its repository, alone.  So each folder above one of these, up to the root of its repository,
+    /// is watched too, and sees it deleted or made.  None is below
     /// another that is watched with its folders below, and none is there twice.  A folder may not exist, which the
     /// session skips.
     /// </summary>
@@ -273,7 +275,9 @@ internal sealed class WatchSet
         {
             if (AssetsFolderOf(project, assetsFile) is { } assetsFolder)
             {
+                // With the folders above it, so that its deletion is seen.
                 recursive.Add(assetsFolder);
+                alone.AddRange(DotEnvSearch.FoldersOf(assetsFolder));
             }
         }
 

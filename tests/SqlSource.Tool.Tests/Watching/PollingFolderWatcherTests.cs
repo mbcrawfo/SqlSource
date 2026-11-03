@@ -158,8 +158,10 @@ public sealed class PollingFolderWatcherTests
         scene.Seen.ShouldBe([new FileChange(FileChangeKind.Created, path, IsFolder: false)]);
     }
 
+    // A folder that is gone raises one failure however often it is listed, and its changes, against the last listing
+    // that worked, once it is back; gone again, it raises a failure again.
     [Fact]
-    public void Poll_FolderGone_RaisesOneFailureAndTriesAgain()
+    public void Poll_FolderGone_RaisesOneFailureUntilItIsBack()
     {
         using var scene = new Scene();
         var queries = scene.Folder.CreateFolder("queries");
@@ -169,12 +171,29 @@ public sealed class PollingFolderWatcherTests
 
         watch.Poll();
         watch.Poll();
+        watch.Poll();
+
+        var failure = scene.Failures.ShouldHaveSingleItem();
+        failure.Folder.ShouldBe(scene.Folder.Path);
+        failure.Overflow.ShouldBeFalse();
+        failure.Message.ShouldNotBeEmpty();
+        scene.Seen.ShouldBeEmpty();
+
+        var users = scene.Folder.WriteFile("Users.sql", "SELECT 1");
+        watch.Poll();
+
+        scene.Seen.ShouldBe([
+            new FileChange(FileChangeKind.Created, users, IsFolder: false),
+            new FileChange(FileChangeKind.Deleted, queries, IsFolder: false),
+        ]);
+        scene.Failures.Count.ShouldBe(1);
+
+        File.Delete(users);
+        Directory.Delete(scene.Folder.Path);
+        watch.Poll();
+        watch.Poll();
 
         scene.Failures.Count.ShouldBe(2);
-        scene.Failures[0].Folder.ShouldBe(scene.Folder.Path);
-        scene.Failures[0].Overflow.ShouldBeFalse();
-        scene.Failures[0].Message.ShouldNotBeEmpty();
-        scene.Seen.ShouldBeEmpty();
         _ = Directory.CreateDirectory(scene.Folder.Path);
     }
 

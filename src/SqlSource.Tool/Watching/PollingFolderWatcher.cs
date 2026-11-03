@@ -32,6 +32,7 @@ internal sealed class PollingFolderWatcher : IDisposable
     private readonly ITimer _timer;
     private readonly object _gate = new();
     private Dictionary<string, Entry>? _last;
+    private bool _failing;
     private bool _disposed;
 
     public PollingFolderWatcher(WatchRequest request, TimeProvider time, TimeSpan interval)
@@ -54,7 +55,8 @@ internal sealed class PollingFolderWatcher : IDisposable
 
     /// <summary>
     /// Lists the folder and raises what differs from the last listing that worked.  A listing that fails raises one
-    /// <see cref="WatchFailure" />, and the next poll tries again against the same last listing.
+    /// <see cref="WatchFailure" />, and the next poll tries again against the same last listing; the listings that fail
+    /// after it raise nothing until one works, so that a folder that is gone does not ask for a pass every second.
     /// </summary>
     internal void Poll()
     {
@@ -72,10 +74,16 @@ internal sealed class PollingFolderWatcher : IDisposable
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
-                _request.Failed(new WatchFailure(_request.Folder, Overflow: false, exception.Message));
+                if (!_failing)
+                {
+                    _failing = true;
+                    _request.Failed(new WatchFailure(_request.Folder, Overflow: false, exception.Message));
+                }
+
                 return;
             }
 
+            _failing = false;
             var last = _last;
             _last = current;
             if (last is null)

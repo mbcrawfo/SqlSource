@@ -35,7 +35,9 @@ namespace SqlSource.Tool.Watching;
 /// </para>
 /// <para>
 /// The folders of the first set are watched before the first pass, and those of each evaluation's set as soon as it
-/// ends, before the pass reads a file, so that no change of a pass is missed.  A folder of both sets keeps its watch.
+/// ends, before the pass reads a file, so that no change of a pass is missed.  A folder of both sets keeps its watch,
+/// unless a change removed the folder, and a folder of the set without a watch is tried again by each evaluation.  A
+/// failure of a watch is reported by the loop, between the output of two passes.
 /// </para>
 /// </remarks>
 internal sealed class WatchSession
@@ -71,10 +73,13 @@ internal sealed class WatchSession
 
     // The changes that came since the last pass began, and what they ask, those that came during the evaluation under
     // way, null when there is none, which are read when it ends, and the failures that the loop has not reported yet.
-    // Guarded by _gate, as _set is.
+    // Also the folders that have a watch, as the loop last opened them, and those of them whose folder a change
+    // removed, whose watch the next evaluation closes.  Guarded by _gate, as _set is.
     private readonly object _gate = new();
     private readonly HashSet<string> _gone = [with(RunProjects.PathComparer)];
     private readonly List<WatchFailure> _failures = [];
+    private readonly HashSet<string> _watched = [with(RunProjects.PathComparer)];
+    private readonly HashSet<string> _stale = [with(RunProjects.PathComparer)];
     private int _changes;
     private WatchEffect _effect;
     private long _lastChange;
@@ -83,8 +88,7 @@ internal sealed class WatchSession
     private List<(FileChange Change, long At)>? _duringEvaluation;
 
     // Read and written by the loop alone: the watch of each folder, by its path, with a null watch for one that could
-    // not start, which is not tried again while the folder stays in the set; and the failures reported, by folder and
-    // message.
+    // not start, which each evaluation tries again; and the failures reported, by folder and message.
     private readonly Dictionary<string, (bool Recursive, IDisposable? Watch)> _watches =
     [
         with(RunProjects.PathComparer),
@@ -340,6 +344,11 @@ internal sealed class WatchSession
             gone = [.. gone.Union(other.Gone(change), RunProjects.PathComparer)];
         }
 
+        if (ChangesAWatchedFolder(change, other))
+        {
+            effect = WatchEffect.Evaluate;
+        }
+
         if (effect == WatchEffect.None && gone.IsEmpty)
         {
             return;
@@ -348,6 +357,48 @@ internal sealed class WatchSession
         _gone.UnionWith(gone);
         Keep(effect, at);
     }
+
+    // True for a change that the watches of the set must follow, which the next evaluation does.  A folder with a
+    // watch, or one above it, deleted or renamed away: a watch does not follow its folder, and on Linux it goes deaf
+    // without a word, so it is marked stale, and the evaluation closes it and watches the folder again when it is back.
+    // A folder of either set without a watch created or renamed to: it did not exist, or its watch could not start,
+    // when the set was watched.  Each folder above a folder of a set, up to the root of its repository, is a folder of
+    // the set too, so the creation of that folder is the one a watch sees.  Under _gate.
+    private bool ChangesAWatchedFolder(FileChange change, WatchSet other)
+    {
+        var removed = change.Kind switch
+        {
+            FileChangeKind.Deleted => change.Path,
+            FileChangeKind.Renamed => change.OldPath,
+            FileChangeKind.Changed or FileChangeKind.Created => null,
+            _ => throw new ArgumentOutOfRangeException(nameof(change), change.Kind, "Not a kind of change."),
+        };
+        var stale = removed is null
+            ? []
+            : _watched.Where(folder => IsAtOrBelow(folder, Path.TrimEndingDirectorySeparator(removed))).ToList();
+        _stale.UnionWith(stale);
+
+        var created = change.Kind is FileChangeKind.Created or FileChangeKind.Renamed
+            ? Path.TrimEndingDirectorySeparator(change.Path)
+            : null;
+        return stale.Count > 0
+            || (
+                created is not null
+                && _set.Folders.Concat(other.Folders)
+                    .Any(entry =>
+                        !_watched.Contains(entry.Folder) && RunProjects.PathComparer.Equals(entry.Folder, created)
+                    )
+            );
+    }
+
+    private static bool IsAtOrBelow(string path, string folder) =>
+        RunProjects.PathComparer.Equals(path, folder)
+        || (
+            path.Length > folder.Length + 1
+            && path.StartsWith(folder, StringComparison.OrdinalIgnoreCase)
+            && path[folder.Length] is var separator
+            && (separator == Path.DirectorySeparatorChar || separator == Path.AltDirectorySeparatorChar)
+        );
 
     // True for a folder that an evaluation makes in ToolHost.TempDirectory, <prefix><32 digits of a Guid>, and for a
     // path below it.  Not for anything else of that folder, which may hold a user's project, as /tmp does.
@@ -370,11 +421,19 @@ internal sealed class WatchSession
     // What a watch tells of its failure, a lost batch of events included, and what a watch that cannot start is: the
     // folder may have changed unseen, so the next pass evaluates.  A lost batch of events is not reported.  Any other
     // failure is kept for the loop to report, so that it is not written in the middle of a pass's output.
-    private void Failed(WatchFailure failure)
+    private void Failed(WatchFailure failure) => Failed(failure, evaluate: true);
+
+    // As above, but a watch that could not start again, when it is tried again, asks nothing: the evaluation that tried
+    // it would otherwise start another, which would try it again, without end.
+    private void Failed(WatchFailure failure, bool evaluate)
     {
         lock (_gate)
         {
-            Keep(WatchEffect.Evaluate, _host.Time.GetTimestamp());
+            if (evaluate)
+            {
+                Keep(WatchEffect.Evaluate, _host.Time.GetTimestamp());
+            }
+
             if (!failure.Overflow)
             {
                 _failures.Add(failure);
@@ -415,9 +474,9 @@ internal sealed class WatchSession
         _ = _wake.TrySetResult();
     }
 
-    // Watches each folder of the set that has no watch yet, then stops the watch of each folder that the set no longer
-    // holds, so that a folder of both is watched throughout.  A folder that does not exist is skipped, and tried again
-    // by the next set; one whose watch could not start is not, while it stays in the set.  Nothing for no set.
+    // Closes each stale watch, watches each folder of the set that has no watch, or whose watch could not start, then
+    // stops the watch of each folder that the set no longer holds, so that a folder of both is watched throughout.  A
+    // folder that does not exist is skipped, and tried again by the next set.  Nothing for no set.
     private void Watch(WatchSet? set)
     {
         if (set is null)
@@ -425,17 +484,31 @@ internal sealed class WatchSession
             return;
         }
 
+        lock (_gate)
+        {
+            foreach (var folder in _stale)
+            {
+                if (_watches.Remove(folder, out var dead))
+                {
+                    dead.Watch?.Dispose();
+                }
+            }
+
+            _stale.Clear();
+        }
+
         var poll = PollsForChanges();
         var opened = new List<(string Folder, bool Recursive, IDisposable? Watch)>();
         foreach (var (folder, recursive) in set.Folders)
         {
-            if (
-                (_watches.TryGetValue(folder, out var open) && open.Recursive == recursive) || !Directory.Exists(folder)
-            )
+            var known = _watches.TryGetValue(folder, out var open);
+            if ((known && open.Recursive == recursive && open.Watch is not null) || !Directory.Exists(folder))
             {
                 continue;
             }
 
+            // A watch that could not start is tried again by each evaluation.
+            var again = known && open.Watch is null;
             IDisposable? watch = null;
             try
             {
@@ -443,7 +516,7 @@ internal sealed class WatchSession
             }
             catch (Exception exception) when (exception is not OutOfMemoryException)
             {
-                Failed(new WatchFailure(folder, Overflow: false, exception.Message));
+                Failed(new WatchFailure(folder, Overflow: false, exception.Message), evaluate: !again);
             }
 
             opened.Add((folder, recursive, watch));
@@ -462,6 +535,12 @@ internal sealed class WatchSession
         foreach (var (folder, recursive, watch) in opened)
         {
             _watches[folder] = (recursive, watch);
+        }
+
+        lock (_gate)
+        {
+            _watched.Clear();
+            _watched.UnionWith(_watches.Where(entry => entry.Value.Watch is not null).Select(entry => entry.Key));
         }
     }
 
