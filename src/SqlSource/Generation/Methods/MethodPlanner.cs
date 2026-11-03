@@ -579,7 +579,7 @@ internal static class MethodPlanner
     private static string? FindTakenReason(MethodsInput input, string name, HashSet<string> written)
     {
         var type = input.Type.Type.Type;
-        if (type.MethodPlacement == MethodPlacement.ExtensionClass)
+        if (MethodHost.Of(type.MethodPlacement).IsExtension)
         {
             if (string.Equals(name, type.Name + ExtensionsSuffix, StringComparison.Ordinal))
             {

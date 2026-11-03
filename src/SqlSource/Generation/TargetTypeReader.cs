@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
+using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 using SqlSource.Settings.Libraries;
 
@@ -69,7 +70,7 @@ internal static class TargetTypeReader
         );
         return new DeclaredType(
             type,
-            placement == MemberPlacement.Nested || methodPlacement != MethodPlacement.ExtensionClass
+            placement == MemberPlacement.Nested || !MethodHost.Of(methodPlacement).IsExtension
                 ? GetTakenNames(symbol)
                 : EquatableArray<string>.Empty
         );
