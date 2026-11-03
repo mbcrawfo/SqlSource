@@ -125,7 +125,7 @@ public sealed class AttributeReaderTests : IDisposable
 
     [Fact]
     public void Read_TwoAttributesOnOneDeclaration_TakesTheFirst() =>
-        Read(OnAClass("[SqlSourceGenerate(Source = \"A\")]\n[SqlSourceGenerate(Path = \"B\")]"))
+        Read(OnAClass("[SqlSourceGenerate(Source = \"A\")]\n[SqlSourceGenerate(Source = \"B\")]"))
             .Claims.ShouldHaveSingleItem()
             .Source.ShouldBe("A");
 
@@ -191,6 +191,40 @@ public sealed class AttributeReaderTests : IDisposable
         claims.Errors.ShouldBe([
             ToolDiagnostic.At(ToolDiagnostics.FileNotUtf8, Source, new LinePosition(3, 23), Source),
         ]);
+    }
+
+    // The name wherever it stands: after a record's class or struct, after a comment, or with the letter outside ASCII
+    // first.  Each position is the name's first character.
+    [Theory]
+    [InlineData("internal partial record class Café;", 30)]
+    [InlineData("internal partial record struct Café;", 31)]
+    [InlineData("internal partial class /* x */ Café;", 31)]
+    [InlineData("internal partial class Écrit;", 23)]
+    [InlineData("internal partial class Caf\u00e9<T>;", 23)]
+    public void Read_NameOutsideAsciiWrittenAnyWayInAFileThatIsNotUtf8_IsSqlsrc271AtTheName(
+        string declaration,
+        int column
+    )
+    {
+        var claims = ReadLatin1($"using SqlSource;\n\n[SqlSourceGenerate]\n{declaration}\n");
+
+        claims.Claims.ShouldBeEmpty();
+        claims.Errors.ShouldBe([
+            ToolDiagnostic.At(ToolDiagnostics.FileNotUtf8, Source, new LinePosition(3, column), Source),
+        ]);
+    }
+
+    // What follows the name is not the name, a comment outside ASCII included.
+    [Theory]
+    [InlineData("internal partial class Queries/*é*/;")]
+    [InlineData("internal partial class Queries /* é */ { }")]
+    [InlineData("internal partial class Queries<T> where T : struct { /* é */ }")]
+    public void Read_AsciiNameFollowedByTextOutsideAsciiInAFileThatIsNotUtf8_IsAClaim(string declaration)
+    {
+        var claims = ReadLatin1($"using SqlSource;\n\n[SqlSourceGenerate]\n{declaration}\n");
+
+        claims.Errors.ShouldBeEmpty();
+        claims.Claims.ShouldHaveSingleItem().TypeName.ShouldBe("Queries");
     }
 
     [Fact]
@@ -316,9 +350,9 @@ public sealed class AttributeReaderTests : IDisposable
             .Errors.ShouldBeEmpty();
 
     [Fact]
-    public void Read_ArgumentsTheReaderDoesNotExpect_AreSteppedOverAndTheFirstPathIsRead()
+    public void Read_ArgumentsTheReaderDoesNotExpect_AreSteppedOverAndTheFirstSourceIsRead()
     {
-        var claims = Read(OnAClass("[SqlSourceGenerate(\"positional\", Source = \"A\", Path = \"B\", Unknown = 3)]"));
+        var claims = Read(OnAClass("[SqlSourceGenerate(\"positional\", Source = \"A\", Source = \"B\", Unknown = 3)]"));
 
         claims.Errors.ShouldBeEmpty();
         claims.Claims.ShouldHaveSingleItem().Source.ShouldBe("A");
