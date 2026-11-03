@@ -265,15 +265,16 @@
     </ItemGroup>
     <!--
         Writes the project manifest: what the compiler is given, for the sqlsource tool, which runs this target by
-        name.  It hooks nothing on purpose, so no build runs it, and nothing of a build runs before it but what it
-        depends on: SqlSourceListFiles, the searches for settings files and for the build's folders and, for a project
-        of the SDK, AddImplicitDefineConstants.  A .sql file that a target adds is in the manifest only when that
-        target hooks SqlSourceListFiles.  TD-0025.
+        name, and for the online build, which runs it through the dependencies of SqlSourceRunOnline.  It hooks nothing
+        on purpose, since a hook would make every build write the manifest.  When the tool runs it by name, nothing of a
+        build runs before it but what it depends on: SqlSourceListFiles, the searches for settings files and for the
+        build's folders and, for a project of the SDK, AddImplicitDefineConstants.  A .sql file that a target adds is in
+        the manifest only when that target hooks SqlSourceListFiles.  TD-0025.
 
         The file is lines of key=value, and its format is a contract with the tool: the rules are in
         src/SqlSource/build/AGENTS.md, and the reasons in docs/architecture/msbuild-and-manifest.md.  The tool names the
         file with SqlSourceManifestFile; without it the file is under obj, and is added to FileWrites.  That reaches
-        "dotnet clean" only from inside a build, so it has no effect until a build runs this target.
+        "dotnet clean" only from inside a build, so it has an effect only in an online build.
 
         It holds no setting: the tool reads the settings from the files of the Settings lines, as the generator
         does.  A property goes through Escape, or MSBuild would make an item of each part of a value that holds a

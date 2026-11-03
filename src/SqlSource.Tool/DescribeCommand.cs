@@ -144,8 +144,9 @@ internal static class DescribeCommand
         var online = new Option<string>(OnlineOption)
         {
             Description =
-                "How the build asked for the databases: 'auto' leaves a database with no connection alone, and "
-                + "'true' makes it an error.  Needs --manifest.  For the use of the SqlSource build.",
+                "How the build asked for the databases: 'auto' says the run is offline, and fails nothing, when no "
+                + "database with a query to describe has a connection; 'true' makes a missing connection an error.  "
+                + "Needs --manifest.  For the use of the SqlSource build.",
             HelpName = "auto|true",
             Arity = ArgumentArity.ExactlyOne,
         };
