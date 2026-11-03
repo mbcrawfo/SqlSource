@@ -1,6 +1,6 @@
 # Diagnostics
 
-Every problem SqlSource finds is an error, and none can be turned off or made a warning, except a warning about a parameter of a SQL Server query that is written in two spellings, [SQLSRC121](#sqlsrc121), two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), a warning about a short name of a C# type that you chose, [SQLSRC284](#sqlsrc284), a warning of a build that cannot start the `sqlsource` tool and goes on with the sidecars it has, [SQLSRC026](#sqlsrc026), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `codegen` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  An error in a settings file, `sqlsource.json`, is reported at its line and column in that file.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
+Every problem SqlSource finds is an error, and none can be turned off or made a warning, except a warning about a parameter of a SQL Server query that is written in two spellings, [SQLSRC121](#sqlsrc121), two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), a warning about a short name of a C# type that you chose, [SQLSRC284](#sqlsrc284), a warning of a build that cannot start the `sqlsource` tool and goes on with the sidecars it has, [SQLSRC026](#sqlsrc026), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 120, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: a query whose output is `models` still gets its constant or token method, and one whose output is `codegen` gets no method until the error is fixed.  An error in a sidecar is reported at its line and column in the sidecar.  An error in a settings file, `sqlsource.json`, is reported at its line and column in that file.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.  In a build that [runs the tool](tool.md#running-in-the-build), each of its errors is one line, with its other lines after it, each after `; `.
 
 **Project and attribute**
 
@@ -635,6 +635,8 @@ The project sets the MSBuild property `SqlSourceOnline` to a value that is not `
 
 Set `SqlSourceOnline` to `auto`, `true` or `false`, or remove it to get `auto`.  The property can come from the project file or from a `Directory.Build.props` above it.
 
+See: [Running the tool in the build](settings.md#online-build)
+
 ## SQLSRC025
 
 **Build cannot run the tool**
@@ -647,7 +649,7 @@ Set `SqlSourceOnline` to `auto`, `true` or `false`, or remove it to get `auto`. 
 
 Install the tool as a local tool of the repository, as under [install the tool](tool.md#install-the-tool), or run `dotnet tool restore` where the tool manifest names it already.  To build from the sidecars you have committed, without the tool, set `SqlSourceOnline` to `false`.
 
-See: [The tool](tool.md)
+See: [Running in the build](tool.md#running-in-the-build)
 
 ## SQLSRC026
 
@@ -661,7 +663,7 @@ See: [The tool](tool.md)
 
 Run `dotnet tool restore`, or install the tool as under [install the tool](tool.md#install-the-tool), and the next build describes the queries.  A `.env` file that holds your application's settings and no connection of SqlSource turns the build on too: set `SqlSourceOnline` to `false` in a project that should build from its committed sidecars, which also stops the warning.
 
-See: [The tool](tool.md)
+See: [Running in the build](tool.md#running-in-the-build)
 
 ## SQLSRC027
 
@@ -675,7 +677,7 @@ The build ran `dotnet sqlsource describe` on the project before it compiled, and
 
 Bring the tool to the version of the `SqlSource` package the project uses, with `dotnet tool update SqlSource.Tool --version <version>`: the two are released together under one version number.  If the versions are the same, run `dotnet sqlsource describe` in the project's folder to see what the tool says.
 
-See: [The tool](tool.md)
+See: [Running in the build](tool.md#running-in-the-build)
 
 ## SQLSRC101
 
@@ -1349,7 +1351,7 @@ A query that must be described belongs to a database that the run has no connect
     help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES in the environment or in /work/.env
 ```
 
-Give the connection in one of the ways the `help:` line names, or leave the database out of the run with `--database`.  The `help:` line names the `.env` file the run read, or, when it found none, the `.env` it would read in the folder of the solution or project it runs on.  A run on a solution reads the `.env` beside the solution or above it, and not one in a project's folder: when a project of the database has a `.env` in its folder, or in a folder between it and the solution's, the `help:` line names each such file, as `The run did not read /work/App/.env: it reads the .env nearest to /work`.  Move the file, or its connection variables, to the solution's folder or to the root of the repository.  When `--connection` was given for a name that no database of the run has, the `help:` line lists the names that are close to a database of the run, so that a misspelt one is seen, and counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`: a name that is far from every database of the run, such as the start of a connection string typed without its `name=`, is not printed.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.
+Give the connection in one of the ways the `help:` line names, or leave the database out of the run with `--database`.  The `help:` line names the `.env` file the run read, or, when it found none, the `.env` it would read in the folder of the solution or project it runs on.  A run on a solution reads the `.env` beside the solution or above it, and not one in a project's folder: when a project of the database has a `.env` in its folder, or in a folder between it and the solution's, the `help:` line names each such file, as `The run did not read /work/App/.env: it reads the .env nearest to /work`.  Move the file, or its connection variables, to the solution's folder or to the root of the repository.  When `--connection` was given for a name that no database of the run has, the `help:` line lists the names that are close to a database of the run, so that a misspelt one is seen, and counts any other by the position of its value on the command line, as `The value of --connection at position 3 names no database of this run`: a name that is far from every database of the run, such as the start of a connection string typed without its `name=`, is not printed.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.  A build that [runs the tool](tool.md#running-in-the-build) because it found a connection reports it only when another database with a query to describe has one; when none has, the build goes on with the committed sidecars, unless `SQLSOURCE_CONNECTION` is set for several databases, [SQLSRC215](#sqlsrc215).  Under `SqlSourceOnline` `true` it reports it for every database without one.
 
 See: [Connections](tool.md#connections)
 
@@ -1544,7 +1546,7 @@ The tool could not open a session with the database of a query that must be desc
     help: check that the database is running and that the connection string names it
 ```
 
-**Fix:** start the database, or correct the connection string that `--connection` or the database's variable gives.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.
+**Fix:** start the database, or correct the connection string that `--connection` or the database's variable gives.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.  In a build that [runs the tool](tool.md#running-in-the-build), the error fails the build, and the `help:` line also says how to build without the database: `To build without the database, remove its connection or set SqlSourceOnline to false`.
 
 The `server:` line is one of these.  A SQLSTATE is PostgreSQL's code of the error, listed in [PostgreSQL's error codes](https://www.postgresql.org/docs/current/errcodes-appendix.html).
 

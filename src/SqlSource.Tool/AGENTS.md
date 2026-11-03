@@ -4,21 +4,21 @@ How the tool works: [`docs/architecture/tool.md`](../../docs/architecture/tool.m
 How the PostgreSQL describer works: [`docs/architecture/postgres-describer.md`](../../docs/architecture/postgres-describer.md) and [`docs/architecture/postgres-nullability.md`](../../docs/architecture/postgres-nullability.md).
 How the SQL Server describer works: [`docs/architecture/sqlserver-describer.md`](../../docs/architecture/sqlserver-describer.md).
 
-The `sqlsource` command, packed as the .NET tool `SqlSource.Tool`.  Its tests, and where each kind goes, are in [`tests/README.md`](../../tests/README.md).
+The tool's tests, and where each kind goes, are in [`tests/README.md`](../../tests/README.md).
 
 ## The project
 
 - **The tool shares the generator's code and never copies it.**  It references `src/SqlSource/SqlSource.csproj` and sees its internals ([folders](../../docs/architecture/tool.md#folders)).  Code that both need goes in the generator's project, where `netstandard2.0` and Roslyn 4.14.0 bound it.
 - **It targets `net8.0` with `RollForward` `Major`, and references a current Roslyn by `VersionOverride`.**  Do not raise the target: a user with only the .NET 8 SDK must be able to run it.  `tools/check-tool-install.sh` runs the packed tool on the newest runtime the machine has.
 - **The tool writes English**, and `SatelliteResourceLanguages` keeps other languages out of the package.  A test compares no text that System.CommandLine wrote.
-- **`README.md` here is the package's short page on nuget.org**: what the tool is for, how to install it, the commands a user runs most, and links to the manual and the repository's `README.md`, which is not in this package.
+- **`README.md` here is the package's short page on nuget.org**: what the tool is for, how to install it, the commands a user runs most, and links to the manual and the repository's `README.md`, which is not packed into this package.  Keep it that short.
 - **The tool's behaviour is documented in `docs/manual/tool.md`**, where a new option, environment variable, exit code or command goes; in `docs/manual/settings.md`, for the logical database setting; and in `docs/manual/postgresql.md` and `docs/manual/sqlserver.md`.
 
 ## The host
 
 - **Everything from outside comes through `ToolHost`.**  Nothing reads `Console`, `Environment`, `RuntimeInformation` or the current directory except `ToolHost.Create` and `Cli.Run` ([the host](../../docs/architecture/tool.md#the-host)).  A test gives `Cli.RunAsync` a host of its own.  What a later phase takes from outside is a new member of `ToolHost`.
 - **The clock is `ToolHost.Time`.**  The time of a log's events and how long a step took come from it, never from `DateTime` or `Stopwatch`.
-- **Every process goes through `ToolHost.Processes`.**  `Processes/ProcessRunner.cs` is the only code that starts one, and a test gives `tests/SqlSource.Tool.Testing/FakeProcessRunner.cs`.  A temporary folder is made in `ToolHost.TempDirectory`, and what runs at once is bounded by `ToolHost.ProcessorCount`.
+- **Every process goes through `ToolHost.Processes`.**  `Processes/ProcessRunner.cs` is the only code that starts one, and a test gives `tests/SqlSource.Tool.Testing/FakeProcessRunner.cs`.
 - **The tool never restores and never builds a project, and writes nothing into one but its sidecars** ([evaluating a project](../../docs/architecture/tool.md#evaluating-a-project)).  Do not add `-restore`, a target of a build, or a file under a project's folder: `tests/SqlSource.Tool.Tests/Projects/FixtureProjectTests.cs` checks that a project has no `obj` afterwards.
 - **A sidecar is written or deleted by `Describing/SidecarStore.cs` and by nothing else.**
 
@@ -36,13 +36,14 @@ The `sqlsource` command, packed as the .NET tool `SqlSource.Tool`.  Its tests, a
 ## A connection's value
 
 - **A connection's value goes to the describer and nowhere else** ([where a connection's value goes](../../docs/architecture/tool.md#where-a-connections-value-goes)).  The parts that `IQueryDescriber.SecretsOf` returns and the text of `RewriteOf` are all a describer gives back that holds it, which the run uses only to remove them and to refuse a capture.
-- **A type that holds the value overrides `ToString` to leave it out**, as `ConnectionArgument`, `ConnectionSecret`, `DatabaseConnection`, `OpenRequest` and `UsageValue` do: a record prints its members.  The tool says only where a connection came from: `--connection`, a variable, or a variable and its `.env` file.
+- **A type that holds the value overrides `ToString` to leave it out**, as `ConnectionArgument`, `ConnectionSecret`, `DatabaseConnection`, `OpenRequest` and `UsageValue` do: a record prints its members.
 - **Every text of a describer that is printed, said under `--verbose` or logged has the secret removed**, whatever the describer's rule: by `Describing/Redaction.cs`, by a describer's log, `Logging/SessionRunLog.cs`, and by `RunTrace.Without` once a database's connection is found.  What the removal misses is `docs/tech-debt/TD-0034-redaction-of-a-describers-text-has-holes.md`.
 - **A new event that carries what a describer gave gets a case in `tests/SqlSource.Tool.Tests/Logging/RunLogRedactionTests.cs`**, and a new place that prints it one in `tests/SqlSource.Tool.Tests/Commands/SecretTests.cs`.
 
 ## What a run says
 
 - **A step that reports nothing writes no event either**: its caller writes it from what the step returned, as for the planner, `RunDecisions`, `FileOutcomes` and `SidecarCheck`.  `Logging/RunEvents.cs` builds every event but `run.start`, `run.end` and `diagnostic`, and says each line of `--verbose` through `RunTrace.Say`, the one writer of those lines.
+- **Under `--online` a run always prints a line of the tool's own**, an error, a `sqlsource:` line or a summary line: `SqlSourceRunOnline` reads silence as a tool that could not start ([why](../../docs/architecture/tool.md#build-integration-options)).
 - **An event's name and its members are read by people and by phase 10's bundle.**  A member is added and never renamed, and a value is one of `Logging/LogValue.cs`'s closed set ([the log](../../docs/architecture/tool.md#the-log)).
 
 ## The command line

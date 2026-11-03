@@ -26,6 +26,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Read rows into the models with Dapper | [The recipe](recipes.md#models-through-dapper) |
 | Let a test project see the internals of another project, or catch another project's exceptions by type | [Projects that share internals](generator.md#projects-that-share-internals), [public exceptions](settings.md#public-exceptions), or the recipes for [a test project](recipes.md#test-project-sees-internals) and [two data projects](recipes.md#share-the-exceptions) |
 | Install the tool and describe my queries | [Install the tool](tool.md#install-the-tool) |
+| Have the build describe my queries, or keep it from doing so | [Running in the build](tool.md#running-in-the-build), [running the tool in the build](settings.md#online-build) |
 | Give the tool a connection, keep it in a `.env` file, or work with several databases | [Connections](tool.md#connections), [a `.env` file](tool.md#env-file), or the [recipe](recipes.md#use-several-databases) |
 | Keep the sidecars current after a schema change | [After a schema change](tool.md#after-a-schema-change) |
 | Set up CI | [Check in CI](tool.md#check-in-ci), or the [recipe](recipes.md#check-sidecars-in-ci) |
@@ -79,7 +80,8 @@ SqlSource is in early development.  This table is the one list of what works in 
 | Custom type mapping: the type override, `typeOverrides` in a settings file and `-- type-override:` | Available | [Type overrides](settings.md#setting-type-overrides); for a PostgreSQL type that cannot be sent as a parameter, see [SQLSRC232](diagnostics.md#sqlsrc232) |
 | Column types: a C# type for one column, by the column it is read from, with `columnTypes` in a settings file or a `-- column:` in the file header, or by a `-- column:` inside a query, and for one parameter by `-- param: @id -> Type` | Available | [Column types](settings.md#setting-column-types), [giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | C# types written by their short names, `UserId` for `MyApp.UserId`, wherever SqlSource takes a C# type | Available | [Type overrides](settings.md#setting-type-overrides) |
-| Build integration: the tool running in your build | Coming | Not documented until it is delivered; today you run the tool yourself: [install the tool](tool.md#install-the-tool) |
+| Build integration: the tool running in your build before it compiles, when a connection is configured, and `SqlSourceOnline` | Available | [Running in the build](tool.md#running-in-the-build), [running the tool in the build](settings.md#online-build) |
+| Watch mode: the tool describing your queries as you save them | Coming | Not documented until it is delivered; today a build describes them: [running in the build](tool.md#running-in-the-build) |
 | Bug-report bundles | Coming | Not documented until it is delivered; today attach a [log](tool.md#logs) |
 
 ## The pages
@@ -90,7 +92,7 @@ SqlSource is in early development.  This table is the one list of what works in 
 - [Parameters and tokens](parameters-and-tokens.md): query parameters, `-- param:` and tokens.
 - [Dialects](dialects.md): how each database's comments and strings are read, and which databases can be described.
 - [The generator](generator.md): what the `SqlSource` package generates.
-- [The tool](tool.md): the `SqlSource.Tool` package and its `sqlsource` command.
+- [The tool](tool.md): the `SqlSource.Tool` package, its `sqlsource` command, and running it in the build.
 - [PostgreSQL](postgresql.md): how SqlSource works with PostgreSQL.
 - [SQL Server](sqlserver.md): how SqlSource works with SQL Server.
 - [Recipes](recipes.md): short how-tos, each a sample and a link to the rules.

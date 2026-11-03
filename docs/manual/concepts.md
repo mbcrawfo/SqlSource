@@ -1,6 +1,6 @@
 # Concepts
 
-SqlSource reads the queries you keep in `.sql` files.  The **generator**, in the `SqlSource` package, runs inside the compiler whenever you build the project, and turns each query into C# code: for a described query its models, a type for its parameters and a type for its rows, and by default a method that runs it; or a string constant, or a method where the query has tokens, that holds its SQL for your own code to run.  The **tool**, in the `SqlSource.Tool` package, connects to your database, asks it what each query's parameters and columns are, and writes the answer into a **sidecar** file beside the `.sql` file.  You commit the sidecar with the project, and the generator reads it during the build, so that the build needs no database.  A query whose [output](#output) is `models` or `codegen`, the default, must be described: the build reports an error for one that has no current entry in its sidecar.  A query whose output is `sql` needs neither the tool nor a sidecar.
+SqlSource reads the queries you keep in `.sql` files.  The **generator**, in the `SqlSource` package, runs inside the compiler whenever you build the project, and turns each query into C# code: for a described query its models, a type for its parameters and a type for its rows, and by default a method that runs it; or a string constant, or a method where the query has tokens, that holds its SQL for your own code to run.  The **tool**, in the `SqlSource.Tool` package, connects to your database, asks it what each query's parameters and columns are, and writes the answer into a **sidecar** file beside the `.sql` file.  You commit the sidecar with the project, and the generator reads it during the build, so that the build needs no database.  On a machine with a connection, the build [runs the tool itself](tool.md#running-in-the-build) before it compiles.  A query whose [output](#output) is `models` or `codegen`, the default, must be described: the build reports an error for one that has no current entry in its sidecar.  A query whose output is `sql` needs neither the tool nor a sidecar.
 
 ```mermaid
 flowchart LR
@@ -44,7 +44,7 @@ The part of a `.sql` file before its first `-- name:` line.  It holds comments, 
 
 #### Sidecar
 
-The tool's record of what the database said about each query's parameters and columns.  It is the file `Users.sql.json` beside `Users.sql`.  It is committed with the project, so that a build never needs a database, and it is never edited by hand: the tool writes it.  The build checks it, and reports a query that must be described and has no current entry in it.  See [sidecar files](tool.md#sidecar-files).
+The tool's record of what the database said about each query's parameters and columns.  It is the file `Users.sql.json` beside `Users.sql`.  It is committed with the project, so that a build needs no database, and it is never edited by hand: the tool writes it.  The build checks it, and reports a query that must be described and has no current entry in it.  See [sidecar files](tool.md#sidecar-files).
 
 The generator builds the [models](generator.md#models) and the [query method](#query-method) of a query from its entry in the sidecar.
 

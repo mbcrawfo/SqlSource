@@ -8,6 +8,8 @@ A `.sql` file that a target of the project adds as an `AdditionalFiles` item is 
 
 The same holds for a `Compile` item that a target adds: a `[SqlSourceGenerate]` in such a file is not read.  Every project of the SDK has such items, the files it writes under `obj` for the assembly's attributes and for the global usings.  None holds the attribute, but a global `using` alias that names it is in one of them, and the tool's reader of attributes, in sub-phase 2.4, does not see that alias.
 
+The online build, which runs the tool before the compiler ([the online build](../architecture/msbuild-and-manifest.md#the-online-build)), does not have the limit in a project with one target framework: `SqlSourceRunOnline` runs just before `CoreCompile`, after the build's hooks.  It has it in a project with several.  The tool runs once, in the first framework's configuration, which is called by name: by the outer build before `DispatchToInnerBuilds`, or by the build of another framework, alone under `-f` or through a `ProjectReference`.  Either call runs `SqlSourceRunOnline` and what it depends on, and none of the first framework's hooks, so its manifest misses the file as the tool's own run does, while every framework compiles it.  A build of the first framework alone, by `-f`, runs it from its own build and does not.
+
 `tests/SqlSource.Tool.Tests/Projects/ManifestTargetTests.cs` pins it with the fixture `BuildHookFile`, and `tools/check-package-install.sh` with the file that `tools/package-install/Directory.Build.targets` adds.
 
 ## Why it exists
@@ -20,8 +22,8 @@ Low.  It takes a target that adds `.sql` files while the build runs.  The failur
 
 ## Proposed fix
 
-A target that adds a `.sql` file hooks `SqlSourceListFiles`, which runs it before the manifest is written as well as before the search for settings files; the comment at the top of `build/SqlSource.targets` says the same for a build.  The known issues of [`docs/manual/settings.md`](../manual/settings.md#known-issues) say so, and those of `docs/manual/tool.md` point there.  Phase 9's run inside a build does not have the limit: the build has run its hooks by then.
+A target that adds a `.sql` file hooks `SqlSourceListFiles`, which runs it before the manifest is written as well as before the search for settings files; the comment at the top of `build/SqlSource.targets` says the same for a build.  The known issues of [`docs/manual/settings.md`](../manual/settings.md#known-issues) say so, and those of `docs/manual/tool.md` point there.  The online build of a project with one framework does not have the limit, and that of a project with several keeps it, as the problem says; the same line fixes it there.
 
 ## Trigger
 
-A user reports that `sqlsource describe` leaves out the queries of a file that their build adds.  Or phase 9, which may close it for a run inside a build.
+A user reports that `sqlsource describe`, or the build of a project with several target frameworks, leaves out the queries of a file that their build adds.

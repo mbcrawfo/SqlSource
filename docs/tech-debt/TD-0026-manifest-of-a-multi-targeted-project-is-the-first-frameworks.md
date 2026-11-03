@@ -10,6 +10,8 @@ For a project with `TargetFrameworks`, the `sqlsource` tool passes the first of 
 
 The queries those bring are never described.  The generator compiles for every framework, so the build of the other framework reports each of them whose output is not `Sql` as having no entry, `SQLSRC241`.
 
+The online build has the same limit ([the online build](../architecture/msbuild-and-manifest.md#the-online-build)).  It runs the tool once, on the manifest of the first framework, since a run for each framework would delete or trim what another's run had just written.  So the build of another framework reports a query only that framework claims, `SQLSRC241`, as it does after a run by hand.
+
 `tests/SqlSource.Tool.Tests/Projects/ManifestTargetTests.cs` and `tests/SqlSource.Tool.Tests/Projects/FixtureProjectTests.cs` pin the first two with the fixture `Multi`, and the third with `SecondOnly`.
 
 ## Why it exists
@@ -22,7 +24,7 @@ Low.  The gap is loud in the build, which reports each query that was not descri
 
 ## Proposed fix
 
-One evaluation and one manifest for each framework, and the plan of a run as the union of what they need: a query needs an entry when any framework's types claim it with an output that needs one.
+One evaluation and one manifest for each framework, and the plan of a run as the union of what they need: a query needs an entry when any framework's types claim it with an output that needs one.  The online build's one run then needs the manifest of every framework, written before it runs.
 
 ## Trigger
 
