@@ -243,7 +243,7 @@ Two things catch a PostgreSQL project out.  Entity Framework Core's `Npgsql.Enti
 
 A project's JSON columns are `string`s until it turns System.Text.Json on, with `"libraryTypes": { "json": "on" }` in a settings file: then PostgreSQL's `json` and `jsonb` and SQL Server's `json` are a `JsonElement` in its query methods.  A type override, a column type or a marker gives a JSON column a `JsonDocument` or a `JsonNode` instead, or a class of your own, which the query methods read and send through System.Text.Json's serializer.  Nothing is registered on the data source, and a column of a string type that holds JSON, such as an `nvarchar(max)`, takes a class by the JSON opt-in, `-> json OrderMetadata`.  See JSON on [PostgreSQL](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/postgresql.md#json) and [SQL Server](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/sqlserver.md#json), and [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#class-in-a-json-column).
 
-The deliveries of [the PostgreSQL example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/PostgresExamples/README.md) and [the SQL Server example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/SqlServerExamples/README.md), `CodeGen/Deliveries.sql`, show all three libraries in a whole project.
+The deliveries of [the PostgreSQL example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/PostgresExamples/README.md) and [the SQL Server example](https://github.com/mbcrawfo/SqlSource/blob/main/examples/SqlServerExamples/README.md), `CodeGen/DeliveryQueries.sql`, show all three libraries in a whole project.
 
 ## Custom type mapping
 
