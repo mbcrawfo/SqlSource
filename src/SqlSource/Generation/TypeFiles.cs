@@ -3,7 +3,7 @@ using SqlSource.Diagnostics;
 namespace SqlSource.Generation;
 
 /// <summary>
-/// A type and the <c>.sql</c> files its <c>Path</c> resolves to.
+/// A type and the <c>.sql</c> files its <c>Source</c> resolves to.
 /// </summary>
 /// <param name="Type">The type.</param>
 /// <param name="Files">The normalised paths of the type's files, in member order.</param>

@@ -435,7 +435,7 @@ public sealed class SidecarTests
     {
         var source = Source.Replace(
             "[SqlSourceGenerate]",
-            "[SqlSourceGenerate(Path = \"Users.sql\")]",
+            "[SqlSourceGenerate(Source = \"Users.sql\")]",
             StringComparison.Ordinal
         );
         var orders = new SqlFile("/app/Repo/Orders.sql", "-- name: GetOrder\nSELECT 2;\n");

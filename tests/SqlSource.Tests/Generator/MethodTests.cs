@@ -370,14 +370,14 @@ public sealed class MethodTests
             {
                 public partial class Outer
                 {
-                    [SqlSourceGenerate(Path = "Users.sql")]
+                    [SqlSourceGenerate(Source = "Users.sql")]
                     public partial class Inner;
 
-                    [SqlSourceGenerate(Path = "Orders.sql")]
+                    [SqlSourceGenerate(Source = "Orders.sql")]
                     private partial class Hidden;
                 }
 
-                [SqlSourceGenerate(Path = "Lines.sql")]
+                [SqlSourceGenerate(Source = "Lines.sql")]
                 public partial class Repository<T>;
             }
             """;

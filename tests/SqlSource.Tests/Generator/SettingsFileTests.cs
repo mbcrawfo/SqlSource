@@ -394,7 +394,7 @@ public sealed class SettingsFileTests
                     """
                     using SqlSource;
                     namespace App;
-                    [SqlSourceGenerate(Path = "../Queries/Users.sql", SqlLocation = SqlLocation.Nested)]
+                    [SqlSourceGenerate(Source = "../Queries/Users.sql", SqlLocation = SqlLocation.Nested)]
                     public partial class Sample
                     {
                         public static string Get() => Queries.GetUser;
@@ -428,7 +428,7 @@ public sealed class SettingsFileTests
             [
                 new SourceFile(
                     GeneratorHarness.SourcePath,
-                    GeneratorHarness.SampleSource("Path = \"../../shared/Users.sql\"")
+                    GeneratorHarness.SampleSource("Source = \"../../shared/Users.sql\"")
                 ),
             ],
             [

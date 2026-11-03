@@ -9,7 +9,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC001](#sqlsrc001) | Type must be partial |
 | [SQLSRC002](#sqlsrc002) | Type is file-local |
 | [SQLSRC003](#sqlsrc003) | Target framework is not supported |
-| [SQLSRC004](#sqlsrc004) | Path matches no SQL file |
+| [SQLSRC004](#sqlsrc004) | Source matches no SQL file |
 | [SQLSRC005](#sqlsrc005) | Folder has no SQL file |
 | [SQLSRC006](#sqlsrc006) | Attribute value is not valid |
 | [SQLSRC007](#sqlsrc007) | Type has a member named like its nested class |
@@ -310,28 +310,28 @@ Target `net8.0` or later.  For a project that targets several frameworks, put th
 
 ## SQLSRC004
 
-**Path matches no SQL file**
+**Source matches no SQL file**
 
-`Path` is relative to the folder of the source file that carries the attribute.  A value that ends in `.sql` names one file.  Any other value names a folder, and the type gets the `.sql` files directly in it; subfolders are not searched.
+`Source` is relative to the folder of the source file that carries the attribute.  A value that ends in `.sql` names one file.  Any other value names a folder, and the type gets the `.sql` files directly in it; subfolders are not searched.
 
 ```csharp
-[SqlSourceGenerate(Path = "Queries/User.sql")] // The file is Queries/Users.sql.
+[SqlSourceGenerate(Source = "Queries/User.sql")] // The file is Queries/Users.sql.
 public partial class UserRepository { }
 ```
 
 Check the spelling, and that the path starts from the folder of this source file and not from the project.  If the file exists, check that the build sees it.  The package registers the `.sql` files under the project's own folder, so a file outside it, such as a linked file, must be listed as an `AdditionalFiles` item.  So must every `.sql` file of a project that sets `SqlSourceIncludeFiles` to `false`.
 
-See: [Path](settings.md#setting-path)
+See: [Source](settings.md#setting-source)
 
 ## SQLSRC005
 
 **Folder has no SQL file**
 
-Without `Path`, the type gets every `.sql` file in the folder of the source file that carries the attribute.  That folder has none.
+Without `Source`, the type gets every `.sql` file in the folder of the source file that carries the attribute.  That folder has none.
 
-Add a `.sql` file next to the source file, or set `Path` to the folder or file that holds the queries.  If a file is there, check that the build sees it, as described for [SQLSRC004](#sqlsrc004).
+Add a `.sql` file next to the source file, or set `Source` to the folder or file that holds the queries.  If a file is there, check that the build sees it, as described for [SQLSRC004](#sqlsrc004).
 
-See: [Path](settings.md#setting-path)
+See: [Source](settings.md#setting-source)
 
 ## SQLSRC006
 
@@ -429,7 +429,7 @@ Remove the item, since the package already includes the file.  To change the ite
 
 The error is reported only for a `.sql` file that a type uses.
 
-See: [Path](settings.md#setting-path)
+See: [Source](settings.md#setting-source)
 
 ## SQLSRC015
 
@@ -683,7 +683,7 @@ A file without a `-- name:` marker is one query, named after the file without it
 get-user.sql
 ```
 
-Add a `-- name:` marker at the top of the file, or rename the file.  If the file is not meant to be a query of this type, move it out of the type's folder or point the type's `Path` somewhere else.
+Add a `-- name:` marker at the top of the file, or rename the file.  If the file is not meant to be a query of this type, move it out of the type's folder or point the type's `Source` somewhere else.
 
 See: [A file with no `-- name:`](sql-files.md#a-file-with-no-name)
 
@@ -1185,20 +1185,20 @@ See: [Options](tool.md#options)
 
 **Attribute argument is not a literal**
 
-The `sqlsource` tool finds `[SqlSourceGenerate]` by reading the C# files of a project as text.  It does not compile them, so it cannot follow a name to its value.  `Path` and `Output` decide which queries are described, and the tool reads those two alone: `Path` must be a string literal, and `Output` a member of `GeneratorOutput` written out.
+The `sqlsource` tool finds `[SqlSourceGenerate]` by reading the C# files of a project as text.  It does not compile them, so it cannot follow a name to its value.  `Source` and `Output` decide which queries are described, and the tool reads those two alone: `Source` must be a string literal, and `Output` a member of `GeneratorOutput` written out.
 
 ```csharp
 using SqlSource;
 internal static class Folders { public const string Queries = "Queries"; }
-[SqlSourceGenerate(Path = Folders.Queries)]
+[SqlSourceGenerate(Source = Folders.Queries)]
 internal static partial class Queries;
 ```
 
 ```console
-/work/App/Queries.cs(3,27): error SQLSRC208: 'Path' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here
+/work/App/Queries.cs(3,29): error SQLSRC208: 'Source' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here
 ```
 
-Write the value where the attribute is: `Path = "Queries"`, `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation, an interpolated string and a cast of a number are all this error, though the compiler accepts them.  The tool describes nothing for the type until it is mended, so the build reports [SQLSRC241](#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none.  Under a dialect that has no database to ask, such as `ansi`, the build reports [SQLSRC209](#sqlsrc209) instead.
+Write the value where the attribute is: `Source = "Queries"`, `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation, an interpolated string and a cast of a number are all this error, though the compiler accepts them.  The tool describes nothing for the type until it is mended, so the build reports [SQLSRC241](#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none.  Under a dialect that has no database to ask, such as `ansi`, the build reports [SQLSRC209](#sqlsrc209) instead.
 
 See: [Known issues](generator.md#known-issues)
 
@@ -1271,7 +1271,7 @@ $ dotnet sqlsource describe Queries/User.sql
 sqlsource : error SQLSRC212: '/work/App/Queries/User.sql' is not a .sql file that a type of the run claims
 ```
 
-Check the spelling of the path.  If the file exists, it is either not a file of the project, as when `SqlSourceIncludeFiles` is off and the project does not list it, or no type claims it: a type claims the `.sql` files in the folder of its own source file, or the ones its `Path` names.  With `--project`, the file must be claimed by a type of one of the projects named.  The rest of the run goes on.
+Check the spelling of the path.  If the file exists, it is either not a file of the project, as when `SqlSourceIncludeFiles` is off and the project does not list it, or no type claims it: a type claims the `.sql` files in the folder of its own source file, or the ones its `Source` names.  With `--project`, the file must be claimed by a type of one of the projects named.  The rest of the run goes on.
 
 See: [Arguments](tool.md#arguments)
 
@@ -2617,13 +2617,13 @@ The tool reports a `.sql` file saved in another encoding, such as Windows-1252, 
 
 The build does not report this error itself.  It reports a query of the file that has no entry as missing one ([SQLSRC241](#sqlsrc241)), and on Windows, when the characters outside ASCII are in a query's SQL and not only in its comments, reports the query's entry as out of date ([SQLSRC244](#sqlsrc244)).  Otherwise the build may report nothing while the tool reports the file.
 
-The tool also reports a C# file in another encoding whose `[SqlSourceGenerate]` has a `Path` written with a character outside ASCII, at that `Path`.  A build on Windows reads that `Path` in the system's code page, and so can look for the `.sql` files in another folder than the tool, which plans nothing for the type until the file is saved as UTF-8.  A C# file in another encoding is read as before when its `Path` is written with ASCII characters only, an escape such as `\u00ea` included.
+The tool also reports a C# file in another encoding whose `[SqlSourceGenerate]` has a `Source` written with a character outside ASCII, at that `Source`.  A build on Windows reads that `Source` in the system's code page, and so can look for the `.sql` files in another folder than the tool, which plans nothing for the type until the file is saved as UTF-8.  A C# file in another encoding is read as before when its `Source` is written with ASCII characters only, an escape such as `\u00ea` included.
 
 ```console
 /work/App/Queries/Users.sql : error SQLSRC271: '/work/App/Queries/Users.sql' is not saved as UTF-8, so its text depends on the system that reads it.  Save it as UTF-8.
 ```
 
-Save the file as UTF-8, with the "Save with encoding" command of your editor, and run `dotnet sqlsource describe` again.  That fixes the entries the build reported as missing or out of date.  For a `.sql` file the error is reported once, at the file with no line or column; for a C# file it is reported at the `Path` argument, with its line and column.  When the file has a parse error of its own, the tool reports this error instead of the parse errors, since what it read may not be what the build reads.  A file that is also [SQLSRC209](#sqlsrc209) gets this error alone.
+Save the file as UTF-8, with the "Save with encoding" command of your editor, and run `dotnet sqlsource describe` again.  That fixes the entries the build reported as missing or out of date.  For a `.sql` file the error is reported once, at the file with no line or column; for a C# file it is reported at the `Source` argument, with its line and column.  When the file has a parse error of its own, the tool reports this error instead of the parse errors, since what it read may not be what the build reads.  A file that is also [SQLSRC209](#sqlsrc209) gets this error alone.
 
 See: [Describing again](tool.md#describing-again)
 

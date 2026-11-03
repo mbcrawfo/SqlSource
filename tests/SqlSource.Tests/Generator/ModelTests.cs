@@ -746,7 +746,7 @@ public sealed class ModelTests
 
             namespace Other
             {
-                [SqlSourceGenerate(Path = "Users.sql")]
+                [SqlSourceGenerate(Source = "Users.sql")]
                 public partial class Second;
             }
             """;

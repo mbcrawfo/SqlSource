@@ -24,13 +24,13 @@ public sealed class MethodConflictTests
         {
             public partial class First
             {
-                [SqlSourceGenerate(Path = "A.sql")]
+                [SqlSourceGenerate(Source = "A.sql")]
                 public partial class Queries;
             }
 
             public partial class Second
             {
-                [SqlSourceGenerate(Path = "B.sql")]
+                [SqlSourceGenerate(Source = "B.sql")]
                 public partial class Queries;
             }
         }
@@ -42,10 +42,10 @@ public sealed class MethodConflictTests
 
         namespace App
         {
-            [SqlSourceGenerate(Path = "A.sql")]
+            [SqlSourceGenerate(Source = "A.sql")]
             public partial class First;
 
-            [SqlSourceGenerate(Path = "B.sql")]
+            [SqlSourceGenerate(Source = "B.sql")]
             public partial class Second;
         }
         """;
@@ -253,13 +253,13 @@ public sealed class MethodConflictTests
             {
                 public partial class First
                 {
-                    [SqlSourceGenerate(Path = "A.sql")]
+                    [SqlSourceGenerate(Source = "A.sql")]
                     public partial class Queries;
                 }
 
                 internal partial class Second
                 {
-                    [SqlSourceGenerate(Path = "B.sql")]
+                    [SqlSourceGenerate(Source = "B.sql")]
                     public partial class Queries;
                 }
             }
@@ -277,11 +277,11 @@ public sealed class MethodConflictTests
 
         run.Problems()
             .ShouldBe([
-                "SQLSRC276 /app/Repo/Sample.cs(7,10)-(7,43): The query methods of 'App.First.Queries' cannot go into "
+                "SQLSRC276 /app/Repo/Sample.cs(7,10)-(7,45): The query methods of 'App.First.Queries' cannot go into "
                     + "the extension class 'App.QueriesExtensions', because 'App.Second.Queries' puts its methods "
                     + "there too, and the class would be public for one and internal for the other.  Rename the type "
                     + "or what has the name, or set the attribute's MethodLocation to put the methods on the type.",
-                "SQLSRC276 /app/Repo/Sample.cs(13,10)-(13,43): The query methods of 'App.Second.Queries' cannot go "
+                "SQLSRC276 /app/Repo/Sample.cs(13,10)-(13,45): The query methods of 'App.Second.Queries' cannot go "
                     + "into the extension class 'App.QueriesExtensions', because 'App.First.Queries' puts its methods "
                     + "there too, and the class would be public for one and internal for the other.  Rename the type "
                     + "or what has the name, or set the attribute's MethodLocation to put the methods on the type.",

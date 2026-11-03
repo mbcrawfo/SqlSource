@@ -36,10 +36,10 @@ public sealed class RowBufferTests
 
         namespace App
         {
-            [SqlSourceGenerate(Path = "A.sql")]
+            [SqlSourceGenerate(Source = "A.sql")]
             public partial class First;
 
-            [SqlSourceGenerate(Path = "B.sql")]
+            [SqlSourceGenerate(Source = "B.sql")]
             public partial class Second;
         }
         """;

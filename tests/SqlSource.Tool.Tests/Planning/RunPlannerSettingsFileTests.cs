@@ -195,7 +195,7 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
     {
         var project = new TestProject(_folder);
         project.Settings["dialect"] = "postgres";
-        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"Queries\""));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Source = \"Queries\""));
         _ = project.AddSql("Other/X.sql", "SELECT 1;");
         var settings = project.AddSettings(
             "Other/sqlsource.json", /*lang=json,strict*/
@@ -360,7 +360,7 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
     public void Plan_ErrorsOfAProject_AreClaimsThenSettingsFiles()
     {
         var project = OwnFile();
-        var other = project.AddSource("Other.cs", Plans.TypeNamed("Other", "Path = Folder"));
+        var other = project.AddSource("Other.cs", Plans.TypeNamed("Other", "Source = Folder"));
         var lower = project.AddSettings(
             "b/sqlsource.json", /*lang=json,strict*/
             """{"lower": 1}"""
@@ -380,8 +380,8 @@ public sealed class RunPlannerSettingsFileTests : IDisposable
                 new Reported(
                     "SQLSRC208",
                     other,
-                    new LinePosition(0, "[SqlSource.SqlSourceGenerate(Path = ".Length),
-                    "'Path' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here"
+                    new LinePosition(0, "[SqlSource.SqlSourceGenerate(Source = ".Length),
+                    "'Source' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here"
                 ),
                 new Reported("SQLSRC016", upper, new LinePosition(0, 1), "'upper' is not a key of a settings file"),
                 new Reported("SQLSRC016", lower, new LinePosition(0, 1), "'lower' is not a key of a settings file"),

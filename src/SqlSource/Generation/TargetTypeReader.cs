@@ -63,7 +63,7 @@ internal static class TargetTypeReader
             methodPlacement,
             SettingsLevelReader.Read(ref source),
             IsPublic(symbol),
-            ReadPath(attribute),
+            ReadSource(attribute),
             reference.SyntaxTree.FilePath,
             attributeLocation,
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable())
@@ -177,9 +177,9 @@ internal static class TargetTypeReader
             ? string.Empty
             : "<" + string.Join(", ", list.Parameters.Select(static parameter => parameter.Identifier.Text)) + ">";
 
-    private static string? ReadPath(AttributeData attribute) =>
-        GetNamedArgument(attribute, AttributeSource.PathProperty) is { Value: string { Length: > 0 } path }
-            ? path
+    private static string? ReadSource(AttributeData attribute) =>
+        GetNamedArgument(attribute, AttributeSource.SourceProperty) is { Value: string { Length: > 0 } source }
+            ? source
             : null;
 
     // The attribute as a source of settings.  A word that is no generator parameter is reported, and a type with a
@@ -193,8 +193,8 @@ internal static class TargetTypeReader
     {
         public SettingPlace Place => SettingPlace.Attribute;
 
-        // A string that is empty or white space is not set: the reader of the level says so.  Path is no setting, and
-        // is unset only when it is empty.
+        // A string that is empty or white space is not set: the reader of the level says so.  Source is no setting,
+        // and is unset only when it is empty.
         public string? Text(SettingId setting) =>
             PropertyOf(setting) is { } property && GetNamedArgument(attribute, property) is { Value: string written }
                 ? written

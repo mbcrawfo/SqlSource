@@ -219,7 +219,7 @@ public sealed class FileDiagnosticsTests
             namespace App;
             [SqlSourceGenerate]
             public partial class First { }
-            [SqlSourceGenerate(Path = "Users.sql")]
+            [SqlSourceGenerate(Source = "Users.sql")]
             public partial class Second { }
             """,
             new SqlFile(GeneratorHarness.UsersPath, "-- name: 1x\nSELECT 1;\n")
@@ -360,9 +360,9 @@ public sealed class FileDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Path = "A.sql")]
+            [SqlSourceGenerate(Source = "A.sql")]
             public partial class First { }
-            [SqlSourceGenerate(Path = "B.sql")]
+            [SqlSourceGenerate(Source = "B.sql")]
             public partial class Second { }
             """,
             new SqlFile("/app/Repo/A.sql", SqlTexts.GetUser),

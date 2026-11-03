@@ -433,7 +433,7 @@ public sealed class CachingMethodTests
         var compilation = MethodsCompilation(UserQueries())
             .AddSyntaxTrees(
                 CSharpSyntaxTree.ParseText(
-                    TypeSource("App.Admin", "AdminQueries", "Path = \"Users.sql\""),
+                    TypeSource("App.Admin", "AdminQueries", "Source = \"Users.sql\""),
                     GeneratorHarness.ParseOptions,
                     "/app/Users/AdminQueries.cs",
                     cancellationToken: TestContext.Current.CancellationToken

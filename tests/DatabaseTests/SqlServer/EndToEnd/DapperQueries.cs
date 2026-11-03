@@ -5,17 +5,17 @@ namespace SqlSource.DatabaseTests.SqlServer.EndToEnd;
 // file's models, which the methods and Dapper both read.
 
 // The SQL of Queries/AllTypes.sql, which AllTypesQueryTests and DapperRecipeTests run through Dapper.
-[SqlSourceGenerate(Path = "Queries/AllTypes.sql", SqlLocation = SqlLocation.Direct, Output = GeneratorOutput.Models)]
+[SqlSourceGenerate(Source = "Queries/AllTypes.sql", SqlLocation = SqlLocation.Direct, Output = GeneratorOutput.Models)]
 internal static partial class AllTypesDapperQueries;
 
 // The SQL of Queries/NewTypes.sql, which NewTypesQueryTests runs through Dapper.
-[SqlSourceGenerate(Path = "Queries/NewTypes.sql", SqlLocation = SqlLocation.Direct, Output = GeneratorOutput.Models)]
+[SqlSourceGenerate(Source = "Queries/NewTypes.sql", SqlLocation = SqlLocation.Direct, Output = GeneratorOutput.Models)]
 internal static partial class NewTypesDapperQueries;
 
 // The SQL of Queries/Writes.sql, whose AddNote DapperRecipeTests runs through Dapper.
-[SqlSourceGenerate(Path = "Queries/Writes.sql", SqlLocation = SqlLocation.Direct, Output = GeneratorOutput.Models)]
+[SqlSourceGenerate(Source = "Queries/Writes.sql", SqlLocation = SqlLocation.Direct, Output = GeneratorOutput.Models)]
 internal static partial class WriteDapperQueries;
 
 // The SQL of Queries/Notes.sql, whose ListMarkedNames DapperRecipeTests runs through Dapper.
-[SqlSourceGenerate(Path = "Queries/Notes.sql", SqlLocation = SqlLocation.Direct, Output = GeneratorOutput.Models)]
+[SqlSourceGenerate(Source = "Queries/Notes.sql", SqlLocation = SqlLocation.Direct, Output = GeneratorOutput.Models)]
 internal static partial class NoteDapperQueries;

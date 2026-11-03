@@ -20,7 +20,7 @@ public sealed class PathResolverTests
     );
 
     [Fact]
-    public void Resolve_NoPath_TakesTheFilesInTheFolderOfTheSourceFileAndNotItsSubfolders()
+    public void Resolve_NoSource_TakesTheFilesInTheFolderOfTheSourceFileAndNotItsSubfolders()
     {
         var result = PathResolver.Resolve(
             TestModels.Type(),
@@ -38,7 +38,7 @@ public sealed class PathResolverTests
     [InlineData("..\\Queries\\")]
     [InlineData("../queries")]
     [InlineData("./../Repo/../Queries")]
-    public void Resolve_FolderPath_TakesTheFilesInThatFolder(string path)
+    public void Resolve_FolderSource_TakesTheFilesInThatFolder(string path)
     {
         var result = PathResolver.Resolve(
             TestModels.Type(path),
@@ -58,7 +58,7 @@ public sealed class PathResolverTests
     [InlineData("Admin\\Roles.sql", "app/Repo/Admin/Roles.sql")]
     [InlineData("../Root.sql", "app/Root.sql")]
     [InlineData("/Users.sql", GeneratorHarness.UsersNormalizedPath)]
-    public void Resolve_FilePath_TakesThatFile(string path, string expected)
+    public void Resolve_FileSource_TakesThatFile(string path, string expected)
     {
         var result = PathResolver.Resolve(
             TestModels.Type(path),
@@ -79,7 +79,7 @@ public sealed class PathResolverTests
     [InlineData("../../../Root.sql")]
     [InlineData("/app/Queries")]
     [InlineData(" ")]
-    public void Resolve_PathThatMatchesNothing_IsAnErrorAtTheAttribute(string path)
+    public void Resolve_SourceThatMatchesNothing_IsAnErrorAtTheAttribute(string path)
     {
         var result = PathResolver.Resolve(
             TestModels.Type(path),
@@ -90,7 +90,7 @@ public sealed class PathResolverTests
 
         result.Files.ShouldBeEmpty();
         result.Diagnostics.ShouldBe([
-            DiagnosticInfo.Create(SqlDiagnostics.PathMatchesNothing, TestModels.AttributeLocation, path),
+            DiagnosticInfo.Create(SqlDiagnostics.SourceMatchesNothing, TestModels.AttributeLocation, path),
         ]);
     }
 
@@ -98,7 +98,7 @@ public sealed class PathResolverTests
     [InlineData("/app/Empty/UserRepository.cs")]
     [InlineData("UserRepository.cs")]
     [InlineData("")]
-    public void Resolve_NoPathAndNoSqlFileInTheFolder_IsAnErrorAtTheAttribute(string filePath)
+    public void Resolve_NoSourceAndNoSqlFileInTheFolder_IsAnErrorAtTheAttribute(string filePath)
     {
         var result = PathResolver.Resolve(
             TestModels.Type(filePath: filePath),
@@ -227,7 +227,7 @@ public sealed class PathResolverTests
         result.Diagnostics.ShouldBe([
             declared,
             DiagnosticInfo.Create(SqlDiagnostics.UnsupportedTargetFramework, TestModels.AttributeLocation),
-            DiagnosticInfo.Create(SqlDiagnostics.PathMatchesNothing, TestModels.AttributeLocation, "Missing"),
+            DiagnosticInfo.Create(SqlDiagnostics.SourceMatchesNothing, TestModels.AttributeLocation, "Missing"),
         ]);
     }
 
@@ -255,7 +255,7 @@ public sealed class PathResolverTests
     [InlineData("users.SQL", GeneratorHarness.UsersNormalizedPath)]
     [InlineData("Missing.sql", "")]
     [InlineData("../../..", "")]
-    public void FindFiles_PathOfAnAttribute_GivesTheFilesItNames(string? path, string expected) =>
+    public void FindFiles_SourceOfAnAttribute_GivesTheFilesItNames(string? path, string expected) =>
         string.Join('|', PathResolver.FindFiles("/app/Repo/UserRepository.cs", path, SqlPaths)).ShouldBe(expected);
 
     [Fact]

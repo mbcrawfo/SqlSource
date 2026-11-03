@@ -713,7 +713,7 @@ Rules: [tokens](parameters-and-tokens.md#tokens), [the signature](generator.md#m
 // App.Tests, which references the SqlSource package too
 using SqlSource;
 
-[SqlSourceGenerate(Path = "Queries")]
+[SqlSourceGenerate(Source = "Queries")]
 internal static partial class TestQueries;
 ```
 

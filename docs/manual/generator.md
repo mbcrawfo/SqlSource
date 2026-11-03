@@ -40,7 +40,7 @@ With the output `models`, the same queries give `Sql.GetUser`, a [constant](#con
 `[SqlSourceGenerate]` marks a type that the generator adds to.  The package puts the attribute, its enums, the [`[SqlSourceConverter]`](settings.md#converters) attribute and the exceptions that a query method throws, [`UnexpectedRowCountException`](#unexpected-row-count) and [`TransactionRolledBackException`](#transaction-rolled-back), in your project, as internal types in the namespace `SqlSource`, so the code above needs `using SqlSource;` and nothing else.  The exceptions are left out when your project uses another project's, and are public when it sets [`SqlSourcePublicExceptions`](settings.md#public-exceptions): see [projects that share internals](#projects-that-share-internals).  It also adds `Microsoft.CodeAnalysis.EmbeddedAttribute`, in the generated file `SqlSource-EmbeddedAttribute.g.cs`, an internal attribute that keeps every one of these types but the exceptions out of sight of other projects: see [known issues](#known-issues) if your project declares it too.
 
 ```csharp
-[SqlSourceGenerate(Path = "Queries", SqlLocation = SqlLocation.Direct, Parameters = "keep-comments")]
+[SqlSourceGenerate(Source = "Queries", SqlLocation = SqlLocation.Direct, Parameters = "keep-comments")]
 internal static partial class Reports;
 ```
 
@@ -52,7 +52,7 @@ Every property of the attribute is a [setting](settings.md), documented there wi
 
 | Property | Sets |
 |----|----|
-| `Path` | Which `.sql` files belong to the type: [Path](settings.md#setting-path) |
+| `Source` | Which `.sql` files belong to the type: [Source](settings.md#setting-source) |
 | `SqlLocation` | Where the generated members go: [Where the SQL goes](settings.md#setting-sql-location) |
 | `NestedClass` | The name of the class that holds the members under `SqlLocation.Nested`: [Name of the nested class](settings.md#setting-nested-class) |
 | `Parameters` | Generator parameters for the type's queries: [Generator parameters](settings.md#setting-generator-parameters) |
@@ -78,11 +78,11 @@ Repository/
         Monthly.sql        not searched: it is in a subfolder
 ```
 
-A type gets the files that its [`Path`](settings.md#setting-path) names, by the rules and with the errors given there.  What follows is what the generator does with the files.
+A type gets the files that its [`Source`](settings.md#setting-source) names, by the rules and with the errors given there.  What follows is what the generator does with the files.
 
 - **A type's files are one set.**  A query name is used once across all of them: a second use is [SQLSRC008](diagnostics.md#sqlsrc008), and the file with the second one gets no members and no models for that type.
 - **Two types may claim one file**, and each gets its own members from it, though two types of one namespace can give one method twice: see [where the methods go](#method-location).  They can ask for different things: each type's attribute applies to its own members only, and to the models it asks for, which two types share when they are the same ([shared models](#shared-models)).
-- **A `.sql` file that no type claims is ignored**: see [Path](settings.md#setting-path).
+- **A `.sql` file that no type claims is ignored**: see [Source](settings.md#setting-source).
 - **A file with an error in how it is written produces no members** until it is fixed: see [`.sql` files](sql-files.md).  The other files of the type are unaffected.  An error about describing a query or about its sidecar, such as [SQLSRC241](diagnostics.md#sqlsrc241), leaves the query without models until it is fixed, and so without a [method](#which-methods) under `codegen`; under `models` it keeps its constant or token method.
 
 <a id="locations"></a>
@@ -696,7 +696,7 @@ The compiler gives no warning (CS0436) about the types that are each project's o
 
 ## Known issues
 
-- **The tool reads the attribute without compiling your code.**  `sqlsource describe` finds `[SqlSourceGenerate]` by reading your C# files as text, so `Path` and `Output` must be written out where the attribute is: `Path = "Queries"` and `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation or a cast there compiles, and the tool reports [SQLSRC208](diagnostics.md#sqlsrc208) and describes nothing for the type.  The build then reports [SQLSRC241](diagnostics.md#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none, or, for the file, [SQLSRC209](diagnostics.md#sqlsrc209) under a dialect that has no database to ask, such as `ansi`.  Two more things follow from the same reading.  An alias of the attribute (`using Gen = SqlSource.SqlSourceGenerateAttribute;` and `[Gen]`) works in the build and is not seen by the tool, so the type's queries are not described, and the build reports SQLSRC241 for them in the same way.  An attribute inside `#if` is read with the compilation constants the tool gets from your project, which may not be those of the configuration you build.  Write the attribute under its own name, and outside `#if` where you can.
+- **The tool reads the attribute without compiling your code.**  `sqlsource describe` finds `[SqlSourceGenerate]` by reading your C# files as text, so `Source` and `Output` must be written out where the attribute is: `Source = "Queries"` and `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation or a cast there compiles, and the tool reports [SQLSRC208](diagnostics.md#sqlsrc208) and describes nothing for the type.  The build then reports [SQLSRC241](diagnostics.md#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none, or, for the file, [SQLSRC209](diagnostics.md#sqlsrc209) under a dialect that has no database to ask, such as `ansi`.  Two more things follow from the same reading.  An alias of the attribute (`using Gen = SqlSource.SqlSourceGenerateAttribute;` and `[Gen]`) works in the build and is not seen by the tool, so the type's queries are not described, and the build reports SQLSRC241 for them in the same way.  An attribute inside `#if` is read with the compilation constants the tool gets from your project, which may not be those of the configuration you build.  Write the attribute under its own name, and outside `#if` where you can.
 - **An input model binds through Dapper only when the query writes its parameters as the model's properties are named.**  Dapper sends a property of a parameter object only to a parameter that the SQL writes as `@` and the property's name, ignoring case but not `_`.  So the property `AccountId` binds to `@accountId`, and a query that writes `@account_id` gets no value from it.  Write the query's parameters in camelCase, or give Dapper the parameters yourself, as in `new { account_id = args.AccountId }`: see [the recipe](recipes.md#models-through-dapper).
 - **Under `Direct`, a query named like a member that the type declares is a compiler error.**  A query `Get` whose output is `sql` or `models`, in a type that declares a method `Get`, gives the compiler's CS0102, in the generated code, and no SQLSRC error.  Rename the query, or use `Nested`.  A query method on the type is checked instead, as [SQLSRC274](diagnostics.md#sqlsrc274).
 - **`UnexpectedRowCountException` and `TransactionRolledBackException` are caught by their type only where they are seen.**  A project that sees another's exceptions, because the other grants it `InternalsVisibleTo` or sets [`SqlSourcePublicExceptions`](settings.md#public-exceptions), catches them by type.  A project that uses SqlSource and sees them in two projects it references gets [SQLSRC022](diagnostics.md#sqlsrc022), which [one shared project](recipes.md#share-the-exceptions) fixes; a project that does not use SqlSource and sees two copies gets the compiler's error that the name is ambiguous where it names one, which the same shared project fixes.  Anywhere else, as in an assembly that calls a `public` method of a project whose exceptions are `internal`, catch `InvalidOperationException`, from which both derive.

@@ -7,7 +7,7 @@ SQLSRC274 /app/Repo/Users.sql(6,10)-(6,14): The method of the query 'Open' canno
 SQLSRC274 /app/Repo/Users.sql(8,10)-(8,26): The method of the query 'SampleExtensions' cannot be named 'SampleExtensions', because the class that holds the method has that name.  Rename the query.
 SQLSRC274 /app/Repo/A.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'Get', because the method of the query 'Get' of 'App.Second.Queries' has that name too, in the class 'App.QueriesExtensions'.  Rename the query.
 SQLSRC274 /app/Repo/B.sql(1,10)-(1,13): The method of the query 'Get' cannot be named 'Get', because the method of the query 'Get' of 'App.First.Queries' has that name too, in the class 'App.QueriesExtensions'.  Rename the query.
-SQLSRC276 /app/Repo/Sample.cs(23,6)-(23,45): The query methods of 'App.Blocked.Sample' cannot go into the extension class 'App.Blocked.SampleExtensions', because the project has a type of that name.  Rename the type or what has the name, or set the attribute's MethodLocation to put the methods on the type.
+SQLSRC276 /app/Repo/Sample.cs(23,6)-(23,47): The query methods of 'App.Blocked.Sample' cannot go into the extension class 'App.Blocked.SampleExtensions', because the project has a type of that name.  Rename the type or what has the name, or set the attribute's MethodLocation to put the methods on the type.
 
 ==== Compilation errors
 (none)
@@ -856,7 +856,7 @@ namespace SqlSource
         /// A folder or one <c>.sql</c> file, relative to the folder of the file that carries the attribute.
         /// The default is that folder.
         /// </summary>
-        public string Path { get; set; }
+        public string Source { get; set; }
 
         /// <summary>
         /// Where the generated members go.  The default is

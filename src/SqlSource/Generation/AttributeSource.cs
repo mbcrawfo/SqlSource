@@ -40,7 +40,7 @@ internal static class AttributeSource
 
     public const string ConverterAttributeMetadataName = "SqlSource.SqlSourceConverterAttribute";
 
-    public const string PathProperty = "Path";
+    public const string SourceProperty = "Source";
 
     public const string LocationProperty = "SqlLocation";
 
@@ -268,7 +268,7 @@ internal static class AttributeSource
                 /// A folder or one <c>.sql</c> file, relative to the folder of the file that carries the attribute.
                 /// The default is that folder.
                 /// </summary>
-                public string Path { get; set; }
+                public string Source { get; set; }
 
                 /// <summary>
                 /// Where the generated members go.  The default is

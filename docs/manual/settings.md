@@ -21,7 +21,7 @@ SELECT id, name FROM users;
 ```
 
 ```csharp
-[SqlSourceGenerate(Path = "Reports", SqlLocation = SqlLocation.Direct)]
+[SqlSourceGenerate(Source = "Reports", SqlLocation = SqlLocation.Direct)]
 internal static partial class Reports;
 ```
 
@@ -50,7 +50,7 @@ Each name links to its section, which gives its values and its rules.  **Written
 | [Library types](#setting-library-types) | Entries `"library": "state"`, the library `nodaTime`, `netTopologySuite` or `json` and the state `on`, `off` or `default`.  Default: on for PostgreSQL where the project references the library's plugin, `Npgsql.NodaTime` or `Npgsql.NetTopologySuite`, and off otherwise; `json` off | `libraryTypes` in a settings file; `-- library-types:` in the file header and inside a query | Works today |
 | [`SqlLocation`](#setting-sql-location) | `Nested`, `Direct`.  Default `Nested` | `SqlLocation` on the attribute | Works today |
 | [Nested class](#setting-nested-class) | A C# identifier that is not a keyword.  Default `Sql` | `nestedClass` in a settings file; `NestedClass` on the attribute | Works today |
-| [`Path`](#setting-path) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: that folder | `Path` on the attribute | Works today |
+| [`Source`](#setting-source) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: that folder | `Source` on the attribute | Works today |
 | [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`, or `IAsyncEnumerable` to stream the rows: see [its section](#setting-collection-type).  Default `Array` | `collectionType` in a settings file; `CollectionType` on the attribute; `-- collection-type:` in the file header and inside a query | Works today |
 | [`MethodLocation`](#setting-method-location) | `ExtensionClass`, `Public`, `Internal`, `Private`.  Default `ExtensionClass` | `MethodLocation` on the attribute | Works today |
 
@@ -76,7 +76,7 @@ A query with `-- output: sql` has the output `sql`, whatever the other five say.
 The rules:
 
 - **Each setting is decided on its own.**  A query that writes `-- output: sql` still takes its file header's `-- database:`.
-- **A place that gives no value is skipped.**  A settings file that does not name the setting gives none, and so does a string of a settings file or of the attribute that is empty or white space.  `Path` is the exception: see [Path](#setting-path).
+- **A place that gives no value is skipped.**  A settings file that does not name the setting gives none, and so does a string of a settings file or of the attribute that is empty or white space.  `Source` is the exception: see [Source](#setting-source).
 - **A setting has only the places its row of [the tables](#all-settings) lists.**  A key of a settings file that is not in them, nor `root` or `$schema`, is [SQLSRC016](diagnostics.md#sqlsrc016).  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
 - **The attribute belongs to one type.**  Two types that claim one file each use their own attribute, and each gets its own result.
 
@@ -84,7 +84,7 @@ Four exceptions, stated plainly:
 
 - **A list of generator parameters replaces the one below it whole.**  It never adds to it.  See [generator parameters](#setting-generator-parameters).
 - **A dialect value replaces the one below it whole**, options included.  The dialect has no attribute and no in-query level: a file has one dialect, which is the marker in its file header, else the nearest of its settings files that sets one, else `ansi`.  See [dialect](#setting-dialect).
-- **`SqlLocation`, `MethodLocation` and `Path` exist only on the attribute.**  They have nothing to choose between.  The nested class has two, the attribute over the settings files, which are those of the folder of the type's C# file.
+- **`SqlLocation`, `MethodLocation` and `Source` exist only on the attribute.**  They have nothing to choose between.  The nested class has two, the attribute over the settings files, which are those of the folder of the type's C# file.
 - **A type override, a column type, or a library of the library types, replaces only the keys it names.**  Each place adds its entries to those of the places below it, each settings file a place of its own, so a folder's file adds to the entries of the files above it.  An entry for a key, a database type, a column or a library, replaces the entry below it for that key, and `default` takes the key out.  None of them has an attribute level.  See [type overrides](#setting-type-overrides), [column types](#setting-column-types) and [library types](#setting-library-types).
 
 <a id="a-value-that-is-wrong"></a>
@@ -752,28 +752,28 @@ internal static partial class UserQueries;
 
 There is no settings file key or marker for it.  `methodLocation` in a settings file is [SQLSRC016](diagnostics.md#sqlsrc016), and `-- method-location:` in a `.sql` file is not read.  The class and its accessibility, and the names a method cannot have, are on [the generator page](generator.md#method-location).
 
-<a id="setting-path"></a>
+<a id="setting-source"></a>
 
-## Path
+## Source
 
 ```csharp
 [SqlSourceGenerate]                                // every .sql file beside this C# file
 public partial class UserRepository;
 
-[SqlSourceGenerate(Path = "Queries/Users.sql")]    // one file
+[SqlSourceGenerate(Source = "Queries/Users.sql")]    // one file
 public partial class UserQueries;
 
-[SqlSourceGenerate(Path = "../Queries")]           // the .sql files of a folder
+[SqlSourceGenerate(Source = "../Queries")]           // the .sql files of a folder
 public partial class SharedQueries;
 ```
 
-`Path` is a property of the attribute and nothing else.  It says which `.sql` files belong to the type.
+`Source` is a property of the attribute and nothing else.  It says which `.sql` files belong to the type.
 
-- Without `Path`, the type gets every `.sql` file in the folder of the C# file that carries the attribute.  Subfolders are not searched.
-- A `Path` that ends in `.sql` names one file.  Any other `Path` names a folder, whose own `.sql` files the type gets.
-- `Path` is relative to the folder of the C# file, never to the project.  Both `/` and `\` separate folders.  Paths are compared ignoring case, so a project builds the same on every operating system: two `.sql` files of a type whose paths differ only by case are [SQLSRC013](diagnostics.md#sqlsrc013).
-- An empty `Path`, `Path = ""`, is the same as no `Path`.  A `Path` of white space is not: it is read as the name of a folder, like any other `Path`, and so matches nothing.
-- A `Path` that matches nothing is [SQLSRC004](diagnostics.md#sqlsrc004), and a folder with no `.sql` file when there is no `Path` is [SQLSRC005](diagnostics.md#sqlsrc005).
+- Without `Source`, the type gets every `.sql` file in the folder of the C# file that carries the attribute.  Subfolders are not searched.
+- A `Source` that ends in `.sql` names one file.  Any other `Source` names a folder, whose own `.sql` files the type gets.
+- `Source` is relative to the folder of the C# file, never to the project.  Both `/` and `\` separate folders.  Paths are compared ignoring case, so a project builds the same on every operating system: two `.sql` files of a type whose paths differ only by case are [SQLSRC013](diagnostics.md#sqlsrc013).
+- An empty `Source`, `Source = ""`, is the same as no `Source`.  A `Source` of white space is not: it is read as the name of a folder, like any other `Source`, and so matches nothing.
+- A `Source` that matches nothing is [SQLSRC004](diagnostics.md#sqlsrc004), and a folder with no `.sql` file when there is no `Source` is [SQLSRC005](diagnostics.md#sqlsrc005).
 - Two types may use the same file.  A `.sql` file that no type uses is ignored, so a folder of migration scripts elsewhere in the project does no harm.
 
 This is separate from [which files the compiler is given](#included-files), which comes first: a type can only claim a file that the project includes.  The rest of the attribute is on [the generator page](generator.md).
@@ -839,7 +839,7 @@ To turn the default off and list the files yourself:
 </ItemGroup>
 ```
 
-Turning the default off turns it off for sidecars too, so list them as well, as the example does.  A file the project includes is only handed to the compiler.  Which of them belong to a type is the type's [`Path`](#setting-path), and a file no type claims is ignored.
+Turning the default off turns it off for sidecars too, so list them as well, as the example does.  A file the project includes is only handed to the compiler.  Which of them belong to a type is the type's [`Source`](#setting-source), and a file no type claims is ignored.
 
 <a id="public-exceptions"></a>
 
