@@ -12,7 +12,13 @@
         Under OnlineMultiLate, OnlineMultiAddLate adds ../Late/Late.sql, which a test writes beside the copy with a
         sqlsource.json that no other file reaches, from a hook of CoreCompile, as a project's own target that writes
         its .sql files late would, without hooking SqlSourceListFiles.
+
+        Under OnlineMultiOwnItems, with SqlSourceIncludeFiles false, the project lists its .sql files and no sidecar, as
+        a project that lists its own files and forgets its sidecars does.
     -->
+    <ItemGroup Condition="'$(OnlineMultiOwnItems)' == 'true'">
+        <AdditionalFiles Include="Queries/*.sql" />
+    </ItemGroup>
     <Target Name="OnlineMultiAddLate" BeforeTargets="CoreCompile" Condition="'$(OnlineMultiLate)' == 'true'">
         <ItemGroup>
             <AdditionalFiles Include="../Late/Late.sql" />

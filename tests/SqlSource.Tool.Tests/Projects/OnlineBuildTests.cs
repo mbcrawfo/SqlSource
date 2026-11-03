@@ -59,6 +59,30 @@ public sealed class OnlineBuildTests : IDisposable
                 <AdditionalFiles Include="Queries/Users.sql" />
             </ItemGroup>
             """,
+        // A project that lists its own files, its sidecar by name, which an item names before the file exists.
+        ["the sidecar listed by name"] = """
+            <PropertyGroup>
+                <SqlSourceIncludeFiles>false</SqlSourceIncludeFiles>
+            </PropertyGroup>
+            <ItemGroup>
+                <AdditionalFiles Include="Queries/Users.sql;Queries/Users.sql.json" />
+            </ItemGroup>
+            """,
+        // A project that lists its own files and forgets its sidecars.
+        ["SqlSourceIncludeFiles false, the .sql file alone"] = """
+            <PropertyGroup>
+                <SqlSourceIncludeFiles>false</SqlSourceIncludeFiles>
+            </PropertyGroup>
+            <ItemGroup>
+                <AdditionalFiles Include="Queries/**/*.sql" />
+            </ItemGroup>
+            """,
+        // A .sql file linked from a folder beside the project's, without the line of its sidecar.
+        ["a linked file without its sidecar"] = """
+            <ItemGroup>
+                <AdditionalFiles Include="../Shared/*.sql" />
+            </ItemGroup>
+            """,
     };
 
     private readonly FixtureProjects _fixtures = new();
@@ -295,15 +319,23 @@ public sealed class OnlineBuildTests : IDisposable
         output.ShouldContain("Skipping target \"CoreCompile\" because all output files are up-to-date");
     }
 
-    // The run creates the sidecar of a .sql item whose sidecar the project as evaluated does not list, wherever the
-    // item comes from, and the compiler of the same build is given it once.  At the next build, which does not run
-    // the tool, the project as evaluated lists it by a path of its own, and the compiler is still given it once.
+    // The run creates the sidecar of a .sql item, wherever the item comes from, and the compiler of the same build is
+    // given it once, whether or not the project as evaluated lists it.  At the next build, which does not run the
+    // tool, the compiler is given it once when the project lists it, by a path of its own, and not at all when the
+    // project does not, as in an offline build or CI.
     [Theory]
-    [InlineData("the project's folder", "Online/Queries/Users.sql.json")]
-    [InlineData("SqlSourceIncludeFiles false", "Online/Queries/Users.sql.json")]
-    [InlineData("a linked file", "Shared/Linked.sql.json")]
-    [InlineData("a file listed twice", "Online/Queries/Users.sql.json")]
-    public async Task Build_ToolCreatesTheSidecarOfAnItem_GivesItToTheCompilerOnce(string shape, string sidecar)
+    [InlineData("the project's folder", "Online/Queries/Users.sql.json", true)]
+    [InlineData("SqlSourceIncludeFiles false", "Online/Queries/Users.sql.json", true)]
+    [InlineData("a linked file", "Shared/Linked.sql.json", true)]
+    [InlineData("a file listed twice", "Online/Queries/Users.sql.json", true)]
+    [InlineData("the sidecar listed by name", "Online/Queries/Users.sql.json", true)]
+    [InlineData("SqlSourceIncludeFiles false, the .sql file alone", "Online/Queries/Users.sql.json", false)]
+    [InlineData("a linked file without its sidecar", "Shared/Linked.sql.json", false)]
+    public async Task Build_ToolCreatesTheSidecarOfAnItem_GivesItToTheCompilerOnce(
+        string shape,
+        string sidecar,
+        bool listedNextTime
+    )
     {
         File.Delete(Sidecar);
         _ = _fixtures.WriteFile("Shared/Linked.sql", "-- name: GetLinked\nSELECT 1 AS one;\n");
@@ -317,7 +349,33 @@ public sealed class OnlineBuildTests : IDisposable
 
         StandIn.RunsIn(_folder).Count.ShouldBe(1);
         first.Count(item => item == created).ShouldBe(1, string.Join(Environment.NewLine, first));
-        CompiledItems().Count(item => item == created).ShouldBe(1, string.Join(Environment.NewLine, CompiledItems()));
+        var second = CompiledItems();
+        second
+            .Count(item => item == created)
+            .ShouldBe(listedNextTime ? 1 : 0, string.Join(Environment.NewLine, second));
+    }
+
+    // A sidecar that existed before the build and that the project does not list is not given to the compiler,
+    // though the run writes it again: the online build gives the compiler what an offline build or CI does.
+    [Theory]
+    [InlineData("SqlSourceIncludeFiles false, the .sql file alone", "Online/Queries/Users.sql.json")]
+    [InlineData("a linked file without its sidecar", "Shared/Linked.sql.json")]
+    public async Task Build_SidecarThatExistedBeforeAndIsNotListed_IsNotGivenToTheCompiler(string shape, string sidecar)
+    {
+        _ = _fixtures.WriteFile("Shared/Linked.sql", "-- name: GetLinked\nSELECT 1 AS one;\n");
+        var existing = _fixtures.WriteFile(sidecar, "{}");
+        AddToProject(ItemsOfShape[shape]);
+        StandIn.Tell(_folder, create: new() { [Path.GetRelativePath(_folder, existing)] = "{ }" });
+
+        await PassesAsync(NoVariables, "-p:SqlSourceOnline=true");
+        var online = CompiledItems();
+        await PassesAsync(NoVariables, "-p:SqlSourceOnline=false");
+        var offline = CompiledItems();
+
+        StandIn.RunsIn(_folder).Count.ShouldBe(1);
+        (await ReadAsync(existing)).ShouldBe("{ }", "the run wrote the sidecar again");
+        online.ShouldNotContain(existing, string.Join(Environment.NewLine, online));
+        online.ShouldBe(offline);
     }
 
     // Only a .sql item has a sidecar: a JSON file beside an item of another kind is not given to the compiler.
@@ -395,6 +453,19 @@ public sealed class OnlineBuildTests : IDisposable
         output.ShouldContain("error SQLSRC027: The sqlsource tool exited with the code 1");
         output.ShouldNotContain("dotnet tool update");
         Stamp().ShouldBeNull();
+    }
+
+    // A project of one framework runs the tool in its own build, and calls no configuration of its own for the run or
+    // for the sidecars it created, which would cost the build an evaluation of the project.
+    [Fact]
+    public async Task Build_OneFramework_CallsNoConfigurationOfItsOwnForTheRun()
+    {
+        var output = await OutputOfPassingAsync(NoVariables, "-p:SqlSourceOnline=true", "-v:d");
+
+        _ = StandIn.RunsIn(_folder).ShouldHaveSingleItem();
+        output.ShouldContain("Target \"SqlSourceRunOnline");
+        output.ShouldNotContain("SqlSourceRunOnline target(s)");
+        output.ShouldNotContain("SqlSourceCreatedSidecars target(s)");
     }
 
     // The properties a design-time build of an IDE sets, as SettingsFileSearchTests sets them.

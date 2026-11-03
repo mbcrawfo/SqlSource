@@ -155,6 +155,7 @@ public sealed partial class BuildFileTests
                         or DescribeOnlineTarget
                         or RunOnlineTarget
                         or ListSidecarsTarget
+                        or CreatedSidecarsTarget
                     )
             )
             .ToList();

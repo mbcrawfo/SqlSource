@@ -840,7 +840,7 @@ To turn the default off and list the files yourself:
 </ItemGroup>
 ```
 
-Turning the default off turns it off for sidecars too, so list them as well, as the example does.  A file the project includes is only handed to the compiler.  Which of them belong to a type is the type's [`Path`](#setting-path), and a file no type claims is ignored.
+Turning the default off turns it off for sidecars too, so list them as well, as the example does.  A build that [runs the tool](tool.md#running-in-the-build) compiles a sidecar it has just written for the first time, listed or not; every later build, like a build offline or in CI, compiles only the sidecars you list.  A file the project includes is only handed to the compiler.  Which of them belong to a type is the type's [`Path`](#setting-path), and a file no type claims is ignored.
 
 <a id="public-exceptions"></a>
 

@@ -384,8 +384,8 @@
     </PropertyGroup>
     <!--
         Describes the project's queries before the compiler reads its inputs, when the build goes online, and gives the
-        compiler the sidecars the run left.  SqlSourceTrackAdditionalFiles depends on it after the search for settings
-        files, so it runs wherever the search runs, just before CoreCompile or before
+        compiler the sidecars the run created.  SqlSourceTrackAdditionalFiles depends on it after the search for
+        settings files, so it runs wherever the search runs, just before CoreCompile or before
         GenerateMSBuildEditorConfigFileCore, and it hooks nothing of its own.  It is no part of a design-time build,
         which an IDE runs on every edit, nor of a compile by -t:Compile, which leaves BuildingProject false.
 
@@ -408,17 +408,19 @@
         runs it from here.  The run returns the files it wrote under obj, the first framework's, and they are added to
         FileWrites, so that IncrementalClean keeps them and a clean deletes them: a configuration that is called by name
         runs no IncrementalClean of its own.  Another framework's build adds them too, and its IncrementalClean passes
-        over a file outside its own obj folder.
+        over a file outside its own obj folder.  A second call, to SqlSourceCreatedSidecars in the same configuration,
+        gives the sidecars the run created, which go to the compiler and not to FileWrites.
 
         A sidecar the tool deleted is taken out of the items, or the compiler would fail on a file that is not there:
-        a .sql.json item is one whose name, less its .json, ends in .sql.  A sidecar the tool created is not among the
-        items, since every pattern, the props' or the project's own, was expanded when the project was evaluated, so
-        the sidecar of each .sql item is added when it exists and no item names it.  That holds whatever
-        SqlSourceIncludeFiles is and wherever the .sql file is, a file linked from outside the project's folder too,
-        and the generator passes over a sidecar of a .sql file that no type claims.  The tool writes sidecars only for
-        the .sql items of the manifest, so no other sidecar needs adding.  The items are compared by their full paths,
+        a .sql.json item is one whose name, less its .json, ends in .sql.  A sidecar the run created is no item when
+        the project was evaluated before the run, so it is added unless an item names it: its .sql file was described
+        in this build, and the compiler of the same build is given what it wrote.  That holds whatever
+        SqlSourceIncludeFiles is and wherever the .sql file is.  A sidecar that existed before the run, which the
+        project does not list, stays out, as in an offline build or CI, so that a project that forgets to list its
+        sidecars fails the same way in all three.  A run skipped as up to date created nothing: what an earlier run
+        created, the project's patterns list at the next evaluation.  The items are compared by their full paths,
         since an Exclude in a target compares the paths as written, and an item the project lists by a relative path
-        would otherwise be added again.  Both run when the run is skipped as up to date, and give the same items then.
+        would otherwise be added again.
     -->
     <Target
         Name="SqlSourceDescribeOnline"
@@ -440,6 +442,14 @@
         >
             <Output TaskParameter="TargetOutputs" ItemName="SqlSourceOnlineFile" />
         </MSBuild>
+        <MSBuild
+            Projects="$(MSBuildProjectFullPath)"
+            Targets="SqlSourceCreatedSidecars"
+            Properties="TargetFramework=$(SqlSourceFirstFramework);SqlSourceOnlineRun=true"
+            Condition="'$(SqlSourceGoesOnline)' == 'true' and '$(TargetFrameworks)' != ''"
+        >
+            <Output TaskParameter="TargetOutputs" ItemName="SqlSourceSidecarCreated" />
+        </MSBuild>
         <ItemGroup>
             <FileWrites Include="@(SqlSourceOnlineFile)" />
         </ItemGroup>
@@ -459,15 +469,8 @@
             <AdditionalFiles Remove="@(SqlSourceSidecarGone)" />
         </ItemGroup>
         <ItemGroup Condition="'$(SqlSourceGoesOnline)' == 'true'">
-            <SqlSourceSidecarOfItem
-                Include="@(AdditionalFiles->'%(FullPath).json')"
-                Condition="'%(Extension)' == '.sql'"
-            />
             <SqlSourceListedFile Include="@(AdditionalFiles->'%(FullPath)')" />
-            <SqlSourceSidecarNotListed
-                Include="@(SqlSourceSidecarOfItem->Distinct()->Exists())"
-                Exclude="@(SqlSourceListedFile)"
-            />
+            <SqlSourceSidecarNotListed Include="@(SqlSourceSidecarCreated)" Exclude="@(SqlSourceListedFile)" />
             <AdditionalFiles Include="@(SqlSourceSidecarNotListed)" />
         </ItemGroup>
     </Target>
@@ -574,11 +577,14 @@
         but one, and a property function never takes an item's metadata, which MSBuild puts in as text.
 
         The list of sidecars is written again after the run, from the files on the disk, or a sidecar the run created or
-        deleted would change it and run the tool once more at the next build.  The stamp is touched only after a run that
-        exited with 0 and did not print the offline line, so that a failed or offline run is tried again by the next
-        build.  It is in FileWrites, and among the files returned, whether or not this run touched it, as it is when the
-        run is skipped, since MSBuild still runs a skipped target's groups: IncrementalClean deletes a file under obj
-        that an earlier build wrote and this one does not list.  The errors come last, since they end the target.
+        deleted would change it and run the tool once more at the next build.  The sidecars on the list after the run
+        and not before it are the ones the run created, for SqlSourceDescribeOnline to give the compiler; a run skipped
+        as up to date leaves the two lists equal, since MSBuild still runs a skipped target's groups.  The stamp is
+        touched only after a run that exited with 0 and did not print the offline line, so that a failed or offline run
+        is tried again by the next build.  It is in FileWrites, and among the files returned, whether or not this run
+        touched it, as it is when the run is skipped, since MSBuild still runs a skipped target's groups:
+        IncrementalClean deletes a file under obj that an earlier build wrote and this one does not list.  The errors
+        come last, since they end the target.
     -->
     <Target
         Name="SqlSourceRunOnline"
@@ -631,6 +637,10 @@
         </PropertyGroup>
         <ItemGroup>
             <SqlSourceSidecarAfterRun Include="@(SqlSourceSidecarOfSqlFile->Exists())" />
+            <SqlSourceSidecarCreated
+                Include="@(SqlSourceSidecarAfterRun->Distinct())"
+                Exclude="@(SqlSourceSidecarListed)"
+            />
         </ItemGroup>
         <WriteLinesToFile
             File="$(SqlSourceSidecarList)"
@@ -673,5 +683,12 @@
             Condition="'$(SqlSourceToolStarted)' == 'true' and '$(SqlSourceToolExitCode)' != '0' and '$(SqlSourceToolReportedError)' != 'true'"
         />
     </Target>
+    <!--
+        Gives the sidecars that SqlSourceRunOnline created, for a framework's build that called the run in a
+        configuration of its own: a target returns one list, and the run's is the files that go to FileWrites.  It is
+        called in that configuration after the run, and reads the run's items, which MSBuild keeps with the
+        configuration.
+    -->
+    <Target Name="SqlSourceCreatedSidecars" Returns="@(SqlSourceSidecarCreated)" />
     <!-- editorconfig-checker-enable -->
 </Project>

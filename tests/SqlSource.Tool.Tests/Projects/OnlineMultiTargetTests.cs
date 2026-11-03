@@ -54,8 +54,8 @@ public sealed class OnlineMultiTargetTests : IDisposable
 
         exitCode.ShouldBe(0, output);
         RanOnceForTheFirstFramework();
-        CompiledItems("net8.0").ShouldContain(Sidecar);
-        CompiledItems("net10.0").ShouldContain(Sidecar);
+        CompiledItems("net8.0").Count(item => item == Sidecar).ShouldBe(1);
+        CompiledItems("net10.0").Count(item => item == Sidecar).ShouldBe(1);
         var lines = await File.ReadAllLinesAsync(log, TestContext.Current.CancellationToken);
         Index(lines, "Done building target \"SqlSourceRunOnlineBeforeDispatch\"")
             .ShouldBeLessThan(Index(lines, "Target \"DispatchToInnerBuilds:"));
@@ -130,6 +130,29 @@ public sealed class OnlineMultiTargetTests : IDisposable
         RunFiles().ShouldBeEmpty();
     }
 
+    // Each framework's build calls the run's configuration for the run and for the sidecars it created when the
+    // build goes online, and an offline build calls neither, which would cost it an evaluation of the project.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Build_OfOneFramework_CallsTheRunsConfigurationOnlyOnline(bool online)
+    {
+        var (exitCode, output) = await FixtureProjects.BuildAsync(
+            _project,
+            NoVariables,
+            StandIn.CommandSwitch,
+            online ? "-p:SqlSourceOnline=true" : "-p:SqlSourceOnline=false",
+            "-f",
+            "net10.0",
+            "-v:d"
+        );
+
+        exitCode.ShouldBe(0, output);
+        StandIn.RunsIn(_folder).Count.ShouldBe(online ? 1 : 0);
+        output.Contains("(SqlSourceRunOnline target(s))", StringComparison.Ordinal).ShouldBe(online);
+        output.Contains("(SqlSourceCreatedSidecars target(s))", StringComparison.Ordinal).ShouldBe(online);
+    }
+
     // A build of one framework has no outer build, and its framework runs the tool in the first one's configuration.
     [Fact]
     public async Task Build_TheSecondFrameworkAlone_RunsTheToolOnceForTheFirst()
@@ -164,6 +187,64 @@ public sealed class OnlineMultiTargetTests : IDisposable
         exitCode.ShouldBe(0, output);
         RanOnceForTheFirstFramework();
         CompiledItems("net10.0").ShouldContain(Sidecar);
+    }
+
+    // Each way of building the project gives every framework's compiler the sidecar that its run created once, though
+    // the project lists no sidecar, and gives none a sidecar that existed before the build and that the project does
+    // not list, as an offline build gives none, though the run writes it again.  A full build evaluates its inner
+    // builds after the run, a build of one framework before it.
+    [Theory]
+    [InlineData("every framework", true)]
+    [InlineData("every framework", false)]
+    [InlineData("-f net10.0", true)]
+    [InlineData("-f net10.0", false)]
+    [InlineData("a ProjectReference", true)]
+    [InlineData("a ProjectReference", false)]
+    public async Task Build_ProjectThatListsNoSidecar_GivesTheCompilersOnlyTheSidecarTheRunCreated(
+        string way,
+        bool created
+    )
+    {
+        if (!created)
+        {
+            _ = _fixtures.WriteFile("OnlineMulti/Queries/Users.sql.json", "{ }");
+        }
+
+        var (project, frameworks, arguments) = way switch
+        {
+            "every framework" => (_project, new[] { "net8.0", "net10.0" }, Array.Empty<string>()),
+            "-f net10.0" => (_project, new[] { "net10.0" }, new[] { "-f", "net10.0" }),
+            _ => (_fixtures.Copy("OnlineReference", "Reference.csproj"), new[] { "net10.0" }, Array.Empty<string>()),
+        };
+        string[] ownItems = ["-p:SqlSourceIncludeFiles=false", "-p:OnlineMultiOwnItems=true", .. arguments];
+
+        var (exitCode, output) = await FixtureProjects.BuildAsync(
+            project,
+            NoVariables,
+            [StandIn.CommandSwitch, "-p:SqlSourceOnline=true", .. ownItems]
+        );
+        exitCode.ShouldBe(0, output);
+        var online = frameworks.Select(CompiledItems).ToList();
+        (exitCode, output) = await FixtureProjects.BuildAsync(
+            project,
+            NoVariables,
+            ["-p:SqlSourceOnline=false", .. ownItems]
+        );
+        exitCode.ShouldBe(0, output);
+
+        RanOnceForTheFirstFramework();
+        (await File.ReadAllTextAsync(Sidecar, TestContext.Current.CancellationToken)).ShouldBe(
+            "{}",
+            "the run wrote the sidecar"
+        );
+        foreach (var (framework, items) in frameworks.Zip(online))
+        {
+            items.Count(item => item == Sidecar).ShouldBe(created ? 1 : 0, framework);
+            if (!created)
+            {
+                items.ShouldBe(CompiledItems(framework), framework);
+            }
+        }
     }
 
     // One run, on the manifest of the net8.0 build.

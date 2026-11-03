@@ -26,6 +26,9 @@ public sealed partial class BuildFileTests
     // The target that writes the files the run compares and gathers its inputs.
     private const string ListSidecarsTarget = "SqlSourceListSidecars";
 
+    // The target that gives the sidecars the run created, from the configuration the run was called in.
+    private const string CreatedSidecarsTarget = "SqlSourceCreatedSidecars";
+
     // The outer build's target, in buildMultiTargeting/SqlSource.targets.
     private const string OuterTarget = "SqlSourceRunOnlineBeforeDispatch";
 
@@ -170,7 +173,7 @@ public sealed partial class BuildFileTests
     [Fact]
     public void Targets_OnlineTargets_HookNothing()
     {
-        foreach (var name in new[] { DescribeOnlineTarget, RunOnlineTarget, ListSidecarsTarget })
+        foreach (var name in new[] { DescribeOnlineTarget, RunOnlineTarget, ListSidecarsTarget, CreatedSidecarsTarget })
         {
             Target(name).Attribute("BeforeTargets").ShouldBeNull(name);
             Target(name).Attribute("AfterTargets").ShouldBeNull(name);
@@ -185,8 +188,9 @@ public sealed partial class BuildFileTests
     // The online build is no part of a design-time build, which an IDE runs on every edit, nor of a compile by
     // -t:Compile, which leaves BuildingProject false.  It runs the tool itself in a project with no TargetFrameworks,
     // and every framework of a multi-targeted project, the first among them, calls the run in a configuration of its
-    // own and adds the files the run wrote to FileWrites.  Then it takes away the sidecars the run deleted, and gives
-    // the compiler the sidecar of each .sql item that exists and that no item names, compared by full path.
+    // own, adds the files the run wrote to FileWrites, and calls it again for the sidecars the run created.  Then it
+    // takes away the sidecars the run deleted, and gives the compiler each sidecar the run created that no item names,
+    // compared by full path.
     [Fact]
     public void Targets_DescribeOnline_RunsTheToolInABuildAndGivesTheCompilerItsSidecars()
     {
@@ -206,26 +210,31 @@ public sealed partial class BuildFileTests
         target
             .Elements()
             .Select(element => element.Name.LocalName)
-            .ShouldBe(["Error", "MSBuild", "ItemGroup", "ItemGroup", "ItemGroup"]);
-        var call = target.Element("MSBuild")!;
-        Attributes(call)
-            .ShouldBe(
-                new Dictionary<string, string>
-                {
-                    ["Projects"] = "$(MSBuildProjectFullPath)",
-                    ["Targets"] = RunOnlineTarget,
-                    ["Properties"] = OnlineRunConfiguration,
-                    ["Condition"] = "'$(SqlSourceGoesOnline)' == 'true' and '$(TargetFrameworks)' != ''",
-                }
-            );
-        Attributes(call.Elements().ShouldHaveSingleItem())
-            .ShouldBe(
-                new Dictionary<string, string>
-                {
-                    ["TaskParameter"] = "TargetOutputs",
-                    ["ItemName"] = "SqlSourceOnlineFile",
-                }
-            );
+            .ShouldBe(["Error", "MSBuild", "MSBuild", "ItemGroup", "ItemGroup", "ItemGroup"]);
+        var calls = target.Elements("MSBuild").ToList();
+        foreach (
+            var (call, targetName, itemName) in new[]
+            {
+                (calls[0], RunOnlineTarget, "SqlSourceOnlineFile"),
+                (calls[1], CreatedSidecarsTarget, "SqlSourceSidecarCreated"),
+            }
+        )
+        {
+            Attributes(call)
+                .ShouldBe(
+                    new Dictionary<string, string>
+                    {
+                        ["Projects"] = "$(MSBuildProjectFullPath)",
+                        ["Targets"] = targetName,
+                        ["Properties"] = OnlineRunConfiguration,
+                        ["Condition"] = "'$(SqlSourceGoesOnline)' == 'true' and '$(TargetFrameworks)' != ''",
+                    }
+                );
+            Attributes(call.Elements().ShouldHaveSingleItem())
+                .ShouldBe(
+                    new Dictionary<string, string> { ["TaskParameter"] = "TargetOutputs", ["ItemName"] = itemName }
+                );
+        }
 
         var groups = target.Elements("ItemGroup").ToList();
         groups[0].Attributes().ShouldBeEmpty();
@@ -255,17 +264,28 @@ public sealed partial class BuildFileTests
             .Elements()
             .Select(Item)
             .ShouldBe([
-                (
-                    "SqlSourceSidecarOfItem",
-                    "Include=@(AdditionalFiles->'%(FullPath).json') Condition='%(Extension)' == '.sql'"
-                ),
                 ("SqlSourceListedFile", "Include=@(AdditionalFiles->'%(FullPath)')"),
-                (
-                    "SqlSourceSidecarNotListed",
-                    "Include=@(SqlSourceSidecarOfItem->Distinct()->Exists()) Exclude=@(SqlSourceListedFile)"
-                ),
+                ("SqlSourceSidecarNotListed", "Include=@(SqlSourceSidecarCreated) Exclude=@(SqlSourceListedFile)"),
                 ("AdditionalFiles", "Include=@(SqlSourceSidecarNotListed)"),
             ]);
+    }
+
+    // The sidecars the run created, which a framework's build that called the run in a configuration of its own asks
+    // that configuration for: the run returns the files for FileWrites.
+    [Fact]
+    public void Targets_CreatedSidecars_ReturnsTheSidecarsTheRunCreated()
+    {
+        var target = Target(CreatedSidecarsTarget);
+
+        Attributes(target)
+            .ShouldBe(
+                new Dictionary<string, string>
+                {
+                    ["Name"] = CreatedSidecarsTarget,
+                    ["Returns"] = "@(SqlSourceSidecarCreated)",
+                }
+            );
+        target.Elements().ShouldBeEmpty();
     }
 
     // The run's condition is the design's: not BuildingProject, which a configuration that another build calls by
@@ -503,7 +523,8 @@ public sealed partial class BuildFileTests
     }
 
     // The list of sidecars is written again after the run, or a sidecar the run created or deleted would run the tool
-    // once more at the next build.  The stamp is touched only after a run of the tool that exited with 0 and was not
+    // once more at the next build.  The sidecars on it after the run and not before are the ones the run created, each
+    // once.  The stamp is touched only after a run of the tool that exited with 0 and was not
     // offline, so that the next build tries a failed or an offline run again.  The errors
     // come last, since they end the target.
     [Fact]
@@ -535,7 +556,13 @@ public sealed partial class BuildFileTests
             .First()
             .Elements()
             .Select(Item)
-            .ShouldBe([("SqlSourceSidecarAfterRun", "Include=@(SqlSourceSidecarOfSqlFile->Exists())")]);
+            .ShouldBe([
+                ("SqlSourceSidecarAfterRun", "Include=@(SqlSourceSidecarOfSqlFile->Exists())"),
+                (
+                    "SqlSourceSidecarCreated",
+                    "Include=@(SqlSourceSidecarAfterRun->Distinct()) Exclude=@(SqlSourceSidecarListed)"
+                ),
+            ]);
         Attributes(target.Element("WriteLinesToFile")!)
             .ShouldBe(WrittenWhenItChanges("$(SqlSourceSidecarList)", "@(SqlSourceSidecarAfterRun)"));
         target.Element("WriteLinesToFile")!.IsAfter(exec).ShouldBeTrue();
