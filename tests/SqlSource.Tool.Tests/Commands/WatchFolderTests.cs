@@ -86,6 +86,39 @@ public sealed class WatchFolderTests : IAsyncDisposable
         WatchTests.PassStarts(LogPath).ShouldBe([(1, 0, true), (2, 1, true), (3, 1, true)]);
     }
 
+    // Outside a repository the folder above each watched folder is watched too, so that a folder deleted and made
+    // again, whose own watch says nothing on Linux, is seen and watched again.
+    [Fact]
+    public async Task Watch_WatchedFolderDeletedAndMadeAgainOutsideARepository_IsWatchedAgain()
+    {
+        await using var watch = new WatchScene("App");
+        _ = watch.Project.AddSql("Users.sql", SqlTexts.GetUser);
+        var settings = watch.Run.Folder.WriteFile("libs/Shared/sqlsource.json", "{}");
+        var shared = Path.GetDirectoryName(settings)!;
+        watch.Project.ListSettings(settings);
+        await watch.StartAsync("App/App.csproj");
+        watch
+            .Watcher.Open.Select(request => request.Folder)
+            .ShouldBe(
+                [
+                    watch.Run.Folder.Path,
+                    Path.GetDirectoryName(watch.Project.ProjectPath),
+                    watch.Run.Folder.PathOf("libs"),
+                    shared,
+                ],
+                ignoreOrder: true
+            );
+        var first = watch.Watcher.Open.Single(request => request.Folder == shared);
+
+        Directory.Delete(shared, recursive: true);
+        _ = watch.Run.Folder.WriteFile("libs/Shared/sqlsource.json", "{}");
+        await watch.ChangeAsync(Deleted(shared), CreatedFolder(shared));
+
+        watch.Watcher.Requests.Count(request => request.Folder == shared).ShouldBe(2);
+        watch.Watcher.Open.Single(request => request.Folder == shared).ShouldNotBeSameAs(first);
+        (await watch.StopAsync()).ExitCode.ShouldBe(0);
+    }
+
     // A folder beside a watched one whose name starts the same, deleted or renamed away, is not the watched folder or
     // above it: it closes no watch and asks for nothing, so a save beside it is a pass that does not evaluate.
     [Theory]

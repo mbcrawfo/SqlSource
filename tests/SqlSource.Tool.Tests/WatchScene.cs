@@ -36,6 +36,10 @@ internal sealed class WatchScene : IAsyncDisposable
 
     public TestProject Project => Scene.Project;
 
+    // The folder that holds the scene's folder, which a watch outside a repository watches alone, beside the folders
+    // below it that it watches.
+    public string Above => System.IO.Path.GetDirectoryName(Run.Folder.Path)!;
+
     public RunningCli Running => _running ?? throw new InvalidOperationException("The watch was not started.");
 
     public string Output => Running.Output;

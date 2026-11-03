@@ -13,8 +13,9 @@ namespace SqlSource.Tool.Watching;
 /// Which folders a <c>describe --watch</c> session watches, and what a change to a file in them asks of it.
 /// </summary>
 /// <remarks>
-/// It reads nothing but the <c>.git</c> markers that <see cref="DotEnvSearch.FoldersOf" /> looks for, and whether the
-/// folder of a project's assets file, and those above it, exist.  A set is made from the projects of one evaluation,
+/// It reads nothing but the <c>.git</c> markers that <see cref="DotEnvSearch.FoldersOf" /> looks for, whether the
+/// folder of a project's assets file, and those above it, exist, and, outside a repository, where the nearest
+/// <c>Directory.Build.props</c> above a project is.  A set is made from the projects of one evaluation,
 /// so a session makes another when it evaluates again.  Every comparison of paths ignores case, as
 /// <see cref="RunProjects.PathComparer" /> does.
 /// </remarks>
@@ -35,9 +36,11 @@ internal sealed class WatchSet
     private static readonly string[] IgnoredAssetsFolders = ["bin", ".git"];
 
     // Any change to one of these asks for another evaluation, wherever it is.
+    private const string BuildPropsFileName = "Directory.Build.props";
+
     private static readonly string[] EvaluationFileNames =
     [
-        "Directory.Build.props",
+        BuildPropsFileName,
         "Directory.Build.targets",
         "Directory.Packages.props",
     ];
@@ -83,9 +86,9 @@ internal sealed class WatchSet
     /// exists above it in the project's repository, with their folders below; and each other folder that holds a listed
     /// file, or may hold a settings file of one, a <c>.env</c> or a <c>Directory.*</c> file, or is above an assets
     /// file's folder in its repository, alone.  So each folder above one of these, up to the root of its repository,
-    /// is watched too, and sees it deleted or made.  None is below
-    /// another that is watched with its folders below, and none is there twice.  A folder may not exist, which the
-    /// session skips.
+    /// is watched too, and sees it deleted or made; outside a repository the folder above each is watched alone.  None
+    /// is below another that is watched with its folders below, and none is there twice.  A folder may not exist, which
+    /// the session skips.
     /// </summary>
     public ImmutableArray<(string Folder, bool Recursive)> Folders { get; }
 
@@ -302,6 +305,20 @@ internal sealed class WatchSet
             others.Add(folder);
         }
 
+        // Outside a repository no folder above one of these is in the list, so the folder above each is watched alone
+        // too, so that its deletion and its making again are seen: on Linux a watch says nothing when its folder goes.
+        others.AddRange([
+            .. roots
+                .Concat(others)
+                .Where(folder => !DotEnvSearch.IsInRepository(folder))
+                .Select(Path.GetDirectoryName)
+                .OfType<string>()
+                .Select(Trim)
+                .Where(parent => !IsAtOrBelowAny(parent, roots) && !others.Contains(parent, Comparer))
+                .Order(StringComparer.Ordinal)
+                .Distinct(Comparer),
+        ]);
+
         return
         [
             .. roots
@@ -313,8 +330,9 @@ internal sealed class WatchSet
 
     // The folder that a restore writes the project's assets file into, which an artifacts layout may put outside every
     // folder of the unit.  Before the restore makes it, the nearest folder above it that exists, at or below the root
-    // of the project's repository, or the project's folder outside one, so that the restore is seen; null when there is
-    // none, for an assets file outside the repository whose folder does not exist.
+    // of the project's repository, so that the restore is seen.  Outside a repository the bound is the folder of the
+    // nearest Directory.Build.props above the project, where UseArtifactsOutput puts its artifacts folder, or the
+    // project's folder when there is none.  Null when there is no such folder.
     private static string? AssetsFolderOf(string project, string assetsFile)
     {
         var folder = FolderOf(assetsFile);
@@ -323,7 +341,10 @@ internal sealed class WatchSet
             return folder;
         }
 
-        var root = Trim(DotEnvSearch.FoldersOf(FolderOf(project))[^1]);
+        var projectFolder = FolderOf(project);
+        var root = DotEnvSearch.IsInRepository(projectFolder)
+            ? Trim(DotEnvSearch.FoldersOf(projectFolder)[^1])
+            : BuildPropsFolderOf(projectFolder) ?? projectFolder;
         var above = Path.GetDirectoryName(folder);
         while (above is not null && (Comparer.Equals(Trim(above), root) || IsBelow(above, root)))
         {
@@ -333,6 +354,20 @@ internal sealed class WatchSet
             }
 
             above = Path.GetDirectoryName(above);
+        }
+
+        return null;
+    }
+
+    // The nearest folder at or above the project's that holds a Directory.Build.props, as MSBuild finds it.
+    private static string? BuildPropsFolderOf(string projectFolder)
+    {
+        for (var folder = projectFolder; folder is not null; folder = Path.GetDirectoryName(folder))
+        {
+            if (System.IO.File.Exists(Path.Combine(folder, BuildPropsFileName)))
+            {
+                return Trim(folder);
+            }
         }
 
         return null;

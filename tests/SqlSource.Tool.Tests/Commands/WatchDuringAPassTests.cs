@@ -347,7 +347,9 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         var shared = watch.Run.Folder.WriteFile("Shared/sqlsource.json", "{}");
         await watch.StartAsync("App/App.csproj", "--log", "run.log");
         var app = Path.GetDirectoryName(watch.Project.ProjectPath);
-        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([app]);
+        // The folder above the project's, outside a repository.
+        var root = watch.Run.Folder.Path;
+        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app]);
 
         watch.Project.ListSettings(shared);
         await File.WriteAllTextAsync(users, SqlTexts.TwoUsers, TestContext.Current.CancellationToken);
@@ -356,7 +358,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         await watch.TimerAsync();
         watch.Clock.Advance(WatchSession.Debounce);
         _ = await Eventually.WithinAsync(hold.Arrived.Task, "The second pass did not describe.");
-        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([app, Path.GetDirectoryName(shared)]);
+        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app, Path.GetDirectoryName(shared)]);
         watch.Raise(Changed(shared));
         hold.Released.SetResult();
         await watch.PassesAsync(2);
@@ -375,12 +377,13 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
     public async Task Watch_EvaluationThatKeepsAFolder_KeepsItsWatch()
     {
         await _watch.StartAsync();
-        var first = _watch.Watcher.Open.ShouldHaveSingleItem();
+        var first = _watch.Watcher.Open.ToList();
+        first.Select(request => request.Folder).ShouldBe([_watch.Above, _watch.Run.Folder.Path]);
 
         await _watch.ChangeAsync(Changed(_watch.Project.ProjectPath));
 
-        _watch.Watcher.Requests.ShouldHaveSingleItem().ShouldBeSameAs(first);
-        _watch.Watcher.Open.ShouldHaveSingleItem().ShouldBeSameAs(first);
+        _watch.Watcher.Requests.ShouldBe(first);
+        _watch.Watcher.Open.ShouldBe(first);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
     }
 
@@ -403,16 +406,17 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
             openWhenAsked[request.Folder] = [.. watch.Watcher.Open.Select(open => open.Folder)];
             return watch.Watcher.Watch(request);
         };
+        var root = watch.Run.Folder.Path;
         await watch.StartAsync("App/App.csproj");
-        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([app, sharedFolder]);
+        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app, sharedFolder]);
 
         watch.Project.Unlist(shared);
         watch.Project.ListSettings(other);
         await watch.ChangeAsync(Changed(watch.Project.ProjectPath));
 
-        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([app, otherFolder]);
-        openWhenAsked[otherFolder].ShouldBe([app, sharedFolder]);
-        watch.Watcher.Requests.Count.ShouldBe(3);
+        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app, otherFolder]);
+        openWhenAsked[otherFolder].ShouldBe([root, app, sharedFolder]);
+        watch.Watcher.Requests.Count.ShouldBe(4);
         (await watch.StopAsync()).ExitCode.ShouldBe(0);
     }
 
@@ -425,13 +429,14 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         var shared = watch.Run.Folder.PathOf("Shared/sqlsource.json");
         watch.Project.ListSettings(shared);
         var app = Path.GetDirectoryName(watch.Project.ProjectPath);
+        var root = watch.Run.Folder.Path;
         await watch.StartAsync("App/App.csproj");
-        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([app]);
+        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app]);
 
         _ = watch.Run.Folder.WriteFile("Shared/sqlsource.json", "{}");
         await watch.ChangeAsync(Changed(watch.Project.ProjectPath));
 
-        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([app, Path.GetDirectoryName(shared)]);
+        watch.Watcher.Open.Select(request => request.Folder).ShouldBe([root, app, Path.GetDirectoryName(shared)]);
         (await watch.StopAsync()).ExitCode.ShouldBe(0);
     }
 

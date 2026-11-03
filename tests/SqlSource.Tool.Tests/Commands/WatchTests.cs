@@ -56,7 +56,7 @@ public sealed class WatchTests : IAsyncDisposable
         _watch.Output.ShouldBe($"{OneDescribed}\n{WatchSession.WatchingMarker}\n");
         _watch
             .Watcher.Open.Select(request => (request.Folder, request.Recursive, request.Poll))
-            .ShouldBe([(_watch.Run.Folder.Path, true, false)]);
+            .ShouldBe([(_watch.Above, false, false), (_watch.Run.Folder.Path, true, false)], ignoreOrder: true);
         SidecarFiles.Read(_users).Queries.ShouldHaveSingleItem().Name.ShouldBe("GetUser");
         var result = await _watch.StopAsync();
         result.ShouldBe(new CliResult(0, $"{OneDescribed}\n{WatchSession.WatchingMarker}\n", ""));

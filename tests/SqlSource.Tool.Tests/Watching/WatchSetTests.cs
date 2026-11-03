@@ -380,7 +380,8 @@ public sealed class WatchSetTests
             ]
         );
 
-        set.Folders.ShouldBe([(app, true), (shared, false)]);
+        // Outside a repository, with the folder above each, which both share.
+        set.Folders.ShouldBe([(temp.PathOf("w"), false), (app, true), (shared, false)]);
     }
 
     [Fact]
@@ -420,7 +421,7 @@ public sealed class WatchSetTests
             ]
         );
 
-        set.Folders.ShouldBe([(root, true)]);
+        set.Folders.ShouldBe([(temp.Path, false), (root, true)]);
     }
 
     [Fact]
@@ -444,7 +445,7 @@ public sealed class WatchSetTests
             ]
         );
 
-        set.Folders.Length.ShouldBe(2);
+        set.Folders.Length.ShouldBe(3);
     }
 
     // A project of the solution outside its folder, which has no manifest: not restored, or without the package yet.
@@ -546,6 +547,71 @@ public sealed class WatchSetTests
         set.Folders.ShouldNotContain(entry => entry.Recursive && entry.Folder != app);
     }
 
+    // Outside a repository the artifacts folder of UseArtifactsOutput is beside the nearest Directory.Build.props, so
+    // that folder bounds the search for an assets folder that does not exist yet.  In a repository the repository's
+    // root does, wherever a Directory.Build.props is.
+    [Theory]
+    [InlineData(false, "w", "artifacts", "w/artifacts")]
+    [InlineData(false, "w", "", "w")]
+    [InlineData(false, "w/src", "artifacts", null)]
+    [InlineData(true, "w/src", "artifacts", "w/artifacts")]
+    public void Folders_AssetsFolderThatDoesNotExistYet_IsBoundByTheBuildProps(
+        bool repository,
+        string props,
+        string existing,
+        string? watched
+    )
+    {
+        using var temp = new TempFolder();
+        if (repository)
+        {
+            _ = temp.CreateFolder("w/.git");
+        }
+
+        _ = temp.WriteFile(props + "/Directory.Build.props", "<Project />");
+        _ = temp.CreateFolder("w/" + existing);
+        var app = temp.CreateFolder("w/src/App");
+        var project = Path.Combine(app, "App.csproj");
+        var assets = temp.PathOf("w/artifacts/obj/App/project.assets.json");
+
+        var set = Of(project, app, [project], [], (project, assets));
+
+        if (watched is null)
+        {
+            set.Folders.ShouldNotContain(entry => entry.Recursive && entry.Folder != app);
+        }
+        else
+        {
+            set.Folders.ShouldContain((Path.TrimEndingDirectorySeparator(temp.PathOf(watched)), true));
+        }
+    }
+
+    // Outside a repository nothing above a watched folder is otherwise watched, so the folder above each is, alone, so
+    // that a folder deleted and made again is seen: on Linux its own watch says nothing.  In a repository the folders
+    // above are watched up to its root, and nothing above that.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Folders_FolderAboveEachWatchedFolder_IsWatchedOutsideARepository(bool repository)
+    {
+        using var temp = new TempFolder();
+        if (repository)
+        {
+            _ = temp.CreateFolder("w/.git");
+        }
+
+        var app = temp.CreateFolder("w/App");
+        var shared = temp.CreateFolder("w/libs/Shared");
+        var project = Path.Combine(app, "App.csproj");
+
+        var set = Of(project, app, [project], [Manifest(project, [Path.Combine(shared, "Common.sql")], [], [])]);
+
+        set.Folders.ShouldBe(
+            [(app, true), (temp.PathOf("w"), false), (temp.PathOf("w/libs"), false), (shared, false)],
+            ignoreOrder: true
+        );
+    }
+
     // An assets folder that exists is watched wherever it is.
     [Fact]
     public void Folders_AssetsFolderOutsideTheRepositoryThatExists_IsWatched()
@@ -578,7 +644,7 @@ public sealed class WatchSetTests
 
         var set = Of(project, app, [project], [], (project, Path.Combine(app, "obj", "project.assets.json")));
 
-        set.Folders.ShouldBe([(app, true)]);
+        set.Folders.ShouldBe([(temp.PathOf("w"), false), (app, true)]);
     }
 
     // A repository with a project in src/App that lists a .sql file of its own folder and one of Shared, on the disk

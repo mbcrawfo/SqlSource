@@ -175,10 +175,11 @@ public sealed class WatchEndingTests : IAsyncDisposable
 
         result.ShouldBe(new CliResult(0, "", ""));
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
-        // The unit's folder was watched from before the first pass, and is no longer.
+        // The unit's folder, and the folder above it outside a repository, were watched from before the first pass,
+        // and are no longer.
         _watch
             .Watcher.Requests.Select(request => (request.Folder, request.Recursive))
-            .ShouldBe([(_watch.Run.Folder.Path, true)]);
+            .ShouldBe([(_watch.Above, false), (_watch.Run.Folder.Path, true)], ignoreOrder: true);
         _watch.Watcher.Open.ShouldBeEmpty();
     }
 

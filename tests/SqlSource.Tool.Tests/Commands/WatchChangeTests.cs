@@ -140,13 +140,18 @@ public sealed class WatchChangeTests : IAsyncDisposable
     }
 
     // A project in a folder of its repository with an artifacts layout, which restores outside every folder of the
-    // unit: its restore still starts a pass, which describes it.
-    [Fact]
-    public async Task Watch_RestoreIntoAnArtifactsFolder_RunsTheManifestTarget()
+    // unit: its restore still starts a pass, which describes it.  So does one outside a repository, whose artifacts
+    // folder is beside the Directory.Build.props that sets UseArtifactsOutput.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Watch_RestoreIntoAnArtifactsFolder_RunsTheManifestTarget(bool repository)
     {
         await using var watch = new WatchScene("src/App");
         _ = watch.Project.AddSql("Users.sql", SqlTexts.GetUser);
-        _ = watch.Run.Folder.CreateFolder(".git");
+        _ = repository
+            ? watch.Run.Folder.CreateFolder(".git")
+            : watch.Run.Folder.WriteFile("Directory.Build.props", "<Project />");
         var project = watch.Run.Processes.Projects[watch.Project.ProjectPath];
         var assets = watch.Run.Folder.PathOf("artifacts/obj/App/project.assets.json");
         project.Imported = "";
@@ -235,7 +240,7 @@ public sealed class WatchChangeTests : IAsyncDisposable
 
         await _watch.StartAsync();
 
-        _watch.Watcher.Requests.Select(request => request.Folder).ShouldBe([_watch.Run.Folder.Path]);
+        _watch.Watcher.Requests.Select(request => request.Folder).ShouldNotContain(gone);
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
     }
 

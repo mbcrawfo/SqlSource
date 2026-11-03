@@ -45,6 +45,12 @@ internal static class DotEnvSearch
     }
 
     /// <summary>
+    /// True when the folder is in a repository, or a worktree: the last folder of <see cref="FoldersOf" /> holds a
+    /// <c>.git</c> folder or file.
+    /// </summary>
+    public static bool IsInRepository(string folder) => IsRepositoryRoot(FoldersOf(folder)[^1]);
+
+    /// <summary>
     /// Reads the nearest <c>.env</c> of <see cref="FoldersOf" />.  A file that cannot be read, or has a line of a
     /// key of the tool that cannot be, gives errors and no values, so the run goes on as if there were none.
     /// </summary>
