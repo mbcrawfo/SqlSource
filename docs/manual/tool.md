@@ -218,7 +218,7 @@ With a [`.env` file](#env-file) like the one above, `dotnet build` runs `dotnet 
 
 **In CI**, a build never runs the tool, whatever `SqlSourceOnline` says, so that a job checks the sidecars that were committed and does not write its own.  Describe in a step of its own, with `describe --check`: see [check in CI](#check-in-ci).
 
-**What the build prints.**  The build shows the tool's errors at every verbosity, and nothing else that the tool prints.  The tool's [summary](#summary), or its line that says it is offline, is a message of the detailed verbosity, which `dotnet build -tl:off -v:d` shows.  `dotnet build` in an interactive terminal shows no such message at any verbosity unless `-tl:off` turns its live display off; a binary log, `-bl`, holds them too.
+**What the build prints.**  The build shows the tool's errors at every verbosity, and nothing else that the tool prints.  The tool's [summary](#summary), each line of it after `sqlsource: summary: `, or its line that says it is offline, is a message of the detailed verbosity, which `dotnet build -tl:off -v:d` shows.  `dotnet build` in an interactive terminal shows no such message at any verbosity unless `-tl:off` turns its live display off; a binary log, `-bl`, holds them too.
 
 **Logs.**  `--log` cannot be given to the build's run, and a failed build does not suggest it.  Set the variable `SQLSOURCE_LOG`, to any value, and each build that runs the tool writes the log of its run to a file of the project and framework in the intermediate folder, such as `obj/Debug/net10.0/App.csproj.SqlSource.log`; the variable's value is not used as a path, since projects built at once would write one file.  [Read a log before you share it](#logs).
 

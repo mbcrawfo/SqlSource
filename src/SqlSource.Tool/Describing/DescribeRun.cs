@@ -21,6 +21,11 @@ namespace SqlSource.Tool.Describing;
 internal static class DescribeRun
 {
     /// <summary>
+    /// What starts each line of the summary under <c>--online</c>, which the build's <c>SqlSourceRunOnline</c> reads.
+    /// </summary>
+    internal const string SummaryPrefix = "sqlsource: summary: ";
+
+    /// <summary>
     /// Runs the steps in order, reports their errors and writes the summary.
     /// </summary>
     /// <param name="plan">The plan of the run.</param>
@@ -152,9 +157,12 @@ internal static class DescribeRun
             await host.Out.WriteLineAsync("sqlsource: online: nothing to describe");
         }
 
+        // The build's Exec reads a line that starts "error " or "warning " as one of the build, and a database may be
+        // named so: under --online every line of the summary starts with a prefix that ends in a colon.
+        var prefix = options.Online == OnlineMode.Off ? "" : SummaryPrefix;
         foreach (var line in lines)
         {
-            await host.Out.WriteLineAsync(line);
+            await host.Out.WriteLineAsync(prefix + line);
         }
     }
 

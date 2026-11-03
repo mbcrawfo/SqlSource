@@ -440,17 +440,18 @@ public sealed partial class BuildFileTests
         target.Elements("PropertyGroup").First().IsBefore(exec).ShouldBeTrue();
     }
 
-    // A line only the tool writes: one starting sqlsource:, an error of its own, or a line of its summary, in the
-    // forms of RunSummary.Lines of the tool.  None of dotnet's lines when it cannot start the tool is one, in any
-    // language, since none has those forms.
+    // A line only the tool writes: one starting sqlsource:, as each line of its summary does under --online, or an
+    // error of its own.  None of dotnet's lines when it cannot start the tool is one, in any language, since none has
+    // those forms.  A line of the summary without the prefix is not the tool's under --online.
     [Theory]
     [InlineData("sqlsource: offline: no connection for main; the build uses the committed sidecars", true)]
     [InlineData("sqlsource: online: nothing to describe", true)]
     [InlineData("sqlsource: unknown option at position 2", true)]
     [InlineData("/repo/Queries/Users.sql(3,8): error SQLSRC213: No connection.; help: Set it.; see: https://x", true)]
     [InlineData("sqlsource : error SQLSRC206: The manifest cannot be read.; see: https://x", true)]
-    [InlineData("main (postgres): 2 described, 1 skipped, 0 failed", true)]
-    [InlineData("orders (mssql): no connection, 3 skipped", true)]
+    [InlineData("sqlsource: summary: main (postgres): 2 described, 1 skipped, 0 failed", true)]
+    [InlineData("sqlsource: summary: orders (mssql): no connection, 3 skipped", true)]
+    [InlineData("main (postgres): 2 described, 1 skipped, 0 failed", false)]
     [InlineData("Could not execute because the specified command or file was not found.", false)]
     [InlineData("Possible reasons for this include:", false)]
     [InlineData("  * You misspelled a built-in dotnet command.", false)]
@@ -463,7 +464,8 @@ public sealed partial class BuildFileTests
     [InlineData("/repo/Queries/Users.sql(3,8): error SQLSRC213: No connection.; help: Set it.; see: https://x", true)]
     [InlineData("sqlsource : error SQLSRC206: The manifest cannot be read.; see: https://x", true)]
     [InlineData("sqlsource: unknown option at position 2", false)]
-    [InlineData("main (postgres): 0 described, 0 skipped, 1 failed", false)]
+    [InlineData("sqlsource: summary: main (postgres): 0 described, 0 skipped, 1 failed", false)]
+    [InlineData("sqlsource: summary: error (postgres): 1 described, 0 skipped, 0 failed", false)]
     public void Targets_RunOnline_TellsAnErrorOfTheToolsOwn(string line, bool isAnError) =>
         Regex.IsMatch(line, PatternOf("SqlSourceToolReportedError")).ShouldBe(isAnError);
 
@@ -496,6 +498,7 @@ public sealed partial class BuildFileTests
                 "$(SqlSourceToolFirstLine.StartsWith('sqlsource: '))"
                     + " and !$(SqlSourceToolFirstLine.StartsWith('sqlsource: offline:'))"
                     + " and !$(SqlSourceToolFirstLine.StartsWith('sqlsource: online:'))"
+                    + " and !$(SqlSourceToolFirstLine.StartsWith('sqlsource: summary:'))"
             );
         advice[1].Value.ShouldEndWith(".  ");
         advice[1].Value.ShouldContain("'dotnet tool update SqlSource.Tool --version <version>'");

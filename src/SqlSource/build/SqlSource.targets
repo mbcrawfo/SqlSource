@@ -533,12 +533,14 @@
 
         When dotnet cannot start the tool, it prints its own words, which are localised, and its exit code is no
         guide, so a run that printed no line of the tool's own is a tool that did not start: a line starting
-        sqlsource:, an error of the tool, or a line of its summary, in the form of RunSummary.Lines of the tool.
+        sqlsource:, which each line of its summary does under online, or an error of the tool.  Exec would read a line
+        of the summary without that prefix as an error or a warning of the build when the database is named error or
+        warning.
         Under true that fails the build, SQLSRC025; under auto the build goes on with the committed sidecars,
         SQLSRC026, a warning.  A tool that started, exited other than 0 and reported no error of its own fails the
         build with SQLSRC027, which names the exit code and its first line, and when that line is the tool's own and
-        is neither the offline nor the online line, as a usage error from a tool older than the package is, says to
-        update the tool.  Their texts are the messages of SqlDiagnostics.OnlineValueInvalid, OnlineToolCannotRun,
+        is neither the offline line, the online line nor a line of the summary, as a usage error from a tool older
+        than the package is, says to update the tool.  Their texts are the messages of SqlDiagnostics.OnlineValueInvalid, OnlineToolCannotRun,
         OnlineToolCannotRunOffline and OnlineToolFailedSilently, with {0}, {1} and {2} where the targets write a
         property: they change together.  The lines are joined with line breaks, since a line can hold any character
         but one, and a property function never takes an item's metadata, which MSBuild puts in as text.
@@ -583,7 +585,7 @@
             <SqlSourceToolFirstLine>$([System.Text.RegularExpressions.Regex]::Match($(SqlSourceToolOutputText), '^[^\n]*'))</SqlSourceToolFirstLine>
             <SqlSourceToolStarted>false</SqlSourceToolStarted>
             <SqlSourceToolStarted
-                Condition="$([System.Text.RegularExpressions.Regex]::IsMatch($(SqlSourceToolOutputText), '(?m)^(sqlsource:|.*: error SQLSRC\d{3}:|.* \([^()]+\): (\d+ described, \d+ skipped, \d+ failed|no connection, \d+ skipped)$)'))"
+                Condition="$([System.Text.RegularExpressions.Regex]::IsMatch($(SqlSourceToolOutputText), '(?m)^(sqlsource:|.*: error SQLSRC\d{3}:)'))"
                 >true</SqlSourceToolStarted>
             <SqlSourceToolReportedError>false</SqlSourceToolReportedError>
             <SqlSourceToolReportedError
@@ -595,7 +597,7 @@
                 >true</SqlSourceToolOffline>
             <SqlSourceToolUpdateAdvice />
             <SqlSourceToolUpdateAdvice
-                Condition="$(SqlSourceToolFirstLine.StartsWith('sqlsource: ')) and !$(SqlSourceToolFirstLine.StartsWith('sqlsource: offline:')) and !$(SqlSourceToolFirstLine.StartsWith('sqlsource: online:'))"
+                Condition="$(SqlSourceToolFirstLine.StartsWith('sqlsource: ')) and !$(SqlSourceToolFirstLine.StartsWith('sqlsource: offline:')) and !$(SqlSourceToolFirstLine.StartsWith('sqlsource: online:')) and !$(SqlSourceToolFirstLine.StartsWith('sqlsource: summary:'))"
                 >The tool may be older than the SqlSource package, and not know the options the build gives it: update it to the package's version with 'dotnet tool update SqlSource.Tool --version &lt;version&gt;'.  </SqlSourceToolUpdateAdvice>
         </PropertyGroup>
         <ItemGroup>

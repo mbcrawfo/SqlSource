@@ -18,8 +18,8 @@ internal static class Program
     private const string ScriptFile = "stand-in.json";
     private const string LogFile = "stand-in.log";
 
-    // A line of a summary in the form of the tool's own.
-    private const string SummaryLine = "billing (postgres): 0 described, 1 skipped, 0 failed";
+    // A line of a summary in the form of the tool's own under --online.
+    private const string SummaryLine = "sqlsource: summary: billing (postgres): 0 described, 1 skipped, 0 failed";
 
     private static async Task<int> Main(string[] args)
     {

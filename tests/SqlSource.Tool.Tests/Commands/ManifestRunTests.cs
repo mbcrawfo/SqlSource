@@ -128,9 +128,8 @@ public sealed class ManifestRunTests : IDisposable
         result.Error.ShouldContain("the disk is gone");
     }
 
-    // The build passes paths of its own obj folder, where a project's name, or the folder, can put "=" or ";": the
-    // variants of the review's finding R1-F2.  Without --online such a path is refused, as UsageCheckTests and
-    // RunLogDestinationTests show, since it may be a connection string typed after the option.
+    // The build passes paths of its own obj folder, where a project's name, or the folder, can put "=" or ";".
+    // Without --online such a path is refused, since it may be a connection string typed after the option.
     [Theory]
     [InlineData("obj/a;b.csproj.SqlSource.manifest")]
     [InlineData("obj/x=y.csproj.SqlSource.manifest")]
@@ -141,7 +140,9 @@ public sealed class ManifestRunTests : IDisposable
 
         var result = await _scene.DescribeAsync("--manifest", manifest, "--online", "auto");
 
-        result.ShouldBe(new CliResult(0, "billing (postgres): 1 described, 0 skipped, 0 failed\n", ""));
+        result.ShouldBe(
+            new CliResult(0, "sqlsource: summary: billing (postgres): 1 described, 0 skipped, 0 failed\n", "")
+        );
         File.Exists(SidecarFormat.PathFor(_invoices)).ShouldBeTrue();
     }
 
@@ -154,7 +155,9 @@ public sealed class ManifestRunTests : IDisposable
 
         var result = await _scene.DescribeAsync("--manifest", manifest, "--online", "auto", "--log", log);
 
-        result.ShouldBe(new CliResult(0, "billing (postgres): 1 described, 0 skipped, 0 failed\n", ""));
+        result.ShouldBe(
+            new CliResult(0, "sqlsource: summary: billing (postgres): 1 described, 0 skipped, 0 failed\n", "")
+        );
         LogReader
             .Read(log)[0]
             .GetProperty("arguments")

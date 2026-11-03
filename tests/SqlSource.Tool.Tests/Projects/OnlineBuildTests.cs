@@ -291,6 +291,39 @@ public sealed class OnlineBuildTests : IDisposable
         output.ShouldContain("0 Error(s)");
     }
 
+    // Exec reads a line that starts "error " or "warning " as an error or a warning of the build, and a database may
+    // have either name, so under --online the tool writes each line of its summary after a prefix.  -warnaserror
+    // turns a warning into a failure, so a build that passes reported neither.
+    [Theory]
+    [InlineData("error")]
+    [InlineData("warning")]
+    public async Task Build_ToolSummaryOfADatabaseNamedAsAnErrorOrAWarning_PassesAndTouchesTheStamp(string name)
+    {
+        StandIn.Tell(_folder, output: [$"sqlsource: summary: {name} (postgres): 1 described, 0 skipped, 0 failed"]);
+
+        var output = await OutputOfPassingAsync(NoVariables, "-p:SqlSourceOnline=true", "-warnaserror");
+
+        _ = Stamp().ShouldNotBeNull();
+        output.ShouldNotContain("SQLSRC");
+    }
+
+    // A line of the summary is the tool's own, and no sign of a tool older than the package.
+    [Fact]
+    public async Task Build_ToolExitsWithACodeAndOnlyItsSummary_FailsWithoutSayingToUpdateTheTool()
+    {
+        StandIn.Tell(
+            _folder,
+            output: ["sqlsource: summary: billing (postgres): 1 described, 0 skipped, 0 failed"],
+            exitCode: 1
+        );
+
+        var output = await OutputOfFailingAsync(NoVariables, "-p:SqlSourceOnline=true");
+
+        output.ShouldContain("error SQLSRC027: The sqlsource tool exited with the code 1");
+        output.ShouldNotContain("dotnet tool update");
+        Stamp().ShouldBeNull();
+    }
+
     // The properties a design-time build of an IDE sets, as SettingsFileSearchTests sets them.
     [Fact]
     public async Task Build_DesignTime_RunsNothing()

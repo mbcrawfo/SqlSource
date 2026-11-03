@@ -131,7 +131,7 @@ stand_in_log="$work/stand-in.log"
 cat >"$stand_in" <<EOF
 #!/bin/sh
 echo "\$*" >>"$stand_in_log"
-echo 'orders (postgres): 0 described, 1 skipped, 0 failed'
+echo 'sqlsource: summary: orders (postgres): 0 described, 1 skipped, 0 failed'
 EOF
 chmod +x "$stand_in"
 

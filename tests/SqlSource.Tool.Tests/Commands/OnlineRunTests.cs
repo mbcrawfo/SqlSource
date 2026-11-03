@@ -193,10 +193,34 @@ public sealed class OnlineRunTests : IDisposable
         result.ShouldBe(
             new CliResult(
                 0,
-                "postgres (postgres): no connection, 1 skipped\nbilling (postgres): no connection, 1 skipped\n",
+                "sqlsource: summary: postgres (postgres): no connection, 1 skipped\n"
+                    + "sqlsource: summary: billing (postgres): no connection, 1 skipped\n",
                 ""
             )
         );
+    }
+
+    // The build's Exec reads a line that starts "error " or "warning " as an error or a warning of the build, and a
+    // database may have either name: under --online each line of the summary starts with the prefix.
+    [Theory]
+    [InlineData("error")]
+    [InlineData("warning")]
+    [InlineData("Error")]
+    public async Task Run_DatabaseNamedAsAnErrorOrAWarning_WritesItsSummaryLineAfterThePrefix(string name)
+    {
+        _ = _scene.Project.AddSql("Named.sql", $"-- name: GetNamed\n-- database: {name}\nSELECT 3;\n");
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Secrets.Connection;
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = Secrets.Connection;
+        _scene.Run.Environment[$"SQLSOURCE_CONNECTION_{name.ToUpperInvariant()}"] = Secrets.Connection;
+
+        var result = await OnlineAsync("auto");
+
+        result.ExitCode.ShouldBe(0);
+        result.Error.ShouldBe("");
+        var lines = result.Out.Split('\n')[..^1];
+        lines.Length.ShouldBe(3);
+        lines.ShouldAllBe(line => line.StartsWith("sqlsource: summary: ", StringComparison.Ordinal));
+        lines.ShouldContain($"sqlsource: summary: {name} (postgres): 1 described, 0 skipped, 0 failed");
     }
 
     [Theory]
