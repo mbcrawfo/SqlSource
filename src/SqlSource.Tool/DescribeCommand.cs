@@ -41,6 +41,14 @@ internal static class DescribeCommand
 
     internal const string LogOption = "--log";
 
+    internal const string ManifestOption = "--manifest";
+
+    internal const string OnlineOption = "--online";
+
+    private const string OnlineAuto = "auto";
+
+    private const string OnlineTrue = "true";
+
     /// <summary>The environment variable that gives the log's path when <c>--log</c> does not.</summary>
     internal const string LogVariable = "SQLSOURCE_LOG";
 
@@ -123,6 +131,25 @@ internal static class DescribeCommand
             Arity = ArgumentArity.ExactlyOne,
         };
 
+        // The two options of the build that calls the tool.  Each takes exactly one value, given once.
+        var manifest = new Option<string>(ManifestOption)
+        {
+            Description =
+                "Describe the project that this manifest file describes, without asking MSBuild.  For the use of "
+                + "the SqlSource build, which has written the file.",
+            HelpName = "path",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+
+        var online = new Option<string>(OnlineOption)
+        {
+            Description =
+                "How the build asked for the databases: 'auto' leaves a database with no connection alone, and "
+                + "'true' makes it an error.  Needs --manifest.  For the use of the SqlSource build.",
+            HelpName = "auto|true",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+
         return new Command(Name, "Asks the databases of the projects to describe their queries")
         {
             path,
@@ -133,6 +160,8 @@ internal static class DescribeCommand
             check,
             verbose,
             log,
+            manifest,
+            online,
         };
     }
 
@@ -254,8 +283,90 @@ internal static class DescribeCommand
             }
         }
 
+        CheckManifestUsage(usage, messages);
         return messages;
     }
+
+    // The rules of --manifest and --online.  A run from a manifest is on the one project the manifest names, so
+    // nothing else names what to run, and --online is the build's word about that run.
+    private static void CheckManifestUsage(Usage usage, List<string> messages)
+    {
+        var manifests = ValuesOf(usage, ManifestOption);
+        messages.AddRange(manifests.Select(ProblemOfManifestPath).OfType<string>());
+
+        if (manifests.Length > 0)
+        {
+            messages.AddRange(
+                usage
+                    .Values.Select(static value => (value.Position, Kind: WhatIsNamedBy(value)))
+                    .Where(static named => named.Kind is not null)
+                    .Select(named =>
+                        $"sqlsource: option '{ManifestOption}' takes no {named.Kind} (position {named.Position})"
+                    )
+            );
+        }
+
+        var onlines = ValuesOf(usage, OnlineOption);
+        messages.AddRange(
+            onlines
+                .Where(static online => OnlineModeOf(online.Text) is null)
+                .Select(online =>
+                    $"sqlsource: the value of option '{OnlineOption}' at position {online.Position} is not "
+                    + $"'{OnlineAuto}' or '{OnlineTrue}'"
+                )
+        );
+
+        if (manifests.Length == 0 && onlines.Length > 0)
+        {
+            messages.Add($"sqlsource: option '{OnlineOption}' needs '{ManifestOption}'");
+        }
+    }
+
+    // What is wrong with the value of --manifest as a path, as a whole line, or null.
+    private static string? ProblemOfManifestPath(UsageValue manifest)
+    {
+        if (string.IsNullOrWhiteSpace(manifest.Text))
+        {
+            return $"sqlsource: the value of option '{ManifestOption}' at position {manifest.Position} is not a path";
+        }
+
+        return manifest.Text.AsSpan().IndexOfAny('=', ';') >= 0
+            ? $"sqlsource: the value of option '{ManifestOption}' at position {manifest.Position} holds '=' or ';', "
+                + "which a manifest's path may not"
+            : null;
+    }
+
+    // The mode that a value of --online names, ignoring case, or null when it names none.
+    private static OnlineMode? OnlineModeOf(string text)
+    {
+        if (string.Equals(text, OnlineAuto, StringComparison.OrdinalIgnoreCase))
+        {
+            return OnlineMode.Auto;
+        }
+
+        return string.Equals(text, OnlineTrue, StringComparison.OrdinalIgnoreCase) ? OnlineMode.True : null;
+    }
+
+    // What a value names of the run, which a run from a manifest does not take: the unit, a .sql file, a project or a
+    // database.  Null for the rest.
+    private static string? WhatIsNamedBy(UsageValue value) =>
+        value.Option?.Name switch
+        {
+            null => SqlPath.IsSqlFile(value.Text) ? ".sql path" : "path",
+            ProjectOption => $"'{ProjectOption}'",
+            DatabaseOption => $"'{DatabaseOption}'",
+            _ => null,
+        };
+
+    /// <summary>
+    /// What <c>--online</c> said of a <c>describe</c> that runs: <see cref="OnlineMode.Off" /> when it was not given
+    /// or the command line does not run <c>describe</c>.  <see cref="CheckUsage" /> has held the value to the two
+    /// words.
+    /// </summary>
+    public static OnlineMode OnlineOf(ParseResult parsed) =>
+        Runs(parsed) && parsed.GetValue<string>(OnlineOption) is { } text
+            ? OnlineModeOf(text) ?? throw new InvalidOperationException("An --online that is no mode was let through.")
+            : OnlineMode.Off;
 
     /// <summary>
     /// Whether the command line runs <c>describe</c>: the command is named, and it is its own action that runs
@@ -310,12 +421,20 @@ internal static class DescribeCommand
             && ValuesOf(usage, LogOption)
                 .Select(static value => value.Text)
                 .SequenceEqual(parsed.GetValue<string>(LogOption) is { } log ? [log] : [], StringComparer.Ordinal)
+            && ReadsAsOne(usage, parsed, ManifestOption)
+            && ReadsAsOne(usage, parsed, OnlineOption)
         );
 
     private static bool ReadsAs(Usage usage, ParseResult parsed, string option) =>
         ValuesOf(usage, option)
             .Select(static value => value.Text)
             .SequenceEqual(parsed.GetValue<string[]>(option) ?? [], StringComparer.Ordinal);
+
+    // For an option that takes one value, given once.
+    private static bool ReadsAsOne(Usage usage, ParseResult parsed, string option) =>
+        ValuesOf(usage, option)
+            .Select(static value => value.Text)
+            .SequenceEqual(parsed.GetValue<string>(option) is { } text ? [text] : [], StringComparer.Ordinal);
 
     // The values of an option, in order.
     private static ImmutableArray<UsageValue> ValuesOf(Usage usage, string option) =>
@@ -348,7 +467,8 @@ internal static class DescribeCommand
             ValuesOf(usage, ProjectOption).Length > 0 || !plan.Filters.Files.IsEmpty || !plan.Filters.Databases.IsEmpty,
             connections.ToImmutable(),
             plan.Filters.Databases,
-            Path.GetDirectoryName(unit.Path) ?? throw new InvalidOperationException("A unit is a file in a folder.")
+            Path.GetDirectoryName(unit.Path) ?? throw new InvalidOperationException("A unit is a file in a folder."),
+            OnlineOf(parsed)
         );
     }
 
@@ -387,22 +507,45 @@ internal static class DescribeCommand
         // With file filters and no unit, the unit is found from the working directory, not from the files.
         var paths = ArgumentsOf(usage);
         var unitPath = paths.FirstOrDefault(static path => !SqlPath.IsSqlFile(path.Text));
-        var found = RunUnitFinder.Find(unitPath, host.WorkingDirectory);
-        if (!found.Succeeded)
+        RunUnit unit;
+        ImmutableArray<ProjectManifest> manifests;
+        if (ValuesOf(usage, ManifestOption) is [{ } manifestValue])
         {
-            reporter.Report(found.Failure);
-            return null;
+            // The build has evaluated the project, so MSBuild is not asked again, and the project is the unit.
+            manifests = await RunProjects.FromManifestAsync(
+                Path.GetFullPath(manifestValue.Text, host.WorkingDirectory),
+                host,
+                reporter,
+                cancellationToken
+            );
+            if (manifests.IsEmpty)
+            {
+                return null;
+            }
+
+            unit = new RunUnit(RunUnitKind.Project, manifests[0].ProjectPath);
+            RunEvents.Unit(reporter.Trace, unit, wasGiven: true);
+        }
+        else
+        {
+            var found = RunUnitFinder.Find(unitPath, host.WorkingDirectory);
+            if (!found.Succeeded)
+            {
+                reporter.Report(found.Failure);
+                return null;
+            }
+
+            unit = found.Value;
+            RunEvents.Unit(reporter.Trace, unit, wasGiven: unitPath is not null);
+            manifests = await RunProjects.FindAsync(
+                unit,
+                ValuesOf(usage, ProjectOption),
+                host,
+                reporter,
+                cancellationToken
+            );
         }
 
-        var unit = found.Value;
-        RunEvents.Unit(reporter.Trace, unit, wasGiven: unitPath is not null);
-        var manifests = await RunProjects.FindAsync(
-            unit,
-            ValuesOf(usage, ProjectOption),
-            host,
-            reporter,
-            cancellationToken
-        );
         if (manifests.IsEmpty)
         {
             if (reporter.Count == 0)

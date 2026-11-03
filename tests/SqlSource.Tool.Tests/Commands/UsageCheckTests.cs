@@ -371,6 +371,11 @@ public sealed class UsageCheckTests
             "W",
             "Q.sql",
             "R.SQL",
+            "--manifest",
+            "--manifest=M",
+            "--online",
+            "--online=auto",
+            "auto",
         ];
         var root = Cli.BuildCommands();
         var disagreements = new List<string>();
@@ -443,4 +448,106 @@ public sealed class UsageCheckTests
     [Fact]
     public void CheckUsage_AnotherCommand_GivesNoLine() =>
         DescribeCommand.CheckUsage(UsageCheck.Check(Cli.BuildCommands(), ["--version"])).ShouldBeEmpty();
+
+    [Theory]
+    [InlineData("describe", "--manifest", "m")]
+    [InlineData("describe", "--manifest=m", "--online", "auto")]
+    [InlineData("describe", "--manifest", "m", "--online=AUTO")]
+    [InlineData("describe", "--manifest", "m", "--online", "True")]
+    [InlineData("describe", "--manifest", "m", "--connection", "billing=Host=db", "--verbose", "--force")]
+    [InlineData("describe", "--manifest", "m", "--log", "run.log", "--check")]
+    public void CheckUsage_ManifestRun_GivesNoLine(params string[] args) =>
+        DescribeCommand.CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args)).ShouldBeEmpty();
+
+    [Theory]
+    [InlineData("path", 4, "describe", "--manifest", "m", "App.csproj")]
+    [InlineData(".sql path", 4, "describe", "--manifest", "m", "Q.sql")]
+    [InlineData("'--project'", 5, "describe", "--manifest", "m", "--project", "P")]
+    [InlineData("'--database'", 5, "describe", "--manifest", "m", "--database", "billing")]
+    [InlineData("path", 2, "describe", "App.csproj", "--manifest", "m")]
+    public void CheckUsage_ManifestWithAnythingThatNamesWhatToRun_IsReportedByThePositionOfTheValue(
+        string kind,
+        int position,
+        params string[] args
+    ) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldBe([$"sqlsource: option '--manifest' takes no {kind} (position {position})"]);
+
+    [Fact]
+    public void CheckUsage_ManifestWithSeveralValuesThatNameWhatToRun_GivesALineForEach() =>
+        DescribeCommand
+            .CheckUsage(
+                UsageCheck.Check(
+                    Cli.BuildCommands(),
+                    ["describe", "--manifest", "m", "--project", "P", "Q.sql", "--database", "billing"]
+                )
+            )
+            .ShouldBe([
+                "sqlsource: option '--manifest' takes no '--project' (position 5)",
+                "sqlsource: option '--manifest' takes no .sql path (position 6)",
+                "sqlsource: option '--manifest' takes no '--database' (position 8)",
+            ]);
+
+    [Theory]
+    [InlineData("describe", "--online", "auto")]
+    [InlineData("describe", "--online=true")]
+    public void CheckUsage_OnlineWithoutManifest_NeedsIt(params string[] args) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldBe(["sqlsource: option '--online' needs '--manifest'"]);
+
+    [Theory]
+    [InlineData(5, "describe", "--manifest", "m", "--online", "yes")]
+    [InlineData(5, "describe", "--manifest", "m", "--online", "")]
+    [InlineData(5, "describe", "--manifest", "m", "--online", "false")]
+    [InlineData(4, "describe", "--manifest", "m", "--online=" + Secrets.Word)]
+    public void CheckUsage_OnlineThatIsNeitherAutoNorTrue_IsReportedByItsPositionAndNotItsText(
+        int position,
+        params string[] args
+    ) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldBe([$"sqlsource: the value of option '--online' at position {position} is not 'auto' or 'true'"]);
+
+    [Theory]
+    [InlineData(3, "describe", "--manifest", "")]
+    [InlineData(3, "describe", "--manifest", " ")]
+    public void CheckUsage_ManifestThatIsNoPath_IsReportedByItsPosition(int position, params string[] args) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldBe([$"sqlsource: the value of option '--manifest' at position {position} is not a path"]);
+
+    [Theory]
+    [InlineData(3, "describe", "--manifest", "a=" + Secrets.Word + ".txt")]
+    [InlineData(2, "describe", "--manifest=a;" + Secrets.Word + ".txt")]
+    public void CheckUsage_ManifestPathWithAnEqualsSignOrASemicolon_IsNamedByItsPosition(
+        int position,
+        params string[] args
+    ) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldBe([
+                $"sqlsource: the value of option '--manifest' at position {position} holds '=' or ';', which a "
+                    + "manifest's path may not",
+            ]);
+
+    [Fact]
+    public void ReadsValuesAs_ManifestAndOnlineReadAsOtherValues_IsFalse()
+    {
+        var root = Cli.BuildCommands();
+        var usage = UsageCheck.Check(root, ["describe", "--manifest", "m", "--online", "auto"]);
+
+        DescribeCommand
+            .ReadsValuesAs(usage, root.Parse(["describe", "--manifest", "m", "--online", "auto"]))
+            .ShouldBeTrue();
+        DescribeCommand
+            .ReadsValuesAs(usage, root.Parse(["describe", "--manifest", "other", "--online", "auto"]))
+            .ShouldBeFalse();
+        DescribeCommand
+            .ReadsValuesAs(usage, root.Parse(["describe", "--manifest", "m", "--online", "true"]))
+            .ShouldBeFalse();
+        DescribeCommand.ReadsValuesAs(usage, root.Parse(["describe", "--manifest", "m"])).ShouldBeFalse();
+        DescribeCommand.ReadsValuesAs(usage, root.Parse(["describe", "--online", "auto"])).ShouldBeFalse();
+    }
 }
