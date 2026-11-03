@@ -54,6 +54,23 @@ public sealed class VerboseTests : IDisposable
 
     private static string Line(string text) => "sqlsource: " + text + "\n";
 
+    // A connection from the .env file is said with the variable and the file, and never with its value.
+    [Fact]
+    public async Task Run_VerboseWithAConnectionFromTheDotEnvFile_SaysTheVariableAndTheFile()
+    {
+        _ = _scene.Run.Environment.Remove("SQLSOURCE_CONNECTION_BILLING");
+        var path = _scene.Run.Folder.WriteFile(".env", "SQLSOURCE_CONNECTION_BILLING=Host=from-the-file\n");
+
+        var result = await _scene.DescribeAsync("All.slnx", "--verbose");
+
+        result.ExitCode.ShouldBe(0);
+        result.Out.ShouldContain(
+            Line($"database 'billing' (postgres): connection from SQLSOURCE_CONNECTION_BILLING in {path}")
+        );
+        result.Out.ShouldContain(Line("database 'postgres' (postgres): connection from SQLSOURCE_CONNECTION_POSTGRES"));
+        result.Out.ShouldNotContain("from-the-file");
+    }
+
     [Fact]
     public async Task Run_Verbose_SaysOfEachProjectFileDatabaseQueryAndSidecarWhatItDecided()
     {

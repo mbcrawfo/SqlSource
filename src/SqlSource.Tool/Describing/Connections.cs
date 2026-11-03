@@ -22,10 +22,12 @@ internal sealed class Connections
         ImmutableArray<string> describable,
         ImmutableArray<string> unusedNames,
         ImmutableArray<int> unusedPositions,
-        bool unnamedIsSetAndNotUsed
+        bool unnamedIsSetAndNotUsed,
+        ConnectionEnvironment environment
     )
     {
         _byDatabase = byDatabase;
+        Environment = environment;
         Databases = databases;
         Describable = describable;
         UnusedNames = unusedNames;
@@ -62,14 +64,21 @@ internal sealed class Connections
     /// </summary>
     public bool UnnamedIsSetAndNotUsed { get; }
 
+    /// <summary>
+    /// Where the variables were looked up, which the help of <c>SQLSRC213</c> names: the environment and the run's
+    /// <c>.env</c> file.
+    /// </summary>
+    public ConnectionEnvironment Environment { get; }
+
     /// <summary>The connection of a selected database, by its name in any case.</summary>
     public DatabaseConnection For(string database) => _byDatabase[database];
 
     /// <summary>
     /// Finds the connection of each selected database: the command line's value for its name, ignoring case; else
     /// the variable of its name; else <c>SQLSOURCE_CONNECTION</c>, when it is the one selected database that can be
-    /// described.  A variable that is empty, or holds only white space, is not set: redacting a space would turn
-    /// every space of a describer's text into the mark.
+    /// described.  Each variable is looked up in the environment and then in the run's <c>.env</c> file, by
+    /// <see cref="ConnectionEnvironment.Find" />, so the file's variable of a database's name wins over
+    /// <c>SQLSOURCE_CONNECTION</c> in the environment.
     /// </summary>
     /// <param name="selected">The selected databases, in the plan's order, each once ignoring case.</param>
     /// <param name="describable">
@@ -79,13 +88,13 @@ internal sealed class Connections
     /// Every database of the plan, selected or not: the names that <c>--connection</c> may be close to.
     /// </param>
     /// <param name="given">The values of <c>--connection</c>, each name once ignoring case.</param>
-    /// <param name="getEnvironmentVariable">The host's.</param>
+    /// <param name="environment">The environment and the <c>.env</c> file of the run.</param>
     public static Connections Resolve(
         IReadOnlyList<string> selected,
         IReadOnlyList<string> describable,
         IReadOnlyList<string> planned,
         IReadOnlyList<ConnectionArgument> given,
-        Func<string, string?> getEnvironmentVariable
+        ConnectionEnvironment environment
     )
     {
         var onCommandLine = new Dictionary<string, string>(DatabaseName.Comparer);
@@ -94,7 +103,7 @@ internal sealed class Connections
             onCommandLine[argument.Name] = argument.Value;
         }
 
-        var unnamed = NullIfBlank(getEnvironmentVariable(ConnectionVariables.Unnamed));
+        var unnamed = environment.Find(ConnectionVariables.Unnamed);
         var variables = selected.Select(ConnectionVariables.For).ToArray();
         var byDatabase = new Dictionary<string, DatabaseConnection>(DatabaseName.Comparer);
         for (var index = 0; index < selected.Count; index++)
@@ -109,13 +118,13 @@ internal sealed class Connections
             {
                 byDatabase[name] = new DatabaseConnection(name, variable, value, CommandLineSource, null);
             }
-            else if (NullIfBlank(getEnvironmentVariable(variable)) is { } ofName)
+            else if (environment.Find(variable) is { } ofName)
             {
-                byDatabase[name] = new DatabaseConnection(name, variable, ofName, variable, null);
+                byDatabase[name] = new DatabaseConnection(name, variable, ofName.Value, ofName.Source, null);
             }
-            else if (unnamed is not null && IsTheOnly(describable, name))
+            else if (unnamed is { } ofNone && IsTheOnly(describable, name))
             {
-                byDatabase[name] = new DatabaseConnection(name, variable, unnamed, ConnectionVariables.Unnamed, null);
+                byDatabase[name] = new DatabaseConnection(name, variable, ofNone.Value, ofNone.Source, null);
             }
             else
             {
@@ -131,7 +140,8 @@ internal sealed class Connections
             [.. describable],
             [.. byNearness[true].Select(static argument => argument.Name)],
             [.. byNearness[false].Select(static argument => argument.Position)],
-            unnamed is not null && describable.Count > 1
+            unnamed is not null && describable.Count > 1,
+            environment
         );
     }
 
@@ -163,6 +173,4 @@ internal sealed class Connections
 
         return null;
     }
-
-    private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 }

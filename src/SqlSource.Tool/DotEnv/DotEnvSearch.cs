@@ -21,7 +21,8 @@ namespace SqlSource.Tool.DotEnv;
 /// </remarks>
 internal static class DotEnvSearch
 {
-    private const string FileName = ".env";
+    /// <summary>The name of the file.</summary>
+    public const string FileName = ".env";
 
     private const string RepositoryMarker = ".git";
 

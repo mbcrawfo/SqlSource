@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.CommandLine;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -155,11 +156,11 @@ internal static class DescribeCommand
             async (command, cancellationToken) =>
             {
                 // An error is in the reporter, where the exit code is taken.
-                if (await PlanAsync(usage, host, reporter, cancellationToken) is { } plan)
+                if (await PlanUnitAsync(usage, host, reporter, cancellationToken) is { } planned)
                 {
                     await DescribeRun.RunAsync(
-                        plan,
-                        OptionsOf(command, usage, plan),
+                        planned.Plan,
+                        OptionsOf(command, usage, planned.Unit, planned.Plan),
                         host,
                         reporter,
                         counted,
@@ -327,7 +328,7 @@ internal static class DescribeCommand
     // What the command line says of the run, beside its plan.  CheckUsage has held each --connection to its form.
     // The plan's filters hold --database and the .sql paths, and not --project.  A .sql path that names no file still
     // counts as a filter, so that such a run deletes no sidecar.
-    private static DescribeOptions OptionsOf(ParseResult parsed, Usage usage, RunPlan plan)
+    private static DescribeOptions OptionsOf(ParseResult parsed, Usage usage, RunUnit unit, RunPlan plan)
     {
         var connections = ImmutableArray.CreateBuilder<ConnectionArgument>();
         foreach (var value in ValuesOf(usage, ConnectionOption))
@@ -346,7 +347,8 @@ internal static class DescribeCommand
             ModeOf(parsed),
             ValuesOf(usage, ProjectOption).Length > 0 || !plan.Filters.Files.IsEmpty || !plan.Filters.Databases.IsEmpty,
             connections.ToImmutable(),
-            plan.Filters.Databases
+            plan.Filters.Databases,
+            Path.GetDirectoryName(unit.Path) ?? throw new InvalidOperationException("A unit is a file in a folder.")
         );
     }
 
@@ -368,6 +370,14 @@ internal static class DescribeCommand
     /// reads the plan from here, and the run goes on from it.
     /// </remarks>
     internal static async Task<RunPlan?> PlanAsync(
+        Usage usage,
+        ToolHost host,
+        Reporter reporter,
+        CancellationToken cancellationToken
+    ) => (await PlanUnitAsync(usage, host, reporter, cancellationToken))?.Plan;
+
+    // The plan, with the unit it was built for, whose folder is where the run's .env is searched for.
+    private static async Task<(RunUnit Unit, RunPlan Plan)?> PlanUnitAsync(
         Usage usage,
         ToolHost host,
         Reporter reporter,
@@ -425,6 +435,6 @@ internal static class DescribeCommand
             reporter.Report(error);
         }
 
-        return result.Plan;
+        return (unit, result.Plan);
     }
 }

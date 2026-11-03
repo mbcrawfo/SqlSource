@@ -67,6 +67,10 @@ internal sealed class CliRun : IDisposable
     // that fails.
     public Func<string, Stream>? CreateFile { get; set; }
 
+    // Reads the text files the tool reads, as a ".env".  The host's own unless a test brings one, for a file that
+    // cannot be read.
+    public Func<string, string?>? ReadTextFile { get; set; }
+
     // Set to stand in for standard output, for a test of a writer that fails.
     public TextWriter? Out { get; set; }
 
@@ -112,12 +116,12 @@ internal sealed class CliRun : IDisposable
 
     private static StringWriter NewWriter() => new(CultureInfo.InvariantCulture) { NewLine = "\n" };
 
-    private ToolHost CreateHost(TextWriter output, TextWriter error) =>
-        (
-            _realWorkingDirectory is null
-                ? Hosts.Create(Folder.Path, Processes, Folder.CreateFolder("tmp"), environment: Environment)
-                : Hosts.Real(_realWorkingDirectory, Folder.CreateFolder("tmp"))
-        ) with
+    private ToolHost CreateHost(TextWriter output, TextWriter error)
+    {
+        var host = _realWorkingDirectory is null
+            ? Hosts.Create(Folder.Path, Processes, Folder.CreateFolder("tmp"), environment: Environment)
+            : Hosts.Real(_realWorkingDirectory, Folder.CreateFolder("tmp"));
+        return host with
         {
             Out = Out ?? output,
             Error = error,
@@ -125,5 +129,7 @@ internal sealed class CliRun : IDisposable
             Exchange = _ => Exchange,
             Time = Time,
             CreateFile = CreateFile ?? ToolHost.NewFile,
+            ReadTextFile = ReadTextFile ?? host.ReadTextFile,
         };
+    }
 }
