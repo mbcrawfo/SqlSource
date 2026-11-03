@@ -69,11 +69,12 @@ internal sealed class WatchSession
     private readonly Reporter _session;
     private readonly Action<LogValue> _counted;
 
-    // The changes that came since the last pass began, and what they ask, and those that came during the evaluation
-    // under way, null when there is none, which are read when it ends.  Guarded by _gate, as _set is.
+    // The changes that came since the last pass began, and what they ask, those that came during the evaluation under
+    // way, null when there is none, which are read when it ends, and the failures that the loop has not reported yet.
+    // Guarded by _gate, as _set is.
     private readonly object _gate = new();
     private readonly HashSet<string> _gone = [with(RunProjects.PathComparer)];
-    private readonly HashSet<(string Folder, string Message)> _reported = [];
+    private readonly List<WatchFailure> _failures = [];
     private int _changes;
     private WatchEffect _effect;
     private long _lastChange;
@@ -82,11 +83,13 @@ internal sealed class WatchSession
     private List<(FileChange Change, long At)>? _duringEvaluation;
 
     // Read and written by the loop alone: the watch of each folder, by its path, with a null watch for one that could
-    // not start, which is not tried again while the folder stays in the set.
+    // not start, which is not tried again while the folder stays in the set; and the failures reported, by folder and
+    // message.
     private readonly Dictionary<string, (bool Recursive, IDisposable? Watch)> _watches =
     [
         with(RunProjects.PathComparer),
     ];
+    private readonly HashSet<(string Folder, string Message)> _reported = [];
     private ImmutableArray<ProjectManifest> _manifests = [];
     private bool _evaluationFailed = true;
     private int _pass;
@@ -141,6 +144,7 @@ internal sealed class WatchSession
         // Before the first pass reads a file, so that a change made during it makes one more pass.
         Watch(_set);
         await PassAsync(0, evaluate: true, firstMode, cancellationToken);
+        ReportFailures();
         while (!cancellationToken.IsCancellationRequested)
         {
             // The wait begins before the marker, so that whoever reads the marker sees the wait for a change that came
@@ -149,12 +153,14 @@ internal sealed class WatchSession
             await _host.Out.WriteLineAsync(WatchingMarker);
             var changes = await next;
 
+            ReportFailures();
             await _host.Out.WriteLineAsync(ChangeDetectedMarker);
             var evaluate =
                 changes.Effect == WatchEffect.Evaluate
                 || _evaluationFailed
                 || changes.Gone.Any(static path => !File.Exists(path));
             await PassAsync(changes.Count, evaluate, RunMode.Describe, cancellationToken);
+            ReportFailures();
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -363,18 +369,33 @@ internal sealed class WatchSession
 
     // What a watch tells of its failure, a lost batch of events included, and what a watch that cannot start is: the
     // folder may have changed unseen, so the next pass evaluates.  A lost batch of events is not reported.  Any other
-    // failure is, once for each folder and message of the session, since a limit of the system raises the same error
-    // again and again.
+    // failure is kept for the loop to report, so that it is not written in the middle of a pass's output.
     private void Failed(WatchFailure failure)
     {
-        bool report;
         lock (_gate)
         {
             Keep(WatchEffect.Evaluate, _host.Time.GetTimestamp());
-            report = !failure.Overflow && _reported.Add((failure.Folder, failure.Message));
+            if (!failure.Overflow)
+            {
+                _failures.Add(failure);
+            }
+        }
+    }
+
+    // Reports the failures kept since the last call, after the pass during which they came, or before the next pass
+    // when none ran: each once for each folder and message of the session, since a limit of the system raises the same
+    // error again and again.
+    private void ReportFailures()
+    {
+        WatchFailure[] failures;
+        lock (_gate)
+        {
+            failures = [.. _failures];
+            _failures.Clear();
         }
 
-        if (report)
+        // Where adds each to what was reported as it goes, so a failure twice in one batch is reported once.
+        foreach (var failure in failures.Where(failure => _reported.Add((failure.Folder, failure.Message))))
         {
             _session.Report(
                 ToolDiagnostic

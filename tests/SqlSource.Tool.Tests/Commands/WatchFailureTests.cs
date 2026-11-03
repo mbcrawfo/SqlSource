@@ -3,6 +3,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Testing;
+using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
 
@@ -36,6 +38,8 @@ public sealed class WatchFailureTests : IAsyncDisposable
         _watch.Watcher.Fail(new WatchFailure(Folder, Overflow: false, InotifyLimit));
         _watch.Watcher.Fail(new WatchFailure(Folder, Overflow: false, InotifyLimit));
         await _watch.TimerAsync();
+        // Written by the session's loop, before the pass it starts, and not on the watch's thread.
+        _watch.Errors.ShouldBeEmpty();
         _watch.Clock.Advance(WatchSession.Debounce);
         await _watch.PassesAsync(passes + 1);
 
@@ -54,11 +58,79 @@ public sealed class WatchFailureTests : IAsyncDisposable
     {
         await _watch.StartAsync();
 
+        var passes = _watch.Count(WatchSession.WatchingMarker);
+
         _watch.Watcher.Fail(new WatchFailure(Folder, Overflow: false, "one"));
         _watch.Watcher.Fail(new WatchFailure(Folder, Overflow: false, "two"));
+        await _watch.TimerAsync();
+        _watch.Clock.Advance(WatchSession.Debounce);
+        await _watch.PassesAsync(passes + 1);
 
         _watch.Errors.Split('\n').Count(line => line.Contains("error SQLSRC287", StringComparison.Ordinal)).ShouldBe(2);
         _ = await _watch.StopAsync();
+    }
+
+    // A failure that comes while a pass runs, the first or a later one, is written after that pass's output, and not in
+    // the middle of it.  Every pass reports the query, which the server rejects.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Watch_WatcherErrorDuringAPass_IsWrittenAfterThePassesOutput(bool first)
+    {
+        _watch.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
+        var arrived = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var released = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task Hold(DescribeRequest request)
+        {
+            _ = arrived.TrySetResult(true);
+            return released.Task;
+        }
+
+        if (first)
+        {
+            _watch.Describer.BeforeDescribe = Hold;
+            _ = _watch.Begin();
+        }
+        else
+        {
+            await _watch.StartAsync();
+            _watch.Describer.BeforeDescribe = Hold;
+            _watch.Raise(WatchTests.Changed(_watch.Project.PathOf("Users.sql")));
+            await _watch.TimerAsync();
+            _watch.Clock.Advance(WatchSession.Debounce);
+        }
+
+        _ = await Eventually.WithinAsync(arrived.Task, "The pass did not describe.");
+        _watch.Watcher.Fail(new WatchFailure(Folder, Overflow: false, InotifyLimit));
+        var beforeTheEnd = _watch.Errors;
+        released.SetResult();
+        await _watch.PassesAsync(first ? 1 : 2);
+
+        beforeTheEnd.ShouldNotContain("SQLSRC287");
+        var errors = _watch.Errors;
+        errors
+            .IndexOf("error SQLSRC287", StringComparison.Ordinal)
+            .ShouldBeGreaterThan(errors.LastIndexOf("'GetUser'", StringComparison.Ordinal), errors);
+        (await _watch.StopAsync()).ExitCode.ShouldBe(0);
+    }
+
+    // A failure that comes while the watch waits is written before the output of the pass it starts.
+    [Fact]
+    public async Task Watch_WatcherErrorWhileWaiting_IsWrittenBeforeTheNextPassesOutput()
+    {
+        _watch.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
+        await _watch.StartAsync();
+
+        _watch.Watcher.Fail(new WatchFailure(Folder, Overflow: false, InotifyLimit));
+        await _watch.TimerAsync();
+        _watch.Clock.Advance(WatchSession.Debounce);
+        await _watch.PassesAsync(2);
+
+        var errors = _watch.Errors;
+        var failure = errors.IndexOf("error SQLSRC287", StringComparison.Ordinal);
+        failure.ShouldBeGreaterThan(errors.IndexOf("'GetUser'", StringComparison.Ordinal), errors);
+        failure.ShouldBeLessThan(errors.LastIndexOf("'GetUser'", StringComparison.Ordinal), errors);
+        (await _watch.StopAsync()).ExitCode.ShouldBe(0);
     }
 
     [Fact]
