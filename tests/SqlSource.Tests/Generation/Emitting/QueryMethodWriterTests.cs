@@ -1336,6 +1336,9 @@ public sealed class QueryMethodWriterTests
     {
         var text = WriteWith(Stream, ExecutionCapabilities.DrainsLaterResults);
 
+        text.ShouldNotContain("TransactionRolledBackException");
+        text.ShouldNotContain(CompletedTransactionDocumentation);
+
         text.ShouldContain("                yield return new global::App.GetUserDto(");
         text.ShouldContain(");\n            }\n\n" + Drain("            ") + "        }\n        finally\n");
         text.ShouldNotContain("atRow");
@@ -1349,6 +1352,9 @@ public sealed class QueryMethodWriterTests
     public void Append_StreamsCheckingRollbackAlone_CatchesAroundEachRowWithoutTrackingIt()
     {
         var text = WriteWith(Stream, ExecutionCapabilities.ChecksRollbackAtRead);
+
+        text.ShouldContain("/// <exception cref=\"T:SqlSource.TransactionRolledBackException\">");
+        text.ShouldNotContain(CompletedTransactionDocumentation);
 
         text.ShouldContain(
             "                global::App.GetUserDto row;\n"
@@ -1369,6 +1375,9 @@ public sealed class QueryMethodWriterTests
     {
         var text = WriteWith(Stream, ExecutionCapabilities.DrainsWhenLeftAtARow);
 
+        text.ShouldNotContain("TransactionRolledBackException");
+        text.ShouldNotContain(CompletedTransactionDocumentation);
+
         text.ShouldContain(
             "                    global::App.GetUserDto row;\n"
                 + "                    row = new global::App.GetUserDto("
@@ -1388,6 +1397,19 @@ public sealed class QueryMethodWriterTests
         text.ShouldNotContain("catch (");
         text.ShouldNotContain("NextResultAsync(cancellationToken)");
         ShouldBalanceItsBraces(text);
+    }
+
+    // An engine that refuses a completed transaction alone refuses it, and documents that exception and no other of
+    // the capabilities'.
+    [Fact]
+    public void Append_RefusingCompletedTransactionAlone_DocumentsOnlyThatException()
+    {
+        var text = WriteWith(GetUser, ExecutionCapabilities.RefusesCompletedTransaction);
+
+        text.ShouldContain(CompletedTransactionDocumentation);
+        text.ShouldContain("if (transaction is not null && transaction.Connection is null)\n");
+        text.ShouldNotContain("TransactionRolledBackException");
+        text.ShouldNotContain("NextResultAsync");
     }
 
     // The writer given every flag writes what SQL Server's capabilities write.
