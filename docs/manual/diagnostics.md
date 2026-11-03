@@ -2918,4 +2918,6 @@ sqlsource describe /work/App --watch
 
 On Linux, raise the limit with `sudo sysctl fs.inotify.max_user_watches=524288`, and add `fs.inotify.max_user_watches=524288` to `/etc/sysctl.conf` to keep it.  Or set the environment variable `DOTNET_USE_POLLING_FILE_WATCHER` to `true` or `1` before you start the watch: it then looks at the folders at a fixed interval instead of asking the system, which needs no limit and finds a change within a second or two.  Polling is also the way to watch a folder on a network share or in a container that does not pass on file changes.
 
+A watch that polls, with `DOTNET_USE_POLLING_FILE_WATCHER` set, reports this error when it cannot list a folder, such as one that was deleted or that you may not read, and then gives no help line.  It says so once while the folder stays that way, and sees the folder's changes again as soon as it can list it.
+
 See: [Describe on save](tool.md#describe-on-save)

@@ -394,13 +394,14 @@ internal sealed class WatchSession
             _failures.Clear();
         }
 
+        // A watch that polls already does what the help line says.
+        ContinuationLine[] help = PollsForChanges() ? [] : [PollInstead];
+
         // Where adds each to what was reported as it goes, so a failure twice in one batch is reported once.
         foreach (var failure in failures.Where(failure => _reported.Add((failure.Folder, failure.Message))))
         {
             _session.Report(
-                ToolDiagnostic
-                    .ForFile(ToolDiagnostics.WatchFailed, failure.Folder, failure.Message)
-                    .WithLines(PollInstead)
+                ToolDiagnostic.ForFile(ToolDiagnostics.WatchFailed, failure.Folder, failure.Message).WithLines(help)
             );
         }
     }

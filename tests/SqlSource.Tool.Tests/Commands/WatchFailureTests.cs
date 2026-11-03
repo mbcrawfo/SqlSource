@@ -53,6 +53,29 @@ public sealed class WatchFailureTests : IAsyncDisposable
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
     }
 
+    // A watch that polls already does what the help line says, so a folder it cannot list is reported without it.
+    [Theory]
+    [InlineData("true")]
+    [InlineData("1")]
+    public async Task Watch_WatcherErrorWhilePolling_HasNoHelpLine(string polling)
+    {
+        _watch.Run.Environment[WatchSession.PollingVariable] = polling;
+        await _watch.StartAsync();
+        var passes = _watch.Count(WatchSession.WatchingMarker);
+        var message = $"Could not find a part of the path '{Folder}'.";
+
+        _watch.Watcher.Fail(new WatchFailure(Folder, Overflow: false, message));
+        await _watch.TimerAsync();
+        _watch.Clock.Advance(WatchSession.Debounce);
+        await _watch.PassesAsync(passes + 1);
+
+        _watch.Errors.ShouldBe(
+            $"{Folder} : error SQLSRC287: watching '{Folder}' for changes failed: {message}\n"
+                + "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc287\n"
+        );
+        (await _watch.StopAsync()).ExitCode.ShouldBe(0);
+    }
+
     [Fact]
     public async Task Watch_WatcherErrorWithANewMessage_IsReportedAgain()
     {
