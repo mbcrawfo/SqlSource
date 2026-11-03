@@ -217,18 +217,13 @@ internal static class AttributeReader
     private static LinePosition StartOf(SyntaxNode node) => node.GetLocation().GetLineSpan().StartLinePosition;
 
     // Where the type's name is written, when it holds a character outside ASCII, and null otherwise.  A character that
-    // is not UTF-8 reads as U+FFFD, which ends the identifier or comes before it, so the name is the identifier and the
-    // characters on either side of it that can be part of one.
+    // is not UTF-8 reads as U+FFFD, which ends the identifier, or, at the name's start, leaves a missing identifier at
+    // its own position, so the name is the characters from the identifier's start that can be part of one.
     private static LinePosition? WrittenNameOf(TypeDeclarationSyntax declaration)
     {
         var text = declaration.SyntaxTree.GetText();
         var identifier = declaration.Identifier;
         var start = identifier.SpanStart;
-        while (start > 0 && IsInName(text[start - 1]))
-        {
-            start--;
-        }
-
         var end = identifier.Span.End;
         while (end < text.Length && IsInName(text[end]))
         {

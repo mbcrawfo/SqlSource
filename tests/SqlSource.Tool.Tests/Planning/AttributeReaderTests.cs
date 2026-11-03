@@ -276,6 +276,15 @@ public sealed class AttributeReaderTests : IDisposable
         claims.Claims.ShouldHaveSingleItem().Source.ShouldBe("Requêtes");
     }
 
+    [Fact]
+    public void Read_NameOutsideAsciiInUtf8_IsAClaimWithThatName()
+    {
+        var claims = Read("using SqlSource;\n\n[SqlSourceGenerate]\ninternal partial class Café;\n");
+
+        claims.Errors.ShouldBeEmpty();
+        claims.Claims.ShouldHaveSingleItem().TypeName.ShouldBe("Café");
+    }
+
     [Theory]
     [InlineData("GeneratorOutput.Sql", "Sql")]
     [InlineData("GeneratorOutput.Models", "Models")]
