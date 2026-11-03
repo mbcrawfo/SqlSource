@@ -210,9 +210,7 @@ internal static class MethodPlanner
             );
         }
 
-        // A query that gets no method takes no name, so it is compared with the other methods' only once it has one.
-        // Its models are read whatever its other problems, so that it gets every problem of its converters too.
-        var planned = new Planned(problems, name, query.Name, query.NameLocation, null, false, []);
+        // The query's models are read whatever its other problems, so that it gets every problem of its converters too.
         // A query whose driver is missing gets no method, which SQLSRC273 says, so its converters are not decided.
         var isUsable = input.Drivers.Allows(engine);
         var reading = new Reading(
@@ -230,9 +228,10 @@ internal static class MethodPlanner
         var hasOutput = TryReadOutput(context, models, reading, out var methodOutput);
         // SQLSRC282, for the project, says why a query that uses a library below its floor has no method.
         var isBelowTheFloor = AddUsedLibraries(input, engine, models, methodInput, methodOutput, ref usedLibraries);
+        // A query that gets no method takes no name, so it is compared with the other methods' only once it has one.
         if (problems.Count > 0 || !hasInput || !hasOutput || isBelowTheFloor)
         {
-            return planned;
+            return new Planned(problems, query.Name, query.NameLocation, [], false, []);
         }
 
         var method = new QueryMethod(
@@ -249,12 +248,14 @@ internal static class MethodPlanner
             methodOutput,
             query.NameLocation
         );
-        return planned with
-        {
-            Method = method,
-            IsDriverUsable = isUsable,
-            WarningIds = WarningIdsOf(models, methodInput, methodOutput),
-        };
+        return new Planned(
+            problems,
+            query.Name,
+            query.NameLocation,
+            [method],
+            isUsable,
+            WarningIdsOf(models, methodInput, methodOutput)
+        );
     }
 
     // SQLSRC281 for each entry that turns a library on for the query whose assemblies the project does not reference
@@ -629,9 +630,9 @@ internal static class MethodPlanner
             .Split(',')
             .Any(parameter => string.Equals(parameter.Trim().TrimStart('@'), name, StringComparison.Ordinal));
 
-    // The planned queries in order: the problems of each, then SQLSRC274 at each of two or more methods of one name,
-    // and the rest of the methods when their driver allows them, with the ids of their warnings and the libraries
-    // whose conversions they call.
+    // The planned queries in order: the problems of each, then, for each of its methods in order, SQLSRC274 at each of
+    // two or more methods of one name among every query's, and the rest of the methods when their driver allows them,
+    // with the ids of their warnings and the libraries whose conversions they call.
     private static void AddPlanned(
         List<Planned> planned,
         ImmutableArray<QueryMethod>.Builder methods,
@@ -641,38 +642,46 @@ internal static class MethodPlanner
     )
     {
         var byName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
-        foreach (var plan in planned.Where(static plan => plan.Method is not null))
+        foreach (var plan in planned)
         {
-            if (!byName.TryGetValue(plan.Name, out var queries))
+            // An index, not a Select of the names, which would allocate for each query.
+            for (var index = 0; index < plan.Methods.Length; index++)
             {
-                queries = [];
-                byName.Add(plan.Name, queries);
-            }
+                var name = plan.Methods[index].Name;
+                if (!byName.TryGetValue(name, out var queries))
+                {
+                    queries = [];
+                    byName.Add(name, queries);
+                }
 
-            queries.Add(plan.QueryName);
+                queries.Add(plan.QueryName);
+            }
         }
 
         foreach (var plan in planned)
         {
             diagnostics.AddRange(plan.Problems);
-            if (plan.Method is not null && byName[plan.Name] is { Count: > 1 } queries)
+            foreach (var method in plan.Methods)
             {
-                var other = queries[0] == plan.QueryName ? queries[1] : queries[0];
-                diagnostics.Add(
-                    DiagnosticInfo.Create(
-                        SqlDiagnostics.MethodNameTaken,
-                        plan.NameLocation,
-                        plan.QueryName,
-                        plan.Name,
-                        "the method of the query '" + other + "' has that name too"
-                    )
-                );
-            }
-            else if (plan is { Method: { } method, IsDriverUsable: true })
-            {
-                methods.Add(method);
-                warningIds.UnionWith(plan.WarningIds);
-                AddConversionLibraries(method, ref conversionLibraries);
+                if (byName[method.Name] is { Count: > 1 } queries)
+                {
+                    var other = queries[0] == plan.QueryName ? queries[1] : queries[0];
+                    diagnostics.Add(
+                        DiagnosticInfo.Create(
+                            SqlDiagnostics.MethodNameTaken,
+                            plan.NameLocation,
+                            plan.QueryName,
+                            method.Name,
+                            "the method of the query '" + other + "' has that name too"
+                        )
+                    );
+                }
+                else if (plan.IsDriverUsable)
+                {
+                    methods.Add(method);
+                    warningIds.UnionWith(plan.WarningIds);
+                    AddConversionLibraries(method, ref conversionLibraries);
+                }
             }
         }
     }
@@ -800,14 +809,13 @@ internal static class MethodPlanner
         }
     }
 
-    // One query's problems, the name its method would have, and its method, with whether its driver allows it and the
-    // ids of the warnings it gives, when it has no problem and its models were read.
+    // One query's problems and its methods, one today or none when it cannot have one, with whether its driver allows
+    // them and the ids of the warnings they give.
     private sealed record Planned(
         List<DiagnosticInfo> Problems,
-        string Name,
         string QueryName,
         LocationInfo NameLocation,
-        QueryMethod? Method,
+        ImmutableArray<QueryMethod> Methods,
         bool IsDriverUsable,
         List<string> WarningIds
     );

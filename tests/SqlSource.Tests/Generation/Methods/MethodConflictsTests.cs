@@ -38,8 +38,8 @@ public sealed class MethodConflictsTests
         var conflicts = Find([first, second]);
 
         conflicts.Dropped.ShouldBe([
-            new DroppedMethod("App.First.Queries", first.NameLocation),
-            new DroppedMethod("App.Second.Queries", second.NameLocation),
+            new DroppedMethod("App.First.Queries", "Get"),
+            new DroppedMethod("App.Second.Queries", "Get"),
         ]);
         conflicts.BlockedTypes.ShouldBeEmpty();
         Texts(conflicts)
@@ -61,10 +61,7 @@ public sealed class MethodConflictsTests
 
         var conflicts = Find([first, second]);
 
-        conflicts.Dropped.ShouldBe([
-            new DroppedMethod("App.First", first.NameLocation),
-            new DroppedMethod("App.Second", second.NameLocation),
-        ]);
+        conflicts.Dropped.ShouldBe([new DroppedMethod("App.First", "Get"), new DroppedMethod("App.Second", "Get")]);
         Texts(conflicts)
             .ShouldBe([
                 "SQLSRC274 a.sql: The method of the query 'Get' cannot be named 'Get', because the method of the "
@@ -206,9 +203,24 @@ public sealed class MethodConflictsTests
 
         var conflicts = Find([first, second, third]);
 
-        conflicts.DroppedOf("App.First").ShouldBe([first.NameLocation]);
-        conflicts.DroppedOf("App.Second").ShouldBe([second.NameLocation]);
+        conflicts.DroppedOf("App.First").ShouldBe(["Get"]);
+        conflicts.DroppedOf("App.Second").ShouldBe(["Get"]);
         conflicts.DroppedOf("Other.Third").ShouldBeEmpty();
+    }
+
+    // Two methods of one type share their query's place, as a query that gives two methods would: the one that clashes
+    // is dropped by its name, and the other is kept.
+    [Fact]
+    public void DroppedOf_TwoMethodsOfOnePlaceOneClashing_DropsOnlyTheClashingName()
+    {
+        var get = Signature("App.First", "FirstExtensions", "Get");
+        var list = Signature("App.First", "FirstExtensions", "List") with { NameLocation = get.NameLocation };
+        var other = Signature("App.Second", "FirstExtensions", "Get", path: "b.sql");
+
+        var conflicts = Find([get, list, other]);
+
+        conflicts.DroppedOf("App.First").ShouldBe(["Get"]);
+        conflicts.Dropped.ShouldBe([new DroppedMethod("App.First", "Get"), new DroppedMethod("App.Second", "Get")]);
     }
 
     // Each of three methods of one class is dropped, and each names the first of the others.
