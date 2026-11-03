@@ -44,6 +44,21 @@ public sealed class WatchChangeTests : IAsyncDisposable
     public async Task Watch_ProjectFileChanged_RunsTheManifestTarget() =>
         (await EvaluatesAsync(Changed(_watch.Project.ProjectPath))).ShouldBeTrue();
 
+    // A batch asks as much as the largest of its changes, not as the last: a project file saved, then a .sql file,
+    // within one debounce.
+    [Fact]
+    public async Task Watch_ProjectFileThenSqlFileInOneBatch_RunsTheManifestTarget()
+    {
+        await _watch.StartAsync("--log", "run.log");
+        var manifestRuns = _watch.ManifestRuns;
+
+        await _watch.ChangeAsync(Changed(_watch.Project.ProjectPath), Changed(_users));
+
+        _watch.ManifestRuns.ShouldBe(manifestRuns + 1);
+        (await _watch.StopAsync()).ExitCode.ShouldBe(0);
+        WatchTests.PassStarts(_watch.Run.Folder.PathOf("run.log")).ShouldBe([(1, 0, true), (2, 2, true)]);
+    }
+
     [Fact]
     public async Task Watch_ProjectAssetsWritten_RunsTheManifestTarget() =>
         (await EvaluatesAsync(Created(_watch.Project.PathOf("obj/project.assets.json")))).ShouldBeTrue();
