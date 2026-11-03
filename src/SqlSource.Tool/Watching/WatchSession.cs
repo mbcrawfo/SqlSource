@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.CommandLine;
@@ -50,6 +51,11 @@ internal sealed class WatchSession
 
     /// <summary>The environment variable that makes the session poll its folders instead of watching them.</summary>
     internal const string PollingVariable = "DOTNET_USE_POLLING_FILE_WATCHER";
+
+    // The digits of the Guid that ends the name of an evaluation's folder, as Guid.ToString("N") writes them.
+    private const int ManifestFolderIdLength = 32;
+
+    private static readonly SearchValues<char> HexDigits = SearchValues.Create("0123456789abcdef");
 
     private static readonly ContinuationLine PollInstead = new(
         "help",
@@ -292,12 +298,12 @@ internal sealed class WatchSession
         }
     }
 
-    // What a watch tells of a change: kept, with what it asks, when it asks something.  One of the tool's own
-    // temporary folder, where an evaluation writes the manifests, is dropped.  One that comes during an evaluation is
+    // What a watch tells of a change: kept, with what it asks, when it asks something.  One in a folder where an
+    // evaluation writes its manifests is the tool's own, and dropped.  One that comes during an evaluation is
     // kept as it came until the evaluation ends.
     private void Changed(FileChange change)
     {
-        if (IsTemporary(change.Path) && (change.OldPath is null || IsTemporary(change.OldPath)))
+        if (IsManifestFolder(change.Path) && (change.OldPath is null || IsManifestFolder(change.OldPath)))
         {
             return;
         }
@@ -337,14 +343,23 @@ internal sealed class WatchSession
         Keep(effect, at);
     }
 
-    // True for a path below the tool's own temporary folder.
-    private bool IsTemporary(string path) =>
-        path.StartsWith(
-            Path.EndsInDirectorySeparator(_host.TempDirectory)
-                ? _host.TempDirectory
-                : _host.TempDirectory + Path.DirectorySeparatorChar,
-            StringComparison.OrdinalIgnoreCase
-        );
+    // True for a folder that an evaluation makes in ToolHost.TempDirectory, <prefix><32 digits of a Guid>, and for a
+    // path below it.  Not for anything else of that folder, which may hold a user's project, as /tmp does.
+    private bool IsManifestFolder(string path)
+    {
+        var temporary = Path.TrimEndingDirectorySeparator(_host.TempDirectory) + Path.DirectorySeparatorChar;
+        if (!path.StartsWith(temporary, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var name = path.AsSpan(temporary.Length);
+        var end = name.IndexOfAny(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        name = end < 0 ? name : name[..end];
+        return name.Length == ProjectEvaluator.ManifestFolderPrefix.Length + ManifestFolderIdLength
+            && name.StartsWith(ProjectEvaluator.ManifestFolderPrefix, StringComparison.Ordinal)
+            && name[ProjectEvaluator.ManifestFolderPrefix.Length..].IndexOfAnyExcept(HexDigits) < 0;
+    }
 
     // What a watch tells of its failure, a lost batch of events included, and what a watch that cannot start is: the
     // folder may have changed unseen, so the next pass evaluates.  A lost batch of events is not reported.  Any other

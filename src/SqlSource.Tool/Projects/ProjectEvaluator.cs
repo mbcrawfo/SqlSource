@@ -38,6 +38,12 @@ internal static class ProjectEvaluator
     /// <summary>How many lines of MSBuild's output an error shows.</summary>
     public const int MaxOutputLines = 20;
 
+    /// <summary>
+    /// The start of the name of the folder that an evaluation makes in <see cref="ToolHost.TempDirectory" /> for its
+    /// manifests, which a <see cref="Guid" /> of 32 digits ends.  A watch knows its writes there by it.
+    /// </summary>
+    public const string ManifestFolderPrefix = "sqlsource-";
+
     /// <summary>The name of the target of the package that writes the manifest.</summary>
     public const string ManifestTarget = "SqlSourceWriteManifest";
 
@@ -86,7 +92,7 @@ internal static class ProjectEvaluator
 
         // A folder of this run's own, for the manifests: nothing is written into a project.
         var folder = Directory
-            .CreateDirectory(Path.Combine(host.TempDirectory, "sqlsource-" + Guid.NewGuid().ToString("N")))
+            .CreateDirectory(Path.Combine(host.TempDirectory, ManifestFolderPrefix + Guid.NewGuid().ToString("N")))
             .FullName;
         try
         {

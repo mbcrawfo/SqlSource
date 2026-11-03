@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Testing;
+using SqlSource.Tool.Projects;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Watching;
 using Xunit;
@@ -30,6 +31,10 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
     private static FileChange Created(string path) => WatchTests.Created(path);
 
     private static string NewSql => "-- name: GetNew\nSELECT 5;\n";
+
+    // A folder that an evaluation makes in the run's temporary folder, as ProjectEvaluator names it.
+    private static string ManifestFolder =>
+        "tmp/" + ProjectEvaluator.ManifestFolderPrefix + "0123456789abcdef0123456789abcdef";
 
     private static (int Pass, int Changes, bool Evaluated)[] PassStarts(WatchScene watch) =>
         WatchTests.PassStarts(watch.Run.Folder.PathOf("run.log"));
@@ -269,8 +274,8 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         PassStarts(_watch).ShouldBe([(1, 0, true), (2, 1, true)]);
     }
 
-    // The evaluation writes its manifests into the tool's temporary folder, which a test's run keeps in its working
-    // directory: the tool's own writes start no pass.
+    // The evaluation writes its manifests into a folder of its own in the tool's temporary folder, which a test's run
+    // keeps in its working directory: the tool's own writes start no pass.
     [Fact]
     public async Task Watch_WritesInTheToolsTemporaryFolder_RunNoPass()
     {
@@ -278,7 +283,7 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         _ = _watch.Begin();
         await ReachTheManifestTargetAsync(gate);
 
-        var temporary = _watch.Run.Folder.PathOf("tmp/sqlsource-0123");
+        var temporary = _watch.Run.Folder.PathOf(ManifestFolder);
         _watch.Raise(
             new FileChange(FileChangeKind.Created, temporary, IsFolder: true),
             Created(Path.Combine(temporary, "manifest.txt")),
@@ -297,18 +302,40 @@ public sealed class WatchDuringAPassTests : IAsyncDisposable
         _watch.Count(WatchSession.ChangeDetectedMarker).ShouldBe(0);
     }
 
-    // A listed file moved into the temporary folder is not the tool's own write: it is gone from the project.
+    // A listed file moved into an evaluation's folder is not the tool's own write: it is gone from the project.
     [Fact]
-    public async Task Watch_ListedFileMovedIntoTheTemporaryFolder_IsAChange()
+    public async Task Watch_ListedFileMovedIntoAnEvaluationsFolder_IsAChange()
     {
         await _watch.StartAsync("--log", "run.log");
-        var moved = _watch.Run.Folder.PathOf("tmp/Users.sql");
+        _ = _watch.Run.Folder.CreateFolder(ManifestFolder);
+        var moved = _watch.Run.Folder.PathOf(ManifestFolder + "/Users.sql");
         File.Move(_users, moved);
 
         await _watch.ChangeAsync(new FileChange(FileChangeKind.Renamed, moved, IsFolder: false, _users));
 
         (await _watch.StopAsync()).ExitCode.ShouldBe(0);
         PassStarts(_watch).ShouldBe([(1, 0, true), (2, 1, true)]);
+    }
+
+    // A project in the tool's temporary folder, as one in /tmp on Linux, outside a folder that an evaluation makes: its
+    // changes are not the tool's own.  Each name is one the rule must not take for an evaluation's folder.
+    [Theory]
+    [InlineData("tmp/App")]
+    [InlineData("tmp/sqlsource-app")]
+    [InlineData("tmp/sqlsource-0123456789abcdef0123456789abcdef0")]
+    [InlineData("tmp/sqlsource-0123456789abcdef0123456789abcdeg")]
+    [InlineData("tmp/xqlsource-0123456789abcdef0123456789abcdef")]
+    public async Task Watch_ProjectInTheTemporaryFolder_GivesAPass(string directory)
+    {
+        await using var watch = new WatchScene(directory);
+        var users = watch.Project.AddSql("Users.sql", SqlTexts.GetUser);
+        await watch.StartAsync(directory + "/App.csproj");
+        await File.WriteAllTextAsync(users, SqlTexts.TwoUsers, TestContext.Current.CancellationToken);
+
+        await watch.ChangeAsync(Changed(users));
+
+        SidecarFiles.Read(users).Queries.Select(entry => entry.Name).ShouldBe(["GetUser", "ListUsers"]);
+        (await watch.StopAsync()).ExitCode.ShouldBe(0);
     }
 
     // A save in a folder that an evaluating pass adds to the set, after the evaluation and while the pass describes.
