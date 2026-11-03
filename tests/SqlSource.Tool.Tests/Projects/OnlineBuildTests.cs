@@ -33,6 +33,34 @@ public sealed class OnlineBuildTests : IDisposable
         ["SQLSOURCE_CONNECTION"] = "Host=localhost;Database=billing",
     };
 
+    // The items each project shape adds to the project file, before the import of the targets.
+    private static readonly Dictionary<string, string> ItemsOfShape = new()
+    {
+        ["the project's folder"] = "",
+        // The manual's example of a project that lists its own files.
+        ["SqlSourceIncludeFiles false"] = """
+            <PropertyGroup>
+                <SqlSourceIncludeFiles>false</SqlSourceIncludeFiles>
+            </PropertyGroup>
+            <ItemGroup>
+                <AdditionalFiles Include="Queries/**/*.sql" />
+                <AdditionalFiles Include="Queries/**/*.sql.json" />
+            </ItemGroup>
+            """,
+        // A .sql file linked from a folder beside the project's, listed as the manual says.
+        ["a linked file"] = """
+            <ItemGroup>
+                <AdditionalFiles Include="../Shared/*.sql;../Shared/*.sql.json" />
+            </ItemGroup>
+            """,
+        // A .sql file the project lists again, beside the props' pattern.
+        ["a file listed twice"] = """
+            <ItemGroup>
+                <AdditionalFiles Include="Queries/Users.sql" />
+            </ItemGroup>
+            """,
+    };
+
     private readonly FixtureProjects _fixtures = new();
     private readonly string _project;
     private readonly string _folder;
@@ -265,6 +293,51 @@ public sealed class OnlineBuildTests : IDisposable
 
         StandIn.RunsIn(_folder).Count.ShouldBe(1);
         output.ShouldContain("Skipping target \"CoreCompile\" because all output files are up-to-date");
+    }
+
+    // The run creates the sidecar of a .sql item whose sidecar the project as evaluated does not list, wherever the
+    // item comes from, and the compiler of the same build is given it once.  At the next build, which does not run
+    // the tool, the project as evaluated lists it by a path of its own, and the compiler is still given it once.
+    [Theory]
+    [InlineData("the project's folder", "Online/Queries/Users.sql.json")]
+    [InlineData("SqlSourceIncludeFiles false", "Online/Queries/Users.sql.json")]
+    [InlineData("a linked file", "Shared/Linked.sql.json")]
+    [InlineData("a file listed twice", "Online/Queries/Users.sql.json")]
+    public async Task Build_ToolCreatesTheSidecarOfAnItem_GivesItToTheCompilerOnce(string shape, string sidecar)
+    {
+        File.Delete(Sidecar);
+        _ = _fixtures.WriteFile("Shared/Linked.sql", "-- name: GetLinked\nSELECT 1 AS one;\n");
+        AddToProject(ItemsOfShape[shape]);
+        var created = _fixtures.PathOf(sidecar);
+        StandIn.Tell(_folder, create: new() { [Path.GetRelativePath(_folder, created)] = "{}" });
+
+        await PassesAsync(NoVariables, "-p:SqlSourceOnline=true");
+        var first = CompiledItems();
+        await PassesAsync(NoVariables, "-p:SqlSourceOnline=true");
+
+        StandIn.RunsIn(_folder).Count.ShouldBe(1);
+        first.Count(item => item == created).ShouldBe(1, string.Join(Environment.NewLine, first));
+        CompiledItems().Count(item => item == created).ShouldBe(1, string.Join(Environment.NewLine, CompiledItems()));
+    }
+
+    // Only a .sql item has a sidecar: a JSON file beside an item of another kind is not given to the compiler.
+    [Fact]
+    public async Task Build_JsonFileBesideAnItemThatIsNoSqlFile_IsNotGivenToTheCompiler()
+    {
+        _ = _fixtures.WriteFile("Online/Queries/notes.txt", "notes");
+        var json = _fixtures.WriteFile("Online/Queries/notes.txt.json", "{}");
+        AddToProject(
+            """
+            <ItemGroup>
+                <AdditionalFiles Include="Queries/notes.txt" />
+            </ItemGroup>
+            """
+        );
+
+        await PassesAsync(NoVariables, "-p:SqlSourceOnline=true");
+
+        CompiledItems().ShouldContain(Path.Combine(_folder, "Queries", "notes.txt"));
+        CompiledItems().ShouldNotContain(json);
     }
 
     [Fact]
@@ -511,6 +584,18 @@ public sealed class OnlineBuildTests : IDisposable
         );
         exitCode.ShouldNotBe(0, output);
         return output;
+    }
+
+    // Adds elements to the copy's project file, before the import of the targets, as a project writes them.
+    private void AddToProject(string elements)
+    {
+        const string TargetsImport = """<Import Project="../build/SqlSource.targets" />""";
+        var text = File.ReadAllText(_project);
+        text.ShouldContain(TargetsImport);
+        File.WriteAllText(
+            _project,
+            text.Replace(TargetsImport, elements + "\n" + TargetsImport, StringComparison.Ordinal)
+        );
     }
 
     // The full paths of the AdditionalFiles items the compiler was given, which the fixture's Directory.Build.targets

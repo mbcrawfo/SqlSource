@@ -185,8 +185,8 @@ public sealed partial class BuildFileTests
     // The online build is no part of a design-time build, which an IDE runs on every edit, nor of a compile by
     // -t:Compile, which leaves BuildingProject false.  It runs the tool itself in a project with no TargetFrameworks,
     // and every framework of a multi-targeted project, the first among them, calls the run in a configuration of its
-    // own and adds the files the run wrote to FileWrites.  Then it gives the compiler the sidecars the run created, as
-    // the props' pattern does, and takes away the ones it deleted.
+    // own and adds the files the run wrote to FileWrites.  Then it takes away the sidecars the run deleted, and gives
+    // the compiler the sidecar of each .sql item that exists and that no item names, compared by full path.
     [Fact]
     public void Targets_DescribeOnline_RunsTheToolInABuildAndGivesTheCompilerItsSidecars()
     {
@@ -231,22 +231,8 @@ public sealed partial class BuildFileTests
         groups[0].Attributes().ShouldBeEmpty();
         groups[0].Elements().Select(Item).ShouldBe([("FileWrites", "Include=@(SqlSourceOnlineFile)")]);
         groups.RemoveAt(0);
+        groups[0].Attribute("Condition").ShouldNotBeNull().Value.ShouldBe("'$(SqlSourceGoesOnline)' == 'true'");
         groups[0]
-            .Attribute("Condition")
-            .ShouldNotBeNull()
-            .Value.ShouldBe("'$(SqlSourceGoesOnline)' == 'true' and '$(SqlSourceIncludeFiles)' != 'false'");
-        groups[0]
-            .Elements()
-            .Select(Item)
-            .ShouldBe([
-                (
-                    "SqlSourceSidecarFound",
-                    "Include=**/*.sql.json Exclude=$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)"
-                ),
-                ("AdditionalFiles", "Include=@(SqlSourceSidecarFound) Exclude=@(AdditionalFiles)"),
-            ]);
-        groups[1].Attribute("Condition").ShouldNotBeNull().Value.ShouldBe("'$(SqlSourceGoesOnline)' == 'true'");
-        groups[1]
             .Elements()
             .Select(Item)
             .ShouldBe([
@@ -264,22 +250,22 @@ public sealed partial class BuildFileTests
                 ),
                 ("AdditionalFiles", "Remove=@(SqlSourceSidecarGone)"),
             ]);
-    }
-
-    // The props' pattern for a sidecar is the one the online build expands again, with the same excludes and under
-    // the same condition.
-    [Fact]
-    public void Targets_DescribeOnline_ExpandsThePropsPatternForSidecars()
-    {
-        var props = Props
-            .Descendants("AdditionalFiles")
-            .Single(item => item.Attribute("Include")!.Value == "**/*.sql.json");
-        var online = Target(DescribeOnlineTarget).Descendants("SqlSourceSidecarFound").ShouldHaveSingleItem();
-
-        online.Attribute("Exclude")!.Value.ShouldBe(props.Attribute("Exclude")!.Value);
-        online
-            .Parent!.Attribute("Condition")!
-            .Value.ShouldEndWith(" and " + props.Parent!.Attribute("Condition")!.Value);
+        groups[1].Attribute("Condition").ShouldNotBeNull().Value.ShouldBe("'$(SqlSourceGoesOnline)' == 'true'");
+        groups[1]
+            .Elements()
+            .Select(Item)
+            .ShouldBe([
+                (
+                    "SqlSourceSidecarOfItem",
+                    "Include=@(AdditionalFiles->'%(FullPath).json') Condition='%(Extension)' == '.sql'"
+                ),
+                ("SqlSourceListedFile", "Include=@(AdditionalFiles->'%(FullPath)')"),
+                (
+                    "SqlSourceSidecarNotListed",
+                    "Include=@(SqlSourceSidecarOfItem->Distinct()->Exists()) Exclude=@(SqlSourceListedFile)"
+                ),
+                ("AdditionalFiles", "Include=@(SqlSourceSidecarNotListed)"),
+            ]);
     }
 
     // The run's condition is the design's: not BuildingProject, which a configuration that another build calls by
