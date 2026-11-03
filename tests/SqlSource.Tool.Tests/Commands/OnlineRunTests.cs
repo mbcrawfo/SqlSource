@@ -474,6 +474,49 @@ public sealed class OnlineRunTests : IDisposable
         File.Exists(stale).ShouldBeTrue();
     }
 
+    // The value of a settings file's database is read by the tool alone, so the compiler never reports a wrong one and
+    // the run writes it, however many of the errors beside it the compiler does report.  The keys are written in the
+    // order of the row, so that an error is not taken for the one before or after it.
+    [Theory]
+    [InlineData("auto", "database")]
+    [InlineData("true", "database")]
+    [InlineData("auto", "output,database")]
+    [InlineData("true", "output,database")]
+    [InlineData("auto", "database,output")]
+    [InlineData("true", "database,output")]
+    [InlineData("auto", "modelNamespace,database,output")]
+    [InlineData("true", "modelNamespace,database,output")]
+    public async Task Run_SettingsFileDatabaseThatIsNotAName_IsTheOnlyErrorWrittenAndExitsOne(string mode, string keys)
+    {
+        await DescribeEverythingAsync();
+        var stale = AddAStaleSidecar();
+        foreach (var key in keys.Split(','))
+        {
+            // modelNamespace is read by the compiler alone, so the tool has no error of it to write.
+            _scene.Project.Settings[key] = key switch
+            {
+                "database" => "report db",
+                "modelNamespace" => "a..b",
+                _ => "nonsense",
+            };
+        }
+
+        GiveBothConnections();
+
+        var result = await OnlineAsync(mode, "--log", "run.log");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldStartWith(_scene.Project.SettingsPath + "(");
+        result.Error.ShouldContain(": error SQLSRC019: 'report db' is not a valid value of database");
+        result.Error.Split('\n')[..^1].Length.ShouldBe(1);
+        EveryErrorIsOneLine(result.Error);
+        File.Exists(stale).ShouldBeTrue();
+        LogReader
+            .Events(_scene.Run.Folder.PathOf("run.log"), "diagnostic")
+            .Count(line => line.GetProperty("id").GetString() == "SQLSRC019")
+            .ShouldBe(keys.Contains("output", StringComparison.Ordinal) ? 2 : 1);
+    }
+
     // An error that only the tool reports is written under --online, and a run that has one exits 1 even when the
     // compiler's errors are not written: the build would otherwise not know the tool failed.
     [Fact]

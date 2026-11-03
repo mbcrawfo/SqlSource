@@ -599,14 +599,14 @@ internal static class DescribeCommand
             RunEvents.File(reporter.Trace, file);
         }
 
-        // The build's compiler reports these too, at the same place, and the build lists the errors of both.  So under
-        // --online they are counted and logged and their lines are left out: the plan holds back the same files and
-        // the run deletes nothing, as after any error, and the run exits 0 with its summary, since an exit code of 1
-        // with no error line would be a tool that failed.
+        // The build's compiler reports most of these too, at the same place, and the build lists the errors of both.
+        // So under --online they are counted and logged and their lines are left out: the plan holds back the same
+        // files and the run deletes nothing, as after any error, and the run exits 0 with its summary, since an exit
+        // code of 1 with no error line would be a tool that failed.
         var isOnline = IsOnline(usage);
         foreach (var error in result.Errors)
         {
-            if (isOnline && IsReportedByTheCompiler(error.Descriptor))
+            if (isOnline && IsReportedByTheCompiler(error))
             {
                 reporter.ReportWithoutWriting(error);
             }
@@ -620,9 +620,13 @@ internal static class DescribeCommand
     }
 
     // The generator reports every SqlDiagnostics descriptor the planner finds, from the same code, and two of the
-    // tool's own that SidecarChecker reports where the tool does (GeneratorParityTests compares them).
-    private static bool IsReportedByTheCompiler(DiagnosticDescriptor descriptor) =>
-        SqlDiagnostics.All.Contains(descriptor)
-        || ReferenceEquals(descriptor, ToolDiagnostics.OutputNeedsDescribableDialect)
-        || ReferenceEquals(descriptor, ToolDiagnostics.TokenHasNoDefault);
+    // tool's own that SidecarChecker reports where the tool does (GeneratorParityTests compares them).  An error of one
+    // of those descriptors that the generator does not report, a settings file's database, says so itself.
+    private static bool IsReportedByTheCompiler(ToolDiagnostic error) =>
+        !error.IsNotReportedByTheCompiler
+        && (
+            SqlDiagnostics.All.Contains(error.Descriptor)
+            || ReferenceEquals(error.Descriptor, ToolDiagnostics.OutputNeedsDescribableDialect)
+            || ReferenceEquals(error.Descriptor, ToolDiagnostics.TokenHasNoDefault)
+        );
 }

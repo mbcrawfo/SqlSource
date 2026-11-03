@@ -74,7 +74,22 @@ internal sealed class RunSettingsFiles
                 continue;
             }
 
-            errors.AddRange(file.Diagnostics.Select(ToolDiagnostic.From));
+            errors.AddRange(DiagnosticsOf(file));
         }
+    }
+
+    // The diagnostics of a file are its errors that the tool's side reports, in the order of the file's errors, so
+    // they are paired with those errors again to find which of them the build's side leaves to the tool.
+    private static IEnumerable<ToolDiagnostic> DiagnosticsOf(ListedSettingsFile file)
+    {
+        var reported = file.File.Errors.Where(static error => SettingsFileSides.Reports(SettingsFileSide.Tool, error));
+        return reported.Zip(
+            file.Diagnostics,
+            static (error, diagnostic) =>
+                ToolDiagnostic.From(diagnostic) with
+                {
+                    IsNotReportedByTheCompiler = !SettingsFileSides.Reports(SettingsFileSide.Build, error),
+                }
+        );
     }
 }

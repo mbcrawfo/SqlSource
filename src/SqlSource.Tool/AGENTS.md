@@ -43,7 +43,7 @@ The tool's tests, and where each kind goes, are in [`tests/README.md`](../../tes
 ## What a run says
 
 - **A step that reports nothing writes no event either**: its caller writes it from what the step returned, as for the planner, `RunDecisions`, `FileOutcomes` and `SidecarCheck`.  `Logging/RunEvents.cs` builds every event but `run.start`, `run.end` and `diagnostic`, and says each line of `--verbose` through `RunTrace.Say`, the one writer of those lines.
-- **Under `--online` a run always prints a line of the tool's own**, an error, a `sqlsource:` line or a summary line: `SqlSourceRunOnline` reads silence as a tool that could not start, a bare exit code of 1 as `SQLSRC027` ([why](../../docs/architecture/tool.md#build-integration-options)).  A plan error that the compiler reports too goes through `Reporter.ReportWithoutWriting`.
+- **Under `--online` a run always prints a line of the tool's own**, an error or a `sqlsource:` line: `SqlSourceRunOnline` reads silence as a tool that could not start, a bare exit code of 1 as `SQLSRC027` ([why](../../docs/architecture/tool.md#build-integration-options)).  A plan error the compiler reports too goes through `Reporter.ReportWithoutWriting`, unless it is marked `IsNotReportedByTheCompiler`.
 - **An event's name and its members are read by people and by phase 10's bundle.**  A member is added and never renamed, and a value is one of `Logging/LogValue.cs`'s closed set ([the log](../../docs/architecture/tool.md#the-log)).
 
 ## The command line
