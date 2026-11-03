@@ -213,23 +213,48 @@ public sealed class SidecarStoreTests : IDisposable
 
     private const int LockViolation = unchecked((int)0x80070021);
 
-    // The move of a temporary file over the sidecar, as the system does it, except that it fails with the given
-    // codes first, one for each try.  The waits are recorded and not slept.
-    private sealed class Moves(params int[] failures)
+    private const int AccessDenied = unchecked((int)0x80070005);
+
+    // ERROR_DISK_FULL, which no program's letting go ends.
+    private const int DiskFull = unchecked((int)0x80070070);
+
+    // What .NET raises for a file that another process holds: an IOException for a sharing or a lock violation, and an
+    // UnauthorizedAccessException for ERROR_ACCESS_DENIED.
+    private static Exception Held(int hResult) =>
+        hResult == AccessDenied
+            ? new UnauthorizedAccessException("Access to the path is denied.")
+            : new IOException("The process cannot access the file.", hResult);
+
+    // The move of a temporary file over the sidecar and the delete of a sidecar, as the system does them, except that
+    // each fails with the given exceptions first, one for each try.  The waits are recorded and not slept.
+    private sealed class Changes(Exception[]? moveFailures = null, Exception[]? deleteFailures = null)
     {
-        public int Tries { get; private set; }
+        public int MoveTries { get; private set; }
+
+        public int DeleteTries { get; private set; }
 
         public List<TimeSpan> Waits { get; } = [];
 
         public void Move(string temporary, string path)
         {
-            Tries++;
-            if (Tries <= failures.Length)
+            MoveTries++;
+            if (moveFailures is not null && MoveTries <= moveFailures.Length)
             {
-                throw new IOException("The process cannot access the file.", failures[Tries - 1]);
+                throw moveFailures[MoveTries - 1];
             }
 
             File.Move(temporary, path, overwrite: true);
+        }
+
+        public void Delete(string path)
+        {
+            DeleteTries++;
+            if (deleteFailures is not null && DeleteTries <= deleteFailures.Length)
+            {
+                throw deleteFailures[DeleteTries - 1];
+            }
+
+            File.Delete(path);
         }
 
         public void Wait(TimeSpan delay, CancellationToken cancellationToken)
@@ -239,30 +264,36 @@ public sealed class SidecarStoreTests : IDisposable
         }
     }
 
-    private void ApplyWith(Moves moves, CancellationToken cancellationToken, params FileOutcome[] outcomes) =>
+    private void ApplyWith(Changes changes, CancellationToken cancellationToken, params FileOutcome[] outcomes) =>
         SidecarStore.Apply(
             [.. outcomes],
             new Reporter(_error),
             _clock,
             onTheWhole: false,
-            moves.Move,
-            moves.Wait,
+            changes.Move,
+            changes.Delete,
+            changes.Wait,
             cancellationToken
         );
+
+    private static Exception[] Twice(int hResult) => [Held(hResult), Held(hResult)];
+
+    private static Exception[] EveryTime(int hResult) => [.. Enumerable.Range(0, 20).Select(_ => Held(hResult))];
 
     [Theory]
     [InlineData(SharingViolation)]
     [InlineData(LockViolation)]
+    [InlineData(AccessDenied)]
     public void Apply_MoveThatAnotherProcessHoldsTwice_IsRetriedAndTheFileIsWritten(int hResult)
     {
         File.WriteAllText(_sidecar, "old");
-        var moves = new Moves(hResult, hResult);
+        var changes = new Changes(moveFailures: Twice(hResult));
 
-        ApplyWith(moves, TestContext.Current.CancellationToken, Outcome(FileAction.Write, "new"));
+        ApplyWith(changes, TestContext.Current.CancellationToken, Outcome(FileAction.Write, "new"));
 
         File.ReadAllText(_sidecar).ShouldBe("new");
-        moves.Tries.ShouldBe(3);
-        moves.Waits.ShouldBe([SidecarStore.RetryDelay, SidecarStore.RetryDelay]);
+        changes.MoveTries.ShouldBe(3);
+        changes.Waits.ShouldBe([SidecarStore.RetryDelay, SidecarStore.RetryDelay]);
         Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql", "Users.sql.json", "sqlsource.json"]);
         _error.ToString().ShouldBeEmpty();
     }
@@ -271,14 +302,14 @@ public sealed class SidecarStoreTests : IDisposable
     public void Apply_MoveThatIsHeldEveryTime_IsSqlsrc218AfterTenTriesOverAboutASecondAndKeepsTheOldFile()
     {
         File.WriteAllText(_sidecar, "old");
-        var moves = new Moves([.. Enumerable.Repeat(SharingViolation, 20)]);
+        var changes = new Changes(moveFailures: EveryTime(SharingViolation));
 
-        ApplyWith(moves, TestContext.Current.CancellationToken, Outcome(FileAction.Write, "new"));
+        ApplyWith(changes, TestContext.Current.CancellationToken, Outcome(FileAction.Write, "new"));
 
-        moves.Tries.ShouldBe(SidecarStore.MoveTries);
-        moves.Tries.ShouldBe(10);
-        moves.Waits.Count.ShouldBe(9);
-        moves.Waits.ShouldAllBe(delay => delay == TimeSpan.FromMilliseconds(100));
+        changes.MoveTries.ShouldBe(SidecarStore.Tries);
+        changes.MoveTries.ShouldBe(10);
+        changes.Waits.Count.ShouldBe(9);
+        changes.Waits.ShouldAllBe(delay => delay == TimeSpan.FromMilliseconds(100));
         File.ReadAllText(_sidecar).ShouldBe("old");
         Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql", "Users.sql.json", "sqlsource.json"]);
         _error
@@ -286,24 +317,78 @@ public sealed class SidecarStoreTests : IDisposable
             .ShouldStartWith($"{_sidecar} : error SQLSRC218: '{_sidecar}' could not be written: The process cannot");
     }
 
-    [Fact]
-    public void Apply_MoveThatFailsForAnotherReason_IsReportedAtOnce()
+    // A code is retried only from the exception that .NET raises it with for a held file.
+    [Theory]
+    [InlineData(typeof(IOException), DiskFull)]
+    [InlineData(typeof(IOException), AccessDenied)]
+    [InlineData(typeof(UnauthorizedAccessException), SharingViolation)]
+    public void Apply_MoveThatFailsForAnotherReason_IsReportedAtOnce(Type type, int hResult)
     {
-        var moves = new Moves(unchecked((int)0x80070005));
+        var failure = (Exception)Activator.CreateInstance(type, "refused")!;
+        failure.HResult = hResult;
+        var changes = new Changes(moveFailures: [failure]);
 
-        ApplyWith(moves, TestContext.Current.CancellationToken, Outcome(FileAction.Write, "new"));
+        ApplyWith(changes, TestContext.Current.CancellationToken, Outcome(FileAction.Write, "new"));
 
-        moves.Tries.ShouldBe(1);
-        moves.Waits.ShouldBeEmpty();
+        changes.MoveTries.ShouldBe(1);
+        changes.Waits.ShouldBeEmpty();
         File.Exists(_sidecar).ShouldBeFalse();
-        _error.ToString().ShouldStartWith($"{_sidecar} : error SQLSRC218: '{_sidecar}' could not be written: ");
+        _error.ToString().ShouldStartWith($"{_sidecar} : error SQLSRC218: '{_sidecar}' could not be written: refused");
+    }
+
+    [Theory]
+    [InlineData(SharingViolation)]
+    [InlineData(LockViolation)]
+    [InlineData(AccessDenied)]
+    public void Apply_DeleteThatAnotherProcessHoldsTwice_IsRetriedAndTheFileIsDeleted(int hResult)
+    {
+        File.WriteAllText(_sidecar, "old");
+        var changes = new Changes(deleteFailures: Twice(hResult));
+
+        ApplyWith(changes, TestContext.Current.CancellationToken, Outcome(FileAction.Delete));
+
+        File.Exists(_sidecar).ShouldBeFalse();
+        changes.DeleteTries.ShouldBe(3);
+        changes.Waits.ShouldBe([SidecarStore.RetryDelay, SidecarStore.RetryDelay]);
+        _error.ToString().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Apply_DeleteThatIsHeldEveryTime_IsSqlsrc218AfterTenTriesAndKeepsTheFile()
+    {
+        File.WriteAllText(_sidecar, "old");
+        var changes = new Changes(deleteFailures: EveryTime(AccessDenied));
+
+        ApplyWith(changes, TestContext.Current.CancellationToken, Outcome(FileAction.Delete));
+
+        changes.DeleteTries.ShouldBe(SidecarStore.Tries);
+        changes.Waits.Count.ShouldBe(9);
+        File.ReadAllText(_sidecar).ShouldBe("old");
+        _error
+            .ToString()
+            .ShouldStartWith($"{_sidecar} : error SQLSRC218: '{_sidecar}' could not be deleted: Access to the path");
+        _error.ToString().Split("error SQLSRC218").Length.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Apply_DeleteThatFailsForAnotherReason_IsReportedAtOnce()
+    {
+        File.WriteAllText(_sidecar, "old");
+        var changes = new Changes(deleteFailures: [Held(DiskFull)]);
+
+        ApplyWith(changes, TestContext.Current.CancellationToken, Outcome(FileAction.Delete));
+
+        changes.DeleteTries.ShouldBe(1);
+        changes.Waits.ShouldBeEmpty();
+        File.Exists(_sidecar).ShouldBeTrue();
+        _error.ToString().ShouldStartWith($"{_sidecar} : error SQLSRC218: '{_sidecar}' could not be deleted: ");
     }
 
     [Fact]
     public void Apply_RunThatIsCancelledWhileItWaitsToMove_StopsRetryingAndLeavesNoTemporaryFile()
     {
         using var cancel = new CancellationTokenSource();
-        var moves = new Moves([.. Enumerable.Repeat(SharingViolation, 20)]);
+        var changes = new Changes(moveFailures: EveryTime(SharingViolation));
 
         _ = Should.Throw<OperationCanceledException>(() =>
             SidecarStore.Apply(
@@ -311,15 +396,51 @@ public sealed class SidecarStoreTests : IDisposable
                 new Reporter(_error),
                 _clock,
                 onTheWhole: false,
-                moves.Move,
+                changes.Move,
+                changes.Delete,
                 (_, _) => cancel.Cancel(),
                 cancel.Token
             )
         );
 
-        moves.Tries.ShouldBe(1);
+        changes.MoveTries.ShouldBe(1);
         Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql", "sqlsource.json"]);
         _error.ToString().ShouldBeEmpty();
+    }
+
+    // A program holds the sidecar open as an editor does, shared for reading alone: on Windows the move over it and its
+    // delete then fail with the system's own error, which the nightly run's Windows job shows if it is not one the
+    // store retries.  The program lets go when the store first waits to try again, so the test waits for no time; on
+    // another system the first try succeeds and the store does not wait.
+    [Theory]
+    [InlineData(nameof(FileAction.Write))]
+    [InlineData(nameof(FileAction.Delete))]
+    public void Apply_SidecarThatAProgramHoldsOpenUntilTheStoreWaits_IsChangedWithoutAnError(string actionName)
+    {
+        var action = Enum.Parse<FileAction>(actionName);
+        File.WriteAllText(_sidecar, "old");
+        using var holder = new FileStream(_sidecar, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        SidecarStore.Apply(
+            [Outcome(action, action == FileAction.Write ? "new" : null)],
+            new Reporter(_error),
+            _clock,
+            onTheWhole: false,
+            SidecarStore.MoveOverwriting,
+            SidecarStore.DeleteFile,
+            (_, _) => holder.Dispose(),
+            TestContext.Current.CancellationToken
+        );
+
+        _error.ToString().ShouldBeEmpty();
+        if (action == FileAction.Write)
+        {
+            File.ReadAllText(_sidecar).ShouldBe("new");
+        }
+        else
+        {
+            File.Exists(_sidecar).ShouldBeFalse();
+        }
     }
 
     [Fact]
