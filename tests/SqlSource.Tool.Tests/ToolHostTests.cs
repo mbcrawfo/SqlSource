@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using Shouldly;
@@ -9,6 +10,7 @@ using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Processes;
 using SqlSource.Tool.Testing;
+using SqlSource.Tool.Watching;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -34,6 +36,28 @@ public sealed class ToolHostTests
         host.Time.ShouldBeSameAs(TimeProvider.System);
         host.Runtime.ShouldBe(RuntimeInformation.FrameworkDescription);
         host.OperatingSystem.ShouldBe(RuntimeInformation.OSDescription);
+    }
+
+    [Fact]
+    public void Create_Watch_IsTheRealWatcher() =>
+        ToolHost.Create().Watch.ShouldBe(new Func<WatchRequest, IDisposable>(ToolHost.WatchFolder));
+
+    [Fact]
+    public void Hosts_Watch_WatchesOnlyUnderTheTemporaryFolder()
+    {
+        using var folder = new TempFolder();
+        var seen = new List<FileChange>();
+        var host = Hosts.Create(folder.Path, new FakeProcessRunner(), folder.Path);
+
+        using (host.Watch(new WatchRequest(folder.Path, Recursive: true, Poll: true, seen.Add, _ => { })))
+        {
+            // The real watcher, which polls here, accepts the folder and is stopped by the dispose.
+        }
+
+        // Outside the temporary folder nothing is watched, so a folder that is not there is no fault.
+        var outside = Path.Combine(RepositoryRoot.Path(), "no-such-folder");
+        host.Watch(new WatchRequest(outside, Recursive: true, Poll: false, seen.Add, _ => { })).Dispose();
+        seen.ShouldBeEmpty();
     }
 
     [Fact]

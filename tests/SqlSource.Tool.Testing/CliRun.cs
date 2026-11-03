@@ -10,6 +10,7 @@ using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
+using SqlSource.Tool.Watching;
 using Xunit;
 
 namespace SqlSource.Tool.Testing;
@@ -71,6 +72,10 @@ internal sealed class CliRun : IDisposable
     // cannot be read.
     public Func<string, string?>? ReadTextFile { get; set; }
 
+    // Starts the watches of a "--watch" run.  The host's own unless a test brings one, for a watch it raises changes
+    // through.
+    public Func<WatchRequest, IDisposable>? Watch { get; set; }
+
     // Set to stand in for standard output, for a test of a writer that fails.
     public TextWriter? Out { get; set; }
 
@@ -130,6 +135,7 @@ internal sealed class CliRun : IDisposable
             Time = Time,
             CreateFile = CreateFile ?? ToolHost.NewFile,
             ReadTextFile = ReadTextFile ?? host.ReadTextFile,
+            Watch = Watch ?? host.Watch,
         };
     }
 }
