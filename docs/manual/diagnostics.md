@@ -2908,15 +2908,15 @@ See: [A `.env` file](tool.md#env-file)
 
 `sqlsource describe --watch` asks the system to tell it when a file changes, and the system refused to watch a folder or failed while it did.  The message names the folder and ends with the reason the system gave.  The watch goes on, and describes again, reading your projects again, since the folder may have changed unseen.  Each time it reads your projects again it tries the folder again, so a file you save there may not be described until it can watch the folder.  An error that repeats with the same folder and the same reason is written once in a watch.
 
-The usual cause is the limit of watched folders on Linux, which a machine with many projects, or with other tools that watch folders, can reach.
+The usual cause is one of the two limits that Linux puts on watching files, of `inotify instances` and of `inotify watches`, which a machine with many projects, or with other tools that watch folders, such as editors, can reach.
 
 ```console
 sqlsource describe /work/App --watch
-/work/App : error SQLSRC287: watching '/work/App' for changes failed: The configured user limit (128) on the number of inotify watches has been reached, or the operating system failed to allocate a required resource.
+/work/App : error SQLSRC287: watching '/work/App' for changes failed: The configured user limit (128) on the number of inotify instances has been reached, or the per-process limit on the number of open file descriptors has been reached.
     help: set DOTNET_USE_POLLING_FILE_WATCHER=true to poll for changes instead
 ```
 
-On Linux, raise the limit with `sudo sysctl fs.inotify.max_user_watches=524288`, and add `fs.inotify.max_user_watches=524288` to `/etc/sysctl.conf` to keep it.  Or set the environment variable `DOTNET_USE_POLLING_FILE_WATCHER` to `true` or `1` before you start the watch: it then looks at the folders at a fixed interval instead of asking the system, which needs no limit and finds a change within a second or two.  Polling is also the way to watch a folder on a network share or in a container that does not pass on file changes.
+On Linux, raise the limit that the message names.  For a message about `inotify instances`, as above, raise `fs.inotify.max_user_instances`, with `sudo sysctl fs.inotify.max_user_instances=1024`, and add `fs.inotify.max_user_instances=1024` to `/etc/sysctl.conf` to keep it.  For one about `inotify watches`, such as `The configured user limit (65536) on the number of inotify watches has been reached, or the operating system failed to allocate a required resource.`, raise `fs.inotify.max_user_watches` the same way, to `524288`.  Or set the environment variable `DOTNET_USE_POLLING_FILE_WATCHER` to `true` or `1` before you start the watch: it then looks at the folders at a fixed interval instead of asking the system, which needs no limit and finds a change within a second or two.  Polling is also the way to watch a folder on a network share or in a container that does not pass on file changes.
 
 A watch that polls, with `DOTNET_USE_POLLING_FILE_WATCHER` set, reports this error when it cannot list a folder, such as one that was deleted or that you may not read, and then gives no help line.  It says so once while the folder stays that way, and sees the folder's changes again as soon as it can list it.
 

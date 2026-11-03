@@ -14,7 +14,7 @@ namespace SqlSource.Tool.Tests.Commands;
 public sealed class WatchFailureTests : IAsyncDisposable
 {
     private const string InotifyLimit =
-        "The configured user limit (128) on the number of inotify watches has been reached, "
+        "The configured user limit (65536) on the number of inotify watches has been reached, "
         + "or the operating system failed to allocate a required resource.";
 
     private readonly WatchScene _watch = new();
