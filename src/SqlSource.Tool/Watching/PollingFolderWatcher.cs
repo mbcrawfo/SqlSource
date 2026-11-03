@@ -22,7 +22,9 @@ internal sealed class PollingFolderWatcher : IDisposable
     // query.
     private static readonly string[] IgnoredFolders = ["bin", "obj", ".git"];
 
-    // The one file of an ignored folder that is listed, because a restore writes it and a build of the project follows.
+    // The one file of an ignored folder that is listed, because a restore writes it and a build of the project follows:
+    // at any depth below an obj folder, as an artifacts layout or a custom MSBuildProjectExtensionsPath puts it.  It is
+    // looked for below every folder of obj but bin and .git.
     private const string AssetsFolder = "obj";
     private const string AssetsFile = "project.assets.json";
 
@@ -122,14 +124,16 @@ internal sealed class PollingFolderWatcher : IDisposable
             if (info is DirectoryInfo directory)
             {
                 // A link to a folder is not followed, which a loop of links would never leave.
-                if (!_request.Recursive || directory.Attributes.HasFlag(FileAttributes.ReparsePoint) || assetsOnly)
+                if (!_request.Recursive || directory.Attributes.HasFlag(FileAttributes.ReparsePoint))
                 {
                     continue;
                 }
 
-                if (IgnoredFolders.Contains(directory.Name, StringComparer.Ordinal))
+                var ignored = IgnoredFolders.Contains(directory.Name, StringComparer.Ordinal);
+                if (assetsOnly || ignored)
                 {
-                    if (directory.Name == AssetsFolder)
+                    // Below obj, every folder but bin and .git may hold the assets file.
+                    if (directory.Name == AssetsFolder || (assetsOnly && !ignored))
                     {
                         Add(listing, directory, assetsOnly: true);
                     }

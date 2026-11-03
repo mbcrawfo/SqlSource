@@ -79,6 +79,7 @@ public sealed class PollingFolderWatcherTests
     [InlineData("bin/Debug/App.dll")]
     [InlineData("obj/Debug/App.dll")]
     [InlineData("obj/project.nuget.cache")]
+    [InlineData("obj/x/project.nuget.cache")]
     [InlineData(".git/index")]
     [InlineData("src/App/bin/App.dll")]
     public void Poll_FileUnderBinObjOrGit_RaisesNothing(string relativePath)
@@ -93,11 +94,15 @@ public sealed class PollingFolderWatcherTests
         scene.Seen.ShouldBeEmpty();
     }
 
-    [Fact]
-    public void Poll_ProjectAssetsWritten_RaisesChanged()
+    // At any depth below obj, as an artifacts layout or a custom MSBuildProjectExtensionsPath puts it.
+    [Theory]
+    [InlineData("src/App/obj/project.assets.json")]
+    [InlineData("src/App/obj/x/project.assets.json")]
+    [InlineData("artifacts/obj/App/project.assets.json")]
+    public void Poll_ProjectAssetsWritten_RaisesChanged(string relativePath)
     {
         using var scene = new Scene();
-        var path = scene.Folder.WriteFile("src/App/obj/project.assets.json", "{}");
+        var path = scene.Folder.WriteFile(relativePath, "{}");
         using var watch = scene.Start();
 
         File.WriteAllText(path, "{ }");
@@ -105,6 +110,38 @@ public sealed class PollingFolderWatcherTests
         watch.Poll();
 
         scene.Seen.ShouldBe([new FileChange(FileChangeKind.Changed, path, IsFolder: false)]);
+    }
+
+    [Theory]
+    [InlineData("src/App/obj/x/project.assets.json")]
+    [InlineData("artifacts/obj/App/project.assets.json")]
+    public void Poll_ProjectAssetsCreatedBelowObj_RaisesCreated(string relativePath)
+    {
+        using var scene = new Scene();
+        _ = scene.Folder.CreateFolder(Path.GetDirectoryName(relativePath)!);
+        using var watch = scene.Start();
+
+        var path = scene.Folder.WriteFile(relativePath, "{}");
+        watch.Poll();
+
+        scene.Seen.ShouldBe([new FileChange(FileChangeKind.Created, path, IsFolder: false)]);
+    }
+
+    // The assets file below a bin or .git folder of obj is passed over, as WatchSet ignores it.
+    [Theory]
+    [InlineData("src/App/obj/bin/project.assets.json")]
+    [InlineData("src/App/obj/.git/project.assets.json")]
+    [InlineData("src/App/bin/obj/project.assets.json")]
+    public void Poll_ProjectAssetsBelowBinOrGit_RaisesNothing(string relativePath)
+    {
+        using var scene = new Scene();
+        _ = scene.Folder.CreateFolder(Path.GetDirectoryName(relativePath)!);
+        using var watch = scene.Start();
+
+        _ = scene.Folder.WriteFile(relativePath, "{}");
+        watch.Poll();
+
+        scene.Seen.ShouldBeEmpty();
     }
 
     [Fact]

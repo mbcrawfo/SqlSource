@@ -235,12 +235,47 @@ public sealed class WatchSetTests
             .ShouldBe(WatchEffect.None);
     }
 
-    [Fact]
-    public void Classify_ProjectAssetsBelowABinFolder_IsNone()
+    // A restore writes the assets file below obj wherever the project puts that folder: an artifacts layout, or a
+    // custom MSBuildProjectExtensionsPath; and any project.assets.json outside the ignored folders.
+    [Theory]
+    [InlineData("App/obj/project.assets.json")]
+    [InlineData("artifacts/obj/App/project.assets.json")]
+    [InlineData("App/obj/x/project.assets.json")]
+    [InlineData("App/obj/x/obj/project.assets.json")]
+    [InlineData("App/intermediate/project.assets.json")]
+    public void Classify_ProjectAssetsWrittenOutsideBinAndGit_IsEvaluate(string path)
+    {
+        var set = AppSet();
+        var full = P(path);
+
+        set.Classify(Changed(full)).ShouldBe(WatchEffect.Evaluate);
+        set.Classify(Created(full)).ShouldBe(WatchEffect.Evaluate);
+    }
+
+    [Theory]
+    [InlineData("App/bin/obj/project.assets.json")]
+    [InlineData("App/obj/bin/project.assets.json")]
+    [InlineData("App/bin/project.assets.json")]
+    [InlineData(".git/x/project.assets.json")]
+    [InlineData("App/obj/.git/project.assets.json")]
+    public void Classify_ProjectAssetsBelowABinOrGitFolder_IsNone(string path)
+    {
+        var set = AppSet();
+        var full = P(path);
+
+        set.Classify(Changed(full)).ShouldBe(WatchEffect.None);
+        set.Classify(Created(full)).ShouldBe(WatchEffect.None);
+    }
+
+    // Only the assets file is let through below obj, at any depth.
+    [Theory]
+    [InlineData("App/obj/x/project.nuget.cache")]
+    [InlineData("artifacts/obj/App/App.csproj.nuget.g.props")]
+    public void Classify_OtherFileBelowObj_IsNone(string path)
     {
         var set = AppSet();
 
-        set.Classify(Changed(P("App/bin/obj/project.assets.json"))).ShouldBe(WatchEffect.None);
+        set.Classify(Created(P(path))).ShouldBe(WatchEffect.None);
     }
 
     [Fact]

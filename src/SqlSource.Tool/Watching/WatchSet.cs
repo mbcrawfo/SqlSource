@@ -29,6 +29,10 @@ internal sealed class WatchSet
 
     private static readonly string[] IgnoredFolders = ["bin", "obj", ".git"];
 
+    // The folders whose project.assets.json is ignored too: a restore writes it below an obj folder, wherever the
+    // project puts that, and never below these.
+    private static readonly string[] IgnoredAssetsFolders = ["bin", ".git"];
+
     // Any change to one of these asks for another evaluation, wherever it is.
     private static readonly string[] EvaluationFileNames =
     [
@@ -162,7 +166,7 @@ internal sealed class WatchSet
         Comparer.Equals(path, _unitPath)
         || EvaluationFileNames.Contains(name, Comparer)
         || EvaluationExtensions.Any(extension => name.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
-        || IsProjectAssets(path, name);
+        || Comparer.Equals(name, AssetsFileName);
 
     // A file or a folder that a project's folder did not have, and a project may list now: a .sql or .cs file, a
     // settings file, or a folder the globs may reach.
@@ -175,12 +179,10 @@ internal sealed class WatchSet
             || Comparer.Equals(name, SettingsFileName)
         );
 
-    private static bool IsProjectAssets(string path, string name) =>
-        Comparer.Equals(name, AssetsFileName) && Comparer.Equals(Path.GetFileName(Path.GetDirectoryName(path)), "obj");
-
     // Sidecars and the temporary files the sidecar store makes are the tool's own writes.  Everything in bin, obj and
-    // .git is the build's, or the repository's, except the one file of obj that a restore writes.  Only the parts of
-    // the path below the nearest watched folder count, so that a folder named bin above the project is not one.
+    // .git is the build's, or the repository's, except the one file that a restore writes, at any depth below obj, as
+    // an artifacts layout or a custom MSBuildProjectExtensionsPath puts it.  Only the parts of the path below the
+    // nearest watched folder count, so that a folder named bin above the project is not one.
     private bool IsIgnored(string path)
     {
         var name = Path.GetFileName(path);
@@ -189,13 +191,8 @@ internal sealed class WatchSet
             return true;
         }
 
-        var parts = PartsBelowWatched(path);
-        if (parts.Length >= 2 && IsProjectAssets(path, name))
-        {
-            parts = parts[..^2];
-        }
-
-        return parts.Any(part => IgnoredFolders.Contains(part, Comparer));
+        var ignored = Comparer.Equals(name, AssetsFileName) ? IgnoredAssetsFolders : IgnoredFolders;
+        return PartsBelowWatched(path).Any(part => ignored.Contains(part, Comparer));
     }
 
     // <sidecar>.<32 digits of a Guid>.tmp, as the sidecar store names them.
