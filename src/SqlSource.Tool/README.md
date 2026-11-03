@@ -25,6 +25,7 @@ The same variable in the environment wins over the file, and `--connection postg
 $ dotnet sqlsource describe
 $ dotnet sqlsource describe --force
 $ dotnet sqlsource describe --check
+$ dotnet sqlsource describe --watch
 ```
 
 `postgres` is the name of the database your queries belong to, which is the dialect's name unless you name it: for SQL Server it is `mssql`, read from `SQLSOURCE_CONNECTION_MSSQL`.
@@ -32,5 +33,6 @@ $ dotnet sqlsource describe --check
 - `describe` describes each query that is new or changed since its sidecar was written, and writes the sidecars.
 - `describe --force` describes every query again: run it after a change to the database's schema.
 - `describe --check` writes nothing, and fails when a sidecar is out of date: run it on a build server.
+- `describe --watch` describes again each time you save a `.sql` file or another file of your project, until you stop it with Ctrl+C: leave it running while you work.
 
 [The tool's manual page](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md) has the whole workflow, every option and the exit codes.  [The SqlSource readme](https://github.com/mbcrawfo/SqlSource/blob/main/README.md) says what SqlSource does and how to start.
