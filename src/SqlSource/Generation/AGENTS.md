@@ -7,4 +7,8 @@
 - **A library's class of conversions is written from the one table that gives its edges**, as `Generation/Converters/NodaTimeConversions.cs` does, so an edge never names a method the class lacks; it names the library's types as text alone, `global::`-qualified.  A new library adds its edges to `Of` and its text to `SourceOf` in `Generation/Converters/LibraryConverters.cs`, and declares its class with `ClassDeclaration` there, which marks it embedded.  `Generation/Converters/NetTopologySuiteConversions.cs` has no edges, only the instances of the spatial read path.  See [converters](../../../docs/architecture/generator.md#converters).
 - **A `CodeGen` query's only member is its method.**  `TypeEmitter` writes no constant or token method for it, and `Generation/Methods/MethodPlanner.cs` gives no method to one that fails a check, so such a query gets neither; its models are unaffected.  See [query methods](../../../docs/architecture/generator.md#query-methods).
 
+## Strategies
+
+- **A strategy object, as `Emitting/ParameterBinder.cs` is, is chosen in the output step by one exhaustive switch and never enters the pipeline**, whose records `Methods/` plans with value equality.  See [adding a kind of method](../../../docs/architecture/generator.md#adding-a-kind-of-method).
+
 > Maintenance: this file names specific files, folders, types and members.  If you rename, move, or remove them, update this file in the same commit.
