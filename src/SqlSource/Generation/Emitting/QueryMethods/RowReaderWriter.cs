@@ -5,7 +5,7 @@ using SqlSource.Generation.Converters;
 using SqlSource.Generation.Methods;
 using Conversion = SqlSource.Generation.Methods.Conversion;
 
-namespace SqlSource.Generation.Emitting;
+namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// Writes the reading of a row of a query's method from its reader: the checks of the columns read into locals first,

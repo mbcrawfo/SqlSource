@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 
-namespace SqlSource.Generation.Emitting;
+namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// Writes the asynchronous method of a query: it opens the connection when it is closed, binds each parameter with

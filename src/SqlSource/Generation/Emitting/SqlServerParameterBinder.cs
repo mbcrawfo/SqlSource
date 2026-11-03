@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Converters;
+using SqlSource.Generation.Emitting.QueryMethods;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Types.Maps;
 using SqlSource.Snapshot;

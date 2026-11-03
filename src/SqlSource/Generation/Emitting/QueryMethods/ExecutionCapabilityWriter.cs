@@ -2,7 +2,7 @@ using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Methods;
 
-namespace SqlSource.Generation.Emitting;
+namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// Writes the statements that a query's method's <see cref="ExecutionCapabilities" /> turn on: the refusal of a

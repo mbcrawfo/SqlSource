@@ -1,7 +1,7 @@
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 
-namespace SqlSource.Generation.Emitting;
+namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// Decides the <see cref="ExecutionCapabilities" /> of a query's method, from its engine, its shape and whether it

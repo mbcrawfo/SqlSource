@@ -4,6 +4,7 @@ using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 using SqlSource.Testing.Snapshot;
+using SqlSource.Tests.Generation.Emitting.QueryMethods;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;

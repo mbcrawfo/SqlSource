@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Linq;
 using SqlSource.Generation.Methods;
 
-namespace SqlSource.Generation.Emitting;
+namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// The names of the locals of a query's method and of its lambdas' parameters, none of which an argument has.  The

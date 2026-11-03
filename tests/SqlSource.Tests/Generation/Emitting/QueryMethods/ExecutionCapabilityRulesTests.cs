@@ -1,10 +1,10 @@
 using System;
 using Shouldly;
-using SqlSource.Generation.Emitting;
+using SqlSource.Generation.Emitting.QueryMethods;
 using SqlSource.Settings;
 using Xunit;
 
-namespace SqlSource.Tests.Generation.Emitting;
+namespace SqlSource.Tests.Generation.Emitting.QueryMethods;
 
 public sealed class ExecutionCapabilityRulesTests
 {

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using SqlSource.Generation.Emitting.QueryMethods;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 

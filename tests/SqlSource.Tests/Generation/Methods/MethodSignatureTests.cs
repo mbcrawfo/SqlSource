@@ -5,7 +5,7 @@ using SqlSource.Generation.Methods;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 using SqlSource.Testing.Snapshot;
-using SqlSource.Tests.Generation.Emitting;
+using SqlSource.Tests.Generation.Emitting.QueryMethods;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Methods;
