@@ -1,3 +1,5 @@
+using SqlSource.Generation.Emitting.QueryMethods;
+
 namespace SqlSource.Generation.Emitting;
 
 /// <summary>

@@ -1,11 +1,10 @@
 using System.Globalization;
-using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Converters;
 using SqlSource.Generation.Methods;
 using Conversion = SqlSource.Generation.Methods.Conversion;
 
-namespace SqlSource.Generation.Emitting;
+namespace SqlSource.Generation.Emitting.QueryMethods;
 
 /// <summary>
 /// Writes the reading of a row of a query's method from its reader: the checks of the columns read into locals first,
@@ -14,16 +13,20 @@ namespace SqlSource.Generation.Emitting;
 internal static class RowReaderWriter
 {
     /// <summary>
+    /// The spelling of <see cref="MethodColumn.ReadText" /> that marks a column read as SqlClient's vector, which gives
+    /// <c>SqlVector&lt;float&gt;.Null</c> on a <c>NULL</c> instead of throwing: a not-null column read as exactly this
+    /// text is read into a local and refused when it <c>IsNull</c>, before a converter sees it.
+    /// </summary>
+    internal const string VectorType = "global::Microsoft.Data.SqlTypes.SqlVector<float>";
+
+    /// <summary>
     /// A not-null column read as <c>SqlVector&lt;float&gt;</c> is read into a local first, and its <c>Null</c> is
     /// refused as a <c>NULL</c> of any other not-null column is.
     /// </summary>
-    public static void AppendVectorChecks(
-        StringBuilder builder,
-        string indent,
-        MethodOutput output,
-        QueryMethodLocals locals
-    )
+    public static void AppendVectorChecks(in QueryMethodContext context, string indent, MethodOutput output)
     {
+        var builder = context.Builder;
+        var locals = context.Locals;
         for (var index = 0; index < output.Columns.Count; index++)
         {
             if (locals.Values[index] is not { } value)
@@ -59,8 +62,9 @@ internal static class RowReaderWriter
     /// A record by its positional constructor, its arguments in the order of its properties; a class by an object
     /// initializer, in column order.
     /// </summary>
-    public static void AppendRow(StringBuilder builder, MethodOutput output, QueryMethodLocals locals)
+    public static void AppendRow(in QueryMethodContext context, MethodOutput output)
     {
+        var builder = context.Builder;
         _ = builder.Append("new ").Append(output.TypeText);
         if (output.IsRecord)
         {
@@ -68,7 +72,7 @@ internal static class RowReaderWriter
             for (var index = 0; index < output.ConstructorOrder.Count; index++)
             {
                 _ = builder.Append(index > 0 ? ", " : string.Empty);
-                AppendColumn(builder, output, output.ConstructorOrder[index], locals);
+                AppendColumn(in context, output, output.ConstructorOrder[index]);
             }
 
             _ = builder.Append(')');
@@ -79,7 +83,7 @@ internal static class RowReaderWriter
         for (var index = 0; index < output.Columns.Count; index++)
         {
             _ = builder.Append(index > 0 ? ", " : string.Empty).Append(output.Columns[index].Property).Append(" = ");
-            AppendColumn(builder, output, index, locals);
+            AppendColumn(in context, output, index);
         }
 
         _ = builder.Append(" }");
@@ -90,8 +94,10 @@ internal static class RowReaderWriter
     // passed to it, so that the converter never sees a NULL; an array converted by element is read as the database's
     // array and each of its elements passed to it; and the spatial read path reads the column's bytes.  A not-null
     // column whose read can give null for a JSON null throws on one.
-    private static void AppendColumn(StringBuilder builder, MethodOutput output, int ordinal, QueryMethodLocals locals)
+    private static void AppendColumn(in QueryMethodContext context, MethodOutput output, int ordinal)
     {
+        var builder = context.Builder;
+        var locals = context.Locals;
         var column = output.Columns[ordinal];
         var read = column.Read;
         if (locals.Values[ordinal] is { } value)
@@ -116,13 +122,13 @@ internal static class RowReaderWriter
 
         if (read is { IsByElement: true })
         {
-            AppendByElement(builder, column, read, ordinalText, locals);
+            AppendByElement(in context, column, read, ordinalText);
             return;
         }
 
         if (read is null)
         {
-            AppendGetFieldValue(builder, column, ordinalText, locals);
+            AppendGetFieldValue(in context, column, ordinalText);
         }
         else
         {
@@ -134,18 +140,18 @@ internal static class RowReaderWriter
             };
             if (readsBytes)
             {
-                AppendSpatial(builder, column, read, ordinalText, locals);
+                AppendSpatial(in context, column, read, ordinalText);
                 return;
             }
 
             _ = builder.Append(read.Method).Append('(');
-            AppendGetFieldValue(builder, column, ordinalText, locals);
+            AppendGetFieldValue(in context, column, ordinalText);
             _ = builder.Append(')');
         }
 
         if (column.ThrowsOnJsonNull)
         {
-            AppendJsonNullThrow(builder, column);
+            AppendJsonNullThrow(in context, column);
         }
     }
 
@@ -154,21 +160,21 @@ internal static class RowReaderWriter
     // or of an element the property writes nullable, stays null.  A JSON null that the converter gives null for throws
     // too, unless the element is nullable.
     private static void AppendByElement(
-        StringBuilder builder,
+        in QueryMethodContext context,
         MethodColumn column,
         Conversion read,
-        string ordinalText,
-        QueryMethodLocals locals
+        string ordinalText
     )
     {
-        var names = locals.ConversionNames;
+        var builder = context.Builder;
+        var names = context.Locals.ConversionNames;
         _ = builder
             .Append("global::System.Array.ConvertAll<")
             .Append(read.ReadElementText)
             .Append(", ")
             .Append(read.ElementText)
             .Append(">(");
-        AppendGetFieldValue(builder, column, ordinalText, locals);
+        AppendGetFieldValue(in context, column, ordinalText);
         _ = builder
             .Append(", static ")
             .Append(names.Element)
@@ -186,7 +192,7 @@ internal static class RowReaderWriter
             .Append(')');
         if (throwsOnJsonNull)
         {
-            AppendJsonNullThrow(builder, column);
+            AppendJsonNullThrow(in context, column);
             _ = builder.Append(')');
         }
 
@@ -212,22 +218,22 @@ internal static class RowReaderWriter
 
     // After a read that can give null for a JSON null, which a not-null property or element refuses, naming the
     // column.
-    private static void AppendJsonNullThrow(StringBuilder builder, MethodColumn column) =>
-        _ = builder
-            .Append(" ?? throw new global::System.InvalidCastException(")
+    private static void AppendJsonNullThrow(in QueryMethodContext context, MethodColumn column) =>
+        _ = context
+            .Builder.Append(" ?? throw new global::System.InvalidCastException(")
             .Append(SymbolDisplay.FormatLiteral("Column '" + column.Name + "' holds a JSON null.", quote: true))
             .Append(')');
 
     // The shared reader's geometry of the column's bytes, read through GetStream, which every DbDataReader has, cast to
     // the property's type unless it is Geometry itself.
     private static void AppendSpatial(
-        StringBuilder builder,
+        in QueryMethodContext context,
         MethodColumn column,
         Conversion read,
-        string ordinalText,
-        QueryMethodLocals locals
+        string ordinalText
     )
     {
+        var builder = context.Builder;
         if (column.TypeText != NetTopologySuiteConversions.Geometry)
         {
             _ = builder.Append('(').Append(column.TypeText).Append(')');
@@ -236,20 +242,15 @@ internal static class RowReaderWriter
         _ = builder
             .Append(read.Method)
             .Append(".Read(")
-            .Append(locals.Reader)
+            .Append(context.Locals.Reader)
             .Append(".GetStream(")
             .Append(ordinalText)
             .Append("))");
     }
 
-    private static void AppendGetFieldValue(
-        StringBuilder builder,
-        MethodColumn column,
-        string ordinalText,
-        QueryMethodLocals locals
-    ) =>
-        _ = builder
-            .Append(locals.Reader)
+    private static void AppendGetFieldValue(in QueryMethodContext context, MethodColumn column, string ordinalText) =>
+        _ = context
+            .Builder.Append(context.Locals.Reader)
             .Append(".GetFieldValue<")
             .Append(column.ReadText)
             .Append(">(")

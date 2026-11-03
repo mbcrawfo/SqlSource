@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Generation.Converters;
+using SqlSource.Generation.Emitting.QueryMethods;
 using SqlSource.Generation.Methods;
 using SqlSource.Generation.Types.Maps;
 using SqlSource.Snapshot;
@@ -26,7 +27,7 @@ internal sealed class SqlServerParameterBinder : ParameterBinder
     private const string SqlDbTypeText = "global::System.Data.SqlDbType.";
     private const string DbNull = "global::System.DBNull.Value";
     private const string SqlBytesNull = NetTopologySuiteConversions.SqlBytes + ".Null";
-    private const string VectorNullStart = QueryMethodWriter.VectorType + ".CreateNull(";
+    private const string VectorNullStart = RowReaderWriter.VectorType + ".CreateNull(";
 
     // Each base name's binding, matched ignoring case, as the server matches a type's name.
     private static readonly Dictionary<string, Row> Rows = BuildRows();

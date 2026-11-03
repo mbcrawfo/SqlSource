@@ -63,7 +63,7 @@ internal sealed record MethodSignature(
             return EquatableArray<MethodSignature>.Empty;
         }
 
-        var extensionClass = methods.Placement == MethodPlacement.ExtensionClass ? methods.ExtensionClass : null;
+        var extensionClass = methods.Host.IsExtension ? methods.ExtensionClass : null;
         var typeName = methods.DisplayName;
         var signatures = ImmutableArray.CreateBuilder<MethodSignature>(methods.Methods.Count);
         foreach (var method in methods.Methods)

@@ -128,7 +128,7 @@ internal sealed record MethodColumn(
     /// element, the database's array with elements that can be null, <c>long?[]</c> when its element is a value
     /// type, which Npgsql refuses to read as <c>long[]</c> when it holds a <c>NULL</c>, and the array as it is,
     /// <c>string[]</c>, otherwise; or <see cref="TypeText" /> when it has no converter.  A not-null column read as
-    /// exactly <see cref="Emitting.QueryMethodWriter.VectorType" />,
+    /// exactly <see cref="Emitting.QueryMethods.RowReaderWriter.VectorType" />,
     /// <c>global::Microsoft.Data.SqlTypes.SqlVector&lt;float&gt;</c>, is checked with <c>IsNull</c> after its read
     /// and before its converter, since SqlClient gives <c>SqlVector&lt;float&gt;.Null</c> for a <c>NULL</c>.
     /// </summary>

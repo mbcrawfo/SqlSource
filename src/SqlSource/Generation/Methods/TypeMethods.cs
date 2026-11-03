@@ -10,7 +10,7 @@ namespace SqlSource.Generation.Methods;
 /// </summary>
 /// <param name="TypeKey">The type, as <c>HintName.NameOf</c> gives it.</param>
 /// <param name="HintName">The name of the methods' file, from <c>HintName.ForMethods</c>.</param>
-/// <param name="Placement">Where the methods go.</param>
+/// <param name="Host">Where the methods go and how visible they are.</param>
 /// <param name="Namespace">The type's namespace as a value.  Empty for the global namespace.</param>
 /// <param name="NamespaceText">The type's namespace as code writes it.  Empty for the global namespace.</param>
 /// <param name="Types">The type and the types it is nested in, outermost first.</param>
@@ -48,7 +48,7 @@ namespace SqlSource.Generation.Methods;
 internal sealed record TypeMethods(
     string TypeKey,
     string HintName,
-    MethodPlacement Placement,
+    MethodHost Host,
     string Namespace,
     string NamespaceText,
     EquatableArray<TypeDeclaration> Types,

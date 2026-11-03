@@ -4,6 +4,7 @@ using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 using SqlSource.Testing.Snapshot;
+using SqlSource.Tests.Generation.Emitting.QueryMethods;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
@@ -45,7 +46,7 @@ public sealed class MethodEmitterTests
         var methods = new TypeMethods(
             "App.Sample",
             "App.Sample.Methods.g.cs",
-            MethodPlacement.ExtensionClass,
+            MethodHost.Of(MethodPlacement.ExtensionClass),
             "App",
             "App",
             TestSidecars.Of(new TypeDeclaration("class", "Sample", "Sample", string.Empty, 0)),

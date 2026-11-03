@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Generation.Emitting;
+using SqlSource.Generation.Emitting.QueryMethods;
 using SqlSource.Generation.Methods;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
@@ -13,7 +14,7 @@ using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
 
-namespace SqlSource.Tests.Generation.Emitting;
+namespace SqlSource.Tests.Generation.Emitting.QueryMethods;
 
 public sealed class QueryMethodWriterTests
 {
@@ -84,7 +85,7 @@ public sealed class QueryMethodWriterTests
     {
         var builder = new StringBuilder("before\n");
 
-        QueryMethodWriter.Append(builder, "    ", GetUser, "public static", isExtension: true);
+        QueryMethodWriter.Append(builder, "    ", GetUser, MethodHost.Of(MethodPlacement.ExtensionClass));
 
         builder
             .ToString()
@@ -687,12 +688,12 @@ public sealed class QueryMethodWriterTests
     }
 
     [Theory]
-    [InlineData("public static")]
-    [InlineData("internal static")]
-    [InlineData("private static")]
-    public void Append_TypePlacement_TakesTheConnectionWithoutThis(string modifiers)
+    [InlineData(nameof(MethodPlacement.Public), "public static")]
+    [InlineData(nameof(MethodPlacement.Internal), "internal static")]
+    [InlineData(nameof(MethodPlacement.Private), "private static")]
+    public void Append_TypePlacement_TakesTheConnectionWithoutThis(string placementName, string modifiers)
     {
-        var text = Write(GetUser, modifiers, isExtension: false);
+        var text = Write(GetUser, MethodHost.Of(Enum.Parse<MethodPlacement>(placementName)));
 
         text.ShouldContain(
             modifiers
@@ -1460,12 +1461,15 @@ public sealed class QueryMethodWriterTests
             );
 
     [Theory]
-    [InlineData("public static")]
-    [InlineData("internal static")]
-    [InlineData("private static")]
-    public void Append_IAsyncEnumerableTypePlacement_TakesTheConnectionWithoutThis(string modifiers)
+    [InlineData(nameof(MethodPlacement.Public), "public static")]
+    [InlineData(nameof(MethodPlacement.Internal), "internal static")]
+    [InlineData(nameof(MethodPlacement.Private), "private static")]
+    public void Append_IAsyncEnumerableTypePlacement_TakesTheConnectionWithoutThis(
+        string placementName,
+        string modifiers
+    )
     {
-        var text = Write(Stream, modifiers, isExtension: false);
+        var text = Write(Stream, MethodHost.Of(Enum.Parse<MethodPlacement>(placementName)));
 
         text.ShouldContain(
             "\n"
@@ -1564,8 +1568,7 @@ public sealed class QueryMethodWriterTests
                             builder,
                             "        ",
                             method,
-                            "public static",
-                            isExtension: index % 8 < 4
+                            MethodHost.Of(index % 8 < 4 ? MethodPlacement.ExtensionClass : MethodPlacement.Public)
                         );
                     }
                 }
@@ -1696,17 +1699,25 @@ public sealed class QueryMethodWriterTests
     private static string WriteWith(QueryMethod method, ExecutionCapabilities capabilities)
     {
         var builder = new StringBuilder();
-        QueryMethodWriter.Append(builder, string.Empty, method, "public static", isExtension: true, capabilities);
+        QueryMethodWriter.Append(
+            builder,
+            string.Empty,
+            method,
+            MethodHost.Of(MethodPlacement.ExtensionClass),
+            capabilities
+        );
         return builder.ToString();
     }
 
     private static void ShouldBalanceItsBraces(string text) =>
         text.Count(static character => character == '{').ShouldBe(text.Count(static character => character == '}'));
 
-    private static string Write(QueryMethod method, string modifiers = "public static", bool isExtension = true)
+    private static string Write(QueryMethod method) => Write(method, MethodHost.Of(MethodPlacement.ExtensionClass));
+
+    private static string Write(QueryMethod method, MethodHost host)
     {
         var builder = new StringBuilder();
-        QueryMethodWriter.Append(builder, string.Empty, method, modifiers, isExtension);
+        QueryMethodWriter.Append(builder, string.Empty, method, host);
         return builder.ToString();
     }
 }
