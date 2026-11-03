@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using SqlSource.Diagnostics;
 using SqlSource.Generation.Methods;
 using SqlSource.Settings;
 
@@ -24,14 +23,14 @@ internal static class MethodEmitter
     /// keeps reads its rows into the project's <see cref="RowBuffer" />.
     /// </summary>
     /// <param name="methods">The type's methods.</param>
-    /// <param name="dropped">The <see cref="QueryMethod.NameLocation" />s of the methods to leave out.</param>
+    /// <param name="dropped">The <see cref="QueryMethod.Name" />s of the methods to leave out.</param>
     /// <param name="extensionClassBlocked">
     /// Whether the extension class cannot be written, which leaves out every method under
     /// <see cref="MethodPlacement.ExtensionClass" />.
     /// </param>
     public static (string HintName, string? Source, bool UsesRowBuffer) Emit(
         TypeMethods methods,
-        EquatableArray<LocationInfo> dropped,
+        EquatableArray<string> dropped,
         bool extensionClassBlocked
     )
     {
@@ -110,9 +109,9 @@ internal static class MethodEmitter
     // The list of the dropped is almost always empty, and holds a few clashes when it is not.
     private static List<QueryMethod> Keep(
         EquatableArray<QueryMethod> methods,
-        EquatableArray<LocationInfo> dropped,
+        EquatableArray<string> dropped,
         bool dropAll
-    ) => dropAll ? [] : [.. methods.Where(method => !dropped.Contains(method.NameLocation))];
+    ) => dropAll ? [] : [.. methods.Where(method => !dropped.Contains(method.Name))];
 
     private static string ModifiersOf(MethodPlacement placement) =>
         placement switch
