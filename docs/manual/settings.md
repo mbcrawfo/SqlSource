@@ -906,6 +906,7 @@ See: [SQLSRC015](diagnostics.md#sqlsrc015), a file that is not a JSON object; [S
 
 ## Known issues
 
+- **A build started through a symbolic link applies none of your settings files.**  When the folder you build in is reached through a link, as `/tmp` is on macOS, the project's `sqlsource.json` files are ignored: every query is generated as if no setting were made, and a query whose output is `models` reports [SQLSRC209](diagnostics.md#sqlsrc209) for the dialect `ansi`.  Build from the folder's real path instead, such as `cd "$(pwd -P)"` before `dotnet build`.
 - **A `.sql` file that one of your own build targets adds is not described.**  This is about a target in your project that adds a `.sql` file to the `AdditionalFiles` items while the build runs, such as one that writes a file or copies it in.  The build compiles the file, but `sqlsource` leaves out the file's queries, so it describes none of them, and the build reports [SQLSRC241](diagnostics.md#sqlsrc241) for each that must be described.  To make it work, tell your target to run before the package lists the project's files, wherever the target is declared:
 
   ```xml
